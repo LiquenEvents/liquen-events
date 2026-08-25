@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PainelDoEstudio, { type PaginaParaOPainel } from "./PainelDoEstudio";
+import { CORTES } from "./ui/adaptativo";
 import type { MoodBoard } from "@/lib/proposal-doc";
 
 /**
@@ -22,14 +23,28 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** O navegador diz que o ecrã é largo — ou que não é. */
-const largura = (cabe: boolean) =>
-  vi.stubGlobal("matchMedia", (q: string) => ({
-    matches: cabe,
-    media: q,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  }));
+/**
+ * Um `matchMedia` que responde a partir de uma largura de verdade, e não de um
+ * `true`/`false` combinado.
+ *
+ * A versão anterior dizia sempre que sim ou sempre que não, portanto o NÚMERO
+ * do limiar nunca era afirmado — e era o número que estava errado: a medida
+ * dizia 1536 e o corte da casa para «há espaço para um painel lateral» é o
+ * `CORTES.largo`, 1440. Entre os dois o painel cabia e não aparecia.
+ */
+const aJanelaTem = (px: number) =>
+  vi.stubGlobal("matchMedia", (q: string) => {
+    const min = /min-width:\s*(\d+)px/.exec(q);
+    return {
+      matches: min ? px >= Number(min[1]) : false,
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+  });
+
+/** O ecrã é largo — ou não é. Em píxeis, à volta do corte da casa. */
+const largura = (cabe: boolean) => aJanelaTem(cabe ? CORTES.largo : CORTES.largo - 1);
 
 const board = (over: Partial<MoodBoard> = {}): MoodBoard =>
   ({ title: "Cerimónia", images: ["p/a.jpg", "p/b.jpg"], ...over }) as MoodBoard;
@@ -56,7 +71,7 @@ describe("o painel só existe onde cabe", () => {
    * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
    */
   it("num ecrã estreito não desenha NADA — nem escondido", () => {
-    // `hidden 2xl:block` esconde com CSS e o React desenha na mesma. Medido:
+    // Um `hidden 2xl:block` esconde com CSS e o React desenha na mesma. Medido:
     // numa proposta no tecto do gerador isso chegou para o estúdio deixar de
     // responder. Quem trabalha num portátil não pode pagar o painel que não tem.
     largura(false);
@@ -68,6 +83,37 @@ describe("o painel só existe onde cabe", () => {
     largura(true);
     desenhar();
     expect(screen.getByRole("complementary", { name: /o que vai sair/i })).toBeTruthy();
+  });
+
+  /**
+   * ── O LIMIAR É UM NÚMERO SÓ, E É O DA CASA ─────────────────────────────
+   *
+   * Havia dois a discordar: a medida em JavaScript dizia 1536 e o `<aside>`
+   * trazia `hidden 2xl:block`. Entre 1440 e 1536 — que é o portátil dela —
+   * o painel montava-se (pagava-se o desenho das páginas) e ficava escondido
+   * por CSS: o pior dos dois mundos.
+   */
+  it("aparece exactamente no corte da casa (1440), nem um píxel depois", () => {
+    aJanelaTem(CORTES.largo);
+    desenhar();
+    expect(screen.getByRole("complementary", { name: /o que vai sair/i })).toBeTruthy();
+  });
+
+  it("um píxel abaixo do corte não desenha NADA — nem escondido", () => {
+    aJanelaTem(CORTES.largo - 1);
+    const { container } = desenhar();
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("a 1440 não sobra CSS a escondê-lo — quem decide é a montagem", () => {
+    // Um `hidden … 2xl:block` no `<aside>` era a segunda resposta à mesma
+    // pergunta, e a errada: esconder por CSS é o que este ficheiro existe para
+    // NÃO fazer. Quando o painel é desenhado, é porque cabe.
+    aJanelaTem(CORTES.largo);
+    desenhar();
+    const painel = screen.getByRole("complementary", { name: /o que vai sair/i });
+    expect(painel.className.split(/\s+/)).not.toContain("hidden");
+    expect(painel.className).not.toMatch(/\b(sm|md|lg|xl|2xl):/);
   });
 
   it("sem `matchMedia` nenhum, não rebenta — não desenha", () => {

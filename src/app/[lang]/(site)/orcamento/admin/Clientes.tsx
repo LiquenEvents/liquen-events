@@ -4,7 +4,16 @@ import { useMemo, useState, useDeferredValue } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Segmented, Toolbar } from "./ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Segmented,
+  TabelaOuCartoes,
+  Toolbar,
+  useAdaptativo,
+  type Coluna,
+} from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { eur0 as eur } from "@/lib/money";
@@ -227,6 +236,20 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
     downloadCsv(`clientes-${dateStamp()}`, rows);
   }
 
+  /**
+   * A MESMA PERGUNTA QUE O `TabelaOuCartoes` FAZ POR DENTRO.
+   *
+   * A ficha aberta vive dentro do cartão no telemóvel e num painel a seguir à
+   * tabela no computador — e tem de ser montada UMA vez, não duas com um
+   * `hidden` pelo meio (ver `useMedida.ts`). O `montado &&` é o que impede o
+   * primeiro desenho de discordar do servidor.
+   */
+  const { desktop, montado } = useAdaptativo();
+  const emTabela = montado && desktop;
+  /** Abrir a ficha deste cliente, ou fechá-la se já era ela que estava aberta. */
+  const alternarFicha = (c: Client) => setOpen((o) => (o === c.key ? null : c.key));
+  const aberta = open ? (clients.find((c) => c.key === open) ?? null) : null;
+
   return (
     <div>
       {/* Controls */}
@@ -327,253 +350,47 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
         }
       />
 
-      {/* List */}
-      <div className="flex flex-col gap-2.5">
-        {clients.map((c) => {
-          const isOpen = open === c.key;
-          const decided = c.wonCount + c.rejectedCount;
-          const convRate = decided > 0 ? Math.round((c.wonCount / decided) * 100) : -1;
-          const waPhone = c.phone?.replace(/[^\d+]/g, "");
+      {/* ── A LISTA, EM DUAS FORMAS ──────────────────────────────────────────
+          Era uma linha `flex` só, igual em todas as larguras, e o bloco dos
+          números estava `hidden md:flex`: ABAIXO DE 768 px a lista de clientes
+          não tinha um único número — nem o ganho, nem o pipeline, nem quantos
+          pedidos, nem a taxa de conversão. A empresa e a última actividade
+          eram `hidden sm:inline` sem substituto nenhum, e a última actividade é
+          o que ORDENA a lista por omissão: no telemóvel a ordem ficava sem
+          explicação nenhuma.
 
-          return (
-            <Card key={c.key} padding="none" className="overflow-hidden">
-              <button
-                onClick={() => setOpen(isOpen ? null : c.key)}
-                aria-expanded={isOpen}
-                className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-foreground/[0.025] motion-safe:transition-colors"
-              >
-                {/* Avatar */}
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[#d6ab3a]/20 text-[#b88f28] ring-[#d6ab3a]/20" : "bg-[#4d6350] text-white ring-[#4d6350]/10"}`}
-                >
-                  {c.name.slice(0, 1).toUpperCase()}
-                </div>
+          Passa a ser o `TabelaOuCartoes`: a tabela com as dez coisas a partir
+          de `CORTES.desktop` (1024), e abaixo disso um cartão ESCRITO À MÃO com
+          as quatro que decidem — nome (+ ★VIP), email, o que este cliente já
+          rendeu, e quantos pedidos há quanto tempo. De caminho o corte deixa de
+          ser os 768 px do `md:`, que este back office não usa (ver
+          `ui/adaptativo.ts:53-60`) e que é exactamente a largura de um iPad em
+          retrato, onde os quatro achados Críticos do MOBILE-AUDIT apareceram.
 
-                {/* Name + email */}
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground/78 text-sm font-semibold truncate flex items-center gap-2">
-                    <span className="truncate">{c.name}</span>
-                    {c.vip && (
-                      <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#b88f28] text-[8px] tracking-[0.12em] uppercase font-bold">
-                        ★ VIP
-                      </span>
-                    )}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <p className="text-foreground/30 text-xs truncate">{c.email}</p>
-                    {c.company && (
-                      <span className="text-foreground/22 text-[10px] hidden sm:inline truncate">
-                        · {c.company}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 text-right">
-                  <div className="flex items-center gap-3">
-                    {c.totalWon > 0 && (
-                      <span className="text-[#4d6350] text-xs font-semibold">
-                        {eur(c.totalWon)}
-                      </span>
-                    )}
-                    {c.totalPipeline > 0 && c.totalWon === 0 && (
-                      <span className="text-foreground/40 text-xs">
-                        {eur(c.totalPipeline)} pipeline
-                      </span>
-                    )}
-                    {c.totalPipeline > 0 && c.totalWon > 0 && (
-                      <span className="text-foreground/28 text-[10px]">
-                        +{eur(c.totalPipeline)} pipeline
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-foreground/35 text-[10px]">
-                      {c.quotes.length} pedido{c.quotes.length !== 1 ? "s" : ""}
-                    </span>
-                    {convRate >= 0 && (
-                      <span
-                        className={`text-[10px] font-medium ${convRate >= 50 ? "text-[#4d6350]" : convRate >= 25 ? "text-foreground/50" : "text-foreground/30"}`}
-                      >
-                        {convRate}% conv.
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Last activity + chevron */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-foreground/22 text-[10px] hidden sm:inline">
-                    {timeAgo(c.lastAt)}
-                  </span>
-                  <span
-                    className={`text-foreground/25 motion-safe:transition-transform ${isOpen ? "rotate-180" : ""}`}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </div>
-              </button>
-
-              {isOpen && (
-                <div className="border-t border-foreground/[0.07]">
-                  {/* Contact bar */}
-                  {/* ── OS TRÊS ATALHOS DE CONTACTO LEVAM `alvo-toque` ───────
-                      MEDIDO a 375×667 e a 320×667, com toque emulado, com o
-                      cliente aberto: telefone **78×16 px**, email
-                      **171×16 px**, WhatsApp **75×16 px**. Dezasseis píxeis de
-                      altura — pouco mais de um terço do mínimo de 44 — em três
-                      links empilhados a 8 px uns dos outros (`gap-y-2`).
-
-                      É a barra mais irónica do back office: ligar, escrever e
-                      mandar WhatsApp ao cliente são as três coisas que só se
-                      fazem MESMO com o telemóvel na mão, e eram os três alvos
-                      mais pequenos de toda a vista. Um deles — o `tel:` — abre
-                      o marcador do telefone; falhar por um pixel e acertar no
-                      `mailto:` do lado troca uma chamada por um rascunho de
-                      email.
-
-                      `alvo-toque` cresce só no dedo, portanto a barra fina do
-                      portátil não muda. A altura de linha do texto continua a
-                      ser a mesma; o que cresce é a caixa em que se toca. */}
-                  <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-foreground/[0.015] border-b border-foreground/[0.05]">
-                    {c.phone && (
-                      <a
-                        href={`tel:${c.phone}`}
-                        className="alvo-toque text-foreground/45 hover:text-[#4d6350] transition-colors flex items-center gap-1"
-                      >
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.07 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                        </svg>
-                        {c.phone}
-                      </a>
-                    )}
-                    {c.email && (
-                      <a
-                        href={`mailto:${c.email}`}
-                        className="alvo-toque text-[#4d6350]/80 hover:text-[#4d6350] transition-colors flex items-center gap-1"
-                      >
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                        >
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                          <polyline points="22,6 12,13 2,6" />
-                        </svg>
-                        {c.email}
-                      </a>
-                    )}
-                    {waPhone && (
-                      <a
-                        href={`https://wa.me/${waPhone.replace("+", "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="alvo-toque text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 transition-opacity flex items-center gap-1"
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
-                        </svg>
-                        WhatsApp
-                      </a>
-                    )}
-                    {/* Mini stats */}
-                    <div className="ml-auto flex items-center gap-3">
-                      {convRate >= 0 && (
-                        <span className="text-foreground/35">
-                          {convRate}% taxa de conversão ({c.wonCount}/{decided} decididos)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quote rows */}
-                  <div className="divide-y divide-foreground/[0.06]">
-                    {c.quotes
-                      .slice()
-                      .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt))
-                      .map((q) => (
-                        <button
-                          key={q.id}
-                          onClick={() => onOpen(q)}
-                          className="w-full text-left px-5 py-3 hover:bg-foreground/[0.025] motion-safe:transition-colors flex items-center justify-between gap-3"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span
-                                className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-md font-medium"
-                                style={{
-                                  background: `${metaFor(STATUS_META, q.status).color}18`,
-                                  color: metaFor(STATUS_META, q.status).color,
-                                }}
-                              >
-                                {metaFor(STATUS_META, q.status).label}
-                              </span>
-                              {q.assignedTo && (
-                                <span className="text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-md bg-[#4d6350]/10 text-[#4d6350] font-medium">
-                                  {q.assignedTo}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-foreground/55 text-xs truncate">
-                              {eventTypeLabel(q)} · {q.guests} convidados
-                              {q.date
-                                ? ` · ${new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
-                                : ""}
-                            </p>
-                            {q.lostReason && (
-                              <p className="text-foreground/28 text-[10px] truncate mt-0.5">
-                                ↳ {q.lostReason}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            {q.quotedPrice ? (
-                              // Com IVA — para bater com o «Ganho»/«Pipeline»
-                              // do cliente ali em cima, que somam o mesmo campo.
-                              <span className="text-[#4d6350] text-xs font-medium">
-                                {eur(contractedAmounts(q).gross)}
-                              </span>
-                            ) : q.priceBreakdown?.total ? (
-                              <span className="text-foreground/28 text-xs">
-                                ≈{eur(q.priceBreakdown.total)}
-                              </span>
-                            ) : null}
-                            <p className="text-foreground/22 text-[10px] font-mono">
-                              {q.id.slice(-8)}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </Card>
-          );
-        })}
-        {clients.length === 0 &&
-          (falhaDeLeitura ? (
+          A ORDEM É A DA BARRA DE CIMA, e por isso nenhuma coluna é ordenável:
+          o `Segmented` «Recentes / Valor ganho / Pipeline» já decide a ordem da
+          lista, e uma seta no cabeçalho a dizer outra coisa dava duas verdades
+          para a mesma pergunta. */}
+      <TabelaOuCartoes
+        itens={clients}
+        chaveDe={(c) => c.key}
+        legenda="Clientes"
+        // O cartão traz a sua própria moldura (é um `Card`) e o seu próprio
+        // botão de abrir a ficha: embrulhá-lo dava duas bordas e um botão
+        // dentro de outro botão.
+        semMoldura
+        cartao={(c) => (
+          <CartaoDeCliente
+            c={c}
+            aberto={open === c.key}
+            onAlternar={() => alternarFicha(c)}
+            onOpen={onOpen}
+          />
+        )}
+        aoAbrir={alternarFicha}
+        colunas={colunasDeClientes(open, alternarFicha)}
+        vazio={
+          falhaDeLeitura ? (
             /* A leitura não voltou: aqui não se afirma nada sobre os clientes
                dela — nem que não há nenhum, nem que a procura não encontrou.
                Diz-se o que se passou e o passo a dar. */
@@ -615,8 +432,423 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
                 }
               />
             </Card>
+          )
+        }
+      />
+
+      {/* ── A FICHA ABERTA, NO COMPUTADOR ────────────────────────────────────
+          Uma tabela não tem onde abrir uma linha sem se montar uma segunda
+          árvore para a mesma lista — que é exactamente o defeito que o
+          `useMedida.ts:16-21` descreve. Por isso a ficha desenha-se num sítio
+          de cada vez: dentro do cartão no telemóvel, aqui a seguir à tabela no
+          computador, com o nome de quem se está a ver por cima. É a MESMA
+          `FichaDoCliente`, montada uma vez. */}
+      {emTabela && aberta && (
+        <Card padding="none" className="mt-3 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-foreground/[0.07] px-5 py-3">
+            <p className="truncate text-sm font-semibold text-foreground/78">{aberta.name}</p>
+            <Button size="sm" variant="ghost" onClick={() => setOpen(null)}>
+              Fechar
+            </Button>
+          </div>
+          <FichaDoCliente c={aberta} onOpen={onOpen} />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/** A inicial do cliente — dourada quando é VIP, musgo nos outros. */
+function Avatar({ c }: { c: Client }) {
+  return (
+    <div
+      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[#d6ab3a]/20 text-[#b88f28] ring-[#d6ab3a]/20" : "bg-[#4d6350] text-white ring-[#4d6350]/10"}`}
+    >
+      {c.name.slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
+/**
+ * O QUE ESTE CLIENTE JÁ RENDEU — e é isto que faltava por inteiro no telemóvel.
+ *
+ * Um número só, e o que ele é: o ganho quando já há ganho, senão o pipeline
+ * (dito por extenso, «pipeline», porque um número sozinho não diz se já entrou
+ * ou se ainda é esperança). Os dois vêm COM IVA, como o resto da casa — ver a
+ * cascata em `contractedAmounts`.
+ */
+function Dinheiro({ c }: { c: Client }) {
+  if (c.totalWon > 0)
+    return (
+      <span className="text-[#4d6350] text-sm font-semibold tabular-nums">{eur(c.totalWon)}</span>
+    );
+  if (c.totalPipeline > 0)
+    return (
+      <span className="text-foreground/45 text-xs tabular-nums">
+        {eur(c.totalPipeline)} pipeline
+      </span>
+    );
+  return <span className="text-foreground/25 text-xs">—</span>;
+}
+
+function Chevron({ aberto }: { aberto: boolean }) {
+  return (
+    <span
+      className={`text-foreground/25 motion-safe:transition-transform ${aberto ? "rotate-180" : ""}`}
+      aria-hidden="true"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
+/** A taxa de conversão, ou −1 quando ainda não há nada decidido. */
+function conversao(c: Client): number {
+  const decididos = c.wonCount + c.rejectedCount;
+  return decididos > 0 ? Math.round((c.wonCount / decididos) * 100) : -1;
+}
+
+/**
+ * O CARTÃO DO TELEMÓVEL — quatro coisas, não dez.
+ *
+ * nome (+ ★VIP) · email · o que já rendeu · quantos pedidos e há quanto tempo.
+ * A última actividade está aqui e não escondida atrás de um `sm:` porque é ela
+ * que ordena a lista por omissão: sem ela a ordem dos cartões não tem
+ * explicação nenhuma.
+ *
+ * O que fica de fora — empresa, pipeline ao lado do ganho, taxa de conversão,
+ * referência — está na tabela do computador e na ficha, a um toque daqui. Um
+ * cartão que mostra tudo deixa de se poder varrer com os olhos, que é a única
+ * coisa que uma lista faz bem.
+ */
+function CartaoDeCliente({
+  c,
+  aberto,
+  onAlternar,
+  onOpen,
+}: {
+  c: Client;
+  aberto: boolean;
+  onAlternar: () => void;
+  onOpen: (q: Quote) => void;
+}) {
+  return (
+    <Card padding="none" className="overflow-hidden">
+      <button
+        onClick={onAlternar}
+        aria-expanded={aberto}
+        className="w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-foreground/[0.025] motion-safe:transition-colors"
+      >
+        <Avatar c={c} />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground/78 text-sm font-semibold truncate flex items-center gap-2">
+            <span className="truncate">{c.name}</span>
+            {c.vip && (
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#b88f28] text-[8px] tracking-[0.12em] uppercase font-bold">
+                ★ VIP
+              </span>
+            )}
+          </p>
+          <p className="text-foreground/35 text-xs truncate mt-0.5">{c.email}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[10px] text-foreground/40">
+            <span>
+              {c.quotes.length} pedido{c.quotes.length !== 1 ? "s" : ""}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{timeAgo(c.lastAt)}</span>
+          </p>
+        </div>
+
+        <span className="shrink-0 flex flex-col items-end gap-1.5 text-right">
+          <Dinheiro c={c} />
+          <Chevron aberto={aberto} />
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="border-t border-foreground/[0.07]">
+          <FichaDoCliente c={c} onOpen={onOpen} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * AS DEZ COISAS DA TABELA — as mesmas que a linha `flex` já mostrava no
+ * computador, agora numa tabela a sério, com cabeçalhos com nome.
+ *
+ * `soLargo` na empresa e na conversão: são contexto, e a coluna da navegação
+ * come 336 px do ecrã. Só aparecem quando há mesmo espaço (≥1440).
+ */
+function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void): Coluna<Client>[] {
+  return [
+    {
+      chave: "cliente",
+      cabecalho: "Cliente",
+      celula: (c) => (
+        <span className="flex items-center gap-2.5">
+          <Avatar c={c} />
+          <span className="min-w-0">
+            <span className="block truncate text-foreground/90">{c.name}</span>
+            {c.vip && (
+              <span className="mt-0.5 inline-flex items-center rounded-full bg-[#d6ab3a]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#b88f28]">
+                ★ VIP
+              </span>
+            )}
+          </span>
+        </span>
+      ),
+    },
+    {
+      chave: "email",
+      cabecalho: "Email",
+      celula: (c) => <span className="block max-w-[220px] truncate bo-text-muted">{c.email}</span>,
+    },
+    {
+      chave: "empresa",
+      cabecalho: "Empresa",
+      soLargo: true,
+      celula: (c) => (
+        <span className="block max-w-[180px] truncate text-foreground/45">{c.company || "—"}</span>
+      ),
+    },
+    {
+      chave: "ganho",
+      cabecalho: "Ganho",
+      alinharADireita: true,
+      celula: (c) =>
+        c.totalWon > 0 ? (
+          <span className="font-semibold tabular-nums text-[#4d6350]">{eur(c.totalWon)}</span>
+        ) : (
+          <span className="text-foreground/25">—</span>
+        ),
+    },
+    {
+      chave: "pipeline",
+      cabecalho: "Pipeline",
+      alinharADireita: true,
+      celula: (c) =>
+        c.totalPipeline > 0 ? (
+          <span className="tabular-nums text-foreground/50">{eur(c.totalPipeline)}</span>
+        ) : (
+          <span className="text-foreground/25">—</span>
+        ),
+    },
+    {
+      chave: "pedidos",
+      cabecalho: "Pedidos",
+      alinharADireita: true,
+      largura: "w-20",
+      celula: (c) => <span className="tabular-nums text-foreground/55">{c.quotes.length}</span>,
+    },
+    {
+      chave: "conversao",
+      cabecalho: "Conversão",
+      soLargo: true,
+      alinharADireita: true,
+      celula: (c) => {
+        const taxa = conversao(c);
+        return taxa < 0 ? (
+          <span className="text-foreground/25">—</span>
+        ) : (
+          <span
+            className={`tabular-nums font-medium ${taxa >= 50 ? "text-[#4d6350]" : taxa >= 25 ? "text-foreground/50" : "text-foreground/35"}`}
+          >
+            {taxa}%
+          </span>
+        );
+      },
+    },
+    {
+      chave: "ultima",
+      cabecalho: "Última atividade",
+      celula: (c) => (
+        <span className="whitespace-nowrap text-foreground/45">{timeAgo(c.lastAt)}</span>
+      ),
+    },
+    {
+      chave: "ficha",
+      cabecalho: "",
+      largura: "w-28",
+      alinharADireita: true,
+      celula: (c) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-expanded={aberto === c.key}
+          onClick={(e) => {
+            e.stopPropagation();
+            alternar(c);
+          }}
+        >
+          {aberto === c.key ? "Fechar" : "Ver ficha"}
+        </Button>
+      ),
+    },
+  ];
+}
+
+/**
+ * A FICHA ABERTA — os contactos e o histórico de pedidos deste cliente.
+ *
+ * Escrita uma vez e montada num sítio de cada vez (dentro do cartão no
+ * telemóvel, num painel a seguir à tabela no computador). Duas cópias com
+ * `hidden` davam dois componentes montados a partilhar o mesmo estado — ver
+ * `useMedida.ts`.
+ */
+function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }) {
+  const decided = c.wonCount + c.rejectedCount;
+  const convRate = conversao(c);
+  const waPhone = c.phone?.replace(/[^\d+]/g, "");
+
+  return (
+    <>
+      {/* Contact bar */}
+      {/* ── OS TRÊS ATALHOS DE CONTACTO LEVAM `alvo-toque` ───────
+          MEDIDO a 375×667 e a 320×667, com toque emulado, com o
+          cliente aberto: telefone **78×16 px**, email
+          **171×16 px**, WhatsApp **75×16 px**. Dezasseis píxeis de
+          altura — pouco mais de um terço do mínimo de 44 — em três
+          links empilhados a 8 px uns dos outros (`gap-y-2`).
+
+          É a barra mais irónica do back office: ligar, escrever e
+          mandar WhatsApp ao cliente são as três coisas que só se
+          fazem MESMO com o telemóvel na mão, e eram os três alvos
+          mais pequenos de toda a vista. Um deles — o `tel:` — abre
+          o marcador do telefone; falhar por um pixel e acertar no
+          `mailto:` do lado troca uma chamada por um rascunho de
+          email.
+
+          `alvo-toque` cresce só no dedo, portanto a barra fina do
+          portátil não muda. A altura de linha do texto continua a
+          ser a mesma; o que cresce é a caixa em que se toca. */}
+      <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-foreground/[0.015] border-b border-foreground/[0.05]">
+        {c.phone && (
+          <a
+            href={`tel:${c.phone}`}
+            className="alvo-toque text-foreground/45 hover:text-[#4d6350] transition-colors flex items-center gap-1"
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.07 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+            {c.phone}
+          </a>
+        )}
+        {c.email && (
+          <a
+            href={`mailto:${c.email}`}
+            className="alvo-toque text-[#4d6350]/80 hover:text-[#4d6350] transition-colors flex items-center gap-1"
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
+            {c.email}
+          </a>
+        )}
+        {waPhone && (
+          <a
+            href={`https://wa.me/${waPhone.replace("+", "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="alvo-toque text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 transition-opacity flex items-center gap-1"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
+            </svg>
+            WhatsApp
+          </a>
+        )}
+        {/* Mini stats */}
+        <div className="ml-auto flex items-center gap-3">
+          {convRate >= 0 && (
+            <span className="text-foreground/35">
+              {convRate}% taxa de conversão ({c.wonCount}/{decided} decididos)
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Quote rows */}
+      <div className="divide-y divide-foreground/[0.06]">
+        {c.quotes
+          .slice()
+          .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt))
+          .map((q) => (
+            <button
+              key={q.id}
+              onClick={() => onOpen(q)}
+              className="w-full text-left px-5 py-3 hover:bg-foreground/[0.025] motion-safe:transition-colors flex items-center justify-between gap-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-md font-medium"
+                    style={{
+                      background: `${metaFor(STATUS_META, q.status).color}18`,
+                      color: metaFor(STATUS_META, q.status).color,
+                    }}
+                  >
+                    {metaFor(STATUS_META, q.status).label}
+                  </span>
+                  {q.assignedTo && (
+                    <span className="text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-md bg-[#4d6350]/10 text-[#4d6350] font-medium">
+                      {q.assignedTo}
+                    </span>
+                  )}
+                </div>
+                <p className="text-foreground/55 text-xs truncate">
+                  {eventTypeLabel(q)} · {q.guests} convidados
+                  {q.date
+                    ? ` · ${new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
+                    : ""}
+                </p>
+                {q.lostReason && (
+                  <p className="text-foreground/28 text-[10px] truncate mt-0.5">↳ {q.lostReason}</p>
+                )}
+              </div>
+              <div className="text-right shrink-0">
+                {q.quotedPrice ? (
+                  // Com IVA — para bater com o «Ganho»/«Pipeline»
+                  // do cliente ali em cima, que somam o mesmo campo.
+                  <span className="text-[#4d6350] text-xs font-medium">
+                    {eur(contractedAmounts(q).gross)}
+                  </span>
+                ) : q.priceBreakdown?.total ? (
+                  <span className="text-foreground/28 text-xs">≈{eur(q.priceBreakdown.total)}</span>
+                ) : null}
+                <p className="text-foreground/22 text-[10px] font-mono">{q.id.slice(-8)}</p>
+              </div>
+            </button>
           ))}
       </div>
-    </div>
+    </>
   );
 }

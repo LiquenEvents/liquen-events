@@ -47,10 +47,17 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
+    /* `py-16` eram 128 px de altura só em ar, a QUALQUER largura — 19% de um
+       iPhone SE para dizer que não há nada. `--bo-p-vazio` dá 32 px abaixo de
+       640 e os 64 de sempre a partir daí (ver a escala do espaço no
+       `globals.css`); o poço do ícone e a margem da acção acompanham. */
     <div
-      className={cn("flex flex-col items-center justify-center px-6 py-16 text-center", className)}
+      className={cn(
+        "flex flex-col items-center justify-center px-[var(--bo-p-cartao)] py-[var(--bo-p-vazio)] text-center",
+        className,
+      )}
     >
-      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4d6350]/[0.08] text-[#4d6350]">
+      <div className="mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4d6350]/[0.08] text-[#4d6350] sm:mb-5">
         {icon ?? (
           <svg
             width="24"
@@ -71,7 +78,7 @@ export function EmptyState({
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-foreground/50">{description}</p>
       )}
       {(action || secondaryAction) && (
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:mt-6">
           {action && (
             <Button variant="primary" onClick={action.onClick}>
               {action.label}

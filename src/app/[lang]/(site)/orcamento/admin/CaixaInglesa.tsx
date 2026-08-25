@@ -87,9 +87,24 @@ export default function CaixaInglesa({
    * duplicando a altura de tudo». Medido no formulário dela: cerca de dez mil
    * píxeis de altura, e a proposta bilingue paga o dobro em cada campo.
    *
-   * Com isto, em ecrã largo o par fica numa linha só. Abaixo de `xl` volta ao
-   * empilhado, e é de propósito: duas caixas de texto lado a lado num portátil
-   * de treze polegadas são duas caixas onde não cabe uma frase.
+   * Com isto, o par fica numa linha só sempre que a FILA tenha largura para os
+   * dois — e empilha quando não tem. Cada caixa reserva `min-w-[12rem]`
+   * (192 px), portanto o empilhado continua a acontecer exactamente onde tem
+   * de acontecer: duas caixas de texto lado a lado com menos do que isso são
+   * duas caixas onde não cabe uma frase.
+   *
+   * ── PORQUE É QUE JÁ NÃO HÁ PONTO DE CORTE NENHUM ────────────────────────
+   *
+   * Era `xl:` — 1280 px de JANELA. Mas a pergunta nunca foi sobre a janela: é
+   * sobre a fila onde esta caixa está, e essa fila vive dentro de um cartão,
+   * dentro de uma coluna que o índice do estúdio e o painel lateral estreitam
+   * sem a janela encolher. É a regra 3 do MOBILE-AUDIT — `sm:` (e `xl:`) medem
+   * o ECRÃ —, e a resposta que ela manda usar é a primeira da lista:
+   * `flex-wrap` sozinho, que quebra só quando não cabe.
+   *
+   * O efeito prático: num portátil de 1024–1440, onde havia largura de sobra
+   * para o par e mesmo assim se empilhava, ele passa a ficar lado a lado. Num
+   * telemóvel a 375 px a fila não chega para 2×12rem e empilha, como sempre.
    *
    * ── PORQUE É QUE É UMA MARCA E NÃO UM AUTOMATISMO ───────────────────────
    *
@@ -170,8 +185,12 @@ export default function CaixaInglesa({
 
   return (
     <div
-      className={`mt-1 flex w-full basis-full items-start gap-1.5 ${
-        aoLado ? "xl:mt-0 xl:min-w-[12rem] xl:flex-1 xl:basis-0" : ""
+      /* O `mt-1` só serve a caixa que fica SEMPRE por baixo: com a marca, a
+         separação vertical passa a ser o `row-gap` da fila (que já existe, e
+         que se aplica quando ela quebra) — de outra forma a caixa ficava 4 px
+         mais abaixo do que o par, na linha em que está ao lado dele. */
+      className={`flex w-full items-start gap-1.5 ${
+        aoLado ? "min-w-[12rem] grow basis-[12rem]" : "mt-1 basis-full"
       }`}
     >
       <span

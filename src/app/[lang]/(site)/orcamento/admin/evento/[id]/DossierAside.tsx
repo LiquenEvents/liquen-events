@@ -36,9 +36,16 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
   const wa = quote.phone ? quote.phone.replace(/[^\d]/g, "") : "";
 
   return (
-    <div className="flex flex-col gap-5">
+    /* ── TRÊS MOLDURAS A SEGUIR A TRÊS MOLDURAS ───────────────────────────────
+       Abaixo de 1024 este painel cai POR BAIXO do conteúdo: quem chega aqui no
+       telemóvel acabou de rolar as três zonas e encontra mais três caixas
+       iguais, cada uma com 40 px de enchimento e 2 de borda. A moldura sai
+       abaixo de 640 e fica um risco no lugar dela — a mesma decisão das zonas
+       (ver o cabeçalho do `FinanceZone`), pela mesma conta: ~126 px de altura e
+       ~40 de largura devolvidos. A partir de 640 volta o cartão. */
+    <div className="flex flex-col gap-[var(--bo-gap-vista)]">
       {/* Contacto */}
-      <div className="bo-card p-5">
+      <div className="border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]">
         <p className="bo-eyebrow mb-3">Contacto</p>
         {/* ── OS TRÊS ALVOS QUE SÓ EXISTEM NO TELEMÓVEL ──────────────────────
             Medidos a 375 px: o email 301×16, o telefone 63×16, o WhatsApp
@@ -94,9 +101,17 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
       </div>
 
       {/* Factos do evento */}
-      <div className="bo-card p-5">
+      {/* `@container` e não `sm:`: a pergunta é «cabem duas colunas NESTE
+          painel?», e o painel não tem a largura da janela — a 375 px é o ecrã
+          quase todo (343), mas no computador é uma coluna de 20 rem, ou seja
+          280 px de conteúdo. Um `sm:` respondia à janela e acertava no
+          telemóvel por acidente enquanto errava no sítio onde o painel é mais
+          estreito. Duas colunas assim que houver 15 rem de caixa (~114 px por
+          coluna, que é o mínimo em que «Casamento» cabe numa linha); abaixo
+          disso, uma. */}
+      <div className="@container border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]">
         <p className="bo-eyebrow mb-3">Evento</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 @min-[15rem]:grid-cols-2 gap-3">
           {facts.map(({ l, v }) => (
             <div key={l}>
               <p className="text-foreground/25 text-[9px] tracking-wide uppercase mb-0.5">{l}</p>
@@ -115,7 +130,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
       </div>
 
       {/* Registo de atividade */}
-      <div className="bo-card p-5">
+      <div className="border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]">
         <ActivityLog quote={quote} actor={actor} onAddEntry={onAddEntry} />
       </div>
     </div>

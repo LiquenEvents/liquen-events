@@ -269,7 +269,11 @@ export default function EventTimeline({ quote, onChange }: Props) {
   }
 
   return (
-    <section className="border-t border-foreground/10 pt-6">
+    // O `pt-6` do separador eram 24 px de ar por cima do título, iguais a 375
+    // e a 1440, e nesta zona do dossier há vários painéis destes empilhados.
+    // `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma vista:
+    // 12 px de volta no telemóvel, computador na mesma.
+    <section className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Cronograma do Dia</p>
         {items.length > 0 && (
@@ -339,7 +343,6 @@ export default function EventTimeline({ quote, onChange }: Props) {
 
       {items.length === 0 ? (
         <EmptyState
-          className="px-4 py-10"
           icon={
             <svg
               width="24"

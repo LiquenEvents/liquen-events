@@ -1365,7 +1365,7 @@ export default function Overview({
   if (quotes.length === 0) {
     const tudoArquivado = arquivados > 0;
     return (
-      <div className="flex flex-col gap-7">
+      <div className="flex flex-col gap-[var(--bo-gap-vista)]">
         <div>
           <p className="text-foreground/30 text-[10px] tracking-[0.4em] uppercase mb-2">
             {dateLabel}
@@ -1384,9 +1384,9 @@ export default function Overview({
             aoTentarDeNovo={aoTentarDeNovo}
           />
         ) : (
-          <div className="bo-card p-8 sm:p-12 text-center flex flex-col items-center">
+          <div className="bo-card p-[var(--bo-p-vazio)] sm:p-12 text-center flex flex-col items-center">
             <span
-              className="flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
+              className="flex items-center justify-center w-14 h-14 rounded-2xl mb-3.5 sm:mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
               aria-hidden="true"
             >
               <svg
@@ -1401,7 +1401,7 @@ export default function Overview({
               </svg>
             </span>
             <h3
-              className="text-foreground/80 font-bold text-xl mb-2"
+              className="text-foreground/80 font-bold text-base sm:text-xl mb-2"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
               {tudoArquivado ? "Está tudo arquivado." : "Ainda sem pedidos por aqui."}
@@ -1470,7 +1470,9 @@ export default function Overview({
   }
 
   return (
-    <div className="flex flex-col gap-7">
+    // O espaço entre os blocos de topo é o token da escala (`globals.css`):
+    // 20 px abaixo de 640, 28 a partir daí — o valor que esta vista já tinha.
+    <div className="flex flex-col gap-[var(--bo-gap-vista)]">
       {/* Greeting + quick actions */}
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
         <div>
@@ -1569,7 +1571,7 @@ export default function Overview({
             </div>
             <div className="shrink-0 text-right">
               <p
-                className="text-3xl font-bold tabular-nums"
+                className="text-2xl sm:text-3xl font-bold tabular-nums"
                 style={{
                   fontFamily: "var(--font-playfair)",
                   color:
@@ -1789,8 +1791,8 @@ export default function Overview({
       {/* Pipeline funnel + financial pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Funnel */}
-        <div className="bo-card p-5">
-          <div className="flex items-center justify-between mb-5">
+        <div className="bo-card p-[var(--bo-p-cartao)]">
+          <div className="flex items-center justify-between mb-3.5 sm:mb-5">
             <h3 className="bo-eyebrow">Fases dos pedidos</h3>
             <button
               onClick={() => onGo("kanban")}
@@ -1827,7 +1829,7 @@ export default function Overview({
               );
             })}
           </div>
-          <div className="flex items-center justify-between mt-5 pt-4 border-t border-foreground/[0.07]">
+          <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
             <span className="text-foreground/35 text-xs">
               Pedidos que acabam em evento
               <span className="block text-foreground/25 text-[10px]">
@@ -1841,8 +1843,8 @@ export default function Overview({
         </div>
 
         {/* Financial pulse */}
-        <div className="bo-card p-5">
-          <div className="flex items-center justify-between mb-5">
+        <div className="bo-card p-[var(--bo-p-cartao)]">
+          <div className="flex items-center justify-between mb-3.5 sm:mb-5">
             <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
             <button
               onClick={onGoStats}
@@ -1851,7 +1853,7 @@ export default function Overview({
               Ver tudo →
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="grid grid-cols-2 gap-3 mb-3.5 sm:mb-5">
             <div>
               <p
                 className="text-[#4d6350] font-bold leading-none mb-1"
@@ -1900,7 +1902,7 @@ export default function Overview({
               falta receber aparecem aqui.
             </p>
           )}
-          <div className="flex items-center justify-between mt-5 pt-4 border-t border-foreground/[0.07]">
+          <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
             <span className="text-foreground/35 text-xs">
               Valor médio por evento ganho
               <span className="block text-foreground/25 text-[10px]">
@@ -1934,7 +1936,7 @@ export default function Overview({
           </div>
           <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
             {data.needAction.length === 0 && (
-              <div className="text-center py-12 px-6">
+              <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
                 <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
                 <p className="text-foreground/35 text-xs mt-1.5 leading-relaxed">
                   Não há pedidos à tua espera. Bom trabalho — aproveita para preparar os próximos
@@ -2016,7 +2018,7 @@ export default function Overview({
                 o dia em que a Visão Geral deixar de ter esse atalho — ou em que
                 a lista passar a ter janela — este é o texto certo. */}
             {data.recent.length === 0 && (
-              <div className="text-center py-10 px-5">
+              <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-10">
                 <p className="text-foreground/45 text-sm">Ainda sem movimentos por aqui.</p>
                 <p className="text-foreground/30 text-xs mt-1.5 leading-relaxed">
                   Esta lista são os últimos pedidos que entraram, do mais recente para trás.

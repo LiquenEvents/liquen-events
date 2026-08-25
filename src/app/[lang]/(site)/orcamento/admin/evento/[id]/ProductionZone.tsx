@@ -23,9 +23,14 @@ interface Props {
   doc?: ProposalDoc | null;
 }
 
+/** A moldura desta zona sai abaixo de 640 e fica um risco no lugar dela — a
+ *  conta está no cabeçalho do `FinanceZone`, que tem a mesma linha. */
 export default function ProductionZone({ quote, userName, onQuoteChange, doc }: Props) {
   return (
-    <section id="zone-producao" className="bo-card p-5 sm:p-6 scroll-mt-40 flex flex-col gap-6">
+    <section
+      id="zone-producao"
+      className="scroll-mt-40 flex flex-col gap-[var(--bo-gap-vista)] border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]"
+    >
       <p className="bo-eyebrow">Produção</p>
 
       {/* Antes das tarefas: o que o casal escolheu decide o que se compra, e

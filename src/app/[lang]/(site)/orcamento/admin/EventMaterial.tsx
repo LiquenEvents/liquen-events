@@ -277,7 +277,13 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
           // não aqui. Este botão é a ponte para lá.
           <a
             href={`/orcamento/admin/carregamento/${dados.evento.id}`}
-            className="bo-btn-ghost inline-flex min-h-[32px] items-center rounded-xl px-3 text-xs"
+            /* `alvo-toque` porque este é um `<a>` escrito à mão: não passa pelo
+               `ui/Button.tsx`, que é onde vive o piso de 44 px do dedo, e ficava
+               em 32 px de altura. E é o link para o ecrã de carregamento — o
+               único que se usa mesmo no telemóvel, de pé ao lado da carrinha.
+               O `min-h-[32px]` fica: é a altura com rato, e os 44 do `.alvo-toque`
+               (fora de camadas, de propósito) ganham-lhe sob `pointer: coarse`. */
+            className="alvo-toque bo-btn-ghost inline-flex min-h-[32px] items-center rounded-xl px-3 text-xs"
           >
             Abrir para carregar
           </a>

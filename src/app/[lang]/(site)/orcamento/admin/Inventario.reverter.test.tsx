@@ -79,13 +79,15 @@ function montar() {
 
 /** Abrir a edição da primeira linha e pôr `quantidade` no valor pedido. */
 async function editarQuantidadePara(user: ReturnType<typeof userEvent.setup>, valor: string) {
-  // Os dois desenhos (cartões no telemóvel, tabela no computador) estão ambos
-  // no DOM — só o CSS os separa. Trabalhamos com o primeiro.
-  await user.click(screen.getAllByRole("button", { name: "Editar" })[0]);
-  const qtd = screen.getAllByLabelText("Quantidade")[0];
+  // Já só há UM desenho montado de cada vez (o `TabelaOuCartoes` escolhe a
+  // forma; no jsdom, sem `matchMedia`, é a de telemóvel). Antes estavam os dois
+  // no DOM e havia dois campos «Quantidade» ligados ao mesmo estado — ver
+  // `Inventario.telemovel.test.tsx`.
+  await user.click(screen.getByRole("button", { name: "Editar" }));
+  const qtd = screen.getByLabelText("Quantidade");
   await user.clear(qtd);
   await user.type(qtd, valor);
-  await user.click(screen.getAllByRole("button", { name: "Guardar" })[0]);
+  await user.click(screen.getByRole("button", { name: "Guardar" }));
 }
 
 describe("Inventário — o servidor recusa a alteração", () => {
@@ -104,7 +106,7 @@ describe("Inventário — o servidor recusa a alteração", () => {
 
     // A edição fica aberta de propósito (o que ela escreveu não se perde), por
     // isso a linha ainda mostra o formulário. Fechamo-lo para ler a lista.
-    await user.click(screen.getAllByRole("button", { name: "Cancelar" })[0]);
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
 
     // O "40" que nunca chegou a existir na base de dados não pode ficar aqui.
     expect(screen.queryAllByText("40")).toHaveLength(0);

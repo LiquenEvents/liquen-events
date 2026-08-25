@@ -16,6 +16,34 @@ const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }>
   pago: { label: "Pago", color: "#4d6350" },
 };
 
+/**
+ * As três peças de um quadrado de número — a caixa, o valor, o rótulo e a nota.
+ *
+ * Ficam em constantes porque os três quadrados têm de mudar de forma AO MESMO
+ * TEMPO: abaixo dos 26 rem de painel são três linhas de uma caixa só, acima são
+ * três cartões. Um deles ficar para trás é a leitura partir-se a meio.
+ *
+ * O `PaymentsPanel` tem o mesmo bloco, com os mesmos limiares e as mesmas
+ * razões — os dois vivem lado a lado no dossier e não podem divergir.
+ */
+const QUADRADO =
+  "flex flex-wrap items-baseline gap-x-3 p-3 text-left " +
+  "@min-[26rem]:block @min-[26rem]:rounded-xl @min-[26rem]:border " +
+  "@min-[26rem]:border-foreground/[0.06] @min-[26rem]:bg-foreground/[0.03] @min-[26rem]:text-center";
+
+/** O número. `whitespace-nowrap` é o que impede «202 889,00 €» de partir em duas. */
+const VALOR =
+  "order-2 ml-auto whitespace-nowrap text-sm font-semibold tabular-nums " +
+  "@min-[26rem]:order-none @min-[26rem]:ml-0";
+
+/** O rótulo, que abre a linha no telemóvel e volta para baixo do número a 26 rem. */
+const ROTULO =
+  "order-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45 @min-[26rem]:mt-1";
+
+/** A linha de apoio (o valor com IVA, o aviso de prejuízo): sempre por baixo. */
+const NOTA =
+  "order-3 mt-1 w-full text-[9px] leading-tight tabular-nums text-foreground/35 @min-[26rem]:w-auto";
+
 const CATEGORIES = [
   "Catering",
   "Floristas",
@@ -317,7 +345,13 @@ export default function EventCosts({ quote, onChange }: Props) {
     // DESTE painel, não à da janela — ele vive no dossier, onde a coluna lateral
     // lhe rouba largura sem a janela encolher. É o mesmo que o `PaymentsPanel`
     // já faz, e pela mesma razão.
-    <div className="@container border-t border-foreground/10 pt-6">
+    //
+    // O `pt-6` do separador eram 24 px de ar por cima do título, iguais a 375 e
+    // a 1440 — e na mesma zona do dossier há quatro painéis destes, cada um a
+    // pagar os seus. `--bo-p-vista` é o token do respiro vertical de uma vista
+    // (12 → 24): devolve 12 px por painel no telemóvel e deixa o computador
+    // exactamente como estava.
+    <div className="@container border-t border-foreground/10 pt-[var(--bo-p-vista)]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Fornecedores &amp; Custos</p>
         {items.length > 0 && (
@@ -361,53 +395,44 @@ export default function EventCosts({ quote, onChange }: Props) {
 
       {/* Margin summary — the headline number. Receita/Custos/Margem na mesma base
           (sem IVA) para reconciliarem no ecrã; o valor com IVA vai por baixo. */}
-      {/* ── DUAS COLUNAS PRIMEIRO, TRÊS SÓ QUANDO CABEM ────────────────────
-          Três colunas fixas partiam os números no telemóvel — o defeito que o
-          `PaymentsPanel` tinha na mesma linha de código, encontrado ao lado e
-          relatado por quem não lhe podia mexer. Medido a 375 px, com o painel
-          a 343: 68 px de caixa por célula, e «18 415,00 €» precisa de 82. O
-          número transbordava para cima do vizinho — e estes são a receita, o
-          custo e a margem, ou seja, os três números por que ela decide se o
-          evento vale a pena.
-          O limiar é o mesmo do painel dos pagamentos (26 rem, medido no
-          contentor) para os dois não divergirem. No computador nada muda. */}
-      <div className="mb-5 grid grid-cols-2 @min-[26rem]:grid-cols-3 gap-2.5">
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
-          <p className="text-sm font-semibold text-foreground/80 tabular-nums">
-            {eur2(totals.revenueNet)}
-          </p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
-            Receita (s/ IVA)
-          </p>
-          <p className="mt-1 text-[9px] tabular-nums text-foreground/35 leading-tight">
-            c/ IVA {eur2(amounts.gross)}
-          </p>
+      {/* ── O TERCEIRO NÍVEL DE MOLDURA, E PORQUE É QUE ELE SAI ────────────
+          Estes três quadrados são uma caixa DENTRO do cartão de zona, que já
+          está dentro de uma coluna. Medido a 375 px: sobram 279 px para o
+          painel, e duas colunas com `p-3` deixavam **110 px** de conteúdo por
+          célula. «202 889,00 €» precisa de 109 — ou seja, o número mais alto
+          que ela lança aqui ficava a um pixel de partir, e partia mesmo assim
+          que o rótulo por baixo era mais largo do que ele.
+
+          Abaixo dos 26 rem os quadrados perdem a moldura própria e passam a
+          três linhas dentro da MESMA caixa, separadas por um risco: rótulo à
+          esquerda, número à direita. A célula passa de 110 para **255 px** de
+          conteúdo, e o `whitespace-nowrap` garante que o valor nunca se parte
+          ao meio — se não couber ao lado do rótulo, o `flex-wrap` dá-lhe uma
+          linha inteira em vez de o embrulhar. É o padrão do `Overview.tsx`
+          (:1641), aqui em *container query* e não em `sm:` porque a pergunta é
+          sobre a largura DESTE painel, não sobre a da janela: num iPad a
+          768 px o `sm:` disparava e o painel continuava com os mesmos 279.
+
+          A partir de 26 rem volta tudo ao que era: três cartões com a sua
+          moldura, os números ao centro. No computador não muda nada. */}
+      <div className="mb-5 flex flex-col divide-y divide-foreground/[0.08] rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] @min-[26rem]:grid @min-[26rem]:grid-cols-3 @min-[26rem]:gap-2.5 @min-[26rem]:divide-y-0 @min-[26rem]:rounded-none @min-[26rem]:border-0 @min-[26rem]:bg-transparent">
+        <div className={QUADRADO}>
+          <p className={`${VALOR} text-foreground/80`}>{eur2(totals.revenueNet)}</p>
+          <p className={ROTULO}>Receita (s/ IVA)</p>
+          <p className={NOTA}>c/ IVA {eur2(amounts.gross)}</p>
         </div>
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
-          <p className="text-sm font-semibold text-[#a4642f] tabular-nums">
-            {eur2(totals.actualNet)}
-          </p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
-            Custos (s/ IVA)
-          </p>
-          <p className="mt-1 text-[9px] tabular-nums text-foreground/35 leading-tight">
-            c/ IVA {eur2(totals.actual)}
-          </p>
+        <div className={QUADRADO}>
+          <p className={`${VALOR} text-[#a4642f]`}>{eur2(totals.actualNet)}</p>
+          <p className={ROTULO}>Custos (s/ IVA)</p>
+          <p className={NOTA}>c/ IVA {eur2(totals.actual)}</p>
         </div>
-        {/* A Margem atravessa as duas colunas na linha de baixo: é o número
-            que decide, e uma linha só para ele é a leitura que já tinha no
-            computador — melhor do que ficar sozinho a meia largura. */}
-        <div className="col-span-2 @min-[26rem]:col-span-1 rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
-          <p
-            className={`text-sm font-semibold tabular-nums ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}
-          >
+        <div className={QUADRADO}>
+          <p className={`${VALOR} ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}>
             {eur2(totals.margin)}
           </p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
-            Margem{totals.revenueNet > 0 ? ` · ${totals.marginPct}%` : ""}
-          </p>
+          <p className={ROTULO}>Margem{totals.revenueNet > 0 ? ` · ${totals.marginPct}%` : ""}</p>
           {totals.margin < 0 && (
-            <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#8a2a22] leading-tight">
+            <p className="order-3 mt-1 w-full text-[9px] uppercase leading-tight tracking-[0.12em] text-[#8a2a22] @min-[26rem]:w-auto">
               Prejuízo
             </p>
           )}
@@ -480,7 +505,14 @@ export default function EventCosts({ quote, onChange }: Props) {
                   </svg>
                 </button>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              {/* Dois campos de dinheiro a 16 px (o piso de `pointer: coarse`).
+                  Medido a 375 px: o painel tem 279, a moldura da linha come
+                  28 (`px-3.5`) e as duas colunas ficam com 119 cada — e um
+                  valor de seis algarismos a 16 px precisa de 115 mais o
+                  `px-2` do campo. Empilham por omissão e voltam a par assim
+                  que o PAINEL tem 22 rem, que é o limiar que o
+                  `StatsDashboard` já usa para a mesma pergunta. */}
+              <div className="mt-3 grid grid-cols-1 gap-3 @min-[22rem]:grid-cols-2">
                 <Field
                   as="input"
                   type="text"
@@ -553,7 +585,11 @@ export default function EventCosts({ quote, onChange }: Props) {
               ))}
             </Field>
           )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {/* `sm:grid-cols-2` media a JANELA: num iPad a 768 px disparava e
+              punha o nome do fornecedor e a categoria a par dentro de um
+              painel que continuava com 279. O limiar passa a ser o do
+              painel, e é o mesmo dos quadrados de número aqui em cima. */}
+          <div className="grid grid-cols-1 gap-3 @min-[26rem]:grid-cols-2">
             <Field
               label="Nome do fornecedor"
               value={form.name}
@@ -595,7 +631,6 @@ export default function EventCosts({ quote, onChange }: Props) {
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          className="px-4 py-10"
           icon={
             <svg
               width="24"

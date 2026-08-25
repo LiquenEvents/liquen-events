@@ -165,10 +165,24 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      {/* ── A FILA QUE NÃO QUEBRAVA, ESMAGAVA ────────────────────────────────
+          Este cabeçalho é `justify-between` sem `flex-wrap`: «Histórico de
+          Atividade» de um lado, «Chamada» e «Nota» do outro. MEDIDO a 375 px,
+          dentro do `DossierAside` (343 px de caixa, menos o enchimento): a fila
+          não cabe e, sem permissão para quebrar, o que acontece é os três
+          encolherem uns contra os outros até o título se partir a meio.
+
+          `flex-wrap` SOZINHO, sem ponto de corte nenhum: este bloco vive dentro
+          do painel lateral do dossier E dentro da gaveta do pedido, que têm
+          larguras diferentes — a pergunta é sobre a CAIXA, não sobre a janela
+          (ver `ui/adaptativo.ts`). Quebra quando não couber, e só então. O
+          `gap-2` é o que impede o título de encostar aos botões na linha em que
+          ainda cabem todos — um `justify-between` não separa nada, só empurra
+          cada um para o seu extremo. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <p className="bo-eyebrow">Histórico de Atividade</p>
         {onAddEntry && mode === null && (
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <Button
               variant="ghost"
               size="sm"

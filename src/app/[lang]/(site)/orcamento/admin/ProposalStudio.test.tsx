@@ -759,6 +759,102 @@ describe("total desalinhado da soma das linhas", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
+ * «TOTAL» ERA A MESMA PALAVRA PARA DOIS NÚMEROS DIFERENTES
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Ela trabalha no iPhone e confere no computador, e queixou-se durante dias de
+ * que «os valores estão diferentes». Estavam — mas não era a conta.
+ *
+ * A barra do fundo escrevia a palavra «Total» FORA do corte de largura e
+ * deixava só o NÚMERO trocar por dentro:
+ *
+ *     <span>Total</span>
+ *     <strong>
+ *       <span className="sm:hidden">{aPagar}</span>       ← com IVA
+ *       <span className="hidden sm:inline">{total}</span> ← sem IVA
+ *     </strong>
+ *
+ * No telemóvel lia-se «Total 3.025,80 €»; no computador, «Total 2.460,00 € sem
+ * IVA». A mesma proposta, a mesma palavra, dois valores — e nada no ecrã a
+ * dizer qual era qual.
+ *
+ * A escolha de mostrar no telemóvel o que o CLIENTE paga estava certa e está
+ * explicada no ficheiro. O que faltava era a etiqueta viajar com o número. O
+ * que estes testes prendem é isso: cada ramo da barra tem de se explicar
+ * sozinho a quem só vê esse.
+ */
+describe("a barra do fundo chama cada número pelo seu nome", () => {
+  /** Com `acrescer`, os dois números afastam-se — que é o que dá para medir. */
+  function seedBarra(total: number) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+        budgetAmounts: [900, 2350],
+        coverImages: ["", ""],
+        totalAmount: total,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+  }
+
+  /** Os dois ramos da barra do fundo, cada um com o texto que ele mostra. */
+  async function ramosDaBarra(total: number) {
+    seedBarra(total);
+    const { container } = renderStudio();
+    await screen.findByText("Totais");
+    const doc = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
+    const esperado = totaisDaProposta(doc, 30);
+    const barra = container.querySelector("p.mr-auto")!;
+    const ramos = [...barra.querySelectorAll(":scope > span")];
+    const estreito = ramos.find((el) => el.className.includes("sm:hidden"));
+    const largo = ramos.find((el) => el.className.includes("sm:inline"));
+    return { esperado, estreito, largo };
+  }
+
+  it("no telemóvel o número traz a sua etiqueta, e ela não é «Total»", async () => {
+    const { esperado, estreito } = await ramosDaBarra(2460);
+    expect(estreito).toBeTruthy();
+    // O que o iPhone mostra é o que o cliente paga — com IVA.
+    expect(estreito!.textContent).toContain(eur(esperado.aPagar));
+    expect(estreito!.textContent).toContain("A pagar");
+    // E a palavra que sobrava do lado de fora não pode voltar para aqui.
+    expect(estreito!.textContent).not.toContain("Total");
+  });
+
+  it("no computador «Total» fica com o número que ele nomeia — o sem IVA", async () => {
+    const { esperado, largo } = await ramosDaBarra(2460);
+    expect(largo).toBeTruthy();
+    expect(largo!.textContent).toContain("Total");
+    expect(largo!.textContent).toContain(eur(esperado.total));
+    expect(largo!.textContent).toContain(`a pagar ${eur(esperado.aPagar)}`);
+  });
+
+  it("os dois ecrãs nunca dão a mesma etiqueta a valores diferentes", async () => {
+    const { esperado, estreito, largo } = await ramosDaBarra(2460);
+    // A premissa do teste: com IVA a acrescer, os dois números são mesmo outros.
+    expect(esperado.aPagar).not.toBe(esperado.total);
+    // A rede: cada ramo é auto-suficiente — etiqueta e número no mesmo sítio.
+    for (const ramo of [estreito!, largo!]) {
+      expect(ramo.textContent).toMatch(/A pagar|Total/);
+    }
+    // E «Total», onde aparecer sozinho a nomear um valor, nomeia o sem IVA.
+    expect(estreito!.textContent).not.toBe(largo!.textContent);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
  * A COLUNA DE PREÇOS DE ORGANIZAÇÃO, DESALINHADA, VISTA ANTES DE ENVIAR
  * ════════════════════════════════════════════════════════════════════════════
  *

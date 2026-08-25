@@ -15,8 +15,11 @@ interface Props {
 
 export default function EmptyState({ icon, title, hint, action }: Props) {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-      <div className="w-12 h-12 rounded-2xl bg-foreground/[0.04] flex items-center justify-center text-foreground/25 mb-4">
+    /* A mesma conta do irmão em `ui/EmptyState.tsx`: 128 px de ar para dizer
+       que não há nada, iguais a 375 e a 1440. Lê o mesmo token, para os dois
+       vazios do back office não poderem discordar. */
+    <div className="flex flex-col items-center justify-center text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)]">
+      <div className="w-12 h-12 rounded-2xl bg-foreground/[0.04] flex items-center justify-center text-foreground/25 mb-3 sm:mb-4">
         {icon ?? (
           <svg
             width="22"
@@ -45,7 +48,7 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
          */
         <button
           onClick={action.onClick}
-          className="alvo-toque mt-5 px-4 py-2 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm"
+          className="alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm"
         >
           {action.label}
         </button>

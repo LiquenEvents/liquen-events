@@ -341,12 +341,14 @@ describe("Button (extended)", () => {
 
 describe("Card / SectionCard (extended)", () => {
   it("applies the requested padding and drops it for padding=none", () => {
+    // O degrau do telemóvel deixou de ser um número escrito aqui: é
+    // `--bo-p-cartao`, da escala do espaço (ver `escala-do-espaco.test.ts`).
     const { container: withPad } = render(<Card padding="lg">a</Card>);
-    expect(withPad.firstElementChild).toHaveClass("p-6");
+    expect(withPad.firstElementChild).toHaveClass("p-4", "sm:p-8");
     cleanup();
     const { container: noPad } = render(<Card padding="none">b</Card>);
     expect(noPad.firstElementChild).not.toHaveClass("p-4");
-    expect(noPad.firstElementChild).not.toHaveClass("p-5");
+    expect(noPad.firstElementChild).not.toHaveClass("p-[var(--bo-p-cartao)]");
   });
 
   it("forwards arbitrary DOM props to the Card surface", () => {

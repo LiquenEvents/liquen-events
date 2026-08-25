@@ -739,9 +739,15 @@ function EditorClassico() {
         </div>
       </div>
 
-      {/* Right: editor + live preview */}
+      {/* ── EDITOR E PRÉ-VISUALIZAÇÃO LADO A LADO A PARTIR DE 1024 ─────────
+          Era `xl:` (1280). Entre 1024 e 1280 — que é o portátil dela — havia
+          largura para as duas colunas e mostrava-se uma só: escrevia-se o
+          modelo em cima e rolava-se para baixo para ver como ficava, a cada
+          alteração. A partir de agora as duas colunas abrem no mesmo sítio em
+          que a barra lateral do back office deixa de ser gaveta (`lg`, 1024),
+          que é o único corte que esta casa usa para «cabem duas colunas?». */}
       {selected ? (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {/* Editor */}
           <div className="bo-card p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -885,7 +891,7 @@ function EditorClassico() {
           </div>
 
           {/* Live preview */}
-          <div className="bo-card p-5 xl:sticky xl:top-5">
+          <div className="bo-card p-5 lg:sticky lg:top-5">
             <p className="bo-eyebrow mb-1.5">Pré-visualização</p>
             {/* A MOLDURA E O FECHO NÃO ESTÃO AQUI, E TÊM DE SER DITOS.
                 O que se vê é só o CORPO. Todo o email ao cliente é embrulhado

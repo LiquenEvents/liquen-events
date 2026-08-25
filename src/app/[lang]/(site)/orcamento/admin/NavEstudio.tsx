@@ -107,7 +107,20 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
          com o fim inalcançável — não se rola até ele, porque a coluna não
          acompanha o rolo da página. Só age quando há secções e faltas que
          cheguem; até lá não se nota. */
-      className="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-48 shrink-0 self-start overflow-y-auto xl:block"
+      /* ── O ÍNDICE VOLTA AO PORTÁTIL ───────────────────────────────────
+         Era `xl:block` (1280). Abaixo disso não existia — e o que não existia
+         não era só o índice: era também a lista do que FALTA para poder
+         enviar, que vive no fim desta coluna. Num portátil de 1024–1440 (o
+         dela) escrevia-se a proposta inteira sem saber em que secção se está
+         nem o que ainda a trava, com a barra lateral já recolhida e os 192 px
+         desta coluna à espera. `lg:` é o corte da casa para «há espaço para
+         uma coluna ao lado» e é onde a barra lateral deixa de ser gaveta.
+
+         Abaixo de 1024 continua a não existir, e é uma decisão POR TOMAR e não
+         um esquecimento: a versão de ecrã estreito deste índice tem de ser
+         desenhada (o `MoodBoardIndice` resolveu o mesmo problema com uma fila
+         horizontal que rola e `lg:flex-col`), e desenhá-la é escolha dela. */
+      className="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-48 shrink-0 self-start overflow-y-auto lg:block"
     >
       <ul className="flex flex-col gap-0.5">
         {seccoes.map((s) => {

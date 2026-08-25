@@ -8,9 +8,7 @@ import {
   type ThemeCopyMode,
   type ThemeSummary,
 } from "@/lib/theme-types";
-import { useFocusTrap } from "./useFocusTrap";
-import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { Button } from "./ui";
+import { Button, FolhaOuDialogo } from "./ui";
 
 /**
  * LEVAR AS FOTOS SELECIONADAS PARA OUTRO TEMA — copiar ou mover.
@@ -27,6 +25,12 @@ import { Button } from "./ui";
  *  · SIM um diálogo, porque já existe um igual: o `ThemePicker` do estúdio de
  *    propostas é exatamente este gesto ("escolher um tema"). Mesma forma, mesmo
  *    `useFocusTrap`, mesmo modelo mental.
+ *
+ * E, num telemóvel, uma FOLHA INFERIOR — o `FolhaOuDialogo`, gémeo a gémeo com
+ * o `FundirTemas`. Já era meia folha à mão, sem pega, sem arrasto e sem camada
+ * de história: a meio de uma cópia, o gesto de voltar do iPhone saía do back
+ * office em vez de fechar a caixa. O `bloqueado` do primitivo é o `&& !running`
+ * que estava aqui espalhado por três sítios.
  *
  * COPIAR e MOVER, as duas. Copiar é o pedido literal e o caso de uso real — um
  * tema é uma ETIQUETA, não uma gaveta exclusiva: uma mesa de terracota
@@ -92,10 +96,6 @@ export default function ThemeCopyDialog({
   onClose: () => void;
   onDone: (outcome: ThemeCopyOutcome) => void;
 }) {
-  const trapRef = useFocusTrap<HTMLDivElement>(true);
-  // Como no `ThemePicker` e pela mesma razão: montado é aberto, e o fundo não
-  // pode rolar por trás de um diálogo.
-  useTrincoDeScroll(true);
   const others = useMemo(
     () => themes.filter((t) => t.id !== sourceTheme.id),
     [themes, sourceTheme],
@@ -126,17 +126,6 @@ export default function ThemeCopyDialog({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [running]);
-
-  // Escape fecha — mas nunca no meio de uma operação (para isso há "Parar").
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || running) return;
-      e.stopPropagation();
-      onClose();
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose, running]);
 
   // O campo de procura só aparece com lista que chegue para o justificar — a
   // mesma regra (e a mesma normalização) da lista de temas.
@@ -234,216 +223,185 @@ export default function ThemeCopyDialog({
     progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-6"
-      onClick={(e) => {
-        // A correr, clicar fora não fecha: para isso há o botão "Parar".
-        if (e.target === e.currentTarget && !running) onClose();
-      }}
-    >
-      <div
-        ref={trapRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Copiar fotos para outro tema"
-        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-foreground/[0.08] px-5 py-4">
-          <div>
-            <p className="bo-eyebrow">De “{sourceTheme.name}”</p>
-            <h2 className="font-display text-lg text-foreground/85">
-              {plural(count, "foto selecionada", "fotos selecionadas")}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={running}
-            aria-label="Fechar"
-            // 30×30 medidos a 375 px, como o gémeo no `ThemePicker` — abaixo
-            // dos 44 px que a casa exige ao dedo, e é a saída do diálogo.
-            className="alvo-toque bo-text-muted rounded-lg p-1.5 hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Para onde */}
-        <div className="min-h-[8rem] flex-1 overflow-y-auto px-5 py-4">
-          {searchable && (
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Procurar tema…"
-              aria-label="Procurar tema de destino"
-              disabled={running}
-              className="bo-input mb-3 px-3 py-2 text-sm text-foreground/80 placeholder-foreground/30"
-            />
-          )}
-          {others.length === 0 ? (
-            <p className="bo-text-muted py-6 text-center text-sm">
-              Não há outro tema para onde levar estas fotos. Cria um em <strong>Temas</strong>.
-            </p>
-          ) : visible.length === 0 ? (
-            <p className="bo-text-muted py-6 text-center text-sm">
-              Nenhum tema com “{search.trim()}” no nome.
-            </p>
-          ) : (
-            <div role="radiogroup" aria-label="Tema de destino" className="flex flex-col gap-1.5">
-              {visible.map((t) => {
-                const on = t.id === destId;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    disabled={running}
-                    onClick={() => setDestId(t.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
-                      on
-                        ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
-                        : "border-foreground/[0.1] hover:border-[#4d6350]/40"
-                    }`}
-                  >
-                    <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-foreground/[0.06]">
-                      {t.coverUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={t.coverUrl}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover"
-                        />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-foreground/85">{t.name}</span>
-                      <span className="bo-text-muted block text-xs">{countLabel(t)}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Copiar ou mover, com a consequência escrita por extenso */}
-        {others.length > 0 && (
-          <div className="border-t border-foreground/[0.06] px-5 py-3">
-            <div
-              className="flex flex-wrap items-center gap-2"
-              role="radiogroup"
-              aria-label="O que fazer"
-            >
-              {(["copiar", "mover"] as const).map((m) => (
-                <Button
-                  key={m}
-                  size="sm"
-                  variant={mode === m ? "subtle" : "ghost"}
-                  role="radio"
-                  aria-checked={mode === m}
-                  disabled={running}
-                  onClick={() => setMode(m)}
-                >
-                  {m === "copiar" ? "Copiar" : "Mover"}
-                </Button>
-              ))}
-            </div>
-            <p className="bo-text-muted mt-2 text-xs leading-relaxed">
-              {mode === "copiar" ? (
-                <>
-                  {plural(count, "foto vai", "fotos vão")} também para “{dest?.name ?? "…"}”.{" "}
-                  {count === 1 ? "Continua" : "Continuam"} aqui.
-                </>
-              ) : (
-                <>
-                  {plural(count, "foto passa", "fotos passam")} para “{dest?.name ?? "…"}” e{" "}
-                  {count === 1 ? "sai" : "saem"} de “{sourceTheme.name}”. As propostas já feitas não
-                  são afetadas.
-                </>
-              )}
-            </p>
-            {count > MAX_THEME_COPY_BATCH * 12 && (
-              <p className="bo-text-muted mt-1 text-xs">
-                São muitas fotos — pode demorar alguns minutos. Deixa este separador aberto.
-              </p>
-            )}
-          </div>
-        )}
-
-        {progress && (
-          <div className="border-t border-foreground/[0.06] px-5 py-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm text-foreground/80">
-                {mode === "copiar" ? "A copiar" : "A mover"}{" "}
-                <strong className="font-medium">{progress.done}</strong> de{" "}
-                {plural(progress.total, "foto", "fotos")}…
-              </p>
-              <span className="bo-text-muted text-xs">{pct}%</span>
-            </div>
-            <div
-              role="progressbar"
-              aria-label="Progresso"
-              aria-valuemin={0}
-              aria-valuemax={progress.total}
-              aria-valuenow={progress.done}
-              className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
-            >
+    <FolhaOuDialogo
+      aberto
+      onFechar={onClose}
+      sobretitulo={`De “${sourceTheme.name}”`}
+      titulo={plural(count, "foto selecionada", "fotos selecionadas")}
+      largura="md"
+      /* A meio, fechar não é uma opção — a mesma razão do `FundirTemas`: cada
+         lote é atómico, mas o que fica de uma cópia interrompida é metade das
+         fotos aqui e metade ali. Num telemóvel o fundo é uma faixa estreita e o
+         gesto de voltar do iPhone faz-se sem se pensar nele. A saída é o
+         «Parar», que fecha o lote a correr em vez de o cortar. */
+      bloqueado={running}
+      accoes={
+        <div className="flex w-full flex-col gap-3">
+          {/* Copiar ou mover, com a consequência escrita por extenso. Presa ao
+              rodapé e não a rolar com a lista: a frase que diz o que vai
+              acontecer tem de estar à vista quando se carrega no botão. */}
+          {others.length > 0 && (
+            <div>
               <div
-                className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
-                style={{ transform: `scaleX(${pct / 100})` }}
-              />
+                className="flex flex-wrap items-center gap-2"
+                role="radiogroup"
+                aria-label="O que fazer"
+              >
+                {(["copiar", "mover"] as const).map((m) => (
+                  <Button
+                    key={m}
+                    size="sm"
+                    variant={mode === m ? "subtle" : "ghost"}
+                    role="radio"
+                    aria-checked={mode === m}
+                    disabled={running}
+                    onClick={() => setMode(m)}
+                  >
+                    {m === "copiar" ? "Copiar" : "Mover"}
+                  </Button>
+                ))}
+              </div>
+              <p className="bo-text-muted mt-2 text-xs leading-relaxed">
+                {mode === "copiar" ? (
+                  <>
+                    {plural(count, "foto vai", "fotos vão")} também para “{dest?.name ?? "…"}”.{" "}
+                    {count === 1 ? "Continua" : "Continuam"} aqui.
+                  </>
+                ) : (
+                  <>
+                    {plural(count, "foto passa", "fotos passam")} para “{dest?.name ?? "…"}” e{" "}
+                    {count === 1 ? "sai" : "saem"} de “{sourceTheme.name}”. As propostas já feitas
+                    não são afetadas.
+                  </>
+                )}
+              </p>
+              {count > MAX_THEME_COPY_BATCH * 12 && (
+                <p className="bo-text-muted mt-1 text-xs">
+                  São muitas fotos — pode demorar alguns minutos. Deixa este separador aberto.
+                </p>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {error && !running && (
-          <div className="border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
-            <p className="text-sm text-foreground/80">{error}</p>
-            <p className="bo-text-muted mt-0.5 text-xs">
-              As fotos não saíram deste tema. Podes tentar outra vez.
-            </p>
-          </div>
-        )}
+          {progress && (
+            <div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm text-foreground/80">
+                  {mode === "copiar" ? "A copiar" : "A mover"}{" "}
+                  <strong className="font-medium">{progress.done}</strong> de{" "}
+                  {plural(progress.total, "foto", "fotos")}…
+                </p>
+                <span className="bo-text-muted text-xs">{pct}%</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label="Progresso"
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.done}
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+              >
+                <div
+                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  style={{ transform: `scaleX(${pct / 100})` }}
+                />
+              </div>
+            </div>
+          )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-foreground/[0.08] px-5 py-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={
-              running
-                ? () => {
-                    stopRequested.current = true;
-                  }
-                : onClose
-            }
-          >
-            {running ? "Parar" : "Cancelar"}
-          </Button>
-          <Button
-            size="sm"
-            variant={mode === "mover" ? "danger" : "primary"}
-            loading={running}
-            disabled={!dest || running || count === 0}
-            onClick={() => void run()}
-          >
-            {mode === "copiar" ? "Copiar" : "Mover"} {plural(count, "foto", "fotos")}
-          </Button>
+          {error && !running && (
+            <div className="rounded-lg border border-[#8a2a22]/20 bg-[#f6e6df]/40 px-3 py-2">
+              <p className="text-sm text-foreground/80">{error}</p>
+              <p className="bo-text-muted mt-0.5 text-xs">
+                As fotos não saíram deste tema. Podes tentar outra vez.
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={
+                running
+                  ? () => {
+                      stopRequested.current = true;
+                    }
+                  : onClose
+              }
+            >
+              {running ? "Parar" : "Cancelar"}
+            </Button>
+            <Button
+              size="sm"
+              variant={mode === "mover" ? "danger" : "primary"}
+              loading={running}
+              disabled={!dest || running || count === 0}
+              onClick={() => void run()}
+            >
+              {mode === "copiar" ? "Copiar" : "Mover"} {plural(count, "foto", "fotos")}
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      }
+    >
+      {searchable && (
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Procurar tema…"
+          aria-label="Procurar tema de destino"
+          disabled={running}
+          className="bo-input mb-3 px-3 py-2 text-sm text-foreground/80 placeholder-foreground/30"
+        />
+      )}
+      {others.length === 0 ? (
+        <p className="bo-text-muted py-6 text-center text-sm">
+          Não há outro tema para onde levar estas fotos. Cria um em <strong>Temas</strong>.
+        </p>
+      ) : visible.length === 0 ? (
+        <p className="bo-text-muted py-6 text-center text-sm">
+          Nenhum tema com “{search.trim()}” no nome.
+        </p>
+      ) : (
+        <div role="radiogroup" aria-label="Tema de destino" className="flex flex-col gap-1.5">
+          {visible.map((t) => {
+            const on = t.id === destId;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={running}
+                onClick={() => setDestId(t.id)}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
+                  on
+                    ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
+                    : "border-foreground/[0.1] hover:border-[#4d6350]/40"
+                }`}
+              >
+                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-foreground/[0.06]">
+                  {t.coverUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.coverUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-foreground/85">{t.name}</span>
+                  <span className="bo-text-muted block text-xs">{countLabel(t)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </FolhaOuDialogo>
   );
 }

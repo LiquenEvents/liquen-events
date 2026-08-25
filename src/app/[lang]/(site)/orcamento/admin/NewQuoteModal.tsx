@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import type { Quote, EventCategory } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
-import { useFocusTrap } from "./useFocusTrap";
-import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { Button, Field } from "./ui";
+import { Button, Field, FolhaOuDialogo } from "./ui";
 import { porqueFalhou } from "@/lib/erro-do-servidor";
 
 interface Props {
@@ -34,22 +32,6 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
   const { toast } = useToast();
   const [f, setF] = useState({ ...EMPTY });
   const [saving, setSaving] = useState(false);
-  const titleId = useId();
-  // Trap Tab within the dialog + restore focus to the trigger on close.
-  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
-  // ordem de declaração, portanto a página já está trancada quando o foco entra
-  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
-  useTrincoDeScroll(open);
-  const dialogRef = useFocusTrap<HTMLDivElement>(open);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   const set = (k: keyof typeof EMPTY, v: string) => setF((p) => ({ ...p, [k]: v }));
   const eventTypes = f.category ? (EVENT_TYPES_BY_CATEGORY[f.category as EventCategory] ?? []) : [];
@@ -92,58 +74,47 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[85] flex items-center justify-center p-4 sm:p-6"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="relative flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ── Header ── */}
-        <div className="flex shrink-0 items-center justify-between gap-4 px-7 pt-7 pb-5 sm:px-9">
-          <div>
-            <p className="bo-eyebrow text-foreground/40 mb-2">Registo manual</p>
-            <h2
-              id={titleId}
-              className="text-foreground/90 text-xl leading-tight font-semibold"
-              style={{ fontFamily: "var(--font-playfair)" }}
-            >
-              Novo pedido
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Fechar"
-            className="alvo-toque -mt-3 -mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/35 motion-safe:transition-colors hover:text-foreground/70"
+    <FolhaOuDialogo
+      aberto={open}
+      onFechar={onClose}
+      sobretitulo="Registo manual"
+      titulo="Novo pedido"
+      largura="md"
+      // Era `z-[85]` à mão: acima dos avisos passageiros (80) e da gaveta do
+      // pedido (50, e depois disto na árvore).
+      nivel={85}
+      accoes={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={submit}
+            loading={saving}
+            disabled={!f.name.trim()}
+            iconRight={<span aria-hidden="true">→</span>}
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* ── Body ── */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-4 gap-y-5 overflow-y-auto overscroll-contain px-7 pb-7 sm:grid-cols-2 sm:px-9">
+            {saving ? "A criar…" : "Criar pedido"}
+          </Button>
+        </>
+      }
+    >
+      {/* ── AS DUAS COLUNAS MEDEM A CAIXA, NÃO O ECRÃ ──────────────────────
+          Eram `sm:grid-cols-2`/`sm:col-span-2`, e `sm:` pergunta pelo ECRÃ.
+          Dentro de uma folha inferior o ecrã deixou de ser a pergunta certa:
+          num tablet de 768 px o `sm:` disparava e punha dois campos lado a
+          lado numa caixa que ali é a largura toda do aparelho, mas noutro
+          sítio pode não ser. `@container` pergunta pela caixa — 26 rem é o
+          mesmo limiar do `EventCosts` e do `PaymentsPanel`, para a casa não
+          ficar com três números a dizer a mesma coisa.
+          Os telemóveis todos ficam numa coluna: um iPhone Pro Max dá 388 px
+          de caixa, abaixo dos 416 px do limiar. */}
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-5 @min-[26rem]:grid-cols-2">
           {duplicates.length > 0 && (
-            <div className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] p-3.5">
+            <div className="@min-[26rem]:col-span-2 flex items-start gap-3 rounded-xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] p-3.5">
               <svg
                 width="16"
                 height="16"
@@ -172,7 +143,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
 
           <Field
             variant="underline"
-            containerClassName="sm:col-span-2"
+            containerClassName="@min-[26rem]:col-span-2"
             label="Nome"
             required
             value={f.name}
@@ -257,7 +228,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
           />
           <Field
             variant="underline"
-            containerClassName="sm:col-span-2"
+            containerClassName="@min-[26rem]:col-span-2"
             label="Local"
             value={f.location}
             onChange={(e) => set("location", e.target.value)}
@@ -266,7 +237,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
           <Field
             variant="underline"
             as="textarea"
-            containerClassName="sm:col-span-2"
+            containerClassName="@min-[26rem]:col-span-2"
             label="Notas"
             rows={3}
             value={f.notes}
@@ -275,23 +246,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             className="resize-none"
           />
         </div>
-
-        {/* ── Footer ── */}
-        <div className="flex shrink-0 items-center justify-end gap-2 px-7 py-5 sm:px-9">
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            variant="primary"
-            onClick={submit}
-            loading={saving}
-            disabled={!f.name.trim()}
-            iconRight={<span aria-hidden="true">→</span>}
-          >
-            {saving ? "A criar…" : "Criar pedido"}
-          </Button>
-        </div>
       </div>
-    </div>
+    </FolhaOuDialogo>
   );
 }

@@ -169,7 +169,16 @@ export default function GuestList({ quote, onChange }: Props) {
   const estimate = quote.guests || 0;
 
   return (
-    <section className="border-t border-foreground/10 pt-6">
+    // `@container` porque tudo o que se segue pergunta pela largura DESTE
+    // painel: ele vive num cartão de zona do dossier, dentro de uma coluna, e
+    // a 375 px de ecrã sobram-lhe 279 — os mesmos 279 que sobram num iPad a
+    // 768, onde o `sm:` já disparou. É o que o `EventCosts` e o
+    // `PaymentsPanel` ao lado já fazem.
+    //
+    // E o `pt-6` do separador eram 24 px de ar por cima do título a qualquer
+    // largura. `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma
+    // vista, o mesmo que os painéis vizinhos passaram a ler.
+    <section className="@container border-t border-foreground/10 pt-[var(--bo-p-vista)]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Lista de Convidados</p>
         {/* ── OS DOIS BOTÕES DE ÍCONE DESTA BARRA ──────────────────────────
@@ -243,7 +252,12 @@ export default function GuestList({ quote, onChange }: Props) {
       </div>
 
       {/* Headcount summary */}
-      <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      {/* `sm:grid-cols-4` media a JANELA: num iPad a 768 px disparava e punha
+          os quatro contadores a 62 px de célula dentro de um painel que
+          continuava com 279 — e «Confirm.» já precisa de 60. O limiar passa a
+          ser o do painel (26 rem, o mesmo dos quadrados de dinheiro dos
+          painéis vizinhos), onde as quatro colunas têm 90 px cada. */}
+      <div className="mb-5 grid grid-cols-2 gap-2.5 @min-[26rem]:grid-cols-4">
         <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
           <p className="text-base font-semibold text-[#4d6350]">{totals.confirmed}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
@@ -371,7 +385,16 @@ export default function GuestList({ quote, onChange }: Props) {
       )}
 
       {/* Add guest */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      {/* ── QUEBRA QUANDO NÃO CABE, E NÃO QUANDO A JANELA MUDA ────────────
+          `sm:flex-row` media a JANELA: num iPad a 768 px disparava e punha os
+          três campos e o botão numa linha dentro de um painel de 279 px — o
+          «Nome» ficava com 60 px e o botão saía da margem. Sem ponto de corte
+          nenhum: `flex-wrap` com uma largura mínima por campo quebra só quando
+          não cabe, seja qual for a largura da janela. A 279 px dá Nome numa
+          linha, Nota noutra e «Convidados» ao lado do botão; a 550 dá a fila
+          inteira que o computador sempre teve. É a receita do `ui/Toolbar.tsx`,
+          que já estava certa. */}
+      <div className="flex flex-wrap items-end gap-2">
         <Field
           as="input"
           label="Nome"
@@ -379,7 +402,7 @@ export default function GuestList({ quote, onChange }: Props) {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Nome (convidado ou família)"
-          containerClassName="flex-1"
+          containerClassName="min-w-[10rem] flex-1"
         />
         <Field
           as="input"
@@ -388,7 +411,7 @@ export default function GuestList({ quote, onChange }: Props) {
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Ex.: mesa 3, alergia, +1"
-          containerClassName="flex-1"
+          containerClassName="min-w-[10rem] flex-1"
         />
         <Field
           as="input"
@@ -399,7 +422,7 @@ export default function GuestList({ quote, onChange }: Props) {
           onChange={(e) => setParty(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           className="text-center"
-          containerClassName="w-full sm:w-24"
+          containerClassName="w-24 shrink-0"
         />
         <Button variant="primary" onClick={add} disabled={!name.trim()}>
           Adicionar

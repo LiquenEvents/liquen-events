@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { normalizedThemeName, type ThemeSummary } from "@/lib/theme-types";
-import { useFocusTrap } from "./useFocusTrap";
-import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { Button } from "./ui";
+import { Button, FolhaOuDialogo } from "./ui";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -34,6 +32,15 @@ import { Button } from "./ui";
  * fica onde está, e um tema que não tenha ficado vazio não sai da lista — o
  * relatório diz porquê. Apagar continua a ser uma decisão dela, no botão que
  * já existe para isso.
+ *
+ * ── E PORQUE É QUE ISTO É UM `FolhaOuDialogo` ─────────────────────────────
+ *
+ * Já era meia folha à mão (`items-end sm:items-center`, `rounded-t-2xl`), mas
+ * sem pega, sem arrasto e — o que doía — SEM camada de história: num iPhone,
+ * deslizar da esquerda é o botão de voltar, e a meio de uma fusão isso saía do
+ * back office em vez de fechar a caixa. O primitivo traz as quatro (pega,
+ * arrasto, história e as acções coladas em baixo ao alcance do polegar) e leva
+ * consigo o `bloqueado`, que é o `&& !running` que estava aqui espalhado.
  */
 
 /** O que aconteceu à fusão inteira — é isto que a lista de temas usa para se
@@ -92,9 +99,6 @@ export default function FundirTemas({
   onClose: () => void;
   onDone: (outcome: ThemeMergeOutcome) => void;
 }) {
-  const trapRef = useFocusTrap<HTMLDivElement>(true);
-  useTrincoDeScroll(true);
-
   /**
    * Para onde se pode fundir.
    *
@@ -131,16 +135,6 @@ export default function FundirTemas({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [running]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || running) return;
-      e.stopPropagation();
-      onClose();
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose, running]);
 
   const searchable = others.length > 4;
   const visible = useMemo(() => {
@@ -242,183 +236,162 @@ export default function FundirTemas({
       : 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-6"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !running) onClose();
-      }}
-    >
-      <div
-        ref={trapRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Juntar este tema a outro"
-        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-foreground/[0.08] px-5 py-4">
-          <div className="min-w-0">
-            <p className="bo-eyebrow">Juntar “{sourceTheme.name}” a</p>
-            <h2 className="font-display text-lg text-foreground/85">{countLabel(sourceTheme)}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={running}
-            aria-label="Fechar"
-            className="alvo-toque bo-text-muted rounded-lg p-1.5 hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="min-h-[8rem] flex-1 overflow-y-auto px-5 py-4">
-          {searchable && (
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Procurar tema…"
-              aria-label="Procurar tema de destino"
-              disabled={running}
-              className="bo-input mb-3 px-3 py-2 text-sm text-foreground/80 placeholder-foreground/30"
-            />
-          )}
-          {others.length === 0 ? (
-            <p className="bo-text-muted py-6 text-center text-sm">
-              Não há outro tema a que juntar este.
-            </p>
-          ) : visible.length === 0 ? (
-            <p className="bo-text-muted py-6 text-center text-sm">
-              Nenhum tema com “{search.trim()}” no nome.
-            </p>
-          ) : (
-            <div role="radiogroup" aria-label="Tema que fica" className="flex flex-col gap-1.5">
-              {visible.map((t) => {
-                const on = t.id === destId;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    disabled={running}
-                    onClick={() => setDestId(t.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
-                      on
-                        ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
-                        : "border-foreground/[0.1] hover:border-[#4d6350]/40"
-                    }`}
-                  >
-                    <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-foreground/[0.06]">
-                      {t.coverUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={t.coverUrl}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover"
-                        />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-foreground/85">{t.name}</span>
-                      <span className="bo-text-muted block text-xs">{countLabel(t)}</span>
-                    </span>
-                  </button>
-                );
-              })}
+    <FolhaOuDialogo
+      aberto
+      onFechar={onClose}
+      sobretitulo={`Juntar “${sourceTheme.name}” a`}
+      titulo={countLabel(sourceTheme)}
+      largura="md"
+      /* ── PORQUE É QUE ISTO SE TRANCA A MEIO ──────────────────────────────
+         Cada volta é atómica e repetível, mas o que fica de uma fusão
+         interrompida é um tema com menos fotos e outro com mais — trabalho
+         pelo meio, que é a coisa que esta casa promete não perder. Num
+         telemóvel isto não é hipotético: o fundo é uma faixa estreita, e o
+         gesto de voltar do iPhone faz-se sem se pensar nele. A saída existe e
+         é o «Parar» aqui em baixo, que fecha a volta que está a correr em vez
+         de a cortar. */
+      bloqueado={running}
+      accoes={
+        <div className="flex w-full flex-col gap-3">
+          {/* A consequência por extenso, ANTES de se carregar — e com o que NÃO
+              acontece a seguir, que é o que dá coragem para carregar. Fica
+              PRESA ao rodapé e não a rolar com a lista: uma frase de
+              consequência que se pode não ter visto não é um aviso. */}
+          {others.length > 0 && (
+            <div>
+              <p className="bo-text-muted text-xs leading-relaxed">
+                As fotos de “{sourceTheme.name}” passam para “{dest?.name ?? "…"}” e “
+                {sourceTheme.name}” fica arquivado. Nenhuma fotografia é apagada, e as propostas já
+                feitas não são afetadas.
+              </p>
+              {total > 400 && (
+                <p className="bo-text-muted mt-1 text-xs">
+                  São muitas fotos — pode demorar alguns minutos. Deixa este separador aberto.
+                </p>
+              )}
             </div>
           )}
-        </div>
 
-        {/* A consequência por extenso, ANTES de se carregar — e com o que NÃO
-            acontece a seguir, que é o que dá coragem para carregar. */}
-        {others.length > 0 && (
-          <div className="border-t border-foreground/[0.06] px-5 py-3">
-            <p className="bo-text-muted text-xs leading-relaxed">
-              As fotos de “{sourceTheme.name}” passam para “{dest?.name ?? "…"}” e “
-              {sourceTheme.name}” fica arquivado. Nenhuma fotografia é apagada, e as propostas já
-              feitas não são afetadas.
-            </p>
-            {total > 400 && (
-              <p className="bo-text-muted mt-1 text-xs">
-                São muitas fotos — pode demorar alguns minutos. Deixa este separador aberto.
-              </p>
-            )}
-          </div>
-        )}
-
-        {progress && (
-          <div className="border-t border-foreground/[0.06] px-5 py-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm text-foreground/80">
-                A juntar <strong className="font-medium">{progress.done}</strong>
-                {progress.total > 0 ? ` de ${plural(progress.total, "foto", "fotos")}` : " fotos"}…
-              </p>
-              {progress.total > 0 && <span className="bo-text-muted text-xs">{pct}%</span>}
-            </div>
-            <div
-              role="progressbar"
-              aria-label="Progresso"
-              aria-valuemin={0}
-              aria-valuemax={progress.total}
-              aria-valuenow={progress.done}
-              className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
-            >
+          {progress && (
+            <div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm text-foreground/80">
+                  A juntar <strong className="font-medium">{progress.done}</strong>
+                  {progress.total > 0 ? ` de ${plural(progress.total, "foto", "fotos")}` : " fotos"}
+                  …
+                </p>
+                {progress.total > 0 && <span className="bo-text-muted text-xs">{pct}%</span>}
+              </div>
               <div
-                className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
-                style={{ transform: `scaleX(${pct / 100})` }}
-              />
+                role="progressbar"
+                aria-label="Progresso"
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.done}
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+              >
+                <div
+                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  style={{ transform: `scaleX(${pct / 100})` }}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && !running && (
-          <div className="border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
-            <p className="text-sm text-foreground/80">{error}</p>
-            <p className="bo-text-muted mt-0.5 text-xs">
-              O que já passou está em “{dest?.name ?? "…"}”; o resto continua aqui. Podes tentar
-              outra vez.
-            </p>
-          </div>
-        )}
+          {error && !running && (
+            <div className="rounded-lg border border-[#8a2a22]/20 bg-[#f6e6df]/40 px-3 py-2">
+              <p className="text-sm text-foreground/80">{error}</p>
+              <p className="bo-text-muted mt-0.5 text-xs">
+                O que já passou está em “{dest?.name ?? "…"}”; o resto continua aqui. Podes tentar
+                outra vez.
+              </p>
+            </div>
+          )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-foreground/[0.08] px-5 py-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={
-              running
-                ? () => {
-                    stopRequested.current = true;
-                  }
-                : onClose
-            }
-          >
-            {running ? "Parar" : "Cancelar"}
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            loading={running}
-            disabled={!dest || running}
-            onClick={() => void run()}
-          >
-            Juntar os temas
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={
+                running
+                  ? () => {
+                      stopRequested.current = true;
+                    }
+                  : onClose
+              }
+            >
+              {running ? "Parar" : "Cancelar"}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              loading={running}
+              disabled={!dest || running}
+              onClick={() => void run()}
+            >
+              Juntar os temas
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      }
+    >
+      {searchable && (
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Procurar tema…"
+          aria-label="Procurar tema de destino"
+          disabled={running}
+          className="bo-input mb-3 px-3 py-2 text-sm text-foreground/80 placeholder-foreground/30"
+        />
+      )}
+      {others.length === 0 ? (
+        <p className="bo-text-muted py-6 text-center text-sm">
+          Não há outro tema a que juntar este.
+        </p>
+      ) : visible.length === 0 ? (
+        <p className="bo-text-muted py-6 text-center text-sm">
+          Nenhum tema com “{search.trim()}” no nome.
+        </p>
+      ) : (
+        <div role="radiogroup" aria-label="Tema que fica" className="flex flex-col gap-1.5">
+          {visible.map((t) => {
+            const on = t.id === destId;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={running}
+                onClick={() => setDestId(t.id)}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
+                  on
+                    ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
+                    : "border-foreground/[0.1] hover:border-[#4d6350]/40"
+                }`}
+              >
+                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-foreground/[0.06]">
+                  {t.coverUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.coverUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-foreground/85">{t.name}</span>
+                  <span className="bo-text-muted block text-xs">{countLabel(t)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </FolhaOuDialogo>
   );
 }

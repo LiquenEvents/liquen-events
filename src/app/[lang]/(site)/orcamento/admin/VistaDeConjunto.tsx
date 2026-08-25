@@ -114,7 +114,13 @@ export default function VistaDeConjunto({
         </button>
       </div>
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+      {/* Duas miniaturas, três a partir de 640, quatro a partir de 1024. O
+          último degrau era `xl:` (1280): entre 1024 e 1280 lia-se um documento
+          de treze folhas a três por linha — cinco linhas onde cabiam quatro —,
+          e o corte não era nenhum dos três da casa. `lg:` é o mesmo sítio onde
+          a barra lateral deixa de ser gaveta, portanto os três degraus desta
+          fila são agora os mesmos três de todo o back office. */}
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {paginas.map((pagina, i) => {
           const bi = pagina.bi;
           const b = bi === undefined ? undefined : doc.moodBoards[bi];

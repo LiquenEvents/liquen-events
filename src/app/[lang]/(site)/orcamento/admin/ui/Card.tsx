@@ -29,11 +29,31 @@ import { cn } from "./cn";
 
 export type CardPadding = "none" | "sm" | "md" | "lg";
 
+/**
+ * ── O DEGRAU DO TELEMÓVEL E O DEGRAU DO COMPUTADOR ────────────────────────
+ * O `md` é o padrão, e servia 20 px de cada lado a QUALQUER largura: 40 px dos
+ * 375 de um iPhone SE — mais de um décimo do ecrã — gastos em ar à volta de
+ * cada cartão, repetido em todos os cartões empilhados da vista. O `lg` fazia o
+ * mesmo com 24.
+ *
+ * `--bo-p-cartao` é 14 px abaixo de 640 e 24 a partir daí (ver a escala do
+ * espaço no `globals.css`), portanto o computador fica exactamente como estava
+ * e é só o telemóvel que aperta.
+ *
+ * O `lg` não lê o token, e é de propósito: no token os dois degraus ficariam
+ * iguais abaixo de 640 e a palavra «lg» passava a não querer dizer nada nessa
+ * largura. Fica um degrau acima (16 px) e guarda os 32 do `sm:` — é o cartão de
+ * entrada e o de recuperar palavra-passe, onde o conteúdo é pouco e a folga é o
+ * desenho.
+ *
+ * `Calendario.tsx:517` continua a mandar por cima (`!p-3 sm:!p-8`), com a conta
+ * dele explicada lá: uma grelha de sete colunas não tem 14 px para dar.
+ */
 const PADDING: Record<CardPadding, string> = {
   none: "",
   sm: "p-4",
-  md: "p-5 sm:p-6",
-  lg: "p-6 sm:p-8",
+  md: "p-[var(--bo-p-cartao)]",
+  lg: "p-4 sm:p-8",
 };
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
@@ -81,7 +101,10 @@ export function SectionCard({
   return (
     <Card padding={padding} className={className} {...rest}>
       {hasHeader && (
-        <div className="mb-5 flex items-start justify-between gap-4">
+        /* 20 px entre o título do painel e o que ele mostra eram 20 px em
+           qualquer largura; abaixo de 640 chegam 14, e a diferença repete-se
+           uma vez por painel. */
+        <div className="mb-3.5 flex items-start justify-between gap-3 sm:mb-5 sm:gap-4">
           <div className="min-w-0">
             {eyebrow && <p className="bo-eyebrow mb-2">{eyebrow}</p>}
             {title && (

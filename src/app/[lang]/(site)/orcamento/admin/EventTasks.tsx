@@ -269,7 +269,12 @@ export default function EventTasks({ quote, userName }: Props) {
   const done = tasks.filter((t) => t.done);
 
   return (
-    <div>
+    // `@container`: a linha de campos do formulário de baixo pergunta pela
+    // largura DESTE painel, não pela da janela. Ele vive num cartão de zona
+    // do dossier, dentro de uma coluna — a 375 px de ecrã sobram-lhe 279, e
+    // num iPad a 768 continuam a ser 279. É a mesma razão pela qual o
+    // `EventCosts` e o `PaymentsPanel` ao lado já são contentores.
+    <div className="@container">
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Tarefas do evento</p>
         <div className="flex items-center gap-3">
@@ -315,7 +320,13 @@ export default function EventTasks({ quote, userName }: Props) {
             }}
             placeholder="Ex.: Confirmar catering"
           />
-          <div className="grid grid-cols-2 gap-3">
+          {/* Prioridade e Data limite, lado a lado, davam duas colunas de
+              117 px a 375 px (279 de painel, menos os 32 do `p-4` da caixa
+              e os 12 do intervalo). Um `input[type=date]` a 16 px — o piso
+              de `pointer: coarse` — mostra «dd/mm/aaaa» mais o calendário e
+              não cabe nisso: a data saía da margem. Empilham por omissão e
+              voltam a par assim que o painel tem 22 rem. */}
+          <div className="grid grid-cols-1 gap-3 @min-[22rem]:grid-cols-2">
             <Field
               as="select"
               label="Prioridade"
@@ -366,7 +377,6 @@ export default function EventTasks({ quote, userName }: Props) {
         />
       ) : tasks.length === 0 && !adding ? (
         <EmptyState
-          className="px-4 py-10"
           icon={
             <svg
               width="24"

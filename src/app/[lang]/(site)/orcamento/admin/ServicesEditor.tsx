@@ -693,9 +693,8 @@ export default function ServicesEditor({
       }}
     >
       {/* ── ATALHOS DE TECLADO NUM APARELHO SEM TECLADO ────────────────────
-          `max-md:hidden`: abaixo de 768 px esta linha dizia «Enter abre a linha
-          seguinte · Alt+↑/↓ move · Ctrl+Z anula» a quem não tem nenhuma dessas
-          teclas. MEDIDO a 375 px: 60 px de altura (três linhas de texto) no
+          Esta linha diz «Enter abre a linha seguinte · Alt+↑/↓ move · Ctrl+Z
+          anula». MEDIDO a 375 px: 60 px de altura (três linhas de texto) no
           topo da secção mais escrita da casa, gastos a explicar gestos que ali
           não existem.
 
@@ -703,7 +702,17 @@ export default function ServicesEditor({
           «+ Adicionar linha» faz o que o Enter faz, as setas de cada linha
           fazem o que o Alt+↑/↓ faz, e o «Desfazer» do cabeçalho do estúdio faz
           o que o Ctrl+Z faz. É por isso que isto se pode esconder em vez de ter
-          de ser substituído. */}
+          de ser substituído.
+
+          ── E A PERGUNTA É SOBRE O PONTEIRO, NÃO SOBRE A LARGURA ──────────
+          Era `max-md:hidden`, ou seja «esconde abaixo de 768 px». Mas o que
+          torna estes atalhos inúteis não é o ecrã ser estreito — é não haver
+          teclas. Um iPad ao alto tem 768 px e não tem Ctrl; um iPad com
+          teclado tem os 1024 e TEM. O eixo certo está escrito no
+          `ui/adaptativo.ts`: a largura decide o layout, o ponteiro decide os
+          alvos. `pointer-coarse:hidden` é o que o resto da casa já usa para
+          isto — ver `AjudaGlossario.tsx`, que esconde «ou com a tecla ?» pela
+          mesma razão. */}
       {/*
        * ── OS ATALHOS PASSAM PARA TRÁS DE UM «?» ──────────────────────────
        *
@@ -715,11 +724,11 @@ export default function ServicesEditor({
        * ecrã já sabe anunciá-lo, e o estado fica onde o navegador o guarda em
        * vez de num estado nosso que ninguém grava.
        *
-       * Continua escondido no telemóvel, pela razão que já cá estava: sessenta
-       * píxeis no topo da secção mais escrita da casa, gastos a explicar gestos
-       * que ali não existem.
+       * Continua escondido a quem escreve com o dedo, pela razão que já cá
+       * estava: sessenta píxeis no topo da secção mais escrita da casa, gastos
+       * a explicar gestos que ali não existem.
        */}
-      <details className="max-md:hidden group -mt-2 mb-3">
+      <details className="pointer-coarse:hidden group -mt-2 mb-3">
         <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-foreground/70 [&::-webkit-details-marker]:hidden">
           <span
             aria-hidden
@@ -787,8 +796,9 @@ export default function ServicesEditor({
                           placeholder="Decoração Floral de Casamento"
                           aria-label={`Título do grupo ${gi + 1}`}
                         />
-                        {/* A caixa inglesa AO LADO em ecrã largo, por baixo
-                            abaixo de `xl` — ver `aoLado`, em `CaixaInglesa`.
+                        {/* A caixa inglesa AO LADO quando a fila tem largura
+                            para as duas, por baixo quando não tem — sem ponto
+                            de corte nenhum; ver `aoLado`, em `CaixaInglesa`.
                             Escreve-se em `titleEn`,
                             que viaja colado ao grupo — incluindo quando o grupo
                             é guardado como MODELO, isolado do documento. */}

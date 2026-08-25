@@ -52,6 +52,7 @@ const PASSKEYS = ler("PasskeysDialog.tsx");
 const REPOR = ler("RestoreDialog.tsx");
 const GUARDAR = ler("GuardarTudo.tsx");
 const SINO = ler("NotificationBell.tsx");
+const FOLHA = ler("ui", "FolhaOuDialogo.tsx");
 
 /**
  * A ETIQUETA DE ABERTURA INTEIRA do controlo que contém uma dada âncora.
@@ -149,12 +150,42 @@ describe("os contactos do dossier", () => {
 });
 
 describe("os diálogos da moldura", () => {
-  it.each([
-    ["as passkeys", () => PASSKEYS],
-    ["o repor cópia de segurança", () => REPOR],
-  ])("dá 44 px ao × de fechar de %s", (_nome, fonte) => {
-    const bloco = blocoQueContem(fonte(), 'aria-label="Fechar"');
+  /**
+   * O `RestoreDialog` continua a desenhar o seu próprio ×, e por isso continua
+   * a ser aqui que se prova que ele tem 44 px.
+   */
+  it("dá 44 px ao × de fechar do repor cópia de segurança", () => {
+    const bloco = blocoQueContem(REPOR, 'aria-label="Fechar"');
     expect(bloco).toContain("alvo-toque");
+  });
+
+  /**
+   * ── AS PASSKEYS DEIXARAM DE TER × PRÓPRIO, E ISSO É A CORRECÇÃO ──────────
+   * Este diálogo passou a ser um `FolhaOuDialogo` — folha inferior no
+   * telemóvel, diálogo centrado no computador. O × deixou de estar escrito
+   * aqui porque passou a vir do primitivo, que o desenha `alvo-toque h-11 w-11`
+   * e o garante a TODOS os que o usam de uma vez.
+   *
+   * Procurar `aria-label="Fechar"` neste ficheiro passou a ser procurar a
+   * cópia que se queria ver desaparecer. Ficam duas asserções no lugar de uma:
+   * que este diálogo delega mesmo no primitivo, e — a seguir — que o × do
+   * primitivo tem os 44 px.
+   *
+   * A segunda tem de estar AQUI. O `ui/adaptativo.test.tsx` prova que o botão
+   * existe e que fecha; não mede nada, e o jsdom também não o deixaria. Sem a
+   * linha abaixo, converter um diálogo passava a ser uma forma silenciosa de
+   * perder a garantia dos 44 px em todos eles ao mesmo tempo — que é o
+   * contrário do que a conversão serve.
+   */
+  it("as passkeys herdam o × do primitivo em vez de desenharem o seu", () => {
+    expect(PASSKEYS).toMatch(/<FolhaOuDialogo\b/);
+    expect(PASSKEYS).not.toContain('aria-label="Fechar"');
+  });
+
+  it("e o × do primitivo, que agora serve todos, tem 44 px", () => {
+    const bloco = blocoQueContem(FOLHA, 'aria-label="Fechar"');
+    expect(bloco).toContain("alvo-toque");
+    expect(bloco).toMatch(/h-11 w-11/);
   });
 });
 
