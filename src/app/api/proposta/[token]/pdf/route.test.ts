@@ -15,6 +15,19 @@ const db = vi.hoisted(() => ({
   rendered: [] as unknown[],
   /** Fotos que o gerador não conseguiu meter no documento. */
   emFalta: 0,
+  /**
+   * O endereço assinado do PDF já guardado, quando existe.
+   *
+   * `null` é o caso normal destes testes: o armazenamento não está configurado
+   * aqui, e a rota desenha como sempre fez. Só o bloco do fim o liga.
+   */
+  urlDirecto: null as string | null,
+}));
+
+vi.mock("@/lib/proposal-pdf-guardado", () => ({
+  urlDoPdfDaProposta: vi.fn(async () => db.urlDirecto),
+  guardarPdfDaProposta: vi.fn(async () => true),
+  lerPdfDaProposta: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/proposal-token", () => ({
@@ -73,6 +86,9 @@ beforeEach(() => {
   esvaziarCachePdf();
   db.proposals.clear();
   db.rendered = [];
+  // Por omissão o ficheiro NÃO está guardado — é o estado em que o resto deste
+  // ficheiro foi escrito, e o que faz a rota desenhar como sempre fez.
+  db.urlDirecto = null;
   vi.clearAllMocks();
 });
 
@@ -232,5 +248,56 @@ describe("GET /api/proposta/[token]/pdf — a língua da proposta", () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", idioma: "fr", doc: { ref: "PO" } });
     await call();
     expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PDF GUARDADO NÃO PRECISA DE NOS ATRAVESSAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «para ver a proposta em PDF quando carrego demora mesmo muito
+ * tempo a abrir».
+ *
+ * Guardá-lo no envio tirou o DESENHO do caminho. Mas os bytes continuavam a
+ * fazer duas viagens — armazenamento → esta função → o telemóvel dela — e numa
+ * proposta com quarenta e seis fotografias são megabytes a passar por um sítio
+ * que não precisava de os ver, com um arranque a frio pelo meio.
+ */
+describe("GET /api/proposta/[token]/pdf — quando já está guardado", () => {
+  beforeEach(() => {
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
+  });
+
+  it("reencaminha para o ficheiro em vez de o reenviar", async () => {
+    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
+
+    const res = await call();
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("https://cdn.exemplo/pdf-assinado");
+    // E não se desenhou nada — era esse o custo que isto existe para não pagar.
+    expect(db.rendered).toHaveLength(0);
+  });
+
+  it("o reencaminhamento não fica guardado por cache nenhuma", async () => {
+    // O endereço assinado expira em minutos. Um cache partilhado a guardar
+    // este 302 servia um link morto a quem carregasse a seguir.
+    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
+
+    const res = await call();
+
+    expect(res.headers.get("Cache-Control")).toMatch(/no-store/);
+  });
+
+  it("não estando guardado, desenha e serve como sempre", async () => {
+    // `null` quer dizer «não está lá», e não «falhou»: o caminho de antes
+    // continua inteiro por baixo.
+    db.urlDirecto = null;
+
+    const res = await call();
+
+    expect(res.status).toBe(200);
+    expect(db.rendered).toHaveLength(1);
   });
 });

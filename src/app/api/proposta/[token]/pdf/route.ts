@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { propostaDoLink } from "@/lib/proposta-do-link";
-import { pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { chaveDoPdf, pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { urlDoPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { respostaPdf } from "@/lib/pdf-resposta";
@@ -89,24 +90,50 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // servido tal e qual — é este o caminho que o casal usa, e o que o
     // inventário apanhou como «um link que não diz nada enquanto trabalha».
     // Ver `proposal-pdf-guardado.ts`.
-    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // O nome do ficheiro vai dentro de um cabeçalho: saneia-se a referência
     // (aspas, espaços, acentos) em vez de a confiar tal como está gravada.
     const ref = (proposal.quoteId || proposal.id).replace(/[^A-Za-z0-9_-]/g, "");
+    const nome = nomeDoFicheiroDaProposta(
+      {
+        escolhido: proposal.doc?.nomeDoFicheiro,
+        clientNames: proposal.doc?.clientNames,
+        eventDate: proposal.doc?.eventDate,
+        ref,
+      },
+      idioma,
+    );
+
+    /**
+     * ── SE ELE JÁ ESTÁ GUARDADO, NÃO PRECISA DE NOS ATRAVESSAR ────────────
+     *
+     * Palavras dela: «para ver a proposta em PDF quando carrego demora mesmo
+     * muito tempo a abrir».
+     *
+     * O PDF passou a ficar guardado no envio, e isso tirou o desenho do
+     * caminho. Mas os bytes continuavam a fazer duas viagens: armazenamento →
+     * esta função → o telemóvel dela. Numa proposta com quarenta e seis
+     * fotografias são megabytes a passar por um sítio que não precisava de os
+     * ver, com um arranque a frio pelo meio.
+     *
+     * Com o endereço assinado, o ficheiro vai do CDN directo a quem carregou.
+     * `null` quer dizer que não está lá — e aí desenha-se, como antes.
+     */
+    const directo = await urlDoPdfDaProposta(proposal.id, chaveDoPdf(proposal.doc, idioma), nome);
+    if (directo) {
+      return NextResponse.redirect(directo, {
+        status: 302,
+        // O endereço expira em minutos: um reencaminhamento guardado por um
+        // cache partilhado seria um link morto servido a quem carregasse
+        // depois. É a mesma regra da página e do PDF em si.
+        headers: { "Cache-Control": "private, no-store, must-revalidate" },
+      });
+    }
+
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     // O NOME é o mesmo com que o ficheiro seguiu no email: o casal tem-no na
     // caixa de correio e tem de reconhecer o que descarrega como o mesmo.
-    return respostaPdf(request, pdf, {
-      nome: nomeDoFicheiroDaProposta(
-        {
-          escolhido: proposal.doc?.nomeDoFicheiro,
-          clientNames: proposal.doc?.clientNames,
-          eventDate: proposal.doc?.eventDate,
-          ref,
-        },
-        idioma,
-      ),
-    });
+    return respostaPdf(request, pdf, { nome });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.
