@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+import { MEDIA_LADO, MEDIA_QUALIDADE } from "@/lib/derivadas-medidas";
+
 import { corDominanteDePixeis } from "@/lib/cor-dominante";
 
 /**
@@ -43,6 +45,7 @@ export type WorkerResponse =
       blob: Blob | null;
       thumb: Blob | null;
       micro: Blob | null;
+      mid: Blob | null;
       lqip: string | null;
       cor: string | null;
     }
@@ -121,6 +124,34 @@ export const LQIP_MAX_CHARS = 1200;
 export const MICRO_EDGE = 96;
 /** Qualidade da micro. Mais baixa do que a miniatura: a 43 px não se vê. */
 export const MICRO_QUALITY = 0.65;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DE 1200 px — A QUE O CASAL VÊ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A miniatura de 400 px serve as GRELHAS do back office. A página da proposta
+ * mostra outra coisa: num telemóvel a fotografia ocupa ~343 pontos a três
+ * pixéis por ponto, e o `srcset` escolhe a de 1200.
+ *
+ * Essa nascia no SERVIDOR, uma a uma, à primeira vez que alguém olhava para
+ * cada fotografia — um download do original, um `sharp` e um upload, tudo
+ * dentro do pedido, com o casal a olhar para um rectângulo vazio. Numa
+ * proposta acabada de enviar, essa primeira visita é sempre a deles.
+ *
+ * Aqui não custa quase nada: a bitmap já está descodificada para fazer a
+ * miniatura, e este é mais um desenho do MESMO canvas. Sobem ~250 KB ao lado
+ * de um original de 2 MB, e a fotografia nasce pronta — nunca chega a existir
+ * o instante em que alguém espera por ela.
+ *
+ * Os números são os do servidor (`MEDIA` em `lib/derivadas.ts`): 1200 px e
+ * qualidade 80. Se divergirem, a mesma fotografia sai diferente conforme o
+ * caminho por onde foi fabricada.
+ */
+export const MID_EDGE = MEDIA_LADO;
+/** Qualidade da de 1200 px. Ver `MEDIA` em `lib/derivadas.ts` — é a que o
+ *  casal vê em grande, e os dois pontos acima da miniatura custam ~15 KB. */
+export const MID_QUALITY = MEDIA_QUALIDADE / 100;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -240,6 +271,7 @@ export async function prepareInWorker(req: WorkerRequest): Promise<{
   blob: Blob | null;
   thumb: Blob | null;
   micro: Blob | null;
+  mid: Blob | null;
   lqip: string | null;
   cor: string | null;
 }> {
@@ -291,6 +323,25 @@ export async function prepareInWorker(req: WorkerRequest): Promise<{
       }
     }
 
+    // A DE 1200 px — a que a página do casal mostra. Do mesmo canvas, e pela
+    // mesma regra das outras duas: só quando a fonte é maior do que ela, senão
+    // seria ampliar. Uma foto que já nasce com 1000 px é servida tal e qual, e
+    // é isso que o `planThumb` decide.
+    //
+    // Dispensável como as irmãs: falhar aqui devolve a fotografia ao caminho
+    // de antes — o servidor fabrica-a à primeira visita —, e não estraga um
+    // carregamento que correu bem.
+    let mid: Blob | null = null;
+    if (req.wantThumb && planThumb(bw, bh, MID_EDGE)) {
+      const d = planResize(bw, bh, MID_EDGE);
+      const canvas = drawTo(base, d.w, d.h);
+      if (canvas) {
+        mid = await canvas
+          .convertToBlob({ type: "image/jpeg", quality: MID_QUALITY })
+          .catch(() => null);
+      }
+    }
+
     // Do MESMO canvas já reduzido, como a miniatura. Sempre — uma foto sem
     // miniatura (já pequena) é precisamente uma que continua a precisar de
     // alguma coisa para mostrar enquanto chega.
@@ -299,7 +350,7 @@ export async function prepareInWorker(req: WorkerRequest): Promise<{
     // origem cruzada e sem uma segunda descodificação.
     const cor = await corDe(base, bw, bh);
 
-    return { blob, thumb, micro, lqip, cor };
+    return { blob, thumb, micro, mid, lqip, cor };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.
@@ -335,8 +386,8 @@ if (
   self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     const req = e.data;
     try {
-      const { blob, thumb, micro, lqip, cor } = await prepareInWorker(req);
-      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, micro, lqip, cor };
+      const { blob, thumb, micro, mid, lqip, cor } = await prepareInWorker(req);
+      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, micro, mid, lqip, cor };
       self.postMessage(res);
     } catch (err) {
       const res: WorkerResponse = {

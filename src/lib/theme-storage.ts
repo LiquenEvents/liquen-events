@@ -28,6 +28,7 @@ import {
   THEME_BUCKET,
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
+  THEME_MID_BUCKET,
   THEME_AVIF_BUCKET,
   THEME_AVIF_MICRO_BUCKET,
   THEME_SIGNED_TTL,
@@ -344,6 +345,16 @@ const uploadThemeMicro = (path: string, micro: ThemeThumbInput) =>
   uploadThemeDerivada(THEME_MICRO_BUCKET, path, micro);
 
 /**
+ * A de 1200 px — a que a PÁGINA DO CASAL mostra.
+ *
+ * As de 400 e 96 servem as grelhas e as tiras daqui. Aquela nascia no
+ * servidor, uma a uma, à primeira vez que alguém olhava para cada fotografia,
+ * e chega agora já feita do browser (ver `MID_EDGE` em `image-worker.ts`).
+ */
+const uploadThemeMid = (path: string, mid: ThemeThumbInput) =>
+  uploadThemeDerivada(THEME_MID_BUCKET, path, mid);
+
+/**
  * O que aconteceu a uma foto que se tentou guardar.
  *
  * `duplicate` NÃO é um erro: é a resposta certa a "esta foto já está no tema",
@@ -381,6 +392,7 @@ export async function uploadThemeImage(
   thumb?: ThemeThumbInput,
   options?: ThemeUploadOptions,
   micro?: ThemeThumbInput,
+  mid?: ThemeThumbInput,
 ): Promise<ThemeUploadResult | null> {
   const sb = getSupabase();
   if (!sb || !(await ensureBucket(THEME_BUCKET))) return null;
@@ -407,13 +419,16 @@ export async function uploadThemeImage(
   // O índice acompanha o que acabámos de escrever, em vez de ser reconstruído
   // (ver a armadilha em `FINGERPRINT_TTL_MS`).
   noteThemeFingerprint(themeId, { hash: fingerprint, md5: md5Of(bytes), path });
-  // As três em paralelo: a assinatura do original e as duas derivadas não
-  // dependem uma da outra, e em série somavam-se três idas ao Storage por foto
-  // num lote que pode ter 300.
+  // As QUATRO em paralelo: a assinatura do original e as três derivadas não
+  // dependem umas das outras, e em série somavam-se quatro idas ao Storage por
+  // foto num lote que pode ter 300.
   const [{ data }, thumbUrl, microUrl] = await Promise.all([
     sb.storage.from(THEME_BUCKET).createSignedUrl(path, SIGNED_TTL),
     thumb ? uploadThemeThumb(path, thumb) : Promise.resolve(""),
     micro ? uploadThemeMicro(path, micro) : Promise.resolve(""),
+    // O URL desta não vai na resposta: a grelha do back office não a usa, e é
+    // a página do casal que a procura pelo caminho. Guardar é o que interessa.
+    mid ? uploadThemeMid(path, mid) : Promise.resolve(""),
   ]);
   return {
     kind: "created",

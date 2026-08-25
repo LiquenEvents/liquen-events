@@ -76,11 +76,12 @@ function post(
   files: File[],
   id = "t-1",
   thumbs?: File[],
-  extra?: { hashes?: string[]; force?: boolean },
+  extra?: { hashes?: string[]; force?: boolean; medias?: File[] },
 ): [NextRequest, Ctx] {
   const form = new FormData();
   for (const f of files) form.append("files", f);
   for (const t of thumbs ?? []) form.append("thumbs", t);
+  for (const m of extra?.medias ?? []) form.append("medias", m);
   for (const h of extra?.hashes ?? []) form.append("hashes", h);
   if (extra?.force) form.append("force", "1");
   const r = new Request(`https://liquen.test/api/temas/${id}/imagens`, {
@@ -284,6 +285,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       undefined,
       naming(null),
       undefined,
+      undefined,
     );
   });
 
@@ -300,6 +302,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       { bytes: expect.any(Buffer), contentType: "image/jpeg" },
       naming(null),
       undefined,
+      undefined,
     );
     expect(st.upload).toHaveBeenCalledTimes(2);
   });
@@ -315,6 +318,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       undefined,
       naming(null),
       undefined,
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -323,6 +327,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       expect.objectContaining({ contentType: "image/jpeg" }),
       naming(null),
+      undefined,
       undefined,
     );
   });
@@ -340,6 +345,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       undefined,
       naming(null),
       undefined,
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -348,6 +354,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
       undefined,
     );
   });
@@ -362,6 +369,7 @@ describe("POST /api/temas/[id]/imagens", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
       undefined,
     );
   });
@@ -379,6 +387,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       undefined,
       naming(H1),
       undefined,
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -387,6 +396,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(H2),
+      undefined,
       undefined,
     );
   });
@@ -403,6 +413,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       undefined,
       naming(null),
       undefined,
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -411,6 +422,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(null),
+      undefined,
       undefined,
     );
   });
@@ -431,6 +443,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       undefined,
       naming(null),
       undefined,
+      undefined,
     );
     expect(st.upload).toHaveBeenNthCalledWith(
       2,
@@ -439,6 +452,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       "image/jpeg",
       undefined,
       naming(H2),
+      undefined,
       undefined,
     );
   });
@@ -502,6 +516,7 @@ describe("POST /api/temas/[id]/imagens — repetidas", () => {
       undefined,
       naming(H1, true),
       undefined,
+      undefined,
     );
   });
 
@@ -520,5 +535,88 @@ describe("GET /api/temas/[id]/imagens — ordem arrumada à mão", () => {
     );
     await GET(...get("t-1", "?offset=0&limit=60"));
     expect(st.list).toHaveBeenCalledWith("t-1", 60, 0, ["t-1/b.jpg", "t-1/a.jpg"]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DE 1200 px DA BIBLIOTECA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É a derivada que a PÁGINA DO CASAL mostra — as de 400 e 96 servem a grelha e
+ * as tiras daqui. A maior parte das fotografias de uma proposta vem da
+ * Biblioteca, portanto é por aqui que a maior parte delas nasce.
+ *
+ * Nascia no servidor, uma a uma, à primeira vez que alguém olhava. Chega agora
+ * já feita do browser, do mesmo canvas que fez a miniatura.
+ */
+describe("a derivada de 1200 px", () => {
+  it("é entregue ao armazenamento, emparelhada com a sua fotografia", async () => {
+    const [req, c] = post([jpg("a.jpg")], "t-1", [jpg("a.thumb.jpg")], {
+      medias: [jpg("a.mid.jpg", 2048)],
+    });
+
+    const res = await POST(req, c);
+
+    expect(res.status).toBe(200);
+    // O SÉTIMO argumento do `uploadThemeImage`, a seguir à micro. Afirmado por
+    // posição e não por índice: o duplo tem tipo estreito, e indexá-lo passava
+    // nos testes e rebentava o `tsc` — que só corre no CI.
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      expect.objectContaining({ contentType: "image/jpeg" }),
+      naming(null),
+      undefined,
+      expect.objectContaining({ contentType: "image/jpeg" }),
+    );
+  });
+
+  it("sem ela, o carregamento corre na mesma", async () => {
+    // Um browser onde a fabricação falhou, ou um cliente mais antigo do que
+    // esta rota, envia só o original: a fotografia guarda-se e a de 1200 volta
+    // a ser feita a pedido, que é o que acontecia a todas.
+    const [req, c] = post([jpg("a.jpg")], "t-1", [jpg("a.thumb.jpg")]);
+
+    const res = await POST(req, c);
+
+    expect(res.status).toBe(200);
+    expect(st.upload).toHaveBeenNthCalledWith(
+      1,
+      "t-1",
+      expect.any(Buffer),
+      "image/jpeg",
+      expect.objectContaining({ contentType: "image/jpeg" }),
+      naming(null),
+      undefined,
+      undefined,
+    );
+  });
+
+  it("um número de derivadas diferente do de fotos não emparelha nenhuma", async () => {
+    // A mesma regra das miniaturas, e pela mesma razão: emparelhar pela ordem
+    // com listas de tamanhos diferentes daria a derivada de uma fotografia à
+    // fotografia ao lado — e ninguém repara, porque as duas são plausíveis.
+    const [req, c] = post([jpg("a.jpg"), jpg("b.jpg")], "t-1", undefined, {
+      medias: [jpg("a.mid.jpg", 2048)],
+    });
+
+    const res = await POST(req, c);
+
+    expect(res.status).toBe(200);
+    for (const n of [1, 2]) {
+      expect(st.upload).toHaveBeenNthCalledWith(
+        n,
+        "t-1",
+        expect.any(Buffer),
+        "image/jpeg",
+        undefined,
+        naming(null),
+        undefined,
+        undefined,
+      );
+    }
   });
 });

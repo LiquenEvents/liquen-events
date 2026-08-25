@@ -162,6 +162,27 @@ function pairMicros(files: File[], form: FormData): (File | null)[] {
   return micros.map((m) => (m.size === 0 ? null : m));
 }
 
+/**
+ * As de 1200 px, emparelhadas pela ordem — mesma regra do `pairThumbs`.
+ *
+ * É a derivada que a PÁGINA DO CASAL mostra (as de 400 e 96 servem as grelhas
+ * e as tiras do back office). Nascia no servidor, uma a uma, à primeira vez
+ * que alguém olhava para cada fotografia; chega agora já feita do browser, do
+ * mesmo canvas que fez a miniatura.
+ */
+function pairMids(files: File[], form: FormData): (File | null)[] {
+  const mids = form.getAll("medias").filter((f): f is File => f instanceof File);
+  if (mids.length === 0) return files.map(() => null);
+  if (mids.length !== files.length) {
+    log.warn("temas: derivadas de 1200 px ignoradas (não correspondem aos ficheiros)", {
+      files: files.length,
+      medias: mids.length,
+    });
+    return files.map(() => null);
+  }
+  return mids.map((m) => (m.size === 0 ? null : m));
+}
+
 function pairLqips(files: File[], form: FormData): (string | null)[] {
   const raw = form.getAll("lqips").filter((v): v is string => typeof v === "string");
   if (raw.length === 0) return files.map(() => null);
@@ -263,6 +284,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const lqips = pairLqips(files, form);
   const cores = pairCores(files, form);
   const micros = pairMicros(files, form);
+  const mids = pairMids(files, form);
   const force = form.get("force") === "1";
 
   const uploaded: ThemeImage[] = [];
@@ -328,6 +350,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const microInput: ThemeThumbInput | undefined = micro
       ? { bytes: Buffer.from(await micro.arrayBuffer()), contentType: micro.type }
       : undefined;
+    const mid = mids[i];
+    const midInput: ThemeThumbInput | undefined = mid
+      ? { bytes: Buffer.from(await mid.arrayBuffer()), contentType: mid.type }
+      : undefined;
     // `pronto.contentType` e não `file.type`: o que ficou guardado foi o
     // ficheiro CONVERTIDO, e declarar o tipo de entrada faria o bucket guardar
     // um JPEG rotulado de WebP.
@@ -338,6 +364,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       thumbInput,
       { fingerprint: hashes[i], force },
       microInput,
+      midInput,
     );
     if (!res) {
       log.error("temas: upload falhou", null, { id, name: file.name });
