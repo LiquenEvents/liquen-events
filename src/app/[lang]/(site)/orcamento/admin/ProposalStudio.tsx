@@ -3830,6 +3830,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     thumb: File | null,
     cor?: string | null,
     lqip?: string | null,
+    mid?: File | null,
   ): Promise<{ path: string; url: string; thumbUrl?: string; cor?: string }> {
     const post = () => {
       const form = new FormData();
@@ -3851,6 +3852,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // Sem ela, a grelha voltava a puxar 1130 KB por célula para desenhar
       // 174 px (medido em IMAGES-BEFORE.md).
       if (thumb) form.append("thumbs", thumb);
+      // A de 1200 px — a que a PÁGINA DO CASAL mostra. Sai da mesma
+      // descodificação que fez a miniatura, portanto não custa tempo nenhum, e
+      // ~250 KB não se notam ao lado de uma foto de 2 MB.
+      //
+      // Sem ela, esta fotografia só ganha a de 1200 quando ALGUÉM OLHAR para
+      // ela — e numa proposta acabada de enviar essa pessoa é o casal, com um
+      // download do original e uma conversão a acontecer no servidor enquanto
+      // eles olham para um rectângulo vazio.
+      if (mid) form.append("medias", mid);
       return fetch(`/api/orcamento/${quote.id}/assets`, { method: "POST", body: form });
     };
     let res: Response;
@@ -3916,7 +3926,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         const f = files[i];
         try {
           const prepared = await prepareImageWithThumb(f, kind);
-          const im = await uploadOne(prepared.file, prepared.thumb, prepared.cor, prepared.lqip);
+          const im = await uploadOne(
+            prepared.file,
+            prepared.thumb,
+            prepared.cor,
+            prepared.lqip,
+            prepared.mid,
+          );
           // Guardado pelo ÍNDICE: as vias acabam fora de ordem e a ordem das
           // fotos escolhidas é a que a Catarina vê no documento.
           results[i] = { path: im.path };

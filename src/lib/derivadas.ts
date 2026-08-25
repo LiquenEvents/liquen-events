@@ -21,6 +21,7 @@ import {
 } from "@/lib/theme-ref";
 import { garantirBucketDeDerivadas } from "@/lib/theme-storage";
 import { log } from "@/lib/logger";
+import { MEDIA_LADO, MEDIA_QUALIDADE } from "@/lib/derivadas-medidas";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -98,7 +99,7 @@ const MINIATURA = { lado: 400, qualidade: 78 } as const;
  * Qualidade 80 e não 78: esta é a que o casal vê em grande no telemóvel, e os
  * dois pontos custam ~15 KB numa imagem que já pesa 200.
  */
-const MEDIA = { lado: 1200, qualidade: 80 } as const;
+const MEDIA = { lado: MEDIA_LADO, qualidade: MEDIA_QUALIDADE } as const;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

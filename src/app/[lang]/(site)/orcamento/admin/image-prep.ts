@@ -30,6 +30,8 @@ import {
   LQIP_QUALITY,
   MICRO_EDGE,
   MICRO_QUALITY,
+  MID_EDGE,
+  MID_QUALITY,
 } from "./image-worker";
 import { corDominanteDePixeis } from "@/lib/cor-dominante";
 // A mesma explicação que o servidor dá, num sítio só. Este módulo não traz nada
@@ -159,6 +161,22 @@ export function microFileName(name: string): string {
   return jpegName(name).replace(/\.jpg$/i, ".micro.jpg");
 }
 
+export function midFileName(name: string): string {
+  return jpegName(name).replace(/\.jpg$/i, ".mid.jpg");
+}
+
+/**
+ * Vale a pena fabricar a de 1200 px?
+ *
+ * A mesma regra da miniatura, com a medida dela: só quando a fonte é
+ * MAIOR do que o alvo com folga. Uma fotografia que já nasce com 1000 px é
+ * servida tal e qual — fabricar-lhe uma «de 1200» seria ampliar, e produzir um
+ * ficheiro maior do que o que se está a evitar.
+ */
+export function needsMid(w: number, h: number): boolean {
+  return Math.max(w, h) > MID_EDGE * 1.25;
+}
+
 export function thumbFileName(name: string): string {
   return jpegName(name).replace(/\.jpg$/i, ".thumb.jpg");
 }
@@ -182,6 +200,19 @@ export interface PreparedImage {
    * miniatura de 400 px, exactamente como faz hoje.
    */
   micro: File | null;
+  /**
+   * A derivada de 1200 px — a que a PÁGINA DO CASAL mostra.
+   *
+   * A miniatura de 400 px serve as grelhas do back office; num telemóvel a
+   * fotografia da proposta ocupa ~343 pontos a três pixéis por ponto, e o
+   * `srcset` escolhe esta. Nascia no servidor, uma a uma, à primeira vez que
+   * alguém olhava para cada fotografia — e numa proposta acabada de enviar
+   * essa primeira vez é sempre a do casal.
+   *
+   * `null` quando não se justifica (a foto já é pequena) ou não foi possível
+   * criar: aí volta ao caminho de antes, e o servidor fabrica-a a pedido.
+   */
+  mid: File | null;
   /**
    * A imagem de 16 px em `data:` URI — o que a grelha desenha a 0 ms, antes de
    * haver rede (ver `LQIP_EDGE` em `image-worker.ts`).
@@ -324,6 +355,7 @@ async function prepareViaWorker(
   blob: Blob | null;
   thumb: Blob | null;
   micro: Blob | null;
+  mid: Blob | null;
   lqip: string | null;
   cor: string | null;
 } | null> {
@@ -355,7 +387,14 @@ async function prepareViaWorker(
     }
   });
   if (!res || !res.ok) return null;
-  return { blob: res.blob, thumb: res.thumb, micro: res.micro, lqip: res.lqip, cor: res.cor };
+  return {
+    blob: res.blob,
+    thumb: res.thumb,
+    micro: res.micro,
+    mid: res.mid,
+    lqip: res.lqip,
+    cor: res.cor,
+  };
 }
 
 type Source = ImageBitmap | HTMLImageElement;
@@ -476,7 +515,8 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   const keep = keepOriginal(file.type, file.size, kind);
   // Sem miniatura a pedir, um ficheiro já pequeno e suportado nem sequer é
   // descodificado — é o caminho barato que o estúdio de propostas já usava.
-  if (keep && !wantThumb) return { file, thumb: null, micro: null, lqip: null, cor: null };
+  if (keep && !wantThumb)
+    return { file, thumb: null, micro: null, mid: null, lqip: null, cor: null };
 
   // 1ª tentativa: fora do fio principal. Devolve `null` quando este browser não
   // tem `OffscreenCanvas` ou quando o trabalhador não consegue descodificar o
@@ -489,10 +529,13 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     const thumb = viaWorker.thumb
       ? new File([viaWorker.thumb], thumbFileName(file.name), { type: "image/jpeg" })
       : null;
+    const mid = viaWorker.mid
+      ? new File([viaWorker.mid], midFileName(file.name), { type: "image/jpeg" })
+      : null;
     const micro = viaWorker.micro
       ? new File([viaWorker.micro], microFileName(file.name), { type: "image/jpeg" })
       : null;
-    return { file: out, thumb, micro, lqip: viaWorker.lqip, cor: viaWorker.cor };
+    return { file: out, thumb, micro, mid, lqip: viaWorker.lqip, cor: viaWorker.cor };
   }
 
   let source: Source;
@@ -504,7 +547,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     // servidor que o converte antes de guardar — a porta fecha-se lá, e não
     // aqui, precisamente para casos como este.
     if (SUPPORTED.test(file.type)) {
-      return { file, thumb: null, micro: null, lqip: null, cor: null };
+      return { file, thumb: null, micro: null, mid: null, lqip: null, cor: null };
     }
     /**
      * O caso mais provável tem nome: um HEIC arrastado do telemóvel para o
@@ -570,12 +613,23 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
       if (blob) micro = new File([blob], microFileName(file.name), { type: "image/jpeg" });
     }
 
-    // 4) O LQIP, do MESMO canvas — a imagem que a grelha desenha a 0 ms.
+    // 4) A de 1200 px, do mesmo canvas — a que a página do casal mostra.
+    //    Silenciosa como as irmãs: sem ela o servidor fabrica-a à primeira
+    //    visita, que é o que acontecia a todas até aqui.
+    let mid: File | null = null;
+    if (wantThumb && needsMid(bw, bh)) {
+      const d = fitWithin(bw, bh, MID_EDGE);
+      const canvas = drawTo(base, d.w, d.h);
+      const blob = canvas ? await encode(canvas, MID_QUALITY) : null;
+      if (blob) mid = new File([blob], midFileName(file.name), { type: "image/jpeg" });
+    }
+
+    // 5) O LQIP, do MESMO canvas — a imagem que a grelha desenha a 0 ms.
     //    Silencioso como a miniatura: sem ele fica a caixa de hoje.
     const lqip = await lqipNoFioPrincipal(base, bw, bh);
     const cor = corNoFioPrincipal(base, bw, bh);
 
-    return { file: out, thumb, micro, lqip, cor };
+    return { file: out, thumb, micro, mid, lqip, cor };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.

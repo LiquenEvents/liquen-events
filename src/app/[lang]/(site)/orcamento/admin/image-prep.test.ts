@@ -4,11 +4,14 @@ import {
   COVER_QUALITY,
   fitWithin,
   keepOriginal,
+  midFileName,
+  needsMid,
   needsThumb,
   thumbFileName,
   THUMB_EDGE,
 } from "./image-prep";
-import { planResize, planThumb } from "./image-worker";
+import { MID_EDGE, MID_QUALITY, planResize, planThumb } from "./image-worker";
+import { MEDIA_LADO, MEDIA_QUALIDADE } from "@/lib/derivadas-medidas";
 
 /**
  * Pure-logic coverage for the upload image preparation. The canvas/decode path
@@ -158,5 +161,64 @@ describe("thumbFileName", () => {
 
   it("keeps dots inside the name", () => {
     expect(thumbFileName("casa.da.pedra.png")).toBe("casa.da.pedra.thumb.jpg");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DE 1200 px NASCE NO NAVEGADOR, E NÃO À PRIMEIRA VISITA DO CASAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A miniatura de 400 px serve as GRELHAS do back office. A página da proposta
+ * mostra outra coisa: num telemóvel a fotografia ocupa ~343 pontos a três
+ * pixéis por ponto, e o `srcset` escolhe a de 1200.
+ *
+ * Essa nascia no servidor, uma a uma, à primeira vez que alguém olhava para
+ * cada fotografia — e numa proposta acabada de enviar essa pessoa é o casal.
+ * Aqui sai do MESMO canvas que já fez a miniatura.
+ */
+describe("a derivada de 1200 px", () => {
+  it("tem as medidas do servidor — senão a mesma foto sai diferente conforme o caminho", () => {
+    // Se estas divergirem, uma fotografia carregada pelo estúdio fica
+    // diferente da mesma fotografia fabricada pelo lote, e ninguém repara.
+    expect(MID_EDGE).toBe(MEDIA_LADO);
+    expect(Math.round(MID_QUALITY * 100)).toBe(MEDIA_QUALIDADE);
+  });
+
+  it("não se fabrica quando a foto já é pequena — seria ampliar", () => {
+    // Uma fotografia que nasce com 1000 px é servida tal e qual: fabricar-lhe
+    // uma «de 1200» produzia um ficheiro MAIOR do que o que se está a evitar.
+    expect(needsMid(1000, 700)).toBe(false);
+    expect(needsMid(1200, 900)).toBe(false);
+    // Com folga suficiente, vale a pena.
+    expect(needsMid(2200, 1467)).toBe(true);
+    expect(needsMid(1467, 2200)).toBe(true);
+  });
+
+  it("a mesma aritmética do trabalhador e do fio principal", () => {
+    // As duas cópias existem porque o trabalhador não pode importar um módulo
+    // "use client" cheio de DOM. Esta é a rede contra divergirem em silêncio.
+    for (const [w, h] of [
+      [4032, 3024],
+      [2200, 1467],
+      [1000, 700],
+      [1200, 900],
+      [0, 0],
+    ] as [number, number][]) {
+      expect(planThumb(w, h, MID_EDGE)).toBe(needsMid(w, h));
+    }
+  });
+
+  it("o nome diz o que é, e acaba sempre em .jpg", () => {
+    expect(midFileName("praia.jpg")).toBe("praia.mid.jpg");
+    expect(midFileName("IMG_0042.HEIC")).toBe("IMG_0042.mid.jpg");
+    expect(midFileName("casa.da.pedra.png")).toBe("casa.da.pedra.mid.jpg");
+  });
+
+  it("não se confunde com a miniatura nem com a micro", () => {
+    // Três derivadas da mesma fotografia sobem no mesmo pedido; nomes iguais
+    // fariam uma escrever por cima da outra.
+    const nomes = new Set([midFileName("f.jpg"), thumbFileName("f.jpg"), "f.micro.jpg"]);
+    expect(nomes.size).toBe(3);
   });
 });

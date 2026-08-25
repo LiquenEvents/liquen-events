@@ -16,6 +16,8 @@ const st = vi.hoisted(() => ({
   /** O documento gravado da proposta (null = não há). */
   doc: null as unknown,
   upload: vi.fn(async (id: string) => ({ path: `${id}/x.jpg`, url: "https://signed/x.jpg" })),
+  /** O que guardou a de 1200 px, para se poder afirmar que foi guardada. */
+  guardarMedia: vi.fn(async (_p: string, _b: Buffer, _t?: string) => true),
   list: vi.fn(
     async (id: string): Promise<{ path: string; url: string; thumbUrl?: string }[]> => [
       { path: `${id}/x.jpg`, url: "https://signed/x.jpg" },
@@ -43,6 +45,9 @@ vi.mock("@/lib/proposal-storage", () => ({
   ),
   signProposalThumbs: vi.fn(async () => new Map<string, string>()),
   uploadProposalThumb: vi.fn(async () => ""),
+  // A de 1200 px — a que a PÁGINA DO CASAL mostra. Passou a chegar já feita do
+  // browser, em vez de nascer no servidor à primeira vez que alguém olha.
+  uploadProposalMid: st.guardarMedia,
 }));
 /** O documento gravado desta proposta — é aí que estão escritas as referências
  *  das fotos que a listagem da pasta não vê. */
@@ -82,9 +87,15 @@ function file(name: string, type: string, size = 8): File {
   return new File([new Uint8Array(size)], name, { type });
 }
 
-function uploadReq(files: File[], id = "q-1"): [NextRequest, { params: Promise<{ id: string }> }] {
+function uploadReq(
+  files: File[],
+  id = "q-1",
+  extra?: { thumbs?: File[]; medias?: File[] },
+): [NextRequest, { params: Promise<{ id: string }> }] {
   const fd = new FormData();
   for (const f of files) fd.append("files", f);
+  for (const t of extra?.thumbs ?? []) fd.append("thumbs", t);
+  for (const m of extra?.medias ?? []) fd.append("medias", m);
   const req = new Request(`https://liquen.test/api/orcamento/${id}/assets`, {
     method: "POST",
     body: fd,
@@ -394,5 +405,80 @@ describe("o carregamento grava a forma da fotografia", () => {
     }) as unknown as NextRequest;
     await POST(req, { params: Promise.resolve({ id: "q-1" }) });
     expect(gravado()).not.toHaveProperty("lqip");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DE 1200 px CHEGA JÁ FEITA — E NÃO NASCE À PRIMEIRA VISITA DO CASAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É a derivada que a PÁGINA DO CASAL mostra: num telemóvel a fotografia ocupa
+ * ~343 pontos a três pixéis por ponto, e é essa que o `srcset` escolhe. A de
+ * 400 px serve as grelhas do back office.
+ *
+ * Nascia no servidor, uma a uma, à primeira vez que alguém olhava para cada
+ * fotografia — um download do original, um `sharp` e um upload, tudo dentro do
+ * pedido de quem estava a ver. Numa proposta acabada de enviar, quem está a ver
+ * é o casal, a olhar para um rectângulo vazio.
+ *
+ * Agora sobe ao lado do original, do mesmo canvas que já fez a miniatura.
+ */
+describe("a derivada de 1200 px que vem do browser", () => {
+  beforeEach(() => {
+    st.authed = true;
+    st.dbConfigured = true;
+    vi.clearAllMocks();
+  });
+
+  it("é guardada, com o caminho da fotografia que acabou de subir", async () => {
+    const [req, ctx] = uploadReq([file("f.jpg", "image/jpeg")], "q-1", {
+      medias: [file("f.mid.jpg", "image/jpeg", 2048)],
+    });
+
+    const res = await POST(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(st.guardarMedia).toHaveBeenCalledTimes(1);
+    // O caminho é o do ORIGINAL guardado, e não o nome do ficheiro que veio no
+    // formulário: é por esse caminho que a página a vai procurar.
+    expect(st.guardarMedia.mock.calls[0][0]).toBe("q-1/x.jpg");
+  });
+
+  it("sem ela, o carregamento corre na mesma", async () => {
+    // Um browser onde a fabricação falhou, ou um cliente mais antigo do que
+    // esta rota, envia só o original. A fotografia guarda-se na mesma e a de
+    // 1200 volta a ser feita a pedido — que é o que acontecia a todas.
+    const [req, ctx] = uploadReq([file("f.jpg", "image/jpeg")]);
+
+    const res = await POST(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(st.guardarMedia).not.toHaveBeenCalled();
+  });
+
+  it("uma que não seja imagem não é guardada", async () => {
+    const [req, ctx] = uploadReq([file("f.jpg", "image/jpeg")], "q-1", {
+      medias: [file("f.mid.pdf", "application/pdf", 2048)],
+    });
+
+    const res = await POST(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(st.guardarMedia).not.toHaveBeenCalled();
+  });
+
+  it("guardá-la falhar não deita abaixo um carregamento que correu bem", async () => {
+    // Melhor esforço, como a miniatura: a fotografia JÁ está guardada quando se
+    // chega aqui, e devolver erro faria alguém repetir um carregamento que
+    // resultou — criando a foto duas vezes.
+    st.guardarMedia.mockResolvedValueOnce(false);
+    const [req, ctx] = uploadReq([file("f.jpg", "image/jpeg")], "q-1", {
+      medias: [file("f.mid.jpg", "image/jpeg", 2048)],
+    });
+
+    const res = await POST(req, ctx);
+
+    expect(res.status).toBe(200);
   });
 });

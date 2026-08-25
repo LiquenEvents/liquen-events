@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { isAuthed } from "@/lib/admin-auth";
 import {
   uploadProposalImage,
+  uploadProposalMid,
   uploadProposalThumb,
   listProposalImages,
   signProposalPaths,
@@ -249,6 +250,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // a grelha cai para o original, que é o comportamento de hoje.
   const thumbs = form.getAll("thumbs").filter((f): f is File => f instanceof File);
 
+  /**
+   * As de 1200 px, fabricadas no browser (ver `MID_EDGE` em `image-worker.ts`).
+   *
+   * É a derivada que a PÁGINA DO CASAL mostra — a de 400 px serve as grelhas
+   * daqui. Nascia no servidor, uma a uma, à primeira vez que alguém olhava
+   * para cada fotografia: um download do original, um `sharp` e um upload,
+   * tudo dentro do pedido de quem estava a ver. Numa proposta acabada de
+   * enviar, essa pessoa é o casal.
+   *
+   * Opcionais pela mesma razão que as miniaturas: um cliente antigo, ou um
+   * browser onde a fabricação falhou, envia só o original e continua a
+   * funcionar — a de 1200 volta a ser feita a pedido, como era.
+   */
+  const medias = form.getAll("medias").filter((f): f is File => f instanceof File);
+
   // As CORES dominantes, calculadas no browser (ver `corDe` em
   // `image-worker.ts`) e emparelhadas pela ordem, como as miniaturas.
   // Comprimentos diferentes significam que os dois lados discordam sobre o que
@@ -372,6 +388,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         Buffer.from(await thumb.arrayBuffer()),
         thumb.type,
       );
+    }
+    // A de 1200 px, pelo mesmo caminho e com as mesmas regras da miniatura:
+    // só depois de o original estar guardado, e sempre em melhor esforço.
+    // `uploadProposalMid` nunca lança e devolve `false` quando não dá — e aí
+    // esta fotografia fica exactamente como estavam todas até aqui, com a
+    // derivada a ser fabricada à primeira visita.
+    const media = medias[indice];
+    if (media && OK_TYPES.test(media.type) && media.size <= MAX_BYTES) {
+      await uploadProposalMid(res.path, Buffer.from(await media.arrayBuffer()), media.type);
     }
     // A cor entra na linha da foto. Melhor esforço, como a miniatura: a
     // fotografia já está guardada, e falhar aqui deixa-a sem cor — exactamente
