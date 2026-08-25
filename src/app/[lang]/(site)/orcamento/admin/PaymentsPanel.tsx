@@ -37,6 +37,43 @@ const GRID =
   "@min-[36rem]:gap-y-0 " +
   "@min-[36rem]:grid-cols-[6.25rem_5.5rem_7.25rem_minmax(3.5rem,1fr)_5rem_5.5rem]";
 
+/**
+ * As peças de um quadrado de número — a caixa, o valor, o rótulo e a nota.
+ *
+ * Em constantes porque os três têm de mudar de forma AO MESMO TEMPO: abaixo dos
+ * 26 rem de painel são três linhas de uma caixa só, acima são três cartões. Um
+ * deles ficar para trás é a leitura do dinheiro partir-se a meio.
+ *
+ * O `EventCosts` tem o mesmo bloco, com os mesmos limiares e as mesmas razões —
+ * os dois painéis vivem lado a lado no dossier e não podem divergir.
+ */
+const QUADRADO =
+  "flex flex-wrap items-baseline gap-x-3 p-3 text-left " +
+  "@min-[26rem]:block @min-[26rem]:rounded-xl @min-[26rem]:border @min-[26rem]:text-center";
+
+/**
+ * O tom do quadrado, escrito à parte da forma.
+ *
+ * Separado do `QUADRADO` de propósito: o terceiro tem tom próprio quando há
+ * dinheiro em falta, e duas classes de cor no MESMO variante (`@min-[26rem]:`)
+ * resolvem-se pela ordem da FOLHA DE ESTILOS, não pela ordem em que se
+ * escreveram — é a armadilha que o `globals.css` conta por extenso a propósito
+ * do `.alvo-toque`. Assim cada quadrado traz UMA cor, e não há empate a desfazer.
+ */
+const NEUTRO = "@min-[26rem]:border-foreground/[0.06] @min-[26rem]:bg-foreground/[0.02]";
+
+/** O número. `whitespace-nowrap` é o que impede «202 889,00 €» de partir em duas. */
+const VALOR =
+  "order-2 ml-auto whitespace-nowrap font-semibold tabular-nums " +
+  "@min-[26rem]:order-none @min-[26rem]:ml-0";
+
+/** O rótulo, que abre a linha no telemóvel e volta para baixo do número a 26 rem. */
+const ROTULO = "order-1 text-[9px] uppercase tracking-[0.2em] @min-[26rem]:mt-1";
+
+/** A linha de apoio (o s/ IVA e o IVA): sempre por baixo, sempre a largura toda. */
+const NOTA =
+  "order-3 mt-1 w-full text-[9px] leading-tight tabular-nums text-foreground/35 @min-[26rem]:w-auto";
+
 /** Data curta para a tabela de pagamentos ("12 mai"). */
 const fmtRowDate = (d: string) =>
   isDateKey(d)
@@ -543,7 +580,12 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
   return (
     // `@container`: as colunas do formulário/tabela reagem à largura DESTE painel
     // (que muda entre o estúdio, o separador Financeiro e o tablet), não à janela.
-    <div className="@container border-t border-foreground/10 pt-5">
+    //
+    // O `pt-5` do separador eram 20 px de ar por cima do título a qualquer
+    // largura. `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma
+    // vista, e é o que os painéis vizinhos desta zona do dossier passaram a
+    // ler: um separador que mede o mesmo em todos, e 8 px de volta aqui.
+    <div className="@container border-t border-foreground/10 pt-[var(--bo-p-vista)]">
       <div className="flex items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Pagamentos</p>
         {/* Contract reference */}
@@ -589,28 +631,48 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           3 × 130 px de célula mais os intervalos, que é o mínimo em que o "Em
           falta" cabe inteiro.
 
-          O "Em falta" atravessa as duas colunas em baixo, e não fica meio a
-          meio com o "Recebido": é o herói deste bloco, e uma linha só para ele
-          é a leitura que já tinha no computador. */}
-      <div className="grid grid-cols-2 @min-[26rem]:grid-cols-3 gap-2.5 mb-1.5">
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-3 text-center">
-          <p className="text-base font-semibold tabular-nums text-foreground/85">{eur2(total)}</p>
-          <p className="text-foreground/40 text-[9px] tracking-[0.2em] uppercase mt-1">
-            Total (c/ IVA)
-          </p>
-          <p className="text-foreground/35 text-[9px] tabular-nums mt-1 leading-tight">
+          O "Em falta" atravessava as duas colunas em baixo, para não ficar meio
+          a meio com o "Recebido": é o herói deste bloco. Já não precisa de
+          atravessar nada — ver a nota a seguir. */}
+      {/* ── E O TERCEIRO NÍVEL DE MOLDURA SAI ──────────────────────────────
+          Duas colunas resolveram as três, mas o quadrado continuava a ser uma
+          caixa dentro do cartão de zona, que já está dentro de uma coluna.
+          Medido a 375 px: 279 px de painel, menos o intervalo, dá 134 px de
+          célula — e os `p-3` deixam **110 px** de conteúdo para um número que
+          precisa de 109 («202 889,00 €»), com o "Em falta" a `text-lg` a
+          precisar de 121. Um pixel de folga não é folga: é o número a partir-se
+          em duas linhas assim que o valor sobe de escalão.
+
+          Abaixo dos 26 rem os três perdem a moldura própria e passam a três
+          linhas da MESMA caixa, com um risco a separá-las — rótulo à esquerda,
+          número à direita. A célula passa de 110 para **255 px**, e o
+          `whitespace-nowrap` garante que o valor nunca parte ao meio: se não
+          couber ao lado do rótulo, o `flex-wrap` dá-lhe a linha inteira. É o
+          padrão do `Overview.tsx` (:1641) e o mesmo que o `EventCosts` faz na
+          linha equivalente — os dois painéis vivem lado a lado no dossier.
+
+          Container query e não `sm:`: num iPad a 768 px o `sm:` disparava e o
+          painel continuava com os mesmos 279. A partir de 26 rem volta a grelha
+          de três cartões, como sempre esteve. */}
+      <div className="flex flex-col divide-y divide-foreground/[0.08] rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] mb-1.5 @min-[26rem]:grid @min-[26rem]:grid-cols-3 @min-[26rem]:gap-2.5 @min-[26rem]:divide-y-0 @min-[26rem]:rounded-none @min-[26rem]:border-0 @min-[26rem]:bg-transparent">
+        <div className={`${QUADRADO} ${NEUTRO}`}>
+          <p className={`${VALOR} text-base text-foreground/85`}>{eur2(total)}</p>
+          <p className={`${ROTULO} text-foreground/40`}>Total (c/ IVA)</p>
+          <p className={NOTA}>
             s/ IVA {eur2(totalNet)} · IVA {eur2(totalIva)}
           </p>
         </div>
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-3 text-center">
-          <p className="text-base font-semibold tabular-nums text-[#4d6350]">
-            {eur2(headlinePaid)}
-          </p>
-          <p className="text-foreground/40 text-[9px] tracking-[0.2em] uppercase mt-1">Recebido</p>
+        <div className={`${QUADRADO} ${NEUTRO}`}>
+          <p className={`${VALOR} text-base text-[#4d6350]`}>{eur2(headlinePaid)}</p>
+          <p className={`${ROTULO} text-foreground/40`}>Recebido</p>
         </div>
         {allReceived ? (
-          <div className="col-span-2 @min-[26rem]:col-span-1 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.05] p-3 text-center flex flex-col items-center justify-center">
-            <p className="text-sm font-semibold text-[#4d6350] inline-flex items-center gap-1.5">
+          <div
+            className={`${QUADRADO} @min-[26rem]:border-[#4d6350]/25 @min-[26rem]:bg-[#4d6350]/[0.05]`}
+          >
+            <p
+              className={`${VALOR} inline-flex items-center gap-1.5 text-sm text-[#4d6350] @min-[26rem]:justify-center`}
+            >
               Tudo recebido
               <svg
                 width="13"
@@ -624,27 +686,25 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 <path d="M4 12.5 9.5 18 20 6.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </p>
-            <p className="text-[#4d6350]/60 text-[9px] tracking-[0.2em] uppercase mt-1">Em falta</p>
+            <p className={`${ROTULO} text-[#4d6350]/60`}>Em falta</p>
           </div>
         ) : (
           <div
-            className={`col-span-2 @min-[26rem]:col-span-1 rounded-xl border p-3 text-center ${
+            className={`${QUADRADO} ${
               outstanding > 0
-                ? "border-[#b5654a]/35 bg-[#b5654a]/[0.05]"
-                : "border-foreground/[0.06] bg-foreground/[0.02]"
+                ? "@min-[26rem]:border-[#b5654a]/35 @min-[26rem]:bg-[#b5654a]/[0.05]"
+                : NEUTRO
             }`}
           >
             <p
-              className={`font-semibold tabular-nums ${
+              className={`${VALOR} ${
                 outstanding > 0 ? "text-lg text-[#b5654a]" : "text-base text-foreground/45"
               }`}
             >
               {eur2(outstanding)}
             </p>
             <p
-              className={`text-[9px] tracking-[0.2em] uppercase mt-1 ${
-                outstanding > 0 ? "text-[#b5654a]/70" : "text-foreground/40"
-              }`}
+              className={`${ROTULO} ${outstanding > 0 ? "text-[#b5654a]/70" : "text-foreground/40"}`}
             >
               Em falta
             </p>

@@ -289,7 +289,10 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   const seeded = items.length > 0;
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
+    // O `pt-5` eram 20 px a qualquer largura. `--bo-p-vista` (12 → 24) é o
+    // token que os painéis vizinhos desta zona passaram a ler para o mesmo
+    // separador — um só ritmo, e 8 px de volta no telemóvel.
+    <div className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
         <div className="flex flex-wrap items-center gap-2">
@@ -342,7 +345,6 @@ export default function ProductionPlan({ quote, onChange }: Props) {
 
       {!seeded ? (
         <EmptyState
-          className="px-4 py-10"
           icon={
             <svg
               width="24"

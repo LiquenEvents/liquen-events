@@ -207,11 +207,17 @@ export function CuradoriaDeFotos({
       {/* ── O PROGRESSO ─────────────────────────────────────────────────────
           «12 de 37» e não uma barra: o número diz quantas faltam, que é a
           pergunta de quem está a meio de quarenta fotografias parecidas. */}
-      <div className="flex items-center justify-between gap-3">
+      {/* `justify-between` não quebra: empurra cada um para o seu extremo e,
+          quando deixam de caber, o de baixo sai da margem em vez de descer.
+          Medido a 320 px (o iPhone SE de origem): «12 de 37» pede 56 px, os dois
+          botões pedem 184 com o intervalo, e sobram 280 — falta 12. `flex-wrap`
+          sem ponto de corte nenhum: a fila continua uma linha em todos os
+          telemóveis onde cabe, e desce sozinha onde não cabe. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="bo-text-muted text-xs tabular-nums" aria-live="polite">
           {indice + 1} de {images.length}
         </p>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button size="sm" variant="ghost" onClick={anular} disabled={historico.length === 0}>
             ↩ Anular
           </Button>
@@ -284,7 +290,10 @@ export function CuradoriaDeFotos({
           ninguém descobre é uma funcionalidade que não existe; quem navega por
           teclado não desliza nada; e há dias em que se está com uma mão
           ocupada. */}
-      <div className="mt-3 flex items-center justify-center gap-3">
+      {/* Mesma razão do cabeçalho: os três pedem 310 px com os intervalos e a
+          320 px só há 280. Sem `flex-wrap`, «Incluir →» — o botão que decide —
+          era o que saía da margem. */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
         <Button variant="secondary" onClick={() => decidir(false)}>
           ← Saltar
         </Button>
