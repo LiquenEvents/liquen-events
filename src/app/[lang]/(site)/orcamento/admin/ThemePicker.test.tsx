@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MAX_IMPORT_BATCH, THEME_PAGE_SIZE, type ThemeSummary } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import ThemePicker, { __resetThemePickerState } from "./ThemePicker";
@@ -2154,5 +2154,47 @@ describe("escolher um tema no computador", () => {
       emFalta,
       "um `flex` sem `min-h-0` entre a lista e a coluna: a altura não desce e a lista deixa de rolar",
     ).toEqual([]);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O NOME DA FOLHA DIZ PARA QUE SERVE **E** EM QUE TEMA SE ESTÁ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * É a primeira coisa que um leitor de ecrã anuncia ao abrir isto, e é a única
+ * que anuncia — depois dela vem uma grelha de «Foto 1 de 12».
+ *
+ * Já esteve errado das duas maneiras possíveis, o que é a razão de haver aqui
+ * um teste e não só um comentário:
+ *
+ *   · uma `aria-label` fixa («Escolher fotos da biblioteca de temas») dizia o
+ *     TRABALHO e nunca o tema — e era uma cópia paralela do cabeçalho, que
+ *     ninguém se lembrava de actualizar;
+ *   · o cabeçalho que a substituiu («Biblioteca de temas» + o tema) dizia o
+ *     TEMA e deixou de dizer o trabalho.
+ *
+ * As duas metades, e vindas do texto que está mesmo escrito no cabeçalho.
+ */
+describe("o nome acessível da folha", () => {
+  it("junta o trabalho ao tema activo, a partir do texto visível", async () => {
+    await openPicker(true);
+    const folha = screen.getByRole("dialog");
+    const nome = (folha.getAttribute("aria-labelledby") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent ?? "")
+      .join(" ");
+
+    expect(nome, "o nome não diz para que serve a folha").toMatch(
+      /Escolher fotos da biblioteca de temas/i,
+    );
+    expect(nome, "o nome não diz em que tema se está").toMatch(new RegExp(THEME.name));
+
+    // E é MESMO o texto visível: nada de `aria-label` paralela por cima dele.
+    expect(folha.getAttribute("aria-label")).toBeNull();
+    for (const pedaco of ["Escolher fotos da biblioteca de temas", THEME.name]) {
+      expect(within(folha).getAllByText(pedaco).length).toBeGreaterThan(0);
+    }
   });
 });

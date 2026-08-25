@@ -2141,11 +2141,28 @@ export default function ThemePicker({
     <FolhaOuDialogo
       aberto
       onFechar={dismiss}
-      /* O nome acessível continua a ser «Biblioteca de temas» + o tema activo —
-         só que agora vem do que está ESCRITO no cabeçalho, e não de uma
-         `aria-label` paralela que ninguém se lembrava de actualizar. */
-      sobretitulo="Biblioteca de temas"
-      titulo={activeTheme ? activeTheme.name : "Escolher fotos"}
+      /* ── O NOME DESTA FOLHA DIZ AS DUAS COISAS ─────────────────────────
+         O que uma pessoa com leitor de ecrã ouve ao abrir isto é o
+         `sobretitulo` mais o `titulo`, porque na leitura são uma frase só:
+         «Escolher fotos da biblioteca de temas, Itália».
+
+         PARA QUE SERVE (o sobretítulo) e EM QUE TEMA SE ESTÁ (o título) têm
+         de estar as duas lá. Havia aqui uma `aria-label` que só dizia a
+         primeira («Escolher fotos da biblioteca de temas») e nunca o tema; a
+         primeira versão deste cabeçalho corrigiu isso mas trocou uma pela
+         outra — passou a dizer «Biblioteca de temas, Itália», que anuncia
+         onde se está e não o que se veio cá fazer.
+
+         E continua a ser o TEXTO VISÍVEL, que é a regra que motivou a troca e
+         é a boa: uma etiqueta paralela é uma cópia que ninguém se lembra de
+         actualizar, e foi por isso que a `aria-label` antiga ficou anos a
+         dizer sempre a mesma frase enquanto o painel por baixo dela mudava.
+
+         O `e2e/temas.spec.ts` procura a folha por «Escolher fotos da
+         biblioteca de temas»; a âncora dele NÃO se moveu — o que se repôs foi
+         a propriedade que ele guarda. */
+      sobretitulo="Escolher fotos da biblioteca de temas"
+      titulo={activeTheme ? activeTheme.name : "Sem tema escolhido"}
       largura="largo"
       folhaAlta
       corpoProprio

@@ -70,6 +70,17 @@ import { useEffect, useRef } from "react";
  */
 let proximaCamada = 1;
 
+/**
+ * As saídas ADIADAS: entradas que já não têm dono mas ainda estão na história,
+ * à espera do `back()` que as tira. Ver o bloco grande na montagem.
+ *
+ * Módulo, como o contador, e pela mesma razão: a história é UMA. Uma camada que
+ * arma enquanto há uma saída pendente reaproveita a entrada dela em vez de
+ * empilhar outra — e é isso que impede o `back()` já pedido de aterrar numa
+ * entrada com um número mais baixo do que o dela.
+ */
+const saidasAdiadas: { cancelar: () => void; camada: number }[] = [];
+
 /** A marca que distingue as nossas entradas de qualquer outra da aplicação. */
 export const MARCA_DA_CAMADA = "liquenCamada";
 
@@ -98,10 +109,47 @@ export function useCamadaDeHistoria(aberta: boolean, fechar: () => void): void {
   useEffect(() => {
     if (!aberta || typeof window === "undefined") return;
 
+    /* ── O DESMONTAR-E-MONTAR NÃO PODE EMPILHAR DUAS ENTRADAS ───────────────
+       MEDIDO, no seletor de fotos aberto contra `next dev`: a folha abria e
+       fechava-se sozinha no mesmo instante, e o passeio via um diálogo que
+       «não existe». A sequência, lida no `history`:
+
+         pushState {camada:1}   ← montagem
+         history.back()         ← limpeza; o `popstate` dela é ASSÍNCRONO
+         pushState {camada:2}   ← segunda montagem, ainda na mesma tarefa
+         replaceState {…}       ← o router do Next reescreve o estado do topo
+                                   e leva a nossa marca com ele
+         popstate               ← o `back()` de cima chega AGORA: cai numa
+                                   entrada sem marca, `camadaActual()` dá 0,
+                                   0 < 2, e a camada conclui que foi consumida
+
+       Quem desmonta e volta a montar assim é o Modo Estrito do React, que
+       corre os efeitos duas vezes em desenvolvimento precisamente para
+       apanhar efeitos que não sobrevivem a isso — e este não sobrevivia.
+
+       A saída é não pedir o `back()` já: adia-se uma MICROTAREFA. Se a
+       camada voltar a montar entretanto — é o que o Modo Estrito faz, na
+       mesma tarefa e portanto antes de qualquer microtarefa correr —,
+       cancela-se a saída e REAPROVEITA-SE a entrada que ainda está na
+       história, em vez de empilhar uma segunda.
+
+       MICROTAREFA e não `setTimeout(0)`, e a diferença mediu-se: com um
+       temporizador, o `back()` de uma folha fechada aterrava a meio do que
+       viesse a seguir — 21 testes do `ThemePicker` passaram a fechar-se
+       sozinhos com o `back()` do teste anterior. Uma microtarefa esgota-se
+       antes de mais alguém correr. Para quem carrega no «×» não muda nada: o
+       `popstate` do `back()` já era assíncrono de qualquer maneira. */
     /** O número da entrada desta camada. Muda se a camada se rearmar — ver abaixo. */
-    let minha = proximaCamada;
-    proximaCamada += 1;
-    window.history.pushState({ [MARCA_DA_CAMADA]: minha }, "");
+    let minha: number;
+    const adiada = saidasAdiadas.pop();
+    if (adiada) {
+      adiada.cancelar();
+      minha = adiada.camada;
+    } else {
+      minha = proximaCamada;
+      proximaCamada += 1;
+      window.history.pushState({ [MARCA_DA_CAMADA]: minha }, "");
+    }
 
     /** A nossa entrada já foi consumida? Então não há nada para tirar. */
     let consumida = false;
@@ -138,7 +186,21 @@ export function useCamadaDeHistoria(aberta: boolean, fechar: () => void): void {
       // A ordem importa: sair da escuta ANTES de pedir o `back()`, senão esta
       // camada ouvia o seu próprio fecho.
       window.removeEventListener("popstate", aoVoltar);
-      if (!consumida && camadaActual() >= minha) window.history.back();
+      if (consumida || camadaActual() < minha) return;
+      // Adiada e cancelável: ver o bloco na montagem.
+      let cancelada = false;
+      const saida = {
+        cancelar: () => {
+          cancelada = true;
+        },
+        camada: minha,
+      };
+      saidasAdiadas.push(saida);
+      queueMicrotask(() => {
+        const i = saidasAdiadas.indexOf(saida);
+        if (i >= 0) saidasAdiadas.splice(i, 1);
+        if (!cancelada) window.history.back();
+      });
     };
   }, [aberta]);
 }
