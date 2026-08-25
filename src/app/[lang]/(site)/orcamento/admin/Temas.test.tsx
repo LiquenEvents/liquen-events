@@ -2280,9 +2280,10 @@ describe("temPoucasFotos", () => {
 describe("Grelha de fotos de um tema — ergonomia de toque", () => {
   it("começa em DUAS colunas e só chega a três quando há largura", () => {
     // Duas colunas a 375 px dão células de 150,5 px, que é o que permite três
-    // alvos de 44 px sem eles se tocarem. As três colunas voltam a 26rem.
+    // alvos de 44 px sem eles se tocarem. As três colunas voltam quando a ZONA
+    // DE LARGAR chega a 22rem — ver a tabela no comentário do `GRELHA_DE_FOTOS`.
     expect(GRELHA_DE_FOTOS).toContain("grid-cols-2");
-    expect(GRELHA_DE_FOTOS).toContain("min-[26rem]:grid-cols-3");
+    expect(GRELHA_DE_FOTOS).toContain("@min-[22rem]:grid-cols-3");
     // A três colunas SEM condição nenhuma é exactamente o defeito medido.
     expect(GRELHA_DE_FOTOS).not.toMatch(/(^|\s)grid-cols-3(\s|$)/);
   });
@@ -2303,6 +2304,281 @@ describe("Grelha de fotos de um tema — ergonomia de toque", () => {
       const botao = screen.getByRole("button", { name: nome });
       expect(botao.className, `${nome} sem alvo de 44 px`).toContain("alvo-toque");
     }
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PISO DA CÉLULA — 111 px, e em TODAS as larguras que interessam
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O comentário do `GRELHA_DE_FOTOS` fixa um número: 111 px é a célula mais
+ * pequena onde os três botões de 44 px de uma foto ainda cabem sem se tocarem.
+ * Só que os degraus da grelha mediam a JANELA e a célula depende da ZONA DE
+ * LARGAR — e as duas larguras separam-se exactamente em `lg`, que é onde a
+ * navegação deixa de ser uma gaveta por cima da página e passa a ocupar 256 px
+ * em fluxo. A 1024 px de janela sobravam 654 para a grelha e ela pedia SEIS
+ * colunas: células de 102,3 px, com três alvos de 44 px lá dentro. Num iPad
+ * Pro deitado — 1024 px, e dedo — era esse o ecrã.
+ *
+ * ── PORQUE É QUE O TESTE RESOLVE AS CLASSES À MÃO ───────────────────────────
+ *
+ * O jsdom não faz disposição, não avalia `@media` e não avalia `@container`:
+ * renderizar a 1024 e a 1440 dá o mesmo DOM com a mesma `className`, e um
+ * `getBoundingClientRect` devolve zeros. Um teste que se ficasse pelo
+ * `toContain("lg:grid-cols-6")` afirmava a ORTOGRAFIA da classe e não a
+ * decisão — passava na mesma com o degrau errado ao lado.
+ *
+ * Por isso o `colunasEm()` faz o que o navegador faria: separa cada classe nas
+ * suas variantes, decide quais estão ligadas naquela janela e naquele
+ * contentor, e devolve as colunas que sobram. Depois a aritmética é a mesma do
+ * ficheiro — `(largura − gap·(n−1)) / n`. É a escolha do `Cortes.movel.test.tsx`
+ * e do `adaptativo.test.tsx`; a geometria a sério mede-se no navegador, o que
+ * aqui se prende é a decisão.
+ */
+
+/** As larguras de janela que interessam a este back office. */
+const JANELAS = [375, 640, 1024, 1440] as const;
+
+/** `w-64` da navegação — `fixed` (fora do fluxo) até `lg`, `sticky` daí para cima. */
+const BARRA_LATERAL = 256;
+/** O `gap-2` da grelha. */
+const GAP_DA_GRELHA = 8;
+/** O número que o comentário do `GRELHA_DE_FOTOS` fixa como piso. */
+const PISO_DA_CELULA = 111;
+
+/** O `px` do `VIEW_WRAP` do `AdminClient`, por lado: px-4 / sm:px-6 / lg:px-10. */
+const respiroDaVista = (janela: number) => (janela >= 1024 ? 40 : janela >= 640 ? 24 : 16);
+
+/**
+ * A largura ÚTIL da zona de largar — que é o contentor que a grelha mede.
+ *
+ * Janela − barra lateral (só a partir de `lg`, onde ela entra no fluxo) − o
+ * `px` da vista dos dois lados − a moldura de 1 px e o `p-4` da própria zona
+ * de largar dos dois lados. Dá 309 px a 375, 558 a 640, 654 a 1024 e 1070 a
+ * 1440.
+ */
+function zonaDeLargar(janela: number): number {
+  const emFluxo = janela - (janela >= 1024 ? BARRA_LATERAL : 0);
+  return Math.min(emFluxo, 1600) - 2 * respiroDaVista(janela) - 2 * (1 + 16);
+}
+
+type Contexto = { janela: number; contentor: number };
+
+/**
+ * Os cortes de largura de janela.
+ *
+ * `sm` e `lg` são os desta casa. `md`, `xl` e `2xl` estão aqui NÃO porque sejam
+ * permitidos — o `Cortes.contrato.test.ts` proíbe-os — mas para esta rede
+ * conseguir medir o que estava escrito ANTES desta correcção e falhar nos
+ * píxeis em vez de rebentar no nome da variante. Uma variante que não seja
+ * nenhuma destas rebenta, para isto não passar por vacuidade.
+ */
+const CORTES_DA_JANELA: Record<string, number> = {
+  sm: 640,
+  lg: 1024,
+  md: 768,
+  xl: 1280,
+  "2xl": 1536,
+};
+
+/** Separa `@min-[22rem]:grid-cols-3` sem partir os `:` de dentro de `[…]`. */
+function separar(classe: string): string[] {
+  const partes: string[] = [];
+  let actual = "";
+  let dentro = 0;
+  for (const c of classe) {
+    if (c === "[" || c === "(") dentro++;
+    else if (c === "]" || c === ")") dentro--;
+    if (c === ":" && dentro === 0) {
+      partes.push(actual);
+      actual = "";
+      continue;
+    }
+    actual += c;
+  }
+  partes.push(actual);
+  return partes;
+}
+
+const emPixeis = (valor: string, unidade: string) => Number(valor) * (unidade === "rem" ? 16 : 1);
+
+/** Esta variante está ligada neste contexto? */
+function ligada(variante: string, ctx: Contexto): boolean {
+  if (variante in CORTES_DA_JANELA) return ctx.janela >= CORTES_DA_JANELA[variante];
+
+  const daJanela = /^min-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
+  if (daJanela) return ctx.janela >= emPixeis(daJanela[1], daJanela[2]);
+
+  const doContentor = /^@min-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
+  if (doContentor) return ctx.contentor >= emPixeis(doContentor[1], doContentor[2]);
+
+  throw new Error(
+    `variante \`${variante}:\` desconhecida — a grelha só pode perguntar pela janela (\`sm:\`/\`lg:\`) ou pelo contentor (\`@min-[…]:\`)`,
+  );
+}
+
+/** As colunas que estão MESMO a valer neste contexto. */
+function colunasEm(className: string, ctx: Contexto): number {
+  let n = 0;
+  for (const classe of className.split(/\s+/).filter(Boolean)) {
+    const partes = separar(classe);
+    const utilitario = partes.pop()!;
+    const m = /^grid-cols-(\d+)$/.exec(utilitario);
+    if (!m) continue;
+    if (partes.every((v) => ligada(v, ctx))) n = Number(m[1]);
+  }
+  if (n === 0) throw new Error(`a grelha não declara colunas nenhumas em ${JSON.stringify(ctx)}`);
+  return n;
+}
+
+/** O lado da célula quadrada, em píxeis. */
+const celula = (largura: number, colunas: number) =>
+  (largura - GAP_DA_GRELHA * (colunas - 1)) / colunas;
+
+describe("o resolvedor de classes desta rede (senão isto passava por vacuidade)", () => {
+  it("liga a janela, o contentor, e mais nada", () => {
+    expect(colunasEm("grid-cols-2 lg:grid-cols-6", { janela: 1023, contentor: 9999 })).toBe(2);
+    expect(colunasEm("grid-cols-2 lg:grid-cols-6", { janela: 1024, contentor: 0 })).toBe(6);
+    // O contentor decide SOZINHO: a janela pode ser enorme e a caixa estreita.
+    expect(
+      colunasEm("grid-cols-2 @min-[38rem]:grid-cols-5", { janela: 1440, contentor: 607 }),
+    ).toBe(2);
+    expect(colunasEm("grid-cols-2 @min-[38rem]:grid-cols-5", { janela: 375, contentor: 608 })).toBe(
+      5,
+    );
+    expect(() =>
+      colunasEm("grid-cols-2 aleatoria:grid-cols-9", { janela: 375, contentor: 0 }),
+    ).toThrow(/aleatoria:/);
+  });
+
+  it("sabe onde vive a zona de largar em cada janela", () => {
+    expect(JANELAS.map(zonaDeLargar)).toEqual([309, 558, 654, 1070]);
+  });
+});
+
+describe("a célula da grelha de fotos nunca desce abaixo do piso de 111 px", () => {
+  it("aguenta 375, 640, 1024 e 1440 — e é o 1024 que caía", () => {
+    const medido = JANELAS.map((janela) => {
+      const largura = zonaDeLargar(janela);
+      const colunas = colunasEm(GRELHA_DE_FOTOS, { janela, contentor: largura });
+      return { janela, largura, colunas, celula: celula(largura, colunas) };
+    });
+
+    const abaixo = medido.filter((m) => m.celula < PISO_DA_CELULA);
+
+    expect(
+      abaixo.map(
+        (m) =>
+          `janela ${m.janela}: zona de largar ${m.largura} px ÷ ${m.colunas} colunas = célula de ${m.celula.toFixed(1)} px`,
+      ),
+      `a célula tem de comportar três alvos de 44 px, e o piso medido para isso são ${PISO_DA_CELULA} px (ver o comentário do \`GRELHA_DE_FOTOS\`). Tabela: ${medido
+        .map((m) => `${m.janela}→${m.colunas}c/${m.celula.toFixed(1)}px`)
+        .join(" · ")}`,
+    ).toEqual([]);
+  });
+
+  it("e também não desce em nenhuma largura intermédia da zona de largar", () => {
+    // Os degraus são do contentor, portanto o varrimento é do contentor: 240 px
+    // (a zona de largar mais estreita que este back office consegue produzir,
+    // num ecrã de 320) até aos 1070 do portátil largo, píxel a píxel.
+    const maus: string[] = [];
+    for (let largura = 240; largura <= 1200; largura++) {
+      const colunas = colunasEm(GRELHA_DE_FOTOS, { janela: 1440, contentor: largura });
+      const lado = celula(largura, colunas);
+      if (lado < PISO_DA_CELULA)
+        maus.push(`${largura} px → ${colunas} colunas → ${lado.toFixed(1)} px`);
+    }
+    expect(maus.slice(0, 5)).toEqual([]);
+  });
+
+  it("os degraus perguntam pelo CONTENTOR — nenhum deles pergunta pela janela", () => {
+    // É esta a correcção: a célula depende da zona de largar, e a zona de largar
+    // deixa de acompanhar a janela em `lg`, onde a navegação entra no fluxo.
+    for (const classe of GRELHA_DE_FOTOS.split(/\s+/)) {
+      const variantes = separar(classe).slice(0, -1);
+      for (const v of variantes) {
+        expect(
+          v.startsWith("@"),
+          `\`${classe}\` mede a janela; a célula desta grelha é decidida pela zona de largar`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("a zona de largar é mesmo um contentor — senão os `@min-[…]` não medem nada", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 3 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    const grelha = screen.getByRole("button", { name: /^Ver a foto 2 em grande$/ });
+    const contentor = grelha.closest('[class*="@container"]');
+    expect(
+      contentor,
+      "as fotos vivem numa grelha com degraus `@min-[…]`, e um `@container` que não existe faz esses degraus medirem o elemento errado",
+    ).not.toBeNull();
+    // E é a zona de largar, não um invólucro qualquer lá em cima.
+    expect(contentor!.className).toContain("border-dashed");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS OUTROS DOIS SÍTIOS QUE PERGUNTAVAM AO ECRÃ O QUE ERA DO CONTENTOR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O mesmo engano do `GRELHA_DE_FOTOS`, em ponto pequeno e sem consequência
+ * medida — mas é o engano que volta a crescer. Ficam presos aqui:
+ *
+ *  · o campo de procurar tinha `sm:w-72` dentro de uma `Toolbar` que já é
+ *    `flex flex-wrap` e se parte sozinha. O que decide a largura da caixa é a
+ *    fila onde ela está;
+ *  · o formulário de criar tema tinha `sm:grid-cols-2` dentro de um `Card`. O
+ *    cartão nunca tem a largura da janela: tira-lhe o `px` da vista, a moldura
+ *    e o `p-4` dele, e a partir de `lg` mais os 256 px da barra lateral.
+ */
+describe("largura de contentor, não largura de ecrã", () => {
+  /** Cinco temas: é o que faz a barra ganhar campo de procurar (`themes.length > 4`). */
+  const cinco = Array.from({ length: 5 }, (_, i) => ({
+    ...THEME,
+    id: `t${i + 1}`,
+    name: `Tema ${i + 1}`,
+  }));
+
+  it("o campo de procurar mede a fila da Toolbar, não a janela", async () => {
+    route("GET /api/temas", () => ok(cinco));
+    renderTemas();
+
+    const campo = await screen.findByLabelText(/Procurar tema/);
+    const caixa = campo.closest("div")!.parentElement!;
+
+    expect(caixa.className).toContain("basis-72");
+    expect(
+      caixa.className,
+      "a largura desta caixa é uma pergunta sobre a FILA em que ela está, e a `Toolbar` já embrulha sozinha",
+    ).not.toMatch(/(^|\s)(sm|lg):w-/);
+  });
+
+  it("o formulário de criar tema mede o cartão, não a janela", async () => {
+    route("GET /api/temas", () => ok(cinco));
+    renderTemas();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Novo tema" }));
+
+    const nome = await screen.findByLabelText(/Nome do tema/);
+    const grelha = nome.closest('[class*="grid-cols-"]')!;
+
+    expect(grelha.className).toContain("@min-[36rem]:grid-cols-2");
+    expect(
+      grelha.className,
+      "duas colunas quando o CARTÃO as comporta — o cartão não tem a largura da janela",
+    ).not.toMatch(/(^|\s)(sm|lg):grid-cols-/);
+    expect(
+      grelha.closest('[class*="@container"]'),
+      "sem `@container` o `@min-[36rem]:` mede um contentor que não é este cartão",
+    ).not.toBeNull();
   });
 });
 

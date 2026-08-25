@@ -364,14 +364,49 @@ export const COLUNAS: Record<Densidade, string> = {
  * A biblioteca não fica mais curta de percorrer: são as mesmas fotos, maiores.
  * É a mesma decisão que o `COLUNAS` acima já tinha tomado para os cartões.
  *
- * O `sm` passou de cinco colunas para quatro pela mesma conta, um degrau
- * acima: num tablet de 640 px as cinco davam células de 105 px, e aí os dois
- * botões de baixo ficavam a 7 px um do outro — abaixo dos 8 px de intervalo
- * mínimo entre alvos. Com quatro são 133 px de célula e 37 px de intervalo. As
- * cinco voltam em `md`, onde há largura para elas.
+ * O degrau seguinte passou de cinco colunas para quatro pela mesma conta, um
+ * andar acima: num tablet de 640 px as cinco davam células de 105 px, e aí os
+ * dois botões de baixo ficavam a 7 px um do outro — abaixo dos 8 px de
+ * intervalo mínimo entre alvos. Com quatro são 133,5 px de célula e 37 px de
+ * intervalo.
+ *
+ * ── E PORQUE É QUE OS DEGRAUS MEDEM O CONTENTOR, NÃO A JANELA ─────────────
+ *
+ * Toda a aritmética acima é sobre a largura da CÉLULA, e a célula não sabe o
+ * tamanho do ecrã: sabe o tamanho da zona de largar onde vive. Os dois números
+ * andaram juntos enquanto a navegação foi uma gaveta por cima da página — e
+ * separaram-se exactamente em `lg`, que é onde ela deixa de ser gaveta e passa
+ * a ser uma coluna `sticky` de 256 px em fluxo (`AdminClient.tsx`).
+ *
+ * A conta a 1024 px de janela: sobram 654 px para esta grelha — 1024 − 256 da
+ * barra lateral − 80 do `lg:px-10` da vista − 34 da moldura e do `p-4` da zona
+ * de largar. Seis colunas com `gap-2` davam células de 102,3 px, MENOS do que
+ * os 111 px que o parágrafo acima fixa como o piso onde os três botões ainda
+ * cabem. E num iPad Pro deitado — 1024 px de janela, e dedo — eram três alvos
+ * de 44 px dentro de uma célula de 102. Era o caso do `MOBILE-AUDIT.md` («e
+ * `sm:` não servia para o resolver») com a barra lateral no papel da gaveta.
+ *
+ * Por isso os degraus são `@container`: medem a zona de largar, que é o que
+ * decide mesmo a célula. Cada limiar é a largura mínima a que aquele número de
+ * colunas ainda dá os 111 px — `111·n + 8·(n−1)`, arredondado para cima ao rem
+ * par seguinte:
+ *
+ *     colunas    mínimo    limiar
+ *        3       349 px    22rem (352)
+ *        4       468 px    30rem (480)
+ *        5       587 px    38rem (608)
+ *        6       706 px    46rem (736)
+ *
+ * A zona de largar mede 309 px a 375 de janela, 558 a 640, 654 a 1024 e 1070 a
+ * 1440 — ou seja células de 150,5 px (2 colunas), 133,5 (4), 124,4 (5) e 171,7
+ * (6). São as mesmas de hoje em todas as larguras onde hoje já estavam certas;
+ * só o portátil a 1024 muda, e muda para cima.
+ *
+ * (O `md:grid-cols-5` que aqui vivia era a última infracção deste ficheiro ao
+ * contrato dos cortes. Nunca tinha sido uma pergunta sobre a janela.)
  */
 export const GRELHA_DE_FOTOS =
-  "grid grid-cols-2 gap-2 min-[26rem]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6";
+  "grid grid-cols-2 gap-2 @min-[22rem]:grid-cols-3 @min-[30rem]:grid-cols-4 @min-[38rem]:grid-cols-5 @min-[46rem]:grid-cols-6";
 
 /**
  * "há 3 dias", "hoje" — a data como se fala, para o cartão poder dizer o que
@@ -1214,8 +1249,15 @@ export default function Temas() {
                continua verdadeiro com o campo vazio.
 
                Passa a irmão do campo, na mesma coluna. O que muda é a quem ele
-               parece pertencer. */
-            <div className="w-full max-w-md sm:w-72">
+               parece pertencer.
+
+               A largura era `sm:w-72`: uma pergunta sobre a JANELA feita dentro
+               de uma `Toolbar` que já é `flex flex-wrap` e se parte sozinha. O
+               que decide o tamanho desta caixa é a fila onde ela está, não o
+               ecrã — `basis-72 grow-0` dá-lhe as mesmas 18rem em todo o lado e
+               deixa-a encolher quando a fila é mais estreita do que isso, sem
+               um único ponto de corte pelo meio. */
+            <div className="w-full max-w-md basis-72 grow-0">
               <div className="relative">
                 {SearchIcon}
                 <input
@@ -1381,8 +1423,16 @@ export default function Temas() {
       <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
 
       {adding && (
-        <Card padding="sm" className="mb-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card padding="sm" className="@container mb-6">
+          {/* Duas colunas quando o CARTÃO as comporta, não quando a janela as
+              comporta. Era `sm:grid-cols-2`, e o cartão não tem a largura da
+              janela: tira-lhe o `px` da vista e os 34 px da moldura e do `p-4`
+              dele, e a partir de `lg` mais os 256 px da barra lateral. O
+              limiar em contentor que reproduz o corte de hoje é 36rem — 576 px
+              de cartão dão duas colunas de 280 px, que é o que ele já dava a
+              640 px de janela —, com a diferença de continuar a valer se este
+              cartão alguma vez for para uma coluna estreita. */}
+          <div className="grid grid-cols-1 gap-4 @min-[36rem]:grid-cols-2">
             <div>
               <Field
                 label="Nome do tema"
@@ -3759,7 +3809,11 @@ function ThemeFolder({
           const files = Array.from(e.dataTransfer?.files ?? []);
           void handleDrop(entries, files);
         }}
-        className={`rounded-2xl border border-dashed p-4 motion-safe:transition-colors ${
+        // `@container`: é ESTA caixa que o `GRELHA_DE_FOTOS` mede. A largura
+        // dela não acompanha a da janela a partir de `lg`, onde a navegação
+        // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
+        // `GRELHA_DE_FOTOS`.
+        className={`@container rounded-2xl border border-dashed p-4 motion-safe:transition-colors ${
           drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-foreground/[0.14]"
         }`}
       >
