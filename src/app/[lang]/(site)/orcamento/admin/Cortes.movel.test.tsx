@@ -447,10 +447,16 @@ describe("vista de conjunto: quatro miniaturas por linha já no portátil", () =
  * só o índice: era também a lista do que FALTA para poder enviar, que vive no
  * fim da mesma coluna. Num portátil de 1024–1440 escrevia-se a proposta inteira
  * sem saber em que secção se está nem o que a trava.
- * DEPOIS: `lg:block`. Abaixo de 1024 continua a não existir — a versão de ecrã
- * estreito é uma decisão por tomar, não um esquecimento.
+ * DEPOIS DISSO: `lg:block` — o índice voltou ao portátil dela, e abaixo de 1024
+ * continuava a não existir.
+ * E AGORA: existe em todas as larguras. A MESMA árvore desenhada de duas
+ * maneiras — tira horizontal abaixo de `lg`, coluna acima —, que é o desenho já
+ * demonstrado no `MoodBoardIndice`. O que continua a parar em `lg` é só a lista
+ * do que TRAVA o envio, e não por caber mal: porque a 375 quem a diz é o
+ * `PorqueNaoDaParaEnviar`, ao lado do botão de enviar. O detalhe do ecrã
+ * estreito está preso no `NavEstudio.test.tsx`.
  */
-describe("índice do estúdio: volta ao portátil", () => {
+describe("índice do estúdio: existe em todas as larguras", () => {
   const seccoes: EstadoSeccao[] = [
     { id: "evento", titulo: "Evento", preenchida: true, resumo: "Ana e Rui" },
     { id: "servicos", titulo: "Serviços", preenchida: false, resumo: "0 grupos" },
@@ -459,14 +465,32 @@ describe("índice do estúdio: volta ao portátil", () => {
     { id: "servicos", texto: "Nenhum grupo de serviços", trava: true } as Impedimento,
   ];
 
-  it("a 1024 há índice e há a lista do que falta; a 1023 não há nem um nem outro", () => {
+  it("a 1023 já há índice — e é a tira, não a coluna", () => {
     const { container } = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
-    const coluna = container.querySelector("nav")!;
-    expect(aparece(coluna.className, { largura: ANTES_DO_PORTATIL })).toBe(false);
-    expect(aparece(coluna.className, { largura: PORTATIL })).toBe(true);
-    // O que se ganha na faixa não é só o índice — é o aviso do que trava o envio.
-    expect(coluna.textContent).toContain("Nenhum grupo de serviços");
-    expect(coluna.textContent).toContain("Serviços");
+    const indice = container.querySelector("nav")!;
+    expect(aparece(indice.className, { largura: 375 })).toBe(true);
+    expect(aparece(indice.className, { largura: ANTES_DO_PORTATIL })).toBe(true);
+    expect(aparece(indice.className, { largura: PORTATIL })).toBe(true);
+
+    // Tira de um lado do corte, coluna do outro — e é a lista que muda de
+    // direcção, não uma segunda árvore a aparecer.
+    const lista = container.querySelector("nav ul")!.className;
+    expect(efectivas(lista, { largura: ANTES_DO_PORTATIL }).has("flex-col")).toBe(false);
+    expect(efectivas(lista, { largura: ANTES_DO_PORTATIL }).has("overflow-x-auto")).toBe(true);
+    expect(efectivas(lista, { largura: PORTATIL }).has("flex-col")).toBe(true);
+
+    expect(indice.textContent).toContain("Serviços");
+  });
+
+  it("a lista do que trava o envio continua a ser coisa de `lg`", () => {
+    // A 375 não desaparece do documento: fica `hidden`, porque quem responde à
+    // pergunta «porque é que não envia?» nessa largura é o painel que vive
+    // encostado ao próprio botão.
+    const { container } = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
+    const aviso = screen.getByText("Nenhum grupo de serviços").closest("div")!;
+    expect(aparece(aviso.className, { largura: ANTES_DO_PORTATIL })).toBe(false);
+    expect(aparece(aviso.className, { largura: PORTATIL })).toBe(true);
+    expect(container.textContent).toContain("Nenhum grupo de serviços");
   });
 });
 
