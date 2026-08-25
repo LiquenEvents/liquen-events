@@ -1632,3 +1632,84 @@ describe("por que tema é que o diálogo abre", () => {
     expect(temaActivo()).toBe("Tema 3");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DUAS QUEIXAS DELA SOBRE ESCOLHER TEMAS, E AS DUAS ESTAVAM NO MESMO SÍTIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «às vezes não aparece a barra de pesquisa, outras vezes não dá
+ * para escolher no computador os temas que nós queremos porque aquilo não dá
+ * para fazer scroll para cima e para baixo».
+ */
+describe("escolher um tema no computador", () => {
+  /** Faz o `useMedida` responder que o ecrã é largo. */
+  function ecraLargo() {
+    vi.stubGlobal(
+      "matchMedia",
+      (consulta: string) =>
+        ({
+          matches: true,
+          media: consulta,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+  }
+
+  it("a caixa de procurar está à vista, sem ser preciso encontrar a lupa", async () => {
+    /**
+     * Não era «às vezes»: no computador nunca aparecia sozinha. O comentário
+     * por cima da fila dizia, por escrito, que a partir de `sm` a caixa «volta
+     * a ficar sempre à vista» — e a condição não tinha largura nenhuma.
+     * Descrevia uma intenção que o código não cumpria.
+     */
+    ecraLargo();
+    await openPicker(true);
+    expect(screen.getByLabelText("Procurar tema")).toBeInTheDocument();
+  });
+
+  it("no telemóvel continua atrás da lupa — é altura que as fotos não têm", async () => {
+    // Sem `matchMedia` o `useMedida` responde `false`, que é o caso estreito.
+    // (A lupa só nasce com mais de três temas — aqui o que se afirma é que a
+    // caixa não se abre sozinha e não come a altura das fotografias.)
+    await openPicker(true);
+    expect(screen.queryByLabelText("Procurar tema")).toBeNull();
+  });
+
+  /**
+   * ── A ARMADILHA DO FLEX, VISTA NO DOM ─────────────────────────────────
+   *
+   * A lista dos temas rola com `overflow-y-auto` e pede a altura ao pai com
+   * `flex-1`. Só que um elemento `flex` sem `min-h-0` nunca encolhe abaixo do
+   * seu conteúdo: os pais cresciam, a coluna (que tem `overflow-hidden`)
+   * cortava o que passava, e os temas de baixo ficavam inalcançáveis — sem
+   * barra de rolamento, porque a lista nunca chegou a ter altura limitada.
+   *
+   * O jsdom não faz layout, portanto o que se afirma é a CADEIA: entre quem
+   * rola e o primeiro antepassado de altura limitada, todo o `flex` pelo meio
+   * tem de deixar a altura passar. Basta um a faltar para o scroll morrer.
+   */
+  it("a altura chega até quem rola — nenhum elo do flex a segura", async () => {
+    ecraLargo();
+    await openPicker(true);
+
+    const lista = screen.getByRole("group", { name: "Temas" });
+    expect(lista.className).toMatch(/overflow-y-auto/);
+
+    const emFalta: string[] = [];
+    let no = lista.parentElement;
+    while (no && !no.className.includes("overflow-hidden")) {
+      const classe = no.className ?? "";
+      if (classe.includes("flex") && !classe.includes("min-h-0")) emFalta.push(classe);
+      no = no.parentElement;
+    }
+    // E o varrimento tem de ter chegado mesmo a um antepassado com altura
+    // limitada — senão passava por vacuidade sobre uma árvore que mudou.
+    expect(no, "não há antepassado com `overflow-hidden`: a cadeia mudou").not.toBeNull();
+    expect(
+      emFalta,
+      "um `flex` sem `min-h-0` entre a lista e a coluna: a altura não desce e a lista deixa de rolar",
+    ).toEqual([]);
+  });
+});
