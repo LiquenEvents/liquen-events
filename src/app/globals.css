@@ -330,6 +330,13 @@ body.admin-mode {
   --bo-barra-inferior: 72px;
   --bo-lh-tight: 1.3;
   --bo-lh-body: 1.6;
+  /* ── A ENTRELINHA DA LEGENDA ─────────────────────────────────────────────
+     Faltava, e a falta media-se. O `--bo-lh-body: 1.6` é aplicado na raiz do
+     back office e HERDA-SE por tudo o que não peça outra coisa — incluindo as
+     legendas. No telemóvel isso dava 19,2 px de entrelinha para 12 px de letra,
+     enquanto o `text-xs` — A MESMA MEDIDA — saía com 16. Ver a regra do chão,
+     mais abaixo, para a conta inteira. */
+  --bo-lh-caption: 1.35;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
   /* Calm "ChatGPT-app" look: the back office uses one clean humanist sans
@@ -535,6 +542,57 @@ body.admin-mode .bo-text-faint {
   body.admin-mode .bo-eyebrow {
     font-size: var(--bo-fs-caption);
     letter-spacing: 0.04em;
+  }
+  /* ── E A ENTRELINHA VAI COM O TAMANHO ────────────────────────────────────
+     Padrão 02 da análise de craft: «entrelinha por tamanho — sem regra
+     visível». Não havia mesmo, e o preço pagava-se no telemóvel dela.
+
+     A CONTA. A regra aqui em cima levanta 7, 8, 9, 10 e 11 px para 12 px
+     abaixo de 1024 — ou seja, no telemóvel, 649 chamadas desenham-se a 12 px.
+     Mas o TAMANHO era a única coisa que mudava:
+
+       herda o `--bo-lh-body` (1,6)  →  19,2 px de entrelinha
+       o `text-xs`, a MESMA medida   →  16,0 px
+       ─────────────────────────────────────────────────────
+       diferença por linha           →   3,2 px
+
+     Numa lista de vinte linhas são 64 px de altura a mais, decididos por qual
+     das duas grafias alguém calhou de escrever. É a queixa dela — «está tudo
+     enorme», «pouco prático» — com um número em cima.
+
+     ── PORQUÊ UMA REGRA À PARTE, E EM `:where()` ─────────────────────────
+     A regra do tamanho, aqui em cima, ganha DE PROPÓSITO a quem escreveu um
+     tamanho à mão: o comentário dela explica que sem isso o `text-[9px]` da
+     chamada voltava a ganhar. Para a entrelinha isso estaria errado — quem
+     escreveu `leading-relaxed` num sítio quis aquilo, e são 102 sítios.
+
+     ── E POR ISSO ESTA REGRA VIVE DENTRO DE `@layer utilities`, AO CONTRÁRIO
+        DA DE CIMA ────────────────────────────────────────────────────────
+
+     Isto é a parte que quase me escapou, e escrevi o contrário antes de a
+     verificar. `:where()` zera a especificidade — mas a especificidade só
+     decide DENTRO da mesma camada. Uma declaração normal FORA de camadas ganha
+     a qualquer uma que esteja dentro de uma, por mais específica que seja. E os
+     utilitários do Tailwind vivem todos em `@layer utilities` — compilado e
+     confirmado: `.leading-snug` sai lá dentro.
+
+     Ou seja: escrita fora de camada, como a regra do tamanho aqui em cima, esta
+     regra atropelava as 102 chamadas que escreveram `leading-*` à mão, por mais
+     `:where()` que levasse.
+
+     As duas regras querem coisas OPOSTAS, e é por isso que estão em sítios
+     diferentes:
+       · o TAMANHO tem de ganhar à chamada (é um chão) → fora de camada;
+       · a ENTRELINHA tem de PERDER para a chamada (é uma omissão) → dentro da
+         camada dos utilitários, onde o `.leading-snug` (0,1,0) ganha ao
+         `:where()` (0,0,0) sem depender da ordem.
+     E continua a ganhar à HERANÇA, que é o que se quer: uma declaração, seja de
+     que camada for, ganha sempre ao valor herdado. */
+  @layer utilities {
+    :where(body.admin-mode)
+      :where(.text-\[7px\], .text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
+      line-height: var(--bo-lh-caption);
+    }
   }
 }
 
