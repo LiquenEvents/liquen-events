@@ -1906,6 +1906,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     aPagarAqui: number;
     /** O identificador da versão, para ir buscar o documento ao repor. */
     versaoId: string;
+    /**
+     * ── A ÚNICA PERGUNTA QUE INTERESSA: FOI ELA? ──────────────────────────
+     *
+     * Palavras dela: «ISTO E SIMPLES, O VALOR NAO ALTERA CASO EU NAO MUDO».
+     *
+     * `false` — não há registo de ninguém ter mexido no preço depois do envio,
+     * portanto o número mexeu-se SOZINHO. Não há nada a perguntar: repõe-se o
+     * que seguiu para o cliente, com aviso e com dez segundos para anular.
+     *
+     * `true` — há um `price_set` no histórico do pedido posterior ao envio.
+     * Ela corrigiu o preço de propósito depois de a proposta ter saído, e esse
+     * é trabalho dela: repor por cima apagava-o em silêncio. Só nesse caso é
+     * que os dois números vão ao ecrã com a escolha.
+     */
+    elaMudou: boolean;
   } | null>(null);
   /** A ir buscar o documento que seguiu, para o repor. */
   const [aReporOEnviado, setAReporOEnviado] = useState(false);
@@ -6212,11 +6227,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         if (Math.abs(enviado - aPagarAqui) <= 0.01) return;
         if (divergenciaJaVista(aPagarAqui)) return;
         if (!vivo) return;
+        /**
+         * O histórico do pedido é quem sabe. Cada alteração de preço feita à
+         * mão deixa lá um `price_set` (ver `registarNoHistorico`) — no estúdio
+         * e na Gestão do pedido. Uma posterior ao envio quer dizer que a
+         * mudança foi decidida; não havendo nenhuma, o número mexeu-se
+         * sozinho, e aí não há escolha nenhuma a oferecer-lhe.
+         */
+        const elaMudou = (quote.activityLog ?? []).some(
+          (e) => e.kind === "price_set" && e.at > ultima.enviadaEm,
+        );
         setDivergenciaDoEnviado({
           enviadaEm: ultima.enviadaEm,
           aPagarEnviado: enviado,
           aPagarAqui,
           versaoId: ultima.id,
+          elaMudou,
         });
       } catch {
         /* sem rede: o estúdio abre como sempre abriu, só sem a rede por baixo */
@@ -6271,6 +6297,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       registarNoHistorico(
         `Valores repostos no estúdio como seguiram para o cliente: total a pagar de ${eur(d.aPagarAqui)} para ${eur(d.aPagarEnviado)}.`,
       );
+      /**
+       * ── E O «ANULAR» TEM DE FICAR ANULADO ────────────────────────────────
+       *
+       * A reposição é reversível durante dez segundos. Se ela a anular, o ecrã
+       * volta a `aPagarAqui` — e, sem esta linha, a abertura seguinte via outra
+       * vez uma divergência que ninguém tinha decidido e repunha de novo. Ela
+       * ficava a lutar com o ecrã, e a anulação não valia nada.
+       *
+       * Guardar `aPagarAqui` (o valor de ANTES) diz exactamente isto: «se
+       * acabares neste número, é porque o escolheste». Se não anular, o ecrã
+       * fica no valor enviado e não há divergência nenhuma para conferir.
+       */
+      try {
+        localStorage.setItem(chaveDoEnviadoVisto, String(d.aPagarAqui));
+      } catch {
+        /* sem `localStorage` a reposição vale na mesma; o que se perde é a
+           memória de ela a ter anulado */
+      }
       setDivergenciaDoEnviado(null);
       toast(
         "Os valores voltaram ao que seguiu para o cliente. Podes anular durante 10 segundos.",
@@ -6285,6 +6329,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       setAReporOEnviado(false);
     }
   }
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O VALOR QUE SE MEXEU SOZINHO VOLTA SOZINHO — SEM PERGUNTAR NADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «eu quero que o valor enviado para o cliente seja o valor
+   * que fica na proposta e não quero depois se eu for à proposta no back
+   * office já esteja outro valor naquele pedido. ISTO É SIMPLES, O VALOR NÃO
+   * ALTERA CASO EU NÃO MUDO».
+   *
+   * Antes isto punha os dois números no ecrã e esperava por ela. A razão
+   * escrita era boa — duas causas diferentes dão a mesma diferença — mas a
+   * conclusão estava errada, e ela disse-o: nos dois casos QUEM DECIDE JÁ
+   * DECIDIU. Se mudou o preço, mudou-o de propósito e isso está no histórico.
+   * Se não mudou, o número que vale é o que o casal tem em mãos, e perguntar
+   * é fazê-la escolher entre um valor certo e um valor avariado.
+   *
+   * Portanto: `elaMudou === false` repõe, e a pergunta só sobrevive no caso em
+   * que responder por ela apagava trabalho dela.
+   *
+   * O que ela vê continua a ser tudo: o aviso do que aconteceu, o valor velho
+   * e o novo, dez segundos para anular e uma linha no histórico do pedido.
+   * Nada disto é silencioso — é só uma coisa a menos para decidir.
+   */
+  useEffect(() => {
+    if (!divergenciaDoEnviado || divergenciaDoEnviado.elaMudou) return;
+    if (aReporOEnviado) return;
+    void reporOsValoresEnviados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [divergenciaDoEnviado]);
 
   /** Fica o que está neste aparelho — e a pergunta não se repete enquanto o
    *  número não voltar a mexer. */
@@ -6637,7 +6712,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           o `gap-4` de 1rem e o respiro), portanto 26rem é onde os dois deixam
           de se apertar; 30rem é o degrau da casa logo acima, e dá folga para
           os números de seis dígitos que ela tem (202 889,00 €). */}
-      {divergenciaDoEnviado && (
+      {divergenciaDoEnviado?.elaMudou && (
         <div
           role="alert"
           /* O nome distingue-o dos outros avisos do estúdio — há mais do que um

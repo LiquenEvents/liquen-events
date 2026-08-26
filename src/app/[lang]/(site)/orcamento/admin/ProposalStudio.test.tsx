@@ -2597,8 +2597,12 @@ describe("a proposta enviada e o que está no aparelho", () => {
       .filter((v) => v !== undefined);
   }
 
-  /** O pedido ficou com um número que não é o que seguiu — seja qual for a
-   *  causa. É esta a situação que ela viu. */
+  /**
+   * O pedido ficou com um número que não é o que seguiu, e NINGUÉM mexeu no
+   * preço depois do envio — o histórico do pedido não tem `price_set` nenhum
+   * posterior a 1 de junho. Ou seja: o número mexeu-se sozinho. É esta a
+   * situação que ela viu, e é a que se resolve sem lhe perguntar nada.
+   */
   const abrirDesalinhado = () =>
     render(
       <ToastProvider>
@@ -2606,9 +2610,98 @@ describe("a proposta enviada e o que está no aparelho", () => {
       </ToastProvider>,
     );
 
-  it("os dois números aparecem lado a lado, com a data do envio", async () => {
+  /**
+   * A MESMA diferença, com uma causa diferente: ela corrigiu o preço de
+   * propósito DEPOIS de a proposta ter saído, e isso ficou escrito no histórico
+   * do pedido. Aqui repor por cima apagava trabalho dela — e é o único caso em
+   * que os dois números vão ao ecrã com a escolha.
+   */
+  const abrirDepoisDeElaMudar = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio
+          quote={
+            {
+              ...quote,
+              quotedPrice: 12268.74,
+              activityLog: [
+                {
+                  id: "a1",
+                  at: "2026-06-14T09:00:00.000Z",
+                  kind: "price_set",
+                  summary: "Preço final alterado para 12.268,74 €.",
+                },
+              ],
+            } as Quote
+          }
+        />
+      </ToastProvider>,
+    );
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * O QUE SE MEXEU SOZINHO VOLTA SOZINHO
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «eu quero que o valor enviado para o cliente seja o valor
+   * que fica na proposta (…). ISTO É SIMPLES, O VALOR NÃO ALTERA CASO EU NÃO
+   * MUDO».
+   *
+   * Isto punha os dois números no ecrã e esperava por ela. A razão escrita era
+   * boa — duas causas dão a mesma diferença — mas obrigava-a a escolher entre
+   * um valor certo e um avariado, de cada vez que abria a proposta. Sem
+   * `price_set` no histórico depois do envio, não há dúvida nenhuma a ter.
+   */
+  it("sem ninguém ter mexido no preço, o valor volta ao que o cliente recebeu — sozinho", async () => {
     jaSeguiuPor13257();
     abrirDesalinhado();
+    // Abre a 12.268,74 (o número avariado) e assenta no 9.883,74 do envio.
+    await waitFor(
+      () =>
+        expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+          "9883,74",
+        ),
+      { timeout: 3000 },
+    );
+    // E o «Preço final» do pedido volta com ele: 9.883,74 + 895,00 de deslocação.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74), { timeout: 3000 });
+  }, 20_000);
+
+  it("e não lhe pergunta nada — não há aviso a pedir para escolher", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await waitFor(
+      () =>
+        expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+          "9883,74",
+        ),
+      { timeout: 3000 },
+    );
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Repor os valores que seguiram/ })).toBeNull();
+  }, 20_000);
+
+  /**
+   * Mas não é silencioso: a regra da casa é que ela nunca fica sem saber que
+   * algo aconteceu. O aviso diz o que mudou e deixa dez segundos para anular.
+   */
+  it("mas diz-lhe o que fez, e deixa-lhe dez segundos para anular", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await waitFor(
+      () =>
+        expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+          "9883,74",
+        ),
+      { timeout: 3000 },
+    );
+    expect(document.body.textContent).toMatch(/voltaram ao que seguiu para o cliente/i);
+    expect(await screen.findByRole("button", { name: /Anular/i })).toBeTruthy();
+  }, 20_000);
+
+  it("os dois números aparecem lado a lado, com a data do envio", async () => {
+    jaSeguiuPor13257();
+    abrirDepoisDeElaMudar();
     const aviso = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     expect(aviso.textContent).toContain("já seguiu para o cliente");
     expect(aviso.textContent).toContain("1 de junho de 2026");
@@ -2626,7 +2719,7 @@ describe("a proposta enviada e o que está no aparelho", () => {
    */
   it("e nada muda enquanto ela não escolher", async () => {
     jaSeguiuPor13257();
-    abrirDesalinhado();
+    abrirDepoisDeElaMudar();
     await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("12268,74");
     // E o documento que seguiu não entrou no que está gravado: a conferência
@@ -2636,7 +2729,7 @@ describe("a proposta enviada e o que está no aparelho", () => {
 
   it("repor põe no ecrã os valores que o cliente recebeu", async () => {
     jaSeguiuPor13257();
-    abrirDesalinhado();
+    abrirDepoisDeElaMudar();
     await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Repor os valores que seguiram/ }));
@@ -2675,7 +2768,7 @@ describe("a proposta enviada e o que está no aparelho", () => {
       }),
     );
     localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
-    abrirDesalinhado();
+    abrirDepoisDeElaMudar();
     await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Repor os valores que seguiram/ }));
@@ -2690,7 +2783,7 @@ describe("a proposta enviada e o que está no aparelho", () => {
 
   it("«manter» fica com o do aparelho, e não volta a perguntar o mesmo", async () => {
     jaSeguiuPor13257();
-    abrirDesalinhado();
+    abrirDepoisDeElaMudar();
     await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Manter os deste aparelho/ }));
@@ -2699,7 +2792,7 @@ describe("a proposta enviada e o que está no aparelho", () => {
     cleanup();
 
     // A visita seguinte, com o MESMO número: já foi respondida.
-    abrirDesalinhado();
+    abrirDepoisDeElaMudar();
     await screen.findByLabelText(/Valor \(sem IVA\)/);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 300));
