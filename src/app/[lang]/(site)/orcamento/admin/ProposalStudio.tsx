@@ -107,7 +107,7 @@ import {
   tempoEstimado,
   type AmostraDeGeracao,
 } from "@/lib/custo-do-pdf";
-import Versoes from "./Versoes";
+import Versoes, { type VersaoEnviada } from "./Versoes";
 import { comoSeDiz, noMesmoEspaco, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { custosDe, margemTotal } from "@/lib/orcamento/margem";
@@ -545,6 +545,51 @@ function aplicarBase(d: StudioDoc, base: number): StudioDoc {
 function baseDoDoc(d: Partial<StudioDoc>): number | undefined {
   const m = resolveProposalMoney(d as StudioDoc);
   return m.base > 0 ? m.base : undefined;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS CAMPOS QUE DECIDEM O DINHEIRO — E SÓ ESSES
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É o conjunto exacto que `totaisDaProposta` lê para desenhar o quadro do PDF:
+ * o valor, o modo e a taxa de IVA, os textos de display, as linhas adicionais e
+ * a regra com que elas contam, e a percentagem do sinal. Nada mais.
+ *
+ * Existe para repor o dinheiro de uma proposta ENVIADA sem lhe repor o resto: o
+ * texto, as fotografias e os mood boards podem ter sido escritos DEPOIS do
+ * envio, são trabalho dela, e nunca estiveram em causa. «Se falhar, não perder
+ * trabalho» é a regra da casa, e trocar o documento inteiro para acertar um
+ * número era perdê-lo.
+ *
+ * Os campos são copiados MESMO QUANDO NÃO EXISTEM no documento enviado (fica
+ * `undefined`), e é de propósito: uma proposta que seguiu sem `vatRate` não
+ * pode ficar com a taxa que o rascunho deste aparelho entretanto ganhou.
+ */
+/** «em 12 de setembro de 2026». Uma data sem dia lê-se mal ao lado de dois
+ *  números; uma data ilegível não se escreve de todo. */
+function dataDoEnvioPorExtenso(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "num envio anterior";
+  return `em ${d.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`;
+}
+
+const CAMPOS_DO_DINHEIRO = [
+  "totalAmount",
+  "totalVatMode",
+  "vatRate",
+  "totalText",
+  "totalEstimatedText",
+  "budgetExtras",
+  "budgetExtrasSomam",
+  "depositPercent",
+] as const;
+
+function dinheiroDoDocumento(d: Partial<StudioDoc>): Partial<StudioDoc> {
+  const saida: Record<string, unknown> = {};
+  const origem = d as unknown as Record<string, unknown>;
+  for (const campo of CAMPOS_DO_DINHEIRO) saida[campo] = origem[campo];
+  return saida as Partial<StudioDoc>;
 }
 
 function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
@@ -1792,6 +1837,58 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const serverStamp = useRef<string | null>(null);
   /** Já avisámos desta gravação cruzada? (uma vez chega; não a cada gravação) */
   const warnedOverwrite = useRef(false);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE SEGUIU PARA O CLIENTE, E O QUE ESTE APARELHO TEM
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela, com três pontos de exclamação: «eu quero igual o valor!!!
+   * até eu alterar por mim!». O PDF que o casal tem em mãos dizia 13.257,85 € a
+   * pagar; a proposta reabria a dizer 15.090,55 €.
+   *
+   * As contas que faziam o número mexer sozinho estão corrigidas (ver os três
+   * blocos «AQUI ESTAVA O VALOR A CRESCER SOZINHO» e o merge do rascunho do
+   * servidor). Isto é a REDE por baixo delas: o estúdio nunca olhava para o
+   * documento que SEGUIU. O que reabria era o rascunho deste aparelho com o
+   * «Preço final» do pedido por cima — dois números que ninguém obriga a
+   * continuar iguais ao terceiro, o que o casal recebeu.
+   *
+   * Agora, ao abrir, compara-se com a última proposta ENVIADA. Havendo
+   * diferença, ela aparece ESCRITA, com os dois números lado a lado, antes de
+   * qualquer decisão.
+   *
+   * ── PORQUE É QUE NÃO SE REPÕE SOZINHO ────────────────────────────────────
+   *
+   * Porque duas coisas legítimas produzem exactamente a mesma diferença, e o
+   * código não as distingue:
+   *
+   *   · o valor mexeu sozinho — e repor o enviado é o que ela quer;
+   *   · ela CORRIGIU o preço de propósito depois do envio, na Gestão do pedido
+   *     ou aqui, para a proposta seguinte — e repor o enviado apagava-lhe a
+   *     correcção sem uma palavra.
+   *
+   * Escolher por ela seria acertar em metade dos casos e destruir trabalho na
+   * outra metade, em silêncio nos dois. O que a rede garante é que nenhum dos
+   * dois números ganha sem ela saber: estão os dois no ecrã, com as datas, e o
+   * botão de repor é dela.
+   */
+  const [divergenciaDoEnviado, setDivergenciaDoEnviado] = useState<{
+    /** Quando é que a proposta seguiu para o cliente. */
+    enviadaEm: string;
+    /** O total a pagar (com IVA) que ia no PDF que ele recebeu. */
+    aPagarEnviado: number;
+    /** O total a pagar que este ecrã mostra agora. */
+    aPagarAqui: number;
+    /** O identificador da versão, para ir buscar o documento ao repor. */
+    versaoId: string;
+  } | null>(null);
+  /** A ir buscar o documento que seguiu, para o repor. */
+  const [aReporOEnviado, setAReporOEnviado] = useState(false);
+  /** A conferência com o enviado corre UMA vez por abertura. */
+  const conferidoComOEnviado = useRef(false);
+  /** A abertura assentou (o rascunho local e o do servidor já foram lidos)?
+   *  Sem isto a conferência olhava para um ecrã a meio de ser montado. */
+  const [aberturaAssente, setAberturaAssente] = useState(false);
 
   // ── Restore draft on mount ──
   //
@@ -1825,6 +1922,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   useEffect(() => {
     if (hydrated.current) return;
     let hadDraft = false;
+    /** O rascunho deste aparelho, já lido — e a BASE que ele traz. Guardam-se
+     *  aqui fora porque o ramo do «o pedido ainda não tem preço», lá em baixo,
+     *  precisa dos dois: ler `totalInput` ali daria SEMPRE a cadeia vazia (o
+     *  `setTotalInput` de cima só entra em vigor na render seguinte), e a
+     *  conversão para o pedido precisa dos adicionais DO RASCUNHO, não dos do
+     *  documento em branco que ainda está no estado. */
+    let rascunhoLocal: StudioDoc | null = null;
+    let baseDoRascunho: number | undefined;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -1844,8 +1949,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               coverImages: normaliseCoverImages(merged.coverImages),
             });
           });
+          rascunhoLocal = parsed as StudioDoc;
           // A BASE, não o `totalAmount` cru — ver `baseDoDoc`.
           const base = baseDoDoc(parsed);
+          baseDoRascunho = base;
           if (base != null) setTotalInput(textoDoTotal(base));
           // Um rascunho que já traz traduções abre com as caixas inglesas à
           // vista, haja `meta` ou não: texto que existe no documento e não
@@ -1972,8 +2079,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // de isto existir. Não se deita fora: adopta-se, e GRAVA-SE no pedido —
       // é o que faz os dois convergirem numa verdade só, em vez de escolher
       // uma e perder a outra.
-      const daProposta = parseMoneyText(totalInput) || undefined;
-      if (daProposta && daProposta > 0) persistirPreco(daProposta);
+      //
+      // ── E LIA O CAMPO ERRADO ────────────────────────────────────────────
+      //
+      // Estava `parseMoneyText(totalInput)`, e `totalInput` aqui é SEMPRE "":
+      // começa vazio e o `setTotalInput` de cima só entra em vigor na render
+      // seguinte. O ramo nunca gravava nada — a promessa escrita nele («os dois
+      // convergem numa verdade só») não se cumpria uma única vez, e um pedido
+      // sem preço com uma proposta escrita continuava a aparecer sem dinheiro
+      // nenhum na Visão Geral, no Kanban e no dossier.
+      //
+      // Lê-se agora a base DO RASCUNHO, e a conversão para o pedido é feita
+      // contra o rascunho — que é quem tem os adicionais. Ver
+      // `baseDoEcraParaOPedido`.
+      if (baseDoRascunho != null && baseDoRascunho > 0) {
+        persistirPreco(baseDoRascunho, rascunhoLocal ? { doc: rascunhoLocal } : undefined);
+      }
     }
     hydrated.current = true;
     // SÓ quando não havia rascunho nenhum. Ver o bloco «A ABERTURA TAMBÉM NÃO
@@ -2221,22 +2342,62 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           ...merged,
           coverImages: normaliseCoverImages(merged.coverImages),
         });
-        return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
+        /**
+         * ── E O PREÇO DO PEDIDO ATRAVESSA PELA CONVERSÃO, COMO NA MONTAGEM ──
+         *
+         * Aqui estava `aplicarBase(limpo, doPedido)`: o «Preço final» do pedido
+         * — que é o que o casal paga, adicionais INCLUÍDOS — escrito em cru no
+         * campo que significa só os SERVIÇOS. `dinheiroDaProposta` somava-lhe
+         * a deslocação outra vez por baixo, e o total subia exactamente o valor
+         * dos adicionais. Medido numa proposta já enviada, com 895,00 € de
+         * deslocação: o PDF dizia 10.778,74 € sem IVA e o estúdio reabria a
+         * dizer 11.673,74 €.
+         *
+         * É o MESMO defeito que a montagem já tinha fechado (ver «AQUI ESTAVA
+         * O VALOR A CRESCER SOZINHO») — sobrevivia neste segundo efeito, que é
+         * o que corre quase sempre: o carimbo local é escrito ANTES do PUT e o
+         * `updatedAt` do servidor DEPOIS, portanto a comparação de datas está
+         * estruturalmente a favor do servidor. E é também o caminho do
+         * telemóvel que abre dias depois sem rascunho guardado nenhum.
+         *
+         * E ESCALAVA: o número inflacionado ficava no `totalAmount` do rascunho
+         * gravado a seguir, e a visita seguinte partia de lá.
+         *
+         * `null` = a conta não dá (o preço do pedido é menor do que os
+         * adicionais escritos). Deixa-se o documento como está, pela razão que
+         * está escrita em `baseParaOEstudio`: o aviso de desalinhamento já diz
+         * o que se passa, e inventar um número aqui fazia o preço do PEDIDO
+         * subir na gravação seguinte.
+         */
+        const paraOEcra = mandaOPedido ? baseDoPedidoParaOEcra(doPedido, limpo) : null;
+        // O campo do total é estado à parte e a conversão precisa do documento
+        // MERGIDO (dos adicionais e do modo de IVA que vieram do servidor), por
+        // isso lê-se aqui dentro — a mesma razão que a montagem tem escrita.
+        const base = mandaOPedido ? paraOEcra : (baseDoDoc(doDoServidor) ?? null);
+        if (base != null && !camposTocados.current.has("__total")) {
+          setTotalInput(textoDoTotal(base));
+        }
+        return paraOEcra == null ? limpo : aplicarBase(limpo, paraOEcra);
       });
       // O que estava marcado como «vindo do pedido» deixou de estar no ecrã: o
       // que se vê agora é o rascunho dela, feito noutro dispositivo. Manter os
       // anéis pedia confirmação de texto que ela já escreveu — e o anel só vale
       // enquanto quiser dizer «isto não é teu».
       setPorConfirmar(new Set());
-      const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
-      if (base != null && !camposTocados.current.has("__total")) {
-        setTotalInput(textoDoTotal(base));
-      }
       // O documento do servidor pode trazer traduções que este computador nunca
       // viu — é o caso de abrir a proposta noutro portátil. As caixas inglesas
       // acendem-se, pela mesma razão do restauro local.
       if (docTemIngles(doDoServidor)) setBilingue(true);
-    })();
+    })()
+      // A abertura ASSENTOU — o rascunho local já foi restaurado e o do
+      // servidor já foi lido (ou já se sabe que não há, ou que não dá para
+      // perguntar). É a partir daqui que a conferência com o documento que
+      // seguiu para o cliente pode olhar para números estáveis; antes disto
+      // olhava para um ecrã a meio de ser montado e acusava diferenças que se
+      // desfaziam sozinhas 200 ms depois.
+      .finally(() => {
+        if (active) setAberturaAssente(true);
+      });
     return () => {
       active = false;
     };
@@ -2921,10 +3082,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * Quando os adicionais estão dentro do valor, as duas não fazem nada, e o
    * comportamento é exactamente o de sempre.
    */
-  /** A INVERSA da de cima, e vive no mesmo ficheiro que ela — ver
-   *  `lib/preco-do-pedido`. */
-  function baseDoEcraParaOPedido(base: number): number {
-    return precoDoPedidoParaBase(base, doc as unknown as ContextoDoPreco);
+  /**
+   * A INVERSA da de cima, e vive no mesmo ficheiro que ela — ver
+   * `lib/preco-do-pedido`.
+   *
+   * ── O DOCUMENTO É UM ARGUMENTO, E TEM DE SER ────────────────────────────
+   *
+   * Lia `doc` da closure, e havia três chamadores em que `doc` é precisamente
+   * o documento ERRADO: repor uma versão, copiar uma proposta e anular uma
+   * limpeza trocam o documento inteiro com um `setDoc` e chamam isto na linha
+   * a seguir — quando `doc` ainda é o que se acabou de substituir. Os
+   * adicionais somados eram os do documento ANTIGO.
+   *
+   * Repor a versão que seguiu para o cliente é o caso que dói: a versão traz
+   * 1.490,00 € de adicionais, o rascunho no ecrã tinha 895,00 €, e o pedido
+   * ficava a 595,00 € de distância do que o casal recebeu — sem nada no ecrã
+   * a dizê-lo, e à espera da abertura seguinte para o mostrar.
+   */
+  function baseDoEcraParaOPedido(base: number, deQue: StudioDoc = doc): number {
+    return precoDoPedidoParaBase(base, deQue as unknown as ContextoDoPreco);
   }
 
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
@@ -2933,9 +3109,44 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   /** O último valor que ESTE ecrã mandou gravar — para a resposta que volta do
    *  servidor não disparar outra vez a sincronização e entrar em ciclo. */
   const precoEnviado = useRef<number | undefined>(quote.quotedPrice);
+  /**
+   * ── E O QUE CHEGOU NO `quote`, QUE É COISA DIFERENTE ────────────────────
+   *
+   * O `precoEnviado` diz o que daqui SAIU; este diz o que de lá VEIO. Eram o
+   * mesmo ref, e a sincronização de baixo usava-o como detector de mudança do
+   * `quote.quotedPrice` — o que quer dizer que quem lhe MEXESSE fabricava uma
+   * mudança que nunca houve.
+   *
+   * E passou a haver quem lhe mexesse: o ramo do «o pedido ainda não tem
+   * preço» adopta o valor do rascunho e chama `persistirPreco`, que marca
+   * 3.250 como enviado. O PATCH só volta 600 ms depois, portanto a
+   * sincronização corre na montagem com `quotedPrice` ainda por preencher, lê
+   * `undefined ≠ 3.250`, conclui que o preço foi APAGADO na Gestão do pedido —
+   * e limpava o total do ecrã. Medido: o campo ficava em branco até a resposta
+   * chegar, e se a rede estivesse em baixo ficava em branco e era assim que o
+   * rascunho gravava. O valor dela desaparecia por não haver rede.
+   *
+   * Com os dois separados, a pergunta que a sincronização faz volta a ser a
+   * certa: «o número que veio é diferente do último que veio?». Na montagem
+   * não é — a hidratação já aplicou o que havia a aplicar.
+   */
+  const doPedidoVisto = useRef<number | undefined>(quote.quotedPrice);
 
-  function persistirPreco(escrito: number | undefined, opcoes?: { jaEfectivo: boolean }) {
-    const base = escrito == null || opcoes?.jaEfectivo ? escrito : baseDoEcraParaOPedido(escrito);
+  function persistirPreco(
+    escrito: number | undefined,
+    opcoes?: {
+      /** O número já é o que o casal paga: não se lhe somam adicionais nenhuns. */
+      jaEfectivo?: boolean;
+      /** Contra que documento se faz a conversão. Ver `baseDoEcraParaOPedido`:
+       *  quem acabou de trocar o documento tem de o dizer, senão a soma é feita
+       *  com os adicionais do que já lá não está. */
+      doc?: StudioDoc;
+    },
+  ) {
+    const base =
+      escrito == null || opcoes?.jaEfectivo
+        ? escrito
+        : baseDoEcraParaOPedido(escrito, opcoes?.doc ?? doc);
     precoEnviado.current = base;
     if (gravarPreco.current) clearTimeout(gravarPreco.current);
     gravarPreco.current = setTimeout(async () => {
@@ -3355,8 +3566,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // `precoEnviado` evita o ciclo: quando a mudança veio DAQUI, o valor que
   // volta é o que acabámos de mandar e não há nada a fazer.
   useEffect(() => {
-    if (!hydrated.current) return;
     const doPedido = quote.quotedPrice;
+    // Primeiro a pergunta certa: MUDOU o que vem de fora? A montagem também
+    // corre este efeito, e na montagem não mudou nada. Ver `doPedidoVisto`.
+    const mudou = doPedido !== doPedidoVisto.current;
+    doPedidoVisto.current = doPedido;
+    if (!hydrated.current) return;
+    if (!mudou) return;
     if (doPedido === precoEnviado.current) return;
     precoEnviado.current = doPedido;
     setDoc((d) => {
@@ -3595,7 +3811,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // E o preço volta ao pedido com ele: quem repôs o rascunho repôs o valor
     // que lá estava, e deixá-lo só no ecrã era voltar a ter duas verdades.
     const base = parseMoneyText(limpo.total);
-    persistirPreco(base > 0 ? base : undefined);
+    // Com o documento REPOSTO, e não com o que está a sair do ecrã — ver
+    // `baseDoEcraParaOPedido`.
+    persistirPreco(base > 0 ? base : undefined, { doc: limpo.doc });
     setLimpo(null);
     toast("Rascunho reposto.", "success");
   }
@@ -3754,7 +3972,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // estúdio passava a dizer 8.000 e a Gestão do pedido, o Kanban e o dossier
     // continuavam a dizer 9.400 até ela enviar. Duas verdades sobre o mesmo
     // negócio, e a errada era a que aparecia em todos os outros ecrãs.
-    persistirPreco(typeof base === "number" && base > 0 ? base : undefined);
+    // Com a versão REPOSTA, e não com o rascunho que ela acabou de substituir:
+    // os adicionais que contam são os da versão. Ver `baseDoEcraParaOPedido`.
+    persistirPreco(typeof base === "number" && base > 0 ? base : undefined, { doc: reposto });
     // A referência é composta a partir dos campos ATÉ alguém lhe mexer. Uma
     // versão reposta traz a referência com que seguiu, e recompô-la por cima
     // trocava o número da proposta que o cliente tem em mãos.
@@ -5370,6 +5590,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     persistirPreco(base > 0 ? base : undefined);
   }
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * TROCAR «COMO CONTAM OS ADICIONAIS» É MEXER NO DINHEIRO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O selector decide se a deslocação está DENTRO do valor escrito ou se lhe
+   * SOMA — ou seja, decide se o casal paga 3.000 ou 3.140. A frase debaixo
+   * dele diz isso mesmo, com os dois números.
+   *
+   * E era um `setDoc` a seco: mudava o total no ecrã e não gravava nada no
+   * pedido. A partir daí o estúdio dizia um número e o «Preço final» dizia
+   * outro, em silêncio — até à abertura seguinte, em que quem manda no valor é
+   * o pedido e o total saltava sozinho o valor inteiro dos adicionais. É «o
+   * valor está diferente do que enviámos», pela porta do lado.
+   *
+   * A conta é a do `definirExtras`, e de propósito a mesma: o campo do escrito
+   * NÃO mexe (é sempre só os serviços); o que muda é o efectivo, e é o
+   * efectivo que o pedido guarda.
+   */
+  function trocarModoDosAdicionais(somam: boolean) {
+    setDoc((d) => ({ ...d, budgetExtrasSomam: somam }));
+    const escrito = parseMoneyText(totalInput);
+    // Os adicionais do documento que está no ecrã — o `setDoc` acima é
+    // assíncrono e só mexe na REGRA, não nas linhas.
+    const adicionais = somaDosExtrasSemIva(doc.budgetExtras ?? [], {
+      mode: vatMode,
+      vatRate: doc.vatRate,
+    });
+    const efectivo = round2(somam ? escrito + adicionais : escrito);
+    persistirPreco(efectivo > 0 ? efectivo : undefined, { jaEfectivo: true });
+  }
+
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
   function addBudgetExtra() {
     // Uma linha nova nasce vazia: não há valor nenhum para somar ainda.
@@ -5855,6 +6107,143 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     };
   }, [quote.id]);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A CONFERÊNCIA COM O QUE SEGUIU PARA O CLIENTE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Ver o bloco `divergenciaDoEnviado`, que conta o porquê. Aqui é a mecânica,
+   * e ela é de propósito barata: a LISTA das versões traz o total de cada
+   * envio (`total`, o bruto que ia no PDF) e mais nada. Quando bate certo — que
+   * é o caso normal — não se descarrega documento nenhum.
+   *
+   * `versoes[0]` é a mais recente: a rota devolve da mais nova para a mais
+   * velha, e está escrito lá.
+   */
+  const chaveDoEnviadoVisto = `${DRAFT_KEY}:enviado-visto`;
+  /** Esta MESMA diferença já lhe foi mostrada e ela ficou com o que tem? */
+  function divergenciaJaVista(aPagarAqui: number): boolean {
+    try {
+      const cru = localStorage.getItem(chaveDoEnviadoVisto);
+      return cru != null && Math.abs(Number(cru) - aPagarAqui) <= 0.01;
+    } catch {
+      // Sem `localStorage` a pergunta volta na abertura seguinte. É o lado
+      // certo para falhar: repetir uma pergunta custa um clique, calá-la custa
+      // o número que o casal recebeu.
+      return false;
+    }
+  }
+
+  useEffect(() => {
+    if (!aberturaAssente || conferidoComOEnviado.current) return;
+    // Enviar NESTA sessão põe no ecrã exactamente o documento que seguiu — não
+    // há nada para conferir, e a lista de versões ainda nem o conhece.
+    if (sent) return;
+    // Uma proposta a meio de ser escrita não tem total nenhum para comparar.
+    if (!(totais.aPagar > 0)) return;
+    conferidoComOEnviado.current = true;
+    let vivo = true;
+    const aPagarAqui = round2(totais.aPagar);
+    (async () => {
+      try {
+        const r = await fetch(`/api/orcamento/${quote.id}/versoes`, { cache: "no-store" });
+        if (!r.ok || !vivo) return;
+        const dados = (await r.json()) as { versoes?: VersaoEnviada[] } | null;
+        const ultima = dados?.versoes?.[0];
+        if (!ultima || !(Number(ultima.total) > 0)) return;
+        const enviado = round2(Number(ultima.total));
+        // Um cêntimo de tolerância, a mesma do resto da casa: os dois lados
+        // passaram por arredondamentos, e um cêntimo não é uma divergência.
+        if (Math.abs(enviado - aPagarAqui) <= 0.01) return;
+        if (divergenciaJaVista(aPagarAqui)) return;
+        if (!vivo) return;
+        setDivergenciaDoEnviado({
+          enviadaEm: ultima.enviadaEm,
+          aPagarEnviado: enviado,
+          aPagarAqui,
+          versaoId: ultima.id,
+        });
+      } catch {
+        /* sem rede: o estúdio abre como sempre abriu, só sem a rede por baixo */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberturaAssente, sent, totais.aPagar, quote.id]);
+
+  /**
+   * Repõe no ecrã os VALORES que seguiram para o cliente — e só os valores.
+   *
+   * O texto, as fotografias e os mood boards ficam exactamente como estão: são
+   * trabalho dela, podem ser posteriores ao envio, e nunca estiveram em causa.
+   * O que volta é o conjunto de campos que decide o dinheiro — o mesmo que
+   * `totaisDaProposta` lê para desenhar o quadro do PDF.
+   *
+   * Reversível durante dez segundos, como todas as outras acções que mexem no
+   * preço, e com uma linha no histórico do pedido pela mesma razão: um valor
+   * que muda, visto três semanas depois, tem de ter onde se explicar.
+   */
+  async function reporOsValoresEnviados() {
+    const d = divergenciaDoEnviado;
+    if (!d || aReporOEnviado) return;
+    setAReporOEnviado(true);
+    try {
+      const res = await fetch(`/api/orcamento/${quote.id}/versoes?doc=${d.versaoId}`, {
+        cache: "no-store",
+      });
+      const dados = (await res.json().catch(() => null)) as { doc?: ProposalDoc } | null;
+      if (!res.ok || !dados?.doc) {
+        throw new Error(
+          "Não foi possível ir buscar a proposta que seguiu para o cliente. A ligação falhou ou a versão já não está no servidor — tenta outra vez daqui a pouco, ou fala com quem gere a instalação. Nada mudou no que está no ecrã.",
+        );
+      }
+      const enviado = dados.doc as StudioDoc;
+      setLimpo({
+        doc,
+        total: totalInput,
+        segundos: 10,
+        motivo: `Valores repostos como seguiram para o cliente — total a pagar de ${eur(d.aPagarAqui)} para ${eur(d.aPagarEnviado)}.`,
+      });
+      setDoc((dd) => ({ ...dd, ...dinheiroDoDocumento(enviado) }));
+      const base = baseDoDoc(enviado);
+      setTotalInput(typeof base === "number" && base > 0 ? textoDoTotal(base) : "");
+      // Com o documento ENVIADO, e não com o que estava no ecrã — ver
+      // `baseDoEcraParaOPedido`. É isto que volta a pôr o «Preço final» do
+      // pedido de acordo com o que o casal recebeu.
+      persistirPreco(typeof base === "number" && base > 0 ? base : undefined, { doc: enviado });
+      registarNoHistorico(
+        `Valores repostos no estúdio como seguiram para o cliente: total a pagar de ${eur(d.aPagarAqui)} para ${eur(d.aPagarEnviado)}.`,
+      );
+      setDivergenciaDoEnviado(null);
+      toast(
+        "Os valores voltaram ao que seguiu para o cliente. Podes anular durante 10 segundos.",
+        "success",
+      );
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : "Não foi possível repor os valores enviados.",
+        "error",
+      );
+    } finally {
+      setAReporOEnviado(false);
+    }
+  }
+
+  /** Fica o que está neste aparelho — e a pergunta não se repete enquanto o
+   *  número não voltar a mexer. */
+  function manterOsValoresDesteAparelho() {
+    const d = divergenciaDoEnviado;
+    if (!d) return;
+    try {
+      localStorage.setItem(chaveDoEnviadoVisto, String(d.aPagarAqui));
+    } catch {
+      /* sem `localStorage` a pergunta volta na abertura seguinte */
+    }
+    setDivergenciaDoEnviado(null);
+  }
+
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
   /**
    * Copiar uma proposta antiga para cima desta.
@@ -5884,7 +6273,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const base = baseDoDoc(copiado);
     const temValor = typeof base === "number" && base > 0;
     setTotalInput(temValor ? textoDoTotal(base!) : "");
-    persistirPreco(temValor ? base : undefined);
+    // Com o documento COPIADO — ver `baseDoEcraParaOPedido`.
+    persistirPreco(temValor ? base : undefined, { doc: copiado });
     setPorConfirmar(new Set(e.camposAMudar));
     // O título interno volta a gerar-se sozinho: a cópia esvaziou-o de
     // propósito para não ficar com o nome do casal anterior no cabeçalho.
@@ -6169,6 +6559,94 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Button>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          O QUE SEGUIU PARA O CLIENTE, E O QUE ESTE APARELHO TEM
+          ══════════════════════════════════════════════════════════════════
+
+          Palavras dela: «eu quero igual o valor!!! até eu alterar por mim!».
+
+          Os dois números lado a lado, com a data do envio, antes de qualquer
+          decisão. Ver o bloco `divergenciaDoEnviado`, que explica porque é que
+          nenhum dos dois se aplica sozinho: uma correcção de preço feita de
+          propósito depois do envio produz exactamente esta mesma diferença, e
+          escolher por ela era apagar trabalho em metade dos casos.
+
+          No topo do estúdio, ao lado das outras perguntas de dinheiro e pela
+          mesma razão que está escrita lá: uma pergunta que aparece cada vez
+          noutro sítio é uma pergunta que se responde sem se ler.
+
+          Empilhado abaixo dos 30rem e em linha acima — a caixa vive na coluna
+          do estúdio, e não na janela. A conta: os dois blocos de número pedem
+          ~13rem cada («Total a pagar» + «15 090,55 €» a 13px são ~11rem, mais
+          o `gap-4` de 1rem e o respiro), portanto 26rem é onde os dois deixam
+          de se apertar; 30rem é o degrau da casa logo acima, e dá folga para
+          os números de seis dígitos que ela tem (202 889,00 €). */}
+      {divergenciaDoEnviado && (
+        <div
+          role="alert"
+          /* O nome distingue-o dos outros avisos do estúdio — há mais do que um
+             `role="alert"` neste ecrã, e um leitor que anuncie «alerta» sem
+             dizer de quê obriga a ir procurar. */
+          aria-label="O valor não é o que seguiu para o cliente"
+          className="mb-4 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+        >
+          <p className="text-xs leading-relaxed text-foreground/70">
+            Esta proposta já seguiu para o cliente{" "}
+            {dataDoEnvioPorExtenso(divergenciaDoEnviado.enviadaEm)}, e o valor que está neste ecrã
+            NÃO é o que ele recebeu. Escolhe qual dos dois fica — nada muda até escolheres.
+          </p>
+          <div className="@container mt-2.5">
+            <dl className="flex flex-col gap-2 @min-[30rem]:flex-row @min-[30rem]:gap-4">
+              <div className="min-w-0 grow">
+                <dt className="text-[11px] text-foreground/45">O que o cliente recebeu</dt>
+                <dd className="text-sm font-semibold text-foreground/85">
+                  {eur(divergenciaDoEnviado.aPagarEnviado)}
+                </dd>
+              </div>
+              <div className="min-w-0 grow">
+                <dt className="text-[11px] text-foreground/45">O que está neste aparelho</dt>
+                <dd className="text-sm font-semibold text-foreground/85">
+                  {eur(divergenciaDoEnviado.aPagarAqui)}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          {/* A espera desenhada da única maneira que esta casa desenha esperas.
+              `estimadoMs` e não uma barra sabida: é um pedido e uma resposta, e
+              no meio não há nada que se possa contar. */}
+          {aReporOEnviado ? (
+            <EmCurso
+              className="mt-2.5 max-w-xs"
+              titulo="A ir buscar a proposta que seguiu…"
+              estimadoMs={2000}
+              nota="Só os valores voltam atrás. O texto e as fotografias ficam como estão."
+              notaDemorada="O servidor está a demorar. Se falhar, nada muda no que está no ecrã."
+            />
+          ) : (
+            <div className="mt-2.5 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                onClick={() => void reporOsValoresEnviados()}
+              >
+                Repor os valores que seguiram
+              </button>
+              <button
+                type="button"
+                className="alvo-toque text-xs text-foreground/55 underline-offset-2 hover:underline"
+                onClick={manterOsValoresDesteAparelho}
+              >
+                Manter os deste aparelho
+              </button>
+            </div>
+          )}
+          <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/45">
+            Repor mexe só nos valores — o texto, as fotografias e os mood boards ficam como estão, e
+            podes anular durante 10 segundos.
+          </p>
+        </div>
+      )}
 
       {limpo && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
@@ -8421,9 +8899,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       aria-label="Como contam os valores adicionais no preço final"
                       className="bo-input alvo-toque px-2.5 py-2 text-xs"
                       value={doc.budgetExtrasSomam ? "somam" : "dentro"}
-                      onChange={(e) =>
-                        setDoc((d) => ({ ...d, budgetExtrasSomam: e.target.value === "somam" }))
-                      }
+                      onChange={(e) => trocarModoDosAdicionais(e.target.value === "somam")}
                     >
                       <option value="dentro">Já incluídas no valor</option>
                       <option value="somam">Somam ao valor</option>

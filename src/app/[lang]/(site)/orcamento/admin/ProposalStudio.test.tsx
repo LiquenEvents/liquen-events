@@ -1102,7 +1102,7 @@ describe("mood board com mais fotos do que a página desenha", () => {
       await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
     );
     await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
-    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const alerta = await screen.findByRole("alert");
     expect(alerta.textContent).toMatch(/fica com 11 fotos e a página do PDF mostra 10/);
     expect(alerta.textContent).toMatch(/a última não entra/);
     // …e a foto a mais fica marcada, para o aviso não morrer com o toast.
@@ -1227,7 +1227,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
     await user.click(await screen.findByRole("button", { name: /Descarregar PDF/ }));
 
-    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const alerta = await screen.findByRole("alert");
     expect(
       within(alerta).getByText(/Mood board «Cerimónia»: 2 fotos não entram no PDF/),
     ).toBeTruthy();
@@ -1251,7 +1251,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
 
-    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const alerta = await screen.findByRole("alert");
     const texto = alerta.textContent ?? "";
     expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la ou desenhá-la\)/);
     expect(texto).toMatch(/Campo «Local»: 1 linha cortada/);
@@ -2295,7 +2295,7 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
 
-    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const alerta = await screen.findByRole("alert");
     expect(alerta.textContent ?? "").toMatch(/email de cliente válido/i);
     // E o passo NÃO fica dado por feito: o botão continua lá para ela poder
     // corrigir o contacto e enviar a sério.
@@ -2401,6 +2401,116 @@ describe("o preço do pedido sobrevive ao rascunho do servidor", () => {
       expect(gravados[gravados.length - 1]).toContain('"totalAmount":9400');
     });
   });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UM PEDIDO SEM PREÇO E UMA PROPOSTA COM ELE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A abertura tem um ramo para isto — «o pedido ainda não tem preço mas o
+ * rascunho tem um valor escrito; adopta-se, e GRAVA-SE no pedido» — e ele lia
+ * `totalInput`, que naquele instante é SEMPRE a cadeia vazia: começa vazio e o
+ * `setTotalInput` da linha de cima só entra em vigor na render seguinte.
+ *
+ * Ou seja, nunca gravou nada. O pedido continuava sem dinheiro nenhum na Visão
+ * Geral, no Kanban e no dossier, com a proposta escrita ao lado a dizer o
+ * contrário.
+ */
+describe("o rascunho leva o preço ao pedido que ainda não o tem", () => {
+  function precosNoPedido(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  it("e leva o que o casal paga, com os adicionais somados", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        location: "Évora",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 9883.74,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    // O pedido não tem «Preço final» nenhum.
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByDisplayValue("Évora");
+    // 9.883,74 de serviços + 895,00 de deslocação.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74), { timeout: 3000 });
+  }, 20_000);
+
+  /**
+   * ── E ADOPTAR O PREÇO NÃO PODE APAGAR O ECRÃ ──────────────────────────
+   *
+   * O ramo de cima chama `persistirPreco`, e `persistirPreco` marca 10.778,74
+   * como «enviado por mim». Só que o PATCH volta 600 ms depois: na montagem, o
+   * `quote.quotedPrice` ainda está por preencher.
+   *
+   * A sincronização que ouve o pedido usava esse mesmo carimbo como detector
+   * de mudança. Lia `undefined ≠ 10.778,74`, concluía que o preço tinha sido
+   * APAGADO na Gestão do pedido, e limpava o total: `setTotalInput("")` e
+   * `totalAmount: undefined`. O campo ficava em branco.
+   *
+   * Com rede, voltava quando a resposta chegasse — um piscar. SEM rede, ficava
+   * em branco, e era o branco que o rascunho seguinte gravava: o valor dela
+   * desaparecia por não haver rede. É a regra da casa ao contrário («se
+   * falhar, não perder trabalho»), e por isso tem caso próprio.
+   */
+  it("e o valor não desaparece do campo enquanto o pedido não responde", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        location: "Évora",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 9883.74,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByDisplayValue("Évora");
+    const campo = (await screen.findByLabelText(/Valor \(sem IVA\)/)) as HTMLInputElement;
+    expect(campo.value).toBe("9883,74");
+    // E continua lá depois de o PATCH ter tido tempo de ir e não voltar: é o
+    // caso da rede em baixo, que é onde isto doía.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74), { timeout: 3000 });
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("9883,74");
+  }, 20_000);
 });
 
 /**
