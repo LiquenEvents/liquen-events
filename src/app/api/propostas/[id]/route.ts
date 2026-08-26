@@ -2,9 +2,111 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { deleteProposal, updateProposal } from "@/lib/proposals-store";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
+import { updateQuoteWith } from "@/lib/quotes-store";
+import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
+import type { AcontecimentoDoPedido } from "@/lib/orcamento/estado-do-pedido";
+import { eur } from "@/lib/money";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PEDIDO SEGUE A PROPOSTA — E SEGUE-A AQUI, QUE É POR ONDE TODOS PASSAM
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O DEFEITO, tal como uma auditoria a correr em produção o apanhou: sete
+ * pedidos marcados «Proposta enviada» sem proposta nenhuma, e — ao contrário —
+ * a Margarida Serra com duas propostas enviadas por email e o pedido dela ainda
+ * na coluna «Novo». Duas verdades sobre o mesmo casamento, cada uma no seu
+ * ecrã, e nenhuma das duas a saber da outra.
+ *
+ * O CENSO dos sítios que mudam o estado de uma proposta, e do que cada um
+ * fazia ao pedido:
+ *
+ *   Estúdio → enviar por email          →  punha o pedido em «Proposta enviada»
+ *   Propostas → marcar «Aceite»         →  punha, MAS num segundo pedido HTTP
+ *                                          disparado pelo browser, e só ali
+ *   Propostas → marcar «Enviada»        →  NÃO
+ *   Propostas → marcar «Recusada»       →  não (decisão escrita, ver abaixo)
+ *   Acompanhamento → mudar o estado     →  NÃO
+ *   PATCH directo a esta rota           →  NÃO
+ *
+ * Três dos seis não mexiam no pedido, e o único que mexia fazia-o do lado
+ * errado da rede: dois pedidos HTTP, e se o segundo não chega — num 4G fraco
+ * numa quinta, que é onde este back office se usa — a proposta fica aceite e o
+ * pedido fica para trás, sem ninguém dar por isso. O ecrã até dizia a frase
+ * certa nesse caso; o que não dizia era que ficava por fazer.
+ *
+ * Passa a ser UMA escrita, no servidor, na única porta por onde os seis
+ * caminhos passam. Não é regra nova: é a mesma máquina de
+ * `@/lib/orcamento/estado-do-pedido` que a rota do envio já usa — a que nunca
+ * desce a escada e a que deixa a linha no histórico a dizer o que a causou.
+ *
+ * ── E «RECUSADA» CONTINUA A NÃO MEXER NO PEDIDO ────────────────────────────
+ *
+ * De propósito, e não por esquecimento. É a regra 3 da máquina de estados:
+ * `rejeitado` é uma decisão de uma pessoa. Uma proposta recusada pode ser
+ * renegociada, e dar o pedido por perdido em nome dela tirava-o da lista onde
+ * ela ainda ia atrás dele. O `Propostas.tsx` já tinha esta decisão escrita e
+ * ela mantém-se palavra por palavra.
+ */
+const ACONTECIMENTO_DA_PROPOSTA: Partial<Record<string, AcontecimentoDoPedido>> = {
+  // Enviada e em negociação afirmam a mesma coisa vista do pedido: a proposta
+  // saiu. O tecto é o mesmo, e a escada trata de não recuar um pedido que já
+  // esteja mais à frente.
+  enviada: "proposta_enviada",
+  em_negociacao: "proposta_enviada",
+  aceite: "proposta_aceite",
+};
+
+/**
+ * Move o pedido associado, se houver o que mover. Devolve o pedido gravado —
+ * para quem chamou não ter de o ir buscar num segundo pedido — ou `undefined`
+ * quando não havia transição nenhuma a fazer.
+ *
+ * ── PORQUE É QUE UMA FALHA AQUI NÃO FAZ FALHAR O PATCH ─────────────────────
+ *
+ * Porque a proposta JÁ ficou gravada. Devolver 500 a partir daqui fazia o ecrã
+ * dizer que o gesto falhou sobre uma escrita que passou, e o gesto seguinte
+ * dela é repeti-lo. Fica registado no log; o pedido resolve-se na visita
+ * seguinte ao Quadro. É a mesma escolha — e pela mesma razão — que a rota do
+ * envio faz depois de o email já ter saído.
+ */
+async function moverOPedido(
+  proposta: { quoteId?: string; status?: string; total?: number },
+  actor?: string,
+) {
+  const acontecimento = ACONTECIMENTO_DA_PROPOSTA[proposta.status ?? ""];
+  if (!acontecimento || !proposta.quoteId) return undefined;
+  try {
+    let houve = false;
+    // `updateQuoteWith` e não `updateQuote`: a regra tem de ser avaliada contra
+    // o pedido tal como está GRAVADO agora, e a linha nova do histórico não
+    // pode apagar a que outra ferramenta escreveu entretanto.
+    const gravado = await updateQuoteWith(proposta.quoteId, (actual) => {
+      const transicao = transicaoDoPedido({
+        acontecimento,
+        estadoActual: actual.status,
+        detalhe: typeof proposta.total === "number" ? eur(proposta.total) : undefined,
+        actor,
+      });
+      if (!transicao) return actual;
+      houve = true;
+      return {
+        ...actual,
+        status: transicao.status,
+        activityLog: [...(actual.activityLog ?? []), transicao.entrada],
+      };
+    });
+    return houve && gravado ? gravado : undefined;
+  } catch (e) {
+    log.error("propostas PATCH: a proposta gravou mas o pedido não acompanhou", e, {
+      quoteId: proposta.quoteId,
+    });
+    return undefined;
+  }
+}
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -79,7 +181,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     const updated = await updateProposal(id, patch);
     if (!updated) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
-    return NextResponse.json(updated);
+
+    /**
+     * ── PORQUE É QUE O NOME DELA VEM DO BROWSER ────────────────────────────
+     *
+     * Porque o servidor não sabe quem está sentado do outro lado: a sessão do
+     * back office é uma só e não tem nome. E a linha do histórico que ESTA
+     * transição escreve tinha o nome dela desde que alguém reparou que «só a
+     * que fecha o negócio aparecia sem nome».
+     *
+     * Sem isto, aceitar uma proposta passava a dizer «Sistema» — que é a
+     * palavra que este back office reserva para o que não foi ninguém, e não é
+     * o caso: foi ela. Fica opcional, com tecto, e a fiar-se só do que já
+     * passou pelo `isAuthed` acima. É menos confiança no browser do que havia
+     * antes, não mais: até aqui era o browser a escrever a linha inteira.
+     */
+    const actor = typeof body.actor === "string" ? body.actor.trim().slice(0, 80) : undefined;
+    const pedido = "status" in patch ? await moverOPedido(updated, actor || undefined) : undefined;
+    return NextResponse.json(pedido ? { ...updated, pedido } : updated);
   } catch (err) {
     // A proposta é o documento que seguiu para o casal e tem vários donos ao
     // mesmo tempo: o Estúdio a gravar, esta rota a mudar o estado, o portal do

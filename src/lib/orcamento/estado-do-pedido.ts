@@ -55,10 +55,28 @@ import type { ActivityEntry, QuoteStatus } from "./types";
  * Um caso que NÃO está aqui de propósito: o cliente aceitar a proposta pelo
  * link público. Essa é uma decisão dele, é a única porta para `rejeitado`
  * (recusa) e vive inteira em `src/app/api/proposta/route.ts`.
+ *
+ * ── `proposta_aceite` É O GESTO DELA, NÃO O DO CLIENTE ─────────────────────
+ *
+ * Não confundir com o parágrafo acima. `proposta_aceite` é ela a marcar a
+ * proposta como aceite no back office — no ecrã «Propostas» ou no
+ * «Acompanhamento» —, tipicamente porque o casal respondeu por email ou ao
+ * telefone e não pelo link. É o mesmo tecto (`aceite`) que o pagamento e o
+ * contrato já davam, pela mesma razão: ninguém marca uma proposta como aceite
+ * a um cliente que ainda está a pensar.
+ *
+ * Nasceu porque essa regra JÁ EXISTIA — escrita à mão dentro do
+ * `Propostas.tsx`, num segundo pedido HTTP disparado pelo browser depois do
+ * primeiro. Estava certa e estava no sítio errado: só valia naquele ecrã (o
+ * «Acompanhamento» mudava o mesmo estado e não mexia no pedido), e num 4G
+ * fraco o segundo pedido podia nunca chegar — a proposta ficava aceite e o
+ * pedido não. É exactamente a regra 1 do cabeçalho a repetir-se: a mesma
+ * decisão escrita em dois sítios acaba a divergir.
  */
 export type AcontecimentoDoPedido =
   | "mensagem_enviada"
   | "proposta_enviada"
+  | "proposta_aceite"
   | "pagamento_recebido"
   | "contrato_registado";
 
@@ -105,6 +123,7 @@ export const ROTULO_DO_ESTADO: Record<QuoteStatus, string> = {
 export const ESTADO_APOS: Record<AcontecimentoDoPedido, QuoteStatus> = {
   mensagem_enviada: "em_revisao",
   proposta_enviada: "cotado",
+  proposta_aceite: "aceite",
   pagamento_recebido: "aceite",
   contrato_registado: "aceite",
 };
@@ -116,6 +135,7 @@ export const ESTADO_APOS: Record<AcontecimentoDoPedido, QuoteStatus> = {
 const MOTIVO: Record<AcontecimentoDoPedido, string> = {
   mensagem_enviada: "respondemos ao cliente",
   proposta_enviada: "proposta enviada ao cliente",
+  proposta_aceite: "proposta dada como aceite",
   pagamento_recebido: "pagamento recebido",
   contrato_registado: "contrato registado",
 };

@@ -200,19 +200,30 @@ describe("Propostas — a lista muda de forma", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * ACEITAR UMA PROPOSTA NÃO PODE APAGAR O HISTÓRICO DO PEDIDO
+ * ACEITAR UMA PROPOSTA MOVE O PEDIDO — NUMA IDA À REDE, NÃO EM DUAS
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Ao aceitar, o pedido associado passa a "Aceite" com uma linha no histórico.
- * Isso ia como `activityLog: [...tudo o que este ecrã tinha, entrada]` — e o
- * que este ecrã tem são os `quotes` que o pai carregou quando o back office
- * abriu. Entre a manhã e o clique cabe tudo o que as outras ferramentas
- * escreveram (o Quadro, a gaveta, o estúdio), e desaparecia sem erro nenhum.
+ * Este bloco guardava outra coisa, e a mudança merece ficar escrita.
  *
- * O servidor tem o caminho seguro — `activityLogAppend`, que junta ao registo
- * FRESCO. E a entrada leva o nome de quem aceitou, como todas as outras.
+ * Guardava que o segundo pedido HTTP — o que este ecrã disparava para mover o
+ * pedido depois de a proposta ficar aceite — mandasse `activityLogAppend` e não
+ * o registo inteiro. Estava certo: mandar o registo inteiro gravava o retrato
+ * VELHO que este ecrã tinha e apagava o que as outras ferramentas escreveram
+ * pelo meio.
+ *
+ * O que mudou é que esse segundo pedido DEIXOU DE EXISTIR. Uma auditoria em
+ * produção mostrou o resto do problema: a regra só valia neste ecrã (marcar a
+ * mesma proposta como enviada, aqui ou no «Acompanhamento», não mexia no
+ * pedido), e um segundo pedido pela rede num 4G de quinta é um pedido que pode
+ * nunca chegar — a proposta ficava aceite e o pedido para trás. A decisão
+ * passou para dentro do PATCH da proposta, no servidor.
+ *
+ * O que se guarda AQUI é a metade que continua a ser deste ecrã: uma só
+ * escrita, e o nome de quem aceitou a viajar com ela. A outra metade — juntar
+ * ao registo FRESCO, e nunca recuar o estado — está guardada onde passou a
+ * viver, em `api/propostas/[id]/route.test.ts`.
  */
-describe("Propostas — aceitar acrescenta ao histórico, não o reescreve", () => {
+describe("Propostas — aceitar move o pedido do lado do servidor", () => {
   const enviada = {
     id: "p-enviada",
     quoteId: "q1",
@@ -271,23 +282,27 @@ describe("Propostas — aceitar acrescenta ao histórico, não o reescreve", () 
     await userEvent.click(screen.getAllByRole("button", { name: "Acções de Ana e Rui" })[0]);
     await userEvent.click(await screen.findByRole("menuitem", { name: "Aceitar" }));
     await waitFor(() =>
-      expect(enviados.some((e) => e.url.startsWith("/api/orcamento/"))).toBe(true),
+      expect(enviados.some((e) => e.url.startsWith("/api/propostas/"))).toBe(true),
     );
-    return enviados.find((e) => e.url.startsWith("/api/orcamento/"))!;
+    return enviados.find((e) => e.url.startsWith("/api/propostas/"))!;
   }
 
-  it("manda `activityLogAppend` com uma entrada — e nunca o registo inteiro", async () => {
-    const patch = await aceitar();
-    expect(patch.body.status).toBe("aceite");
-    expect(patch.body).not.toHaveProperty("activityLog");
-    expect(patch.body.activityLogAppend).toHaveLength(1);
+  it("uma só escrita: o pedido não leva um segundo pedido HTTP", async () => {
+    await aceitar();
+    // Sem margem para a corrida: se o segundo pedido ainda estivesse a caminho,
+    // um tempo de espera apanhava-o.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(enviados.filter((e) => e.url.startsWith("/api/orcamento/"))).toHaveLength(0);
+    expect(enviados.filter((e) => e.url.startsWith("/api/propostas/"))).toHaveLength(1);
   });
 
-  it("a entrada diz QUEM aceitou", async () => {
+  it("leva o nome de quem aceitou — o servidor não o sabe", async () => {
     const patch = await aceitar();
-    const entrada = (patch.body.activityLogAppend as { actor?: string; summary: string }[])[0];
-    expect(entrada.actor).toBe("Catarina");
-    expect(entrada.summary).toMatch(/Proposta aceite/);
+    expect(patch.body.status).toBe("aceite");
+    expect(patch.body.actor).toBe("Catarina");
+    // E nunca o registo do pedido: este ecrã já não escreve histórico nenhum.
+    expect(patch.body).not.toHaveProperty("activityLog");
+    expect(patch.body).not.toHaveProperty("activityLogAppend");
   });
 });
 
