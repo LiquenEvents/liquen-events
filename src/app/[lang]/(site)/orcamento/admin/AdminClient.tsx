@@ -405,8 +405,34 @@ function COLUNAS_DE_PEDIDOS(ctx: {
   /** O pedido gravado quando alguém marca o desfecho na própria linha. */
   onDesfecho: (q: Quote) => void;
 }): Coluna<Quote>[] {
-  const diasAEsperar = (q: Quote) =>
-    Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UM CASAMENTO JÁ GANHO NÃO ESTÁ «À ESPERA» DE NADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Isto contava os dias desde a submissão para TODOS os pedidos, e a coluna
+   * desenhava-os a todos. Debaixo de um cabeçalho que diz «À espera», um
+   * trabalho ganho em Maio aparecia com «104d» — e um perdido também.
+   *
+   * O número não estava errado; a pergunta é que era outra. «Há quanto tempo
+   * este pedido entrou» e «há quanto tempo isto está parado à espera de
+   * alguém» são coisas diferentes, e esta coluna existe para a segunda: é por
+   * ela que se ordena para responder a «a quem devo responder já».
+   *
+   * Um pedido em aberto está à espera de alguém — de nós enquanto não tem
+   * proposta (`pendente`, `em_revisao`), do casal depois de ela seguir
+   * (`cotado`). Um `aceite` e um `rejeitado` não estão à espera de ninguém:
+   * acabaram. Esses passam a mostrar «—», que é a mesma marca que o resto da
+   * tabela usa para «não se aplica».
+   *
+   * `null` e não zero, pela mesma razão que está escrita em `diasDeEspera`
+   * (`lib/orcamento/espera.ts`): zero é um número, e um número debaixo desta
+   * coluna é uma afirmação sobre quanto tempo alguém está à espera.
+   */
+  const diasAEsperar = (q: Quote): number | null => {
+    if (q.status === "aceite" || q.status === "rejeitado") return null;
+    return Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
+  };
   return [
     {
       chave: "sel",
@@ -526,9 +552,13 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       chave: "espera",
       cabecalho: "À espera",
       alinharADireita: true,
-      ordenar: (a, b) => diasAEsperar(b) - diasAEsperar(a),
+      // Os fechados vão para o FIM da ordenação, e não para o princípio: ordenar
+      // por «à espera» é procurar o que está parado há mais tempo, e um trabalho
+      // acabado no topo dessa lista era ruído no sítio de maior atenção.
+      ordenar: (a, b) => (diasAEsperar(b) ?? -1) - (diasAEsperar(a) ?? -1),
       celula: (q) => {
         const d = diasAEsperar(q);
+        if (d === null) return <span className="text-foreground/40">—</span>;
         const parado =
           (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
           d >= 14;
