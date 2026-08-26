@@ -302,6 +302,28 @@ const VIEW_KEYS: Record<string, View> = {
   e: "estatisticas",
 };
 const VIEW_STORAGE_KEY = "liquen-admin-view";
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA SECÇÃO, MAS NUM COOKIE — PARA O SERVIDOR A PODER LER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO por uma auditoria, em separador limpo: a ~1 s aparece a Visão Geral
+ * (desenhada no servidor), a ~2 s a aplicação troca SOZINHA para a última
+ * secção usada e o menu lateral fecha-se. Quem entrou para ver a Visão Geral
+ * vê-a desaparecer-lhe da frente.
+ *
+ * A causa é a memória estar num sítio onde o servidor não chega: o
+ * `localStorage` só existe depois de a página ter sido desenhada, portanto a
+ * escolha dela só podia ser aplicada DEPOIS — como uma correcção, à vista.
+ *
+ * Um cookie é a mesma memória por aparelho, mas viaja com o pedido. O servidor
+ * desenha logo a secção certa e não há salto nenhum para corrigir.
+ *
+ * O `localStorage` FICA, e não é redundância: é ele que continua a valer para
+ * quem tenha os cookies restringidos, e é a ponte para quem já tem uma escolha
+ * guardada e ainda não tem cookie nenhum.
+ */
+export const VIEW_COOKIE = "liquen-admin-view";
 /** A barra lateral recolhida no computador — por aparelho, como o resto. */
 const CHAVE_MENU_RECOLHIDO = "liquen-admin-menu-recolhido";
 
@@ -323,6 +345,14 @@ interface Props {
    * office abria como se ela não tivesse pedido nenhum. Ver o comentário lá.
    */
   falhaDosPedidos?: LeituraFalhada | null;
+  /**
+   * A secção com que abrir, decidida NO SERVIDOR a partir do cookie.
+   *
+   * `undefined` = não havia cookie, e o primeiro desenho é a Visão Geral. Ver
+   * `VIEW_COOKIE`: é isto que faz o salto de secção desaparecer, porque o
+   * servidor já desenha a secção certa em vez de o cliente a corrigir à vista.
+   */
+  vistaInicial?: View;
 }
 
 // Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
@@ -944,6 +974,7 @@ export default function AdminClient({
   initialQuotes,
   userName = "Catarina",
   falhaDosPedidos = null,
+  vistaInicial,
 }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
@@ -1181,7 +1212,7 @@ export default function AdminClient({
   const quotesEtag = useRef<string | null>(null);
   /** Quando foi a última revalidação, para não a repetir a cada piscar de olhos. */
   const ultimaRevalidacao = useRef(0);
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>(vistaInicial ?? "overview");
   const [navOpen, setNavOpen] = useState(false);
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -1805,15 +1836,29 @@ export default function AdminClient({
     });
   }, []);
 
-  // Restore the last view the user was on (per device). Done in an effect so it
-  // never causes an SSR/hydration mismatch.
+  /**
+   * ── A PONTE, E SÓ A PONTE ────────────────────────────────────────────────
+   *
+   * A secção passou a vir DO SERVIDOR (ver `VIEW_COOKIE`): quando o cookie já
+   * existe, o primeiro desenho já é o certo e não há nada a restaurar aqui.
+   *
+   * O que fica é o caso de quem já tinha uma escolha guardada no
+   * `localStorage` e ainda não tem cookie — a primeira visita depois desta
+   * alteração. Aí ainda há um salto, uma vez, e a gravação seguinte escreve o
+   * cookie que o faz desaparecer para sempre.
+   *
+   * `vistaInicial` a dizer que já veio decidida é o que impede isto de voltar
+   * a pôr o salto no ecrã de quem já não precisa dele.
+   */
   useEffect(() => {
+    if (vistaInicial) return;
     try {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY) as View | null;
       if (saved && NAV.some((n) => n.id === saved)) setView(saved);
     } catch {
       /* localStorage unavailable — keep default */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1830,6 +1875,19 @@ export default function AdminClient({
       localStorage.setItem(VIEW_STORAGE_KEY, view);
     } catch {
       /* ignore */
+    }
+    /**
+     * E no cookie, que é o que o servidor lê no arranque seguinte. Um ano, o
+     * mesmo horizonte do `localStorage`; `SameSite=Lax` porque isto não é uma
+     * credencial — é a preferência de que separador abrir — e `Lax` é o que
+     * deixa o cookie viajar numa navegação normal sem o oferecer a terceiros.
+     * Sem `Secure` escrito à mão: em `localhost` ele impedia a gravação, e em
+     * produção o site é servido só por HTTPS.
+     */
+    try {
+      document.cookie = `${VIEW_COOKIE}=${encodeURIComponent(view)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    } catch {
+      /* sem cookies: fica o `localStorage`, e volta a haver o salto de uma vez */
     }
   }, [view]);
 
