@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { avancoDaEspera, esperaDemorada } from "@/lib/espera-em-curso";
 import { cn } from "./cn";
+import { ESTADO, PRESSAO, PROGRESSO } from "./movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -154,7 +155,10 @@ export function EmCurso({
           <button
             type="button"
             onClick={aoParar}
-            className="alvo-toque shrink-0 rounded-lg px-2 text-[11px] text-[#4d6350]/75 underline decoration-dotted underline-offset-2 hover:text-[#4d6350]"
+            // Sem transição nenhuma até aqui — e é o botão que pára uma espera,
+            // ou seja aquele em que se carrega com pressa. É onde a resposta ao
+            // toque mais se nota que falta.
+            className={`alvo-toque shrink-0 rounded-lg px-2 text-[11px] text-[#4d6350]/75 underline decoration-dotted underline-offset-2 hover:text-[#4d6350] active:bg-[#4d6350]/[0.12] ${ESTADO} ${PRESSAO}`}
           >
             {rotuloDoParar}
           </button>
@@ -176,7 +180,12 @@ export function EmCurso({
             // contar `span`s dentro de `span`s — que se cala no dia em que
             // alguém acrescentar um.
             data-barra="preenchimento"
-            className="block h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+            // `motion-safe:duration-elemento` NÃO gerava regra nenhuma: o
+            // Tailwind v4 lê os utilitários `duration-*` do espaço de nomes
+            // `--transition-duration-*`, e o `@theme` da casa declara
+            // `--duration-elemento`. A barra corria nos 150 ms por omissão em
+            // vez dos 250 ms pretendidos. Ver `movimento.ts` (ponto 3).
+            className={`block h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
             style={{ transform: `scaleX(${avanco})` }}
           />
         </span>

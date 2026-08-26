@@ -26,6 +26,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # full history so historical leaks are caught too
+          # ── E O HISTÓRICO TODO SEM OS FICHEIROS TODOS ────────────────────
+          #
+          # MEDIDO: `git count-objects -vH` neste repositório dá um pacote de
+          # **1,41 GiB**. Com `fetch-depth: 0` e um clone normal, o runner
+          # descarrega isso inteiro antes de o gitleaks ver um único commit — e
+          # se a rede do dia não chegar, o `git fetch` passa dos dez minutos
+          # aqui em cima e o job morre CANCELADO. Aconteceu três vezes seguidas
+          # numa tarde, e o comentário no topo deste ficheiro conta uma luta
+          # anterior com o mesmo tecto (nessa, a causa era outra: duas execuções
+          # gémeas a clonar ao mesmo tempo).
+          #
+          # `blob:none` é um clone PARCIAL: vêm os commits e as árvores — que é
+          # o que o gitleaks precisa para saber o que mudou — e os conteúdos dos
+          # ficheiros ficam por buscar até alguém os pedir. O `git` vai buscá-los
+          # sozinho, e só os do que for mesmo lido.
+          #
+          # A cobertura não muda: o histórico continua cá todo. O que muda é não
+          # se pagar 1,41 GiB de fotografias e PDFs antigos para procurar
+          # segredos em texto.
+          #
+          # Uma verificação vermelha que não quer dizer nada é o que este
+          # ficheiro já dizia que não quer ser — e um scan de segredos que
+          # ninguém lê é pior do que não ter scan nenhum.
+          filter: blob:none
       - name: Scan for committed secrets
         uses: gitleaks/gitleaks-action@v2
         env:

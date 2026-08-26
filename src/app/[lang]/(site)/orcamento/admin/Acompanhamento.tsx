@@ -152,6 +152,16 @@ interface Props {
    * continua a explicar-se, só que sem botão — que é o que já fazia.
    */
   onFazerProposta?: () => void;
+  /**
+   * O pedido, depois de o servidor o ter movido por causa desta proposta.
+   *
+   * Marcar uma proposta como enviada ou aceite move o PEDIDO — e a decisão
+   * vive agora no servidor, dentro do PATCH (ver `api/propostas/[id]`). Sem
+   * isto, o Quadro e a lista de pedidos ficavam com a coluna antiga até ao
+   * próximo carregamento do back office: a escrita estava certa e o ecrã ao
+   * lado dizia o contrário.
+   */
+  onQuoteAtualizado?: (q: Quote) => void;
 }
 
 /**
@@ -164,7 +174,12 @@ interface Props {
  */
 type PatchDeProposta = Partial<{ [K in keyof Proposal]: Proposal[K] | null }>;
 
-export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }: Props) {
+export default function Acompanhamento({
+  quotes,
+  onOpenQuote,
+  onFazerProposta,
+  onQuoteAtualizado,
+}: Props) {
   const {
     data: propostas,
     loading,
@@ -298,14 +313,19 @@ export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }:
           reverter(porqueRebentou(oQue));
           return;
         }
+        // O `paraLeve` deita fora o que esta lista não guarda — e é ele que
+        // trata do `pedido` que vem ao lado da proposta. Lê-se ANTES, do corpo
+        // cru, porque é a única coisa aqui que não é da proposta.
+        const pedidoMovido = (corpo as { pedido?: Quote }).pedido;
         const actualizada = paraLeve(corpo as Proposal);
         setData((prev) => (prev ?? []).map((p) => (p.id === id ? actualizada : p)));
+        if (pedidoMovido) onQuoteAtualizado?.(pedidoMovido);
         toast(comoDizer, "success");
       } finally {
         setAGravar(null);
       }
     },
-    [propostas, setData, toast],
+    [propostas, setData, toast, onQuoteAtualizado],
   );
 
   // Este ecrã EXISTE para dizer o que está por responder. Uma leitura que

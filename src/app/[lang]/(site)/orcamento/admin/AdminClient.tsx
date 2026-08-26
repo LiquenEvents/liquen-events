@@ -4434,6 +4434,10 @@ export default function AdminClient({
                 quotes={quotes}
                 onOpenQuote={openQuote}
                 onFazerProposta={() => setView("fazer-proposta")}
+                onQuoteAtualizado={(q) => {
+                  setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                  setSelected((prev) => (prev?.id === q.id ? q : prev));
+                }}
               />
             </div>
           )}

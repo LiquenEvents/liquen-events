@@ -8938,3 +8938,115 @@ function seedComPrecosEAdicionais() {
     }),
   );
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PASSO 2 NÃO DESMONTA O ECRÃ — E É POR ISSO QUE NÃO HÁ NADA PARA ENCHER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto não corrige nada. É um prego, e vale a pena dizer porquê, porque a
+ * auditoria ao back office pediu uma correcção para um mecanismo que este
+ * ficheiro nunca teve.
+ *
+ * O achado F-04 dizia: «entre o clique em "Pré-visualizar" e o aparecimento do
+ * resumo passam 3 a 8 segundos com a página completamente branca — nem sequer
+ * o cabeçalho fica». A proposta que vinha atrás era desenhar o esqueleto das
+ * páginas a encher-se uma a uma, 600–800 ms cada, para dar corpo a essa espera.
+ *
+ * ── PORQUE É QUE O ECRÃ BRANCO NÃO É EXPRIMÍVEL AQUI ──────────────────────
+ *
+ * O salto para o passo 2 é UM `setStep("prever")` chamado direito de um
+ * `onClick`. Não há `useTransition`, não há `Suspense`, não há `React.lazy` e
+ * não há um único `await` neste caminho — o `dynamic()` que traz o estúdio
+ * resolve-se uma vez, ao abrir o painel, e nunca mais. O React fecha isso num
+ * commit síncrono ANTES de devolver o fio ao navegador, e um navegador que não
+ * chega a pintar nada pelo meio não tem como pintar branco: os píxeis antigos
+ * ficam no ecrã até os novos estarem prontos. O ecrã branco não é um defeito
+ * que se corrigiu — é um estado que este código não sabe produzir.
+ *
+ * E o cabeçalho não vai a lado nenhum: o passo 1 é `hidden`, não é
+ * desmontado, e o `StepNav` vive por fora dos três passos. Medido com um
+ * `MutationObserver` a vigiar onze mudanças de passo seguidas: 33 elementos
+ * removidos ao todo, todos eles a árvore do PRÓPRIO passo 2 a desmontar-se no
+ * caminho de volta. O `body` nunca ficou vazio.
+ *
+ * ── E A ESPERA, MEDIDA ────────────────────────────────────────────────────
+ *
+ * Mediana de cinco saltos, neste ambiente (jsdom monta cada nó em JS, portanto
+ * é um TECTO generoso do que um motor a sério gasta a construir a mesma
+ * árvore):
+ *
+ *     1 board ×3 fotos    1798 → 1865 nós   (+67)    94 ms
+ *     7 boards ×6 fotos   3803 → 3873 nós   (+70)   198 ms
+ *    14 boards ×8 fotos   6932 → 7005 nós   (+73)   313 ms
+ *
+ * O resumo inteiro são ~70 nós. Os 3 a 8 segundos não têm de onde sair, e o
+ * que se paga são uns 100 a 300 ms — a banda dos ESTADOS de interface
+ * (200–320 ms), não a de uma apresentação. Um esqueleto de seis páginas a
+ * 600–800 ms cada seriam 3,6 a 4,8 segundos: não encheria a espera, criá-la-ia,
+ * e é isso que a regra da casa proíbe («nenhuma animação atrasa uma tarefa»).
+ *
+ * As esperas a sério deste ecrã — desenhar o PDF e enviar a proposta, 10 a 60
+ * segundos — já têm o `EmCurso` com o seu nome, a sua barra opaca e a
+ * estimativa aprendida das gerações anteriores (`ProposalStudio.tsx`, ao lado
+ * do «Descarregar PDF», e `AEnviarAProposta.tsx`).
+ *
+ * O que este prego guarda: no dia em que alguém trocar o `hidden` do passo 1
+ * por uma montagem condicional, ou puser o salto atrás de qualquer coisa que
+ * não seja síncrona, isto cai — e quem o fizer tem de dizer o que fica no ecrã
+ * pelo meio antes de o refazer passar.
+ *
+ * Um prego que passa sempre não é um prego, portanto isto foi verificado ao
+ * contrário: trocou-se à mão o `hidden` do passo 1 por `{step === "conteudo" &&
+ * (…)}` e o teste caiu na linha do campo dos clientes. Depois desfez-se, e
+ * volta a passar.
+ */
+describe("o salto para a pré-visualização não deixa o ecrã sem nada", () => {
+  it("mantém o cabeçalho e o campo onde ela escrevia — os MESMOS nós — e não esvazia nada", async () => {
+    seedDraft(3);
+    renderStudio();
+
+    const stepper = document.querySelector('nav[aria-label="Passos da proposta"]');
+    expect(stepper).not.toBeNull();
+    // O campo é o prego melhor do que o contentor do passo: é um nó que SÓ
+    // existe dentro do passo 1, e é onde o dedo dela estava um segundo antes.
+    // (Perguntar por `[hidden]` não serve — o passo 3 também é `hidden` e
+    // responde à pergunta por ele, e então o teste passa mesmo com o passo 1
+    // desmontado. Foi o que aconteceu à primeira versão disto.)
+    const campoDosClientes = await screen.findByRole("textbox", { name: "Clientes" });
+
+    // Vigia TODAS as remoções de elementos enquanto o passo muda. É a única
+    // maneira honesta de perguntar «alguma coisa desapareceu?»: procurar o
+    // cabeçalho DEPOIS não distingue «ficou» de «foi removido e reposto».
+    const removidos: Element[] = [];
+    const observador = new MutationObserver((registos) => {
+      for (const r of registos)
+        for (const n of Array.from(r.removedNodes)) {
+          if (n.nodeType !== 1) continue;
+          const el = n as Element;
+          removidos.push(el, ...Array.from(el.querySelectorAll("*")));
+        }
+    });
+    observador.observe(document.body, { childList: true, subtree: true });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Pré-visualizar/ })[0]);
+
+    // SEM `await`: o resumo tem de estar no ecrã no mesmo commit síncrono do
+    // clique. É esta linha que fecha a porta ao ecrã branco — se o resumo
+    // passar a chegar depois, há um intervalo por explicar, e é aí (e só aí)
+    // que um esqueleto passaria a fazer sentido.
+    expect(screen.getByText("Resumo da proposta")).toBeTruthy();
+
+    observador.takeRecords();
+    observador.disconnect();
+
+    // O cabeçalho e o campo são os mesmos objectos, e continuam na página — o
+    // passo 1 apenas escondido, nunca desmontado.
+    expect(document.body.contains(stepper!)).toBe(true);
+    expect(document.body.contains(campoDosClientes)).toBe(true);
+    expect(removidos).not.toContain(stepper);
+    expect(removidos).not.toContain(campoDosClientes);
+    expect(campoDosClientes.closest("[hidden]")).not.toBeNull();
+    expect(document.body.children.length).toBeGreaterThan(0);
+  });
+});

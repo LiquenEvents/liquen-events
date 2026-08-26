@@ -66,10 +66,35 @@
 
      O QUARTO tempo — a entrada de uma fotografia ao scroll — não está aqui
      porque não é um degrau desta escala: é uma escala própria, que acompanha o
-     TAMANHO da fotografia, e vive em `lib/motion/tokens.ts` desde antes disto. */
-  --duration-micro: 120ms;
-  --duration-elemento: 250ms;
-  --duration-vista: 350ms;
+     TAMANHO da fotografia, e vive em `lib/motion/tokens.ts` desde antes disto.
+
+     ── E O PREFIXO ESTAVA ERRADO: AS TRÊS CLASSES NÃO EXISTIAM ─────────────
+     Estava `--duration-micro`. O Tailwind v4 lê os utilitários `duration-*` do
+     espaço `--transition-duration-*`, e só desse. COMPILADO para confirmar, com
+     dois tokens irmãos no mesmo ficheiro:
+
+         --duration-alfa            →  .duration-alfa    NENHUMA REGRA
+         --transition-duration-beta →  .duration-beta     { transition-duration: … }
+
+     As variáveis chegavam ao `:root` com os valores certos — legíveis para
+     quem lesse o CSS — e as regras `.duration-micro`, `.duration-elemento` e
+     `.duration-vista` eram ZERO. Catorze chamadas no back office, em oito
+     ficheiros, a correr todas aos 150 ms do `--default-transition-duration` sem
+     ninguém dar por isso.
+
+     É a armadilha que o `AGENTS.md` avisa e que já mordeu esta casa noutro
+     sítio: no Tailwind v4 uma classe que aponte para um token inexistente não
+     dá erro de compilação nem aviso do lint. Não gera regra e cala-se.
+
+     O nome do token muda; o nome da CLASSE não — `duration-micro` continua a
+     escrever-se igual nos componentes, e passa a fazer o que sempre prometeu. */
+  --transition-duration-micro: 120ms;
+  --transition-duration-elemento: 250ms;
+  --transition-duration-vista: 350ms;
+  /* O toque: 20 ms, e só para o `:active`. Ver `ui/movimento.ts` — a assimetria
+     é deliberada (carrega a 20, larga a 120), e o número vem de uma medição na
+     apple.com: imperceptível como animação, perceptível como suavidade. */
+  --transition-duration-toque: 20ms;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -511,6 +536,99 @@ body.admin-mode .bo-text-faint {
     font-size: var(--bo-fs-caption);
     letter-spacing: 0.04em;
   }
+}
+
+/* ── E UM CHÃO ABSOLUTO, ABAIXO DO QUAL NÃO SE LÊ EM ECRÃ NENHUM ──────────
+   O chão acima pára nos 1024 de propósito, e a razão está escrita lá: é aí que
+   o `TabelaOuCartoes` passa a tabela, e a tabela é densa porque tem de ser.
+   Havia até um teste a guardar essa fronteira — «se alguém alargar o chão para
+   lá de 1024, a densidade da tabela do portátil muda sem ninguém pedir».
+
+   Essa fronteira continua a valer para os 10 e 11 px. Não vale para os 8 e 9.
+
+   ── O QUE MUDOU A LEITURA ────────────────────────────────────────────────
+   Uma análise de craft mediu o CSS calculado da apple.com nó a nó: 208 blocos
+   de texto, oito degraus, e o mais baixo de todos é **12 px** — num ecrã de
+   1108 px de largura, onde densidade não falta. A escala desta casa começa no
+   mesmo sítio (`--bo-fs-caption`, 12 px). Nenhuma das duas desce abaixo disso
+   em ecrã nenhum, porque abaixo disso não é texto denso: é texto que não se lê.
+
+   Medido aqui: 94 chamadas a `text-[8px]` e `text-[9px]` em 20 ficheiros do
+   back office. As piores no `AdminClient` (23), no `ProposalStudio` (15), na
+   Visão Geral (11) e no Calendário (10) — e algumas vestem etiquetas de estado
+   e rótulos de destino, que não são decoração.
+
+   ── PORQUE É QUE ISTO NÃO É ALARGAR O CHÃO DE CIMA ──────────────────────
+   O de cima levanta CINCO tamanhos (7 a 11) e serve uma FORMA de interface —
+   cartões, gaveta, barra inferior —, por isso tem largura. Este levanta TRÊS
+   (7 a 9) e não tem: é um limite do olho, não do ecrã. Os 10 e 11 px continuam
+   a ser o registo denso do computador, exactamente como estavam.
+
+   Fica DEPOIS do bloco de cima e não antes, para não lhe partir o localizador:
+   o `escala-movel.test.ts` lê a regra do telemóvel a partir do título dela até
+   ao comentário seguinte, e um bloco pelo meio deixava-o a ler metade.
+
+   O `letter-spacing` acompanha pela mesma geometria que está escrita acima:
+   subir o corpo sem desapertar o espacejamento troca letra pequena por texto
+   transbordado. */
+body.admin-mode :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
+  font-size: var(--bo-fs-caption);
+  letter-spacing: 0.01em;
+}
+
+/* ── O CHÃO DA COR DO TEXTO, PELA MESMA RAZÃO DO CHÃO DA LETRA ────────────
+   A casa tem três tokens de texto com o rácio medido e um teste a guardá-lo
+   (`contraste-do-texto.test.ts`). Só que os componentes quase não os usam.
+
+   MEDIDO: 1288 chamadas a `text-foreground/NN` no back office contra 147 aos
+   tokens `--bo-*`. E 723 dessas — 56% — não chegam aos 4,5:1 que a norma pede.
+   A conta, sobre o branco do back office (`--color-foreground` é `#0d0d0d`
+   aqui, e o que o olho vê é a cor COMPOSTA):
+
+       /25  #c2c2c2  1,78:1      /45  #929292  3,11:1
+       /30  #b6b6b6  2,03:1      /50  #868686  3,64:1
+       /35  #aaaaaa  2,32:1      /55  #7a7a7a  4,29:1
+       /40  #9e9e9e  2,68:1
+
+   São 159 usos do `/45`, 147 do `/40`, 138 do `/55`, 91 do `/50`, 69 do `/35`,
+   64 do `/30` e 39 do `/25` — espalhados por 94 ficheiros. Não é um defeito de
+   um ecrã: é o registo em que quase todo o texto secundário desta casa está
+   escrito.
+
+   ── PORQUÊ AQUI, E NÃO EM 94 FICHEIROS ──────────────────────────────────
+   A mesma razão do chão da letra, vinte linhas acima: são centenas de sítios, e
+   uma regra que se lê de uma vez mantém-se honesta melhor do que 723 decisões
+   soltas. Corrigir à mão pedia 94 diffs, e o primeiro componente novo voltava a
+   escrever `/40` sem ninguém dar por isso.
+
+   ── E NÃO SE INVENTA CINZENTO NENHUM ────────────────────────────────────
+   Cada opacidade que chumba aponta para um dos tokens QUE JÁ EXISTEM e que já
+   têm o rácio medido e guardado por teste:
+
+       /25 … /45   →  --bo-text-faint   #737373   4,74:1
+       /50 … /55   →  --bo-text-muted   #646464   5,92:1
+
+   Dois degraus e não um, porque a ORDEM tem de se manter: o `/25` era mais
+   fraco do que o `/55`, e continua a sê-lo. Achatar tudo num só valor passava
+   a norma e apagava a hierarquia que alguém escreveu — que é meia correcção.
+
+   O `/60` e acima já passam (5,10:1) e ficam exactamente como estão.
+
+   Fora de `@layer`, de propósito: os utilitários do Tailwind vivem numa camada,
+   e sem isto o `text-foreground/40` da chamada ganhava outra vez. É a mesma
+   nota que o chão da letra tem escrita. */
+body.admin-mode
+  :is(
+    .text-foreground\/25,
+    .text-foreground\/30,
+    .text-foreground\/35,
+    .text-foreground\/40,
+    .text-foreground\/45
+  ) {
+  color: var(--bo-text-faint);
+}
+body.admin-mode :is(.text-foreground\/50, .text-foreground\/55) {
+  color: var(--bo-text-muted);
 }
 
 /* ── Selection ── */

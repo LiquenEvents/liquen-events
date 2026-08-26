@@ -44,7 +44,7 @@ export const EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
  * 200, 500, 700, 150, 400) sem regra escrita em lado nenhum — ou seja, cada
  * componente novo escolhia à sorte, e a olho lia-se como deriva.
  *
- * Espelham os `--duration-*` do `@theme` do globals.css, com teste a ligar as
+ * Espelham os `--transition-duration-*` do `@theme` do globals.css, com teste a ligar as
  * pontas. Lá dão utilitários do Tailwind (`duration-elemento`); aqui servem
  * quem escreve `element.style.transition` à mão.
  *

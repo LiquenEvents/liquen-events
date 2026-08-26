@@ -7,7 +7,6 @@ import { useToast } from "./Toast";
 import { MenuDeAccoes, TabelaOuCartoes, type AccaoDeItem } from "./ui";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
-import { randomId } from "./util";
 import { useCachedList } from "./useCachedList";
 import { metaFor } from "./status-meta";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
@@ -215,63 +214,45 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       const res = await fetch(`/api/propostas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, respondedAt: new Date().toISOString() }),
+        // `actor` não é da proposta: é só para a linha do histórico do PEDIDO,
+        // que este gesto move. O servidor não sabe quem está sentado do outro
+        // lado — a sessão do back office é uma só e não tem nome.
+        body: JSON.stringify({ status, respondedAt: new Date().toISOString(), actor: userName }),
       });
       if (!res.ok) {
         toast(porqueFalhou(oQue, res, await res.json().catch(() => null)).mensagem, "error");
         return;
       }
-      const updated: Proposal = await res.json();
+      /**
+       * ── O PEDIDO JÁ VEM MOVIDO ────────────────────────────────────────────
+       *
+       * Aqui estavam trinta linhas que faziam um SEGUNDO pedido HTTP para pôr
+       * o pedido em «Ganho» depois de a proposta ficar aceite. A regra estava
+       * certa e estava no sítio errado, por duas razões:
+       *
+       *  · só valia NESTE ecrã. O «Acompanhamento» muda o mesmo estado da mesma
+       *    proposta e não mexia no pedido — e marcar uma proposta como ENVIADA,
+       *    aqui ou lá, também não. Foi assim que uma auditoria em produção
+       *    encontrou a Margarida Serra com duas propostas enviadas por email e o
+       *    pedido dela ainda na coluna «Novo»;
+       *  · e eram dois pedidos pela rede num back office que se usa em quintas,
+       *    num 4G fraco. Se o segundo não chegava, a proposta ficava aceite e o
+       *    pedido ficava para trás.
+       *
+       * A decisão passou para o servidor, dentro do próprio PATCH (ver
+       * `api/propostas/[id]/route.ts`), que é a porta por onde os dois ecrãs e a
+       * API passam. O que vem de volta é a proposta com o pedido JÁ GRAVADO ao
+       * lado — uma ida à rede, e a mesma verdade nos dois sítios.
+       *
+       * O `pedido` sai do objecto antes de a proposta entrar no estado: a lista
+       * guarda propostas, e um campo a mais que ninguém lê é um campo que um dia
+       * alguém volta a gravar sem querer.
+       */
+      const { pedido, ...updated } = (await res.json()) as Proposal & { pedido?: Quote };
       setProposals((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      if (pedido) onQuoteUpdated?.(pedido);
 
-      // Aceitar a proposta fecha o negócio: o pedido associado passa também
-      // a "aceite" no pipeline (com entrada no histórico). Recusar não toca
-      // no pedido — a equipa pode querer renegociar antes de o dar por perdido.
       if (status === "aceite") {
-        const lq = quotesById.get(updated.quoteId);
-        if (lq && lq.status !== "aceite") {
-          const entry = {
-            id: randomId(),
-            at: new Date().toISOString(),
-            kind: "status_change" as const,
-            // Quem aceitou. Todas as outras entradas do histórico dizem-no; só
-            // esta — a que fecha o negócio — aparecia sem nome.
-            actor: userName,
-            summary: `Proposta aceite — pedido movido para Aceite (${eur(updated.total)})`,
-          };
-          /**
-           * ACRESCENTAR ao histórico, e não reescrevê-lo.
-           *
-           * `activityLog: [...lq.activityLog, entry]` grava o retrato que ESTE
-           * ecrã tinha — e os `quotes` chegam do pai, que os carregou quando o
-           * back office abriu. Entre isso e o clique em «Aceitar» cabe uma
-           * manhã inteira de trabalho noutras ferramentas (o Quadro, a gaveta,
-           * o estúdio), e tudo o que elas escreveram desaparecia sem erro
-           * nenhum. O servidor já tem o caminho seguro, que junta ao registo
-           * FRESCO — a mesma decisão, com a mesma razão, está no `Kanban.tsx`.
-           */
-          const qRes = await fetch(`/api/orcamento/${lq.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              status: "aceite",
-              activityLogAppend: [entry],
-            }),
-          }).catch(() => null);
-          if (qRes?.ok) {
-            const updatedQuote: Quote = await qRes.json();
-            onQuoteUpdated?.(updatedQuote);
-          } else {
-            // A proposta FICOU aceite — só o pedido é que não acompanhou. As
-            // duas metades vão em frases separadas: dizer só «não foi possível»
-            // fá-la repetir o gesto inteiro, e a metade que passou passa outra
-            // vez.
-            const falha = qRes
-              ? porqueFalhou(`mover o pedido «${lq.name}» para Aceite`, qRes)
-              : porqueRebentou(`mover o pedido «${lq.name}» para Aceite`);
-            toast(`Proposta de «${updated.clientName}» aceite. ${falha.mensagem}`, "info");
-          }
-        }
         toast(`Proposta de ${updated.clientName} aceite.`, "success");
       } else if (status === "rejeitada") {
         toast("Proposta marcada como recusada.", "info");

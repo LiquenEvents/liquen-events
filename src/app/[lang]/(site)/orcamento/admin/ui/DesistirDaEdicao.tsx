@@ -1,4 +1,5 @@
 "use client";
+import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -55,7 +56,10 @@ export function DesistirDaEdicao({
       onClick={onDesistir}
       aria-label={`Desistir de editar ${oQue}`}
       title="Desistir"
-      className={`alvo-toque flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sm leading-none text-foreground/40 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70 ${className}`}
+      // O `transition-colors` que aqui estava não tinha `motion-safe:` e corria
+      // nos 150 ms por omissão do Tailwind. Agora é a escala de `movimento.ts`:
+      // 120 ms de estado, 20 ms ao carregar.
+      className={`alvo-toque flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sm leading-none text-foreground/40 hover:bg-foreground/[0.06] hover:text-foreground/70 active:bg-foreground/[0.12] ${ESTADO} ${PRESSAO} ${className}`}
     >
       <span aria-hidden="true">✕</span>
     </button>

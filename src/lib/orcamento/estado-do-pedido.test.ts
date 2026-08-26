@@ -27,6 +27,11 @@ import {
 const TODOS: AcontecimentoDoPedido[] = [
   "mensagem_enviada",
   "proposta_enviada",
+  // Ela a marcar a proposta como aceite no back office — não o cliente pelo
+  // link público, que é outra porta e vive noutro sítio. Mesmo tecto do
+  // pagamento e do contrato, e pela mesma razão: ninguém marca uma proposta
+  // como aceite a um casal que ainda está a pensar.
+  "proposta_aceite",
   "pagamento_recebido",
   "contrato_registado",
 ];
@@ -72,11 +77,16 @@ describe("cada acontecimento leva o pedido ao seu estado", () => {
   });
 
   /**
-   * Os dois acontecimentos do fecho dizem a mesma coisa: o trabalho é nosso.
-   * Ninguém transfere um sinal para quem ainda está a pensar.
+   * Os três acontecimentos do fecho dizem a mesma coisa: o trabalho é nosso.
+   * Ninguém transfere um sinal — nem marca uma proposta como aceite — a quem
+   * ainda está a pensar.
    */
-  it("receber um pagamento ou registar o contrato dão o pedido por ganho", () => {
-    for (const acontecimento of ["pagamento_recebido", "contrato_registado"] as const) {
+  it("aceitar a proposta, receber um pagamento ou registar o contrato dão o pedido por ganho", () => {
+    for (const acontecimento of [
+      "proposta_aceite",
+      "pagamento_recebido",
+      "contrato_registado",
+    ] as const) {
       expect(estadoApos(acontecimento, "pendente")).toBe("aceite");
       expect(estadoApos(acontecimento, "em_revisao")).toBe("aceite");
       expect(estadoApos(acontecimento, "cotado")).toBe("aceite");

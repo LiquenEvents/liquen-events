@@ -67,3 +67,10 @@ export type { MenuDeAccoesProps, AccaoDeItem } from "./MenuDeAccoes";
 
 export { CampoData, porExtenso } from "./CampoData";
 export type { CampoDataProps } from "./CampoData";
+
+// ── A escala de movimento ──────────────────────────────────────────────────
+// Duas velocidades de interacção (toque 20 ms, estado 120 ms) e as duas curvas
+// que a casa já tinha. Exportada para que os ecrãs possam convergir para a
+// mesma escala em vez de cada um escolher a sua — ver `movimento.ts` para o
+// censo que a motivou e para as três avarias silenciosas que ele encontrou.
+export { ESTADO, PRESSAO, PROGRESSO, TOQUE_MS, ESTADO_MS, PROGRESSO_MS } from "./movimento";
