@@ -151,12 +151,30 @@ function Numero({
         />
         <span className="text-[11px] text-foreground/45">{unidade}</span>
       </span>
-      {erro && (
+      {/**
+       * ── A FRASE DE ERRO OCUPA O LUGAR DA AJUDA, NÃO SE SOMA A ELA ────────
+       *
+       * A auditoria queixa-se de que a mensagem «empurra o resto do formulário
+       * para baixo». Empurrava: aparecia POR CIMA da ajuda, e a linha crescia.
+       *
+       * A saída óbvia — reservar uma linha em branco debaixo de cada campo —
+       * foi RECUSADA, e vale a pena dizer porquê: os quatro campos vivem numa
+       * fila que embrulha, e num telemóvel de 390 px embrulham a dois por
+       * linha. Reservar custava duas linhas vazias PARA SEMPRE, num ecrã que
+       * ela já disse estar «tudo enorme», para evitar um salto que só acontece
+       * enquanto se escreve um valor inválido.
+       *
+       * Trocar é de graça e é melhor: quando há um erro, a ajuda é a coisa
+       * menos útil no ecrã. Onde não há ajuda, o salto fica — de uma linha, e
+       * assumido.
+       */}
+      {erro ? (
         <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
           {erro}
         </span>
+      ) : (
+        ajuda && <span className="text-[10px] leading-relaxed text-foreground/40">{ajuda}</span>
       )}
-      {ajuda && <span className="text-[10px] leading-relaxed text-foreground/40">{ajuda}</span>}
     </label>
   );
 }
@@ -211,12 +229,14 @@ function Texto({
         }}
         className={`bo-input w-56 px-2.5 py-2 text-xs${erro ? " border-[#b5654a]" : ""}`}
       />
-      {erro && (
+      {/* A mesma troca do campo de número, e pela mesma razão — ver lá. */}
+      {erro ? (
         <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
           {erro}
         </span>
+      ) : (
+        ajuda && <span className="text-[10px] leading-relaxed text-foreground/40">{ajuda}</span>
       )}
-      {ajuda && <span className="text-[10px] leading-relaxed text-foreground/40">{ajuda}</span>}
     </label>
   );
 }
@@ -361,6 +381,28 @@ export default function DefinicoesProposta() {
     .filter((x) => x.s !== null);
   const desactualizado = velho(p.definidoEm.deslocacao);
 
+  /**
+   * ── A PRÉ-VISUALIZAÇÃO NÃO PODE MOSTRAR O NÚMERO ANTIGO EM SILÊNCIO ───────
+   *
+   * Achado F-11 de uma auditoria em produção: «escrevi -99999 em Preço do
+   * gasóleo. A mensagem de erro aparece correctamente. Mas a pré-visualização
+   * por baixo continua a mostrar 0,40 €/km, o valor antigo, sem avisar que está
+   * desactualizada.»
+   *
+   * Continuava, e por uma razão que é uma boa decisão a produzir um mau efeito:
+   * um campo que não dá um número que sirva NÃO emite valor (é o que impede um
+   * `Number("")` de gravar zero no preço do gasóleo). O formulário fica com o
+   * último valor bom — e a conta por baixo mostra-o, com toda a confiança.
+   *
+   * É a queixa dela sobre os valores outra vez, em ponto pequeno: o ecrã a
+   * mostrar um número que não é o que está à frente dos olhos. Um número em que
+   * ela não pode confiar vale menos do que número nenhum.
+   *
+   * Com um campo por corrigir, a conta cala-se e diz o que falta. Volta assim
+   * que o campo voltar a dar um número.
+   */
+  const contaSuspensa = CAMPOS_DE.deslocacao.some((c) => porCorrigir[c]);
+
   return (
     <div className="flex flex-col gap-4">
       <Card padding="md">
@@ -483,33 +525,44 @@ export default function DefinicoesProposta() {
 
         {/* ── O que isto faz, em euros ─────────────────────────────────── */}
         <div className="mt-4 rounded-xl bg-foreground/[0.02] p-3">
-          <p className="text-[11px] text-foreground/60">
-            Cada quilómetro fica a{" "}
-            <strong className="font-semibold text-foreground/85">{eur(custo.total)}</strong>{" "}
-            <span className="text-foreground/45">
-              (combustível {eur(custo.combustivel)} + portagens {eur(custo.portagens)} + desgaste{" "}
-              {eur(custo.desgaste)})
-            </span>
-          </p>
-          {exemplos.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/60">
-              {exemplos.map(({ sitio, s }) => (
-                <li key={sitio}>
-                  <span className="text-foreground/45">{sitio}:</span>{" "}
-                  <strong className="font-semibold text-foreground/85">{eur(s!.valor)}</strong>{" "}
-                  <span className="text-foreground/40">({s!.formula})</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            // Sem exemplos, o custo por quilómetro fica a ser um número
-            // abstracto — que era exactamente o que a pré-visualização veio
-            // resolver. Dizer porquê é melhor do que uma lista vazia.
-            <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
-              Sem uma sede que eu conheça não consigo dar exemplos em euros. O custo por quilómetro
-              acima continua a valer: multiplica-o pelos quilómetros que escreveres em cada
-              proposta.
+          {contaSuspensa ? (
+            <p className="text-[11px] leading-relaxed text-foreground/60">
+              <strong className="font-semibold text-foreground/85">—</strong> Não mostro o custo por
+              quilómetro enquanto houver um campo por corrigir: o que aparecia aqui era o valor
+              ANTERIOR, e isso é pior do que não mostrar nada. Corrige o campo marcado a vermelho e
+              a conta volta.
             </p>
+          ) : (
+            <>
+              <p className="text-[11px] text-foreground/60">
+                Cada quilómetro fica a{" "}
+                <strong className="font-semibold text-foreground/85">{eur(custo.total)}</strong>{" "}
+                <span className="text-foreground/45">
+                  (combustível {eur(custo.combustivel)} + portagens {eur(custo.portagens)} +
+                  desgaste {eur(custo.desgaste)})
+                </span>
+              </p>
+              {exemplos.length > 0 ? (
+                <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/60">
+                  {exemplos.map(({ sitio, s }) => (
+                    <li key={sitio}>
+                      <span className="text-foreground/45">{sitio}:</span>{" "}
+                      <strong className="font-semibold text-foreground/85">{eur(s!.valor)}</strong>{" "}
+                      <span className="text-foreground/40">({s!.formula})</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                // Sem exemplos, o custo por quilómetro fica a ser um número
+                // abstracto — que era exactamente o que a pré-visualização veio
+                // resolver. Dizer porquê é melhor do que uma lista vazia.
+                <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
+                  Sem uma sede que eu conheça não consigo dar exemplos em euros. O custo por
+                  quilómetro acima continua a valer: multiplica-o pelos quilómetros que escreveres
+                  em cada proposta.
+                </p>
+              )}
+            </>
           )}
         </div>
 

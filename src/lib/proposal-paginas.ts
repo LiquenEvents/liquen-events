@@ -357,3 +357,58 @@ export function resumoDaPagina(
 export function rubricaDaLinha(linha: string): string | null {
   return /^—\s*(.+?)\s*—$/.exec(linha)?.[1] ?? null;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS FOLHAS QUE SAEM EM BRANCO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Achado F-13 de uma auditoria em produção: na proposta da Maria João, a vista
+ * de conjunto anunciava as páginas 4 («Condições gerais») e 5 («Observações e
+ * contactos») com a nota «Esta folha sai em branco» — e o documento seguiu para
+ * o cliente com duas folhas vazias no meio. Palavras da auditoria: «a aplicação
+ * sabe e avisa — mas deixa enviar».
+ *
+ * A parte de saber já cá estava: é o `vazia` do {@link resumoDaPagina}, e a
+ * `FolhaDaProposta` já o desenha a vermelho. O que faltava era a MESMA verdade
+ * chegar ao sítio onde o envio se decide — e a distância entre a vista de
+ * conjunto e o botão de enviar são dois passos e um scroll.
+ *
+ * ── PORQUE É QUE TRÊS ESPÉCIES FICAM DE FORA ──────────────────────────────
+ *
+ * Porque «sem texto» e «em branco» não são a mesma coisa nelas:
+ *
+ *  · `moodboard` — as páginas de inspiração NÃO passam pelo resumo para serem
+ *    desenhadas (têm a `PreviaDaPagina`, com as fotografias à escala). Uma
+ *    página de inspiração sem uma linha de texto está cheia de fotografias.
+ *    Contá-la aqui era anunciar como vazia a página mais cheia da proposta.
+ *  · `capa` e `contracapa` — «a capa desenha-se, não se lê», diz o próprio
+ *    resumo. Leva o painel escuro e a fotografia; sem o nome do casal fica
+ *    pobre, não fica em branco — e o nome em falta já tem quem o diga, na
+ *    conferência, com o seu próprio nome.
+ *
+ * Sobram as folhas de TEXTO, que são exactamente aquelas em que uma folha sem
+ * conteúdo sai mesmo com um cabeçalho e nada por baixo. São as duas que a
+ * auditoria encontrou.
+ */
+const ESPECIES_QUE_SAO_DESENHO: ReadonlySet<EspecieDePagina> = new Set([
+  "moodboard",
+  "capa",
+  "contracapa",
+]);
+
+/**
+ * As folhas de texto que vão sair com o cabeçalho e nada por baixo.
+ *
+ * Devolve as páginas inteiras (com `titulo` e `seccao`) e não só um número, por
+ * duas razões: o número da folha não sobrevive a uma página de inspiração a
+ * mais, e a `seccao` é o que permite levar quem lê ao sítio onde se resolve.
+ */
+export function paginasEmBranco(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = "pt",
+): PaginaDaProposta[] {
+  return paginasDaProposta(doc).filter(
+    (p) => !ESPECIES_QUE_SAO_DESENHO.has(p.especie) && resumoDaPagina(doc, p, idioma).vazia,
+  );
+}

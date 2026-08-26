@@ -251,6 +251,98 @@ describe("um número que não serve não é gravado às escondidas", () => {
  * Passa a ser um campo, com Évora por omissão, e tudo o que a pressupunha lê
  * daqui: os exemplos deste ecrã, a franquia, e a conta de cada proposta.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A CONTA NÃO MOSTRA O NÚMERO ANTIGO EM SILÊNCIO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Achado F-11 de uma auditoria em produção: «escrevi -99999 em Preço do
+ * gasóleo. A mensagem de erro aparece correctamente. Mas a pré-visualização por
+ * baixo continua a mostrar 0,40 €/km, o valor antigo, sem avisar que está
+ * desactualizada.»
+ *
+ * A causa é uma boa decisão a produzir um mau efeito: um campo que não dá um
+ * número que sirva NÃO emite valor — é o que impede um `Number("")` de gravar
+ * zero no preço do gasóleo. O formulário fica com o último valor bom, e a conta
+ * por baixo mostra-o com toda a confiança.
+ *
+ * É a queixa dela sobre os valores outra vez, em ponto pequeno: o ecrã a
+ * mostrar um número que não é o que está à frente dos olhos.
+ */
+describe("a conta por baixo, com um campo por corrigir", () => {
+  async function escrever(texto: string) {
+    montar();
+    const campo = (await screen.findByLabelText(/Preço do gasóleo/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    if (texto) await userEvent.type(campo, texto);
+    return campo;
+  }
+
+  it("cala-se em vez de mostrar o custo anterior", async () => {
+    // Uma montagem só: `escrever` monta, e voltar a chamá-lo punha DOIS
+    // formulários no ecrã — e a conta do primeiro respondia pela do segundo.
+    const campo = await escrever("1,72");
+    await waitFor(() => expect(screen.getByText(/Cada quilómetro fica a/)).toBeInTheDocument());
+
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "-99999");
+    await waitFor(() => expect(screen.queryByText(/Cada quilómetro fica a/)).toBeNull());
+  });
+
+  it("e diz o que falta fazer, em vez de ficar em branco", async () => {
+    await escrever("-99999");
+    await waitFor(() =>
+      expect(screen.getByText(/Corrige o campo marcado a vermelho/)).toBeInTheDocument(),
+    );
+    // A razão, e não só a instrução: sem ela isto lê-se como uma avaria.
+    expect(screen.getByText(/era o valor ANTERIOR/)).toBeInTheDocument();
+  });
+
+  it("volta assim que o campo volta a dar um número", async () => {
+    const campo = await escrever("-99999");
+    await waitFor(() => expect(screen.queryByText(/Cada quilómetro fica a/)).toBeNull());
+
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "1,72");
+    await waitFor(() => expect(screen.getByText(/Cada quilómetro fica a/)).toBeInTheDocument());
+  });
+});
+
+/**
+ * A queixa do «salto de layout» do mesmo achado: a frase de erro aparecia POR
+ * CIMA da ajuda e a linha crescia. Passa a ocupar o LUGAR dela.
+ *
+ * Reservar uma linha em branco debaixo de cada campo foi recusado, e está
+ * escrito no componente porquê: os campos embrulham a dois por linha num
+ * telemóvel de 390 px, portanto custava duas linhas vazias para sempre num ecrã
+ * que ela já disse estar «tudo enorme» — para evitar um salto que só acontece
+ * enquanto se escreve um valor inválido.
+ */
+describe("a frase de erro ocupa o lugar da ajuda", () => {
+  it("com erro, a ajuda do campo sai do ecrã", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Preço do gasóleo/)) as HTMLInputElement;
+    expect(screen.getByText(/O que paga na bomba/)).toBeInTheDocument();
+
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "-2,5");
+    await waitFor(() => expect(screen.queryByText(/O que paga na bomba/)).toBeNull());
+    expect(screen.getAllByText(/não pode ser negativo/i).length).toBeGreaterThan(0);
+  });
+
+  it("e volta quando o erro desaparece", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Preço do gasóleo/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "-2,5");
+    await waitFor(() => expect(screen.queryByText(/O que paga na bomba/)).toBeNull());
+
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "1,72");
+    await waitFor(() => expect(screen.getByText(/O que paga na bomba/)).toBeInTheDocument());
+  });
+});
+
 describe("o local da sede", () => {
   it("aparece com Évora por omissão, e diz para que serve", async () => {
     montar();

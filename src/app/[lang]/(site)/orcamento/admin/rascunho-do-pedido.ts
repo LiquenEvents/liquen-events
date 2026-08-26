@@ -131,14 +131,32 @@ export function lerRascunho(id: string): RascunhoDoPedido | null {
   }
 }
 
-/** Os campos em que os dois lados não dizem o mesmo. */
+/**
+ * Os campos em que os dois lados não dizem o mesmo.
+ *
+ * ── PORQUE É QUE ISTO ACEITA `undefined` QUE O TIPO DIZ NÃO EXISTIR ────────
+ *
+ * Porque existia. `CamposDoPedido` promete onze `string`, e quem monta os dois
+ * lados no `AdminClient` promete o mesmo ao TypeScript — mas o `estado` vinha
+ * de um `Quote` que pode não ter `status`, e o tipo não impede um campo em
+ * falta de atravessar um `as`. Um pedido gravado antes de o campo existir (a
+ * máquina de estados di-lo por escrito: «há pedidos gravados antes de metade
+ * destes campos existirem») fazia isto chamar `.trim()` sobre `undefined` —
+ * DENTRO DE UM EFEITO, portanto o que se via não era um campo em branco: era o
+ * back office inteiro substituído por «Ocorreu um erro inesperado».
+ *
+ * As duas pontas foram corrigidas na origem. Isto fica na mesma, e não é
+ * cinto-e-suspensórios inútil: esta função é o único sítio por onde os dois
+ * lados passam, e é barato ser o sítio onde um campo em falta é um campo vazio
+ * em vez de um ecrã perdido.
+ */
 export function oQueMudou(
   rascunho: CamposDoPedido,
   doServidor: CamposDoPedido,
 ): (keyof CamposDoPedido)[] {
   // `trim` porque um espaço a mais no fim de um nome não é uma alteração que
   // valha a pena interromper alguém para perguntar.
-  return CAMPOS.filter((c) => rascunho[c].trim() !== doServidor[c].trim());
+  return CAMPOS.filter((c) => (rascunho[c] ?? "").trim() !== (doServidor[c] ?? "").trim());
 }
 
 /**
