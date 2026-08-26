@@ -3082,8 +3082,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // ── Total estruturado + IVA ──
   // O modo efetivo: explícito no doc, senão detetado a partir do texto livre
   // (retrocompatibilidade com propostas antigas só com "3.000,00 € + IVA").
+  /**
+   * ── E UM DOCUMENTO NOVO NASCE EM «ACRESCE» ────────────────────────────
+   *
+   * O `detectVatMode` devolve "incluido" quando não há texto nenhum para ler —
+   * é a retrocompatibilidade com propostas antigas só com «3.000,00 €». Mas um
+   * documento ACABADO DE COMEÇAR também não tem texto, e caía nessa mesma
+   * porta: nascia em «IVA incluído», que é o modo que a casa deixou de usar.
+   *
+   * A detecção fica onde serve — havendo texto livre, é ele que manda.
+   */
   const vatMode: VatMode =
-    doc.totalVatMode ?? detectVatMode(doc.totalText || doc.totalEstimatedText);
+    doc.totalVatMode ??
+    (doc.totalText || doc.totalEstimatedText
+      ? detectVatMode(doc.totalText || doc.totalEstimatedText)
+      : "acrescer");
 
   /** Compõe o texto de DISPLAY do PDF a partir do valor + modo estruturados,
    *  no formato do estúdio ("3.000,00 € + IVA" ou "3.000,00 €"). */
@@ -3248,13 +3261,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
     writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
     persistirPreco(base);
-  }
-
-  function setVatMode(mode: VatMode) {
-    // A base não muda ao trocar de modo — muda o que o cliente vê. O valor do
-    // documento é recalculado a partir da mesma base.
-    const base = parseMoneyText(totalInput);
-    writeTotal(base > 0 ? amountParaBase(base, mode) : undefined, mode);
   }
 
   /**
@@ -9466,86 +9472,70 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </div>
               )}
               {/* ══════════════════════════════════════════════════════════════
-                  O SELECTOR DO IVA — UM SÓ, E O ESCOLHIDO É O QUE DÁ NAS VISTAS
+                  SÓ HÁ UMA MANEIRA DE CONTAR O IVA: ACRESCE
                   ══════════════════════════════════════════════════════════════
 
-                  Eram duas coisas: um selector de dois botões e, por baixo, dois
-                  cartões com as mesmas duas leituras. Palavras dela: «o selector
-                  tem o não-seleccionado mais visível do que o seleccionado».
-                  Tinha — o segmento escolhido ficava BRANCO sobre um cartão que
-                  também é branco (é assim que o `Segmented` do back office
-                  marca a escolha, e funciona sobre fundos lavados, não sobre
-                  este), enquanto o outro ficava recortado na calha cinzenta.
+                  Palavras dela: «retira com o IVA incluído. É apenas com o
+                  valor sem IVA mais o IVA acresce».
 
-                  Passou a haver UM controlo: os dois cartões É que se carregam.
-                  O escolhido leva moldura de dois pixéis, fundo de musgo, texto
-                  a cheio e a palavra «escolhido»; o outro é uma linha fina e
-                  cinzenta. Não há como trocá-los, e desaparece a repetição —
-                  eram dois sítios a dizer «IVA incluído» a um palmo um do outro.
+                  Eram duas opções lado a lado, para escolher. A escolha não
+                  valia nada — as propostas da casa são todas «valor sem IVA +
+                  IVA» — e custava o pior engano que este ecrã pode ter: um
+                  toque distraído no cartão errado mudava o que o casal paga
+                  SEM mudar o número que ela está a olhar.
 
-                  `radiogroup` + `radio` e não botões: é o que faz as setas
-                  andarem entre as duas opções e o leitor de ecrã anunciar «1 de
-                  2, escolhido». A marca nunca é só a cor (moldura, negrito e
-                  palavra), como manda o `DESIGN-TOKENS.md`. */}
-              {/* `@container`: estas duas caixas vivem numa CÉLULA da grelha
-                  aqui em cima, e essa célula tem ~252 px aos 1024 e ~296 aos
-                  640. Postas a duas colunas por uma pergunta feita à janela,
-                  ficavam com 126 px cada — para dois botões que dizem «IVA
-                  incluído» e trazem o valor por extenso. Aqui a pergunta é a
-                  largura da célula. */}
+                  ── O QUE ISTO NÃO MUDA, E É O QUE INTERESSA ────────────────
+                  O campo «Valor (sem IVA)» já mostrava a BASE nos dois modos
+                  (`baseDoDoc` → `resolveProposalMoney`). Medido: um documento
+                  em «IVA incluído» com 3280 guardado mostra base 2666,67, IVA
+                  613,33 e 3280,00 a pagar — exactamente o mesmo que o mesmo
+                  documento em «acresce» com base 2666,67. Tirar a opção não
+                  mexe em número nenhum: nem no campo, nem no IVA, nem no que o
+                  cliente paga, nem nas propostas que já seguiram.
+
+                  Fica a LEITURA, que continua a valer — é onde ela confere que
+                  o IVA e o total a pagar são os que espera. O que saiu foi o
+                  controlo, não a informação. */}
               <div className="@container flex flex-col gap-1.5">
                 <span className="bo-eyebrow">IVA</span>
-                <div
-                  role="radiogroup"
-                  aria-label="Modo de IVA"
-                  className="grid grid-cols-1 gap-2 text-[11px] @min-[26rem]:grid-cols-2"
-                  onKeyDown={(e) => {
-                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                    e.preventDefault();
-                    setVatMode(vatMode === "acrescer" ? "incluido" : "acrescer");
-                  }}
-                >
-                  {(["acrescer", "incluido"] as const).map((modo) => {
-                    const v = duasFormas[modo];
-                    const ativa = vatMode === modo;
-                    return (
-                      <button
-                        key={modo}
-                        type="button"
-                        role="radio"
-                        aria-checked={ativa}
-                        tabIndex={ativa ? 0 : -1}
-                        onClick={() => setVatMode(modo)}
-                        className={`alvo-toque !justify-start rounded-xl border px-3 py-2.5 text-left motion-safe:transition-colors ${
-                          ativa
-                            ? "border-2 border-[#4d6350] bg-[#4d6350]/[0.09] text-foreground/90"
-                            : "border border-foreground/12 text-foreground/45 hover:border-foreground/25 hover:text-foreground/65"
-                        }`}
-                      >
-                        <span className="block">
-                          <span className={`block ${ativa ? "font-semibold" : "font-medium"}`}>
-                            {modo === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
-                            {ativa && " · escolhido"}
-                          </span>
-                          {money.base > 0 && (
-                            <>
-                              <span className="mt-0.5 block">
-                                base {eur(v.base)} · IVA {eur(v.iva)}
-                              </span>
-                              <span className="block">
-                                o cliente paga{" "}
-                                <strong className="font-semibold">{eur(v.total)}</strong>
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="rounded-xl border border-foreground/12 px-3 py-2.5 text-[11px]">
+                  {/* A leitura é do modo DESTE documento, não do que a casa faz
+                      hoje. Uma proposta antiga gravada em «IVA incluído» tem o
+                      bruto no `totalAmount`; mostrar-lhe a leitura de «acresce»
+                      dizia base 3280 e IVA 754,40 sobre um documento que vale
+                      2666,67 e 613,33. Um quadro que mente sobre o dinheiro é
+                      pior do que um quadro a menos. */}
+                  <span className="block font-medium text-foreground/70">
+                    {vatMode === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
+                  </span>
+                  {money.base > 0 && (
+                    <>
+                      <span className="mt-0.5 block text-foreground/55">
+                        base {eur(duasFormas[vatMode].base)} · IVA {eur(duasFormas[vatMode].iva)}
+                      </span>
+                      <span className="block text-foreground/55">
+                        o cliente paga{" "}
+                        <strong className="font-semibold text-foreground/80">
+                          {eur(duasFormas[vatMode].total)}
+                        </strong>
+                      </span>
+                    </>
+                  )}
                 </div>
                 <p className="text-xs leading-relaxed text-foreground/45">
-                  Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
-                  «incluído» mostra já a soma. O valor acima é sempre sem IVA.
+                  {vatMode === "acrescer" ? (
+                    "O valor acima é sempre sem IVA, e o PDF mostra-o com o IVA a somar por cima."
+                  ) : (
+                    /* E não se converte por ela: mudar o modo muda o TEXTO que
+                       sai no PDF («3.280,00 €» passa a «2.666,67 € + IVA»).
+                       Numa proposta que já seguiu, isso é o documento do casal
+                       a deixar de bater certo com o que ele tem em mãos. */
+                    <>
+                      Esta proposta foi escrita com o IVA já dentro do valor. As novas são todas
+                      «sem IVA + IVA acresce»; esta fica como seguiu, para o documento continuar
+                      igual ao que o cliente tem.
+                    </>
+                  )}
                 </p>
               </div>
               <Field

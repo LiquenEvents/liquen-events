@@ -754,13 +754,37 @@ describe("total desalinhado da soma das linhas", () => {
     );
   });
 
-  it("mostra as duas leituras do IVA lado a lado", async () => {
-    // Para ela ver o que o cliente vai ver, antes de decidir.
+  /**
+   * ── DE DUAS LEITURAS PARA UMA ─────────────────────────────────────────
+   *
+   * Palavras dela: «retira com o IVA incluído. É apenas com o valor sem IVA
+   * mais o IVA acresce».
+   *
+   * Eram dois cartões, e carregar num deles ESCOLHIA o modo. A escolha não
+   * valia nada (as propostas da casa são todas «acresce») e custava o pior
+   * engano que este ecrã pode ter: um toque distraído no cartão errado mudava
+   * o que o casal paga sem mexer no número que ela está a olhar.
+   *
+   * Fica a leitura — é onde ela confere o IVA e o total a pagar. Saiu o
+   * controlo, não a informação.
+   */
+  it("mostra UMA leitura do IVA, e nenhuma para escolher", async () => {
     seedComPrecos(3250);
     renderStudio();
-    // A barra fixa do fundo também diz "o cliente paga", precedida de
-    // "sem IVA ·" — daí a âncora no início.
-    expect(await screen.findAllByText(/^o cliente paga/)).toHaveLength(2);
+    // A barra fixa do fundo também diz "o cliente paga" (precedida de
+    // "sem IVA ·"), daí a âncora no início: a do bloco de totais é a única.
+    expect(await screen.findAllByText(/^o cliente paga/)).toHaveLength(1);
+    // E não há nada para carregar: o modo deixou de ser uma escolha.
+    expect(screen.queryByRole("radiogroup", { name: "Modo de IVA" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /IVA incluído/i })).toBeNull();
+  });
+
+  it("e um documento novo nasce em «acresce», não em «IVA incluído»", async () => {
+    // `detectVatMode` devolvia "incluido" quando não havia texto nenhum para
+    // ler — retrocompatibilidade com propostas antigas. Um documento acabado
+    // de começar também não tem texto, e caía na mesma porta.
+    renderStudio();
+    expect(await screen.findByText(/\+ IVA \(acresce\)/)).toBeTruthy();
   });
 });
 
@@ -1678,16 +1702,22 @@ describe("O valor é UM só — o do pedido", () => {
     vi.useRealTimers();
   });
 
-  it("trocar o modo de IVA não mexe na base — muda o que o cliente vê", async () => {
-    const user = userEvent.setup();
+  /**
+   * ── JÁ NÃO SE TROCA O MODO, E ERA ESSE O PONTO ────────────────────────
+   *
+   * O caso de antes carregava no cartão «IVA incluído» e provava que a base
+   * não se mexia. O controlo desapareceu (ver «mostra UMA leitura do IVA»), e
+   * com ele o engano que ele permitia — um toque a mudar o que o casal paga.
+   *
+   * O que continua a ter de ser verdade é a outra metade da afirmação antiga:
+   * o número que viaja para o pedido é a BASE, e o rótulo «(sem IVA)» da
+   * Gestão do pedido é verdadeiro.
+   */
+  it("o número do pedido é a base, e o ecrã não deixa trocar o modo do IVA", async () => {
     desenhar(comPreco(3000));
     const campo = await screen.findByLabelText(/Valor \(sem IVA\)/i);
     expect(campo).toHaveValue("3000");
-
-    await user.click(screen.getByRole("radio", { name: /IVA incluído/i }));
-    // O número do pedido é a BASE, e continua a ser 3000 — o rótulo "(sem IVA)"
-    // da Gestão do pedido tem de continuar verdadeiro nos dois modos.
-    expect(campo).toHaveValue("3000");
+    expect(screen.queryByRole("radio", { name: /IVA incluído/i })).toBeNull();
   });
 });
 
