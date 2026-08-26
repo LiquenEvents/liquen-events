@@ -54,7 +54,7 @@ import { guestRangeLabel, ceremonyTypeLabel, eventTypeName } from "@/lib/orcamen
 import { log } from "@/lib/logger";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
-import { pedirVezDeImagemPesada, ESPERA_MAXIMA_MS } from "./fila-de-imagens";
+import { pedirVezDeImagemPesada } from "./fila-de-imagens";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
@@ -1448,6 +1448,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [assetOriginais, setAssetOriginais] = useState<Record<string, string>>({});
   /**
    * ══════════════════════════════════════════════════════════════════════════
+   * O DEGRAU DO MEIO: A DERIVADA DE 1200 px
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A cascata de cada célula tinha DOIS degraus e nada entre eles — a miniatura
+   * e, a falhar essa, o ORIGINAL. Os pesos, medidos no estúdio a 1,6 Mbps com
+   * 24 células:
+   *
+   *     miniatura (400 px)     20 KB por célula   →   0,4 MB nas 24
+   *     derivada  (1200 px)  ~150 KB por célula   →   3,6 MB nas 24
+   *     original  (2200 px)   1099 KB por célula  →  26,4 MB nas 24
+   *
+   * E as células destas grelhas medem, medido no navegador: **~101 px aos 375,
+   * ~126 px entre 640 e 1023, ~92 px aos 1024** (as fotografias dos mood
+   * boards) — nenhuma delas com o que fazer a 2200 px de largura.
+   *
+   * Uma miniatura falha por coisas banais: a assinatura de seis horas de uma
+   * foto da Biblioteca que caducou, um pedido que expirou, um `sharp` que não
+   * correu. O que não era banal era a queda — de 20 KB para 1099 KB, na rede em
+   * que ela está a trabalhar. Daqui em diante cai-se para 150.
+   *
+   * Ausente quer dizer «essa derivada ainda não foi fabricada»: a célula cai
+   * directa ao original, como sempre caiu. Ver `mediasAssinadas` no `/assets`.
+   */
+  const [assetMedias, setAssetMedias] = useState<Record<string, string>>({});
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
    * OS URL QUE ESTA SESSÃO JÁ VIU MORRER
    * ══════════════════════════════════════════════════════════════════════════
    *
@@ -1969,6 +1995,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         if (meta?.originais && typeof meta.originais === "object") {
           setAssetOriginais(meta.originais);
         }
+        // O degrau do meio viaja com o rascunho pela mesma razão que o plano B,
+        // e rascunhos gravados antes de ele existir não o têm: abrem na mesma,
+        // com a cascata de dois degraus, até a hidratação responder.
+        if (meta?.medias && typeof meta.medias === "object") {
+          setAssetMedias(meta.medias);
+        }
         // Rascunhos guardados antes de as cores existirem não as têm: abrem na
         // mesma, e a hidratação preenche-as assim que o servidor responder.
         if (meta?.cores && typeof meta.cores === "object") setAssetCores(meta.cores);
@@ -2433,8 +2465,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             return "falhou";
           }
           const data = await res.json().catch(() => null);
-          const imgs: { path: string; url: string; thumbUrl?: string; cor?: string }[] =
-            Array.isArray(data?.images) ? data.images : [];
+          const imgs: {
+            path: string;
+            url: string;
+            thumbUrl?: string;
+            midUrl?: string;
+            cor?: string;
+          }[] = Array.isArray(data?.images) ? data.images : [];
           // Saiu de cena a meio: não há veredicto nenhum a dar a ninguém.
           if (!vivo()) return "a-caminho";
           // Zero fotografias É uma resposta: uma proposta sem fotos nenhumas
@@ -2472,6 +2509,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             const next = { ...prev };
             for (const im of imgs)
               if (im.path && im.url) next[im.path] = urlAindaBom(vivo_(next[im.path]), im.url);
+            return next;
+          });
+          // O degrau do meio, pela mesma regra do original: o guardado só
+          // ganha ao fresco enquanto o prazo servir.
+          //
+          // Uma foto que volte SEM `midUrl` não apaga a que já se sabia: a
+          // ausência quer dizer «ainda não foi fabricada», e uma resposta que
+          // não a traz não é prova de que a que já se tinha morreu.
+          setAssetMedias((prev) => {
+            const next = { ...prev };
+            for (const im of imgs)
+              if (im.path && im.midUrl)
+                next[im.path] = urlAindaBom(vivo_(next[im.path]), im.midUrl);
             return next;
           });
           // As cores não expiram (não são URLs assinados): uma vez conhecidas,
@@ -2761,6 +2811,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // rede (ou antes de a hidratação responder) deixava as células sem
             // para onde cair — que é exactamente quando mais falta faz.
             originais: semProvisorios(assetOriginais),
+            // E o degrau do meio, para uma reabertura sem rede não ter de cair
+            // de 20 KB direita a 1099 — que é precisamente quando não há linha
+            // para os pagar.
+            medias: semProvisorios(assetMedias),
             // As cores viajam com o rascunho pela mesma razão que o plano B:
             // reabrir sem rede (ou antes de a hidratação responder) deixava o
             // aviso de paleta mudo justamente quando ele ainda faz falta.
@@ -2828,6 +2882,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     doc,
     assetUrls,
     assetOriginais,
+    assetMedias,
     assetCores,
     themeOrigins,
     refEdited,
@@ -4079,6 +4134,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     );
     setAssetUrls({});
     setAssetOriginais({});
+    setAssetMedias({});
     setAssetCores({});
     setThemeOrigins({});
     setRefEdited(false);
@@ -7172,7 +7228,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <>
                         <Thumb
                           url={assetUrls[path]}
-                          planoB={assetOriginais[path]}
+                          // A cascata, do mais leve para o mais pesado. Ver
+                          // `assetMedias`: o degrau do meio poupa ~950 KB por
+                          // célula sempre que a miniatura falha.
+                          planoB={[assetMedias[path], assetOriginais[path]]}
                           estadoDosUrls={estadoDosUrls}
                           aoTentarDeNovo={() => void tentarBuscarFotos()}
                           aoMorrer={marcarUrlMorto}
@@ -7861,7 +7920,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         >
                                           <Thumb
                                             url={assetUrls[path]}
-                                            planoB={assetOriginais[path]}
+                                            // Do mais leve para o mais pesado —
+                                            // ver `assetMedias`. É esta grelha
+                                            // que tem 24 células e é aqui que a
+                                            // queda de 20 KB para 1099 doía.
+                                            planoB={[assetMedias[path], assetOriginais[path]]}
                                             estadoDosUrls={estadoDosUrls}
                                             aoTentarDeNovo={() => void tentarBuscarFotos()}
                                             aoMorrer={marcarUrlMorto}
@@ -9621,6 +9684,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             doc={doc}
             assetUrls={assetUrls}
             assetOriginais={assetOriginais}
+            assetMedias={assetMedias}
             money={money}
             split={split}
             pctSinal={pctSinal}
@@ -11476,8 +11540,8 @@ function PreviewThumb({
   pendente = false,
 }: {
   url?: string;
-  /** O ORIGINAL, para quando a miniatura não existir. */
-  planoB?: string;
+  /** Para onde cair, do mais leve para o mais pesado. Ver `planoB` no `Thumb`. */
+  planoB?: string | readonly (string | undefined)[];
   pendente?: boolean;
 }) {
   const { alvo, desistiu: failed, aoFalhar } = useFotoComPlanoB(url, planoB);
@@ -11677,14 +11741,17 @@ function PreviewSummary({
   doc,
   assetUrls,
   assetOriginais,
+  assetMedias,
   money,
   split,
   pctSinal,
 }: {
   doc: StudioDoc;
   assetUrls: Record<string, string>;
-  /** O ORIGINAL de cada foto — o plano B das células. */
+  /** O ORIGINAL de cada foto — o último degrau da cascata das células. */
   assetOriginais: Record<string, string>;
+  /** A derivada de 1200 px, o degrau do meio. Ver `assetMedias` no estúdio. */
+  assetMedias: Record<string, string>;
   money: ReturnType<typeof resolveProposalMoney>;
   /** O sinal e o saldo, tal como `totaisDaProposta` os devolve. */
   split: { sinal: number; saldo: number };
@@ -11721,7 +11788,7 @@ function PreviewSummary({
             <PreviewThumb
               key={i}
               url={assetUrls[path]}
-              planoB={assetOriginais[path]}
+              planoB={[assetMedias[path], assetOriginais[path]]}
               pendente={isPendingImage(path)}
             />
           ))}
@@ -12197,8 +12264,16 @@ function Thumb({
   refDoc,
 }: {
   url?: string;
-  /** O ORIGINAL, para quando a miniatura não existir. Ver `assetOriginais`. */
-  planoB?: string;
+  /**
+   * PARA ONDE CAIR, do mais leve para o mais pesado.
+   *
+   * Uma cadeia é o caso antigo («cai para o original»). Uma lista é a cascata
+   * inteira — nas grelhas do estúdio, `[derivada de 1200 px, original]`. Ver
+   * `assetMedias`: entre a miniatura de 20 KB e o original de 1099 KB não havia
+   * nada, e a queda custava cinquenta e cinco vezes o peso para desenhar a
+   * mesma caixa de ~100 px.
+   */
+  planoB?: string | readonly (string | undefined)[];
   /** Em que pé está a leitura dos URL — ver `estadoDosUrls` no estúdio. */
   estadoDosUrls?: EstadoDosUrls;
   /** Ir buscar os URL outra vez, a pedido dela. */
@@ -12266,7 +12341,13 @@ function Thumb({
    * já, sem esperar pelo `ultimoAlvo`, e a cascata pode receber a resposta em
    * vez de gastar uma volta a descobrir o que já se sabia.
    */
-  const recusadaPeloSitio = useRecusaDaPolitica(planoB ?? url);
+  /**
+   * O último degrau da cascata — o ficheiro grande. É por ele que se pergunta a
+   * recusa da política (todas as moradas desta foto têm a mesma origem) e é ele
+   * que o «Abrir ficheiro» abre.
+   */
+  const original = [...(Array.isArray(planoB) ? planoB : [planoB])].reverse().find(Boolean);
+  const recusadaPeloSitio = useRecusaDaPolitica(original ?? url);
   const {
     alvo,
     desistiu: failed,
@@ -12318,7 +12399,21 @@ function Thumb({
    * É também o que a Biblioteca de Temas faz, e é lá que está medido o que
    * vale — a primeira foto passou de 26 s para 1,4 s.
    */
-  const pesada = alvo != null && alvo === planoB;
+  /**
+   * ── O QUE É «PESADA» DEPOIS DE HAVER TRÊS DEGRAUS ────────────────────────
+   *
+   * Era `alvo === planoB`, que com dois degraus queria dizer exactamente «é o
+   * original». Com três, o plano B do meio é a derivada de 1200 px — ~150 KB,
+   * sete vezes a miniatura — e essa também não pode ir vinte e quatro ao mesmo
+   * tempo para o mesmo canal.
+   *
+   * Portanto: pesada é TUDO menos o primeiro degrau. E é também o primeiro
+   * degrau quando ele É o original — uma fotografia sem miniatura nenhuma chega
+   * aqui com o mesmo endereço nos dois lugares, e a cascata guarda-o uma vez
+   * só; sem esta segunda metade da condição, essa célula deixava de esperar
+   * pela vez e voltávamos às 24 a repartir o canal.
+   */
+  const pesada = alvo != null && (alvo !== url || alvo === original);
   /**
    * A vez, uma vez por célula e para sempre.
    *
@@ -12348,27 +12443,28 @@ function Thumb({
      * a cascata caiu para o original, porque ela carregou em «Tentar
      * novamente» — pedia na mesma vez, e ficava com um dos TRÊS lugares sem
      * precisar dele: o download dela já ia a caminho, e o lugar só se largava
-     * ao fim de `ESPERA_MAXIMA_MS` (30 s).
+     * ao fim de `ESPERA_MAXIMA_MS`.
      *
      * Numa grelha onde as fotos falham em cadeia é o pior momento possível
      * para isso: as três vagas ficam com células que não estão à espera de
-     * nada, e as que ainda não têm um único pixel no ecrã esperam meio minuto
-     * por uma vaga que já não é vaga nenhuma. A fila existe para reger quem
-     * ainda não começou.
+     * nada, e as que ainda não têm um único pixel no ecrã esperam por uma vaga
+     * que já não é vaga nenhuma. A fila existe para reger quem ainda não
+     * começou.
+     *
+     * ── O RELÓGIO DO TECTO NÃO ESTÁ AQUI, E É DE PROPÓSITO ─────────────────
+     * Estava: um `setTimeout` montado à volta deste pedido, que devolvia a vaga
+     * ao fim do tecto. Escrito assim, a invariante que importa — **o tecto
+     * conta o DOWNLOAD e nunca a ESPERA** — dependia de o `setTimeout` estar
+     * dentro do arranque e não fora dele, o que ninguém vê ao ler e ninguém
+     * apanha ao mudar. Passou para dentro da `fila-de-imagens`, que o arma no
+     * instante em que concede a vaga e tem um caso a fixá-lo.
      */
     if (!pesada || temVezRef.current) return;
-    let temporizador = 0;
     const largar = pedirVezDeImagemPesada(() => {
       temVezRef.current = true;
       setTemVez(true);
-      // Rede de segurança: um pedido que nunca termina não pode ficar com a vez
-      // para sempre.
-      temporizador = window.setTimeout(() => largarVez.current?.(), ESPERA_MAXIMA_MS);
     });
-    largarVez.current = () => {
-      window.clearTimeout(temporizador);
-      largar();
-    };
+    largarVez.current = largar;
     return () => {
       largarVez.current?.();
       largarVez.current = null;

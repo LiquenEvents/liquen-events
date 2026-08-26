@@ -290,7 +290,14 @@ let traducaoLigadaNoServidor = false;
 let traducaoResponde: (textos: string[]) => Response = (textos) =>
   reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
 /** As fotos que o servidor conhece para este pedido (`GET /assets`). */
-let assetsServidor: { path: string; url: string; thumbUrl?: string; cor?: string }[] = [];
+let assetsServidor: {
+  path: string;
+  url: string;
+  thumbUrl?: string;
+  /** A derivada de 1200 px — o degrau do meio da cascata. */
+  midUrl?: string;
+  cor?: string;
+}[] = [];
 /**
  * O `/assets` FALHA (Storage em baixo, sessão caducada, rede a cair).
  *
@@ -6230,6 +6237,84 @@ describe("porque é que ela não vê as fotografias", () => {
     // 16,0 s a que chega com o tecto de três).
     await waitFor(() => expect(comSrc().length).toBeGreaterThan(0));
     expect(comSrc().length).toBeLessThanOrEqual(3);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA CAIXA DE ~100 px NUNCA PEDE 1099 KB HAVENDO 150
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este é o caso que a fotografia do ecrã dela obrigou a escrever: sete de dez
+   * células a dizer «Imagem guardada / Tentar novamente», num iPhone com 4G.
+   *
+   * A cascata tinha DOIS degraus — a miniatura e, a falhar essa, o ORIGINAL — e
+   * nada pelo meio. Os pesos, medidos no estúdio a 1,6 Mbps:
+   *
+   *     miniatura (400 px)     20 KB    a célula desenha esta
+   *     derivada  (1200 px)  ~150 KB    ESTE degrau não existia
+   *     original  (2200 px)   1099 KB   e a queda ia direita aqui
+   *
+   * As células destas grelhas medem ~101 px aos 375, ~126 entre 640 e 1023 e
+   * ~92 aos 1024 (medido no navegador, ver `GrelhaDeFotos`). Uma miniatura que
+   * falha é um acidente banal — uma assinatura de seis horas caducada, um
+   * pedido que expirou. O que não pode ser banal é o preço: cinquenta e cinco
+   * vezes o peso para desenhar a mesma caixa de cem píxeis.
+   */
+  it("quando a miniatura falha, a célula cai para os 1200 px — NUNCA para o original", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      {
+        path: "board/foto-0.jpg",
+        url: "https://sb/original.jpg",
+        thumbUrl: "https://sb/mini.jpg",
+        midUrl: "https://sb/media.jpg",
+      },
+    ];
+    renderStudio();
+    const morrer = async () => {
+      const img = document.querySelector<HTMLImageElement>("[data-foto] img");
+      if (!img) return;
+      await act(async () => {
+        img.dispatchEvent(new Event("error"));
+      });
+    };
+
+    await waitFor(() => expect(comSrc()).toHaveLength(1));
+    expect(comSrc()[0].getAttribute("src")).toBe("https://sb/mini.jpg");
+
+    // A miniatura falha. É AQUI que estava o salto para os 1099 KB.
+    await morrer();
+    await waitFor(() =>
+      expect(
+        comSrc()[0]?.getAttribute("src"),
+        "a célula saltou a derivada de 1200 px e foi pedir o ficheiro grande",
+      ).toBe("https://sb/media.jpg"),
+    );
+
+    // E o original continua a ser a última rede — mas é a ÚLTIMA.
+    await morrer();
+    await waitFor(() => expect(comSrc()[0]?.getAttribute("src")).toBe("https://sb/original.jpg"));
+  });
+
+  /**
+   * A outra metade da mesma regra: sem derivada de 1200 px fabricada (o
+   * `/assets` só devolve `midUrl` quando o Storage a tem), a cascata é a de
+   * antes. Um degrau que não existe não pode gastar uma tentativa — a célula
+   * ficaria a pedir `undefined` e a desistir uma volta mais cedo.
+   */
+  it("sem derivada de 1200 px, a queda é a de sempre — e não uma tentativa perdida", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/original.jpg", thumbUrl: "https://sb/mini.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => expect(comSrc()).toHaveLength(1));
+    await act(async () => {
+      document
+        .querySelector<HTMLImageElement>("[data-foto] img")
+        ?.dispatchEvent(new Event("error"));
+    });
+    await waitFor(() => expect(comSrc()[0]?.getAttribute("src")).toBe("https://sb/original.jpg"));
   });
 });
 

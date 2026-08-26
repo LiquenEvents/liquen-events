@@ -35,6 +35,22 @@ export const ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS = 2_000;
  *     (assinar um caminho no Storage NÃO garante que o ficheiro lá está, e
  *     devolve um URL bem formado para um objecto que dá 404).
  *
+ * ── E ENTRE OS DOIS CABE UM DEGRAU ────────────────────────────────────────
+ *
+ * A cascata tinha DOIS degraus e nada pelo meio: a miniatura de 400 px (~20 KB)
+ * e, a falhar essa, o ORIGINAL. Medido no estúdio a 1,6 Mbps: o original pesa
+ * **1099 KB** por célula, 26,4 MB numa grelha de 24, e a primeira fotografia
+ * chega aos 34,0 s. Cair de 20 KB para 1099 KB porque uma derivada falhou é
+ * cinquenta e cinco vezes o peso para desenhar a MESMA caixa de ~100 px.
+ *
+ * E havia por onde cair: a derivada de 1200 px (`derivadas-medidas.ts`, os
+ * buckets `PROPOSAL_MID_BUCKET`/`THEME_MID_BUCKET`), ~150 KB, que a página do
+ * casal já usa há muito. Faltava era a cascata ter onde a pôr.
+ *
+ * Por isso `planoB` aceita uma LISTA, do mais leve para o mais pesado. Quem só
+ * tem um plano B continua a passar uma cadeia e nada muda para ele — que são
+ * quatro dos cinco sítios que chamam isto.
+ *
  * ── PORQUE É QUE ISTO VIVE NUM FICHEIRO PRÓPRIO ───────────────────────────
  * Estava exportado de dentro do `ProposalStudio`. A pré-visualização da página
  * — que o estúdio importa — precisa da mesma rede, e importá-la de lá fechava
@@ -52,7 +68,16 @@ export const ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS = 2_000;
  */
 export function useFotoComPlanoB(
   url?: string,
-  planoB?: string,
+  /**
+   * Para onde cair, do MAIS LEVE para o mais pesado.
+   *
+   * Uma cadeia é o caso de sempre («cai para o original»). Uma lista é a
+   * cascata inteira — no estúdio, `[derivada de 1200 px, original]`. Os vazios
+   * e os repetidos saem: uma miniatura que É o original não é um degrau a mais,
+   * e tentar duas vezes o mesmo endereço é gastar uma tentativa a saber o que
+   * já se sabia.
+   */
+  planoB?: string | readonly (string | undefined)[],
   /**
    * Não insistir: já se sabe que insistir dá sempre o mesmo.
    *
@@ -63,7 +88,19 @@ export function useFotoComPlanoB(
    */
   naoInsistir = false,
 ) {
-  const [tentativa, setTentativa] = useState<"principal" | "planoB" | "desistiu">("principal");
+  /**
+   * A cascata, montada a cada desenho e sem `useMemo`.
+   *
+   * É um laço sobre dois ou três elementos — memorizá-lo custaria mais em
+   * dependências instáveis (a lista de planos B é literal em quem chama, e
+   * portanto nova a cada desenho) do que o que pouparia.
+   */
+  const degraus: string[] = [];
+  for (const u of [url, ...(Array.isArray(planoB) ? planoB : [planoB])])
+    if (u && !degraus.includes(u)) degraus.push(u);
+
+  /** Em que degrau vai a cascata. `degraus.length` é «acabaram-se». */
+  const [degrau, setDegrau] = useState(0);
   // Ajustar o estado DURANTE o render, e não num efeito: é o que evita a
   // célula piscar o aviso de erro durante um fotograma antes de voltar a
   // tentar. É o padrão que o React documenta para estado derivado de props.
@@ -75,9 +112,19 @@ export function useFotoComPlanoB(
   const [voltas, setVoltas] = useState(0);
   if (urlVisto !== url) {
     setUrlVisto(url);
-    setTentativa("principal");
+    setDegrau(0);
     setVoltas(0);
   }
+
+  /**
+   * ── SEM DEGRAUS NENHUNS NÃO SE DESISTIU: AINDA NÃO SE COMEÇOU ────────────
+   *
+   * Uma célula cujo URL ainda não chegou (a hidratação vem a caminho) tem a
+   * lista vazia. Dizer «desistiu» ali punha-a a mostrar «Imagem guardada / não
+   * consegui mostrá-la» sobre uma fotografia que ninguém tinha ainda pedido —
+   * que é exactamente a caixa cinzenta que este ficheiro existe para não haver.
+   */
+  const desistiu = degraus.length > 0 && degrau >= degraus.length;
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -102,13 +149,13 @@ export function useFotoComPlanoB(
    * lá (continua a acabar em «desistiu», com o botão e o «Abrir ficheiro»).
    */
   useEffect(() => {
-    if (naoInsistir || tentativa !== "desistiu" || voltas >= 1) return;
+    if (naoInsistir || !desistiu || voltas >= 1) return;
     const t = setTimeout(() => {
       setVoltas((v) => v + 1);
-      setTentativa("principal");
+      setDegrau(0);
     }, ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS);
     return () => clearTimeout(t);
-  }, [tentativa, voltas, naoInsistir]);
+  }, [desistiu, voltas, naoInsistir]);
 
   /**
    * ── E QUANDO A REDE VOLTA, A CÉLULA VOLTA COM ELA ─────────────────────────
@@ -121,29 +168,29 @@ export function useFotoComPlanoB(
    * Não gasta nada enquanto está viva: o ouvinte só existe em «desistiu».
    */
   useEffect(() => {
-    if (naoInsistir || tentativa !== "desistiu") return;
-    const voltar = () => setTentativa("principal");
+    if (naoInsistir || !desistiu) return;
+    const voltar = () => setDegrau(0);
     window.addEventListener("online", voltar);
     return () => window.removeEventListener("online", voltar);
-  }, [tentativa, naoInsistir]);
+  }, [desistiu, naoInsistir]);
 
   return {
     /** O URL a pedir agora, ou `undefined` se já não há por onde tentar. */
-    alvo: tentativa === "planoB" ? planoB : url,
+    alvo: degraus[degrau],
     /** Esgotaram-se as tentativas. */
-    desistiu: tentativa === "desistiu",
+    desistiu,
     /**
-     * O ÚLTIMO URL que esta célula chegou a pedir — o que interessa registar e
-     * o que o «Abrir ficheiro» abre.
+     * O ÚLTIMO degrau da cascata — o que interessa registar e o que o «Abrir
+     * ficheiro» abre. É sempre o mais pesado, e portanto o que mais garantias
+     * tem de existir: o original.
      *
-     * Calculado, não guardado numa referência: a cascata só tem dois degraus, e
-     * qual foi o último sabe-se das próprias props. A primeira versão disto
-     * guardava-o num `useRef` e lia-o durante o desenho, que é precisamente o
-     * que o React não garante — e o linter apanhou-o antes de mim.
+     * Calculado, não guardado numa referência: a cascata sabe-se das próprias
+     * props. A primeira versão disto guardava-o num `useRef` e lia-o durante o
+     * desenho, que é precisamente o que o React não garante — e o linter
+     * apanhou-o antes de mim.
      */
-    ultimoAlvo: planoB && planoB !== url ? planoB : url,
-    aoFalhar: () =>
-      setTentativa((t) => (t === "principal" && planoB && planoB !== url ? "planoB" : "desistiu")),
+    ultimoAlvo: degraus[degraus.length - 1],
+    aoFalhar: () => setDegrau((d) => Math.min(d + 1, degraus.length)),
     /**
      * Voltar ao princípio, a pedido dela.
      *
@@ -156,7 +203,7 @@ export function useFotoComPlanoB(
       // As voltas automáticas voltam à conta: um pedido dela é um recomeço, não
       // a continuação do que já se tentou sozinho.
       setVoltas(0);
-      setTentativa("principal");
+      setDegrau(0);
     },
   };
 }

@@ -6,6 +6,7 @@ import {
   uploadProposalMid,
   uploadProposalThumb,
   listProposalImages,
+  signProposalMids,
   signProposalPaths,
   signProposalThumbs,
 } from "@/lib/proposal-storage";
@@ -162,6 +163,49 @@ function miniaturaAPedidoUrl(id: string, path: string): string {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E QUANDO A MINIATURA FALHA, HÁ ONDE CAIR QUE NÃO SEJA 1099 KB
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A célula do estúdio tinha DOIS degraus: a miniatura, e — a falhar essa — o
+ * ORIGINAL. Nada pelo meio. Os números deste ficheiro, medidos a 1,6 Mbps com
+ * 24 células:
+ *
+ *     miniatura (400 px)     20 KB por célula   →   0,4 MB nas 24
+ *     derivada  (1200 px)  ~150 KB por célula   →   3,6 MB nas 24
+ *     original  (2200 px)   1099 KB por célula  →  26,4 MB nas 24
+ *
+ * Uma miniatura que falhe é um acidente banal — uma assinatura de seis horas
+ * que caducou numa foto da Biblioteca, um `sharp` que não correu, um pedido
+ * que expirou. O que não é banal é o preço da queda: SETENTA vezes a derivada
+ * do meio, para desenhar a mesma caixa de ~100 px.
+ *
+ * A derivada de 1200 px já existe e já é fabricada em LOTE (`derivadas.ts`,
+ * papel «essencial» nas duas famílias); o que faltava era o estúdio saber onde
+ * ela está. Vai assinada e directa do Storage, como as miniaturas — sem passar
+ * por nenhuma função nossa.
+ *
+ * ── PORQUE É QUE, AO CONTRÁRIO DA MINIATURA, NÃO HÁ ROTA A PEDIDO ─────────
+ * Porque isto não é o degrau de todos os dias: é a REDE por baixo dele. A
+ * miniatura é o que a grelha desenha sempre, e por isso tem de existir sempre —
+ * daí `miniaturaAPedidoUrl`, que a fabrica à primeira vez. Esta só é pedida
+ * quando a de cima falhou. Onde ela ainda não estiver fabricada, o campo vem
+ * ausente e a cascata é a de antes (miniatura → original): pior na conta dos
+ * bytes, e igual ao que já se fazia. Uma rota nova para fabricar a meio de uma
+ * queda seria pôr um `sharp` no caminho de uma célula que JÁ está com
+ * problemas.
+ */
+async function mediasAssinadas(caminhos: string[]): Promise<Map<string, string>> {
+  try {
+    return await signProposalMids(caminhos);
+  } catch {
+    // Melhor esforço, como tudo o que é derivada: sem isto a cascata volta a ter
+    // dois degraus, e a grelha continua a desenhar-se.
+    return new Map();
+  }
+}
+
+/**
  * List every image already uploaded for this quote (each with a fresh signed
  * URL), so the studio can re-offer them on any device and re-preview images
  * whose cached URL is gone. Admin-only; returns an empty list when Storage
@@ -191,13 +235,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     //
     // Melhor esforço: sem base de dados, ou com fotos anteriores a isto existir,
     // o mapa vem vazio e o estúdio comporta-se exactamente como antes.
-    const cores = await coresDeCaminhos(imagens.map((im) => im.path));
+    // As cores e as derivadas de 1200 px em PARALELO: são duas idas ao servidor
+    // que não dependem uma da outra, e a grelha espera pelas duas.
+    const [cores, medias] = await Promise.all([
+      coresDeCaminhos(imagens.map((im) => im.path)),
+      mediasAssinadas(imagens.map((im) => im.path)),
+    ]);
     return NextResponse.json({
       ok: true,
       images: imagens.map((im) => {
         const cor = cores.get(im.path);
         const comCor = cor ? { ...im, cor } : im;
-        return im.thumbUrl ? comCor : { ...comCor, thumbUrl: miniaturaAPedidoUrl(id, im.path) };
+        // O degrau do meio da cascata. Ausente é uma resposta: quer dizer que a
+        // derivada ainda não foi fabricada, e a célula cai directa ao original
+        // como sempre caiu. Ver `mediasAssinadas`.
+        const midUrl = medias.get(im.path);
+        const comMedia = midUrl ? { ...comCor, midUrl } : comCor;
+        return im.thumbUrl ? comMedia : { ...comMedia, thumbUrl: miniaturaAPedidoUrl(id, im.path) };
       }),
     });
   } catch (err) {
