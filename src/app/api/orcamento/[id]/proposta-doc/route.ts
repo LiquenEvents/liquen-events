@@ -22,6 +22,7 @@ import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/pro
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { chaveDoPdf } from "@/lib/proposal-pdf-cache";
 import { guardarPdfDaProposta } from "@/lib/proposal-pdf-guardado";
+import { enderecoDoPdfDaProposta } from "@/lib/proposta-link-curto";
 import {
   ehIdiomaDaProposta,
   IDIOMA_POR_OMISSAO,
@@ -1157,6 +1158,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ref: id,
     });
 
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O PDF TEM DE SE VER NO CORPO, E NÃO SÓ LÁ NO FUNDO
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Palavras dela: «dá para colocar o pdf da proposta mais visível no email?».
+     *
+     * O ficheiro segue em anexo, mas quem manda no sítio onde o anexo aparece é
+     * o leitor de correio, não nós: no Gmail do telemóvel dela cai DEPOIS da
+     * assinatura, do banner e de tudo — é preciso rolar o email inteiro para o
+     * encontrar, e o corpo só o menciona de passagem numa frase.
+     *
+     * O que se pode pôr onde se vê é um caminho PRÓPRIO para o mesmo documento,
+     * dentro do corpo e antes da assinatura. As duas portas abrem com a mesma
+     * chave (ver `enderecoDoPdfDaProposta`), portanto não se emite ligação
+     * nenhuma nova nem se gere uma segunda validade.
+     *
+     * Vai nos TRÊS caminhos do envio — o corpo escrito no ecrã, o modelo
+     * guardado e o de recurso —, porque o anexo também vai nos três e o defeito
+     * não era de nenhum deles em particular.
+     *
+     * O nome do ficheiro está escrito no cartão de propósito: é assim que o
+     * casal reconhece, na caixa de correio, que o anexo lá em baixo e este
+     * botão são o mesmo documento.
+     */
+    const linkDoPdf = enderecoDoPdfDaProposta(acceptUrl);
+    const cartaoDoPdf = `
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:24px 0">
+          <tr><td style="border:1px solid #d9d3c7;border-radius:6px;padding:16px 18px">
+            <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#8a8375">${esc(t.anexoEtiqueta)}</p>
+            <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#2a2620">${esc(nomeDoAnexo)}</p>
+            <a href="${linkDoPdf}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:11px 22px;border-radius:4px;font-size:13px;letter-spacing:0.04em">${esc(t.anexoBotao)}</a>
+          </td></tr>
+        </table>`;
+    /** O mesmo, para quem lê o email em texto simples. */
+    const pdfEmTexto = ["", `${t.anexoBotao}: ${linkDoPdf}`];
+
     const email = escrito
       ? emailAoCliente({
           /**
@@ -1179,24 +1217,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
            * pelo endereço verdadeiro — e é por isso que o endereço aqui está nu:
            * o trabalho dele acaba onde o desta função começa.
            */
-          html: arrumarLigacao(escrito.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA }),
+          html: `${arrumarLigacao(escrito.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA })}${cartaoDoPdf}`,
           /**
            * O TEXTO SIMPLES fica com o endereço — não há `href` onde o esconder,
            * e um email de texto sem o link é um email sem a proposta. O que o
            * torna legível é o endereço ser CURTO; é outro trabalho, e é o do
            * identificador curto.
            */
-          texto: escrito.texto,
+          texto: [escrito.texto, ...pdfEmTexto].join("\n"),
           quem,
         })
       : corpoDoModelo
-        ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
+        ? emailAoCliente({
+            html: `${corpoDoModelo}${cartaoDoPdf}`,
+            texto: [textoDoCorpo(corpoDoModelo), ...pdfEmTexto].join("\n"),
+            quem,
+          })
         : emailAoCliente({
             quem,
             html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
         <p style="font-size:14px;line-height:1.6">${esc(t.ola)} ${esc(doc.clientNames)},</p>
         ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">${esc(t.intro)}</p>
-        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">${esc(t.botao)}</a></p>`,
+        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">${esc(t.botao)}</a></p>${cartaoDoPdf}`,
             texto: [
               t.titulo,
               "",
@@ -1209,6 +1251,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               ...(mensagem ? [mensagem, ""] : []),
               t.introEmTexto,
               `${t.verOnline} ${acceptUrl}`,
+              ...pdfEmTexto,
             ].join("\n"),
           });
 

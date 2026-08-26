@@ -213,6 +213,16 @@ export interface TextosDoEmailDaProposta {
   verOnline: string;
   /** O nome do PDF em anexo — ver {@link nomeDoFicheiroDaProposta}. */
   nomeDoAnexo: (dados: DadosDoNomeDoFicheiro) => string;
+  /**
+   * A etiqueta do cartão que põe o PDF à vista DENTRO do corpo.
+   *
+   * O ficheiro segue em anexo, mas quem decide onde o anexo aparece é o leitor
+   * de correio: no Gmail do telemóvel cai depois da assinatura e do banner, e
+   * é preciso rolar a mensagem inteira para dar com ele.
+   */
+  anexoEtiqueta: string;
+  /** O botão desse cartão. */
+  anexoBotao: string;
 }
 
 const PT: TextosDoEmailDaProposta = {
@@ -225,6 +235,8 @@ const PT: TextosDoEmailDaProposta = {
   botao: "Ver a proposta →",
   verOnline: "Ver online:",
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "pt"),
+  anexoEtiqueta: "Proposta em PDF",
+  anexoBotao: "Abrir a proposta em PDF",
 };
 
 const EN: TextosDoEmailDaProposta = {
@@ -243,6 +255,8 @@ const EN: TextosDoEmailDaProposta = {
    * transferências de quem as receba.
    */
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "en"),
+  anexoEtiqueta: "Proposal PDF",
+  anexoBotao: "Open the proposal PDF",
 };
 
 /**

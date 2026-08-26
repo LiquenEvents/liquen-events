@@ -122,6 +122,10 @@ vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok")
  *  `proposta-link-curto.test.ts`. */
 vi.mock("@/lib/proposta-link-curto", () => ({
   enderecoDaProposta: async () => "https://liquen-events.com/proposta/tok",
+  /** A derivação verdadeira, que é pura: as duas portas abrem com a mesma
+   *  chave, portanto o PDF sai do mesmo endereço sem se emitir nada. */
+  enderecoDoPdfDaProposta: (url: string) =>
+    `${url.replace(/\/proposta\/([^/]+)$/, "/api/proposta/$1")}/pdf`,
 }));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
@@ -1718,8 +1722,67 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
       { params },
     );
     expect(enviado().text).toContain("Falamos amanhã ao telefone.");
-    // A moldura da casa continua a fechar o email, e só ela é que traz endereços.
-    expect(enviado().html).not.toContain("/proposta/tok");
+    /**
+     * A moldura da casa continua a fechar o email, e só ela é que traz
+     * endereços. O que se prende é a AUSÊNCIA do link da PÁGINA da proposta —
+     * o que o marcador teria posto lá.
+     *
+     * ── PORQUE É QUE ISTO DEIXOU DE SER `not.toContain("/proposta/tok")` ──
+     * A moldura passou a trazer um endereço seu: o cartão do PDF, que aponta
+     * para `/api/proposta/tok/pdf` e que vai em TODOS os envios de propósito
+     * (ver «O PDF TEM DE SE VER NO CORPO»). Esse texto contém `/proposta/tok`,
+     * portanto a asserção larga apanhava-o e lia-se como se o corpo tivesse
+     * ganho o link que ninguém pediu. São coisas diferentes e agora
+     * distinguem-se: o que não pode aparecer é o `href` para a página.
+     */
+    expect(enviado().html).not.toContain('href="https://liquen-events.com/proposta/tok"');
+    // E o cartão do PDF ESTÁ lá — é a moldura, não é o corpo.
+    expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O PDF TEM DE SE VER NO CORPO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «dá para colocar o pdf da proposta mais visível no email?».
+   *
+   * O ficheiro sempre seguiu em anexo — mas quem manda no sítio onde o anexo
+   * aparece é o leitor de correio. No Gmail do telemóvel dela cai DEPOIS da
+   * assinatura e do banner, e é preciso rolar o email inteiro para dar com ele.
+   *
+   * O cartão é um caminho próprio para o MESMO documento, dentro do corpo. Vai
+   * nos três caminhos do envio porque o anexo também vai nos três.
+   */
+  it("o corpo escrito no ecrã leva o cartão do PDF", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Escrevi isto à mão." }), {
+      params,
+    });
+    expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
+    expect(enviado().html).toContain("Abrir a proposta em PDF");
+    // E o nome do ficheiro, para o casal reconhecer que é o mesmo do anexo.
+    expect(enviado().html).toContain("Proposta-Liquen-Events");
+  });
+
+  it("e o texto simples leva o mesmo endereço, que ali não há botões", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Escrevi isto à mão." }), {
+      params,
+    });
+    expect(enviado().text).toContain("https://liquen-events.com/api/proposta/tok/pdf");
+  });
+
+  it("o modelo guardado também o leva", async () => {
+    modelo.get.mockResolvedValue(modeloGuardado("Assunto", "<p>Texto do modelo.</p>"));
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(enviado().html).toContain("Texto do modelo.");
+    expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
+  });
+
+  it("e o caminho de recurso, que é o que sai quando não há modelo nenhum", async () => {
+    modelo.get.mockResolvedValue(null);
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
+    expect(enviado().text).toContain("https://liquen-events.com/api/proposta/tok/pdf");
   });
 
   it("o assunto que ela viu no ecrã é o assunto que sai", async () => {
