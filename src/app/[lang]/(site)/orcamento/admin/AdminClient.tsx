@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { localeDoCaminho, localizeHref } from "@/lib/i18n/config";
 import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
@@ -1293,7 +1294,26 @@ export default function AdminClient({
   // Current locale, read from the path (/{lang}/orcamento/admin), to build the
   // deep link into a quote's full-screen Dossier route.
   const pathname = usePathname();
-  const lang = pathname?.split("/").filter(Boolean)[0] || "pt";
+  /**
+   * ── O LINK DO DOSSIER SAÍA DO BACK OFFICE PARA UM 404 ───────────────────
+   *
+   * Estava `pathname.split("/").filter(Boolean)[0]`, a chamar «língua» ao
+   * primeiro segmento do caminho. Mas o site é português SEM prefixo: a página
+   * canónica é `/orcamento/admin`, e nesse caminho o primeiro segmento é a
+   * palavra **`orcamento`**. O link do Dossier ficava
+   * `/orcamento/orcamento/admin/evento/{id}` — o 404 do site público, com o
+   * menu comercial e um botão que leva à homepage comercial. Sem caminho de
+   * volta ao back office a não ser escrever o URL à mão.
+   *
+   * E o destino verdadeiro é o Dossier do Evento: financeiro, pagamentos,
+   * fornecedores, produção, cronograma do dia, convidados. Estava construído,
+   * a funcionar, e inacessível pela interface.
+   *
+   * `localeDoCaminho` faz a pergunta certa (é o espelho inglês?) e
+   * `localizeHref` é quem sabe compor o endereço nas duas línguas — as mesmas
+   * funções que o resto do site já usa.
+   */
+  const locale = localeDoCaminho(pathname);
 
   /**
    * O motivo de perda acompanha a decisão do estado?
@@ -4971,7 +4991,7 @@ export default function AdminClient({
                             {/* Full-screen cockpit for this event — the one place that
                               unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
-                              href={`/${lang}/orcamento/admin/evento/${selected.id}`}
+                              href={localizeHref(`/orcamento/admin/evento/${selected.id}`, locale)}
                               className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
                               title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                             >
