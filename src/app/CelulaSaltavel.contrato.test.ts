@@ -89,27 +89,44 @@ describe("content-visibility nas grelhas de fotos", () => {
     expect(css).toContain("content-visibility: auto");
 
     // A camada em que a regra cai decide se ela é um utilitário normal ou uma
-    // regra que ganha a toda a gente. Contam-se as chavetas desde o `@layer
+    // regra que ganha a toda a gente. Contam-se as chavetas desde cada `@layer
     // utilities` até à declaração: se sairmos do bloco antes de lá chegar, a
-    // regra ficou de fora.
-    const inicio = css.indexOf("@layer utilities");
-    expect(inicio, "não há `@layer utilities` em globals.css").toBeGreaterThan(-1);
-    let profundidade = 0;
-    let fim = css.length;
-    for (let i = css.indexOf("{", inicio); i < css.length; i++) {
-      if (css[i] === "{") profundidade++;
-      else if (css[i] === "}") {
-        profundidade--;
-        if (profundidade === 0) {
-          fim = i;
-          break;
+    // regra ficou de fora daquele.
+    //
+    // ── TODOS OS BLOCOS, E NÃO SÓ O PRIMEIRO ────────────────────────────
+    //
+    // Esta procura olhava só para o PRIMEIRO `@layer utilities` do ficheiro, e
+    // isso valia enquanto houvesse um só. No dia em que apareceu um segundo —
+    // a entrelinha da legenda, dentro do `@media` do chão da letra — este teste
+    // chumbou por uma razão que não era a dele: a `.celula-saltavel` continuava
+    // dentro de uma camada, só que da outra.
+    //
+    // O que ele guarda é «está dentro de ALGUMA `@layer utilities`». É isso que
+    // passa a medir, e continua a chumbar se ela sair de todas.
+    const blocosDeUtilitarios: string[] = [];
+    for (let inicio = css.indexOf("@layer utilities"); inicio !== -1; ) {
+      let profundidade = 0;
+      let fim = css.length;
+      for (let i = css.indexOf("{", inicio); i < css.length; i++) {
+        if (css[i] === "{") profundidade++;
+        else if (css[i] === "}") {
+          profundidade--;
+          if (profundidade === 0) {
+            fim = i;
+            break;
+          }
         }
       }
+      blocosDeUtilitarios.push(css.slice(inicio, fim));
+      inicio = css.indexOf("@layer utilities", fim);
     }
+    expect(blocosDeUtilitarios.length, "não há `@layer utilities` em globals.css").toBeGreaterThan(
+      0,
+    );
     expect(
-      css.slice(inicio, fim).includes(".celula-saltavel"),
-      "`.celula-saltavel` está fora da @layer utilities — em Tailwind v4 isso faz " +
-        "uma regra sem camada ganhar a todos os utilitários, em silêncio",
+      blocosDeUtilitarios.some((bloco) => bloco.includes(".celula-saltavel")),
+      "`.celula-saltavel` está fora de QUALQUER @layer utilities — em Tailwind v4 " +
+        "isso faz uma regra sem camada ganhar a todos os utilitários, em silêncio",
     ).toBe(true);
   });
 });
