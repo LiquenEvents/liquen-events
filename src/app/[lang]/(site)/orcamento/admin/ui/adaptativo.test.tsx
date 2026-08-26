@@ -206,6 +206,122 @@ describe("FolhaOuDialogo", () => {
     const acima = (await screen.findByRole("dialog")).parentElement as HTMLElement;
     expect(acima.style.zIndex).toBe("95");
   });
+
+  /**
+   * ── OS TRÊS DEGRAUS QUE FALTAVAM PARA O SELETOR DE FOTOS CABER AQUI ────────
+   *
+   * O `ThemePicker` tinha uma folha escrita à mão — invólucro, pega, arrasto,
+   * armadilha de foco, trinco de scroll e Escape, tudo duplicado. Os limiares
+   * já tinham divergido (fechava aos 90 px, o primitivo aos 80) e faltava-lhe
+   * a camada de história, portanto o gesto de voltar do iPhone saía do back
+   * office e levava a selecção de fotos com ele.
+   *
+   * Não se adoptava o primitivo sem estas três: sem elas, adoptá-lo era uma
+   * REGRESSÃO — um painel estreito de mais, um corpo com scroll no sítio
+   * errado e uma contagem cortada a meio. Cada um destes testes guarda um
+   * degrau, e nenhum deles muda o que sai por omissão.
+   */
+  describe("os degraus que o seletor de fotos precisou", () => {
+    /** As classes que estão MESMO no elemento, para um `toContain` não passar
+     *  por causa de uma variante que contém a cadeia («px-5» em «sm:px-5»). */
+    const classes = (el: Element) => el.className.split(/\s+/);
+
+    it('`largura="largo"` abre até 70 rem onde há coluna lateral', async () => {
+      simularAparelho(DESKTOP);
+      render(
+        <FolhaOuDialogo aberto onFechar={() => {}} titulo="Escolher fotos" largura="largo">
+          <p>conteúdo</p>
+        </FolhaOuDialogo>,
+      );
+      const caixa = await screen.findByRole("dialog");
+      // Abaixo de `lg` não há coluna nenhuma e a caixa fica nas 48 rem; a
+      // partir de `lg` a coluna leva 14 rem e a grelha precisa das 70.
+      expect(classes(caixa)).toContain("max-w-3xl");
+      expect(classes(caixa)).toContain("lg:max-w-[70rem]");
+      // E o degrau NÃO existia: `lg` parava nas 56 rem, que com a coluna
+      // lateral deixava a grelha com 42.
+      expect(classes(caixa)).not.toContain("max-w-4xl");
+    });
+
+    it("os três degraus de sempre não mudaram", async () => {
+      simularAparelho(DESKTOP);
+      for (const [pedida, esperada] of [
+        ["sm", "max-w-md"],
+        ["md", "max-w-2xl"],
+        ["lg", "max-w-4xl"],
+      ] as const) {
+        const { unmount } = render(
+          <FolhaOuDialogo aberto onFechar={() => {}} titulo="Caixa" largura={pedida}>
+            <p>conteúdo</p>
+          </FolhaOuDialogo>,
+        );
+        expect(classes(await screen.findByRole("dialog"))).toContain(esperada);
+        unmount();
+      }
+    });
+
+    /**
+     * A moldura por omissão — `px-5 py-4` com o scroll no corpo inteiro — serve
+     * a um formulário e estraga uma caixa de duas colunas: rolar as fotos
+     * levava a coluna dos temas atrás, e as fotos perdiam 40 px de cada lado.
+     */
+    it("`corpoProprio` tira a margem e o scroll ao corpo — e sem ele nada muda", async () => {
+      simularAparelho(TELEMOVEL);
+      const { unmount } = render(
+        <FolhaOuDialogo aberto onFechar={() => {}} titulo="Escolher fotos" corpoProprio>
+          <p data-testid="dentro">conteúdo</p>
+        </FolhaOuDialogo>,
+      );
+      const corpo = (await screen.findByTestId("dentro")).parentElement as HTMLElement;
+      expect(classes(corpo)).not.toContain("px-5");
+      expect(classes(corpo)).not.toContain("overflow-y-auto");
+      // O que fica é só o que deixa o filho pedir a altura da caixa.
+      expect(classes(corpo)).toEqual(expect.arrayContaining(["min-h-0", "flex-1", "flex"]));
+      unmount();
+
+      render(
+        <FolhaOuDialogo aberto onFechar={() => {}} titulo="Escolher fotos">
+          <p data-testid="dentro">conteúdo</p>
+        </FolhaOuDialogo>,
+      );
+      const porOmissao = (await screen.findByTestId("dentro")).parentElement as HTMLElement;
+      expect(classes(porOmissao)).toContain("px-5");
+      expect(classes(porOmissao)).toContain("overflow-y-auto");
+    });
+
+    /**
+     * Um rodapé com uma contagem viva ao lado de três botões não cabe a 375 px:
+     * os botões não encolhem, o texto sim, e o que se lia era uma palavra
+     * cortada a meio. Sem esta prop, pôr o seletor dentro do primitivo era
+     * repor esse defeito.
+     */
+    it("`accoesQuebram` deixa o rodapé partir — e sem ele continua uma fila só", async () => {
+      simularAparelho(TELEMOVEL);
+      const accoes = <button data-testid="accao">Adicionar</button>;
+      const { unmount } = render(
+        <FolhaOuDialogo
+          aberto
+          onFechar={() => {}}
+          titulo="Escolher fotos"
+          accoes={accoes}
+          accoesQuebram
+        >
+          <p>conteúdo</p>
+        </FolhaOuDialogo>,
+      );
+      const rodape = (await screen.findByTestId("accao")).parentElement as HTMLElement;
+      expect(classes(rodape)).toContain("flex-wrap");
+      unmount();
+
+      render(
+        <FolhaOuDialogo aberto onFechar={() => {}} titulo="Escolher fotos" accoes={accoes}>
+          <p>conteúdo</p>
+        </FolhaOuDialogo>,
+      );
+      const semQuebra = (await screen.findByTestId("accao")).parentElement as HTMLElement;
+      expect(classes(semQuebra)).not.toContain("flex-wrap");
+    });
+  });
 });
 
 describe("TabelaOuCartoes", () => {

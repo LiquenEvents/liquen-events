@@ -105,7 +105,10 @@ export default function MoodBoardIndice({
   }
 
   const lista = (
-    <ul className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+    /* A tira rola de lado; a coluna empilha. O limiar é o do invólucro que
+       lhe dá a largura (`ProposalStudio`, a grelha de `11rem`), e tem de ser o
+       MESMO: ver lá o comentário. */
+    <ul className="flex gap-1.5 overflow-x-auto pb-1 @min-[40rem]:flex-col @min-[40rem]:overflow-visible @min-[40rem]:pb-0">
       {ordem.map((bi, pos) => (
         <EntradaDoIndice
           key={bi}
@@ -124,11 +127,18 @@ export default function MoodBoardIndice({
   return (
     <nav
       aria-label="Índice das páginas de inspiração"
-      /* No telemóvel é uma fila que rola de lado (o `<ul>` abaixo), e aí não há
-         altura para limitar. No ecrã grande é uma coluna `sticky`: sem tecto,
-         uma proposta com muitas páginas tem o fim do índice fora do ecrã e sem
-         maneira de lá chegar, porque uma coluna presa não acompanha o rolo. */
-      className="mb-3 lg:mb-0 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto"
+      /* Na caixa estreita é uma fila que rola de lado (o `<ul>` abaixo), e aí
+         não há altura para limitar. Na caixa larga é uma coluna `sticky`: sem
+         tecto, uma proposta com muitas páginas tem o fim do índice fora do ecrã
+         e sem maneira de lá chegar, porque uma coluna presa não acompanha o
+         rolo.
+
+         O limiar é uma *container query* e não `lg:`, porque este índice não
+         tem largura própria — ela vem da grelha do `ProposalStudio`, e a
+         pergunta que as duas fazem tem de ser a mesma. A caixa que conta é a
+         coluna onde ela escreve, e essa é MAIOR abaixo de 1024 do que acima:
+         a razão está escrita lá, ao pé da grelha. */
+      className="mb-3 @min-[40rem]:mb-0 @min-[40rem]:sticky @min-[40rem]:top-24 @min-[40rem]:max-h-[calc(100vh-7rem)] @min-[40rem]:self-start @min-[40rem]:overflow-y-auto"
     >
       <p className="bo-eyebrow mb-1.5">Páginas</p>
       {/* ── QUANTAS FALTAM, EM VEZ DE QUANTAS HÁ ────────────────────────────
@@ -195,7 +205,9 @@ function EntradaDoIndice({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`flex shrink-0 items-center gap-0.5 lg:shrink ${
+      /* Na tira as entradas não encolhem (rolam); na coluna encolhem, para o
+         título truncar em vez de empurrar. O mesmo limiar dos outros dois. */
+      className={`flex shrink-0 items-center gap-0.5 @min-[40rem]:shrink ${
         isDragging ? "relative z-10 opacity-90" : ""
       }`}
     >

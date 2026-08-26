@@ -63,6 +63,8 @@ import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
 import PainelDoEstudio from "./PainelDoEstudio";
+import { useMedida } from "./useMedida";
+import { CORTES } from "./ui/adaptativo";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import AEnviarAProposta from "./AEnviarAProposta";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
@@ -210,6 +212,16 @@ import {
  * server fills via {@link withProposalDefaults}) and previews / e-mails it.
  */
 type StudioDoc = Parameters<typeof withProposalDefaults>[0];
+
+/**
+ * O painel «O que vai sair» aparece a partir daqui.
+ *
+ * É o MESMO número do `PainelDoEstudio` e lê-se do mesmo sítio (`CORTES.largo`,
+ * 1440): dois sítios a responder à mesma pergunta com números diferentes foi
+ * exactamente o defeito que deixou a miniatura da página e o painel a
+ * aparecerem os dois entre 1440 e 1535.
+ */
+const MEDIDA_DO_PAINEL_LATERAL = `(min-width: ${CORTES.largo}px)`;
 
 // ── Shared styling (matches ProposalBuilder / PaymentsPanel) ──
 /**
@@ -3468,6 +3480,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   /**
    * ════════════════════════════════════════════════════════════════════════
+   * A PRÉ-VISUALIZAÇÃO DA PÁGINA SÓ SE MONTA ONDE ELA SE VÊ
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A miniatura de cada mood board era desenhada SEMPRE e escondida por CSS
+   * (`2xl:hidden`). É exactamente o que o `PainelDoEstudio.tsx:52-57` deixou de
+   * fazer, e a razão está lá escrita: numa proposta no tecto do gerador,
+   * desenhar as páginas num ecrã onde elas nem se veem foi o suficiente para o
+   * estúdio deixar de responder em cinco segundos. Aqui são SETE cópias — uma
+   * por mood board —, cada uma com as URLs de todas as fotografias. Num 4G, de
+   * pé numa quinta, isso é trabalho e são bytes que não dão nada em troca.
+   *
+   * E o número estava errado: o comentário justificava-se com «a partir de
+   * `2xl` o painel da direita mostra a mesma página», mas o painel passou a
+   * `CORTES.largo` (1440). Entre 1440 e 1535 apareciam AS DUAS.
+   *
+   * Como no painel, no servidor responde `false` — o HTML sai pelo caminho
+   * estreito (com a miniatura) e ela desaparece na hidratação. É o lado seguro
+   * dos dois: quem tem ecrã largo perde uma miniatura que já tinha ao lado,
+   * quem não tem nunca fica sem ela.
+   */
+  const painelLateralCabe = useMedida(MEDIDA_DO_PAINEL_LATERAL);
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
    * A FOLGA POR BAIXO DO FORMULÁRIO É A ALTURA MEDIDA DA BARRA
    * ════════════════════════════════════════════════════════════════════════
    *
@@ -5876,7 +5912,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const realce = (campo: CampoAMudar) =>
     porConfirmar.has(campo)
-      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-background"
+      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-white"
       : undefined;
   const confirmado = (campo: CampoAMudar) => {
     // Tocar-lhe É a confirmação. Um botão "confirmar" ao lado de cada campo
@@ -6076,11 +6112,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           É o padrão a evitar em todo o back office: texto e barra de acções na
           mesma linha só a partir de `sm`. */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        {/* ── O CABEÇALHO CUSTAVA UM TERÇO DO ECRÃ DELA ────────────────────
+            Somando as classes num iPhone SE (375×667), gastavam-se ~702 px
+            antes do primeiro campo onde ela escreve — ou seja, ele nascia
+            abaixo da dobra. Este cabeçalho eram ~213 desses píxeis, e ~74 eram
+            três linhas de instrução que se lêem UMA VEZ e depois ficam lá as
+            outras cinquenta.
+
+            A correcção é a mesma que a explicação do «Extra» já levou duzentas
+            linhas abaixo, e o critério é o do `ui/Ajuda.tsx`: úteis na primeira
+            vez, ruído a partir da segunda. Passa a estar onde a pergunta se faz
+            — atrás de um «?» ao pé do nome da secção.
+
+            UM texto num sítio só, e não duas cópias com um `hidden` a escolher:
+            o que aqui se poupa é altura, e duas cópias não poupam altura
+            nenhuma a quem lê o HTML. */}
         <div className="min-w-0">
-          <p className="bo-eyebrow">Estúdio de propostas (PDF)</p>
-          <p className="mt-2 text-sm leading-relaxed text-foreground/55">
-            Monta aqui a proposta em PDF para o cliente. Preenche de cima para baixo; podes
-            pré-visualizar antes de enviar.
+          <p className="bo-eyebrow flex items-center gap-1.5">
+            Estúdio de propostas (PDF)
+            <Ajuda sobre="o que se faz no estúdio de propostas">
+              Monta aqui a proposta em PDF para o cliente. Preenche de cima para baixo; podes
+              pré-visualizar antes de enviar.
+            </Ajuda>
           </p>
         </div>
         {/* `flex-wrap` e não `shrink-0`: com três botões a 375 px, um deles
@@ -6219,9 +6272,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           que a separa do fundo do ecrã, e volta a ser medida sempre que a barra
           muda de tamanho (`ResizeObserver`). Um número que se mede não pode
           ficar desactualizado por alguém acrescentar um botão. */}
+      {/* ── A FILA SÓ EXISTE ONDE HÁ DUAS COLUNAS ────────────────────────
+          Isto era `flex gap-6` em TODAS as larguras. Enquanto o `NavEstudio`
+          era `hidden … lg:block`, a fila tinha um filho só e não se notava;
+          agora que o índice existe também abaixo de 1024 (uma tira que rola de
+          lado), ele passava a ficar AO LADO do conteúdo a 375 px e esmagava a
+          coluna onde ela escreve.
+
+          A direcção é do PAI: nenhuma classe no filho (`w-full`, tirar o
+          `shrink-0`, `display:contents`) desfaz uma fila. É o mesmo padrão que
+          o índice dos mood boards já usa aqui em baixo (`lg:grid lg:grid-cols-…`):
+          abaixo de `lg` é um bloco simples e a tira empilha por cima do
+          conteúdo; a partir de `lg` é a fila de hoje, ao pixel.
+
+          O `min-w-0 flex-1` do irmão fica inerte fora de um contexto flex, e o
+          `@container` dele continua a ser um contentor válido nas duas
+          larguras — `container-type: inline-size` não pede flex nenhum. */}
       <div
         hidden={step !== "conteudo"}
-        className="flex gap-6"
+        className="lg:flex lg:gap-6"
         style={{ paddingBottom: folgaDaBarra }}
       >
         <NavEstudio
@@ -6230,7 +6299,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           onSeccaoActual={anotarSeccao}
           porTraduzir={traducoesPorSeccao}
         />
-        <div className="min-w-0 flex-1">
+        {/* ── QUEM MANDA É A COLUNA ONDE ELA ESCREVE, NÃO A JANELA ─────────
+            Esta coluna vive dentro de três outras: a barra lateral do back
+            office (`w-64`, a partir de 1024), o índice do estúdio (`NavEstudio`,
+            `w-48`, a partir de 1024) e o painel «O que vai sair» (`w-[21rem]`,
+            a partir de 1440). Medida:
+
+              janela   esta coluna
+                375       ~351 px
+                640       ~592 px
+               1023       ~975 px
+               1024       ~504 px   ← perde 471 px de um pixel para o outro
+               1440       ~560 px
+
+            É por isso que `sm:` mente aqui dentro: dispara aos 640 de JANELA e
+            nunca mais volta atrás, portanto tudo o que decidiu «duas colunas»
+            com 592 px de caixa continua a decidir duas colunas quando a caixa
+            passa a ter 504. Este ficheiro tinha quarenta regras de largura e
+            zero `@container`; era esse o defeito de fundo.
+
+            O `@container` põe a pergunta onde ela existe — na largura DESTA
+            coluna — e os limiares são os que a casa já usa (22, 24 e 26 rem),
+            mais as 36 rem que o `PaymentsPanel` usa para o mesmo caso de uma
+            fila de campos com colunas fixas. O método está escrito por extenso
+            em `ProposalBuilder.tsx:973-1009`; aqui é a mesma conta noutra
+            caixa. */}
+        <div className="@container min-w-0 flex-1">
           {/* Template selector */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <Segmented
@@ -6362,7 +6456,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Event fields */}
           <Section title="Evento" id="evento">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
                 value={doc.clientNames}
@@ -6741,10 +6835,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
               )}
               {/* ── O ÍNDICE ─────────────────────────────────────────────
-                  Em ecrã largo é uma coluna fixa ao lado; em telemóvel, uma
+                  Onde a caixa dá, é uma coluna fixa ao lado; onde não dá, uma
                   tira que se percorre por cima da lista — a 390 px, uma coluna
-                  lateral roubava metade da grelha das fotos. */}
-              <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-5">
+                  lateral roubava metade da grelha das fotos.
+
+                  ── PORQUE É QUE «ONDE A CAIXA DÁ» NÃO É `lg:` ────────────
+                  Isto era `lg:grid` — 1024 de JANELA — e era o último sítio do
+                  ficheiro onde dois cortes se SOMAVAM em vez de se
+                  compensarem: aos 1024 a coluna de conteúdo cai de 975 para
+                  504 px (aparecem a barra lateral do back office e o índice do
+                  estúdio) e era exactamente aí que esta coluna de 176 px se
+                  abria. O cartão do board ficava com 276 px e as miniaturas
+                  com 86; sem ela ficaria com 472 e 112.
+
+                  ── E A INVERSÃO QUE ISTO OBRIGA A ESCREVER ───────────────
+                  A coluna de conteúdo é MAIOR abaixo de 1024 (975 px) do que
+                  acima (504 aos 1024, 560 aos 1440). Portanto a resposta certa
+                  desliga esta coluna lateral em TODAS as larguras de desktop e
+                  liga-a entre 640 e 1023. Parece ao contrário e não é: a caixa
+                  a 1024 é mesmo mais estreita do que a 640, e um índice em
+                  coluna custa-lhe 196 px — 39% do sítio onde ela escreve. Em
+                  tira custa ~56 px de altura, uma vez.
+
+                  ── DE ONDE VÊM AS 40 REM ─────────────────────────────────
+                  A coluna custa 176 px mais os 20 do intervalo: 196. O que
+                  sobra tem de continuar a servir a grelha de fotografias na
+                  forma de quatro colunas, que pede 24 rem de cartão (384) mais
+                  os 32 do `p-4` — 416. São 612 px, e 40 rem (640) é o degrau
+                  acima. Medido: liga a 975 e desliga a 351, 504, 560 e 592.
+
+                  O `MoodBoardIndice` lê o MESMO limiar, e é obrigatório que
+                  leia: a forma dele (tira horizontal ou coluna `sticky`) e a
+                  grelha que lhe dá a largura são duas metades da mesma
+                  decisão, e metades da mesma decisão em sinais diferentes é o
+                  defeito que o `useMedida.ts:16-21` conta por extenso. Aqui
+                  seria uma tira de `overflow-x-auto` espremida em 176 px de um
+                  lado, e um índice vertical à largura toda do outro. */}
+              <div className="@min-[40rem]:grid @min-[40rem]:grid-cols-[11rem_minmax(0,1fr)] @min-[40rem]:gap-5">
                 <MoodBoardIndice
                   boards={doc.moodBoards}
                   ordem={ordemDosBoards}
@@ -6877,7 +7004,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             // O `id` é o alvo do índice lateral. Pelo ÍNDICE REAL:
                             // a ordem desenhada pode mudar debaixo do salto.
                             ancora={`mood-board-${bi}`}
-                            className={`rounded-2xl border p-4 ${
+                            // `@container`: a grelha das fotografias aqui
+                            // dentro pergunta pela largura DESTE cartão, e não
+                            // pela da janela — ver o comentário na grelha.
+                            className={`@container rounded-2xl border p-4 ${
                               fechado
                                 ? "border-[#4d6350]/35 bg-[#4d6350]/[0.04]"
                                 : "border-foreground/[0.08] bg-foreground/[0.015]"
@@ -7181,10 +7311,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         </p>
                                       );
                                     })()}
+                                    {/* ── O ECRÃ GRANDE DAVA MINIATURAS MAIS
+                                        PEQUENAS DO QUE O TELEMÓVEL ──────────
+                                        `sm:grid-cols-4` dispara aos 640 de
+                                        JANELA e nunca mais volta atrás. Aos
+                                        1024 a coluna de conteúdo cai de 975
+                                        para 504 px, o índice das páginas leva
+                                        176 desses, e a grelha ficava com ~300
+                                        px para desenhar QUATRO colunas:
+                                        miniaturas de 68 px. A 375, com os
+                                        mesmos ~300 px, desenhava três — 92 px.
+                                        O portátil mostrava as fotografias mais
+                                        pequenas do que o telemóvel.
+
+                                        A pergunta é a largura do CARTÃO, que é
+                                        onde a grelha vive: `@container` no
+                                        cartão, e a quarta coluna só a partir de
+                                        24 rem. Medido depois: ~92 px aos 1024,
+                                        ~101 aos 375 e ~126 entre 640 e 1023 —
+                                        nunca mais uma miniatura mais pequena
+                                        num ecrã maior. */}
                                     <GrelhaDeFotos
                                       bi={bi}
                                       quantas={b.images.length}
-                                      className="grid grid-cols-3 sm:grid-cols-4 gap-2"
+                                      className="grid grid-cols-3 @min-[24rem]:grid-cols-4 gap-2"
                                     >
                                       {b.images.map((path, ii) => (
                                         <CelulaDeFoto
@@ -7352,7 +7502,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             · {semRecorte ? "sem recorte" : "recorta"}
                                           </span>
                                         </summary>
-                                        <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] 2xl:grid-cols-1">
+                                        {/* A segunda coluna abre-se quando há
+                                            mesmo uma segunda coluna. Era
+                                            `2xl:grid-cols-1` a desfazê-la com
+                                            CSS por cima de uma miniatura que
+                                            continuava desenhada; agora a
+                                            miniatura ou está montada ou não
+                                            está, e a grelha diz o mesmo que ela.
+                                            Sem isto, uma coluna de 15 rem ficava
+                                            aberta e vazia. */}
+                                        <div
+                                          className={`mt-2 grid gap-4 ${
+                                            painelLateralCabe
+                                              ? ""
+                                              : "lg:grid-cols-[minmax(0,1fr)_15rem]"
+                                          }`}
+                                        >
                                           <div className="min-w-0">
                                             <SelectorDeLayout
                                               valor={b.layout}
@@ -7368,47 +7533,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                            * ── A MINIATURA REPETIDA SETE VEZES
                                            *
                                            * «Minúscula e repetida sete vezes.»
-                                           * A partir de `2xl` deixa de existir:
-                                           * o painel da direita mostra a MESMA
-                                           * página, grande, e duas cópias da
-                                           * mesma coisa no mesmo ecrã são uma a
-                                           * mais.
+                                           * Onde o painel da direita cabe, ele
+                                           * mostra a MESMA página, grande, e
+                                           * duas cópias da mesma coisa no mesmo
+                                           * ecrã são uma a mais. Abaixo disso
+                                           * fica, porque abaixo disso o painel
+                                           * não cabe — e tirá-la aí era tirar a
+                                           * pré-visualização a quem trabalha
+                                           * num portátil.
                                            *
-                                           * Abaixo disso fica, porque abaixo
-                                           * disso o painel não cabe — e tirá-la
-                                           * aí era tirar a pré-visualização a
-                                           * quem trabalha num portátil, para
-                                           * resolver um problema que só existe
-                                           * no ecrã grande.
+                                           * MONTAGEM CONDICIONAL, e não
+                                           * `2xl:hidden`: escondida por CSS ela
+                                           * continuava a ser DESENHADA, sete
+                                           * vezes, com as URLs de todas as
+                                           * fotografias. Ver `painelLateralCabe`
+                                           * lá em cima, e o
+                                           * `PainelDoEstudio.tsx:52-57`, que
+                                           * conta o que isso custou quando era
+                                           * ele a fazê-lo.
                                            */}
-                                          <div className="lg:pt-6 2xl:hidden">
-                                            <PreviaDaPagina
-                                              layout={layoutDoBoard}
-                                              aspectos={aspectos}
-                                              // Pela ordem de DESENHO, com a principal à frente
-                                              // — a mesma que a página vai usar.
-                                              urls={ordemDeDesenho
-                                                .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                .map((i) => assetUrls[b.images[i]])}
-                                              // O plano B, o mesmo da grelha aqui
-                                              // ao lado: uma miniatura que não
-                                              // existe cai para o original em vez
-                                              // de dar o ícone de imagem partida.
-                                              originais={ordemDeDesenho
-                                                .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                .map((i) => assetOriginais[b.images[i]])}
-                                              semRecorte={semRecorte}
-                                              titulo={b.title}
-                                              subtitulo={b.subtitulo}
-                                              legenda={b.annotation}
-                                              // Aqui o rótulo ainda diz alguma
-                                              // coisa: é a única miniatura do
-                                              // cartão, e sem ele lê-se como
-                                              // mais uma fotografia. Ver
-                                              // `comRotulo`.
-                                              comRotulo
-                                            />
-                                          </div>
+                                          {!painelLateralCabe && (
+                                            <div className="lg:pt-6">
+                                              <PreviaDaPagina
+                                                layout={layoutDoBoard}
+                                                aspectos={aspectos}
+                                                // Pela ordem de DESENHO, com a principal à frente
+                                                // — a mesma que a página vai usar.
+                                                urls={ordemDeDesenho
+                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                  .map((i) => assetUrls[b.images[i]])}
+                                                // O plano B, o mesmo da grelha aqui
+                                                // ao lado: uma miniatura que não
+                                                // existe cai para o original em vez
+                                                // de dar o ícone de imagem partida.
+                                                originais={ordemDeDesenho
+                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                  .map((i) => assetOriginais[b.images[i]])}
+                                                semRecorte={semRecorte}
+                                                titulo={b.title}
+                                                subtitulo={b.subtitulo}
+                                                legenda={b.annotation}
+                                                // Aqui o rótulo ainda diz alguma
+                                                // coisa: é a única miniatura do
+                                                // cartão, e sem ele lê-se como
+                                                // mais uma fotografia. Ver
+                                                // `comRotulo`.
+                                                comRotulo
+                                              />
+                                            </div>
+                                          )}
                                         </div>
                                       </details>
                                     )}
@@ -7757,7 +7930,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   onde="As linhas do orçamento"
                   onFixar={fixarOrdem}
                 />
-                <div className="flex flex-col gap-2 mb-3">
+                <div className="@container flex flex-col gap-2 mb-3">
                   {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
                       A caixa do fim não tinha nome nenhum: uma quadrícula com a
                       palavra «extra» ao lado, sem cabeçalho e sem uma frase que
@@ -7770,8 +7943,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       unitário passou para a segunda linha de cada item, ao pé
                       da fórmula a que pertence: enquanto esteve no meio da
                       linha, aparecia só nas linhas que escalam e empurrava as
-                      colunas dessas para fora do cabeçalho. */}
-                  <div className="hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-foreground/25 sm:flex">
+                      colunas dessas para fora do cabeçalho.
+
+                      ── E PORQUE É QUE O LIMIAR É 36 REM DE CARTÃO ──────────
+                      Era `sm:flex` — 640 de JANELA —, e a fila por baixo quebra
+                      por CAIXA. Num portátil a 1024 a coluna de conteúdo tem
+                      504 px e a fila já vai em duas linhas, mas o cabeçalho
+                      continuava a nomear quatro colunas por cima delas: que é
+                      literalmente a razão escrita duzentas linhas abaixo para o
+                      esconder no telemóvel.
+
+                      A conta da fila: o nome não desce dos `min-w-[12rem]`
+                      (192), a escala leva `w-32` (128), o preço `w-28` (112), o
+                      «Extra» `w-16` (64), o × `w-5` (20) e são quatro
+                      intervalos de 8 — 548 px para caber tudo numa linha. Daí
+                      as 36 rem (576), que é o mesmo limiar e a mesma razão do
+                      `GRID` do `PaymentsPanel`. Os três sítios que decidem
+                      sobre esta fila — este cabeçalho, a palavra «extra» e o
+                      «?» — partilham-no, porque separá-los é como um cabeçalho
+                      volta a mentir. */}
+                  <div className="hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:flex">
                     <span className="flex-1">Item</span>
                     <span className="w-32 shrink-0">Como escala</span>
                     <span className="flex w-28 shrink-0 items-center justify-end gap-1">
@@ -7858,22 +8049,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           multiplicação — e quando os convidados mudam, refazer
                           essas contas à mão é onde entra o erro que ninguém vê,
                           porque o resultado continua a parecer um preço. */}
-                        <select
-                          value={escala?.tipo ?? "fixa"}
-                          onChange={(e) => definirEscala(i, e.target.value as TipoDeEscala)}
-                          aria-label={`Como escala ${l.item || "a linha sem nome"}`}
-                          className="bo-input w-32 shrink-0 px-2 py-2 text-xs"
-                        >
-                          <option value="fixa">Valor fixo</option>
-                          <option value="por-convidado">Por convidado</option>
-                          <option value="por-mesa">Por mesa</option>
-                        </select>
+                        {/* ── O RÓTULO NÃO DESAPARECE SEM SUBSTITUTO ────────
+                            Sem o cabeçalho, «Como escala» não voltava em lado
+                            nenhum: ficava um `<select>` com três opções e
+                            nenhuma palavra visível a dizer o que ele decide. O
+                            nome existia para quem OUVE (`aria-label`) e não
+                            para quem OLHA — é a mesma família do «Total» que se
+                            corrigiu esta semana, e não se resolve com `hidden`.
+
+                            Agora o rótulo está sempre num dos dois sítios, e
+                            nunca nos dois: no cabeçalho enquanto a fila é uma
+                            só, aqui por cima do campo quando ela quebra. Os
+                            dois lêem o MESMO limiar de contentor, que é o que
+                            impede haver um instante com ambos ou com nenhum.
+                            `aria-hidden` porque o `aria-label` já o diz — dois
+                            nomes seguidos era o leitor de ecrã a repetir-se. */}
+                        <label className="flex w-32 shrink-0 flex-col gap-1">
+                          <span
+                            aria-hidden="true"
+                            className="text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:hidden"
+                          >
+                            Como escala
+                          </span>
+                          <select
+                            value={escala?.tipo ?? "fixa"}
+                            onChange={(e) => definirEscala(i, e.target.value as TipoDeEscala)}
+                            aria-label={`Como escala ${l.item || "a linha sem nome"}`}
+                            className="bo-input w-full px-2 py-2 text-xs"
+                          >
+                            <option value="fixa">Valor fixo</option>
+                            <option value="por-convidado">Por convidado</option>
+                            <option value="por-mesa">Por mesa</option>
+                          </select>
+                        </label>
                         {/* A largura vai no invólucro e não no campo: `.bo-input`
                         tem `width: 100%` escrito em CSS, que ganha a um
                         `w-28` do Tailwind. Sem isto o preço comia a linha
                         toda e o nome ficava numa caixa de trinta pixels — foi
                         o que a captura de ecrã mostrou. */}
-                        <span className="w-28 shrink-0">
+                        {/* A largura continua no invólucro e não no campo, pela
+                            razão escrita aqui em cima; o invólucro é que passou
+                            a ser um `<label>`, para o rótulo desta coluna voltar
+                            quando a fila quebra — ver o `<select>` ao lado. */}
+                        <label className="flex w-28 shrink-0 flex-col gap-1">
+                          <span
+                            aria-hidden="true"
+                            className="text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:hidden"
+                          >
+                            Preço (sem IVA)
+                          </span>
                           {/* ── PREENCHIDO E POR PREENCHER, INCONFUNDÍVEIS ──
                               Tinha aqui `placeholder="900"`. Palavras dela: «um
                               número redondo e plausível como placeholder num
@@ -7927,13 +8151,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             inputMode="decimal"
                             aria-label={`Preço de ${l.item || "linha sem nome"}`}
                           />
-                        </span>
+                        </label>
                         {/* EXTRA OU NÃO. Uma caixa e não um menu: a pergunta é
                           de sim ou não, e um menu de duas entradas custa duas
                           carregadas para responder a uma pergunta de uma.
-                          A palavra «extra» some a partir de `sm`, onde o
-                          cabeçalho da coluna já a diz — e fica no telemóvel,
-                          onde não há cabeçalho nenhum. */}
+                          A palavra «extra» some onde o cabeçalho da coluna já a
+                          diz, e fica onde não há cabeçalho nenhum — pelo MESMO
+                          limiar de contentor que o cabeçalho usa, que é o que
+                          impede a palavra e o cabeçalho de se cruzarem. */}
                         <label className="alvo-toque flex w-16 shrink-0 items-center justify-center gap-1.5 text-[11px] text-foreground/50">
                           <input
                             type="checkbox"
@@ -7941,10 +8166,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             onChange={(e) => updateBudgetExtraFlag(i, e.target.checked)}
                             aria-label={`${l.item || "Linha sem nome"} é um extra opcional`}
                           />
-                          <span className="sm:hidden">extra</span>
+                          <span className="@min-[36rem]:hidden">extra</span>
                         </label>
-                        {/* No telemóvel não há cabeçalho de coluna, e portanto
-                            não há onde pendurar o «?». Fica na PRIMEIRA linha,
+                        {/* Onde a fila quebra não há cabeçalho de coluna, e
+                            portanto não há onde pendurar o «?» — o mesmo limiar
+                            de contentor, pela mesma razão. Fica na PRIMEIRA linha,
                             que é o equivalente móvel do cabeçalho — e só nela:
                             um ponto de interrogação por linha seriam oito
                             botões a explicar a mesma coisa.
@@ -7952,7 +8178,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             Fora do `<label>`: um botão lá dentro carregaria a
                             quadrícula ao ser carregado. */}
                         {ordemDoOrcamento[0] === i && (
-                          <Ajuda className="sm:hidden" sobre="o que faz a caixa Extra">
+                          <Ajuda className="@min-[36rem]:hidden" sobre="o que faz a caixa Extra">
                             <strong className="font-semibold text-foreground/85">Extra</strong>{" "}
                             marca uma linha como opcional: ela sai assinalada no quadro do PDF e,
                             por baixo do total, a proposta passa a mostrar também o valor{" "}
@@ -8101,9 +8327,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     );
                   })()}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="xl:grid xl:grid-cols-2 xl:items-end xl:gap-x-3">
+                <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
+                  {/* ── «LADO A LADO» É UMA PERGUNTA DE CONTENTOR ───────────
+                      Era `xl:` — 1280 de JANELA —, e a janela não sabe nada
+                      desta caixa: ela é METADE da coluna de conteúdo, ou seja
+                      ~245 px aos 1024 e ~280 aos 1440. Duas colunas de 240 px
+                      para um par PT/EN não é «lado a lado», é dois campos
+                      apertados um contra o outro.
+
+                      Sem ponto de corte nenhum: cada caixa pede a largura de
+                      que precisa (14 rem a portuguesa, as 12 rem que a
+                      `CaixaInglesa` já pede em `aoLado`) e o `flex-wrap`
+                      põe-nas na mesma linha exactamente onde as duas cabem —
+                      que é a primeira das respostas que o
+                      `Cortes.contrato.test.ts` manda dar quando a pergunta é
+                      sobre o contentor. */}
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
                     <Field
+                      containerClassName="min-w-0 grow basis-[14rem]"
                       label="Rótulo do total"
                       value={doc.totalLabel}
                       onChange={(e) => patch({ totalLabel: e.target.value })}
@@ -8206,12 +8447,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       )}
                     </p>
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="@container flex flex-col gap-2">
                     {/* Os rótulos das colunas escondem-se onde as colunas não
-                        existem: abaixo de 640 px a linha passa a ser duas
-                        filas, e um cabeçalho de quatro colunas por cima disso
-                        seria uma legenda para uma grelha que não está lá. */}
-                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                        existem: abaixo do limiar a linha passa a ser duas filas,
+                        e um cabeçalho de quatro colunas por cima disso seria
+                        uma legenda para uma grelha que não está lá.
+
+                        O limiar é a largura DESTA lista e não a da janela. Era
+                        `sm:` (640 de janela) e a janela não sabe nada desta
+                        caixa: aos 1024 a coluna de conteúdo cai para 504 px e a
+                        caixa da descrição — que é onde ela escreve o texto que
+                        o casal lê — fica com 196 depois das duas colunas fixas
+                        (7 rem + 9 rem) e do botão. O cabeçalho e a linha lêem o
+                        MESMO limiar: separá-los é o que dá parágrafos a meia
+                        largura numa grelha de uma coluna. */}
+                    <div className="hidden @min-[26rem]:grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
                       <span>Descrição</span>
                       <span className="text-right">Valor (€)</span>
                       <span>IVA da linha</span>
@@ -8236,18 +8486,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                            * palavra, no campo que dá nome à linha que o casal
                            * vai ler.
                            *
-                           * Abaixo de 640 px a linha passa a duas filas: a
-                           * descrição sozinha em cima, e o valor, o IVA e o
-                           * botão de apagar por baixo. Acima disso fica
-                           * exactamente como estava.
+                           * Abaixo de 26 rem DE LISTA (e não de janela) a linha
+                           * passa a duas filas: a descrição sozinha em cima, e o
+                           * valor, o IVA e o botão de apagar por baixo. Acima
+                           * disso fica exactamente como estava.
                            */
-                          className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
+                          className="grid grid-cols-[minmax(0,1fr)_auto] @min-[26rem]:grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
                         >
                           {/* Um invólucro só para as duas caixas ficarem uma por
                               cima da outra DENTRO da primeira coluna — a linha é
                               uma grelha, e um filho solto abriria uma coluna
                               nova em vez de descer. */}
-                          <div className="col-span-2 min-w-0 sm:col-span-1">
+                          <div className="col-span-2 min-w-0 @min-[26rem]:col-span-1">
                             <input
                               className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                               value={ex.label}
@@ -8342,11 +8592,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               </>
             ) : (
               <>
-                <div className="flex flex-col gap-2 mb-3">
-                  {/* Os cabeçalhos só a partir de `sm`: no telemóvel a linha
-                      passa a duas filas, e três títulos por cima de duas filas
-                      nomeiam colunas que ali não existem. */}
-                  <div className="hidden grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 sm:grid">
+                <div className="@container flex flex-col gap-2 mb-3">
+                  {/* Os cabeçalhos só a partir das 26 rem DESTA lista: abaixo
+                      disso a linha passa a duas filas, e três títulos por cima
+                      de duas filas nomeiam colunas que ali não existem.
+
+                      Era `sm:` — 640 de JANELA —, e a fila quebra por CAIXA:
+                      aos 1024 a coluna de conteúdo tem 504 px e não 975. O
+                      cabeçalho e a linha partilham o limiar de propósito. */}
+                  <div className="hidden grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 @min-[26rem]:grid">
                     <span>Item</span>
                     <span className="text-right">Valor</span>
                     <span className="w-5" />
@@ -8366,12 +8620,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                          O desenho é o que as linhas adicionais aqui em cima já
                          fazem: a descrição a ocupar a fila toda, e o valor mais
-                         o botão de apagar por baixo. Acima de `sm` fica
-                         exactamente como estava. */
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
+                         o botão de apagar por baixo. Acima das 26 rem de lista
+                         fica exactamente como estava. */
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[26rem]:grid-cols-[minmax(0,1fr)_10rem_auto]"
                     >
                       <input
-                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-foreground/75 sm:col-span-1"
+                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-foreground/75 @min-[26rem]:col-span-1"
                         value={r.item}
                         onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
                         placeholder="Coordenação do dia"
@@ -8399,10 +8653,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     + Adicionar linha
                   </button>
                 </div>
-                {/* O par PT/EN numa linha só em ecrã largo — ver `aoLado`,
-                    em `CaixaInglesa`. Abaixo de `xl` volta a empilhar. */}
-                <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:items-end xl:gap-x-3">
+                {/* O par PT/EN numa linha só quando as duas caixas cabem — ver
+                    `aoLado`, em `CaixaInglesa`.
+
+                    Era `xl:` (1280 de JANELA) e o que manda é a largura desta
+                    caixa: com o painel «O que vai sair» aberto ela tem 560 px
+                    aos 1440, e uma nota de orçamento repartida em duas colunas
+                    de 274 px não é «lado a lado». Sem ponto de corte nenhum:
+                    20 rem de base para a portuguesa (é um `textarea` de prosa),
+                    as 12 rem que a inglesa já pede, e o `flex-wrap` decide. */}
+                <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
                   <Field
+                    containerClassName="min-w-0 grow basis-[20rem]"
                     as="textarea"
                     label="Nota do orçamento"
                     rows={2}
@@ -8509,7 +8771,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           />
 
           <Section title="Total, IVA e validade" id="total">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
               {/**
                * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
                *
@@ -8536,7 +8798,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 const degrau = degrauDosAdicionais(doc as unknown as ContextoDoPreco);
                 if (!(degrau > 0)) {
                   return (
-                    <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
+                    <p className="text-xs leading-relaxed text-foreground/50 @min-[26rem]:col-span-2">
                       É o mesmo valor do <strong className="font-semibold">Preço final</strong> do
                       pedido — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número
                       só.
@@ -8551,7 +8813,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 const efectivo = money.base;
                 const servicos = round2(efectivo - degrau);
                 return (
-                  <p className="text-xs leading-relaxed text-foreground/60 sm:col-span-2">
+                  <p className="text-xs leading-relaxed text-foreground/60 @min-[26rem]:col-span-2">
                     Este campo é <strong className="font-semibold">só os serviços</strong>. O{" "}
                     <strong className="font-semibold">Preço final</strong> do pedido mostra outro
                     número, porque leva também os adicionais:{" "}
@@ -8588,7 +8850,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
                 errado sem dar o gesto que o arruma é meio trabalho. */}
               {desvio && (
-                <div className="sm:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+                <div className="@min-[26rem]:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
                   <span className="text-xs text-foreground/70">
                     O total está escrito à mão e difere da soma das linhas em{" "}
                     <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
@@ -8660,12 +8922,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   andarem entre as duas opções e o leitor de ecrã anunciar «1 de
                   2, escolhido». A marca nunca é só a cor (moldura, negrito e
                   palavra), como manda o `DESIGN-TOKENS.md`. */}
-              <div className="flex flex-col gap-1.5">
+              {/* `@container`: estas duas caixas vivem numa CÉLULA da grelha
+                  aqui em cima, e essa célula tem ~252 px aos 1024 e ~296 aos
+                  640. Postas a duas colunas por uma pergunta feita à janela,
+                  ficavam com 126 px cada — para dois botões que dizem «IVA
+                  incluído» e trazem o valor por extenso. Aqui a pergunta é a
+                  largura da célula. */}
+              <div className="@container flex flex-col gap-1.5">
                 <span className="bo-eyebrow">IVA</span>
                 <div
                   role="radiogroup"
                   aria-label="Modo de IVA"
-                  className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2"
+                  className="grid grid-cols-1 gap-2 text-[11px] @min-[26rem]:grid-cols-2"
                   onKeyDown={(e) => {
                     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
                     e.preventDefault();
@@ -9548,10 +9816,48 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Diz agora as três coisas que são verdade, e nenhuma a mais:
                   o que ela traduziu sai em inglês, o que não traduziu sai em
                   português, e os valores ficam à portuguesa. */}
+              {/* ── ISTO É PROSA DENTRO DE UMA BARRA COLADA, E ISSO CUSTA ECRÃ ──
+                  A barra do fundo é `sticky` e `flex-wrap`: um filho `w-full`
+                  não ocupa uma linha, ocupa uma LINHA SÓ PARA ELE. A 375 px
+                  estas três frases dão cinco linhas de texto, e a barra —
+                  que já se sobrepõe ao conteúdo e já lhe rouba a folga por
+                  baixo — cresce outro tanto. Ela mandou a fotografia: com a
+                  barra de navegação por baixo, sobrava menos de metade do ecrã
+                  para a proposta que estava a escrever.
+
+                  Já havia uma máquina a MEDIR a barra e a reservar essa altura
+                  ao conteúdo (ver o comentário do passo 1). Resolvia o sintoma
+                  — o que ficava por baixo deixou de ser inalcançável — e
+                  deixava a causa de pé: uma barra livre de crescer cresce.
+
+                  Não se esconde. Mostra-se QUANDO É A PERGUNTA: este parágrafo
+                  responde a «o que muda se eu escolher inglês?», e ela trabalha
+                  em português. Com «Português» escolhido fica uma linha, que
+                  chega para saber que há uma diferença e onde a ler; com
+                  «Inglês» escolhido abre inteiro, porque aí é a consequência do
+                  que ela acabou de fazer.
+
+                  Em ecrã largo abre sempre: lá a barra tem espaço, e a única
+                  razão para o encurtar era a que não existe. */}
               <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
-                Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a data e
-                o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas «EN»; o que
-                ficar em branco sai em português. Os valores continuam à portuguesa (1.234,56 €).
+                {idiomaDoPdf === "en" ? (
+                  <>
+                    Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
+                    data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
+                    «EN»; o que ficar em branco sai em português. Os valores continuam à portuguesa
+                    (1.234,56 €).
+                  </>
+                ) : (
+                  <>
+                    <span className="sm:hidden">Em inglês muda a moldura do documento.</span>
+                    <span className="hidden sm:inline">
+                      Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
+                      data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
+                      «EN»; o que ficar em branco sai em português. Os valores continuam à
+                      portuguesa (1.234,56 €).
+                    </span>
+                  </>
+                )}
               </p>
               {/* ── O QUE FALTA, DITO ANTES DO CLIQUE ──────────────────────
                   Este é o sítio onde o PDF nasce, e o primeiro PDF inglês sai

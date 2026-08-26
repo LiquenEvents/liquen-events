@@ -101,8 +101,8 @@ const BOTAO_VAZADO =
  *
  * Era `bg-foreground text-background disabled:opacity-50`. O `opacity` desbota
  * o elemento INTEIRO: o fundo escuro a meia opacidade vira cinzento médio, e o
- * texto — que é da cor do papel — desaparece lá dentro. No ecrã dela, com a
- * geração a correr, este botão era um rectângulo cinzento sem uma letra.
+ * texto desaparecia lá dentro. No ecrã dela, com a geração a correr, este botão
+ * era um rectângulo cinzento sem uma letra.
  *
  * Não é só feio. Enquanto o lote corre, o botão é a única coisa no ecrã que diz
  * QUAL das duas gerações está desactivada e sobre quantas fotografias — e era
@@ -111,9 +111,30 @@ const BOTAO_VAZADO =
  * Desbota-se só o FUNDO, e o texto fica com o contraste que tinha. O vazado
  * pode continuar com `opacity`: aí o texto é escuro sobre branco e a meio
  * caminho ainda se lê.
+ *
+ * ── E DEPOIS O BOTÃO FICOU PRETO SOBRE PRETO ──────────────────────────────
+ * A correcção acima arranjou a metade errada, e a razão está aqui para não se
+ * repetir. O diagnóstico dizia que o texto era «da cor do papel» e que o fundo
+ * desbotado o engolia. NÃO ERA: `text-background` nunca produziu cor nenhuma.
+ *
+ * O `@theme` do `globals.css` define `--color-foreground` e mais doze cores;
+ * `--color-background` NÃO é uma delas. Uma classe do Tailwind que aponta para
+ * um token inexistente não é um erro — não gera regra nenhuma, e cai em
+ * silêncio. O texto ficava com a cor herdada do painel, que é a mesma
+ * `foreground` do fundo do botão.
+ *
+ * Ou seja: preto sobre preto desde sempre. Estava escondido enquanto o botão
+ * passava a vida desactivado e cinzento; assim que o fundo deixou de desbotar,
+ * apareceu como um rectângulo preto sem letras.
+ *
+ * Por isso a cor do texto passa a ser explícita — é o que o `ui/Button.tsx` faz
+ * na variante cheia (`text-white`), e uma cor literal não pode desaparecer por
+ * o tema mudar de nome. E fica um teste (`cores-que-existem.test.ts`) a varrer
+ * o back office à procura de outras classes de cor apontadas a tokens que não
+ * existem, porque este engano não se vê a ler o código: vê-se no ecrã dela.
  */
 const BOTAO_CHEIO =
-  "min-h-11 rounded-lg bg-foreground px-3 text-sm text-background disabled:cursor-not-allowed disabled:bg-foreground/35";
+  "min-h-11 rounded-lg bg-foreground px-3 text-sm text-white disabled:cursor-not-allowed disabled:bg-foreground/35";
 
 export default function Miniaturas() {
   const { toast } = useToast();

@@ -57,7 +57,15 @@ export default function EscolhasDoCasal({
 
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-3">
+      {/* ── `flex-wrap` E NENHUM PONTO DE CORTE ──────────────────────────────
+          Duas coisas na mesma linha: o rótulo da secção e «N por responder».
+          Sem `flex-wrap` elas apertavam-se uma contra a outra — e a largura em
+          que isso acontece não é a do ECRÃ, é a desta caixa: o cartão do evento
+          vive numa coluna que a barra lateral encolhe sem a janela encolher, e
+          o rótulo cresce com o texto que ela escrever. Um `sm:` respondia à
+          pergunta errada; `flex-wrap` sozinho responde à certa — «cabe?» — e a
+          contagem passa para a linha de baixo exactamente quando não cabe. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h3 className="text-foreground/70 text-[11px] uppercase tracking-[0.18em]">
           À escolha do casal
         </h3>
@@ -70,7 +78,10 @@ export default function EscolhasDoCasal({
 
       <ul className="mt-3 flex flex-col gap-3">
         {linhas.map(({ escolha, estado }) => (
-          <li key={escolha.id} className="rounded-lg border border-[var(--bo-hairline)] px-3 py-2.5">
+          <li
+            key={escolha.id}
+            className="rounded-lg border border-[var(--bo-hairline)] px-3 py-2.5"
+          >
             <p className="text-foreground/75 text-sm">{escolha.titulo}</p>
 
             {estado.tipo === "escolhida" && (

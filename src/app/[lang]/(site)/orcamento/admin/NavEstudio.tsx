@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
 
 /**
@@ -17,10 +17,43 @@ import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
  * que decide se o envio pode acontecer — para o aviso e o botão nunca poderem
  * discordar.
  *
- * ── Escondida no telemóvel ────────────────────────────────────────────────
- * Uma coluna lateral num ecrã de 375px é uma coluna a roubar metade da
- * largura ao trabalho. Abaixo de `xl` o estúdio fica como estava, e quem lá
- * navega tem os passos e o scroll.
+ * ── DUAS FORMAS, UM SÓ COMPONENTE ─────────────────────────────────────────
+ * Abaixo de `lg` isto é uma TIRA que se percorre na horizontal, por cima do
+ * primeiro campo; a partir de `lg` é a coluna de sempre, ao lado do trabalho.
+ * A troca é CSS puro — `overflow-x-auto` de um lado, `lg:flex-col` do outro —
+ * e é a mesma receita já demonstrada no `MoodBoardIndice`.
+ *
+ * Não é uma segunda instância com `lg:hidden`, e a distinção não é de gosto: o
+ * comentário de abertura do `useMedida.ts` conta o que acontece quando se
+ * desenham os dois — duas árvores montadas, cada uma com o seu estado, as duas
+ * a escrever na mesma chave, e ao rodar o telemóvel aparece a que ficou aberta.
+ * Este componente tem estado («onde estou», e o observador que o alimenta), por
+ * isso é exactamente o sítio onde esse defeito ia nascer. Uma árvore, uma
+ * resposta.
+ *
+ * ── O QUE A TIRA MOSTRA, E O QUE DEIXA DE FORA ────────────────────────────
+ * Um chip de ~150 px não é uma linha de 192 px com três andares. Fica:
+ *   · o NOME da secção — é por ele que se salta;
+ *   · a marca de preenchida (o ponto cheio), que é a resposta a «já fiz esta?»;
+ *   · a secção onde se está (`aria-current` + fundo), e a tira traz esse chip
+ *     para dentro da vista sozinha quando o scroll muda de secção;
+ *   · um ponto âmbar quando há traduções em falta — a frase inteira só cabe na
+ *     coluna, mas fica no `title` e no nome acessível, que é onde ela é
+ *     precisa. Isto não tinha substituto nenhum a 375 px.
+ * Sai o RESUMO («Ana e Rui», «2 grupos»): é contexto, não navegação, e duplica
+ * a largura do chip.
+ *
+ * ── E PORQUE É QUE A LISTA DO QUE FALTA NÃO DESCE ABAIXO DE `lg` ──────────
+ * Porque já tem quem a diga onde a pergunta se faz: o `PorqueNaoDaParaEnviar`
+ * põe as faltas que TRAVAM ao lado do botão de enviar, e cada linha salta para
+ * o campo. Repeti-la aqui era gastar altura permanente no ecrã mais apertado
+ * para dizer duas vezes a mesma coisa — e a segunda vez, longe do botão.
+ *
+ * ── E PORQUE É QUE A TIRA NÃO É `sticky` ──────────────────────────────────
+ * Porque a 375×667 o estúdio já paga o cabeçalho do back office, a navegação
+ * de baixo e a barra de envio — três bandas presas. Uma quarta, de 48 px,
+ * saía do que resta para escrever. A tira rola com a página, como a do
+ * `MoodBoardIndice`: custa altura UMA vez, no topo do passo, e não a cada ecrã.
  */
 
 interface Props {
@@ -49,8 +82,14 @@ interface Props {
   porTraduzir?: Record<string, number>;
 }
 
+/** «1 tradução em falta» / «3 traduções em falta» — escrito uma vez só. */
+function fraseDasTraducoes(n: number): string {
+  return n === 1 ? "1 tradução em falta" : `${n} traduções em falta`;
+}
+
 export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzir }: Props) {
   const [atual, setAtual] = useState<string | null>(null);
+  const listaRef = useRef<HTMLUListElement>(null);
 
   // ── Onde estou ────────────────────────────────────────────────────────
   // Um observador em vez de ouvir o scroll: dá a resposta sem correr código a
@@ -87,6 +126,27 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
     return () => observador.disconnect();
   }, [seccoes, onSeccaoActual]);
 
+  // ── A tira segue a leitura ─────────────────────────────────────────────
+  // Marcar o chip da secção actual não serve de nada se ele estiver fora da
+  // tira: a 375 px cabem dois ou três, e à quinta secção a marca vive num sítio
+  // que ninguém vê. Isto empurra a tira o mínimo para o trazer à vista.
+  //
+  // Mexe no `scrollLeft` da própria tira e em mais nada — nunca em
+  // `scrollIntoView`, que arrastava a PÁGINA para cima a meio de ela escrever.
+  // Na coluna (`lg`) não há o que rolar de lado e a guarda devolve-o logo; no
+  // jsdom, onde não há disposição, dá o mesmo e sai sem tocar em nada.
+  useEffect(() => {
+    const ul = listaRef.current;
+    if (!ul || ul.scrollWidth <= ul.clientWidth) return;
+    const i = seccoes.findIndex((s) => s.id === atual);
+    const chip = i >= 0 ? (ul.children[i] as HTMLElement | undefined) : undefined;
+    if (!chip) return;
+    const dele = chip.getBoundingClientRect();
+    const dela = ul.getBoundingClientRect();
+    if (dele.left < dela.left) ul.scrollLeft -= dela.left - dele.left;
+    else if (dele.right > dela.right) ul.scrollLeft += dele.right - dela.right;
+  }, [atual, seccoes]);
+
   function saltarPara(id: string) {
     const el = document.getElementById(`seccao-${id}`);
     if (!el) return;
@@ -103,36 +163,50 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
   return (
     <nav
       aria-label="Secções da proposta"
-      /* TECTO: é `sticky`, portanto uma lista mais alta do que o ecrã ficava
-         com o fim inalcançável — não se rola até ele, porque a coluna não
-         acompanha o rolo da página. Só age quando há secções e faltas que
-         cheguem; até lá não se nota. */
-      /* ── O ÍNDICE VOLTA AO PORTÁTIL ───────────────────────────────────
-         Era `xl:block` (1280). Abaixo disso não existia — e o que não existia
-         não era só o índice: era também a lista do que FALTA para poder
-         enviar, que vive no fim desta coluna. Num portátil de 1024–1440 (o
-         dela) escrevia-se a proposta inteira sem saber em que secção se está
-         nem o que ainda a trava, com a barra lateral já recolhida e os 192 px
-         desta coluna à espera. `lg:` é o corte da casa para «há espaço para
-         uma coluna ao lado» e é onde a barra lateral deixa de ser gaveta.
+      /* ── O ÍNDICE EXISTE EM TODAS AS LARGURAS ─────────────────────────
+         Era `xl:block` (1280), depois `hidden … lg:block` (1024). Abaixo de
+         1024 não existia de todo — e o que faltava a 375 px não era conforto:
+         era saber em que secção se está e quais já foram preenchidas, numa
+         página com cinco ecrãs e meio de rolo. `lg:` continua a ser o corte
+         de «há espaço para uma coluna AO LADO»; o que mudou é que abaixo dele
+         a resposta deixou de ser «nada» e passou a ser a tira.
 
-         Abaixo de 1024 continua a não existir, e é uma decisão POR TOMAR e não
-         um esquecimento: a versão de ecrã estreito deste índice tem de ser
-         desenhada (o `MoodBoardIndice` resolveu o mesmo problema com uma fila
-         horizontal que rola e `lg:flex-col`), e desenhá-la é escolha dela. */
-      className="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-48 shrink-0 self-start overflow-y-auto lg:block"
+         Sem `hidden`: a mesma árvore, desenhada de duas maneiras. A altura
+         que a tira custa está paga em `mb-2` + `pb-1` e mais nada — não é
+         `sticky`, pelas razões do cabeçalho do ficheiro.
+
+         TECTO, só em `lg`: aí é `sticky`, e uma lista mais alta do que o ecrã
+         ficava com o fim inalcançável, porque a coluna não acompanha o rolo
+         da página. Na tira não há altura para limitar. */
+      className="mb-2 lg:sticky lg:top-4 lg:mb-0 lg:max-h-[calc(100vh-2rem)] lg:w-48 lg:shrink-0 lg:self-start lg:overflow-y-auto"
     >
-      <ul className="flex flex-col gap-0.5">
+      {/* A tira rola de lado; a coluna empilha. Uma classe de cada lado do
+          corte, e o mesmo `<ul>` nos dois. */}
+      <ul
+        ref={listaRef}
+        className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0"
+      >
         {seccoes.map((s) => {
           const aqui = atual === s.id;
+          const porFazer = porTraduzir?.[s.id] ?? 0;
+          const frase = fraseDasTraducoes(porFazer);
           return (
-            <li key={s.id}>
+            <li key={s.id} className="shrink-0 lg:shrink">
               <button
                 type="button"
                 onClick={() => saltarPara(s.id)}
                 aria-current={aqui ? "true" : undefined}
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
-                  aqui ? "bg-[#4d6350]/[0.08]" : "hover:bg-foreground/[0.04]"
+                /* `alvo-toque` porque na tira isto passa a ser tocado com o
+                   dedo: 44×44 sob `(pointer: coarse)`, e no portátil fica
+                   exactamente com a altura que sempre teve.
+
+                   O fundo próprio existe só na tira: sem ele, chips separados
+                   por 6 px não se leem como coisas distintas. Em `lg` volta a
+                   ser transparente — a coluna é a de sempre, ao pixel. */
+                className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
+                  aqui
+                    ? "bg-[#4d6350]/[0.08]"
+                    : "bg-foreground/[0.04] hover:bg-foreground/[0.07] lg:bg-transparent lg:hover:bg-foreground/[0.04]"
                 }`}
               >
                 <span
@@ -147,21 +221,44 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                   >
                     {s.titulo}
                   </span>
-                  <span className="block truncate text-[10px] text-foreground/40">{s.resumo}</span>
+                  {/* O resumo é contexto, e contexto não cabe num chip: na tira
+                      dobrava a largura de cada entrada para dizer o que a
+                      secção já diz quando se lá chega. Fica na coluna. */}
+                  <span className="hidden truncate text-[10px] text-foreground/40 lg:block">
+                    {s.resumo}
+                  </span>
                   {/* ── O QUE FALTA TRADUZIR, AQUI ─────────────────────────
                       Linha própria e não colada ao resumo: a coluna tem 192 px
                       e o resumo já é `truncate` — «2 grupos · 2 traduções em
                       falta» sairia «2 grupos · 2 tradu…», que é a metade que
                       não interessa. E cor própria, a mesma do que está por
                       rever: é uma falta, não uma descrição. */}
-                  {(porTraduzir?.[s.id] ?? 0) > 0 && (
-                    <span className="block truncate text-[10px] text-[#8a6420]">
-                      {porTraduzir![s.id] === 1
-                        ? "1 tradução em falta"
-                        : `${porTraduzir![s.id]} traduções em falta`}
+                  {porFazer > 0 && (
+                    <span className="hidden truncate text-[10px] text-[#8a6420] lg:block">
+                      {frase}
                     </span>
                   )}
                 </span>
+                {/* ── A MESMA FALTA, DO TAMANHO QUE CABE NA TIRA ──────────────
+                    Um ponto âmbar, porque a frase não entra num chip. Mas o
+                    ponto NÃO é `aria-hidden`: leva a frase inteira como nome, e
+                    é assim que quem ouve fica a saber o mesmo que quem vê a cor.
+
+                    E é UMA frase, não duas. Uma cópia `sr-only` ao lado da linha
+                    escrita fazia a mesma falta ser contada duas vezes a quem
+                    ouve, em `lg`. Aqui cada largura tem exactamente um portador:
+                    abaixo de `lg` o ponto, a partir de `lg` a linha — o outro
+                    está `display:none`, que também o tira da árvore de
+                    acessibilidade. É a solução do `MoodBoardIndice`, pela mesma
+                    razão: a marca diz QUE falta sem a entrada crescer. */}
+                {porFazer > 0 && (
+                  <span
+                    role="img"
+                    aria-label={frase}
+                    title={frase}
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#c98a2e] lg:hidden"
+                  />
+                )}
               </button>
             </li>
           );
@@ -169,9 +266,16 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
       </ul>
 
       {/* O que falta. A cor separa o que TRAVA do que é conselho: laranja é
-          aviso, e o verde da marca está reservado à acção principal. */}
+          aviso, e o verde da marca está reservado à acção principal.
+
+          ── E SÓ A PARTIR DE `lg` ───────────────────────────────────────────
+          Não por caber mal — por já existir noutro sítio, melhor colocado: o
+          `PorqueNaoDaParaEnviar` põe o que TRAVA encostado ao botão de enviar,
+          com o mesmo salto para o campo. Duplicá-la aqui gastava altura
+          permanente no ecrã mais apertado da casa para dizer, mais longe do
+          botão, o que já está dito ao lado dele. */}
       {faltas.length > 0 && (
-        <div className="mt-4 border-t border-foreground/10 pt-3">
+        <div className="mt-4 hidden border-t border-foreground/10 pt-3 lg:block">
           {/*
            * ── «TALVEZ QUEIRA» NÃO QUERIA DIZER NADA ──────────────────────
            *

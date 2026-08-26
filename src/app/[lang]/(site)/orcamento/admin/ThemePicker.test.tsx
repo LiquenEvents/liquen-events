@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MAX_IMPORT_BATCH, THEME_PAGE_SIZE, type ThemeSummary } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import ThemePicker, { __resetThemePickerState } from "./ThemePicker";
+import { MARCA_DA_CAMADA } from "./useCamadaDeHistoria";
 
 /**
  * Rede de segurança do seletor da Biblioteca de Temas.
@@ -277,6 +278,25 @@ afterEach(() => {
   act(() => __resetThemePickerState());
   vi.unstubAllGlobals();
 });
+
+/**
+ * Faz o `useMedida` (e o `useAdaptativo` do `FolhaOuDialogo`) responderem que o
+ * ecrã é largo. Sem isto o jsdom não tem `matchMedia` nenhum, tudo dá `false` e
+ * o que se desenha é a FOLHA — que é o caso por omissão de propósito, mas não
+ * serve para afirmar nada sobre o computador.
+ */
+function ecraLargo() {
+  vi.stubGlobal(
+    "matchMedia",
+    (consulta: string) =>
+      ({
+        matches: true,
+        media: consulta,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+}
 
 /**
  * O botão de adicionar.
@@ -1009,12 +1029,161 @@ describe("a lista de temas não engole o ecrã", () => {
     expect(classes, "com `flex-wrap` no telemóvel volta a empilhar").not.toMatch(/(^|\s)flex-wrap/);
   });
 
-  it("e no computador voltam a quebrar, com tecto — rolar de lado com rato é mau", async () => {
+  it("e numa faixa larga voltam a quebrar, com tecto — rolar de lado com rato é mau", async () => {
     await comMuitos();
     const classes = lista().className;
-    expect(classes).toContain("sm:flex-wrap");
-    expect(classes).toMatch(/sm:max-h-\[\d+vh\]/);
-    expect(classes).toContain("sm:overflow-y-auto");
+    // A pergunta é «que largura tem ESTA coluna?» e não «que largura tem a
+    // janela?»: a partir de `lg` a coluna são 14 rem, e lá um `sm:` — que a
+    // essa altura está sempre ligado — decidia por uma largura que a coluna
+    // nunca teve.
+    expect(classes).toContain("@min-[26rem]:flex-wrap");
+    expect(classes).toContain("@min-[26rem]:overflow-y-auto");
+    // `dvh` e não `vh`: com a barra do Safari à vista, `vh` é maior do que o
+    // que se vê — o mesmo defeito que punha o rodapé por baixo dela.
+    expect(classes).toMatch(/@min-\[26rem\]:max-h-\[\d+dvh\]/);
+    expect(classes, "`vh` mede um ecrã que o Safari não mostra todo").not.toMatch(
+      /max-h-\[\d+vh\]/,
+    );
+  });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A COLUNA DOS TEMAS TEM TRÊS MEDIDAS, E DUAS NÃO SE VÊEM DA JANELA
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * A coluna é uma FAIXA por cima das fotos com 100% do painel enquanto for
+   * faixa, e passa a 14 rem quando vira coluna lateral. A partir de `lg` — ou
+   * seja, precisamente quando ela é mais ESTREITA do que nunca — todas as
+   * variantes `sm:` lá dentro estão ligadas, porque `sm:` só pergunta se a
+   * JANELA tem 640 px. Uma delas era `sm:max-w-xs`: um tecto de 20 rem dentro
+   * de uma coluna de 14, ou seja uma regra que nunca chegou a fazer nada.
+   *
+   * Estas três medidas são as que existem de verdade. O jsdom não avalia
+   * `@container` nenhum, por isso o teste resolve as classes como o navegador
+   * faria e afirma a FORMA que sai de cada uma.
+   */
+  describe("as três medidas da coluna dos temas", () => {
+    /** Faixa estreita, faixa larga, coluna lateral. */
+    const FAIXA_ESTREITA = { janela: 390, coluna: 390 };
+    const FAIXA_LARGA = { janela: 900, coluna: 768 };
+    const COLUNA_LATERAL = { janela: 1120, coluna: 14 * 16 };
+
+    type Medida = { janela: number; coluna: number };
+
+    /** Os utilitários em vigor nesta medida. Uma variante desconhecida REBENTA
+     *  em vez de ser ignorada em silêncio — é assim que um `md:` diz o nome. */
+    function efectivas(className: string, m: Medida): Set<string> {
+      const fora = new Set<string>();
+      for (const classe of className.split(/\s+/).filter(Boolean)) {
+        const partes: string[] = [];
+        let actual = "";
+        let dentro = 0;
+        for (const c of classe) {
+          if (c === "[" || c === "(") dentro++;
+          else if (c === "]" || c === ")") dentro--;
+          if (c === ":" && dentro === 0) {
+            partes.push(actual);
+            actual = "";
+            continue;
+          }
+          actual += c;
+        }
+        partes.push(actual);
+        const utilitario = partes.pop()!;
+        if (partes.every((v) => ligada(v, m))) fora.add(utilitario);
+      }
+      return fora;
+    }
+
+    function ligada(v: string, m: Medida): boolean {
+      if (v === "sm") return m.janela >= 640;
+      if (v === "lg") return m.janela >= 1024;
+      const doContentor = /^@min-\[(\d+(?:\.\d+)?)rem\]$/.exec(v);
+      if (doContentor) return m.coluna >= Number(doContentor[1]) * 16;
+      if (/^\[.*\]$/.test(v)) return true;
+      throw new Error(`variante \`${v}:\` desconhecida na coluna dos temas`);
+    }
+
+    async function classes() {
+      route("GET /api/temas", () => ok(muitos));
+      await openPicker(true);
+      const fila = lista();
+      return {
+        fila: fila.className,
+        // A linha que segura a lupa/caixa de procurar E a fila de chips.
+        linha: fila.parentElement!.className,
+      };
+    }
+
+    /**
+     * ── O QUE FAZ DESTE TESTE UM TESTE ────────────────────────────────────
+     *
+     * A coluna lateral é a medida mais ESTREITA das três (14 rem) e a janela
+     * mais LARGA (1120). Uma regra que pergunte pela janela responde-lhe como
+     * se ela tivesse 1120 px de largo. Aqui afirma-se o contrário: a coluna
+     * lateral empilha, como a faixa larga — e por ser estreita e alta, não por
+     * a janela ser grande.
+     */
+    it("empilha na faixa larga E na coluna lateral; só a faixa estreita rola de lado", async () => {
+      const { fila, linha } = await classes();
+
+      // Faixa estreita: uma fila que rola de lado, para os chips não comerem a
+      // altura que é das fotografias.
+      expect(efectivas(fila, FAIXA_ESTREITA)).toContain("overflow-x-auto");
+      expect(efectivas(fila, FAIXA_ESTREITA)).not.toContain("flex-wrap");
+      expect(efectivas(linha, FAIXA_ESTREITA)).not.toContain("flex-col");
+
+      // Faixa larga: os chips quebram e a caixa de procurar vive por cima.
+      expect(efectivas(fila, FAIXA_LARGA)).toContain("flex-wrap");
+      expect(efectivas(fila, FAIXA_LARGA)).toContain("overflow-y-auto");
+      expect(efectivas(linha, FAIXA_LARGA)).toContain("flex-col");
+
+      // Coluna lateral: um tema por linha, com o scroll dela e sem tecto.
+      const naColuna = efectivas(fila, COLUNA_LATERAL);
+      expect(naColuna).toContain("flex-col");
+      expect(naColuna).toContain("flex-nowrap");
+      expect(naColuna).toContain("overflow-y-auto");
+      expect(naColuna).toContain("max-h-none");
+      expect(efectivas(linha, COLUNA_LATERAL)).toContain("flex-col");
+    });
+
+    /**
+     * A ponta que fecha o par, e a que falha primeiro se alguém repuser um
+     * `sm:`. Dentro desta coluna sobra UMA pergunta legítima sobre a janela: o
+     * `lg:`, que não é uma largura mas a MUDANÇA DE FORMA (faixa → coluna) e
+     * está sincronizado com o salto do painel para as 70 rem. Qualquer outra
+     * — um `sm:`, um `min-[…]px:` — está a medir a janela para responder por
+     * uma coluna que pode ter 14 rem.
+     */
+    it("dentro da coluna, a única pergunta sobre a janela é a mudança de forma", async () => {
+      const { fila, linha } = await classes();
+      const cadeias = [fila, linha];
+      for (const cadeia of cadeias) {
+        const daJanela = cadeia.split(/\s+/).filter((c) => /^(sm|min-\[[^\]]+\]):/.test(c));
+        expect(daJanela, `\`${cadeia}\` mede a janela dentro de uma coluna`).toEqual([]);
+      }
+    });
+
+    /**
+     * A regra morta. `max-w-xs` são 20 rem; a coluna lateral tem 14. Estava
+     * escrita, lia-se como uma decisão, e não limitava nada — é o género de
+     * linha que sobrevive a três refactorizações porque nunca fez diferença
+     * nenhuma.
+     */
+    it("o tecto de 20 rem da caixa de procurar só existe onde há 20 rem", async () => {
+      route("GET /api/temas", () => ok(muitos));
+      await openPicker(true);
+      fireEvent.click(screen.getByRole("button", { name: "Procurar tema" }));
+      const caixa = screen.getByLabelText("Procurar tema").parentElement!.className;
+
+      expect(efectivas(caixa, FAIXA_LARGA)).toContain("max-w-xs");
+      expect(
+        efectivas(caixa, COLUNA_LATERAL),
+        "20 rem dentro de 14 é uma regra que nunca faz nada",
+      ).not.toContain("max-w-xs");
+      // Mas a caixa continua a ocupar a coluna toda, que é o que lá interessa.
+      expect(efectivas(caixa, COLUNA_LATERAL)).toContain("w-full");
+    });
   });
 
   it("os quarenta continuam todos lá — a fila não corta nenhum", async () => {
@@ -1083,13 +1252,195 @@ describe("a lista de temas não engole o ecrã", () => {
     }
   });
 
-  it("as fotos abrem a DUAS colunas no telemóvel, e a cinco no computador", async () => {
-    await comMuitos();
-    const grelha = screen.getByRole("button", { name: /^Foto 1 de/ }).closest(".grid")!;
-    // Três colunas a 390 px dão 111 px por foto — pequeno de mais para
-    // escolher decoração.
-    expect(grelha.className).toMatch(/(^|\s)grid-cols-2(\s|$)/);
-    expect(grelha.className).toContain("sm:grid-cols-5");
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A GRELHA MEDE A ZONA DAS FOTOS, E NÃO A JANELA
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * Este era o pior defeito do seletor, e mede-se em píxeis. Com
+   * `grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-5`, num iPad ao alto:
+   *
+   *   · a 639 px de janela o painel é full-bleed, a grelha tem 599 px e três
+   *     colunas — fotos de 194 px;
+   *   · a 641 px entrava o `sm:p-6`, o painel encolhia para 593, a grelha para
+   *     553, e o `sm:` mandava CINCO colunas — fotos de 102 px.
+   *
+   * A janela cresceu dois píxeis, a ZONA DAS FOTOS encolheu 46, e as
+   * fotografias ficaram com metade. É a inversão que estes testes prendem — e
+   * a razão de ela deixar de existir não é um número mais bem escolhido: é que
+   * a grelha deixou de fazer a pergunta errada.
+   *
+   * ── PORQUE É QUE O TESTE RESOLVE AS CLASSES À MÃO ─────────────────────────
+   *
+   * O jsdom não faz disposição e não avalia `@media` nem `@container`:
+   * renderizar a 639 e a 641 dá o mesmo DOM com a mesma `className`. Um teste
+   * que se ficasse pelo `toContain("grid-cols-2")` afirmava a ORTOGRAFIA da
+   * classe e passava na mesma com um `sm:grid-cols-5` ao lado — que é
+   * precisamente o defeito a apanhar. Por isso o resolvedor abaixo faz o que o
+   * navegador faria, e devolve PÍXEIS. É a mesma escolha do
+   * `Cortes.movel.test.tsx`.
+   */
+  describe("as miniaturas, em píxeis", () => {
+    /** `px-5` de cada lado do invólucro que rola, e `gap-2` entre células. */
+    const MARGEM = 20 * 2;
+    const FOLGA = 8;
+    const REM = 16;
+
+    /** As duas réguas, e o ponto todo é que são duas. */
+    type Medida = { janela: number; contentor: number };
+
+    /** Os utilitários que estão MESMO a valer nesta medida. */
+    function activas(className: string, m: Medida): string[] {
+      const fora: string[] = [];
+      for (const classe of className.split(/\s+/).filter(Boolean)) {
+        // Não partir os dois pontos que vivem DENTRO de um valor arbitrário.
+        const partes: string[] = [];
+        let actual = "";
+        let dentro = 0;
+        for (const c of classe) {
+          if (c === "[" || c === "(") dentro++;
+          else if (c === "]" || c === ")") dentro--;
+          if (c === ":" && dentro === 0) {
+            partes.push(actual);
+            actual = "";
+            continue;
+          }
+          actual += c;
+        }
+        partes.push(actual);
+        const utilitario = partes.pop()!;
+        if (partes.every((v) => ligada(v, m))) fora.push(utilitario);
+      }
+      return fora;
+    }
+
+    function ligada(variante: string, m: Medida): boolean {
+      if (variante === "sm") return m.janela >= 640;
+      if (variante === "lg") return m.janela >= 1024;
+      // `@min-[26rem]:` — a ZONA. É esta que decide a grelha.
+      const doContentor = /^@min-\[(\d+(?:\.\d+)?)rem\]$/.exec(variante);
+      if (doContentor) return m.contentor >= Number(doContentor[1]) * REM;
+      // `min-[480px]:` — a JANELA, sem `@`. Era o limiar inventado.
+      const daJanela = /^min-\[(\d+(?:\.\d+)?)px\]$/.exec(variante);
+      if (daJanela) return m.janela >= Number(daJanela[1]);
+      if (/^\[.*\]$/.test(variante)) return true;
+      throw new Error(`variante \`${variante}:\` desconhecida na grelha das fotos`);
+    }
+
+    /** Quantas colunas a grelha desenha nesta medida. */
+    function colunas(className: string, m: Medida): number {
+      const util = activas(className, m)
+        .filter((c) => c.startsWith("grid-cols-"))
+        .pop();
+      if (!util) throw new Error("a grelha não declara colunas nenhumas");
+      const fixas = /^grid-cols-(\d+)$/.exec(util);
+      if (fixas) return Number(fixas[1]);
+      // `grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]`: tantas quantas caibam
+      // com esse mínimo. É a conta que o `auto-fill` faz.
+      const fluida = /^grid-cols-\[repeat\(auto-fill,minmax\((\d+(?:\.\d+)?)rem,1fr\)\)\]$/.exec(
+        util,
+      );
+      if (!fluida) throw new Error(`colunas por decifrar: ${util}`);
+      const minimo = Number(fluida[1]) * REM;
+      const largura = m.contentor - MARGEM;
+      return Math.max(1, Math.floor((largura + FOLGA) / (minimo + FOLGA)));
+    }
+
+    /** O lado de uma miniatura, em píxeis. */
+    function miniatura(className: string, m: Medida): number {
+      const n = colunas(className, m);
+      return (m.contentor - MARGEM - FOLGA * (n - 1)) / n;
+    }
+
+    const classeDaGrelha = async () => {
+      await comMuitos();
+      return screen.getByRole("button", { name: /^Foto 1 de/ }).closest(".grid")!.className;
+    };
+
+    /** O resolvedor a sério, senão o resto passava por vacuidade. */
+    it("o resolvedor separa a régua da janela da régua da zona", () => {
+      const c = "grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-5";
+      expect(colunas(c, { janela: 400, contentor: 400 })).toBe(2);
+      expect(colunas(c, { janela: 480, contentor: 480 })).toBe(3);
+      expect(colunas(c, { janela: 640, contentor: 200 })).toBe(5);
+      const fluida = "grid-cols-2 @min-[26rem]:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]";
+      // 416 de zona → 376 de grelha → (376+8)/(144+8) = 2,5 → duas.
+      expect(colunas(fluida, { janela: 320, contentor: 416 })).toBe(2);
+      // E a janela não lhe diz nada: a mesma zona dá o mesmo, a 320 ou a 1440.
+      expect(colunas(fluida, { janela: 1440, contentor: 416 })).toBe(2);
+    });
+
+    /**
+     * ── O TESTE QUE IMPORTA ────────────────────────────────────────────────
+     *
+     * As duas medidas do iPad ao alto, com os números do defeito. Repare-se em
+     * qual é qual: a zona MAIS ESTREITA (553 de grelha) é a da janela MAIS
+     * LARGA (641). Uma grelha que pergunte pela janela pode responder «mais
+     * colunas» a uma zona que encolheu; uma que pergunte pela zona não pode.
+     */
+    it("a zona encolher nunca dá MAIS colunas — era 3 → 5 com 46 px a menos", async () => {
+      const classe = await classeDaGrelha();
+      const antes = { janela: 639, contentor: 599 + MARGEM };
+      const depois = { janela: 641, contentor: 553 + MARGEM };
+      expect(depois.contentor).toBeLessThan(antes.contentor);
+      expect(colunas(classe, depois)).toBeLessThanOrEqual(colunas(classe, antes));
+    });
+
+    /**
+     * E o mesmo dito no que se vê: a miniatura não pode cair para metade.
+     * `9rem` é o mínimo declarado na grelha — o `auto-fill` acrescenta uma
+     * coluna em vez de descer abaixo dele, e é isso que põe um CHÃO onde antes
+     * não havia nenhum. Os 102 px de 641 estavam 42 abaixo deste chão.
+     */
+    it("e a miniatura tem um CHÃO — os 102 px estavam 34 abaixo do mais baixo", async () => {
+      const classe = await classeDaGrelha();
+      // Dois chãos, um por regime, e os dois muito acima dos 102 px do defeito:
+      //   · abaixo de 26 rem de zona são duas colunas fixas, e o pior caso é o
+      //     ecrã mais estreito que existe (320) — 136 px por foto;
+      //   · daí para cima o `auto-fill` acrescenta uma coluna em vez de descer
+      //     abaixo do mínimo declarado, 9 rem.
+      const chaoDe = (contentor: number) => (contentor < 26 * REM ? 8.5 : 9) * REM;
+      // Da folha num iPhone SE (320) ao painel de 70 rem com a coluna dos temas
+      // ao lado (1120 − 224 = 896), de dois em dois píxeis. E com janelas que
+      // não têm nada a ver com a zona: é isso que uma folha faz.
+      for (let contentor = 320; contentor <= 896; contentor += 2) {
+        for (const janela of [contentor, 639, 641, 1024, 1440]) {
+          const px = miniatura(classe, { janela, contentor });
+          expect(px, `zona de ${contentor} px numa janela de ${janela}`).toBeGreaterThanOrEqual(
+            chaoDe(contentor),
+          );
+        }
+      }
+    });
+
+    /**
+     * A ponta que fecha o par. Sem isto, alguém repõe um `sm:grid-cols-5` ao
+     * lado do `@min-[26rem]:` e os dois testes de cima continuam verdes na
+     * maior parte das medidas — foi assim que este defeito viveu tanto tempo.
+     */
+    it("a grelha não faz uma única pergunta sobre a janela", async () => {
+      const classe = await classeDaGrelha();
+      const variantes = classe
+        .split(/\s+/)
+        .filter((c) => c.includes("grid-cols-"))
+        .flatMap((c) => c.split(":").slice(0, -1));
+      for (const v of variantes) {
+        expect(v, `\`${v}:\` mede a janela; a grelha vive numa zona`).toMatch(/^@/);
+      }
+      // E a zona tem de EXISTIR, senão a consulta não tem sobre o que medir.
+      const grelha = screen.getByRole("button", { name: /^Foto 1 de/ }).closest(".grid")!;
+      expect(grelha.closest(".\\@container")).toBeTruthy();
+    });
+
+    /** Num telemóvel são sempre duas: três a 390 px dão 111 px por foto,
+     *  pequeno de mais para escolher decoração — e deixar a grelha fluir num
+     *  ecrã de 320 dava UMA coluna gigante. */
+    it("num telemóvel são duas colunas, e não uma nem três", async () => {
+      const classe = await classeDaGrelha();
+      for (const contentor of [320, 375, 390, 414]) {
+        expect(colunas(classe, { janela: contentor, contentor })).toBe(2);
+      }
+    });
   });
 });
 
@@ -1261,14 +1612,85 @@ describe("os chips lêem-se", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O GESTO DE VOLTAR FECHA A FOLHA — E NÃO O BACK OFFICE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este é o achado mais grave da folha escrita à mão, e o mais barato de
+ * corrigir. Num iPhone, deslizar da esquerda É o botão de voltar: numa quinta,
+ * com o telemóvel numa mão e uma caixa de flores na outra, faz-se por acidente.
+ * Sem uma entrada na história, o Safari SAÍA DA APLICAÇÃO — e levava com ele a
+ * selecção de fotos que estava a meio.
+ *
+ * O `FolhaOuDialogo` empilha uma entrada por camada aberta; a folha escrita à
+ * mão não empilhava nenhuma. É a diferença entre o gesto fechar o seletor e o
+ * gesto fechar o back office.
+ *
+ * O jsdom não tem gesto nenhum, mas tem os dois que interessam: `pushState` e o
+ * `popstate` que o gesto dispara. É contra esses que se prende — como no
+ * `useCamadaDeHistoria.test.tsx`.
+ */
+describe("o gesto de voltar do iPhone", () => {
+  /** O jsdom anda na história numa tarefa sua; um tique de zero não a apanha. */
+  const esperarUmTique = () => new Promise((r) => setTimeout(r, 20));
+
+  beforeEach(async () => {
+    await esperarUmTique();
+    window.history.replaceState(null, "");
+  });
+
+  it("empilha uma entrada enquanto o seletor está aberto", async () => {
+    expect(window.history.state?.[MARCA_DA_CAMADA]).toBeUndefined();
+    await openPicker(true);
+    // Sem esta entrada não há nada para o gesto consumir, e o que ele consome
+    // a seguir é a página do back office. O que se lê é a MARCA da camada e
+    // não o comprimento da história: o comprimento não volta atrás e os
+    // testes deste ficheiro partilham uma janela só.
+    expect(typeof window.history.state?.[MARCA_DA_CAMADA]).toBe("number");
+  });
+
+  it("fecha o seletor em vez de sair do back office", async () => {
+    await openPicker(true);
+    // Uma escolha por gravar: é isto que o gesto levava com ele.
+    fireEvent.click(photo(1));
+    expect(screen.getByText("1 foto selecionada")).toBeInTheDocument();
+
+    await act(async () => {
+      window.history.back();
+      await esperarUmTique();
+    });
+
+    expect(onClose, "o gesto tem de fechar ISTO, e não a aplicação").toHaveBeenCalled();
+  });
+});
+
 describe("fechar sem ser pelo ×", () => {
   it("há uma pega para arrastar, e só no telemóvel", async () => {
     const { container } = await openPicker(true);
     const pega = container.querySelector(".cursor-grab");
     expect(pega, "a única saída era o × no canto mais longe do polegar").toBeTruthy();
-    expect(pega!.className).toContain("sm:hidden");
     // `touch-none` para o browser não tratar o arrasto como rolagem.
     expect(pega!.className).toContain("touch-none");
+  });
+
+  /**
+   * O «só no telemóvel» deixou de ser um `sm:hidden` e passou a ser uma
+   * decisão do `FolhaOuDialogo`: no computador a pega NÃO EXISTE, em vez de
+   * existir escondida. É a mesma promessa (arrastar um diálogo ao centro para
+   * baixo não quer dizer nada) com uma garantia mais forte — um `sm:hidden`
+   * continua a apanhar toques de um ponteiro que lá chegue.
+   *
+   * As duas saídas de sempre continuam lá, e são elas que fazem do gesto um
+   * atalho e não a única porta.
+   */
+  it("no computador não há pega nenhuma — e o × e o Esc continuam lá", async () => {
+    ecraLargo();
+    const { container } = await openPicker(true);
+    expect(container.querySelector(".cursor-grab")).toBeNull();
+    expect(screen.getByRole("button", { name: "Fechar" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("arrastar para baixo o suficiente fecha o painel", async () => {
@@ -1400,6 +1822,29 @@ describe("o painel a 390 px", () => {
     expect(contagem.closest("div")?.className).toContain("basis-full");
   });
 
+  /**
+   * A QUEBRA NÃO SE DESFAZ AOS 640 PX.
+   *
+   * Era `basis-full sm:basis-auto` no texto e `w-full ... sm:w-auto
+   * sm:flex-nowrap` nos botões: a 641 px o painel tem 553, e o `sm:` tirava a
+   * quebra de linha exactamente onde ela fazia falta — a contagem e três
+   * botões na mesma fila, com o texto a ser o único que encolhe.
+   *
+   * A janela não é o rodapé. Sem uma única variante de ecrã, a quebra fica de
+   * pé em todas as larguras, e é a `basis-full` que diz quem toma a linha.
+   */
+  it("e nenhuma variante de ecrã a desfaz aos 640 px", async () => {
+    await openPicker(true);
+    const contagem = screen.getByText("Escolhe pelo menos uma foto.").closest("div")!;
+    const botoes = screen.getByRole("button", { name: "Cancelar" }).closest("div")!;
+    for (const el of [contagem, botoes]) {
+      const comEcra = el.className.split(/\s+/).filter((c) => /^(sm|lg|min-\[[^\]]+\]):/.test(c));
+      expect(comEcra, `\`${el.className}\` volta a perguntar pela janela`).toEqual([]);
+    }
+    expect(contagem.className).toContain("basis-full");
+    expect(botoes.className).toContain("w-full");
+  });
+
   it("e a frase inteira está lá — não uma palavra cortada", async () => {
     await openPicker(true);
     // O controlo positivo do de cima: a frase que era cortada. Hoje é outra
@@ -1443,18 +1888,24 @@ describe("o painel a 390 px", () => {
   it("o fundo separa o painel da página, em vez de a deixar ler", async () => {
     await openPicker(true);
     const dialogo = screen.getByRole("dialog", { name: /biblioteca de temas/i });
-    const fundo = dialogo.parentElement!;
-    expect(fundo.className, "`black/35` deixava o cabeçalho legível por trás").toContain(
-      "bg-black/50",
+    // O véu é do `FolhaOuDialogo` e é um irmão do painel, não a camada que o
+    // contém: um `backdrop-blur` no PAI desfocava também o painel.
+    const veu = dialogo.parentElement!.querySelector("[aria-hidden]")!;
+    expect(veu.className, "`black/35` deixava o cabeçalho legível por trás").toContain(
+      "backdrop-blur",
     );
-    expect(fundo.className).toContain("backdrop-blur");
+    // Escuro que chegue para o título «Fazer proposta» deixar de se ler nítido
+    // por trás da folha.
+    expect(veu.className).toMatch(/bg-\[#1b2119\]\/40/);
   });
 
   it("e o rodapé não fica debaixo da barra de gestos do iPhone", async () => {
     await openPicker(true);
     const contagem = screen.getByText("Escolhe pelo menos uma foto.");
     const linha = contagem.closest("div")?.parentElement as HTMLElement;
-    expect(linha.style.paddingBottom).toContain("safe-area-inset-bottom");
+    // Deixou de ser um `style` escrito à mão e passou a vir do primitivo, que
+    // o dá a TODAS as folhas — era isto que faltava às outras seis.
+    expect(linha.className).toContain("env(safe-area-inset-bottom)");
   });
 
   /**
@@ -1537,11 +1988,17 @@ describe("o seletor a partir de 1024 px", () => {
   });
 
   it("o painel abre mais largo, para a coluna não roubar à grelha", async () => {
+    // No computador é um DIÁLOGO ao centro, e é aí que a largura máxima existe
+    // — a folha do telemóvel usa o ecrã todo e não tem tecto nenhum.
+    ecraLargo();
     await openPicker(true);
     const painel = screen.getByRole("dialog");
     expect(painel.className).toContain("lg:max-w-[70rem]");
     // Abaixo de `lg` fica como estava.
     expect(painel.className).toContain("max-w-3xl");
+    // E NÃO o degrau `lg` do primitivo (56 rem): com a coluna de 14 rem a
+    // grelha ficava com 42, que é o defeito que esta largura veio corrigir.
+    expect(painel.className.split(/\s+/)).not.toContain("max-w-4xl");
   });
 
   it("e cada tema ocupa a linha toda, encostado à esquerda", async () => {
@@ -1643,20 +2100,6 @@ describe("por que tema é que o diálogo abre", () => {
  * para fazer scroll para cima e para baixo».
  */
 describe("escolher um tema no computador", () => {
-  /** Faz o `useMedida` responder que o ecrã é largo. */
-  function ecraLargo() {
-    vi.stubGlobal(
-      "matchMedia",
-      (consulta: string) =>
-        ({
-          matches: true,
-          media: consulta,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList,
-    );
-  }
-
   it("a caixa de procurar está à vista, sem ser preciso encontrar a lupa", async () => {
     /**
      * Não era «às vezes»: no computador nunca aparecia sozinha. O comentário
@@ -1711,5 +2154,47 @@ describe("escolher um tema no computador", () => {
       emFalta,
       "um `flex` sem `min-h-0` entre a lista e a coluna: a altura não desce e a lista deixa de rolar",
     ).toEqual([]);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O NOME DA FOLHA DIZ PARA QUE SERVE **E** EM QUE TEMA SE ESTÁ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * É a primeira coisa que um leitor de ecrã anuncia ao abrir isto, e é a única
+ * que anuncia — depois dela vem uma grelha de «Foto 1 de 12».
+ *
+ * Já esteve errado das duas maneiras possíveis, o que é a razão de haver aqui
+ * um teste e não só um comentário:
+ *
+ *   · uma `aria-label` fixa («Escolher fotos da biblioteca de temas») dizia o
+ *     TRABALHO e nunca o tema — e era uma cópia paralela do cabeçalho, que
+ *     ninguém se lembrava de actualizar;
+ *   · o cabeçalho que a substituiu («Biblioteca de temas» + o tema) dizia o
+ *     TEMA e deixou de dizer o trabalho.
+ *
+ * As duas metades, e vindas do texto que está mesmo escrito no cabeçalho.
+ */
+describe("o nome acessível da folha", () => {
+  it("junta o trabalho ao tema activo, a partir do texto visível", async () => {
+    await openPicker(true);
+    const folha = screen.getByRole("dialog");
+    const nome = (folha.getAttribute("aria-labelledby") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent ?? "")
+      .join(" ");
+
+    expect(nome, "o nome não diz para que serve a folha").toMatch(
+      /Escolher fotos da biblioteca de temas/i,
+    );
+    expect(nome, "o nome não diz em que tema se está").toMatch(new RegExp(THEME.name));
+
+    // E é MESMO o texto visível: nada de `aria-label` paralela por cima dele.
+    expect(folha.getAttribute("aria-label")).toBeNull();
+    for (const pedaco of ["Escolher fotos da biblioteca de temas", THEME.name]) {
+      expect(within(folha).getAllByText(pedaco).length).toBeGreaterThan(0);
+    }
   });
 });

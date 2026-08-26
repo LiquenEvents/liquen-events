@@ -302,10 +302,10 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
     : "";
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-[640px] bg-background pb-28">
+    <div className="mx-auto min-h-dvh w-full max-w-[640px] bg-white pb-28">
       {/* Cabeçalho fixo: o contador é a única coisa que se olha a meio do
           carregamento, por isso nunca sai do ecrã. */}
-      <header className="sticky top-0 z-10 border-b border-foreground/10 bg-background/95 px-4 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-foreground/10 bg-white/95 px-4 py-3 backdrop-blur">
         <p className="truncate text-sm text-foreground/70">{titulo}</p>
         <p className="text-2xl font-medium tabular-nums">
           {p.carregados} <span className="text-foreground/45">de {p.total}</span>{" "}
@@ -403,7 +403,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         <div role="group" aria-label="Material a carregar">
           {porCategoria.map(([categoria, linhas]) => (
             <section key={categoria}>
-              <h2 className="sticky top-[132px] bg-background/95 px-4 py-2 text-[11px] tracking-[0.14em] text-foreground/55 uppercase backdrop-blur">
+              <h2 className="sticky top-[132px] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-foreground/55 uppercase backdrop-blur">
                 {categoria}
               </h2>
               <ul>
@@ -460,7 +460,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
       {/* Barra fixa: o gesto que fecha o carregamento fica sempre ao alcance do
           polegar, sem ter de rolar até ao fim de 41 linhas. */}
       {itens.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-foreground/10 bg-background/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-foreground/10 bg-white/95 p-4 backdrop-blur">
           {fechada ? (
             /* O DESFECHO À VISTA, e uma saída.
                Uma acção que não deixa marca é indistinguível de uma que não

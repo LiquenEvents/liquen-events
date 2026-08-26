@@ -103,6 +103,33 @@ describe("o que ela lê", () => {
   });
 });
 
+describe("o cabeçalho embrulha quando não cabe", () => {
+  /**
+   * A linha tem duas coisas — «À escolha do casal» e «N por responder» — e
+   * vivia num `flex … justify-between` SEM `flex-wrap`: com um nome comprido, a
+   * 375 px os dois lados apertavam-se um contra o outro.
+   *
+   * E a pergunta não é sobre o ECRÃ. Este cartão vive numa coluna que a barra
+   * lateral encolhe sem a janela encolher — um `sm:` respondia à pergunta
+   * errada. `flex-wrap` sozinho responde à certa: «cabe nesta caixa?».
+   */
+  const linhaDoTitulo = () => screen.getByText("À escolha do casal").parentElement!;
+
+  it("os dois lados passam de linha em vez de se apertarem", () => {
+    render(<EscolhasDoCasal escolhas={ESCOLHAS} respostas={[]} />);
+    const classes = linhaDoTitulo().className.split(/\s+/);
+    expect(classes).toContain("flex");
+    expect(classes).toContain("flex-wrap");
+  });
+
+  it("e embrulha em TODAS as larguras — a decisão é da caixa, não do ecrã", () => {
+    render(<EscolhasDoCasal escolhas={ESCOLHAS} respostas={[]} />);
+    // Um `sm:flex-wrap` (ou um `lg:flex-nowrap`) seria a mesma medida presa a
+    // uma largura de janela que não é a que aperta a linha.
+    expect(linhaDoTitulo().className).not.toMatch(/:flex-(wrap|nowrap)\b/);
+  });
+});
+
 describe("zero rastreio, também deste lado", () => {
   it("não há hora nenhuma no ecrã — só o dia", () => {
     // A hora a que o casal decidiu não é conta nossa.

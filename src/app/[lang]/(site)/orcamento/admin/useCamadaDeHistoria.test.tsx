@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render } from "@testing-library/react";
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { MARCA_DA_CAMADA, useCamadaDeHistoria } from "./useCamadaDeHistoria";
 
 /**
@@ -211,5 +211,62 @@ describe("uma camada com guarda", () => {
     // Sem o rearmar, este gesto saía do back office.
     const marca = window.history.state?.[MARCA_DA_CAMADA];
     expect(typeof marca, "a camada ficou sem entrada na história").toBe("number");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DESMONTAR E VOLTAR A MONTAR NÃO PODE FECHAR A CAMADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO no seletor de fotos contra `next dev`: a folha abria e fechava-se
+ * sozinha no mesmo instante, e o passeio (`e2e/temas.spec.ts`,
+ * `e2e/biblioteca-temas.spec.ts`) via um diálogo que «não existe». Um
+ * `MutationObserver` no browser apanhou a coisa inteira: DIÁLOGO ENTROU →
+ * POPSTATE → DIÁLOGO SAIU, em três milissegundos.
+ *
+ * A causa é o Modo Estrito do React, que em desenvolvimento monta, desmonta e
+ * volta a montar cada componente — precisamente para apanhar efeitos que não
+ * sobrevivem a isso. Este não sobrevivia: a limpeza pedia `history.back()`, o
+ * `popstate` dele é assíncrono, e a segunda montagem empilhava JÁ uma segunda
+ * entrada. O `back()` chegava depois e caía na entrada da PRIMEIRA — número
+ * mais baixo do que o da segunda —, e a camada lia isso como «a minha entrada
+ * foi consumida».
+ *
+ * Só se via em desenvolvimento, e era em desenvolvimento que os passeios
+ * corriam. Notar quem NÃO era apanhado: os diálogos que ficam montados sempre
+ * e só alternam `aberta` — o efeito deles não é uma montagem, portanto o Modo
+ * Estrito não o desdobra. Era só quem nasce ao abrir, como o seletor de fotos.
+ */
+describe("uma camada que monta duas vezes (Modo Estrito)", () => {
+  it("fica aberta, e com UMA entrada só na história", async () => {
+    const aoFechar = vi.fn();
+    const empurrar = vi.spyOn(window.history, "pushState");
+    const { getByRole } = render(
+      <StrictMode>
+        <Camada aoFechar={aoFechar} />
+      </StrictMode>,
+    );
+    await assentar();
+
+    expect(aoFechar, "a camada fechou-se sozinha ao voltar a montar").not.toHaveBeenCalled();
+    expect(getByRole("button").textContent).toBe("aberta");
+    // UMA entrada empurrada: a segunda montagem reaproveita a que ainda lá
+    // está. Duas seriam dois gestos de voltar para sair de uma folha só.
+    expect(empurrar).toHaveBeenCalledTimes(1);
+    expect(typeof window.history.state?.[MARCA_DA_CAMADA]).toBe("number");
+    empurrar.mockRestore();
+  });
+
+  it("e o gesto de voltar continua a fechá-la, uma vez só", async () => {
+    const aoFechar = vi.fn();
+    render(
+      <StrictMode>
+        <Camada aoFechar={aoFechar} />
+      </StrictMode>,
+    );
+    await assentar();
+    await gestoDeVoltar();
+    expect(aoFechar).toHaveBeenCalledTimes(1);
   });
 });

@@ -71,11 +71,14 @@ const TECTO_POR_TRATAR = new Map<string, number>([
   // O painel de detalhe do pedido (`xl:grid-cols`, `xl:hidden`, `xl:sticky`) e
   // a palavra «Pesquisar» do atalho (`hidden md:inline`).
   ["AdminClient.tsx", 4],
-  // O par PT/EN da nota do orçamento (`xl:grid`) e a coluna do enquadramento
-  // das fotos (`2xl:grid-cols-1` / `2xl:hidden`).
-  ["ProposalStudio.tsx", 4],
-  // A grelha de miniaturas de tema: `… sm:grid-cols-4 md:grid-cols-5 lg:…`.
-  ["Temas.tsx", 1],
+  // (`ProposalStudio.tsx` esteve aqui com tecto 4 — o par PT/EN da nota do
+  // orçamento (`xl:grid`) e a coluna do enquadramento das fotos
+  // (`2xl:grid-cols-1` / `2xl:hidden`). Os quatro eram perguntas sobre a coluna
+  // de conteúdo disfarçadas de perguntas sobre a janela; passaram a `@container`
+  // e o ficheiro chegou a zero.)
+  // (`Temas.tsx` esteve aqui com tecto 1 — o `md:grid-cols-5` da grelha de
+  // miniaturas, escondido numa constante e não no JSX. A grelha passou a
+  // `@container` e ele chegou a zero, portanto a linha saiu.)
   // (`evento/[id]/DossierClient.tsx` esteve aqui com tecto 2 — a coluna lateral
   // do dossier, `xl:grid-cols` + `xl:sticky`. Passou a `lg:` e chegou a zero,
   // portanto a linha saiu e ele passa a ser guardado como todos os outros.)
@@ -227,9 +230,23 @@ describe("contrato dos pontos de corte: o back office tem três larguras, e só 
     expect(cortesProibidos("[&::-webkit-details-marker]:hidden")).toEqual([]);
 
     // E continua a ver o que ainda lá está: as excepções não estão vazias.
+    //
+    // ── ISTO ERA UM NÚMERO À MÃO, E O NÚMERO ESTRAGAVA-SE SOZINHO ──────────
+    // Era `toBeGreaterThan(2)`: calibrado para os três ficheiros que tinham
+    // dívida no dia em que foi escrito. Quando o `Temas.tsx` chegou a zero
+    // sobraram dois, e a rede ficou vermelha por o repositório ter MELHORADO.
+    // Uma guarda que se parte com o progresso ensina a baixar-lhe o número, e
+    // ao fim de duas ou três vezes ninguém sabe o que ela estava a proteger.
+    //
+    // Passa a exigir que TODAS as entradas ainda tenham infracções, o que faz
+    // as duas coisas de uma vez e não pede manutenção nenhuma: se o varredor se
+    // partir, todas caem a zero e o teste falha nomeando-as; e quando um
+    // ficheiro fica mesmo limpo, o teste diz o nome dele e manda apagar a
+    // linha — que é a regra que o comentário do `TECTO_POR_TRATAR` escreve e
+    // que até aqui dependia de alguém se lembrar.
     expect(
-      [...TECTO_POR_TRATAR.keys()].filter((rel) => infraccoes(rel).length > 0).length,
-      "o varredor deixou de ver as infracções conhecidas",
-    ).toBeGreaterThan(2);
+      [...TECTO_POR_TRATAR.keys()].filter((rel) => infraccoes(rel).length === 0),
+      "chegaram a zero: apaga-lhes a linha do TECTO_POR_TRATAR (ou o varredor cegou)",
+    ).toEqual([]);
   });
 });

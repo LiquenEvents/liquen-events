@@ -3829,7 +3829,7 @@ describe("ver as páginas lado a lado", () => {
     await user.click(await screen.findByRole("button", { name: "Ver as páginas lado a lado" }));
 
     const vista = await screen.findByText("Vista de conjunto");
-    const grelha = document.querySelector('[class*="lg:grid-cols-[11rem"]');
+    const grelha = document.querySelector('[class*="grid-cols-[11rem"]');
     expect(grelha).toBeTruthy();
     // O índice e a lista dos boards, e mais nada: um terceiro filho é o que
     // mandava a lista para a coluna de 176 px.
@@ -3907,6 +3907,56 @@ describe("gerar a proposta em inglês", () => {
       "aria-checked",
       "false",
     );
+  });
+
+  /**
+   * ── A BARRA COLADA NÃO É SÍTIO PARA PROSA ──────────────────────────────
+   * Ela mandou a fotografia do «Fazer proposta» num iPhone: o rodapé colado
+   * ocupava quase metade do ecrã e tapava a linha do email do cliente a meio.
+   *
+   * A barra é `sticky` e `flex-wrap`, e um filho `w-full` não ocupa uma linha
+   * — ocupa uma LINHA SÓ PARA ELE. A 375 px estas três frases sobre o inglês
+   * dão cinco linhas, e a barra cresce outro tanto por cima do conteúdo.
+   *
+   * Já havia uma máquina a medir a barra e a reservar essa altura ao conteúdo.
+   * Resolvia o sintoma e deixava a causa: uma barra livre de crescer cresce.
+   *
+   * Não se esconde a explicação — mostra-se quando é a pergunta. Com
+   * «Português» escolhido fica uma linha; com «Inglês», abre inteira, porque
+   * aí é a consequência do que ela acabou de fazer.
+   */
+  it("com português, a explicação do inglês não gasta cinco linhas da barra", async () => {
+    seedDraftEmIngles(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    // A versão de uma linha, que é a única que o telemóvel mostra.
+    expect(screen.getByText("Em inglês muda a moldura do documento.")).toBeTruthy();
+    // E a longa continua lá para o ecrã largo, mas atrás do corte de largura.
+    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("hidden");
+  });
+
+  it("escolhido o inglês, a explicação abre inteira em qualquer ecrã", async () => {
+    seedDraftEmIngles(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    // O que o código antigo violava não era o TEXTO — era o facto de a escolha
+    // do idioma não fazer diferença nenhuma a este parágrafo. Por isso o que
+    // se compara é o antes e o depois da mesma renderização: sem esta linha, o
+    // teste passava por vacuidade contra o código que ele existe para apanhar.
+    const paragrafo = () => screen.getByText(/Da tua prosa sai em inglês/).closest("p")!;
+    const emPortugues = paragrafo().textContent;
+
+    const grupo = screen.getByRole("radiogroup", { name: "Idioma do PDF" });
+    await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
+
+    expect(paragrafo().textContent).not.toBe(emPortugues);
+    // A linha curta desaparece — deixou de ser um resumo, passou a ser o caso.
+    expect(screen.queryByText("Em inglês muda a moldura do documento.")).toBeNull();
+    expect(screen.getByText(/Da tua prosa sai em inglês/).className).not.toContain("hidden");
   });
 
   it("o caminho por omissão fica intacto: «pt», e o ficheiro chama-se proposta-…", async () => {
@@ -6601,11 +6651,15 @@ describe("o orçamento a 390 px", () => {
     );
     renderStudio();
     const item = await screen.findByRole("textbox", { name: "Item" });
-    // A descrição ocupa a fila toda até `sm`, e o valor desce para baixo — o
-    // mesmo desenho que as linhas adicionais já usavam.
+    // A descrição ocupa a fila toda enquanto a LISTA for estreita, e o valor
+    // desce para baixo — o mesmo desenho que as linhas adicionais já usavam.
+    // O limiar deixou de ser `sm:` (640 de JANELA): a fila quebra pela largura
+    // da caixa, e aos 1024 a coluna de conteúdo tem 504 px e não 975.
     expect(item.className).toContain("col-span-2");
-    expect(item.className).toContain("sm:col-span-1");
-    expect(item.parentElement?.className).toContain("sm:grid-cols-[minmax(0,1fr)_10rem_auto]");
+    expect(item.className).toContain("@min-[26rem]:col-span-1");
+    expect(item.parentElement?.className).toContain(
+      "@min-[26rem]:grid-cols-[minmax(0,1fr)_10rem_auto]",
+    );
   });
 });
 
@@ -7163,3 +7217,747 @@ describe("o estúdio diz o que mudou quando não se vê", () => {
     await userEvent.click(botao);
   }
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ESTÚDIO VIVE NUMA COLUNA, E NÃO NUMA JANELA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre as fotografias que mandou do telemóvel: «está tudo
+ * enorme, pouco adaptado», «isto está super pouco prático».
+ *
+ * A CONTA QUE MANDA EM TUDO. A coluna onde ela escreve vive dentro de três
+ * outras — a barra lateral do back office (`w-64`, a partir de 1024), o índice
+ * do estúdio (`w-48`, a partir de 1024) e o painel «O que vai sair»
+ * (`w-[21rem]`, a partir de 1440). Medida:
+ *
+ *     janela   coluna de conteúdo
+ *       375        ~351 px
+ *       640        ~592 px
+ *      1023        ~975 px
+ *      1024        ~504 px   ← perde 471 px de um pixel para o outro
+ *      1440        ~560 px
+ *
+ * `sm:` dispara aos 640 de JANELA e nunca mais volta atrás: tudo o que decidiu
+ * «duas colunas» com 592 px de caixa continuava a decidir duas colunas quando a
+ * caixa passava a ter 504. Era esse o defeito de fundo, e é isso que estes
+ * testes prendem.
+ *
+ * ── PORQUE É QUE O TESTE RESOLVE AS CLASSES À MÃO ──────────────────────────
+ *
+ * O jsdom não faz disposição e não avalia `@media` nem `@container`: desenhar a
+ * 375 e a 1024 dá o mesmo DOM com a mesma `className`. Um teste que se ficasse
+ * pelo `toContain("@min-[26rem]:grid-cols-2")` afirmava a ORTOGRAFIA da classe
+ * e não a decisão — e passava na mesma se alguém lhe pusesse um `sm:` ao lado,
+ * que é precisamente o defeito a apanhar.
+ *
+ * Por isso o `efectivas()` faz o que o navegador faria: separa cada classe nas
+ * suas variantes, decide quais estão ligadas naquela JANELA e naquela CAIXA, e
+ * devolve os utilitários que sobram. Uma variante que ele não conheça REBENTA
+ * em vez de ser ignorada em silêncio. É o mesmo molde do `Cortes.movel.test.tsx`
+ * — aqui com o eixo que falta, que é o do contentor.
+ *
+ * A geometria a sério mede-se no browser; o que aqui se prende é a DECISÃO.
+ */
+describe("o estúdio numa coluna, e não numa janela", () => {
+  /** A largura da coluna de conteúdo em cada janela — a tabela lá de cima. */
+  const COLUNA: Record<number, number> = {
+    375: 351,
+    640: 592,
+    1023: 975,
+    1024: 504,
+    1440: 560,
+  };
+
+  type Contexto = {
+    /** A largura da JANELA — é o que `sm:` e `lg:` medem. */
+    janela: number;
+    /** A largura do CONTENTOR mais próximo — é o que `@min-[…]:` mede. */
+    caixa: number;
+  };
+
+  /** Em cada janela, a coluna de conteúdo é o contentor de topo. */
+  const naColuna = (janela: number): Contexto => ({ janela, caixa: COLUNA[janela] });
+
+  /**
+   * Separa `@min-[36rem]:hidden` em `["@min-[36rem]", "hidden"]` — sem partir
+   * os dois pontos que vivem DENTRO de um valor arbitrário, como em
+   * `[&::-webkit-details-marker]:hidden`.
+   */
+  function separar(classe: string): string[] {
+    const partes: string[] = [];
+    let actual = "";
+    let dentro = 0;
+    for (const c of classe) {
+      if (c === "[" || c === "(") dentro++;
+      else if (c === "]" || c === ")") dentro--;
+      if (c === ":" && dentro === 0) {
+        partes.push(actual);
+        actual = "";
+        continue;
+      }
+      actual += c;
+    }
+    partes.push(actual);
+    return partes;
+  }
+
+  /** Esta variante está ligada neste contexto? */
+  function ligada(variante: string, ctx: Contexto): boolean {
+    if (variante === "sm") return ctx.janela >= 640;
+    if (variante === "lg") return ctx.janela >= 1024;
+
+    const emPixeis = (v: string, u: string) => Number(v) * (u === "rem" ? 16 : 1);
+
+    const doContentor = /^@min-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
+    if (doContentor) return ctx.caixa >= emPixeis(doContentor[1], doContentor[2]);
+
+    const daJanela = /^min-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
+    if (daJanela) return ctx.janela >= emPixeis(daJanela[1], daJanela[2]);
+
+    // Estes três não existem neste back office (ver `Cortes.contrato.test.ts`).
+    // Rebentam aqui com o nome, em vez de passarem por «variante desconhecida».
+    if (/^(max-)?(md|xl|2xl)$/.test(variante)) {
+      throw new Error(`\`${variante}:\` não é um corte deste back office`);
+    }
+
+    // O que não é uma pergunta sobre LARGURA — um selector, um estado, um
+    // grupo — não decide nada aqui e fica ligado.
+    return true;
+  }
+
+  /** As classes de um elemento — `className` num `<svg>` não é uma string. */
+  const classesDe = (el: Element) => el.getAttribute("class") ?? "";
+
+  /** Os utilitários que sobram depois de resolver as variantes. */
+  function efectivas(className: string, ctx: Contexto): Set<string> {
+    const fora = new Set<string>();
+    for (const classe of className.split(/\s+/).filter(Boolean)) {
+      const partes = separar(classe);
+      const utilitario = partes.pop()!;
+      if (partes.every((v) => ligada(v, ctx))) fora.add(utilitario);
+    }
+    return fora;
+  }
+
+  /** Os utilitários de `display`, que são os que decidem «vê-se ou não». */
+  const DISPLAY = new Set([
+    "hidden",
+    "block",
+    "inline",
+    "inline-block",
+    "flex",
+    "inline-flex",
+    "grid",
+    "inline-grid",
+    "contents",
+  ]);
+
+  /**
+   * Este elemento vê-se, resolvidas as variantes?
+   *
+   * `hidden @min-[36rem]:flex` é o idioma da casa e conta-se como o navegador o
+   * conta: entre dois `display` ligados, o que traz VARIANTE ganha ao que não
+   * traz — é o que a ordem da folha de estilos do Tailwind garante.
+   */
+  function seVe(el: Element, ctx: Contexto): boolean {
+    let base: string | null = null;
+    let comVariante: string | null = null;
+    for (const classe of classesDe(el).split(/\s+/).filter(Boolean)) {
+      const partes = separar(classe);
+      const utilitario = partes.pop()!;
+      if (!DISPLAY.has(utilitario)) continue;
+      if (!partes.every((v) => ligada(v, ctx))) continue;
+      if (partes.length === 0) base = utilitario;
+      else comVariante = utilitario;
+    }
+    return (comVariante ?? base) !== "hidden";
+  }
+
+  /**
+   * Vê-se, aqui dentro, um rótulo que diga exactamente estas palavras?
+   *
+   * Só FOLHAS: um `<label>` que embrulha o rótulo e o campo tem o mesmo
+   * `textContent` do rótulo, e contá-lo dava por visível um nome que estava
+   * escondido — o teste passava a dizer o contrário do que se vê.
+   */
+  function rotuloVisivel(dentro: Element, palavras: string, ctx: Contexto): boolean {
+    return [...dentro.querySelectorAll("*")].some(
+      (el) =>
+        el.children.length === 0 &&
+        el.textContent?.trim() === palavras &&
+        [el, ...ascendentes(el, dentro)].every((a) => seVe(a, ctx)),
+    );
+  }
+
+  function ascendentes(el: Element, ate: Element): Element[] {
+    const fora: Element[] = [];
+    let p = el.parentElement;
+    while (p && p !== ate.parentElement) {
+      fora.push(p);
+      p = p.parentElement;
+    }
+    return fora;
+  }
+
+  /** A coluna onde ela escreve. */
+  const colunaDeConteudo = () =>
+    document.querySelector('[class~="@container"][class~="flex-1"]') as HTMLElement;
+
+  /** O contentor `@container` mais próximo, a subir. */
+  function contentorDe(el: Element): HTMLElement {
+    let p: HTMLElement | null = el.parentElement;
+    while (p) {
+      if (p.className.split(/\s+/).includes("@container")) return p;
+      p = p.parentElement;
+    }
+    throw new Error("este elemento não vive dentro de nenhum `@container`");
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 1 · O CONTENTOR DE TOPO
+  // ══════════════════════════════════════════════════════════════════════
+
+  it("a coluna onde ela escreve declara-se contentor — é ela que manda, não a janela", async () => {
+    seedDraft(1);
+    renderStudio();
+    await screen.findByRole("textbox", { name: "Clientes" });
+
+    const coluna = colunaDeConteudo();
+    expect(coluna, "a coluna de conteúdo perdeu o `@container`").toBeTruthy();
+    // `min-w-0` continua lá: sem ele, um filho longo empurra a coluna e a
+    // conta de cima deixa de valer.
+    expect(coluna.className.split(/\s+/)).toContain("min-w-0");
+  });
+
+  /**
+   * O índice do estúdio era `hidden … lg:block` e passou a existir também
+   * abaixo de 1024 (uma tira que rola de lado). O invólucro dos dois, porém,
+   * era `flex gap-6` em TODAS as larguras: enquanto o índice estava escondido a
+   * fila tinha um filho só e não se notava, mas assim que ele existe a 375 px
+   * fica AO LADO do conteúdo e esmaga a coluna onde ela escreve.
+   *
+   * O teste tem de olhar para o INVÓLUCRO e não para o índice: do lado do filho
+   * não há classe nenhuma que desfaça uma fila, e um teste ao índice passaria
+   * por acidente — como passava enquanto ele estava `hidden`.
+   */
+  it("a 375 px o índice não fica ao lado da coluna: a fila só existe a partir de `lg`", async () => {
+    seedDraft(1);
+    renderStudio();
+    await screen.findByRole("textbox", { name: "Clientes" });
+    const coluna = colunaDeConteudo();
+    const indice = screen.getByRole("navigation", { name: "Secções da proposta" });
+    const involucro = coluna.parentElement!;
+    expect(involucro.contains(indice), "o índice e a coluna são irmãos").toBe(true);
+
+    // A 375 o invólucro é um bloco: o índice empilha por cima do conteúdo.
+    expect(efectivas(classesDe(involucro), naColuna(375)).has("flex")).toBe(false);
+    // A partir de `lg` é a fila de sempre, com o mesmo intervalo.
+    const noPortatil = efectivas(classesDe(involucro), naColuna(1024));
+    expect(noPortatil.has("flex")).toBe(true);
+    expect(noPortatil.has("gap-6")).toBe(true);
+  });
+
+  it("e nenhuma classe do estúdio pergunta pelos cortes que esta casa não usa", async () => {
+    seedDraft(1);
+    renderStudio();
+    await screen.findByRole("textbox", { name: "Clientes" });
+
+    // O resolvedor rebenta com o nome da variante proibida. Passar por todas
+    // as classes desenhadas é a rede que apanha um `xl:` que volte por outra
+    // porta — incluindo um que venha de uma constante fora do JSX.
+    const ctx = naColuna(1024);
+    for (const el of document.querySelectorAll("[class]")) {
+      expect(() => efectivas(classesDe(el), ctx), classesDe(el)).not.toThrow();
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 2 · A MINIATURA REPETIDA SETE VEZES
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Palavras dela: «minúscula e repetida sete vezes».
+   *
+   * A pré-visualização de cada página era desenhada SEMPRE e só escondida por
+   * CSS a partir de 1536 — o custo que o `PainelDoEstudio.tsx:52-57` conta por
+   * extenso, aqui multiplicado pelo número de mood boards. E o número estava
+   * errado: o painel da direita passou a aparecer aos 1440, portanto entre
+   * 1440 e 1535 apareciam as DUAS.
+   */
+  describe("a pré-visualização da página só se monta onde se vê", () => {
+    /** Faz o `useMedida` responder «sim» a tudo — o ecrã largo. */
+    function ecraLargo() {
+      vi.stubGlobal(
+        "matchMedia",
+        (consulta: string) =>
+          ({
+            matches: true,
+            media: consulta,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          }) as unknown as MediaQueryList,
+      );
+    }
+
+    it("sem espaço para o painel da direita, a miniatura está lá", async () => {
+      // Sem `matchMedia`, o `useMedida` responde `false` — o caminho estreito.
+      seedDraft(2);
+      renderStudio();
+      expect(await screen.findByText("A página, como vai sair")).toBeTruthy();
+    });
+
+    it("com espaço para o painel, não se DESENHA — não é `hidden`", async () => {
+      ecraLargo();
+      seedDraft(2);
+      renderStudio();
+      await screen.findByRole("textbox", { name: "Clientes" });
+
+      // Não é «está escondida»: é não existir. Escondida por CSS, ela era
+      // desenhada na mesma — uma vez por mood board, com as URLs de todas as
+      // fotografias.
+      expect(screen.queryByText("A página, como vai sair")).toBeNull();
+    });
+
+    it("e a coluna de 15 rem não fica aberta e vazia quando ela sai", async () => {
+      ecraLargo();
+      seedDraft(2);
+      renderStudio();
+      await screen.findByRole("textbox", { name: "Clientes" });
+
+      const grelhas = [...document.querySelectorAll('[class*="grid-cols-[minmax(0,1fr)_15rem]"]')];
+      expect(grelhas, "sem miniatura, a segunda coluna não tem para quem existir").toHaveLength(0);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 3 · A GRELHA DAS FOTOGRAFIAS
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * O portátil mostrava as fotografias MAIS PEQUENAS do que o telemóvel: aos
+   * 1024 a grelha tinha ~300 px úteis e desenhava quatro colunas (miniaturas de
+   * 68 px); a 375, com os mesmos ~300, desenhava três (92 px). A pergunta é a
+   * largura do CARTÃO, não a da janela.
+   */
+  describe("a grelha das fotografias", () => {
+    /**
+     * A largura interior do cartão do board em cada janela: a coluna de
+     * conteúdo, menos o índice das páginas quando ele é coluna (176 + 20 de
+     * intervalo — só a 1023, ver o bloco 3b), menos os 32 do `p-4`.
+     *
+     * Não é uma constante escrita à mão por preguiça: a mesma conta é REFEITA
+     * a partir do DOM no último teste do bloco 3b, que lê a decisão da grelha
+     * do índice em vez de a assumir. Este mapa é a leitura, aquele é a prova.
+     */
+    const CARTAO: Record<number, number> = { 375: 319, 640: 560, 1023: 747, 1024: 472, 1440: 528 };
+
+    async function grelha() {
+      seedDraft(4);
+      renderStudio();
+      await screen.findByRole("textbox", { name: "Clientes" });
+      const el = document.querySelector('[class*="grid-cols-3"]') as HTMLElement;
+      expect(el, "a grelha das fotografias desapareceu").toBeTruthy();
+      return el;
+    }
+
+    it("o cartão do board é o contentor — a grelha não pergunta à janela", async () => {
+      const el = await grelha();
+      const cartao = contentorDe(el);
+      // O contentor mais próximo é o CARTÃO e não a coluna de conteúdo: é a
+      // largura dele que decide quantas fotografias cabem numa fila.
+      expect(cartao.className).toContain("rounded-2xl");
+      expect(cartao).not.toBe(colunaDeConteudo());
+    });
+
+    it("a 375 px são três colunas, porque em 319 px quatro não cabem", async () => {
+      const el = await grelha();
+      const cols = efectivas(classesDe(el), { janela: 375, caixa: CARTAO[375] });
+      expect(cols.has("grid-cols-4")).toBe(false);
+      expect(cols.has("grid-cols-3")).toBe(true);
+    });
+
+    /**
+     * O que uma pergunta de contentor garante e uma de janela nunca pode: um
+     * cartão mais estreito NUNCA leva mais colunas do que um cartão mais largo.
+     * Era exactamente isso que estava partido — o cartão a 1024 encolhia para
+     * 276 px e ganhava na mesma a quarta coluna que a 375, com 319, não tinha.
+     */
+    it("um cartão mais estreito nunca leva mais colunas do que um mais largo", async () => {
+      const el = await grelha();
+      const colunas = (janela: number) =>
+        efectivas(classesDe(el), { janela, caixa: CARTAO[janela] }).has("grid-cols-4") ? 4 : 3;
+
+      const janelas = [375, 640, 1023, 1024, 1440];
+      for (const a of janelas) {
+        for (const b of janelas) {
+          if (CARTAO[a] >= CARTAO[b]) continue;
+          expect(
+            colunas(a),
+            `o cartão a ${a} tem ${CARTAO[a]} px e leva ${colunas(a)} colunas; ` +
+              `a ${b} tem ${CARTAO[b]} e leva ${colunas(b)}`,
+          ).toBeLessThanOrEqual(colunas(b));
+        }
+      }
+    });
+
+    /** A tabela das cinco larguras, que é o resultado desta missão. */
+    it("a miniatura em cada uma das cinco larguras", async () => {
+      const el = await grelha();
+      const miniatura = (janela: number) => {
+        const n = efectivas(classesDe(el), { janela, caixa: CARTAO[janela] }).has("grid-cols-4")
+          ? 4
+          : 3;
+        return Math.floor((CARTAO[janela] - (n - 1) * 8) / n);
+      };
+      // Antes: 101 · 134 · 229 · 68 · 105 — o portátil dela era o pior de todos.
+      expect(miniatura(375)).toBe(101);
+      expect(miniatura(640)).toBe(134);
+      expect(miniatura(1023)).toBe(180);
+      expect(miniatura(1024)).toBe(112);
+      expect(miniatura(1440)).toBe(126);
+      // E nenhuma desce abaixo do telemóvel, que era o defeito de partida.
+      for (const janela of [640, 1023, 1024, 1440]) {
+        expect(miniatura(janela), `a ${janela}`).toBeGreaterThanOrEqual(miniatura(375));
+      }
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 3b · O ÍNDICE DAS PÁGINAS — O ÚLTIMO SÍTIO ONDE OS CORTES SE SOMAVAM
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * A coluna de 176 px do índice abria-se em `lg:` — no pixel exacto em que a
+   * coluna de conteúdo cai de 975 para 504 px. Os dois cortes SOMAVAM-SE: o
+   * cartão do board ficava com 276 px e as miniaturas com 86, quando sem a
+   * coluna ficariam com 472 e 112.
+   *
+   * A resposta obriga a escrever uma inversão que parece errada e não é: a
+   * caixa é MAIOR abaixo de 1024 do que acima, portanto a coluna lateral
+   * desliga-se em todas as larguras de desktop e liga-se entre 640 e 1023.
+   *
+   * E as DUAS METADES têm de ler o mesmo sinal: a grelha que dá a largura vive
+   * no `ProposalStudio` e a forma do índice (tira ou coluna) vive no
+   * `MoodBoardIndice`, que não tem largura própria nenhuma. Em sinais
+   * diferentes seria uma tira de `overflow-x-auto` espremida em 176 px de um
+   * lado e um índice vertical à largura toda do outro — o defeito do
+   * `useMedida.ts:16-21`.
+   */
+  describe("o índice das páginas de inspiração", () => {
+    async function pecas() {
+      seedDraft(4);
+      renderStudio();
+      await screen.findByRole("textbox", { name: "Clientes" });
+      const indice = screen.getByRole("navigation", { name: "Índice das páginas de inspiração" });
+      const grelha = indice.parentElement!;
+      const tira = indice.querySelector("ul")!;
+      return { indice, grelha, tira };
+    }
+
+    it("a coluna lateral já não se abre no pixel em que a caixa encolhe 471", async () => {
+      const { grelha } = await pecas();
+      // A 1023 a caixa tem 975 px e a coluna cabe sem tirar nada.
+      expect(efectivas(classesDe(grelha), naColuna(1023)).has("grid")).toBe(true);
+      // A 1024 tem 504 — e 196 px de índice são 39% do sítio onde ela escreve.
+      expect(efectivas(classesDe(grelha), naColuna(1024)).has("grid")).toBe(false);
+      expect(efectivas(classesDe(grelha), naColuna(1440)).has("grid")).toBe(false);
+      // No telemóvel continua a ser a tira, como sempre foi.
+      expect(efectivas(classesDe(grelha), naColuna(375)).has("grid")).toBe(false);
+    });
+
+    it("e a forma do índice lê o MESMO limiar da grelha que lhe dá a largura", async () => {
+      const { indice, grelha, tira } = await pecas();
+      /** O limiar que traz um dado utilitário. */
+      const limiar = (className: string, utilitario: string) => {
+        for (const classe of className.split(/\s+/).filter(Boolean)) {
+          const partes = separar(classe);
+          if (partes.pop() === utilitario && partes.length) return partes.join(":");
+        }
+        return null;
+      };
+      const daGrelha = limiar(classesDe(grelha), "grid");
+      expect(daGrelha, "a grelha do índice perdeu o limiar").toBeTruthy();
+      expect(daGrelha).toMatch(/^@min-\[/);
+      // A tira vira coluna exactamente onde a grelha abre a coluna…
+      expect(limiar(classesDe(tira), "flex-col")).toBe(daGrelha);
+      // …e o `sticky` do invólucro liga-se no mesmo sítio.
+      expect(limiar(classesDe(indice), "sticky")).toBe(daGrelha);
+    });
+
+    it("o cartão do board deixa de perder 196 px no portátil dela", async () => {
+      const { grelha } = await pecas();
+      const foto = document.querySelector('[class*="grid-cols-3"]') as HTMLElement;
+      /** A largura interior do cartão: caixa − índice (quando é coluna) − `p-4`. */
+      const cartao = (janela: number) => {
+        const comColuna = efectivas(classesDe(grelha), naColuna(janela)).has("grid");
+        return COLUNA[janela] - (comColuna ? 176 + 20 : 0) - 32;
+      };
+      const miniatura = (janela: number) => {
+        const n = efectivas(classesDe(foto), { janela, caixa: cartao(janela) }).has("grid-cols-4")
+          ? 4
+          : 3;
+        return Math.floor((cartao(janela) - (n - 1) * 8) / n);
+      };
+      // Os dois números que a missão pediu: 86 → 112 e 105 → 126.
+      expect(cartao(1024)).toBe(472);
+      expect(miniatura(1024)).toBe(112);
+      expect(cartao(1440)).toBe(528);
+      expect(miniatura(1440)).toBe(126);
+      // E o telemóvel não mexeu.
+      expect(miniatura(375)).toBe(101);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 4 · A FILA DO ORÇAMENTO — E O RÓTULO QUE DESAPARECIA SEM SUBSTITUTO
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * O cabeçalho («Item · Como escala · Preço · Extra») aparecia aos 640 de
+   * JANELA, e a fila por baixo quebra por CAIXA. Num portátil a 1024 o
+   * cabeçalho nomeava quatro colunas por cima de filas já quebradas em duas
+   * linhas — que é literalmente a razão escrita no código para o esconder no
+   * telemóvel.
+   *
+   * E havia informação a desaparecer sem substituto: onde a fila quebra,
+   * «Como escala» e «Preço (sem IVA)» não voltavam em lado nenhum. Ficavam um
+   * `<select>` e um `<input>` com `aria-label` — o leitor de ecrã sabia, o olho
+   * não. É a mesma família do «Total» que se corrigiu esta semana.
+   */
+  describe("a fila do orçamento e os nomes das suas colunas", () => {
+    async function fila() {
+      seedDraft(1);
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+          budgetItems: ["Decor Cerimónia"],
+        }),
+      );
+      renderStudio();
+      const nome = await screen.findByRole("textbox", { name: "Item de orçamento" });
+      const linha = nome.parentElement!;
+      const lista = contentorDe(nome);
+      const cabecalho = [...lista.children].find((c) =>
+        c.textContent?.startsWith("Item"),
+      ) as HTMLElement;
+      expect(cabecalho, "o cabeçalho de colunas desapareceu").toBeTruthy();
+      return { linha, lista, cabecalho };
+    }
+
+    it("o cabeçalho e a fila lêem a MESMA caixa, e não a janela", async () => {
+      const { lista } = await fila();
+      // A lista é o contentor: é a largura dela que diz se a fila cabe numa
+      // linha só (medido: 548 px).
+      expect(lista.className.split(/\s+/)).toContain("@container");
+      expect(lista).not.toBe(colunaDeConteudo());
+    });
+
+    it("num portátil a 1024 o cabeçalho já não nomeia colunas que não estão lá", async () => {
+      const { cabecalho } = await fila();
+      // 504 px de coluna, e a fila precisa de 548 para caber numa linha:
+      // o cabeçalho tem de estar calado.
+      expect(seVe(cabecalho, naColuna(1024))).toBe(false);
+      // E onde a fila cabe mesmo, ele volta.
+      expect(seVe(cabecalho, naColuna(1023))).toBe(true);
+      expect(seVe(cabecalho, naColuna(640))).toBe(true);
+    });
+
+    /**
+     * O TESTE QUE MAIS VALE DESTA MISSÃO. A 375 px o cabeçalho não existe — e
+     * nenhum destes nomes pode desaparecer com ele.
+     */
+    it("a 375 px nenhum rótulo de coluna desaparece sem substituto visível", async () => {
+      const { linha, cabecalho } = await fila();
+      const ctx = naColuna(375);
+      expect(seVe(cabecalho, ctx), "a 375 px não há cabeçalho nenhum").toBe(false);
+
+      for (const nome of ["Como escala", "Preço (sem IVA)"]) {
+        expect(
+          rotuloVisivel(linha, nome, ctx),
+          `«${nome}» desaparece com o cabeçalho e não volta em lado nenhum`,
+        ).toBe(true);
+      }
+      // O «Extra» já tinha o seu, em minúsculas, ao lado da quadrícula.
+      expect(rotuloVisivel(linha, "extra", ctx)).toBe(true);
+    });
+
+    it("e onde o cabeçalho existe, o rótulo da fila cala-se — nunca os dois", async () => {
+      const { linha, cabecalho } = await fila();
+      const ctx = naColuna(640);
+      expect(seVe(cabecalho, ctx)).toBe(true);
+      for (const nome of ["Como escala", "Preço (sem IVA)", "extra"]) {
+        expect(rotuloVisivel(linha, nome, ctx), `«${nome}» dito duas vezes no mesmo ecrã`).toBe(
+          false,
+        );
+      }
+    });
+
+    it("o rótulo de dentro da fila não se anuncia duas vezes a quem ouve", async () => {
+      const { linha } = await fila();
+      const escala = within(linha).getByLabelText(/^Como escala/);
+      // O `aria-label` já diz o nome; o rótulo visível é para o olho.
+      const visivel = linha.querySelector('[aria-hidden="true"]');
+      expect(visivel?.textContent?.trim()).toBe("Como escala");
+      expect(escala.getAttribute("aria-label")).toContain("Como escala");
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 5 · AS DUAS TABELAS DE PREÇOS
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * 7 rem + 9 rem + botão + intervalos são ~308 px fixos; numa caixa de 504
+   * sobram 196 para a DESCRIÇÃO — que é onde ela escreve o texto que o casal
+   * lê. E os `col-span` têm de partilhar o variante da grelha: separados, dão
+   * parágrafos a meia largura numa grelha de uma coluna.
+   */
+  describe("as duas tabelas de preços", () => {
+    /** O variante que traz um dado utilitário, ou `""` se vier sem nenhum. */
+    function varianteDe(className: string, prefixo: string): string | null {
+      for (const classe of className.split(/\s+/).filter(Boolean)) {
+        const partes = separar(classe);
+        const utilitario = partes.pop()!;
+        if (!utilitario.startsWith(prefixo)) continue;
+        if (partes.length === 0) continue;
+        return partes.join(":");
+      }
+      return null;
+    }
+
+    it("os valores adicionais: cabeçalho, fila e descrição no MESMO limiar", async () => {
+      seedComPrecosEAdicionais();
+      renderStudio();
+      const desc = await screen.findByRole("textbox", { name: "Descrição da linha adicional" });
+      const linha = desc.parentElement!.parentElement!;
+      const lista = contentorDe(desc);
+      const cabecalho = [...lista.children].find((c) =>
+        c.textContent?.startsWith("Descrição"),
+      ) as HTMLElement;
+
+      const daFila = varianteDe(linha.className, "grid-cols-[minmax");
+      expect(daFila, "a fila deixou de ter limiar").toBeTruthy();
+      // O cabeçalho aparece exactamente onde a fila ganha as quatro colunas.
+      expect(varianteDe(cabecalho.className, "grid")).toBe(daFila);
+      // E a descrição larga a fila inteira exactamente aí.
+      expect(varianteDe(desc.parentElement!.className, "col-span-")).toBe(daFila);
+      // É uma pergunta de CAIXA, não de janela.
+      expect(daFila).toMatch(/^@min-\[/);
+      expect(lista.className.split(/\s+/)).toContain("@container");
+    });
+
+    it("as linhas de Organização: o mesmo, com a mesma resposta", async () => {
+      seedDraft(1);
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+          template: "organizacao",
+          budgetRows: [{ item: "Coordenação do dia", price: "1.500,00 €" }],
+        }),
+      );
+      renderStudio();
+      const item = await screen.findByRole("textbox", { name: "Item" });
+      const linha = item.parentElement!;
+      const daFila = varianteDe(linha.className, "grid-cols-[minmax");
+      expect(daFila).toMatch(/^@min-\[/);
+      expect(varianteDe(item.className, "col-span-")).toBe(daFila);
+      expect(contentorDe(item).className.split(/\s+/)).toContain("@container");
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 6 · AS GRELHAS DE CAMPOS E OS PARES PT/EN
+  // ══════════════════════════════════════════════════════════════════════
+
+  it("as grelhas de campos abrem a segunda coluna pela CAIXA, e não pela janela", async () => {
+    seedDraft(1);
+    renderStudio();
+    const clientes = await screen.findByRole("textbox", { name: "Clientes" });
+    const grelha = clientes.closest('[class*="grid-cols-1"]') as HTMLElement;
+
+    // A 375 continua a ser uma coluna, como sempre foi.
+    expect(efectivas(classesDe(grelha), naColuna(375)).has("grid-cols-2")).toBe(false);
+    // E a decisão passou a ser sobre a caixa: `sm:` desapareceu.
+    expect(classesDe(grelha)).not.toContain("sm:grid-cols-2");
+    expect(efectivas(classesDe(grelha), naColuna(640)).has("grid-cols-2")).toBe(true);
+  });
+
+  it("o par PT/EN só fica lado a lado onde as duas caixas cabem — sem corte nenhum", async () => {
+    seedDraftEmIngles(1);
+    renderStudio();
+    const rotulo = await screen.findByRole("textbox", { name: "Rótulo do total" });
+    // O invólucro do par: `flex-wrap` puro, que é a resposta que o
+    // `Cortes.contrato.test.ts` manda dar quando a pergunta é sobre a caixa.
+    const par = rotulo.closest('[class*="flex-wrap"]') as HTMLElement;
+    expect(par, "o par PT/EN perdeu o invólucro").toBeTruthy();
+    expect(par.className).toContain("flex-wrap");
+    // Nenhuma pergunta de largura: nem à janela, nem ao contentor.
+    for (const classe of par.className.split(/\s+/)) {
+      expect(separar(classe).length, `«${classe}» é um corte disfarçado`).toBe(1);
+    }
+    // E a caixa portuguesa pede a largura de que precisa, para o `flex-wrap`
+    // ter o que decidir.
+    const caixaPt = rotulo.closest('[class*="basis-"]') as HTMLElement;
+    expect(caixaPt.className).toMatch(/basis-\[\d+rem\]/);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 7 · A ALTURA — O CABEÇALHO CUSTAVA UM TERÇO DO ECRÃ
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Num iPhone SE (375×667) gastavam-se ~702 px antes do primeiro campo onde
+   * ela escreve: ele nascia abaixo da dobra. ~213 desses píxeis eram o
+   * cabeçalho do estúdio, e ~74 eram três linhas de instrução que se lêem uma
+   * vez. É o mesmo critério — e a mesma correcção — que a explicação do
+   * «Extra» já levou duzentas linhas abaixo.
+   */
+  describe("o cabeçalho do estúdio", () => {
+    const INSTRUCAO = /Monta aqui a proposta em PDF para o cliente/;
+
+    it("não gasta três linhas com uma instrução que se lê uma vez", async () => {
+      seedDraft(1);
+      renderStudio();
+      await screen.findByRole("textbox", { name: "Clientes" });
+      expect(screen.queryByText(INSTRUCAO)).toBeNull();
+    });
+
+    it("mas ela continua a poder pedir-se, e num sítio só", async () => {
+      seedDraft(1);
+      renderStudio();
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole("button", { name: "Ajuda: o que se faz no estúdio de propostas" }),
+      );
+      expect(screen.getAllByText(INSTRUCAO)).toHaveLength(1);
+    });
+  });
+});
+
+/** Um rascunho com preços e uma linha de valores adicionais. */
+function seedComPrecosEAdicionais() {
+  localStorage.setItem(
+    DRAFT_KEY,
+    JSON.stringify({
+      template: "decoracao",
+      ref: "PO Decoração",
+      clientNames: "Maria & Zé",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2026",
+      location: "Évora",
+      guests: "80 pax",
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+      moodBoards: [],
+      budgetItems: ["Decor Cerimónia"],
+      budgetAmounts: [900],
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 €" }],
+      coverImages: ["", ""],
+      totalAmount: 3000,
+      totalVatMode: "acrescer",
+      totalLabel: "Valor Total Decoração",
+    }),
+  );
+}
