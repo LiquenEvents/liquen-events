@@ -969,7 +969,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         agenda de 2026 é ruído que se aprende a saltar. */}
                     <p className="text-foreground/40 text-[9px] uppercase mt-0.5">
                       {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
-                      {new Date(q.date + "T12:00:00").getFullYear() !== new Date().getFullYear() && (
+                      {new Date(q.date + "T12:00:00").getFullYear() !==
+                        new Date().getFullYear() && (
                         <span className="ml-0.5">
                           {String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
                         </span>
