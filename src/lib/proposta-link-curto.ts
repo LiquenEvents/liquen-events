@@ -259,6 +259,23 @@ async function codigoJaEmitido(propostaId: string): Promise<string | null> {
  * porque o armazenamento de estado não respondeu: o casal fica com um link
  * comprido, que é feio, e não sem link, que é um negócio parado.
  */
+/**
+ * O ENDEREÇO DO PDF QUE CORRESPONDE A UM ENDEREÇO DE PROPOSTA.
+ *
+ * As duas portas abrem com a mesma chave: o `propostaDoLink` aceita tanto o
+ * código curto de 16 caracteres como o token assinado, e é ele que serve a
+ * página (`/proposta/<chave>`) e o ficheiro (`/api/proposta/<chave>/pdf`).
+ * Portanto o endereço do PDF deriva-se do da proposta sem emitir nada — o que
+ * importa, porque emitir outra ligação curta para o mesmo documento dava ao
+ * casal dois códigos para a mesma coisa e duas validades para gerir.
+ *
+ * A troca é ancorada ao fim: `SITE.url` não tem `/proposta/` lá dentro hoje, e
+ * um `replace` solto passaria a trocar o sítio errado no dia em que tivesse.
+ */
+export function enderecoDoPdfDaProposta(enderecoDaProposta: string): string {
+  return `${enderecoDaProposta.replace(/\/proposta\/([^/]+)$/, "/api/proposta/$1")}/pdf`;
+}
+
 export async function enderecoDaProposta(propostaId: string, pedidoId: string): Promise<string> {
   const id = String(propostaId ?? "").trim();
   const curto = id

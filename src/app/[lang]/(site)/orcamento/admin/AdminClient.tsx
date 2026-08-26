@@ -300,6 +300,8 @@ const VIEW_KEYS: Record<string, View> = {
   e: "estatisticas",
 };
 const VIEW_STORAGE_KEY = "liquen-admin-view";
+/** A barra lateral recolhida no computador — por aparelho, como o resto. */
+const CHAVE_MENU_RECOLHIDO = "liquen-admin-menu-recolhido";
 
 interface Props {
   /**
@@ -1175,6 +1177,31 @@ export default function AdminClient({
   const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>("overview");
   const [navOpen, setNavOpen] = useState(false);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O MENU ENCOLHIDO NO COMPUTADOR — E SOZINHO AO FAZER PROPOSTA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «quero que haja uma cruz para que dê no desktop para
+   * carregar e o menu fica ocultado e a zona do back office estende de forma a
+   * aumentar o espaço para fazer propostas (…) aliás eu quero que quando
+   * carregamos em fazer proposta o menu oculte-se automaticamente».
+   *
+   * A barra lateral mede 256 px e está sempre lá. No estúdio isso importa mais
+   * do que em qualquer outro ecrã: a coluna onde ela escreve vive dentro de
+   * TRÊS outras (esta, o índice do estúdio a 192 e o painel «O que vai sair» a
+   * 336), e é a primeira a pagar quando o ecrã não é enorme.
+   *
+   * `navOpen` é outra coisa e continua a ser: é a GAVETA do telemóvel. Isto é
+   * o computador, onde a barra é uma coluna em fluxo. Dois estados porque são
+   * dois comportamentos — juntá-los fazia fechar a gaveta no telemóvel
+   * esconder a barra no computador da próxima vez que lá voltasse.
+   */
+  const [menuRecolhido, setMenuRecolhido] = useState(false);
+  /** Já se recolheu sozinho nesta visita ao estúdio? Sem isto, voltar a abrir a
+   *  barra à mão e continuar a trabalhar fazia-a fechar-se outra vez a cada
+   *  render — ela abria e o ecrã fechava-lhe. */
+  const recolhidoPeloEstudio = useRef(false);
   /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
   const desceu = useDesceu();
   /** Pedido escolhido na vista "Fazer proposta".
@@ -1779,6 +1806,40 @@ export default function AdminClient({
     } catch {
       /* ignore */
     }
+  }, [view]);
+
+  /** A escolha dela sobrevive ao recarregar — é por aparelho, como o resto. */
+  useEffect(() => {
+    try {
+      const cru = localStorage.getItem(CHAVE_MENU_RECOLHIDO);
+      if (cru != null) setMenuRecolhido(cru === "1");
+    } catch {
+      /* sem `localStorage` abre como sempre abriu */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAVE_MENU_RECOLHIDO, menuRecolhido ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [menuRecolhido]);
+
+  /**
+   * ENTRAR EM «FAZER PROPOSTA» RECOLHE A BARRA. Uma vez, e não a cada render:
+   * o `recolhidoPeloEstudio` é o que faz a abertura à mão sobreviver — sem ele,
+   * carregar na cruz para a trazer de volta era ver o ecrã fechá-la outra vez.
+   * Sair do estúdio arma-o de novo, e a barra NÃO é reaberta: o que ela escolheu
+   * enquanto lá estava é a escolha dela.
+   */
+  useEffect(() => {
+    if (view !== "fazer-proposta") {
+      recolhidoPeloEstudio.current = false;
+      return;
+    }
+    if (recolhidoPeloEstudio.current) return;
+    recolhidoPeloEstudio.current = true;
+    setMenuRecolhido(true);
   }, [view]);
 
   // Restore the Pedidos status filter + sort the team last used (per device).
@@ -3394,8 +3455,40 @@ export default function AdminClient({
             inert={navEhGaveta && !navOpen}
             className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
               navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-            }`}
+            } ${
+              /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
+                 a ocupar a largura toda. `overflow-hidden` porque o que está lá
+                 dentro continua a medir 256 px — não se desmonta, para a
+                 abertura seguinte não ter de o montar outra vez. E `border-r-0`
+                 porque um risco de 1 px sem nada de um dos lados lê-se como uma
+                 coluna vazia. O `transform` desta transição não é o mesmo que o
+                 da gaveta: aqui anima-se a LARGURA, que é a única coisa que
+                 empurra o conteúdo. */
+              menuRecolhido ? "lg:w-0 lg:overflow-hidden lg:border-r-0" : ""
+            } motion-safe:lg:transition-[width] motion-safe:lg:duration-200`}
           >
+            {/* A CRUZ DO COMPUTADOR — recolhe a coluna e devolve os 256 px ao
+                trabalho. É irmã da de baixo, não a mesma: aquela fecha a GAVETA
+                do telemóvel (um estado que se perde ao sair), esta recolhe uma
+                COLUNA (um estado que fica). Por isso são dois botões, cada um
+                visível exactamente onde o seu estado existe. */}
+            <button
+              className="hidden lg:flex absolute top-3 right-3 w-11 h-11 items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
+              onClick={() => setMenuRecolhido(true)}
+              aria-label="Recolher o menu"
+              title="Recolher o menu"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+              </svg>
+            </button>
             {/* Mobile close */}
             <button
               className="lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
@@ -3821,6 +3914,31 @@ export default function AdminClient({
                   Por isso este aparece exactamente quando a outra sai, e nunca
                   ao mesmo tempo: continua a haver UM abridor de cada vez, que
                   é a regra que esta arrumação existe para cumprir. */}
+              {/* ── E A PORTA DE VOLTA ────────────────────────────────────
+                  Uma coluna que se recolhe e não se pode trazer de volta é uma
+                  coluna que se perde. Este botão existe EXACTAMENTE enquanto ela
+                  está recolhida e só no computador — que é onde o estado existe.
+                  No telemóvel a barra nunca foi uma coluna, e quem abre a gaveta
+                  é a barra de baixo. */}
+              {menuRecolhido && (
+                <button
+                  onClick={() => setMenuRecolhido(false)}
+                  aria-label="Mostrar o menu"
+                  title="Mostrar o menu"
+                  className="hidden lg:flex -ml-1 h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
               {selected && (
                 <button
                   onClick={() => setNavOpen(true)}

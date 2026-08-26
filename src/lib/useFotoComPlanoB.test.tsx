@@ -30,7 +30,7 @@ function Sonda({
   naoInsistir,
 }: {
   url?: string;
-  planoB?: string;
+  planoB?: string | readonly (string | undefined)[];
   naoInsistir?: boolean;
 }) {
   const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(url, planoB, naoInsistir);
@@ -174,5 +174,58 @@ describe("useFotoComPlanoB", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DEGRAU DO MEIO — 200 KB EM VEZ DE 1099
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A cascata tinha dois degraus e nada entre eles: a miniatura de 400 px
+ * (~20 KB) e, a falhar essa, o ORIGINAL. MEDIDO no estúdio a 1,6 Mbps, o
+ * original pesa **1099 KB** por célula — 26,4 MB numa grelha de 24, e a
+ * primeira fotografia aos 34,0 s. Numa caixa que o estúdio desenha a ~92–126 px
+ * (medido: ~101 px aos 375, ~126 entre 640 e 1023, ~92 aos 1024), isso é pagar
+ * cinquenta e cinco vezes o peso pela mesma imagem no ecrã.
+ *
+ * A derivada de 1200 px já existia e já era fabricada em lote — só que ninguém
+ * a punha no meio da queda. Estes casos são o meio.
+ */
+describe("a cascata com o degrau do meio", () => {
+  it("cai para a derivada de 1200 px ANTES de pedir o original", async () => {
+    render(<Sonda url="mini" planoB={["media", "original"]} />);
+    expect(estado()).toBe("mini");
+    await falhar();
+    // O que este caso existe para impedir: aqui estava «original».
+    expect(estado()).toBe("media");
+    await falhar();
+    expect(estado()).toBe("original");
+    await falhar();
+    expect(estado()).toBe("desistiu");
+  });
+
+  /**
+   * Os buracos da lista não são degraus. A derivada de 1200 px pode não estar
+   * fabricada (o `/assets` só devolve `midUrl` quando o Storage a tem), e nesse
+   * caso a cascata é a de sempre — não uma tentativa gasta a pedir `undefined`.
+   */
+  it("um degrau que não existe não gasta uma tentativa", async () => {
+    render(<Sonda url="mini" planoB={[undefined, "original"]} />);
+    await falhar();
+    expect(estado()).toBe("original");
+  });
+
+  /**
+   * E o repetido também não. Uma fotografia sem miniatura nenhuma chega aqui
+   * com o original nos dois lugares; contá-lo duas vezes era dar-lhe uma
+   * tentativa a mais do que às outras, contra o mesmo endereço que acabou de
+   * falhar.
+   */
+  it("o mesmo endereço duas vezes é um degrau só", async () => {
+    render(<Sonda url="original" planoB={["original", "original"]} />);
+    expect(estado()).toBe("original");
+    await falhar();
+    expect(estado()).toBe("desistiu");
   });
 });

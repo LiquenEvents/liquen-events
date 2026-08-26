@@ -18,6 +18,8 @@ const st = vi.hoisted(() => ({
   upload: vi.fn(async (id: string) => ({ path: `${id}/x.jpg`, url: "https://signed/x.jpg" })),
   /** O que guardou a de 1200 px, para se poder afirmar que foi guardada. */
   guardarMedia: vi.fn(async (_p: string, _b: Buffer, _t?: string) => true),
+  /** As de 1200 px que o Storage TEM. Vazio = nenhuma fabricada ainda. */
+  assinarMedias: vi.fn(async (_refs: string[]) => new Map<string, string>()),
   list: vi.fn(
     async (id: string): Promise<{ path: string; url: string; thumbUrl?: string }[]> => [
       { path: `${id}/x.jpg`, url: "https://signed/x.jpg" },
@@ -44,6 +46,9 @@ vi.mock("@/lib/proposal-storage", () => ({
     async (refs: string[]) => new Map(refs.map((r) => [r, `https://signed/${r}`])),
   ),
   signProposalThumbs: vi.fn(async () => new Map<string, string>()),
+  // O degrau do MEIO da cascata do estúdio: assinada e directa do Storage,
+  // quando lá está. Ver `mediasAssinadas` na rota.
+  signProposalMids: (refs: string[]) => st.assinarMedias(refs),
   uploadProposalThumb: vi.fn(async () => ""),
   // A de 1200 px — a que a PÁGINA DO CASAL mostra. Passou a chegar já feita do
   // browser, em vez de nascer no servidor à primeira vez que alguém olha.
@@ -270,6 +275,46 @@ describe("GET /api/orcamento/[id]/assets", () => {
     // abre. Uma miniatura no lugar do original seria uma foto pixelizada no
     // ecrã grande.
     expect(body.images[0].url).toBe("https://signed/antiga.jpg");
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * E O DEGRAU DO MEIO, PARA A QUEDA NÃO CUSTAR 1099 KB
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A célula do estúdio tinha dois degraus — a miniatura e, a falhar essa, o
+   * ORIGINAL. Medido a 1,6 Mbps: 20 KB → 1099 KB, para desenhar a mesma caixa
+   * de ~100 px. A derivada de 1200 px (~200 KB) já era fabricada em lote; o que
+   * faltava era esta lista dizer onde ela está.
+   */
+  it("uma foto com a derivada de 1200 px sai com ela, para a célula ter onde cair", async () => {
+    st.list.mockResolvedValueOnce([
+      { path: "q-9/nova.jpg", url: "https://signed/nova.jpg", thumbUrl: "https://signed/mini.jpg" },
+    ]);
+    st.assinarMedias.mockResolvedValueOnce(new Map([["q-9/nova.jpg", "https://signed/media.jpg"]]));
+    const [req, ctx] = getReq("q-9");
+    const body = await (await GET(req, ctx)).json();
+    expect(body.images[0].midUrl).toBe("https://signed/media.jpg");
+    // Os outros dois degraus não se mexem: a grelha continua a desenhar a
+    // miniatura, e o original continua a ser o que a lupa abre.
+    expect(body.images[0].thumbUrl).toBe("https://signed/mini.jpg");
+    expect(body.images[0].url).toBe("https://signed/nova.jpg");
+  });
+
+  /**
+   * Ausente é uma RESPOSTA, e não um buraco a tapar: quer dizer que a derivada
+   * ainda não foi fabricada, e a célula cai directa ao original como sempre
+   * caiu. Um `midUrl` inventado seria um degrau que dá 404 — uma tentativa
+   * gasta a descobrir o que esta lista já sabia.
+   */
+  it("sem a derivada fabricada, o campo não vem — e a lista sai na mesma", async () => {
+    st.list.mockResolvedValueOnce([
+      { path: "q-9/nova.jpg", url: "https://signed/nova.jpg", thumbUrl: "https://signed/mini.jpg" },
+    ]);
+    const [req, ctx] = getReq("q-9");
+    const body = await (await GET(req, ctx)).json();
+    expect(body.images[0].midUrl).toBeUndefined();
+    expect(body.images[0].thumbUrl).toBe("https://signed/mini.jpg");
   });
 
   it("uma foto COM miniatura guardada mantém o URL assinado do Storage", async () => {

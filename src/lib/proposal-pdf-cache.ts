@@ -67,9 +67,64 @@ let bytesGuardados = 0;
  * sem erro nenhum. É a mesma falha do «documento revisto» que a chave por
  * conteúdo já evita, só que por um eixo que o JSON do documento não vê.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ORDEM DAS CHAVES NÃO PODE ENTRAR NA CONTA — E ENTRAVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «para ver a proposta em PDF quando carrego demora mesmo muito
+ * tempo a abrir» — e, depois de tudo o que se lhe fez, continuava a demorar.
+ *
+ * O `JSON.stringify` escreve as chaves pela ordem em que elas estão no objecto.
+ * O documento que se desenha no ENVIO é o objecto que veio do estúdio, com a
+ * ordem em que o estúdio o montou. O documento que se lê DEPOIS vem da coluna
+ * `proposals.doc`, que é `jsonb` — e o Postgres não guarda `jsonb` como texto:
+ * normaliza-o, e essa normalização REORDENA as chaves (por comprimento e
+ * depois por bytes).
+ *
+ * Mesmo documento, mesmíssimo conteúdo, dois resumos diferentes. Consequência,
+ * e é a que ela sentia:
+ *
+ *   · o PDF guardado no envio ficava com uma chave que mais ninguém calculava;
+ *   · `lerPdfDaProposta` procurava pela outra e não encontrava nada;
+ *   · `urlDoPdfDaProposta` — o atalho que manda o casal direito ao CDN e que
+ *     existe precisamente para isto não demorar — nunca disparava;
+ *   · e cada abertura redesenhava o documento inteiro, oitenta fotografias
+ *     pelo `sharp`, num processo a frio.
+ *
+ * As três camadas de cache estavam escritas, testadas, e a fila do meio nunca
+ * acertava. A cache por processo funcionava (as duas pontas lêem o mesmo
+ * `proposal.doc`), e é por isso que isto se escondeu: dentro de uma sessão de
+ * leitura parecia tudo bem.
+ *
+ * ── A CORRECÇÃO ────────────────────────────────────────────────────────────
+ * O resumo passa a ser do CONTEÚDO e não da arrumação: as chaves de cada
+ * objecto são ordenadas antes de escrever. As LISTAS ficam como estão — a
+ * ordem de uma lista é conteúdo (a ordem das páginas, a das fotografias de um
+ * mood board), e ordená-la faria duas propostas diferentes partilharem
+ * ficheiro, que é o defeito grave que esta chave existe para não ter.
+ *
+ * O que já está guardado com a chave antiga fica órfão: a primeira abertura de
+ * cada proposta desenha uma vez e grava com a chave nova. A partir daí é o
+ * atalho. Não é preciso migrar nada.
+ */
+function canonico(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(canonico);
+  if (valor && typeof valor === "object") {
+    const entradas = Object.entries(valor as Record<string, unknown>)
+      // `undefined` não sobrevive a uma ida à base — deixá-lo entrar aqui fazia
+      // o documento em memória e o documento lido divergirem outra vez, pelo
+      // mesmo motivo e sem se ver.
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return Object.fromEntries(entradas.map(([k, v]) => [k, canonico(v)]));
+  }
+  return valor;
+}
+
 export function chaveDoPdf(doc: ProposalDoc, idioma: IdiomaDaProposta): string {
   return createHash("sha256")
-    .update(`${idioma}:${JSON.stringify(doc)}`)
+    .update(`${idioma}:${JSON.stringify(canonico(doc))}`)
     .digest("base64url")
     .slice(0, 32);
 }

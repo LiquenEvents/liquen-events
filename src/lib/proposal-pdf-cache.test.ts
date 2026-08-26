@@ -25,7 +25,12 @@ vi.mock("./proposal-doc-render", () => ({
   },
 }));
 
-import { pdfDaPropostaEmCache, esvaziarCachePdf, estadoCachePdf } from "./proposal-pdf-cache";
+import {
+  pdfDaPropostaEmCache,
+  esvaziarCachePdf,
+  estadoCachePdf,
+  chaveDoPdf,
+} from "./proposal-pdf-cache";
 import type { ProposalDoc } from "./proposal-doc";
 
 const doc = (ref: string) => ({ ref, clientName: "Maria" }) as unknown as ProposalDoc;
@@ -242,5 +247,74 @@ describe("descarregar nas duas línguas, uma a seguir à outra", () => {
     expect(pt[0]).toBe(2);
     expect(en[0]).toBe(1);
     expect(desenhar).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CHAVE É O CONTEÚDO — NÃO A ARRUMAÇÃO DELE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto não é uma finura de serialização: era A razão de o botão «Ver a proposta
+ * completa (PDF)» continuar lento depois de lhe terem posto três camadas de
+ * cache à frente.
+ *
+ * O `doc` que se desenha no ENVIO é o objecto que veio do estúdio. O `doc` que
+ * se lê a seguir vem de `proposals.doc`, que é `jsonb` — e o Postgres normaliza
+ * `jsonb`, o que REORDENA as chaves. Com o resumo a sair de um
+ * `JSON.stringify` cru, o mesmo documento dava duas chaves: o PDF era guardado
+ * numa e procurado noutra. Nunca era encontrado, o atalho para o CDN nunca
+ * disparava, e cada abertura redesenhava oitenta fotografias.
+ *
+ * A cache por processo escondia-o — as duas pontas dela lêem o mesmo objecto,
+ * portanto dentro de uma sessão de leitura parecia tudo bem.
+ */
+describe("chaveDoPdf", () => {
+  it("dá a MESMA chave a um documento que voltou da base com as chaves por outra ordem", () => {
+    const doEstudio = {
+      template: "decoracao",
+      ref: "PO Decoração",
+      clientNames: "Melanie e Sebastien",
+      totalAmount: 10778.74,
+      moodBoards: [{ title: "Cerimónia", images: ["a.jpg", "b.jpg"] }],
+    } as unknown as ProposalDoc;
+    // O mesmo, tal como o `jsonb` o devolve: chaves reordenadas, em todos os
+    // níveis. O conteúdo é idêntico ao cêntimo e à fotografia.
+    const daBase = {
+      ref: "PO Decoração",
+      moodBoards: [{ images: ["a.jpg", "b.jpg"], title: "Cerimónia" }],
+      template: "decoracao",
+      totalAmount: 10778.74,
+      clientNames: "Melanie e Sebastien",
+    } as unknown as ProposalDoc;
+
+    expect(chaveDoPdf(daBase, "pt")).toBe(chaveDoPdf(doEstudio, "pt"));
+  });
+
+  /**
+   * E o contrário continua a valer, que é o que impede a correcção de virar um
+   * defeito pior: uma proposta REVISTA não pode servir o ficheiro que o casal
+   * não viu.
+   */
+  it("mas continua a mudar quando o conteúdo muda", () => {
+    const base = { ref: "PO", totalAmount: 1000 } as unknown as ProposalDoc;
+    const revista = { ref: "PO", totalAmount: 1200 } as unknown as ProposalDoc;
+    expect(chaveDoPdf(revista, "pt")).not.toBe(chaveDoPdf(base, "pt"));
+  });
+
+  /**
+   * A ordem de uma LISTA é conteúdo — é a ordem por que as páginas saem e a das
+   * fotografias dentro de um mood board. Ordenar listas para «canonizar» fazia
+   * duas propostas diferentes partilharem ficheiro.
+   */
+  it("e trocar a ordem das fotografias é uma proposta diferente", () => {
+    const a = { moodBoards: [{ images: ["1.jpg", "2.jpg"] }] } as unknown as ProposalDoc;
+    const b = { moodBoards: [{ images: ["2.jpg", "1.jpg"] }] } as unknown as ProposalDoc;
+    expect(chaveDoPdf(b, "pt")).not.toBe(chaveDoPdf(a, "pt"));
+  });
+
+  it("e a língua continua a separar as duas versões do mesmo documento", () => {
+    const d = { ref: "PO" } as unknown as ProposalDoc;
+    expect(chaveDoPdf(d, "en")).not.toBe(chaveDoPdf(d, "pt"));
   });
 });

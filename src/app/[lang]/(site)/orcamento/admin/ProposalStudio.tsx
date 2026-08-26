@@ -54,7 +54,7 @@ import { guestRangeLabel, ceremonyTypeLabel, eventTypeName } from "@/lib/orcamen
 import { log } from "@/lib/logger";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
-import { pedirVezDeImagemPesada, ESPERA_MAXIMA_MS } from "./fila-de-imagens";
+import { pedirVezDeImagemPesada } from "./fila-de-imagens";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
@@ -107,7 +107,7 @@ import {
   tempoEstimado,
   type AmostraDeGeracao,
 } from "@/lib/custo-do-pdf";
-import Versoes from "./Versoes";
+import Versoes, { type VersaoEnviada } from "./Versoes";
 import { comoSeDiz, noMesmoEspaco, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { custosDe, margemTotal } from "@/lib/orcamento/margem";
@@ -545,6 +545,51 @@ function aplicarBase(d: StudioDoc, base: number): StudioDoc {
 function baseDoDoc(d: Partial<StudioDoc>): number | undefined {
   const m = resolveProposalMoney(d as StudioDoc);
   return m.base > 0 ? m.base : undefined;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS CAMPOS QUE DECIDEM O DINHEIRO — E SÓ ESSES
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É o conjunto exacto que `totaisDaProposta` lê para desenhar o quadro do PDF:
+ * o valor, o modo e a taxa de IVA, os textos de display, as linhas adicionais e
+ * a regra com que elas contam, e a percentagem do sinal. Nada mais.
+ *
+ * Existe para repor o dinheiro de uma proposta ENVIADA sem lhe repor o resto: o
+ * texto, as fotografias e os mood boards podem ter sido escritos DEPOIS do
+ * envio, são trabalho dela, e nunca estiveram em causa. «Se falhar, não perder
+ * trabalho» é a regra da casa, e trocar o documento inteiro para acertar um
+ * número era perdê-lo.
+ *
+ * Os campos são copiados MESMO QUANDO NÃO EXISTEM no documento enviado (fica
+ * `undefined`), e é de propósito: uma proposta que seguiu sem `vatRate` não
+ * pode ficar com a taxa que o rascunho deste aparelho entretanto ganhou.
+ */
+/** «em 12 de setembro de 2026». Uma data sem dia lê-se mal ao lado de dois
+ *  números; uma data ilegível não se escreve de todo. */
+function dataDoEnvioPorExtenso(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "num envio anterior";
+  return `em ${d.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`;
+}
+
+const CAMPOS_DO_DINHEIRO = [
+  "totalAmount",
+  "totalVatMode",
+  "vatRate",
+  "totalText",
+  "totalEstimatedText",
+  "budgetExtras",
+  "budgetExtrasSomam",
+  "depositPercent",
+] as const;
+
+function dinheiroDoDocumento(d: Partial<StudioDoc>): Partial<StudioDoc> {
+  const saida: Record<string, unknown> = {};
+  const origem = d as unknown as Record<string, unknown>;
+  for (const campo of CAMPOS_DO_DINHEIRO) saida[campo] = origem[campo];
+  return saida as Partial<StudioDoc>;
 }
 
 function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
@@ -1403,6 +1448,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [assetOriginais, setAssetOriginais] = useState<Record<string, string>>({});
   /**
    * ══════════════════════════════════════════════════════════════════════════
+   * O DEGRAU DO MEIO: A DERIVADA DE 1200 px
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A cascata de cada célula tinha DOIS degraus e nada entre eles — a miniatura
+   * e, a falhar essa, o ORIGINAL. Os pesos, medidos no estúdio a 1,6 Mbps com
+   * 24 células:
+   *
+   *     miniatura (400 px)     20 KB por célula   →   0,4 MB nas 24
+   *     derivada  (1200 px)  ~200 KB por célula   →   4,8 MB nas 24
+   *     original  (2200 px)   1099 KB por célula  →  26,4 MB nas 24
+   *
+   * E as células destas grelhas medem, medido no navegador: **~101 px aos 375,
+   * ~126 px entre 640 e 1023, ~92 px aos 1024** (as fotografias dos mood
+   * boards) — nenhuma delas com o que fazer a 2200 px de largura.
+   *
+   * Uma miniatura falha por coisas banais: a assinatura de seis horas de uma
+   * foto da Biblioteca que caducou, um pedido que expirou, um `sharp` que não
+   * correu. O que não era banal era a queda — de 20 KB para 1099 KB, na rede em
+   * que ela está a trabalhar. Daqui em diante cai-se para 150.
+   *
+   * Ausente quer dizer «essa derivada ainda não foi fabricada»: a célula cai
+   * directa ao original, como sempre caiu. Ver `mediasAssinadas` no `/assets`.
+   */
+  const [assetMedias, setAssetMedias] = useState<Record<string, string>>({});
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
    * OS URL QUE ESTA SESSÃO JÁ VIU MORRER
    * ══════════════════════════════════════════════════════════════════════════
    *
@@ -1783,7 +1854,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     versao?: "pt" | "en";
   } | null>(null);
   /** A vista com as páginas lado a lado está aberta? */
-  const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
   /** As fotos escolhidas para serem movidas em conjunto — chaves `bi:ii`. */
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const hydrated = useRef(false);
@@ -1792,6 +1862,73 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const serverStamp = useRef<string | null>(null);
   /** Já avisámos desta gravação cruzada? (uma vez chega; não a cada gravação) */
   const warnedOverwrite = useRef(false);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE SEGUIU PARA O CLIENTE, E O QUE ESTE APARELHO TEM
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela, com três pontos de exclamação: «eu quero igual o valor!!!
+   * até eu alterar por mim!». O PDF que o casal tem em mãos dizia 13.257,85 € a
+   * pagar; a proposta reabria a dizer 15.090,55 €.
+   *
+   * As contas que faziam o número mexer sozinho estão corrigidas (ver os três
+   * blocos «AQUI ESTAVA O VALOR A CRESCER SOZINHO» e o merge do rascunho do
+   * servidor). Isto é a REDE por baixo delas: o estúdio nunca olhava para o
+   * documento que SEGUIU. O que reabria era o rascunho deste aparelho com o
+   * «Preço final» do pedido por cima — dois números que ninguém obriga a
+   * continuar iguais ao terceiro, o que o casal recebeu.
+   *
+   * Agora, ao abrir, compara-se com a última proposta ENVIADA. Havendo
+   * diferença, ela aparece ESCRITA, com os dois números lado a lado, antes de
+   * qualquer decisão.
+   *
+   * ── PORQUE É QUE NÃO SE REPÕE SOZINHO ────────────────────────────────────
+   *
+   * Porque duas coisas legítimas produzem exactamente a mesma diferença, e o
+   * código não as distingue:
+   *
+   *   · o valor mexeu sozinho — e repor o enviado é o que ela quer;
+   *   · ela CORRIGIU o preço de propósito depois do envio, na Gestão do pedido
+   *     ou aqui, para a proposta seguinte — e repor o enviado apagava-lhe a
+   *     correcção sem uma palavra.
+   *
+   * Escolher por ela seria acertar em metade dos casos e destruir trabalho na
+   * outra metade, em silêncio nos dois. O que a rede garante é que nenhum dos
+   * dois números ganha sem ela saber: estão os dois no ecrã, com as datas, e o
+   * botão de repor é dela.
+   */
+  const [divergenciaDoEnviado, setDivergenciaDoEnviado] = useState<{
+    /** Quando é que a proposta seguiu para o cliente. */
+    enviadaEm: string;
+    /** O total a pagar (com IVA) que ia no PDF que ele recebeu. */
+    aPagarEnviado: number;
+    /** O total a pagar que este ecrã mostra agora. */
+    aPagarAqui: number;
+    /** O identificador da versão, para ir buscar o documento ao repor. */
+    versaoId: string;
+    /**
+     * ── A ÚNICA PERGUNTA QUE INTERESSA: FOI ELA? ──────────────────────────
+     *
+     * Palavras dela: «ISTO E SIMPLES, O VALOR NAO ALTERA CASO EU NAO MUDO».
+     *
+     * `false` — não há registo de ninguém ter mexido no preço depois do envio,
+     * portanto o número mexeu-se SOZINHO. Não há nada a perguntar: repõe-se o
+     * que seguiu para o cliente, com aviso e com dez segundos para anular.
+     *
+     * `true` — há um `price_set` no histórico do pedido posterior ao envio.
+     * Ela corrigiu o preço de propósito depois de a proposta ter saído, e esse
+     * é trabalho dela: repor por cima apagava-o em silêncio. Só nesse caso é
+     * que os dois números vão ao ecrã com a escolha.
+     */
+    elaMudou: boolean;
+  } | null>(null);
+  /** A ir buscar o documento que seguiu, para o repor. */
+  const [aReporOEnviado, setAReporOEnviado] = useState(false);
+  /** A conferência com o enviado corre UMA vez por abertura. */
+  const conferidoComOEnviado = useRef(false);
+  /** A abertura assentou (o rascunho local e o do servidor já foram lidos)?
+   *  Sem isto a conferência olhava para um ecrã a meio de ser montado. */
+  const [aberturaAssente, setAberturaAssente] = useState(false);
 
   // ── Restore draft on mount ──
   //
@@ -1825,6 +1962,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   useEffect(() => {
     if (hydrated.current) return;
     let hadDraft = false;
+    /** O rascunho deste aparelho, já lido — e a BASE que ele traz. Guardam-se
+     *  aqui fora porque o ramo do «o pedido ainda não tem preço», lá em baixo,
+     *  precisa dos dois: ler `totalInput` ali daria SEMPRE a cadeia vazia (o
+     *  `setTotalInput` de cima só entra em vigor na render seguinte), e a
+     *  conversão para o pedido precisa dos adicionais DO RASCUNHO, não dos do
+     *  documento em branco que ainda está no estado. */
+    let rascunhoLocal: StudioDoc | null = null;
+    let baseDoRascunho: number | undefined;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -1844,8 +1989,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               coverImages: normaliseCoverImages(merged.coverImages),
             });
           });
+          rascunhoLocal = parsed as StudioDoc;
           // A BASE, não o `totalAmount` cru — ver `baseDoDoc`.
           const base = baseDoDoc(parsed);
+          baseDoRascunho = base;
           if (base != null) setTotalInput(textoDoTotal(base));
           // Um rascunho que já traz traduções abre com as caixas inglesas à
           // vista, haja `meta` ou não: texto que existe no documento e não
@@ -1861,6 +2008,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // mesma, e a hidratação preenche-o assim que responder.
         if (meta?.originais && typeof meta.originais === "object") {
           setAssetOriginais(meta.originais);
+        }
+        // O degrau do meio viaja com o rascunho pela mesma razão que o plano B,
+        // e rascunhos gravados antes de ele existir não o têm: abrem na mesma,
+        // com a cascata de dois degraus, até a hidratação responder.
+        if (meta?.medias && typeof meta.medias === "object") {
+          setAssetMedias(meta.medias);
         }
         // Rascunhos guardados antes de as cores existirem não as têm: abrem na
         // mesma, e a hidratação preenche-as assim que o servidor responder.
@@ -1972,8 +2125,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // de isto existir. Não se deita fora: adopta-se, e GRAVA-SE no pedido —
       // é o que faz os dois convergirem numa verdade só, em vez de escolher
       // uma e perder a outra.
-      const daProposta = parseMoneyText(totalInput) || undefined;
-      if (daProposta && daProposta > 0) persistirPreco(daProposta);
+      //
+      // ── E LIA O CAMPO ERRADO ────────────────────────────────────────────
+      //
+      // Estava `parseMoneyText(totalInput)`, e `totalInput` aqui é SEMPRE "":
+      // começa vazio e o `setTotalInput` de cima só entra em vigor na render
+      // seguinte. O ramo nunca gravava nada — a promessa escrita nele («os dois
+      // convergem numa verdade só») não se cumpria uma única vez, e um pedido
+      // sem preço com uma proposta escrita continuava a aparecer sem dinheiro
+      // nenhum na Visão Geral, no Kanban e no dossier.
+      //
+      // Lê-se agora a base DO RASCUNHO, e a conversão para o pedido é feita
+      // contra o rascunho — que é quem tem os adicionais. Ver
+      // `baseDoEcraParaOPedido`.
+      if (baseDoRascunho != null && baseDoRascunho > 0) {
+        persistirPreco(baseDoRascunho, rascunhoLocal ? { doc: rascunhoLocal } : undefined);
+      }
     }
     hydrated.current = true;
     // SÓ quando não havia rascunho nenhum. Ver o bloco «A ABERTURA TAMBÉM NÃO
@@ -2221,22 +2388,62 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           ...merged,
           coverImages: normaliseCoverImages(merged.coverImages),
         });
-        return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
+        /**
+         * ── E O PREÇO DO PEDIDO ATRAVESSA PELA CONVERSÃO, COMO NA MONTAGEM ──
+         *
+         * Aqui estava `aplicarBase(limpo, doPedido)`: o «Preço final» do pedido
+         * — que é o que o casal paga, adicionais INCLUÍDOS — escrito em cru no
+         * campo que significa só os SERVIÇOS. `dinheiroDaProposta` somava-lhe
+         * a deslocação outra vez por baixo, e o total subia exactamente o valor
+         * dos adicionais. Medido numa proposta já enviada, com 895,00 € de
+         * deslocação: o PDF dizia 10.778,74 € sem IVA e o estúdio reabria a
+         * dizer 11.673,74 €.
+         *
+         * É o MESMO defeito que a montagem já tinha fechado (ver «AQUI ESTAVA
+         * O VALOR A CRESCER SOZINHO») — sobrevivia neste segundo efeito, que é
+         * o que corre quase sempre: o carimbo local é escrito ANTES do PUT e o
+         * `updatedAt` do servidor DEPOIS, portanto a comparação de datas está
+         * estruturalmente a favor do servidor. E é também o caminho do
+         * telemóvel que abre dias depois sem rascunho guardado nenhum.
+         *
+         * E ESCALAVA: o número inflacionado ficava no `totalAmount` do rascunho
+         * gravado a seguir, e a visita seguinte partia de lá.
+         *
+         * `null` = a conta não dá (o preço do pedido é menor do que os
+         * adicionais escritos). Deixa-se o documento como está, pela razão que
+         * está escrita em `baseParaOEstudio`: o aviso de desalinhamento já diz
+         * o que se passa, e inventar um número aqui fazia o preço do PEDIDO
+         * subir na gravação seguinte.
+         */
+        const paraOEcra = mandaOPedido ? baseDoPedidoParaOEcra(doPedido, limpo) : null;
+        // O campo do total é estado à parte e a conversão precisa do documento
+        // MERGIDO (dos adicionais e do modo de IVA que vieram do servidor), por
+        // isso lê-se aqui dentro — a mesma razão que a montagem tem escrita.
+        const base = mandaOPedido ? paraOEcra : (baseDoDoc(doDoServidor) ?? null);
+        if (base != null && !camposTocados.current.has("__total")) {
+          setTotalInput(textoDoTotal(base));
+        }
+        return paraOEcra == null ? limpo : aplicarBase(limpo, paraOEcra);
       });
       // O que estava marcado como «vindo do pedido» deixou de estar no ecrã: o
       // que se vê agora é o rascunho dela, feito noutro dispositivo. Manter os
       // anéis pedia confirmação de texto que ela já escreveu — e o anel só vale
       // enquanto quiser dizer «isto não é teu».
       setPorConfirmar(new Set());
-      const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
-      if (base != null && !camposTocados.current.has("__total")) {
-        setTotalInput(textoDoTotal(base));
-      }
       // O documento do servidor pode trazer traduções que este computador nunca
       // viu — é o caso de abrir a proposta noutro portátil. As caixas inglesas
       // acendem-se, pela mesma razão do restauro local.
       if (docTemIngles(doDoServidor)) setBilingue(true);
-    })();
+    })()
+      // A abertura ASSENTOU — o rascunho local já foi restaurado e o do
+      // servidor já foi lido (ou já se sabe que não há, ou que não dá para
+      // perguntar). É a partir daqui que a conferência com o documento que
+      // seguiu para o cliente pode olhar para números estáveis; antes disto
+      // olhava para um ecrã a meio de ser montado e acusava diferenças que se
+      // desfaziam sozinhas 200 ms depois.
+      .finally(() => {
+        if (active) setAberturaAssente(true);
+      });
     return () => {
       active = false;
     };
@@ -2272,8 +2479,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             return "falhou";
           }
           const data = await res.json().catch(() => null);
-          const imgs: { path: string; url: string; thumbUrl?: string; cor?: string }[] =
-            Array.isArray(data?.images) ? data.images : [];
+          const imgs: {
+            path: string;
+            url: string;
+            thumbUrl?: string;
+            midUrl?: string;
+            cor?: string;
+          }[] = Array.isArray(data?.images) ? data.images : [];
           // Saiu de cena a meio: não há veredicto nenhum a dar a ninguém.
           if (!vivo()) return "a-caminho";
           // Zero fotografias É uma resposta: uma proposta sem fotos nenhumas
@@ -2311,6 +2523,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             const next = { ...prev };
             for (const im of imgs)
               if (im.path && im.url) next[im.path] = urlAindaBom(vivo_(next[im.path]), im.url);
+            return next;
+          });
+          // O degrau do meio, pela mesma regra do original: o guardado só
+          // ganha ao fresco enquanto o prazo servir.
+          //
+          // Uma foto que volte SEM `midUrl` não apaga a que já se sabia: a
+          // ausência quer dizer «ainda não foi fabricada», e uma resposta que
+          // não a traz não é prova de que a que já se tinha morreu.
+          setAssetMedias((prev) => {
+            const next = { ...prev };
+            for (const im of imgs)
+              if (im.path && im.midUrl)
+                next[im.path] = urlAindaBom(vivo_(next[im.path]), im.midUrl);
             return next;
           });
           // As cores não expiram (não são URLs assinados): uma vez conhecidas,
@@ -2600,6 +2825,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // rede (ou antes de a hidratação responder) deixava as células sem
             // para onde cair — que é exactamente quando mais falta faz.
             originais: semProvisorios(assetOriginais),
+            // E o degrau do meio, para uma reabertura sem rede não ter de cair
+            // de 20 KB direita a 1099 — que é precisamente quando não há linha
+            // para os pagar.
+            medias: semProvisorios(assetMedias),
             // As cores viajam com o rascunho pela mesma razão que o plano B:
             // reabrir sem rede (ou antes de a hidratação responder) deixava o
             // aviso de paleta mudo justamente quando ele ainda faz falta.
@@ -2667,6 +2896,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     doc,
     assetUrls,
     assetOriginais,
+    assetMedias,
     assetCores,
     themeOrigins,
     refEdited,
@@ -2852,8 +3082,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // ── Total estruturado + IVA ──
   // O modo efetivo: explícito no doc, senão detetado a partir do texto livre
   // (retrocompatibilidade com propostas antigas só com "3.000,00 € + IVA").
+  /**
+   * ── E UM DOCUMENTO NOVO NASCE EM «ACRESCE» ────────────────────────────
+   *
+   * O `detectVatMode` devolve "incluido" quando não há texto nenhum para ler —
+   * é a retrocompatibilidade com propostas antigas só com «3.000,00 €». Mas um
+   * documento ACABADO DE COMEÇAR também não tem texto, e caía nessa mesma
+   * porta: nascia em «IVA incluído», que é o modo que a casa deixou de usar.
+   *
+   * A detecção fica onde serve — havendo texto livre, é ele que manda.
+   */
   const vatMode: VatMode =
-    doc.totalVatMode ?? detectVatMode(doc.totalText || doc.totalEstimatedText);
+    doc.totalVatMode ??
+    (doc.totalText || doc.totalEstimatedText
+      ? detectVatMode(doc.totalText || doc.totalEstimatedText)
+      : "acrescer");
 
   /** Compõe o texto de DISPLAY do PDF a partir do valor + modo estruturados,
    *  no formato do estúdio ("3.000,00 € + IVA" ou "3.000,00 €"). */
@@ -2921,10 +3164,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * Quando os adicionais estão dentro do valor, as duas não fazem nada, e o
    * comportamento é exactamente o de sempre.
    */
-  /** A INVERSA da de cima, e vive no mesmo ficheiro que ela — ver
-   *  `lib/preco-do-pedido`. */
-  function baseDoEcraParaOPedido(base: number): number {
-    return precoDoPedidoParaBase(base, doc as unknown as ContextoDoPreco);
+  /**
+   * A INVERSA da de cima, e vive no mesmo ficheiro que ela — ver
+   * `lib/preco-do-pedido`.
+   *
+   * ── O DOCUMENTO É UM ARGUMENTO, E TEM DE SER ────────────────────────────
+   *
+   * Lia `doc` da closure, e havia três chamadores em que `doc` é precisamente
+   * o documento ERRADO: repor uma versão, copiar uma proposta e anular uma
+   * limpeza trocam o documento inteiro com um `setDoc` e chamam isto na linha
+   * a seguir — quando `doc` ainda é o que se acabou de substituir. Os
+   * adicionais somados eram os do documento ANTIGO.
+   *
+   * Repor a versão que seguiu para o cliente é o caso que dói: a versão traz
+   * 1.490,00 € de adicionais, o rascunho no ecrã tinha 895,00 €, e o pedido
+   * ficava a 595,00 € de distância do que o casal recebeu — sem nada no ecrã
+   * a dizê-lo, e à espera da abertura seguinte para o mostrar.
+   */
+  function baseDoEcraParaOPedido(base: number, deQue: StudioDoc = doc): number {
+    return precoDoPedidoParaBase(base, deQue as unknown as ContextoDoPreco);
   }
 
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
@@ -2933,9 +3191,44 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   /** O último valor que ESTE ecrã mandou gravar — para a resposta que volta do
    *  servidor não disparar outra vez a sincronização e entrar em ciclo. */
   const precoEnviado = useRef<number | undefined>(quote.quotedPrice);
+  /**
+   * ── E O QUE CHEGOU NO `quote`, QUE É COISA DIFERENTE ────────────────────
+   *
+   * O `precoEnviado` diz o que daqui SAIU; este diz o que de lá VEIO. Eram o
+   * mesmo ref, e a sincronização de baixo usava-o como detector de mudança do
+   * `quote.quotedPrice` — o que quer dizer que quem lhe MEXESSE fabricava uma
+   * mudança que nunca houve.
+   *
+   * E passou a haver quem lhe mexesse: o ramo do «o pedido ainda não tem
+   * preço» adopta o valor do rascunho e chama `persistirPreco`, que marca
+   * 3.250 como enviado. O PATCH só volta 600 ms depois, portanto a
+   * sincronização corre na montagem com `quotedPrice` ainda por preencher, lê
+   * `undefined ≠ 3.250`, conclui que o preço foi APAGADO na Gestão do pedido —
+   * e limpava o total do ecrã. Medido: o campo ficava em branco até a resposta
+   * chegar, e se a rede estivesse em baixo ficava em branco e era assim que o
+   * rascunho gravava. O valor dela desaparecia por não haver rede.
+   *
+   * Com os dois separados, a pergunta que a sincronização faz volta a ser a
+   * certa: «o número que veio é diferente do último que veio?». Na montagem
+   * não é — a hidratação já aplicou o que havia a aplicar.
+   */
+  const doPedidoVisto = useRef<number | undefined>(quote.quotedPrice);
 
-  function persistirPreco(escrito: number | undefined, opcoes?: { jaEfectivo: boolean }) {
-    const base = escrito == null || opcoes?.jaEfectivo ? escrito : baseDoEcraParaOPedido(escrito);
+  function persistirPreco(
+    escrito: number | undefined,
+    opcoes?: {
+      /** O número já é o que o casal paga: não se lhe somam adicionais nenhuns. */
+      jaEfectivo?: boolean;
+      /** Contra que documento se faz a conversão. Ver `baseDoEcraParaOPedido`:
+       *  quem acabou de trocar o documento tem de o dizer, senão a soma é feita
+       *  com os adicionais do que já lá não está. */
+      doc?: StudioDoc;
+    },
+  ) {
+    const base =
+      escrito == null || opcoes?.jaEfectivo
+        ? escrito
+        : baseDoEcraParaOPedido(escrito, opcoes?.doc ?? doc);
     precoEnviado.current = base;
     if (gravarPreco.current) clearTimeout(gravarPreco.current);
     gravarPreco.current = setTimeout(async () => {
@@ -2968,13 +3261,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
     writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
     persistirPreco(base);
-  }
-
-  function setVatMode(mode: VatMode) {
-    // A base não muda ao trocar de modo — muda o que o cliente vê. O valor do
-    // documento é recalculado a partir da mesma base.
-    const base = parseMoneyText(totalInput);
-    writeTotal(base > 0 ? amountParaBase(base, mode) : undefined, mode);
   }
 
   /**
@@ -3355,8 +3641,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // `precoEnviado` evita o ciclo: quando a mudança veio DAQUI, o valor que
   // volta é o que acabámos de mandar e não há nada a fazer.
   useEffect(() => {
-    if (!hydrated.current) return;
     const doPedido = quote.quotedPrice;
+    // Primeiro a pergunta certa: MUDOU o que vem de fora? A montagem também
+    // corre este efeito, e na montagem não mudou nada. Ver `doPedidoVisto`.
+    const mudou = doPedido !== doPedidoVisto.current;
+    doPedidoVisto.current = doPedido;
+    if (!hydrated.current) return;
+    if (!mudou) return;
     if (doPedido === precoEnviado.current) return;
     precoEnviado.current = doPedido;
     setDoc((d) => {
@@ -3595,7 +3886,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // E o preço volta ao pedido com ele: quem repôs o rascunho repôs o valor
     // que lá estava, e deixá-lo só no ecrã era voltar a ter duas verdades.
     const base = parseMoneyText(limpo.total);
-    persistirPreco(base > 0 ? base : undefined);
+    // Com o documento REPOSTO, e não com o que está a sair do ecrã — ver
+    // `baseDoEcraParaOPedido`.
+    persistirPreco(base > 0 ? base : undefined, { doc: limpo.doc });
     setLimpo(null);
     toast("Rascunho reposto.", "success");
   }
@@ -3754,7 +4047,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // estúdio passava a dizer 8.000 e a Gestão do pedido, o Kanban e o dossier
     // continuavam a dizer 9.400 até ela enviar. Duas verdades sobre o mesmo
     // negócio, e a errada era a que aparecia em todos os outros ecrãs.
-    persistirPreco(typeof base === "number" && base > 0 ? base : undefined);
+    // Com a versão REPOSTA, e não com o rascunho que ela acabou de substituir:
+    // os adicionais que contam são os da versão. Ver `baseDoEcraParaOPedido`.
+    persistirPreco(typeof base === "number" && base > 0 ? base : undefined, { doc: reposto });
     // A referência é composta a partir dos campos ATÉ alguém lhe mexer. Uma
     // versão reposta traz a referência com que seguiu, e recompô-la por cima
     // trocava o número da proposta que o cliente tem em mãos.
@@ -3859,6 +4154,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     );
     setAssetUrls({});
     setAssetOriginais({});
+    setAssetMedias({});
     setAssetCores({});
     setThemeOrigins({});
     setRefEdited(false);
@@ -5370,6 +5666,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     persistirPreco(base > 0 ? base : undefined);
   }
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * TROCAR «COMO CONTAM OS ADICIONAIS» É MEXER NO DINHEIRO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O selector decide se a deslocação está DENTRO do valor escrito ou se lhe
+   * SOMA — ou seja, decide se o casal paga 3.000 ou 3.140. A frase debaixo
+   * dele diz isso mesmo, com os dois números.
+   *
+   * E era um `setDoc` a seco: mudava o total no ecrã e não gravava nada no
+   * pedido. A partir daí o estúdio dizia um número e o «Preço final» dizia
+   * outro, em silêncio — até à abertura seguinte, em que quem manda no valor é
+   * o pedido e o total saltava sozinho o valor inteiro dos adicionais. É «o
+   * valor está diferente do que enviámos», pela porta do lado.
+   *
+   * A conta é a do `definirExtras`, e de propósito a mesma: o campo do escrito
+   * NÃO mexe (é sempre só os serviços); o que muda é o efectivo, e é o
+   * efectivo que o pedido guarda.
+   */
+  function trocarModoDosAdicionais(somam: boolean) {
+    setDoc((d) => ({ ...d, budgetExtrasSomam: somam }));
+    const escrito = parseMoneyText(totalInput);
+    // Os adicionais do documento que está no ecrã — o `setDoc` acima é
+    // assíncrono e só mexe na REGRA, não nas linhas.
+    const adicionais = somaDosExtrasSemIva(doc.budgetExtras ?? [], {
+      mode: vatMode,
+      vatRate: doc.vatRate,
+    });
+    const efectivo = round2(somam ? escrito + adicionais : escrito);
+    persistirPreco(efectivo > 0 ? efectivo : undefined, { jaEfectivo: true });
+  }
+
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
   function addBudgetExtra() {
     // Uma linha nova nasce vazia: não há valor nenhum para somar ainda.
@@ -5855,6 +6183,203 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     };
   }, [quote.id]);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A CONFERÊNCIA COM O QUE SEGUIU PARA O CLIENTE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Ver o bloco `divergenciaDoEnviado`, que conta o porquê. Aqui é a mecânica,
+   * e ela é de propósito barata: a LISTA das versões traz o total de cada
+   * envio (`total`, o bruto que ia no PDF) e mais nada. Quando bate certo — que
+   * é o caso normal — não se descarrega documento nenhum.
+   *
+   * `versoes[0]` é a mais recente: a rota devolve da mais nova para a mais
+   * velha, e está escrito lá.
+   */
+  const chaveDoEnviadoVisto = `${DRAFT_KEY}:enviado-visto`;
+  /** Esta MESMA diferença já lhe foi mostrada e ela ficou com o que tem? */
+  function divergenciaJaVista(aPagarAqui: number): boolean {
+    try {
+      const cru = localStorage.getItem(chaveDoEnviadoVisto);
+      return cru != null && Math.abs(Number(cru) - aPagarAqui) <= 0.01;
+    } catch {
+      // Sem `localStorage` a pergunta volta na abertura seguinte. É o lado
+      // certo para falhar: repetir uma pergunta custa um clique, calá-la custa
+      // o número que o casal recebeu.
+      return false;
+    }
+  }
+
+  useEffect(() => {
+    if (!aberturaAssente || conferidoComOEnviado.current) return;
+    // Enviar NESTA sessão põe no ecrã exactamente o documento que seguiu — não
+    // há nada para conferir, e a lista de versões ainda nem o conhece.
+    if (sent) return;
+    // Uma proposta a meio de ser escrita não tem total nenhum para comparar.
+    if (!(totais.aPagar > 0)) return;
+    conferidoComOEnviado.current = true;
+    let vivo = true;
+    const aPagarAqui = round2(totais.aPagar);
+    (async () => {
+      try {
+        const r = await fetch(`/api/orcamento/${quote.id}/versoes`, { cache: "no-store" });
+        if (!r.ok || !vivo) return;
+        const dados = (await r.json()) as { versoes?: VersaoEnviada[] } | null;
+        const ultima = dados?.versoes?.[0];
+        if (!ultima || !(Number(ultima.total) > 0)) return;
+        const enviado = round2(Number(ultima.total));
+        // Um cêntimo de tolerância, a mesma do resto da casa: os dois lados
+        // passaram por arredondamentos, e um cêntimo não é uma divergência.
+        if (Math.abs(enviado - aPagarAqui) <= 0.01) return;
+        if (divergenciaJaVista(aPagarAqui)) return;
+        if (!vivo) return;
+        /**
+         * O histórico do pedido é quem sabe. Cada alteração de preço feita à
+         * mão deixa lá um `price_set` (ver `registarNoHistorico`) — no estúdio
+         * e na Gestão do pedido. Uma posterior ao envio quer dizer que a
+         * mudança foi decidida; não havendo nenhuma, o número mexeu-se
+         * sozinho, e aí não há escolha nenhuma a oferecer-lhe.
+         */
+        const elaMudou = (quote.activityLog ?? []).some(
+          (e) => e.kind === "price_set" && e.at > ultima.enviadaEm,
+        );
+        setDivergenciaDoEnviado({
+          enviadaEm: ultima.enviadaEm,
+          aPagarEnviado: enviado,
+          aPagarAqui,
+          versaoId: ultima.id,
+          elaMudou,
+        });
+      } catch {
+        /* sem rede: o estúdio abre como sempre abriu, só sem a rede por baixo */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberturaAssente, sent, totais.aPagar, quote.id]);
+
+  /**
+   * Repõe no ecrã os VALORES que seguiram para o cliente — e só os valores.
+   *
+   * O texto, as fotografias e os mood boards ficam exactamente como estão: são
+   * trabalho dela, podem ser posteriores ao envio, e nunca estiveram em causa.
+   * O que volta é o conjunto de campos que decide o dinheiro — o mesmo que
+   * `totaisDaProposta` lê para desenhar o quadro do PDF.
+   *
+   * Reversível durante dez segundos, como todas as outras acções que mexem no
+   * preço, e com uma linha no histórico do pedido pela mesma razão: um valor
+   * que muda, visto três semanas depois, tem de ter onde se explicar.
+   */
+  async function reporOsValoresEnviados() {
+    const d = divergenciaDoEnviado;
+    if (!d || aReporOEnviado) return;
+    setAReporOEnviado(true);
+    try {
+      const res = await fetch(`/api/orcamento/${quote.id}/versoes?doc=${d.versaoId}`, {
+        cache: "no-store",
+      });
+      const dados = (await res.json().catch(() => null)) as { doc?: ProposalDoc } | null;
+      if (!res.ok || !dados?.doc) {
+        throw new Error(
+          "Não foi possível ir buscar a proposta que seguiu para o cliente. A ligação falhou ou a versão já não está no servidor — tenta outra vez daqui a pouco, ou fala com quem gere a instalação. Nada mudou no que está no ecrã.",
+        );
+      }
+      const enviado = dados.doc as StudioDoc;
+      setLimpo({
+        doc,
+        total: totalInput,
+        segundos: 10,
+        motivo: `Valores repostos como seguiram para o cliente — total a pagar de ${eur(d.aPagarAqui)} para ${eur(d.aPagarEnviado)}.`,
+      });
+      setDoc((dd) => ({ ...dd, ...dinheiroDoDocumento(enviado) }));
+      const base = baseDoDoc(enviado);
+      setTotalInput(typeof base === "number" && base > 0 ? textoDoTotal(base) : "");
+      // Com o documento ENVIADO, e não com o que estava no ecrã — ver
+      // `baseDoEcraParaOPedido`. É isto que volta a pôr o «Preço final» do
+      // pedido de acordo com o que o casal recebeu.
+      persistirPreco(typeof base === "number" && base > 0 ? base : undefined, { doc: enviado });
+      registarNoHistorico(
+        `Valores repostos no estúdio como seguiram para o cliente: total a pagar de ${eur(d.aPagarAqui)} para ${eur(d.aPagarEnviado)}.`,
+      );
+      /**
+       * ── E O «ANULAR» TEM DE FICAR ANULADO ────────────────────────────────
+       *
+       * A reposição é reversível durante dez segundos. Se ela a anular, o ecrã
+       * volta a `aPagarAqui` — e, sem esta linha, a abertura seguinte via outra
+       * vez uma divergência que ninguém tinha decidido e repunha de novo. Ela
+       * ficava a lutar com o ecrã, e a anulação não valia nada.
+       *
+       * Guardar `aPagarAqui` (o valor de ANTES) diz exactamente isto: «se
+       * acabares neste número, é porque o escolheste». Se não anular, o ecrã
+       * fica no valor enviado e não há divergência nenhuma para conferir.
+       */
+      try {
+        localStorage.setItem(chaveDoEnviadoVisto, String(d.aPagarAqui));
+      } catch {
+        /* sem `localStorage` a reposição vale na mesma; o que se perde é a
+           memória de ela a ter anulado */
+      }
+      setDivergenciaDoEnviado(null);
+      toast(
+        "Os valores voltaram ao que seguiu para o cliente. Podes anular durante 10 segundos.",
+        "success",
+      );
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : "Não foi possível repor os valores enviados.",
+        "error",
+      );
+    } finally {
+      setAReporOEnviado(false);
+    }
+  }
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O VALOR QUE SE MEXEU SOZINHO VOLTA SOZINHO — SEM PERGUNTAR NADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «eu quero que o valor enviado para o cliente seja o valor
+   * que fica na proposta e não quero depois se eu for à proposta no back
+   * office já esteja outro valor naquele pedido. ISTO É SIMPLES, O VALOR NÃO
+   * ALTERA CASO EU NÃO MUDO».
+   *
+   * Antes isto punha os dois números no ecrã e esperava por ela. A razão
+   * escrita era boa — duas causas diferentes dão a mesma diferença — mas a
+   * conclusão estava errada, e ela disse-o: nos dois casos QUEM DECIDE JÁ
+   * DECIDIU. Se mudou o preço, mudou-o de propósito e isso está no histórico.
+   * Se não mudou, o número que vale é o que o casal tem em mãos, e perguntar
+   * é fazê-la escolher entre um valor certo e um valor avariado.
+   *
+   * Portanto: `elaMudou === false` repõe, e a pergunta só sobrevive no caso em
+   * que responder por ela apagava trabalho dela.
+   *
+   * O que ela vê continua a ser tudo: o aviso do que aconteceu, o valor velho
+   * e o novo, dez segundos para anular e uma linha no histórico do pedido.
+   * Nada disto é silencioso — é só uma coisa a menos para decidir.
+   */
+  useEffect(() => {
+    if (!divergenciaDoEnviado || divergenciaDoEnviado.elaMudou) return;
+    if (aReporOEnviado) return;
+    void reporOsValoresEnviados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [divergenciaDoEnviado]);
+
+  /** Fica o que está neste aparelho — e a pergunta não se repete enquanto o
+   *  número não voltar a mexer. */
+  function manterOsValoresDesteAparelho() {
+    const d = divergenciaDoEnviado;
+    if (!d) return;
+    try {
+      localStorage.setItem(chaveDoEnviadoVisto, String(d.aPagarAqui));
+    } catch {
+      /* sem `localStorage` a pergunta volta na abertura seguinte */
+    }
+    setDivergenciaDoEnviado(null);
+  }
+
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
   /**
    * Copiar uma proposta antiga para cima desta.
@@ -5884,7 +6409,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const base = baseDoDoc(copiado);
     const temValor = typeof base === "number" && base > 0;
     setTotalInput(temValor ? textoDoTotal(base!) : "");
-    persistirPreco(temValor ? base : undefined);
+    // Com o documento COPIADO — ver `baseDoEcraParaOPedido`.
+    persistirPreco(temValor ? base : undefined, { doc: copiado });
     setPorConfirmar(new Set(e.camposAMudar));
     // O título interno volta a gerar-se sozinho: a cópia esvaziou-o de
     // propósito para não ficar com o nome do casal anterior no cabeçalho.
@@ -6169,6 +6695,94 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Button>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          O QUE SEGUIU PARA O CLIENTE, E O QUE ESTE APARELHO TEM
+          ══════════════════════════════════════════════════════════════════
+
+          Palavras dela: «eu quero igual o valor!!! até eu alterar por mim!».
+
+          Os dois números lado a lado, com a data do envio, antes de qualquer
+          decisão. Ver o bloco `divergenciaDoEnviado`, que explica porque é que
+          nenhum dos dois se aplica sozinho: uma correcção de preço feita de
+          propósito depois do envio produz exactamente esta mesma diferença, e
+          escolher por ela era apagar trabalho em metade dos casos.
+
+          No topo do estúdio, ao lado das outras perguntas de dinheiro e pela
+          mesma razão que está escrita lá: uma pergunta que aparece cada vez
+          noutro sítio é uma pergunta que se responde sem se ler.
+
+          Empilhado abaixo dos 30rem e em linha acima — a caixa vive na coluna
+          do estúdio, e não na janela. A conta: os dois blocos de número pedem
+          ~13rem cada («Total a pagar» + «15 090,55 €» a 13px são ~11rem, mais
+          o `gap-4` de 1rem e o respiro), portanto 26rem é onde os dois deixam
+          de se apertar; 30rem é o degrau da casa logo acima, e dá folga para
+          os números de seis dígitos que ela tem (202 889,00 €). */}
+      {divergenciaDoEnviado?.elaMudou && (
+        <div
+          role="alert"
+          /* O nome distingue-o dos outros avisos do estúdio — há mais do que um
+             `role="alert"` neste ecrã, e um leitor que anuncie «alerta» sem
+             dizer de quê obriga a ir procurar. */
+          aria-label="O valor não é o que seguiu para o cliente"
+          className="mb-4 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+        >
+          <p className="text-xs leading-relaxed text-foreground/70">
+            Esta proposta já seguiu para o cliente{" "}
+            {dataDoEnvioPorExtenso(divergenciaDoEnviado.enviadaEm)}, e o valor que está neste ecrã
+            NÃO é o que ele recebeu. Escolhe qual dos dois fica — nada muda até escolheres.
+          </p>
+          <div className="@container mt-2.5">
+            <dl className="flex flex-col gap-2 @min-[30rem]:flex-row @min-[30rem]:gap-4">
+              <div className="min-w-0 grow">
+                <dt className="text-[11px] text-foreground/45">O que o cliente recebeu</dt>
+                <dd className="text-sm font-semibold text-foreground/85">
+                  {eur(divergenciaDoEnviado.aPagarEnviado)}
+                </dd>
+              </div>
+              <div className="min-w-0 grow">
+                <dt className="text-[11px] text-foreground/45">O que está neste aparelho</dt>
+                <dd className="text-sm font-semibold text-foreground/85">
+                  {eur(divergenciaDoEnviado.aPagarAqui)}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          {/* A espera desenhada da única maneira que esta casa desenha esperas.
+              `estimadoMs` e não uma barra sabida: é um pedido e uma resposta, e
+              no meio não há nada que se possa contar. */}
+          {aReporOEnviado ? (
+            <EmCurso
+              className="mt-2.5 max-w-xs"
+              titulo="A ir buscar a proposta que seguiu…"
+              estimadoMs={2000}
+              nota="Só os valores voltam atrás. O texto e as fotografias ficam como estão."
+              notaDemorada="O servidor está a demorar. Se falhar, nada muda no que está no ecrã."
+            />
+          ) : (
+            <div className="mt-2.5 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                onClick={() => void reporOsValoresEnviados()}
+              >
+                Repor os valores que seguiram
+              </button>
+              <button
+                type="button"
+                className="alvo-toque text-xs text-foreground/55 underline-offset-2 hover:underline"
+                onClick={manterOsValoresDesteAparelho}
+              >
+                Manter os deste aparelho
+              </button>
+            </div>
+          )}
+          <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/45">
+            Repor mexe só nos valores — o texto, as fotografias e os mood boards ficam como estão, e
+            podes anular durante 10 segundos.
+          </p>
+        </div>
+      )}
 
       {limpo && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
@@ -6694,7 +7308,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <>
                         <Thumb
                           url={assetUrls[path]}
-                          planoB={assetOriginais[path]}
+                          // A cascata, do mais leve para o mais pesado. Ver
+                          // `assetMedias`: o degrau do meio poupa ~900 KB por
+                          // célula sempre que a miniatura falha.
+                          planoB={[assetMedias[path], assetOriginais[path]]}
                           estadoDosUrls={estadoDosUrls}
                           aoTentarDeNovo={() => void tentarBuscarFotos()}
                           aoMorrer={marcarUrlMorto}
@@ -6798,42 +7415,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 onMover={moverSeleccaoParaBoard}
                 onLimpar={() => setSeleccionadas(new Set())}
               />
-              {/* ── AS PÁGINAS LADO A LADO ────────────────────────────────
-                  A pergunta que o editor não deixa fazer — «isto parece tudo
-                  do mesmo casamento?» — só se responde com as folhas todas à
-                  mesma distância dos olhos.
-
-                  FORA DA GRELHA, e acima dela. Lá dentro era o TERCEIRO filho
-                  de uma grelha de duas colunas: por colocação automática, a
-                  vista ficava com a coluna do índice e a lista dos mood boards
-                  descia para a coluna de 11 rem — 176 px de largura para as
-                  fotografias todas, a partir dos 1024 px. Aqui em cima ocupa a
-                  largura toda, que é a única em que umas folhas lado a lado se
-                  comparam. */}
-              {vistaDeConjunto && (
-                <VistaDeConjunto
-                  doc={doc as ProposalDoc}
-                  ordem={ordemDosBoards}
-                  idioma={idiomaDoPdf}
-                  urls={assetUrls}
-                  originais={assetOriginais}
-                  aspetos={aspetosDasFotos}
-                  onMover={(de, para) => moverBoardParaPosicao(de, para)}
-                  onSaltar={(bi) => {
-                    const id = doc.moodBoards[bi]?.id;
-                    if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                    document
-                      .getElementById(`mood-board-${bi}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  // O salto de uma folha de texto usa o MESMO caminho da
-                  // Conferência: abre a secção se estiver dobrada e só então
-                  // leva a vista. Uma segunda maneira de saltar era uma segunda
-                  // maneira de falhar a abertura da dobra.
-                  onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
-                  onFechar={() => setVistaDeConjunto(false)}
-                />
-              )}
               {/* ── O ÍNDICE ─────────────────────────────────────────────
                   Onde a caixa dá, é uma coluna fixa ao lado; onde não dá, uma
                   tira que se percorre por cima da lista — a 390 px, uma coluna
@@ -7383,7 +7964,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         >
                                           <Thumb
                                             url={assetUrls[path]}
-                                            planoB={assetOriginais[path]}
+                                            // Do mais leve para o mais pesado —
+                                            // ver `assetMedias`. É esta grelha
+                                            // que tem 24 células e é aqui que a
+                                            // queda de 20 KB para 1099 doía.
+                                            planoB={[assetMedias[path], assetOriginais[path]]}
                                             estadoDosUrls={estadoDosUrls}
                                             aoTentarDeNovo={() => void tentarBuscarFotos()}
                                             aoMorrer={marcarUrlMorto}
@@ -7721,18 +8306,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     interruptor teria de mentir sobre o conjunto. */}
                     {doc.moodBoards.length > 1 && (
                       <>
-                        {/* As oito páginas à mesma distância dos olhos — a única
-                            maneira de ver se parecem todas do mesmo casamento. */}
-                        <button
-                          type="button"
-                          className={ADD_BTN}
-                          onClick={() => setVistaDeConjunto((v) => !v)}
-                          aria-pressed={vistaDeConjunto}
-                        >
-                          {vistaDeConjunto
-                            ? "Fechar a vista de conjunto"
-                            : "Ver as páginas lado a lado"}
-                        </button>
                         <button type="button" className={ADD_BTN} onClick={() => dobrarTodos(true)}>
                           Fechar todos
                         </button>
@@ -8421,9 +8994,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       aria-label="Como contam os valores adicionais no preço final"
                       className="bo-input alvo-toque px-2.5 py-2 text-xs"
                       value={doc.budgetExtrasSomam ? "somam" : "dentro"}
-                      onChange={(e) =>
-                        setDoc((d) => ({ ...d, budgetExtrasSomam: e.target.value === "somam" }))
-                      }
+                      onChange={(e) => trocarModoDosAdicionais(e.target.value === "somam")}
                     >
                       <option value="dentro">Já incluídas no valor</option>
                       <option value="somam">Somam ao valor</option>
@@ -8901,86 +9472,70 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </div>
               )}
               {/* ══════════════════════════════════════════════════════════════
-                  O SELECTOR DO IVA — UM SÓ, E O ESCOLHIDO É O QUE DÁ NAS VISTAS
+                  SÓ HÁ UMA MANEIRA DE CONTAR O IVA: ACRESCE
                   ══════════════════════════════════════════════════════════════
 
-                  Eram duas coisas: um selector de dois botões e, por baixo, dois
-                  cartões com as mesmas duas leituras. Palavras dela: «o selector
-                  tem o não-seleccionado mais visível do que o seleccionado».
-                  Tinha — o segmento escolhido ficava BRANCO sobre um cartão que
-                  também é branco (é assim que o `Segmented` do back office
-                  marca a escolha, e funciona sobre fundos lavados, não sobre
-                  este), enquanto o outro ficava recortado na calha cinzenta.
+                  Palavras dela: «retira com o IVA incluído. É apenas com o
+                  valor sem IVA mais o IVA acresce».
 
-                  Passou a haver UM controlo: os dois cartões É que se carregam.
-                  O escolhido leva moldura de dois pixéis, fundo de musgo, texto
-                  a cheio e a palavra «escolhido»; o outro é uma linha fina e
-                  cinzenta. Não há como trocá-los, e desaparece a repetição —
-                  eram dois sítios a dizer «IVA incluído» a um palmo um do outro.
+                  Eram duas opções lado a lado, para escolher. A escolha não
+                  valia nada — as propostas da casa são todas «valor sem IVA +
+                  IVA» — e custava o pior engano que este ecrã pode ter: um
+                  toque distraído no cartão errado mudava o que o casal paga
+                  SEM mudar o número que ela está a olhar.
 
-                  `radiogroup` + `radio` e não botões: é o que faz as setas
-                  andarem entre as duas opções e o leitor de ecrã anunciar «1 de
-                  2, escolhido». A marca nunca é só a cor (moldura, negrito e
-                  palavra), como manda o `DESIGN-TOKENS.md`. */}
-              {/* `@container`: estas duas caixas vivem numa CÉLULA da grelha
-                  aqui em cima, e essa célula tem ~252 px aos 1024 e ~296 aos
-                  640. Postas a duas colunas por uma pergunta feita à janela,
-                  ficavam com 126 px cada — para dois botões que dizem «IVA
-                  incluído» e trazem o valor por extenso. Aqui a pergunta é a
-                  largura da célula. */}
+                  ── O QUE ISTO NÃO MUDA, E É O QUE INTERESSA ────────────────
+                  O campo «Valor (sem IVA)» já mostrava a BASE nos dois modos
+                  (`baseDoDoc` → `resolveProposalMoney`). Medido: um documento
+                  em «IVA incluído» com 3280 guardado mostra base 2666,67, IVA
+                  613,33 e 3280,00 a pagar — exactamente o mesmo que o mesmo
+                  documento em «acresce» com base 2666,67. Tirar a opção não
+                  mexe em número nenhum: nem no campo, nem no IVA, nem no que o
+                  cliente paga, nem nas propostas que já seguiram.
+
+                  Fica a LEITURA, que continua a valer — é onde ela confere que
+                  o IVA e o total a pagar são os que espera. O que saiu foi o
+                  controlo, não a informação. */}
               <div className="@container flex flex-col gap-1.5">
                 <span className="bo-eyebrow">IVA</span>
-                <div
-                  role="radiogroup"
-                  aria-label="Modo de IVA"
-                  className="grid grid-cols-1 gap-2 text-[11px] @min-[26rem]:grid-cols-2"
-                  onKeyDown={(e) => {
-                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                    e.preventDefault();
-                    setVatMode(vatMode === "acrescer" ? "incluido" : "acrescer");
-                  }}
-                >
-                  {(["acrescer", "incluido"] as const).map((modo) => {
-                    const v = duasFormas[modo];
-                    const ativa = vatMode === modo;
-                    return (
-                      <button
-                        key={modo}
-                        type="button"
-                        role="radio"
-                        aria-checked={ativa}
-                        tabIndex={ativa ? 0 : -1}
-                        onClick={() => setVatMode(modo)}
-                        className={`alvo-toque !justify-start rounded-xl border px-3 py-2.5 text-left motion-safe:transition-colors ${
-                          ativa
-                            ? "border-2 border-[#4d6350] bg-[#4d6350]/[0.09] text-foreground/90"
-                            : "border border-foreground/12 text-foreground/45 hover:border-foreground/25 hover:text-foreground/65"
-                        }`}
-                      >
-                        <span className="block">
-                          <span className={`block ${ativa ? "font-semibold" : "font-medium"}`}>
-                            {modo === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
-                            {ativa && " · escolhido"}
-                          </span>
-                          {money.base > 0 && (
-                            <>
-                              <span className="mt-0.5 block">
-                                base {eur(v.base)} · IVA {eur(v.iva)}
-                              </span>
-                              <span className="block">
-                                o cliente paga{" "}
-                                <strong className="font-semibold">{eur(v.total)}</strong>
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="rounded-xl border border-foreground/12 px-3 py-2.5 text-[11px]">
+                  {/* A leitura é do modo DESTE documento, não do que a casa faz
+                      hoje. Uma proposta antiga gravada em «IVA incluído» tem o
+                      bruto no `totalAmount`; mostrar-lhe a leitura de «acresce»
+                      dizia base 3280 e IVA 754,40 sobre um documento que vale
+                      2666,67 e 613,33. Um quadro que mente sobre o dinheiro é
+                      pior do que um quadro a menos. */}
+                  <span className="block font-medium text-foreground/70">
+                    {vatMode === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
+                  </span>
+                  {money.base > 0 && (
+                    <>
+                      <span className="mt-0.5 block text-foreground/55">
+                        base {eur(duasFormas[vatMode].base)} · IVA {eur(duasFormas[vatMode].iva)}
+                      </span>
+                      <span className="block text-foreground/55">
+                        o cliente paga{" "}
+                        <strong className="font-semibold text-foreground/80">
+                          {eur(duasFormas[vatMode].total)}
+                        </strong>
+                      </span>
+                    </>
+                  )}
                 </div>
                 <p className="text-xs leading-relaxed text-foreground/45">
-                  Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
-                  «incluído» mostra já a soma. O valor acima é sempre sem IVA.
+                  {vatMode === "acrescer" ? (
+                    "O valor acima é sempre sem IVA, e o PDF mostra-o com o IVA a somar por cima."
+                  ) : (
+                    /* E não se converte por ela: mudar o modo muda o TEXTO que
+                       sai no PDF («3.280,00 €» passa a «2.666,67 € + IVA»).
+                       Numa proposta que já seguiu, isso é o documento do casal
+                       a deixar de bater certo com o que ele tem em mãos. */
+                    <>
+                      Esta proposta foi escrita com o IVA já dentro do valor. As novas são todas
+                      «sem IVA + IVA acresce»; esta fica como seguiu, para o documento continuar
+                      igual ao que o cliente tem.
+                    </>
+                  )}
                 </p>
               </div>
               <Field
@@ -9110,6 +9665,68 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               </div>
             )}
           </Section>
+
+          {/* ══════════════════════════════════════════════════════════════
+              AS PÁGINAS LADO A LADO — NO FIM, E SEM SE PEDIR
+              ══════════════════════════════════════════════════════════════
+
+              Palavras dela: «eu quero que apareça isto automaticamente no
+              final sem pedirmos ou carregarmos para ver».
+
+              Estava atrás de um botão («Ver as páginas lado a lado»), e o
+              botão só existia com mais do que um mood board. Duas condições
+              para ver o documento inteiro, e a segunda não fazia sentido
+              nenhuma desde que esta vista deixou de ser dos mood boards e
+              passou a ser da PROPOSTA: a capa, a apresentação, o orçamento,
+              as condições e a contracapa existem com um board ou com zero.
+
+              Fica no FIM da coluna onde ela escreve, que é onde a pergunta
+              nasce — acabei, como é que isto ficou? Estava em cima, antes de
+              tudo o que a responde.
+
+              ── PORQUE É QUE ESTÁ AQUI E NÃO UM NÍVEL ACIMA ────────────────
+              O passo 1 é uma FILA (`lg:flex`): o índice, esta coluna e o
+              painel «O que vai sair». Um quarto filho ali seria uma quarta
+              COLUNA, e as folhas lado a lado espremidas numa coluna deixam de
+              se poder comparar — que é a única coisa que esta vista serve.
+              Último filho da coluna de escrita é a largura toda, e é a mesma
+              que ela já tinha quando estava em cima.
+
+              ── E PORQUE É QUE NÃO LEVA `content-visibility` ──────────────
+              Foi a primeira ideia — saltar o desenho enquanto ela não chega cá
+              abaixo. Mas o `Paineis.contrato.test.ts` proíbe escrevê-lo à mão
+              numa página, e tem razão medida: quem o usa tem de reservar a
+              altura certa, e uma reserva errada faz a página encolher debaixo
+              do dedo na primeira descida (576 px medidos em `/servicos`). O
+              molde da casa, `.cv-panel`, FIXA a altura a `--cv-h` — serve
+              bandas de altura conhecida, e esta vista tem tantas folhas quantas
+              a proposta tiver. Fixá-la era cortá-la.
+
+              Fica sem optimização nenhuma, que é o estado honesto: se algum dia
+              pesar, mede-se primeiro. */}
+          <div className="mt-6">
+            <VistaDeConjunto
+              doc={doc as ProposalDoc}
+              ordem={ordemDosBoards}
+              idioma={idiomaDoPdf}
+              urls={assetUrls}
+              originais={assetOriginais}
+              aspetos={aspetosDasFotos}
+              onMover={(de, para) => moverBoardParaPosicao(de, para)}
+              onSaltar={(bi) => {
+                const id = doc.moodBoards[bi]?.id;
+                if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+                document
+                  .getElementById(`mood-board-${bi}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              // O salto de uma folha de texto usa o MESMO caminho da
+              // Conferência: abre a secção se estiver dobrada e só então
+              // leva a vista. Uma segunda maneira de saltar era uma segunda
+              // maneira de falhar a abertura da dobra.
+              onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
+            />
+          </div>
         </div>
         {/*
          * ── A TERCEIRA ZONA ──────────────────────────────────────────────
@@ -9145,6 +9762,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             doc={doc}
             assetUrls={assetUrls}
             assetOriginais={assetOriginais}
+            assetMedias={assetMedias}
             money={money}
             split={split}
             pctSinal={pctSinal}
@@ -11000,8 +11618,8 @@ function PreviewThumb({
   pendente = false,
 }: {
   url?: string;
-  /** O ORIGINAL, para quando a miniatura não existir. */
-  planoB?: string;
+  /** Para onde cair, do mais leve para o mais pesado. Ver `planoB` no `Thumb`. */
+  planoB?: string | readonly (string | undefined)[];
   pendente?: boolean;
 }) {
   const { alvo, desistiu: failed, aoFalhar } = useFotoComPlanoB(url, planoB);
@@ -11201,14 +11819,17 @@ function PreviewSummary({
   doc,
   assetUrls,
   assetOriginais,
+  assetMedias,
   money,
   split,
   pctSinal,
 }: {
   doc: StudioDoc;
   assetUrls: Record<string, string>;
-  /** O ORIGINAL de cada foto — o plano B das células. */
+  /** O ORIGINAL de cada foto — o último degrau da cascata das células. */
   assetOriginais: Record<string, string>;
+  /** A derivada de 1200 px, o degrau do meio. Ver `assetMedias` no estúdio. */
+  assetMedias: Record<string, string>;
   money: ReturnType<typeof resolveProposalMoney>;
   /** O sinal e o saldo, tal como `totaisDaProposta` os devolve. */
   split: { sinal: number; saldo: number };
@@ -11245,7 +11866,7 @@ function PreviewSummary({
             <PreviewThumb
               key={i}
               url={assetUrls[path]}
-              planoB={assetOriginais[path]}
+              planoB={[assetMedias[path], assetOriginais[path]]}
               pendente={isPendingImage(path)}
             />
           ))}
@@ -11721,8 +12342,16 @@ function Thumb({
   refDoc,
 }: {
   url?: string;
-  /** O ORIGINAL, para quando a miniatura não existir. Ver `assetOriginais`. */
-  planoB?: string;
+  /**
+   * PARA ONDE CAIR, do mais leve para o mais pesado.
+   *
+   * Uma cadeia é o caso antigo («cai para o original»). Uma lista é a cascata
+   * inteira — nas grelhas do estúdio, `[derivada de 1200 px, original]`. Ver
+   * `assetMedias`: entre a miniatura de 20 KB e o original de 1099 KB não havia
+   * nada, e a queda custava cinquenta e cinco vezes o peso para desenhar a
+   * mesma caixa de ~100 px.
+   */
+  planoB?: string | readonly (string | undefined)[];
   /** Em que pé está a leitura dos URL — ver `estadoDosUrls` no estúdio. */
   estadoDosUrls?: EstadoDosUrls;
   /** Ir buscar os URL outra vez, a pedido dela. */
@@ -11790,7 +12419,13 @@ function Thumb({
    * já, sem esperar pelo `ultimoAlvo`, e a cascata pode receber a resposta em
    * vez de gastar uma volta a descobrir o que já se sabia.
    */
-  const recusadaPeloSitio = useRecusaDaPolitica(planoB ?? url);
+  /**
+   * O último degrau da cascata — o ficheiro grande. É por ele que se pergunta a
+   * recusa da política (todas as moradas desta foto têm a mesma origem) e é ele
+   * que o «Abrir ficheiro» abre.
+   */
+  const original = [...(Array.isArray(planoB) ? planoB : [planoB])].reverse().find(Boolean);
+  const recusadaPeloSitio = useRecusaDaPolitica(original ?? url);
   const {
     alvo,
     desistiu: failed,
@@ -11842,7 +12477,21 @@ function Thumb({
    * É também o que a Biblioteca de Temas faz, e é lá que está medido o que
    * vale — a primeira foto passou de 26 s para 1,4 s.
    */
-  const pesada = alvo != null && alvo === planoB;
+  /**
+   * ── O QUE É «PESADA» DEPOIS DE HAVER TRÊS DEGRAUS ────────────────────────
+   *
+   * Era `alvo === planoB`, que com dois degraus queria dizer exactamente «é o
+   * original». Com três, o plano B do meio é a derivada de 1200 px — ~200 KB,
+   * dez vezes a miniatura — e essa também não pode ir vinte e quatro ao mesmo
+   * tempo para o mesmo canal.
+   *
+   * Portanto: pesada é TUDO menos o primeiro degrau. E é também o primeiro
+   * degrau quando ele É o original — uma fotografia sem miniatura nenhuma chega
+   * aqui com o mesmo endereço nos dois lugares, e a cascata guarda-o uma vez
+   * só; sem esta segunda metade da condição, essa célula deixava de esperar
+   * pela vez e voltávamos às 24 a repartir o canal.
+   */
+  const pesada = alvo != null && (alvo !== url || alvo === original);
   /**
    * A vez, uma vez por célula e para sempre.
    *
@@ -11872,27 +12521,28 @@ function Thumb({
      * a cascata caiu para o original, porque ela carregou em «Tentar
      * novamente» — pedia na mesma vez, e ficava com um dos TRÊS lugares sem
      * precisar dele: o download dela já ia a caminho, e o lugar só se largava
-     * ao fim de `ESPERA_MAXIMA_MS` (30 s).
+     * ao fim de `ESPERA_MAXIMA_MS`.
      *
      * Numa grelha onde as fotos falham em cadeia é o pior momento possível
      * para isso: as três vagas ficam com células que não estão à espera de
-     * nada, e as que ainda não têm um único pixel no ecrã esperam meio minuto
-     * por uma vaga que já não é vaga nenhuma. A fila existe para reger quem
-     * ainda não começou.
+     * nada, e as que ainda não têm um único pixel no ecrã esperam por uma vaga
+     * que já não é vaga nenhuma. A fila existe para reger quem ainda não
+     * começou.
+     *
+     * ── O RELÓGIO DO TECTO NÃO ESTÁ AQUI, E É DE PROPÓSITO ─────────────────
+     * Estava: um `setTimeout` montado à volta deste pedido, que devolvia a vaga
+     * ao fim do tecto. Escrito assim, a invariante que importa — **o tecto
+     * conta o DOWNLOAD e nunca a ESPERA** — dependia de o `setTimeout` estar
+     * dentro do arranque e não fora dele, o que ninguém vê ao ler e ninguém
+     * apanha ao mudar. Passou para dentro da `fila-de-imagens`, que o arma no
+     * instante em que concede a vaga e tem um caso a fixá-lo.
      */
     if (!pesada || temVezRef.current) return;
-    let temporizador = 0;
     const largar = pedirVezDeImagemPesada(() => {
       temVezRef.current = true;
       setTemVez(true);
-      // Rede de segurança: um pedido que nunca termina não pode ficar com a vez
-      // para sempre.
-      temporizador = window.setTimeout(() => largarVez.current?.(), ESPERA_MAXIMA_MS);
     });
-    largarVez.current = () => {
-      window.clearTimeout(temporizador);
-      largar();
-    };
+    largarVez.current = largar;
     return () => {
       largarVez.current?.();
       largarVez.current = null;

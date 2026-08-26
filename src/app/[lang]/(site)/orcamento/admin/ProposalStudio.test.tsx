@@ -290,7 +290,14 @@ let traducaoLigadaNoServidor = false;
 let traducaoResponde: (textos: string[]) => Response = (textos) =>
   reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
 /** As fotos que o servidor conhece para este pedido (`GET /assets`). */
-let assetsServidor: { path: string; url: string; thumbUrl?: string; cor?: string }[] = [];
+let assetsServidor: {
+  path: string;
+  url: string;
+  thumbUrl?: string;
+  /** A derivada de 1200 px — o degrau do meio da cascata. */
+  midUrl?: string;
+  cor?: string;
+}[] = [];
 /**
  * O `/assets` FALHA (Storage em baixo, sessão caducada, rede a cair).
  *
@@ -747,13 +754,37 @@ describe("total desalinhado da soma das linhas", () => {
     );
   });
 
-  it("mostra as duas leituras do IVA lado a lado", async () => {
-    // Para ela ver o que o cliente vai ver, antes de decidir.
+  /**
+   * ── DE DUAS LEITURAS PARA UMA ─────────────────────────────────────────
+   *
+   * Palavras dela: «retira com o IVA incluído. É apenas com o valor sem IVA
+   * mais o IVA acresce».
+   *
+   * Eram dois cartões, e carregar num deles ESCOLHIA o modo. A escolha não
+   * valia nada (as propostas da casa são todas «acresce») e custava o pior
+   * engano que este ecrã pode ter: um toque distraído no cartão errado mudava
+   * o que o casal paga sem mexer no número que ela está a olhar.
+   *
+   * Fica a leitura — é onde ela confere o IVA e o total a pagar. Saiu o
+   * controlo, não a informação.
+   */
+  it("mostra UMA leitura do IVA, e nenhuma para escolher", async () => {
     seedComPrecos(3250);
     renderStudio();
-    // A barra fixa do fundo também diz "o cliente paga", precedida de
-    // "sem IVA ·" — daí a âncora no início.
-    expect(await screen.findAllByText(/^o cliente paga/)).toHaveLength(2);
+    // A barra fixa do fundo também diz "o cliente paga" (precedida de
+    // "sem IVA ·"), daí a âncora no início: a do bloco de totais é a única.
+    expect(await screen.findAllByText(/^o cliente paga/)).toHaveLength(1);
+    // E não há nada para carregar: o modo deixou de ser uma escolha.
+    expect(screen.queryByRole("radiogroup", { name: "Modo de IVA" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /IVA incluído/i })).toBeNull();
+  });
+
+  it("e um documento novo nasce em «acresce», não em «IVA incluído»", async () => {
+    // `detectVatMode` devolvia "incluido" quando não havia texto nenhum para
+    // ler — retrocompatibilidade com propostas antigas. Um documento acabado
+    // de começar também não tem texto, e caía na mesma porta.
+    renderStudio();
+    expect(await screen.findByText(/\+ IVA \(acresce\)/)).toBeTruthy();
   });
 });
 
@@ -1384,7 +1415,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     /**
-     * Os pedidos de antes, DESCONTADA a gravação do rascunho.
+     * Os pedidos de antes, DESCONTADAS as GRAVAÇÕES.
      *
      * Este teste chegou a contar todos e a falhar de vez em quando na
      * integração: a gravação do rascunho sai com oitocentos milissegundos de
@@ -1392,9 +1423,22 @@ describe("fotos da biblioteca em estado provisório", () => {
      * coisa — persistência, não a fotografia — e não se controla daqui.
      * Contá-la fazia o teste ficar vermelho por uma razão que nada tem a ver
      * com o que ele afirma, e um teste que falha por acaso deixa de se ler.
+     *
+     * ── E PASSOU A HAVER UMA SEGUNDA GRAVAÇÃO ATRASADA ──────────────────
+     * O `PATCH` do preço, que o ramo do «o pedido ainda não tem preço» dispara
+     * 600 ms depois da montagem para levar ao pedido o valor que só o rascunho
+     * tinha. Cai na MESMA descrição e pela mesma razão — persistência, não a
+     * fotografia — e foi assim que apareceu: verde aqui, vermelho na
+     * integração, que é mais lenta e chega aos 600 ms dentro da janela.
+     *
+     * Descontam-se as duas pelo que são (escritas), e não pelo instante em que
+     * calham: um teste afinado ao relógio da máquina volta a falhar sozinho.
      */
-    const semGravacoes = (ps: typeof pedidos) =>
-      ps.filter((p) => !p.url.includes("proposta-rascunho")).length;
+    const escrita = (p: (typeof pedidos)[number]) => {
+      const metodo = p.init?.method ?? "GET";
+      return p.url.includes("proposta-rascunho") || metodo === "PATCH";
+    };
+    const semGravacoes = (ps: typeof pedidos) => ps.filter((p) => !escrita(p)).length;
     const antes = semGravacoes(pedidos);
     await reservar(user);
 
@@ -1658,16 +1702,22 @@ describe("O valor é UM só — o do pedido", () => {
     vi.useRealTimers();
   });
 
-  it("trocar o modo de IVA não mexe na base — muda o que o cliente vê", async () => {
-    const user = userEvent.setup();
+  /**
+   * ── JÁ NÃO SE TROCA O MODO, E ERA ESSE O PONTO ────────────────────────
+   *
+   * O caso de antes carregava no cartão «IVA incluído» e provava que a base
+   * não se mexia. O controlo desapareceu (ver «mostra UMA leitura do IVA»), e
+   * com ele o engano que ele permitia — um toque a mudar o que o casal paga.
+   *
+   * O que continua a ter de ser verdade é a outra metade da afirmação antiga:
+   * o número que viaja para o pedido é a BASE, e o rótulo «(sem IVA)» da
+   * Gestão do pedido é verdadeiro.
+   */
+  it("o número do pedido é a base, e o ecrã não deixa trocar o modo do IVA", async () => {
     desenhar(comPreco(3000));
     const campo = await screen.findByLabelText(/Valor \(sem IVA\)/i);
     expect(campo).toHaveValue("3000");
-
-    await user.click(screen.getByRole("radio", { name: /IVA incluído/i }));
-    // O número do pedido é a BASE, e continua a ser 3000 — o rótulo "(sem IVA)"
-    // da Gestão do pedido tem de continuar verdadeiro nos dois modos.
-    expect(campo).toHaveValue("3000");
+    expect(screen.queryByRole("radio", { name: /IVA incluído/i })).toBeNull();
   });
 });
 
@@ -2405,6 +2455,687 @@ describe("o preço do pedido sobrevive ao rascunho do servidor", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
+ * UM PEDIDO SEM PREÇO E UMA PROPOSTA COM ELE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A abertura tem um ramo para isto — «o pedido ainda não tem preço mas o
+ * rascunho tem um valor escrito; adopta-se, e GRAVA-SE no pedido» — e ele lia
+ * `totalInput`, que naquele instante é SEMPRE a cadeia vazia: começa vazio e o
+ * `setTotalInput` da linha de cima só entra em vigor na render seguinte.
+ *
+ * Ou seja, nunca gravou nada. O pedido continuava sem dinheiro nenhum na Visão
+ * Geral, no Kanban e no dossier, com a proposta escrita ao lado a dizer o
+ * contrário.
+ */
+describe("o rascunho leva o preço ao pedido que ainda não o tem", () => {
+  function precosNoPedido(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  it("e leva o que o casal paga, com os adicionais somados", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        location: "Évora",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 9883.74,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    // O pedido não tem «Preço final» nenhum.
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByDisplayValue("Évora");
+    // 9.883,74 de serviços + 895,00 de deslocação.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74), { timeout: 3000 });
+  }, 20_000);
+
+  /**
+   * ── E ADOPTAR O PREÇO NÃO PODE APAGAR O ECRÃ ──────────────────────────
+   *
+   * O ramo de cima chama `persistirPreco`, e `persistirPreco` marca 10.778,74
+   * como «enviado por mim». Só que o PATCH volta 600 ms depois: na montagem, o
+   * `quote.quotedPrice` ainda está por preencher.
+   *
+   * A sincronização que ouve o pedido usava esse mesmo carimbo como detector
+   * de mudança. Lia `undefined ≠ 10.778,74`, concluía que o preço tinha sido
+   * APAGADO na Gestão do pedido, e limpava o total: `setTotalInput("")` e
+   * `totalAmount: undefined`. O campo ficava em branco.
+   *
+   * Com rede, voltava quando a resposta chegasse — um piscar. SEM rede, ficava
+   * em branco, e era o branco que o rascunho seguinte gravava: o valor dela
+   * desaparecia por não haver rede. É a regra da casa ao contrário («se
+   * falhar, não perder trabalho»), e por isso tem caso próprio.
+   */
+  it("e o valor não desaparece do campo enquanto o pedido não responde", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        location: "Évora",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 9883.74,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByDisplayValue("Évora");
+    const campo = (await screen.findByLabelText(/Valor \(sem IVA\)/)) as HTMLInputElement;
+    expect(campo.value).toBe("9883,74");
+    // E continua lá depois de o PATCH ter tido tempo de ir e não voltar: é o
+    // caso da rede em baixo, que é onde isto doía.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74), { timeout: 3000 });
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("9883,74");
+  }, 20_000);
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE SEGUIU PARA O CLIENTE TEM DE APARECER ESCRITO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre uma proposta já enviada: «eu quero igual o valor!!! até
+ * eu alterar por mim!».
+ *
+ * As contas que faziam o número mexer sozinho estão corrigidas. Isto é a REDE
+ * por baixo delas: o estúdio nunca olhava para o documento que SEGUIU. O que
+ * reabria era o rascunho deste aparelho com o «Preço final» do pedido por
+ * cima — dois números que nada obriga a continuar iguais ao terceiro, o que o
+ * casal recebeu.
+ *
+ * O caso real, ao cêntimo: o PDF dizia 13.257,85 € a pagar e a proposta
+ * reabria a dizer 15.090,55 €.
+ */
+describe("a proposta enviada e o que está no aparelho", () => {
+  /** A proposta tal como seguiu: 9.883,74 de serviços + 895,00 de deslocação,
+   *  13.257,85 € a pagar. */
+  function jaSeguiuPor13257() {
+    versoesServidor = [
+      {
+        id: "v1",
+        enviadaEm: "2026-06-01T10:00:00.000Z",
+        total: 13257.85,
+        estado: "enviada",
+        mudancas: [],
+        resumo: "Primeira versão enviada",
+      },
+    ];
+    docsDeVersao.v1 = {
+      template: "decoracao",
+      ref: "PO Decoração",
+      clientNames: "Maria & Zé",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2026",
+      location: "Évora",
+      guests: "80 pax",
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+      moodBoards: [],
+      budgetItems: [],
+      coverImages: ["", ""],
+      budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+      budgetExtrasSomam: true,
+      totalAmount: 9883.74,
+      totalVatMode: "acrescer",
+      totalLabel: "Valor Total Decoração",
+    };
+  }
+
+  /** Os `quotedPrice` que foram gravados no pedido, pela ordem. */
+  function precosNoPedido(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  /**
+   * O pedido ficou com um número que não é o que seguiu, e NINGUÉM mexeu no
+   * preço depois do envio — o histórico do pedido não tem `price_set` nenhum
+   * posterior a 1 de junho. Ou seja: o número mexeu-se sozinho. É esta a
+   * situação que ela viu, e é a que se resolve sem lhe perguntar nada.
+   */
+  const abrirDesalinhado = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 12268.74 } as Quote} />
+      </ToastProvider>,
+    );
+
+  /**
+   * A MESMA diferença, com uma causa diferente: ela corrigiu o preço de
+   * propósito DEPOIS de a proposta ter saído, e isso ficou escrito no histórico
+   * do pedido. Aqui repor por cima apagava trabalho dela — e é o único caso em
+   * que os dois números vão ao ecrã com a escolha.
+   */
+  const abrirDepoisDeElaMudar = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio
+          quote={
+            {
+              ...quote,
+              quotedPrice: 12268.74,
+              activityLog: [
+                {
+                  id: "a1",
+                  at: "2026-06-14T09:00:00.000Z",
+                  kind: "price_set",
+                  summary: "Preço final alterado para 12.268,74 €.",
+                },
+              ],
+            } as Quote
+          }
+        />
+      </ToastProvider>,
+    );
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * O QUE SE MEXEU SOZINHO VOLTA SOZINHO
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «eu quero que o valor enviado para o cliente seja o valor
+   * que fica na proposta (…). ISTO É SIMPLES, O VALOR NÃO ALTERA CASO EU NÃO
+   * MUDO».
+   *
+   * Isto punha os dois números no ecrã e esperava por ela. A razão escrita era
+   * boa — duas causas dão a mesma diferença — mas obrigava-a a escolher entre
+   * um valor certo e um avariado, de cada vez que abria a proposta. Sem
+   * `price_set` no histórico depois do envio, não há dúvida nenhuma a ter.
+   */
+  it("sem ninguém ter mexido no preço, o valor volta ao que o cliente recebeu — sozinho", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    // Abre a 12.268,74 (o número avariado) e assenta no 9.883,74 do envio.
+    await waitFor(
+      () =>
+        expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+          "9883,74",
+        ),
+      { timeout: 3000 },
+    );
+    // E o «Preço final» do pedido volta com ele: 9.883,74 + 895,00 de deslocação.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74), { timeout: 3000 });
+  }, 20_000);
+
+  it("e não lhe pergunta nada — não há aviso a pedir para escolher", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await waitFor(
+      () =>
+        expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+          "9883,74",
+        ),
+      { timeout: 3000 },
+    );
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Repor os valores que seguiram/ })).toBeNull();
+  }, 20_000);
+
+  /**
+   * Mas não é silencioso: a regra da casa é que ela nunca fica sem saber que
+   * algo aconteceu. O aviso diz o que mudou e deixa dez segundos para anular.
+   */
+  it("mas diz-lhe o que fez, e deixa-lhe dez segundos para anular", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await waitFor(
+      () =>
+        expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+          "9883,74",
+        ),
+      { timeout: 3000 },
+    );
+    expect(document.body.textContent).toMatch(/voltaram ao que seguiu para o cliente/i);
+    expect(await screen.findByRole("button", { name: /Anular/i })).toBeTruthy();
+  }, 20_000);
+
+  it("os dois números aparecem lado a lado, com a data do envio", async () => {
+    jaSeguiuPor13257();
+    abrirDepoisDeElaMudar();
+    const aviso = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    expect(aviso.textContent).toContain("já seguiu para o cliente");
+    expect(aviso.textContent).toContain("1 de junho de 2026");
+    // O que ele recebeu…
+    expect(aviso.textContent).toContain(eur(13257.85));
+    // …e o que este ecrã mostra.
+    expect(aviso.textContent).toContain(eur(15090.55));
+  });
+
+  /**
+   * NENHUM DOS DOIS GANHA SOZINHO. Uma correcção de preço feita de propósito
+   * depois do envio produz exactamente esta mesma diferença, e o código não as
+   * distingue — escolher por ela apagava trabalho em metade dos casos, em
+   * silêncio nos dois.
+   */
+  it("e nada muda enquanto ela não escolher", async () => {
+    jaSeguiuPor13257();
+    abrirDepoisDeElaMudar();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("12268,74");
+    // E o documento que seguiu não entrou no que está gravado: a conferência
+    // lê, escreve o que encontrou, e não mexe em nada.
+    expect(corpos("proposta-rascunho").join("")).not.toContain('"totalAmount":9883.74');
+  });
+
+  it("repor põe no ecrã os valores que o cliente recebeu", async () => {
+    jaSeguiuPor13257();
+    abrirDepoisDeElaMudar();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Repor os valores que seguiram/ }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+        "9883,74",
+      );
+    });
+    expect(document.body.textContent).toContain(eur(13257.85));
+    // E o «Preço final» do pedido volta ao que o casal paga: 9.883,74 + 895,00.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74));
+    // O aviso sai do ecrã: já não há divergência nenhuma para mostrar.
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  }, 20_000);
+
+  it("e repor mexe só nos valores — o texto fica como estava", async () => {
+    jaSeguiuPor13257();
+    // O rascunho deste aparelho tem um local escrito DEPOIS do envio.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        location: "Herdade da Malhadinha, Albernoa",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 11373.74,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    abrirDepoisDeElaMudar();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Repor os valores que seguiram/ }));
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+        "9883,74",
+      );
+    });
+    // O documento que seguiu dizia «Évora». O que ela escreveu depois FICA.
+    expect(screen.getByDisplayValue("Herdade da Malhadinha, Albernoa")).toBeTruthy();
+  }, 20_000);
+
+  it("«manter» fica com o do aparelho, e não volta a perguntar o mesmo", async () => {
+    jaSeguiuPor13257();
+    abrirDepoisDeElaMudar();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Manter os deste aparelho/ }));
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("12268,74");
+    cleanup();
+
+    // A visita seguinte, com o MESMO número: já foi respondida.
+    abrirDepoisDeElaMudar();
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  }, 20_000);
+
+  it("quando bate certo, não há aviso nenhum nem leitura a mais", async () => {
+    jaSeguiuPor13257();
+    // O pedido guarda o que o casal paga sem IVA: 10.778,74. 13.257,85 com IVA.
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 10778.74 } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  });
+
+  it("uma proposta que nunca foi enviada não tem com que se comparar", async () => {
+    versoesServidor = [];
+    abrirDesalinhado();
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TROCAR «COMO CONTAM OS ADICIONAIS» É MEXER NO DINHEIRO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O selector decide se os 140 € da deslocação estão DENTRO do valor escrito ou
+ * se lhe SOMAM — ou seja, decide se o casal paga 3.000 ou 3.140. A frase por
+ * baixo dele diz exactamente isso, com os números.
+ *
+ * E não gravava nada no pedido. O estúdio passava a dizer um número e o
+ * «Preço final» continuava com o outro, sem nada no ecrã a dizê-lo — até à
+ * abertura seguinte, em que o pedido é quem manda e o total saltava sozinho o
+ * valor inteiro dos adicionais. É «o valor está diferente do que enviámos»,
+ * pela porta do lado.
+ */
+describe("trocar o modo dos adicionais grava o preço no pedido", () => {
+  /** Os `quotedPrice` que foram gravados no pedido, pela ordem. */
+  function precosGravadosNoPedido(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  async function comDeslocacaoDe140() {
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 3000 } as Quote} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+    const campo = await screen.findByLabelText(/^Valor de /i);
+    await user.type(campo, "140");
+    await user.tab();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    // O ponto de partida: «Somam ao valor», e o pedido já leva os 3.140.
+    expect(precosGravadosNoPedido().at(-1)).toBe(3140);
+    return user;
+  }
+
+  it("passar a «já incluídas» faz o pedido descer para o que o casal paga", async () => {
+    const user = await comDeslocacaoDe140();
+    await user.selectOptions(
+      await screen.findByLabelText(/Como contam os valores adicionais/i),
+      "dentro",
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    // O campo do escrito não mexe: continua a dizer 3.000. O que muda é o que
+    // o casal paga — e é isso que o pedido guarda.
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("3000");
+    expect(precosGravadosNoPedido().at(-1)).toBe(3000);
+  }, 20_000);
+
+  it("e voltar a «somam» devolve-lhe a deslocação", async () => {
+    const user = await comDeslocacaoDe140();
+    const seletor = await screen.findByLabelText(/Como contam os valores adicionais/i);
+    await user.selectOptions(seletor, "dentro");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    await user.selectOptions(seletor, "somam");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    expect(precosGravadosNoPedido().at(-1)).toBe(3140);
+  }, 20_000);
+
+  /**
+   * E o que isto vale, ao pé da letra: trocar o modo e voltar amanhã não move
+   * o total. Sem a gravação, a visita seguinte abria com o pedido a dizer
+   * 3.140 e o documento a dizer «já incluídas» — total 3.140 em vez de 3.000.
+   */
+  it("e a visita seguinte mostra o mesmo total", async () => {
+    const user = await comDeslocacaoDe140();
+    await user.selectOptions(
+      await screen.findByLabelText(/Como contam os valores adicionais/i),
+      "dentro",
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    const aPagar = eur(3000 * 1.23);
+    expect(document.body.textContent).toContain(aPagar);
+    const preco = precosGravadosNoPedido().at(-1) as number;
+    cleanup();
+
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    expect(document.body.textContent).toContain(aPagar);
+  }, 30_000);
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ABRIR NO TELEMÓVEL SOMAVA A DESLOCAÇÃO OUTRA VEZ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre uma proposta JÁ ENVIADA: «eu quero igual o valor!!! até
+ * eu alterar por mim!».
+ *
+ * O PDF que seguiu dizia:
+ *
+ *     Subtotal dos serviços        9.883,74 €
+ *     Deslocação equipa Líquen     +  895,00 €
+ *     TOTAL (sem IVA)             10.778,74 €
+ *     Total a pagar               13.257,85 €
+ *
+ * ── A MECÂNICA ────────────────────────────────────────────────────────────
+ *
+ * Há DOIS efeitos de abertura, e só um sabia a conversão. A montagem punha o
+ * «Preço final» do pedido no campo do escrito depois de lhe TIRAR os
+ * adicionais (`baseParaOEstudio`). O merge do rascunho do SERVIDOR, 100-300 ms
+ * depois, punha lá o mesmo número em CRU — e `dinheiroDaProposta` voltava a
+ * somar-lhe a deslocação por baixo.
+ *
+ * O salto é exactamente o valor dos adicionais, e é redondo por construção.
+ *
+ * E o caminho não é raro: é o de sempre. O carimbo local é escrito ANTES do
+ * PUT e o `updatedAt` do servidor DEPOIS — a comparação de datas está
+ * estruturalmente a favor do servidor —, e é também o do telemóvel que abre
+ * dias depois sem rascunho nenhum guardado.
+ */
+describe("o rascunho do servidor não soma os adicionais outra vez", () => {
+  /** O documento tal como seguiu: 9.883,74 de serviços e 895,00 de deslocação. */
+  function rascunhoComoSeguiu() {
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: {
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Herdade do Servidor",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 9883.74,
+        totalVatMode: "acrescer",
+        totalText: "9.883,74 € + IVA",
+        totalLabel: "Valor Total Decoração",
+      },
+    };
+  }
+
+  /** O «Preço final (sem IVA)» do pedido é o que o casal paga: serviços MAIS
+   *  deslocação. É o número que a rota do envio lá gravou (`money.base`). */
+  const comOPrecoQueSeguiu = { ...quote, quotedPrice: 10778.74 } as Quote;
+
+  const abrir = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={comOPrecoQueSeguiu} />
+      </ToastProvider>,
+    );
+
+  it("o campo do valor continua a dizer só os serviços", async () => {
+    rascunhoComoSeguiu();
+    abrir();
+    // O rascunho do servidor TEM de ter chegado — senão o teste passava por
+    // não ter havido merge nenhum.
+    await screen.findByDisplayValue("Herdade do Servidor");
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("9883,74");
+  });
+
+  it("e o total a pagar é o que o casal recebeu, ao cêntimo", async () => {
+    rascunhoComoSeguiu();
+    abrir();
+    await screen.findByDisplayValue("Herdade do Servidor");
+    // 10.778,74 + 23% = 13.257,85. O defeito dava 12.268,74 + IVA = 15.090,55.
+    await waitFor(() => {
+      expect(document.body.textContent).toContain(eur(13257.85));
+    });
+    expect(document.body.textContent).not.toContain(eur(15090.55));
+  });
+
+  /**
+   * ── E NÃO ESCALA ────────────────────────────────────────────────────────
+   *
+   * O defeito não parava numa soma: o número inflacionado ficava no
+   * `totalAmount` do rascunho gravado a seguir, e ia para o servidor. A visita
+   * seguinte partia de lá e somava outra vez. Três visitas, três deslocações.
+   *
+   * Cada volta aqui é uma abertura a sério: o rascunho que a anterior GRAVOU
+   * passa a ser o do servidor, e o preço que ela mandou para o pedido passa a
+   * ser o `quotedPrice` com que o estúdio abre. É a cadeia real.
+   */
+  it("e três aberturas seguidas não movem um cêntimo", async () => {
+    const gravados: number[] = [];
+    const original = global.fetch;
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const corpo = String(init?.body ?? "");
+      if (String(url).includes("/api/orcamento/") && corpo.includes("quotedPrice")) {
+        const lido = JSON.parse(corpo) as { quotedPrice: number | null };
+        if (typeof lido.quotedPrice === "number") gravados.push(lido.quotedPrice);
+        return new Response(JSON.stringify({ ...quote, quotedPrice: lido.quotedPrice }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return original(url, init);
+    }) as typeof fetch;
+    try {
+      rascunhoComoSeguiu();
+      let preco = 10778.74;
+      for (let volta = 1; volta <= 3; volta += 1) {
+        // O telemóvel não tem rascunho local nenhum: quem manda é o do
+        // servidor. É o caso «envia no computador, abre no telemóvel».
+        localStorage.clear();
+        render(
+          <ToastProvider>
+            <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
+          </ToastProvider>,
+        );
+        await screen.findByDisplayValue("Herdade do Servidor");
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 700));
+        });
+        expect(
+          (screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value,
+          `o valor escrito mudou na visita ${volta}`,
+        ).toBe("9883,74");
+        expect(document.body.textContent, `o total a pagar mudou na visita ${volta}`).toContain(
+          eur(13257.85),
+        );
+        // O que este ecrã gravou passa a ser o rascunho do servidor e o preço
+        // do pedido da visita seguinte.
+        const ultimo = corpos("proposta-rascunho").at(-1);
+        if (ultimo) {
+          rascunhoServidor = {
+            updatedAt: new Date().toISOString(),
+            doc: (JSON.parse(ultimo) as { doc: Record<string, unknown> }).doc,
+          };
+        }
+        preco = gravados.at(-1) ?? preco;
+        expect(preco, `o preço do pedido mudou na visita ${volta}`).toBeCloseTo(10778.74, 2);
+        cleanup();
+      }
+    } finally {
+      global.fetch = original;
+    }
+    // Três montagens de um ecrã com doze mil linhas, cada uma com a mão travada
+    // da gravação (600 ms) a assentar.
+  }, 60_000);
+
+  it("e o documento gravado leva a base sem a deslocação lá dentro", async () => {
+    rascunhoComoSeguiu();
+    abrir();
+    await screen.findByDisplayValue("Herdade do Servidor");
+    await waitFor(() => {
+      const gravados = corpos("proposta-rascunho");
+      expect(gravados.length).toBeGreaterThan(0);
+      expect(gravados[gravados.length - 1]).toContain('"totalAmount":9883.74');
+    });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
  * REPOR UMA VERSÃO E COPIAR UMA PROPOSTA TAMBÉM MEXEM NO PREÇO DO PEDIDO
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -2472,6 +3203,83 @@ describe("repor e copiar gravam o preço no pedido", () => {
     });
     await waitFor(() => expect(precosGravados()).toContain(8000));
   });
+
+  /**
+   * ── E COM OS ADICIONAIS DA VERSÃO, NÃO OS DO ECRÃ ───────────────────────
+   *
+   * A conversão escrito → pedido soma os adicionais, e lia-os do `doc` da
+   * render — que, na linha a seguir a um `setDoc` que troca o documento
+   * inteiro, ainda é o documento ANTIGO.
+   *
+   * O caso: no ecrã está um rascunho com 895,00 € de deslocação; repõe-se a
+   * versão que seguiu para o cliente, que trazia 1.490,00 € de adicionais e
+   * 8.000,00 € de serviços. O pedido tem de ficar com 9.490,00 €, que é o que
+   * o casal recebeu. Com os adicionais do ecrã ficava 8.895,00 € — e a
+   * abertura seguinte punha esse número no ecrã como se fosse o enviado.
+   */
+  it("repor uma versão soma os adicionais DESSA versão, não os do ecrã", async () => {
+    versoesServidor = [
+      {
+        id: "v1",
+        enviadaEm: "2026-02-01T10:00:00.000Z",
+        total: 11672.7,
+        estado: "enviada",
+        mudancas: [],
+        resumo: "Primeira",
+      },
+    ];
+    docsDeVersao.v1 = {
+      template: "decoracao",
+      ref: "PO Decoração v1",
+      clientNames: "Maria & Zé",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2026",
+      location: "Évora",
+      guests: "80 pax",
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+      moodBoards: [],
+      budgetItems: [],
+      coverImages: ["", ""],
+      budgetExtras: [{ label: "Deslocação e coordenação", valueText: "1.490,00 €" }],
+      budgetExtrasSomam: true,
+      totalAmount: 8000,
+      totalVatMode: "acrescer",
+      totalLabel: "Valor Total Decoração",
+    };
+    // O que está no ecrã antes de repor: 895,00 € de deslocação.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 8505,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 9400 } as Quote} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Repor esta versão/ }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("8000");
+    });
+    await waitFor(() => expect(precosGravados()).toContain(9490));
+    expect(precosGravados()).not.toContain(8895);
+  }, 20_000);
 
   it("copiar uma proposta grava o valor copiado e arruma o campo", async () => {
     propostasServidor = [
@@ -3163,8 +3971,20 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
   async function medirCapas(formas: { w: number; h: number }[]) {
     // Pelo DOM e não por papel: um `<img alt="">` é decorativo e não tem
     // papel nenhum de acessibilidade — `getAllByRole("img")` não o encontra.
+    //
+    // ── E DENTRO DA SECÇÃO DAS CAPAS, NÃO NA PÁGINA TODA ─────────────────
+    // A mesma fotografia de capa aparece agora em DOIS sítios: aqui e na
+    // «Vista de conjunto», que passou a desenhar-se sozinha no fim do passo 1.
+    // Procurar `capas/` no documento inteiro trazia as duas cópias, e as
+    // `formas` são atribuídas POR ÍNDICE — a primeira forma ia parar à
+    // miniatura da vista e a capa verdadeira ficava por medir. Por medir não
+    // há aviso, e o teste caía a dizer que o aviso desapareceu.
+    //
+    // A secção é a unidade certa: é dela que o aviso fala.
     const capas = await waitFor(() => {
-      const encontradas = [...document.querySelectorAll("img")].filter((i) =>
+      const seccao = document.getElementById("sec-capas");
+      if (!seccao) throw new Error("a secção das capas ainda não está desenhada");
+      const encontradas = [...seccao.querySelectorAll("img")].filter((i) =>
         (i.getAttribute("src") ?? "").includes("capas/"),
       );
       if (encontradas.length === 0) throw new Error("as capas ainda não estão desenhadas");
@@ -3822,11 +4642,66 @@ describe("ver as páginas lado a lado", () => {
     );
   }
 
+  /**
+   * ── ESTÁ LÁ SEM SE PEDIR ────────────────────────────────────────────────
+   *
+   * Palavras dela: «eu quero que apareça isto automaticamente no final sem
+   * pedirmos ou carregarmos para ver».
+   *
+   * Havia um botão («Ver as páginas lado a lado») e o botão só existia com
+   * mais do que um mood board. O teste de antes carregava nele — o que quer
+   * dizer que provava a vista DEPOIS de um clique, que é exactamente o clique
+   * que ela não quer dar. Passa a provar que ela lá está sem ninguém lhe
+   * tocar, e que o botão desapareceu.
+   */
+  function seedUmBoard() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [{ title: "Cerimónia", annotation: "", images: ["board/a.jpg"] }],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("aparece sozinha, sem botão nenhum para a abrir", async () => {
+    seedDoisBoards();
+    renderStudio();
+    await screen.findByText("Vista de conjunto");
+    expect(screen.queryByRole("button", { name: "Ver as páginas lado a lado" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Fechar a vista de conjunto" })).toBeNull();
+    // E o painel não tem «Fechar» PRÓPRIO: não há estado nenhum para onde
+    // fechar. (Procurado DENTRO dele — «Fechar» é palavra de mais sítios.)
+    const painel = screen.getByText("Vista de conjunto").closest("div.rounded-2xl") as HTMLElement;
+    expect(within(painel).queryByRole("button", { name: "Fechar" })).toBeNull();
+  });
+
+  /**
+   * E com UM board — ou nenhum — também. O botão antigo exigia dois, o que
+   * era herança de isto ter sido uma vista dos mood boards; desde que passou a
+   * mostrar o DOCUMENTO (capa, apresentação, orçamento, condições, contracapa)
+   * a condição deixou de querer dizer nada.
+   */
+  it("e também com um só mood board, que era onde o botão nunca aparecia", async () => {
+    seedUmBoard();
+    renderStudio();
+    await screen.findByText("Vista de conjunto");
+  });
+
   it("não entra na grelha do índice — a grelha continua com duas colunas e dois filhos", async () => {
     seedDoisBoards();
     renderStudio();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Ver as páginas lado a lado" }));
 
     const vista = await screen.findByText("Vista de conjunto");
     const grelha = document.querySelector('[class*="grid-cols-[11rem"]');
@@ -3835,6 +4710,27 @@ describe("ver as páginas lado a lado", () => {
     // mandava a lista para a coluna de 176 px.
     expect(grelha!.children).toHaveLength(2);
     expect(grelha!.contains(vista)).toBe(false);
+  });
+
+  /**
+   * ── E NÃO É UMA QUARTA COLUNA ───────────────────────────────────────────
+   *
+   * O passo 1 é uma fila (`lg:flex`): índice, coluna de escrita, painel. Se a
+   * vista subisse um nível ficava lá dentro como quarto filho, e umas folhas
+   * lado a lado espremidas numa coluna não se comparam — que é a única coisa
+   * que esta vista serve. Tem de ser o último filho da COLUNA DE ESCRITA.
+   */
+  it("fica dentro da coluna de escrita, e não como mais uma coluna da fila", async () => {
+    seedDoisBoards();
+    renderStudio();
+    const vista = await screen.findByText("Vista de conjunto");
+    const fila = document.querySelector('[class*="lg:flex"][class*="lg:gap-6"]');
+    expect(fila).toBeTruthy();
+    expect(fila!.contains(vista)).toBe(true);
+    // Nenhum dos filhos directos da fila É a vista.
+    for (const filho of Array.from(fila!.children)) {
+      expect(filho.textContent === vista.textContent).toBe(false);
+    }
   });
 });
 
@@ -4376,7 +5272,10 @@ describe("o botão «Copiar resumo»", () => {
     // Nenhum aviso de erro seco: a caixa É a resposta. (O contentor
     // `role="alert"` do `ToastProvider` existe sempre, vazio; o que se prova
     // é que não tem NENHUM aviso lá dentro.)
-    expect(screen.queryByRole("alert")?.textContent ?? "").toBe("");
+    expect(
+      screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })?.textContent ??
+        "",
+    ).toBe("");
   });
 });
 
@@ -5549,6 +6448,84 @@ describe("porque é que ela não vê as fotografias", () => {
     // 16,0 s a que chega com o tecto de três).
     await waitFor(() => expect(comSrc().length).toBeGreaterThan(0));
     expect(comSrc().length).toBeLessThanOrEqual(3);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA CAIXA DE ~100 px NUNCA PEDE 1099 KB HAVENDO 150
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este é o caso que a fotografia do ecrã dela obrigou a escrever: sete de dez
+   * células a dizer «Imagem guardada / Tentar novamente», num iPhone com 4G.
+   *
+   * A cascata tinha DOIS degraus — a miniatura e, a falhar essa, o ORIGINAL — e
+   * nada pelo meio. Os pesos, medidos no estúdio a 1,6 Mbps:
+   *
+   *     miniatura (400 px)     20 KB    a célula desenha esta
+   *     derivada  (1200 px)  ~200 KB    ESTE degrau não existia
+   *     original  (2200 px)   1099 KB   e a queda ia direita aqui
+   *
+   * As células destas grelhas medem ~101 px aos 375, ~126 entre 640 e 1023 e
+   * ~92 aos 1024 (medido no navegador, ver `GrelhaDeFotos`). Uma miniatura que
+   * falha é um acidente banal — uma assinatura de seis horas caducada, um
+   * pedido que expirou. O que não pode ser banal é o preço: cinquenta e cinco
+   * vezes o peso para desenhar a mesma caixa de cem píxeis.
+   */
+  it("quando a miniatura falha, a célula cai para os 1200 px — NUNCA para o original", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      {
+        path: "board/foto-0.jpg",
+        url: "https://sb/original.jpg",
+        thumbUrl: "https://sb/mini.jpg",
+        midUrl: "https://sb/media.jpg",
+      },
+    ];
+    renderStudio();
+    const morrer = async () => {
+      const img = document.querySelector<HTMLImageElement>("[data-foto] img");
+      if (!img) return;
+      await act(async () => {
+        img.dispatchEvent(new Event("error"));
+      });
+    };
+
+    await waitFor(() => expect(comSrc()).toHaveLength(1));
+    expect(comSrc()[0].getAttribute("src")).toBe("https://sb/mini.jpg");
+
+    // A miniatura falha. É AQUI que estava o salto para os 1099 KB.
+    await morrer();
+    await waitFor(() =>
+      expect(
+        comSrc()[0]?.getAttribute("src"),
+        "a célula saltou a derivada de 1200 px e foi pedir o ficheiro grande",
+      ).toBe("https://sb/media.jpg"),
+    );
+
+    // E o original continua a ser a última rede — mas é a ÚLTIMA.
+    await morrer();
+    await waitFor(() => expect(comSrc()[0]?.getAttribute("src")).toBe("https://sb/original.jpg"));
+  });
+
+  /**
+   * A outra metade da mesma regra: sem derivada de 1200 px fabricada (o
+   * `/assets` só devolve `midUrl` quando o Storage a tem), a cascata é a de
+   * antes. Um degrau que não existe não pode gastar uma tentativa — a célula
+   * ficaria a pedir `undefined` e a desistir uma volta mais cedo.
+   */
+  it("sem derivada de 1200 px, a queda é a de sempre — e não uma tentativa perdida", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/original.jpg", thumbUrl: "https://sb/mini.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => expect(comSrc()).toHaveLength(1));
+    await act(async () => {
+      document
+        .querySelector<HTMLImageElement>("[data-foto] img")
+        ?.dispatchEvent(new Event("error"));
+    });
+    await waitFor(() => expect(comSrc()[0]?.getAttribute("src")).toBe("https://sb/original.jpg"));
   });
 });
 

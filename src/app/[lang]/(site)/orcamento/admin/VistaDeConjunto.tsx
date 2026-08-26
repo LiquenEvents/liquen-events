@@ -82,7 +82,9 @@ export default function VistaDeConjunto({
   onSaltar: (bi: number) => void;
   /** Abrir a secção do formulário que produz uma página. */
   onIrParaSeccao: (seccao: string) => void;
-  onFechar: () => void;
+  /** Fechar — só para quem a abre. Onde ela está sempre à vista (o fim do
+   *  passo 1), não há nada para fechar e o botão não se desenha. */
+  onFechar?: () => void;
 }) {
   const paginas = paginasDaProposta(doc);
   const folhas = folhasAproximadas(doc);
@@ -105,13 +107,15 @@ export default function VistaDeConjunto({
             folhas. Clica numa para ir onde ela se escreve.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onFechar}
-          className="alvo-toque text-[11px] font-medium text-foreground/55 transition-colors hover:text-foreground/80"
-        >
-          Fechar
-        </button>
+        {onFechar && (
+          <button
+            type="button"
+            onClick={onFechar}
+            className="alvo-toque text-[11px] font-medium text-foreground/55 transition-colors hover:text-foreground/80"
+          >
+            Fechar
+          </button>
+        )}
       </div>
 
       {/* Duas miniaturas, três a partir de 640, quatro a partir de 1024. O

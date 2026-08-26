@@ -15,6 +15,9 @@ const db = vi.hoisted(() => ({
   rendered: [] as unknown[],
   /** Fotos que o gerador não conseguiu meter no documento. */
   emFalta: 0,
+  /** O endereço assinado do ficheiro já desenhado. `null` = não está guardado,
+   *  que é o caso normal aqui; só o bloco do fim o liga. */
+  urlDirecto: null as string | null,
 }));
 
 vi.mock("@/lib/portal-token", () => ({
@@ -47,6 +50,12 @@ vi.mock("@/lib/proposal-doc-render", () => ({
     return { pdf: new Uint8Array([1, 2, 3]), missingImages: db.emFalta ?? 0, truncations: [] };
   }),
 }));
+vi.mock("@/lib/proposal-pdf-guardado", () => ({
+  urlDoPdfDaProposta: vi.fn(async () => db.urlDirecto),
+  guardarPdfDaProposta: vi.fn(async () => true),
+  lerPdfDaProposta: vi.fn(async () => null),
+}));
+
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
@@ -68,6 +77,7 @@ beforeEach(() => {
   db.acceptedContractByQuote.clear();
   db.rendered = [];
   db.emFalta = 0;
+  db.urlDirecto = null;
   db.quotes.set("q-1", { id: "q-1", name: "Cliente" });
   vi.clearAllMocks();
 });
@@ -248,5 +258,68 @@ describe("portal proposta-pdf — a língua da proposta", () => {
     const res = await call();
     expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "open" }, "pt");
     expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-q-1.pdf");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ATALHO QUE ESTA PORTA NÃO TINHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A porta do email (`api/proposta/[token]/pdf`) já reencaminhava para o ficheiro
+ * guardado. Esta não — servia sempre os bytes através da função, o que são duas
+ * viagens (armazenamento → função → telemóvel) e megabytes a passar por um
+ * sítio que não precisa de os ver, com um arranque a frio pelo meio.
+ *
+ * As duas portas partilham o ficheiro, porque a chave é o conteúdo.
+ */
+describe("portal proposta-pdf — quando o ficheiro já está guardado", () => {
+  /**
+   * ── IP PRÓPRIO, E NÃO É UMA MANIA ──────────────────────────────────────
+   *
+   * A rota trava a 12 pedidos por IP por minuto (desenhar é caro), e o
+   * limitador é de MÓDULO: sobrevive entre casos. O `call()` do ficheiro não
+   * põe cabeçalho de IP nenhum, portanto todos os casos partilham o mesmo
+   * balde — o ficheiro já ia em dez, e estes três empurravam-no para lá do
+   * tecto. O sintoma não se parece nada com a causa: o caso a seguir recebia
+   * 429 e falhava a dizer que o reencaminhamento não trazia `Cache-Control`.
+   *
+   * É o mesmo remédio que o ficheiro irmão usa no caso do 429: quem precisa de
+   * um orçamento de pedidos só seu, pede-o por um IP só seu.
+   */
+  const chamar = () =>
+    GET(new Request("http://x", { headers: { "x-real-ip": "198.51.100.7" } }), {
+      params: Promise.resolve({ token: "good" }),
+    });
+
+  beforeEach(() => {
+    db.proposalsById.set("p-1", { id: "p-1", quoteId: "q-1", doc: { ref: "PO" } });
+    db.newestByQuote.set("q-1", { id: "p-1", quoteId: "q-1", doc: { ref: "PO" } });
+  });
+
+  it("reencaminha para o ficheiro em vez de o reenviar", async () => {
+    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
+
+    const res = await chamar();
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("https://cdn.exemplo/pdf-assinado");
+    // E não se desenhou nada — era esse o custo que isto existe para não pagar.
+    expect(db.rendered).toHaveLength(0);
+  });
+
+  it("o reencaminhamento não fica guardado por cache nenhuma", async () => {
+    // O endereço assinado expira em minutos: guardá-lo servia um link morto a
+    // quem carregasse a seguir.
+    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
+    const res = await chamar();
+    expect(res.headers.get("Cache-Control")).toMatch(/no-store/);
+  });
+
+  it("não estando guardado, desenha e serve como sempre", async () => {
+    db.urlDirecto = null;
+    const res = await chamar();
+    expect(res.status).toBe(200);
+    expect(db.rendered).toHaveLength(1);
   });
 });
