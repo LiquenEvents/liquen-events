@@ -1384,7 +1384,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     /**
-     * Os pedidos de antes, DESCONTADA a gravação do rascunho.
+     * Os pedidos de antes, DESCONTADAS as GRAVAÇÕES.
      *
      * Este teste chegou a contar todos e a falhar de vez em quando na
      * integração: a gravação do rascunho sai com oitocentos milissegundos de
@@ -1392,9 +1392,22 @@ describe("fotos da biblioteca em estado provisório", () => {
      * coisa — persistência, não a fotografia — e não se controla daqui.
      * Contá-la fazia o teste ficar vermelho por uma razão que nada tem a ver
      * com o que ele afirma, e um teste que falha por acaso deixa de se ler.
+     *
+     * ── E PASSOU A HAVER UMA SEGUNDA GRAVAÇÃO ATRASADA ──────────────────
+     * O `PATCH` do preço, que o ramo do «o pedido ainda não tem preço» dispara
+     * 600 ms depois da montagem para levar ao pedido o valor que só o rascunho
+     * tinha. Cai na MESMA descrição e pela mesma razão — persistência, não a
+     * fotografia — e foi assim que apareceu: verde aqui, vermelho na
+     * integração, que é mais lenta e chega aos 600 ms dentro da janela.
+     *
+     * Descontam-se as duas pelo que são (escritas), e não pelo instante em que
+     * calham: um teste afinado ao relógio da máquina volta a falhar sozinho.
      */
-    const semGravacoes = (ps: typeof pedidos) =>
-      ps.filter((p) => !p.url.includes("proposta-rascunho")).length;
+    const escrita = (p: (typeof pedidos)[number]) => {
+      const metodo = p.init?.method ?? "GET";
+      return p.url.includes("proposta-rascunho") || metodo === "PATCH";
+    };
+    const semGravacoes = (ps: typeof pedidos) => ps.filter((p) => !escrita(p)).length;
     const antes = semGravacoes(pedidos);
     await reservar(user);
 
