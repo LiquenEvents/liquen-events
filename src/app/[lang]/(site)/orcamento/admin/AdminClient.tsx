@@ -16,6 +16,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { localeDoCaminho, localizeHref } from "@/lib/i18n/config";
+import { dataCurta } from "@/lib/data-curta";
 import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
@@ -454,7 +455,11 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         const cd = eventCountdown(q.date);
         return (
           <span className="whitespace-nowrap">
-            {q.date || "—"}
+            {/* Era `q.date` cru: `2028-08-13`, o formato da base de dados, no
+                ÚNICO ecrã onde ele chegava à frente de alguém. Em todo o resto
+                da aplicação — cartões, calendário, propostas, dossier — a data
+                está escrita em português. Ver `dataCurta`. */}
+            {dataCurta(q.date) || "—"}
             {cd && cd.tone !== "past" && (
               <span
                 className={`ml-1.5 text-[10px] ${
