@@ -302,3 +302,59 @@ describe("useFocusTrap — teardown", () => {
     }
   });
 });
+
+/**
+ * ── O FUNDO QUE NUNCA CHEGOU A SER MARCADO ─────────────────────────────────
+ * Os testes acima medem o `inert` com o fundo num IRMÃO DE NÍVEL DE `body`, e
+ * é essa a forma de árvore que o `@testing-library` cria: desenha dentro de um
+ * `<div>` que pendura no `body`, portanto um `<div>` de fundo criado à mão fica
+ * mesmo ao lado da raiz do teste. Só que essa NÃO é a forma da árvore da
+ * aplicação.
+ *
+ * No back office nenhum destes diálogos vai para um portal — são desenhados
+ * onde estão declarados, lá no fundo da árvore do `AdminClient`. O único filho
+ * do `body` é a raiz da aplicação, essa CONTÉM o diálogo, e a guarda
+ * `node.contains(container)` salta-a. Não sobra irmão nenhum para marcar: com o
+ * modal aberto, a barra, o menu e os títulos ficam todos na árvore de
+ * acessibilidade, por baixo de um `aria-modal="true"` que promete o contrário.
+ *
+ * Medido num Chromium verdadeiro em `e2e/foco-nos-dialogos.spec.ts`: com a
+ * paleta aberta, nenhum antepassado do menu de navegação tinha `aria-hidden`
+ * nem `inert`.
+ *
+ * O que se guarda aqui é a regra certa: o que tem de sair da árvore são os
+ * irmãos em TODOS os níveis entre o diálogo e o `body`, e não só no topo.
+ */
+describe("useFocusTrap — o fundo sai da árvore em qualquer nível", () => {
+  it("marca o irmão que vive DENTRO da árvore, não só os filhos do body", () => {
+    // O `trigger` do arnês é irmão do diálogo dentro do contentor do RTL — a
+    // mesma relação que a barra de topo tem com a paleta no back office.
+    render(createElement(Dialog, { active: true }));
+    const trigger = screen.getByTestId("trigger");
+    expect(trigger.getAttribute("aria-hidden")).toBe("true");
+    expect(trigger.inert).toBe(true);
+  });
+
+  it("devolve esse irmão ao estado anterior ao fechar", () => {
+    const { rerender } = render(createElement(Dialog, { active: false }));
+    const trigger = screen.getByTestId("trigger");
+    expect(trigger.getAttribute("aria-hidden")).toBeNull();
+    rerender(createElement(Dialog, { active: true }));
+    expect(trigger.inert).toBe(true);
+    rerender(createElement(Dialog, { active: false }));
+    expect(trigger.getAttribute("aria-hidden")).toBeNull();
+    expect(trigger.inert).toBeFalsy();
+  });
+
+  it("nunca marca um antepassado do próprio diálogo", () => {
+    // A regra tem um limite óbvio e fácil de passar ao escrever a subida: se um
+    // antepassado do diálogo levasse `inert`, o diálogo ia dentro dele e a
+    // armadilha inertizava-se a si própria.
+    render(createElement(Dialog, { active: true }));
+    const dialogo = screen.getByTestId("dialog");
+    for (let el = dialogo as HTMLElement | null; el; el = el.parentElement) {
+      expect(el.inert, `<${el.tagName}> antepassado do diálogo ficou inerte`).toBeFalsy();
+      expect(el.getAttribute("aria-hidden")).not.toBe("true");
+    }
+  });
+});

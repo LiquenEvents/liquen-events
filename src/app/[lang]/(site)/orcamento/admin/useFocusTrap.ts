@@ -60,21 +60,49 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
       }
     }
 
-    // Mark siblings inert/hidden so background content leaves the a11y tree and
-    // the tab order — the whole point of a modal. Restored on cleanup.
+    // ── O FUNDO SAI DA ÁRVORE DE ACESSIBILIDADE, EM TODOS OS NÍVEIS ───────
+    // Isto percorria só os filhos directos do `document.body` e saltava aquele
+    // que contivesse o diálogo. Parecia bastar — e num teste do
+    // `@testing-library` bastava mesmo, porque ali o diálogo TEM irmãos de
+    // nível de `body`: a biblioteca desenha dentro de um `<div>` que pendura no
+    // `body`. Na aplicação não tem. Nenhum destes diálogos vai para um portal;
+    // são desenhados onde estão declarados, lá no fundo da árvore do
+    // `AdminClient`. O único filho do `body` é a raiz da aplicação, essa contém
+    // o diálogo, era saltada pela guarda — e não sobrava irmão nenhum para
+    // marcar. Resultado medido num Chromium verdadeiro (ver
+    // `e2e/foco-nos-dialogos.spec.ts`): com a paleta aberta, nenhum antepassado
+    // do menu de navegação tinha `aria-hidden` nem `inert`. Quem ouve o ecrã
+    // continuava a poder passear pela barra e pelo menu por baixo de um
+    // `aria-modal="true"` que promete exactamente o contrário.
+    //
+    // A subida resolve-o sem depender de portais: em cada nível entre o diálogo
+    // e o `body` marcam-se os IRMÃOS, e nunca o antepassado por onde se sobe —
+    // esse leva o diálogo lá dentro, e marcá-lo era a armadilha a inertizar-se
+    // a si própria.
+    //
+    // Guarda-se o valor ANTERIOR de cada um, e não um booleano de "eu mexi
+    // aqui": com dois diálogos sobrepostos, o de cima restaura o que encontrou,
+    // que é justamente o estado que o de baixo tinha posto.
     const siblings: { el: HTMLElement; ariaHidden: string | null; hadInert: boolean }[] = [];
-    if (document.body) {
-      for (const node of Array.from(document.body.children)) {
-        if (!(node instanceof HTMLElement)) continue;
-        if (node === container || node.contains(container)) continue;
+    let node: HTMLElement | null = container;
+    while (node && node !== document.body) {
+      // Anotado à mão: sem o tipo explícito o TypeScript entra em inferência
+      // circular (TS7022) — `node` avança para o pai, e o pai vinha de `node`.
+      const parent: HTMLElement | null = node.parentElement;
+      if (!parent) break;
+      const actual: HTMLElement = node;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling === actual) continue;
+        if (!(sibling instanceof HTMLElement)) continue;
         siblings.push({
-          el: node,
-          ariaHidden: node.getAttribute("aria-hidden"),
-          hadInert: node.inert,
+          el: sibling,
+          ariaHidden: sibling.getAttribute("aria-hidden"),
+          hadInert: sibling.inert,
         });
-        node.setAttribute("aria-hidden", "true");
-        node.inert = true;
+        sibling.setAttribute("aria-hidden", "true");
+        sibling.inert = true;
       }
+      node = parent;
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
