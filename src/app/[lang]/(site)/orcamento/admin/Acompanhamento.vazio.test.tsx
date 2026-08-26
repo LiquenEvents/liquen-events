@@ -107,3 +107,71 @@ describe("a Análise das propostas sem propostas enviadas", () => {
     resolver(reply(200, []));
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «0 €» NÃO É UM PREÇO — É A AUSÊNCIA DE UM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma auditoria em produção apanhou duas clientes reais listadas com **0 €** no
+ * painel «À espera de resposta». Não têm um orçamento de zero euros: têm o
+ * valor por preencher. O `eur()` faz `n || 0`, e um valor em falta saía
+ * formatado como um preço legítimo.
+ *
+ * É a diferença entre «este casamento vale zero» e «ainda não sabemos quanto
+ * vale», num painel que existe para decidir a quem telefonar primeiro.
+ *
+ * A unidade é a outra metade, e a auditoria é dura com ela: «Quase nenhum
+ * número diz se é com ou sem IVA no sítio onde aparece. Este é o problema de
+ * texto que custa dinheiro.» O `total` de uma proposta é o BRUTO — o tipo tem
+ * `subtotal`, `iva` e `total` lado a lado —, portanto diz-se.
+ */
+function servidorCom(propostas: readonly unknown[]) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) =>
+      String(url).includes("/api/propostas") ? reply(200, propostas) : reply(200, []),
+    ),
+  );
+}
+
+/** Uma proposta enviada e ainda sem resposta — que e o que este painel lista. */
+function propostaEnviada(over: Record<string, unknown>) {
+  return {
+    id: "p1",
+    quoteId: "LIQ-1",
+    clientName: "Ana Rita Colaco",
+    status: "enviada",
+    sentAt: "2026-08-01T10:00:00.000Z",
+    createdAt: "2026-08-01T09:00:00.000Z",
+    subtotal: 0,
+    iva: 0,
+    total: 0,
+    ...over,
+  };
+}
+
+describe("uma proposta sem valor preenchido", () => {
+  it("diz «sem valor» e nao «0 €»", async () => {
+    __resetListCache();
+    servidorCom([propostaEnviada({ total: 0 })]);
+    render(
+      <ToastProvider>
+        <Acompanhamento quotes={[]} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText(/sem valor/)).toBeTruthy();
+    expect(screen.queryByText(/(^|\s)0\s*€/)).toBeNull();
+  });
+
+  it("e um valor a serio diz a unidade — «c/ IVA»", async () => {
+    __resetListCache();
+    servidorCom([propostaEnviada({ id: "p2", clientName: "Margarida Serra", total: 13258 })]);
+    render(
+      <ToastProvider>
+        <Acompanhamento quotes={[]} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText(/c\/ IVA/)).toBeTruthy();
+  });
+});
