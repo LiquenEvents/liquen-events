@@ -513,6 +513,44 @@ body.admin-mode .bo-text-faint {
   }
 }
 
+/* ── E UM CHÃO ABSOLUTO, ABAIXO DO QUAL NÃO SE LÊ EM ECRÃ NENHUM ──────────
+   O chão acima pára nos 1024 de propósito, e a razão está escrita lá: é aí que
+   o `TabelaOuCartoes` passa a tabela, e a tabela é densa porque tem de ser.
+   Havia até um teste a guardar essa fronteira — «se alguém alargar o chão para
+   lá de 1024, a densidade da tabela do portátil muda sem ninguém pedir».
+
+   Essa fronteira continua a valer para os 10 e 11 px. Não vale para os 8 e 9.
+
+   ── O QUE MUDOU A LEITURA ────────────────────────────────────────────────
+   Uma análise de craft mediu o CSS calculado da apple.com nó a nó: 208 blocos
+   de texto, oito degraus, e o mais baixo de todos é **12 px** — num ecrã de
+   1108 px de largura, onde densidade não falta. A escala desta casa começa no
+   mesmo sítio (`--bo-fs-caption`, 12 px). Nenhuma das duas desce abaixo disso
+   em ecrã nenhum, porque abaixo disso não é texto denso: é texto que não se lê.
+
+   Medido aqui: 94 chamadas a `text-[8px]` e `text-[9px]` em 20 ficheiros do
+   back office. As piores no `AdminClient` (23), no `ProposalStudio` (15), na
+   Visão Geral (11) e no Calendário (10) — e algumas vestem etiquetas de estado
+   e rótulos de destino, que não são decoração.
+
+   ── PORQUE É QUE ISTO NÃO É ALARGAR O CHÃO DE CIMA ──────────────────────
+   O de cima levanta CINCO tamanhos (7 a 11) e serve uma FORMA de interface —
+   cartões, gaveta, barra inferior —, por isso tem largura. Este levanta TRÊS
+   (7 a 9) e não tem: é um limite do olho, não do ecrã. Os 10 e 11 px continuam
+   a ser o registo denso do computador, exactamente como estavam.
+
+   Fica DEPOIS do bloco de cima e não antes, para não lhe partir o localizador:
+   o `escala-movel.test.ts` lê a regra do telemóvel a partir do título dela até
+   ao comentário seguinte, e um bloco pelo meio deixava-o a ler metade.
+
+   O `letter-spacing` acompanha pela mesma geometria que está escrita acima:
+   subir o corpo sem desapertar o espacejamento troca letra pequena por texto
+   transbordado. */
+body.admin-mode :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
+  font-size: var(--bo-fs-caption);
+  letter-spacing: 0.01em;
+}
+
 /* ── Selection ── */
 ::selection {
   background: rgba(214, 171, 58, 0.28);
