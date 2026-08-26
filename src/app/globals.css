@@ -66,10 +66,35 @@
 
      O QUARTO tempo — a entrada de uma fotografia ao scroll — não está aqui
      porque não é um degrau desta escala: é uma escala própria, que acompanha o
-     TAMANHO da fotografia, e vive em `lib/motion/tokens.ts` desde antes disto. */
-  --duration-micro: 120ms;
-  --duration-elemento: 250ms;
-  --duration-vista: 350ms;
+     TAMANHO da fotografia, e vive em `lib/motion/tokens.ts` desde antes disto.
+
+     ── E O PREFIXO ESTAVA ERRADO: AS TRÊS CLASSES NÃO EXISTIAM ─────────────
+     Estava `--duration-micro`. O Tailwind v4 lê os utilitários `duration-*` do
+     espaço `--transition-duration-*`, e só desse. COMPILADO para confirmar, com
+     dois tokens irmãos no mesmo ficheiro:
+
+         --duration-alfa            →  .duration-alfa    NENHUMA REGRA
+         --transition-duration-beta →  .duration-beta     { transition-duration: … }
+
+     As variáveis chegavam ao `:root` com os valores certos — legíveis para
+     quem lesse o CSS — e as regras `.duration-micro`, `.duration-elemento` e
+     `.duration-vista` eram ZERO. Catorze chamadas no back office, em oito
+     ficheiros, a correr todas aos 150 ms do `--default-transition-duration` sem
+     ninguém dar por isso.
+
+     É a armadilha que o `AGENTS.md` avisa e que já mordeu esta casa noutro
+     sítio: no Tailwind v4 uma classe que aponte para um token inexistente não
+     dá erro de compilação nem aviso do lint. Não gera regra e cala-se.
+
+     O nome do token muda; o nome da CLASSE não — `duration-micro` continua a
+     escrever-se igual nos componentes, e passa a fazer o que sempre prometeu. */
+  --transition-duration-micro: 120ms;
+  --transition-duration-elemento: 250ms;
+  --transition-duration-vista: 350ms;
+  /* O toque: 20 ms, e só para o `:active`. Ver `ui/movimento.ts` — a assimetria
+     é deliberada (carrega a 20, larga a 120), e o número vem de uma medição na
+     apple.com: imperceptível como animação, perceptível como suavidade. */
+  --transition-duration-toque: 20ms;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

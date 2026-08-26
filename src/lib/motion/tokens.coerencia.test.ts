@@ -92,8 +92,27 @@ describe("ficha de movimento ↔ globals.css", () => {
   });
 
   it("a escala dos tempos é a mesma no CSS e na ficha", () => {
-    // Os `--duration-*` vivem no `@theme` (é lá que o Tailwind os lê e faz
-    // `duration-elemento`); a ficha serve quem escreve `style.transition` à
+    /**
+     * ── O PREFIXO MUDOU, E O TESTE NÃO O TERIA APANHADO ──────────────────
+     *
+     * Estava `--duration-*`. O Tailwind v4 lê os utilitários `duration-*` do
+     * espaço `--transition-duration-*`, e só desse — COMPILADO para confirmar,
+     * com dois tokens irmãos no mesmo ficheiro:
+     *
+     *     --duration-alfa            →  .duration-alfa    NENHUMA REGRA
+     *     --transition-duration-beta →  .duration-beta     { … }
+     *
+     * As variáveis chegavam ao `:root` com os valores certos e as três classes
+     * eram zero. Catorze chamadas no back office a correr aos 150 ms por
+     * omissão, sem ninguém dar por isso.
+     *
+     * E este teste passava, porque comparava o NÚMERO no `@theme` com o número
+     * na ficha — os dois estavam certos. O que ninguém comparava era o nome do
+     * token com o nome que o Tailwind procura. Um teste pode ligar as duas
+     * pontas certas e não reparar que o fio não chega a lado nenhum.
+     */
+    // Os `--transition-duration-*` vivem no `@theme` (é lá que o Tailwind os lê
+    // e faz `duration-elemento`); a ficha serve quem escreve `style.transition` à
     // mão. Dois sítios, um valor — como já acontece com a curva.
     const pares: [string, number][] = [
       ["micro", DUR_MICRO_MS],
@@ -101,9 +120,12 @@ describe("ficha de movimento ↔ globals.css", () => {
       ["vista", DUR_VISTA_MS],
     ];
     for (const [nome, ms] of pares) {
-      const m = new RegExp(`--duration-${nome}:\\s*([0-9]+)ms;`).exec(css);
-      expect(m, `o \`--duration-${nome}\` desapareceu do @theme do globals.css`).not.toBeNull();
-      expect(Number(m![1]), `--duration-${nome}`).toBe(ms);
+      const m = new RegExp(`--transition-duration-${nome}:\\s*([0-9]+)ms;`).exec(css);
+      expect(
+        m,
+        `o \`--transition-duration-${nome}\` desapareceu do @theme do globals.css`,
+      ).not.toBeNull();
+      expect(Number(m![1]), `--transition-duration-${nome}`).toBe(ms);
     }
   });
 
@@ -279,5 +301,51 @@ describe("as páginas não voltam a escrever tempos à mão", () => {
   it.each(paginas)("%s não redefine o passo do stagger do <Reveal>", (ficheiro) => {
     const src = semComentarios(lerFonte(ficheiro));
     expect(src).not.toMatch(/stagger=\{[\d.]+\}/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O NOME DO TOKEN TEM DE SER O NOME QUE O TAILWIND PROCURA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Este ficheiro já ligava as duas pontas — o número no `@theme` e o número na
+ * ficha de JS — e as duas estavam certas. Mesmo assim, as três classes
+ * `duration-micro`, `duration-elemento` e `duration-vista` não geravam regra
+ * nenhuma, e catorze chamadas no back office corriam aos 150 ms por omissão.
+ *
+ * A causa: os tokens estavam declarados como `--duration-*`, e o Tailwind v4 lê
+ * os utilitários `duration-*` do espaço `--transition-duration-*`. COMPILADO
+ * para confirmar, com dois tokens irmãos no mesmo ficheiro:
+ *
+ *     --duration-alfa            →  .duration-alfa    NENHUMA REGRA
+ *     --transition-duration-beta →  .duration-beta     { transition-duration: … }
+ *
+ * O que faltava era esta rede. Um teste pode ligar duas pontas certas e não
+ * reparar que o fio não chega a lado nenhum — e no Tailwind v4 isso não dá erro
+ * de compilação nem aviso do lint: não gera regra e cala-se.
+ */
+describe("o espaço de nomes dos tempos", () => {
+  const css = lerFonte("../../app/globals.css");
+
+  it("declara os tempos onde o Tailwind os lê, e não ao lado", () => {
+    for (const nome of ["micro", "elemento", "vista", "toque"]) {
+      expect(
+        css,
+        `\`--transition-duration-${nome}\` em falta: a classe \`duration-${nome}\` ` +
+          `não gera regra nenhuma e cai nos 150 ms por omissão, em silêncio`,
+      ).toMatch(new RegExp(`--transition-duration-${nome}:\\s*[0-9]+ms;`));
+    }
+  });
+
+  it("e não deixa lá ficar a forma antiga, que não faz nada", () => {
+    // `--duration-micro:` com o prefixo errado voltaria a compilar para zero
+    // regras. A âncora tem de ser o início da declaração, senão apanha a forma
+    // certa (`--transition-duration-micro`) por estar contida nela.
+    for (const nome of ["micro", "elemento", "vista", "toque"]) {
+      expect(css, `\`--duration-${nome}\` voltou — essa forma não gera regra`).not.toMatch(
+        new RegExp(`(^|[^-])--duration-${nome}:`, "m"),
+      );
+    }
   });
 });
