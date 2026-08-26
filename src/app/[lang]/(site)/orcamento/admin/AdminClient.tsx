@@ -1445,15 +1445,30 @@ export default function AdminClient({
       (motivoVaiComADecisao && editLostReason !== (selected.lostReason ?? "")) ||
       editDate !== (selected.date ?? "") ||
       editGuests !== String(selected.guests ?? "") ||
-      // TRIMADOS, como o corpo do PATCH os compara (ver `saveChanges`). Com as
-      // duas comparações diferentes, um espaço a mais no fim de um campo punha
-      // o painel a pedir para guardar uma alteração que a gravação depois não
-      // encontrava: respondia «já está tudo guardado» e a barra não limpava —
-      // e a partir daí fechar o pedido perguntava sempre «descartar?».
-      editLocation.trim() !== (selected.location ?? "") ||
-      editNome.trim() !== (selected.name ?? "") ||
-      editEmail.trim() !== (selected.email ?? "") ||
-      editTelefone.trim() !== (selected.phone ?? ""));
+      // TRIMADOS DOS DOIS LADOS, como o corpo do PATCH os compara (ver
+      // `saveChanges`). Com as duas comparações diferentes, um espaço a mais no
+      // fim de um campo punha o painel a pedir para guardar uma alteração que a
+      // gravação depois não encontrava: respondia «já está tudo guardado» e a
+      // barra não limpava — e a partir daí fechar o pedido perguntava sempre
+      // «descartar?».
+      //
+      // ── E FALTAVA METADE ──────────────────────────────────────────────────
+      //
+      // Só o lado do ECRÃ estava aparado. O lado do SERVIDOR entrava tal e
+      // qual, portanto um pedido gravado com um espaço no fim do nome — o que
+      // acontece a toda a hora a quem cola de um email — dava sempre diferente:
+      // `"Maria".trim()` contra `"Maria "`. Abrir a ficha, sem lhe tocar,
+      // acendia «Guardar tudo (1)», e a partir daí fechá-la perguntava sempre
+      // «descartar?». É o achado F-08 de uma auditoria em produção, e MEDIDO:
+      // dos doze feitios de pedido que sondei, sujavam-se estes quatro, e só
+      // estes quatro — nome, email, telefone e local com espaço.
+      //
+      // Aparar os dois lados é o que torna a comparação a mesma pergunta que a
+      // gravação faz. Um espaço a mais não é uma alteração dela.
+      editLocation.trim() !== (selected.location ?? "").trim() ||
+      editNome.trim() !== (selected.name ?? "").trim() ||
+      editEmail.trim() !== (selected.email ?? "").trim() ||
+      editTelefone.trim() !== (selected.phone ?? "").trim());
 
   /** O que se escreve e ainda não está igual ao que o servidor tem. */
   const escritoPorGravar =
@@ -1673,7 +1688,9 @@ export default function AdminClient({
     () => ({
       preco: editPrice,
       notas: editNotes,
-      estado: editStatus,
+      // A outra ponta do mesmo campo (ver `camposDoPedido` mais abaixo): o
+      // `editStatus` é semeado a partir de `q.status`, que pode não existir.
+      estado: editStatus ?? "",
       responsavel: editAssigned,
       motivoDePerda: editLostReason,
       data: editDate,
@@ -1703,7 +1720,17 @@ export default function AdminClient({
     (q: Quote): CamposDoPedido => ({
       preco: textoDoPreco(q),
       notas: q.adminNotes ?? "",
-      estado: q.status,
+      /**
+       * `?? ""` como os dez irmãos, e não por simetria: era o ÚNICO campo sem
+       * defesa, e um pedido sem `status` fazia o `oQueMudou` chamar `.trim()`
+       * sobre `undefined` — dentro de um efeito, portanto o que ela via era o
+       * back office inteiro substituído por «Ocorreu um erro inesperado».
+       *
+       * E pedidos sem `status` existem: o `degrauDoEstado` da máquina de
+       * estados di-lo por escrito — «há pedidos gravados antes de metade destes
+       * campos existirem», e trata o caso em vez de recusar. Aqui não tratava.
+       */
+      estado: q.status ?? "",
       responsavel: q.assignedTo ?? "",
       motivoDePerda: q.lostReason ?? "",
       data: q.date ?? "",
