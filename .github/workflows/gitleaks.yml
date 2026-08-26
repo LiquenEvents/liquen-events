@@ -21,7 +21,29 @@ jobs:
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # ── VINTE, E COM O NÚMERO AO LADO ────────────────────────────────────────
+    #
+    # Eram dez, e eu escrevi no commit do clone parcial que NÃO os subia —
+    # «o problema não era o tecto ser baixo, era o trabalho ser o errado, e
+    # subir o tecto escondia isto até ao dia em que 1,41 GiB fossem três».
+    #
+    # Estava meio certo. O `filter: blob:none` resolveu mesmo o trabalho errado
+    # e o job passou a acabar em vez de morrer. Só que MEDIDO na primeira
+    # execução verde:
+    #
+    #     checkout                20:05:03 → 20:10:36    5 min 33 s
+    #     scan de segredos        20:10:36 → 20:10:41         5 s
+    #
+    # Cinco minutos e meio de um tecto de dez, para cinco segundos de trabalho
+    # útil. Isso não é margem: é a mesma verificação vermelha à espera da
+    # primeira rede má. O que sobra depois dos blobs são os commits e as
+    # árvores de um histórico grande, e isso não encolhe com nenhuma opção.
+    #
+    # Vinte minutos com o número escrito é honesto; dez sem ele era um limite
+    # que ninguém tinha medido. Se um dia o checkout passar dos dez, é sinal de
+    # que o histórico voltou a crescer — e aí a conversa é outra, e é sobre o
+    # histórico.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
