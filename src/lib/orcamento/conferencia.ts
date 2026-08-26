@@ -4,6 +4,7 @@ import { foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
 import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
+import { paginasEmBranco } from "@/lib/proposal-paginas";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -466,9 +467,7 @@ export function conferir({
               .filter(Boolean)
               .join(" ")
           : "",
-      ...(repetidos.length > 0
-        ? { seccao: "moodboards", campo: `boardTitulo:${primeiro}` }
-        : {}),
+      ...(repetidos.length > 0 ? { seccao: "moodboards", campo: `boardTitulo:${primeiro}` } : {}),
     });
   }
 
@@ -552,6 +551,43 @@ export function conferir({
   // é só a marca de trava; a frase é a que já cá estava. Os outros (o título
   // interno, os grupos, as capas, os boards, a soma) não tinham voz nenhuma
   // aqui e entram tal como estão escritos.
+  // ── As folhas que saem em branco ────────────────────────────────────────
+  //
+  // Achado F-13 de uma auditoria em produção: na proposta da Maria João, a
+  // vista de conjunto anunciava as páginas 4 e 5 com «Esta folha sai em
+  // branco» — e o documento seguiu para o cliente com duas folhas vazias no
+  // meio. «A aplicação sabe e avisa — mas deixa enviar.»
+  //
+  // Sabia num sítio: dois passos e um scroll antes do botão. Passa a saber
+  // aqui, que é onde ela decide.
+  //
+  // ── PORQUE É QUE ISTO NÃO TRAVA ─────────────────────────────────────────
+  //
+  // Pela regra desta casa, escrita no cabeçalho: o que trava nasce em
+  // `proposal-progress.ts` e é copiado, nunca decidido aqui. Uma folha em
+  // branco é grave — mas é dela a decisão de a mandar na mesma (pode estar a
+  // enviar uma versão para ela própria ver). O que não podia continuar é ir
+  // sem ela ter tido a hipótese de reparar, e é isso que muda.
+  //
+  // `aviso` e não `erro` pela mesma razão que a data diferente da do pedido é
+  // `aviso`: é sempre para olhar, e nem sempre é um defeito.
+  const emBranco = paginasEmBranco(doc, idioma);
+  v.push(
+    emBranco.length === 0
+      ? { id: "folhas-em-branco", titulo: "Folhas do documento", severidade: "ok", detalhe: "" }
+      : {
+          id: "folhas-em-branco",
+          titulo: emBranco.length === 1 ? "Uma folha sai em branco" : "Folhas que saem em branco",
+          severidade: "aviso",
+          // Pelo NOME e não pelo número: o número da folha muda com uma página
+          // de inspiração a mais, e o nome é o que ela lê na vista de conjunto.
+          detalhe: `${emBranco.map((p) => `«${p.titulo}»`).join(" e ")} ${
+            emBranco.length === 1 ? "vai sair" : "vão sair"
+          } com o cabeçalho e nada por baixo.`,
+          seccao: emBranco[0].seccao,
+        },
+  );
+
   const porId = new Map(v.map((x) => [x.id, x]));
   for (const falta of oQueFaltaParaEnviar(doc, totalBruto)) {
     const jaDito = porId.get(falta.id);

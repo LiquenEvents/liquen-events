@@ -32,6 +32,12 @@ const doc = (over: Partial<ProposalDoc> = {}): ProposalDoc =>
     serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [] }],
     moodBoards: [{ images: ["board/1.jpg"] }],
     coverImages: ["capa/1.jpg", "capa/2.jpg"],
+    // As duas folhas do fecho, PREENCHIDAS. Sem elas este documento sai com
+    // duas folhas em branco no meio — e desde o achado F-13 a conferência
+    // di-lo, com razão. Um fixture chamado «documento certo» tem de o ser:
+    // ficar sem isto era manter o teste verde à custa de o tornar falso.
+    condicoesGerais: ["O orçamento é válido por 30 dias."],
+    observacoesGerais: ["Montagem na véspera, a combinar com a quinta."],
     ...over,
   }) as ProposalDoc;
 

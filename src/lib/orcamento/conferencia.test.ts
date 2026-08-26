@@ -41,6 +41,27 @@ const documento = (over: Partial<ProposalDoc> = {}): ProposalDoc =>
     ...over,
   }) as ProposalDoc;
 
+/**
+ * O mesmo documento, mas com as folhas de TEXTO preenchidas.
+ *
+ * O `documento()` acima é deliberadamente magro — o comentário lá dentro
+ * explica que um fixture cheio de prosa fazia os testes do idioma contar a
+ * prosa do fixture. O efeito colateral só apareceu quando a conferência passou
+ * a olhar para as folhas em branco (achado F-13): sem condições gerais e sem
+ * observações, aquele documento SAI mesmo com duas folhas vazias — portanto
+ * «um documento certo» não estava certo, e o teste que o afirmava tinha razão
+ * de deixar de passar.
+ *
+ * Os campos de baixo são os que o `resumoDaPagina` lê para as duas folhas do
+ * fecho, e mais nenhum: o fixture continua magro em tudo o resto.
+ */
+const documentoCompleto = (over: Partial<ProposalDoc> = {}): ProposalDoc =>
+  documento({
+    condicoesGerais: ["O orçamento é válido por 30 dias."],
+    observacoesGerais: ["Montagem na véspera, a combinar com a quinta."],
+    ...over,
+  } as Partial<ProposalDoc>);
+
 const achar = (vs: Verificacao[], id: string) => vs.find((v) => v.id === id)!;
 
 const base = { historico: [] as Quote[], totalBruto: 12_000 };
@@ -531,11 +552,70 @@ describe("a lista toda", () => {
 
   it("um documento certo não tem reparos", () => {
     const vs = conferir({
-      doc: documento({ totalText: "12.000,00 € + IVA" }),
+      doc: documentoCompleto({ totalText: "12.000,00 € + IVA" }),
       quote: pedido(),
       ...base,
     });
     expect(temReparos(vs)).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS FOLHAS QUE SAEM EM BRANCO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Achado F-13 de uma auditoria em produção: a vista de conjunto anunciava as
+ * páginas 4 e 5 com «Esta folha sai em branco» — e o documento seguiu para o
+ * cliente com duas folhas vazias no meio. «A aplicação sabe e avisa — mas deixa
+ * enviar.» Sabia num sítio: dois passos e um scroll antes do botão.
+ */
+describe("as folhas que saem em branco", () => {
+  it("nomeia as duas folhas do fecho quando estão vazias", () => {
+    const vs = conferir({ doc: documento(), quote: pedido(), ...base });
+    const f = achar(vs, "folhas-em-branco");
+    expect(f.severidade).toBe("aviso");
+    expect(f.detalhe).toContain("Condições gerais");
+    expect(f.detalhe).toContain("Observações e contactos");
+  });
+
+  it("cala-se quando elas têm conteúdo", () => {
+    const vs = conferir({ doc: documentoCompleto(), quote: pedido(), ...base });
+    expect(achar(vs, "folhas-em-branco").severidade).toBe("ok");
+  });
+
+  it("fala no singular quando é uma só", () => {
+    const vs = conferir({
+      doc: documentoCompleto({ condicoesGerais: [] } as Partial<ProposalDoc>),
+      quote: pedido(),
+      ...base,
+    });
+    const f = achar(vs, "folhas-em-branco");
+    expect(f.titulo).toMatch(/Uma folha/);
+    expect(f.detalhe).toContain("vai sair");
+    expect(f.detalhe).not.toContain("vão sair");
+  });
+
+  /**
+   * A armadilha que isto quase pisou. Uma página de inspiração não tem uma
+   * linha de texto e está CHEIA de fotografias — contá-la como vazia era
+   * anunciar como em branco a página mais cheia da proposta.
+   */
+  it("não confunde uma página de inspiração com uma folha vazia", () => {
+    const vs = conferir({
+      doc: documentoCompleto({
+        moodBoards: [{ images: ["b/1.jpg", "b/2.jpg"] }],
+      } as Partial<ProposalDoc>),
+      quote: pedido(),
+      ...base,
+    });
+    expect(achar(vs, "folhas-em-branco").severidade).toBe("ok");
+  });
+
+  /** Não trava: a decisão de enviar continua a ser dela. */
+  it("avisa, mas não impede o envio", () => {
+    const vs = conferir({ doc: documento(), quote: pedido(), ...base });
+    expect(achar(vs, "folhas-em-branco").trava).toBeFalsy();
   });
 });
 
