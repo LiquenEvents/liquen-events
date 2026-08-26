@@ -239,3 +239,31 @@ describe("EnviarModelo — enquanto o email está a sair", () => {
     );
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FRASE QUE MANDAVA PROCURAR UM ECRÃ SEM PORTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Achado F-14. Dizia «O texto edita-se em "Modelos de email"», e uma auditoria
+ * em produção procurou essa secção no menu e em Definições sem a encontrar.
+ *
+ * O ecrã EXISTE e funciona — está escondido, a pedido dela. Mas o
+ * `modelos-email` também não está no `NAV`, e é dele que saem o menu «Mais» e a
+ * paleta ⌘K: nada no back office lá chega.
+ *
+ * Não se corrige revelando o ecrã — quem o mandou esconder foi ela. Corrige-se
+ * tirando a promessa: uma instrução para um sítio inalcançável é pior do que
+ * não haver instrução nenhuma, porque manda procurar.
+ */
+describe("a frase de rodapé", () => {
+  it("não manda editar num ecrã a que não se chega", () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    expect(document.body.textContent).not.toContain("Modelos de email");
+  });
+
+  it("mas continua a dizer o que interessa — que nada sai sozinho", () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    expect(document.body.textContent).toContain("Nenhum destes emails sai sozinho");
+  });
+});
