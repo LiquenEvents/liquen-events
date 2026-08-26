@@ -1102,7 +1102,7 @@ describe("mood board com mais fotos do que a página desenha", () => {
       await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
     );
     await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
-    const alerta = await screen.findByRole("alert");
+    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     expect(alerta.textContent).toMatch(/fica com 11 fotos e a página do PDF mostra 10/);
     expect(alerta.textContent).toMatch(/a última não entra/);
     // …e a foto a mais fica marcada, para o aviso não morrer com o toast.
@@ -1227,7 +1227,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
     await user.click(await screen.findByRole("button", { name: /Descarregar PDF/ }));
 
-    const alerta = await screen.findByRole("alert");
+    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     expect(
       within(alerta).getByText(/Mood board «Cerimónia»: 2 fotos não entram no PDF/),
     ).toBeTruthy();
@@ -1251,7 +1251,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
 
-    const alerta = await screen.findByRole("alert");
+    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     const texto = alerta.textContent ?? "";
     expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la ou desenhá-la\)/);
     expect(texto).toMatch(/Campo «Local»: 1 linha cortada/);
@@ -2295,7 +2295,7 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
 
-    const alerta = await screen.findByRole("alert");
+    const alerta = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
     expect(alerta.textContent ?? "").toMatch(/email de cliente válido/i);
     // E o passo NÃO fica dado por feito: o botão continua lá para ela poder
     // corrigir o contacto e enviar a sério.
@@ -2405,6 +2405,484 @@ describe("o preço do pedido sobrevive ao rascunho do servidor", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE SEGUIU PARA O CLIENTE TEM DE APARECER ESCRITO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre uma proposta já enviada: «eu quero igual o valor!!! até
+ * eu alterar por mim!».
+ *
+ * As contas que faziam o número mexer sozinho estão corrigidas. Isto é a REDE
+ * por baixo delas: o estúdio nunca olhava para o documento que SEGUIU. O que
+ * reabria era o rascunho deste aparelho com o «Preço final» do pedido por
+ * cima — dois números que nada obriga a continuar iguais ao terceiro, o que o
+ * casal recebeu.
+ *
+ * O caso real, ao cêntimo: o PDF dizia 13.257,85 € a pagar e a proposta
+ * reabria a dizer 15.090,55 €.
+ */
+describe("a proposta enviada e o que está no aparelho", () => {
+  /** A proposta tal como seguiu: 9.883,74 de serviços + 895,00 de deslocação,
+   *  13.257,85 € a pagar. */
+  function jaSeguiuPor13257() {
+    versoesServidor = [
+      {
+        id: "v1",
+        enviadaEm: "2026-06-01T10:00:00.000Z",
+        total: 13257.85,
+        estado: "enviada",
+        mudancas: [],
+        resumo: "Primeira versão enviada",
+      },
+    ];
+    docsDeVersao.v1 = {
+      template: "decoracao",
+      ref: "PO Decoração",
+      clientNames: "Maria & Zé",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2026",
+      location: "Évora",
+      guests: "80 pax",
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+      moodBoards: [],
+      budgetItems: [],
+      coverImages: ["", ""],
+      budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+      budgetExtrasSomam: true,
+      totalAmount: 9883.74,
+      totalVatMode: "acrescer",
+      totalLabel: "Valor Total Decoração",
+    };
+  }
+
+  /** Os `quotedPrice` que foram gravados no pedido, pela ordem. */
+  function precosNoPedido(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  /** O pedido ficou com um número que não é o que seguiu — seja qual for a
+   *  causa. É esta a situação que ela viu. */
+  const abrirDesalinhado = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 12268.74 } as Quote} />
+      </ToastProvider>,
+    );
+
+  it("os dois números aparecem lado a lado, com a data do envio", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    const aviso = await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    expect(aviso.textContent).toContain("já seguiu para o cliente");
+    expect(aviso.textContent).toContain("1 de junho de 2026");
+    // O que ele recebeu…
+    expect(aviso.textContent).toContain(eur(13257.85));
+    // …e o que este ecrã mostra.
+    expect(aviso.textContent).toContain(eur(15090.55));
+  });
+
+  /**
+   * NENHUM DOS DOIS GANHA SOZINHO. Uma correcção de preço feita de propósito
+   * depois do envio produz exactamente esta mesma diferença, e o código não as
+   * distingue — escolher por ela apagava trabalho em metade dos casos, em
+   * silêncio nos dois.
+   */
+  it("e nada muda enquanto ela não escolher", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("12268,74");
+    // E o documento que seguiu não entrou no que está gravado: a conferência
+    // lê, escreve o que encontrou, e não mexe em nada.
+    expect(corpos("proposta-rascunho").join("")).not.toContain('"totalAmount":9883.74');
+  });
+
+  it("repor põe no ecrã os valores que o cliente recebeu", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Repor os valores que seguiram/ }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+        "9883,74",
+      );
+    });
+    expect(document.body.textContent).toContain(eur(13257.85));
+    // E o «Preço final» do pedido volta ao que o casal paga: 9.883,74 + 895,00.
+    await waitFor(() => expect(precosNoPedido()).toContain(10778.74));
+    // O aviso sai do ecrã: já não há divergência nenhuma para mostrar.
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  }, 20_000);
+
+  it("e repor mexe só nos valores — o texto fica como estava", async () => {
+    jaSeguiuPor13257();
+    // O rascunho deste aparelho tem um local escrito DEPOIS do envio.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        location: "Herdade da Malhadinha, Albernoa",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 11373.74,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    abrirDesalinhado();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Repor os valores que seguiram/ }));
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe(
+        "9883,74",
+      );
+    });
+    // O documento que seguiu dizia «Évora». O que ela escreveu depois FICA.
+    expect(screen.getByDisplayValue("Herdade da Malhadinha, Albernoa")).toBeTruthy();
+  }, 20_000);
+
+  it("«manter» fica com o do aparelho, e não volta a perguntar o mesmo", async () => {
+    jaSeguiuPor13257();
+    abrirDesalinhado();
+    await screen.findByRole("alert", { name: /não é o que seguiu para o cliente/i });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Manter os deste aparelho/ }));
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("12268,74");
+    cleanup();
+
+    // A visita seguinte, com o MESMO número: já foi respondida.
+    abrirDesalinhado();
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  }, 20_000);
+
+  it("quando bate certo, não há aviso nenhum nem leitura a mais", async () => {
+    jaSeguiuPor13257();
+    // O pedido guarda o que o casal paga sem IVA: 10.778,74. 13.257,85 com IVA.
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 10778.74 } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  });
+
+  it("uma proposta que nunca foi enviada não tem com que se comparar", async () => {
+    versoesServidor = [];
+    abrirDesalinhado();
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TROCAR «COMO CONTAM OS ADICIONAIS» É MEXER NO DINHEIRO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O selector decide se os 140 € da deslocação estão DENTRO do valor escrito ou
+ * se lhe SOMAM — ou seja, decide se o casal paga 3.000 ou 3.140. A frase por
+ * baixo dele diz exactamente isso, com os números.
+ *
+ * E não gravava nada no pedido. O estúdio passava a dizer um número e o
+ * «Preço final» continuava com o outro, sem nada no ecrã a dizê-lo — até à
+ * abertura seguinte, em que o pedido é quem manda e o total saltava sozinho o
+ * valor inteiro dos adicionais. É «o valor está diferente do que enviámos»,
+ * pela porta do lado.
+ */
+describe("trocar o modo dos adicionais grava o preço no pedido", () => {
+  /** Os `quotedPrice` que foram gravados no pedido, pela ordem. */
+  function precosGravadosNoPedido(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  async function comDeslocacaoDe140() {
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 3000 } as Quote} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+    const campo = await screen.findByLabelText(/^Valor de /i);
+    await user.type(campo, "140");
+    await user.tab();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    // O ponto de partida: «Somam ao valor», e o pedido já leva os 3.140.
+    expect(precosGravadosNoPedido().at(-1)).toBe(3140);
+    return user;
+  }
+
+  it("passar a «já incluídas» faz o pedido descer para o que o casal paga", async () => {
+    const user = await comDeslocacaoDe140();
+    await user.selectOptions(
+      await screen.findByLabelText(/Como contam os valores adicionais/i),
+      "dentro",
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    // O campo do escrito não mexe: continua a dizer 3.000. O que muda é o que
+    // o casal paga — e é isso que o pedido guarda.
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("3000");
+    expect(precosGravadosNoPedido().at(-1)).toBe(3000);
+  }, 20_000);
+
+  it("e voltar a «somam» devolve-lhe a deslocação", async () => {
+    const user = await comDeslocacaoDe140();
+    const seletor = await screen.findByLabelText(/Como contam os valores adicionais/i);
+    await user.selectOptions(seletor, "dentro");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    await user.selectOptions(seletor, "somam");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    expect(precosGravadosNoPedido().at(-1)).toBe(3140);
+  }, 20_000);
+
+  /**
+   * E o que isto vale, ao pé da letra: trocar o modo e voltar amanhã não move
+   * o total. Sem a gravação, a visita seguinte abria com o pedido a dizer
+   * 3.140 e o documento a dizer «já incluídas» — total 3.140 em vez de 3.000.
+   */
+  it("e a visita seguinte mostra o mesmo total", async () => {
+    const user = await comDeslocacaoDe140();
+    await user.selectOptions(
+      await screen.findByLabelText(/Como contam os valores adicionais/i),
+      "dentro",
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    const aPagar = eur(3000 * 1.23);
+    expect(document.body.textContent).toContain(aPagar);
+    const preco = precosGravadosNoPedido().at(-1) as number;
+    cleanup();
+
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
+      </ToastProvider>,
+    );
+    await screen.findByLabelText(/Valor \(sem IVA\)/);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    expect(document.body.textContent).toContain(aPagar);
+  }, 30_000);
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ABRIR NO TELEMÓVEL SOMAVA A DESLOCAÇÃO OUTRA VEZ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre uma proposta JÁ ENVIADA: «eu quero igual o valor!!! até
+ * eu alterar por mim!».
+ *
+ * O PDF que seguiu dizia:
+ *
+ *     Subtotal dos serviços        9.883,74 €
+ *     Deslocação equipa Líquen     +  895,00 €
+ *     TOTAL (sem IVA)             10.778,74 €
+ *     Total a pagar               13.257,85 €
+ *
+ * ── A MECÂNICA ────────────────────────────────────────────────────────────
+ *
+ * Há DOIS efeitos de abertura, e só um sabia a conversão. A montagem punha o
+ * «Preço final» do pedido no campo do escrito depois de lhe TIRAR os
+ * adicionais (`baseParaOEstudio`). O merge do rascunho do SERVIDOR, 100-300 ms
+ * depois, punha lá o mesmo número em CRU — e `dinheiroDaProposta` voltava a
+ * somar-lhe a deslocação por baixo.
+ *
+ * O salto é exactamente o valor dos adicionais, e é redondo por construção.
+ *
+ * E o caminho não é raro: é o de sempre. O carimbo local é escrito ANTES do
+ * PUT e o `updatedAt` do servidor DEPOIS — a comparação de datas está
+ * estruturalmente a favor do servidor —, e é também o do telemóvel que abre
+ * dias depois sem rascunho nenhum guardado.
+ */
+describe("o rascunho do servidor não soma os adicionais outra vez", () => {
+  /** O documento tal como seguiu: 9.883,74 de serviços e 895,00 de deslocação. */
+  function rascunhoComoSeguiu() {
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: {
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Herdade do Servidor",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 9883.74,
+        totalVatMode: "acrescer",
+        totalText: "9.883,74 € + IVA",
+        totalLabel: "Valor Total Decoração",
+      },
+    };
+  }
+
+  /** O «Preço final (sem IVA)» do pedido é o que o casal paga: serviços MAIS
+   *  deslocação. É o número que a rota do envio lá gravou (`money.base`). */
+  const comOPrecoQueSeguiu = { ...quote, quotedPrice: 10778.74 } as Quote;
+
+  const abrir = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={comOPrecoQueSeguiu} />
+      </ToastProvider>,
+    );
+
+  it("o campo do valor continua a dizer só os serviços", async () => {
+    rascunhoComoSeguiu();
+    abrir();
+    // O rascunho do servidor TEM de ter chegado — senão o teste passava por
+    // não ter havido merge nenhum.
+    await screen.findByDisplayValue("Herdade do Servidor");
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("9883,74");
+  });
+
+  it("e o total a pagar é o que o casal recebeu, ao cêntimo", async () => {
+    rascunhoComoSeguiu();
+    abrir();
+    await screen.findByDisplayValue("Herdade do Servidor");
+    // 10.778,74 + 23% = 13.257,85. O defeito dava 12.268,74 + IVA = 15.090,55.
+    await waitFor(() => {
+      expect(document.body.textContent).toContain(eur(13257.85));
+    });
+    expect(document.body.textContent).not.toContain(eur(15090.55));
+  });
+
+  /**
+   * ── E NÃO ESCALA ────────────────────────────────────────────────────────
+   *
+   * O defeito não parava numa soma: o número inflacionado ficava no
+   * `totalAmount` do rascunho gravado a seguir, e ia para o servidor. A visita
+   * seguinte partia de lá e somava outra vez. Três visitas, três deslocações.
+   *
+   * Cada volta aqui é uma abertura a sério: o rascunho que a anterior GRAVOU
+   * passa a ser o do servidor, e o preço que ela mandou para o pedido passa a
+   * ser o `quotedPrice` com que o estúdio abre. É a cadeia real.
+   */
+  it("e três aberturas seguidas não movem um cêntimo", async () => {
+    const gravados: number[] = [];
+    const original = global.fetch;
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const corpo = String(init?.body ?? "");
+      if (String(url).includes("/api/orcamento/") && corpo.includes("quotedPrice")) {
+        const lido = JSON.parse(corpo) as { quotedPrice: number | null };
+        if (typeof lido.quotedPrice === "number") gravados.push(lido.quotedPrice);
+        return new Response(JSON.stringify({ ...quote, quotedPrice: lido.quotedPrice }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return original(url, init);
+    }) as typeof fetch;
+    try {
+      rascunhoComoSeguiu();
+      let preco = 10778.74;
+      for (let volta = 1; volta <= 3; volta += 1) {
+        // O telemóvel não tem rascunho local nenhum: quem manda é o do
+        // servidor. É o caso «envia no computador, abre no telemóvel».
+        localStorage.clear();
+        render(
+          <ToastProvider>
+            <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
+          </ToastProvider>,
+        );
+        await screen.findByDisplayValue("Herdade do Servidor");
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 700));
+        });
+        expect(
+          (screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value,
+          `o valor escrito mudou na visita ${volta}`,
+        ).toBe("9883,74");
+        expect(document.body.textContent, `o total a pagar mudou na visita ${volta}`).toContain(
+          eur(13257.85),
+        );
+        // O que este ecrã gravou passa a ser o rascunho do servidor e o preço
+        // do pedido da visita seguinte.
+        const ultimo = corpos("proposta-rascunho").at(-1);
+        if (ultimo) {
+          rascunhoServidor = {
+            updatedAt: new Date().toISOString(),
+            doc: (JSON.parse(ultimo) as { doc: Record<string, unknown> }).doc,
+          };
+        }
+        preco = gravados.at(-1) ?? preco;
+        expect(preco, `o preço do pedido mudou na visita ${volta}`).toBeCloseTo(10778.74, 2);
+        cleanup();
+      }
+    } finally {
+      global.fetch = original;
+    }
+    // Três montagens de um ecrã com doze mil linhas, cada uma com a mão travada
+    // da gravação (600 ms) a assentar.
+  }, 60_000);
+
+  it("e o documento gravado leva a base sem a deslocação lá dentro", async () => {
+    rascunhoComoSeguiu();
+    abrir();
+    await screen.findByDisplayValue("Herdade do Servidor");
+    await waitFor(() => {
+      const gravados = corpos("proposta-rascunho");
+      expect(gravados.length).toBeGreaterThan(0);
+      expect(gravados[gravados.length - 1]).toContain('"totalAmount":9883.74');
+    });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
  * REPOR UMA VERSÃO E COPIAR UMA PROPOSTA TAMBÉM MEXEM NO PREÇO DO PEDIDO
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -2472,6 +2950,83 @@ describe("repor e copiar gravam o preço no pedido", () => {
     });
     await waitFor(() => expect(precosGravados()).toContain(8000));
   });
+
+  /**
+   * ── E COM OS ADICIONAIS DA VERSÃO, NÃO OS DO ECRÃ ───────────────────────
+   *
+   * A conversão escrito → pedido soma os adicionais, e lia-os do `doc` da
+   * render — que, na linha a seguir a um `setDoc` que troca o documento
+   * inteiro, ainda é o documento ANTIGO.
+   *
+   * O caso: no ecrã está um rascunho com 895,00 € de deslocação; repõe-se a
+   * versão que seguiu para o cliente, que trazia 1.490,00 € de adicionais e
+   * 8.000,00 € de serviços. O pedido tem de ficar com 9.490,00 €, que é o que
+   * o casal recebeu. Com os adicionais do ecrã ficava 8.895,00 € — e a
+   * abertura seguinte punha esse número no ecrã como se fosse o enviado.
+   */
+  it("repor uma versão soma os adicionais DESSA versão, não os do ecrã", async () => {
+    versoesServidor = [
+      {
+        id: "v1",
+        enviadaEm: "2026-02-01T10:00:00.000Z",
+        total: 11672.7,
+        estado: "enviada",
+        mudancas: [],
+        resumo: "Primeira",
+      },
+    ];
+    docsDeVersao.v1 = {
+      template: "decoracao",
+      ref: "PO Decoração v1",
+      clientNames: "Maria & Zé",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2026",
+      location: "Évora",
+      guests: "80 pax",
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+      moodBoards: [],
+      budgetItems: [],
+      coverImages: ["", ""],
+      budgetExtras: [{ label: "Deslocação e coordenação", valueText: "1.490,00 €" }],
+      budgetExtrasSomam: true,
+      totalAmount: 8000,
+      totalVatMode: "acrescer",
+      totalLabel: "Valor Total Decoração",
+    };
+    // O que está no ecrã antes de repor: 895,00 € de deslocação.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "895,00 €" }],
+        budgetExtrasSomam: true,
+        totalAmount: 8505,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: 9400 } as Quote} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Repor esta versão/ }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("8000");
+    });
+    await waitFor(() => expect(precosGravados()).toContain(9490));
+    expect(precosGravados()).not.toContain(8895);
+  }, 20_000);
 
   it("copiar uma proposta grava o valor copiado e arruma o campo", async () => {
     propostasServidor = [
@@ -4376,7 +4931,10 @@ describe("o botão «Copiar resumo»", () => {
     // Nenhum aviso de erro seco: a caixa É a resposta. (O contentor
     // `role="alert"` do `ToastProvider` existe sempre, vazio; o que se prova
     // é que não tem NENHUM aviso lá dentro.)
-    expect(screen.queryByRole("alert")?.textContent ?? "").toBe("");
+    expect(
+      screen.queryByRole("alert", { name: /não é o que seguiu para o cliente/i })?.textContent ??
+        "",
+    ).toBe("");
   });
 });
 
