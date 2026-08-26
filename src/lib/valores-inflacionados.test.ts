@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { valoresSuspeitos, type EntradaParaAuditoria } from "./valores-inflacionados";
+import {
+  valoresSuspeitos,
+  contasQueNaoFecham,
+  type EntradaParaAuditoria,
+} from "./valores-inflacionados";
 import type { ProposalDoc } from "./proposal-doc";
 
 /**
@@ -31,11 +35,22 @@ function docDe({
   extras,
   escrito,
   somam = true,
+  marcaAusente = false,
 }: {
   servicos: number;
   extras: number;
   escrito: number;
   somam?: boolean;
+  /**
+   * A marca `budgetExtrasSomam` NÃO está escrita no documento — que é a avaria
+   * dos dois casos reais que a auditoria encontrou. Ver `contasQueNaoFecham`.
+   *
+   * É uma opção à parte e não um `somam: undefined` por uma razão de
+   * JavaScript que já me apanhou aqui: um valor por omissão num parâmetro
+   * destruturado entra em vigor precisamente quando o que se passa é
+   * `undefined`. `somam: undefined` chegava cá dentro como `true`.
+   */
+  marcaAusente?: boolean;
 }): ProposalDoc {
   return {
     // As linhas são texto; os preços vivem ao lado, em `budgetAmounts`, pelo
@@ -46,7 +61,7 @@ function docDe({
       extras > 0
         ? [{ id: "e1", label: "Deslocação", valueText: `${String(extras).replace(".", ",")} €` }]
         : [],
-    budgetExtrasSomam: somam,
+    ...(marcaAusente ? {} : { budgetExtrasSomam: somam }),
     totalAmount: escrito,
     totalVatMode: "acrescer",
     vatRate: 0.23,
@@ -171,5 +186,134 @@ describe("as propostas com o valor inchado", () => {
     expect(s.comIva).toBe(4378.8);
     // (3000 + 140) × 1,23
     expect(s.comIvaCorrigido).toBe(3862.2);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE O DETECTOR NÃO VIA — OS DOIS CLIENTES REAIS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma auditoria em produção foi ver os 15 pedidos um a um e encontrou duas
+ * propostas com o preço errado. O detector respondia «Nenhuma das 7 propostas
+ * tem a assinatura desta avaria».
+ *
+ * Falso negativo, e do pior tipo: dá sensação de segurança sobre dinheiro que
+ * já saiu num PDF para um casal. A causa era uma linha —
+ * `if (!doc.budgetExtrasSomam) continue` — que saltava exactamente os
+ * documentos avariados, porque a avaria É a marca estar em falta.
+ *
+ * Os números destes casos são os que a auditoria mediu nos dados verdadeiros.
+ */
+describe("as contas que não fecham entre o documento e o pedido", () => {
+  it("apanha a Mónica Teófilo — 70 € de deslocação e a marca por escrever", () => {
+    // Medido: preço no pedido 2.820,00 €, base do documento 2.820,00 €,
+    // deslocação 70,00 €. Devia ser 2.890,00 € se os adicionais contarem.
+    const [c] = contasQueNaoFecham([
+      entrada({
+        nome: "Mónica Teófilo",
+        enviada: true,
+        quotedPrice: 2820,
+        doc: docDe({ servicos: 2820, extras: 70, escrito: 2820, marcaAusente: true }),
+      }),
+    ]);
+
+    expect(c).toBeTruthy();
+    expect(c.tipo).toBe("marca-em-falta");
+    expect(c.base).toBe(2820);
+    expect(c.adicionais).toBe(70);
+    expect(c.noPedido).toBe(2820);
+    // As duas leituras, lado a lado — a decisão é dela.
+    expect(c.seSomam).toBe(2890);
+    expect(c.seNaoSomam).toBe(2820);
+    // E o que está em jogo com IVA: 70 × 1,23.
+    expect(c.emJogoComIva).toBe(86.1);
+  });
+
+  it("e a Tara e Marty — 75 €, o mesmo defeito", () => {
+    const [c] = contasQueNaoFecham([
+      entrada({
+        nome: "Tara e Marty",
+        enviada: true,
+        quotedPrice: 2460,
+        doc: docDe({ servicos: 2460, extras: 75, escrito: 2460, marcaAusente: true }),
+      }),
+    ]);
+    expect(c.tipo).toBe("marca-em-falta");
+    expect(c.emJogoComIva).toBe(92.25);
+  });
+
+  /**
+   * ── E ESTE É O CASO QUE O DETECTOR ANTIGO SALTAVA ────────────────────────
+   * A prova de que a linha `if (!doc.budgetExtrasSomam) continue` era a causa:
+   * o mesmo documento que o reconhecimento novo apanha, o antigo não vê.
+   */
+  it("o detector das inchadas não via nenhum destes — é por isso que este existe", () => {
+    const monica = entrada({
+      quotedPrice: 2820,
+      doc: docDe({ servicos: 2820, extras: 70, escrito: 2820, marcaAusente: true }),
+    });
+    expect(valoresSuspeitos([monica])).toEqual([]);
+    expect(contasQueNaoFecham([monica])).toHaveLength(1);
+  });
+
+  it("com a marca escrita e o pedido a bater certo, cala-se", () => {
+    // A Carolina e a Margarida, que a auditoria verificou estarem certas.
+    expect(
+      contasQueNaoFecham([
+        entrada({
+          quotedPrice: 4330,
+          doc: docDe({ servicos: 3850, extras: 480, escrito: 3850, somam: true }),
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("com a marca escrita e o pedido a NÃO bater certo, diz que está desalinhado", () => {
+    const [c] = contasQueNaoFecham([
+      entrada({
+        quotedPrice: 3000,
+        doc: docDe({ servicos: 3850, extras: 480, escrito: 3850, somam: true }),
+      }),
+    ]);
+    expect(c.tipo).toBe("desalinhado");
+    expect(c.seSomam).toBe(4330);
+  });
+
+  it("sem adicionais nenhuns não há nada que possa contar duas vezes", () => {
+    expect(
+      contasQueNaoFecham([
+        entrada({ quotedPrice: 3000, doc: docDe({ servicos: 3000, extras: 0, escrito: 3000 }) }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("um pedido sem preço nenhum não é uma conta que não fecha — é uma conta por fazer", () => {
+    expect(
+      contasQueNaoFecham([
+        entrada({
+          quotedPrice: null,
+          doc: docDe({ servicos: 3000, extras: 140, escrito: 3000, somam: true }),
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("as enviadas vêm primeiro, e dentro delas as que têm mais dinheiro em jogo", () => {
+    const fora = contasQueNaoFecham([
+      entrada({
+        quoteId: "A",
+        enviada: false,
+        quotedPrice: 1000,
+        doc: docDe({ servicos: 1000, extras: 500, escrito: 1000, marcaAusente: true }),
+      }),
+      entrada({
+        quoteId: "B",
+        enviada: true,
+        quotedPrice: 2820,
+        doc: docDe({ servicos: 2820, extras: 70, escrito: 2820, marcaAusente: true }),
+      }),
+    ]);
+    expect(fora.map((c) => c.quoteId)).toEqual(["B", "A"]);
   });
 });

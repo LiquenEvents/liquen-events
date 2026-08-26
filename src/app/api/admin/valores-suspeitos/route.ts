@@ -3,7 +3,12 @@ import { isAuthed } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { listQuotes } from "@/lib/quotes-store";
 import { listAllProposals } from "@/lib/proposals-store";
-import { valoresSuspeitos, type EntradaParaAuditoria } from "@/lib/valores-inflacionados";
+import {
+  valoresSuspeitos,
+  contasQueNaoFecham,
+  type EntradaParaAuditoria,
+} from "@/lib/valores-inflacionados";
+import { listProposalDrafts, DRAFT_PREFIX } from "@/lib/proposal-drafts";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -38,7 +43,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Base de dados indisponível." }, { status: 503 });
   }
   try {
-    const [pedidos, propostas] = await Promise.all([listQuotes(), listAllProposals()]);
+    /**
+     * ── E OS RASCUNHOS, QUE ERA ONDE O VALOR INCHADO VIVIA ────────────────
+     *
+     * A leitura examinava só as propostas ENVIADAS. Uma auditoria em produção
+     * foi ver os 15 pedidos à mão e encontrou duas com o preço errado; esta
+     * rota respondia «Nenhuma das 7 propostas tem a assinatura desta avaria».
+     *
+     * Falso negativo por três razões, e esta é a terceira: **o valor cresce no
+     * RASCUNHO**, muito antes de haver proposta enviada nenhuma. Uma leitura
+     * que só olha para o que já saiu chega sempre tarde.
+     *
+     * Os rascunhos são de melhor esforço declarado: se a varredura falhar (é
+     * ela que lança quando não consegue ler tudo), examinam-se as propostas na
+     * mesma e diz-se quantos ficaram por ver. Uma lista parcial anunciada é
+     * útil; uma lista parcial que se diz completa é o defeito que estamos aqui
+     * a fechar.
+     */
+    const [pedidos, propostas, rascunhos] = await Promise.all([
+      listQuotes(),
+      listAllProposals(),
+      listProposalDrafts().catch((e) => {
+        log.error("valores-suspeitos: os rascunhos não puderam ser lidos", e);
+        return null;
+      }),
+    ]);
     const porPedido = new Map(pedidos.map((q) => [q.id, q]));
 
     const entradas: EntradaParaAuditoria[] = [];
@@ -63,13 +92,55 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const suspeitas = valoresSuspeitos(entradas);
+    /** O nome dos noivos, ou de quem escreveu — para ela reconhecer de quem se
+     *  trata. É a mesma composição que as propostas usam acima. */
+    const nomeDe = (q: (typeof pedidos)[number] | undefined, alternativa: string) => {
+      const noivos = [q?.partnerA, q?.partnerB].map((n) => (n ?? "").trim()).filter(Boolean);
+      if (noivos.length === 2) return `${noivos[0]} e ${noivos[1]}`;
+      return noivos[0] || (q?.name ?? "").trim() || alternativa;
+    };
+
+    const doRascunho: EntradaParaAuditoria[] = [];
+    for (const r of rascunhos ?? []) {
+      const quoteId = r.key.slice(DRAFT_PREFIX.length);
+      // Um rascunho de um pedido que já não existe não tem com que se comparar.
+      const q = porPedido.get(quoteId);
+      if (!q) continue;
+      const doc = r.doc;
+      if (!doc || typeof doc !== "object") continue;
+      doRascunho.push({
+        quoteId,
+        nome: nomeDe(q, quoteId),
+        estado: q.status ?? "",
+        // Um rascunho NÃO é uma proposta enviada. A distinção decide o que se
+        // faz a seguir — telefonar a alguém, ou só corrigir antes de sair.
+        enviada: false,
+        quando: r.updatedAt,
+        quotedPrice: typeof q.quotedPrice === "number" ? q.quotedPrice : null,
+        doc: doc as EntradaParaAuditoria["doc"],
+      });
+    }
+
+    const suspeitas = valoresSuspeitos([...entradas, ...doRascunho]);
+    /** O reconhecimento novo: as contas que não fecham entre o DOCUMENTO e o
+     *  PEDIDO — incluindo a marca dos adicionais por escrever, que é a avaria
+     *  que os dois casos reais tinham e que a leitura antiga saltava. */
+    const naoFecham = contasQueNaoFecham([...entradas, ...doRascunho]);
+
     return NextResponse.json({
       ok: true,
       suspeitas,
+      naoFecham,
       /** Quantas foram examinadas — sem isto, «nenhuma» tanto pode ser boa
        *  notícia como uma leitura que não leu nada. */
-      examinadas: entradas.length,
+      examinadas: entradas.length + doRascunho.length,
+      /** E de que tipo, porque «7 examinadas» sem dizer se os rascunhos lá
+       *  estavam era exactamente a frase que dava falsa segurança. */
+      propostas: entradas.length,
+      rascunhos: doRascunho.length,
+      /** `true` quando a varredura dos rascunhos falhou: a lista sai na mesma,
+       *  mas anunciada como parcial. */
+      rascunhosPorLer: rascunhos === null,
     });
   } catch (e) {
     log.error("valores-suspeitos: leitura falhou", e);

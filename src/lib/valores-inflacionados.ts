@@ -157,4 +157,129 @@ export function valoresSuspeitos(entradas: readonly Entrada[]): ValorSuspeito[] 
   );
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE O DETECTOR NÃO VIA — E ERA ONDE O DINHEIRO ESTAVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma auditoria ao back office em produção foi ver os 15 pedidos um a um e
+ * encontrou duas propostas com o preço errado. O detector devolveu «Nenhuma das
+ * 7 propostas tem a assinatura desta avaria». Um falso negativo, e o pior tipo:
+ * dá uma sensação de segurança sobre dinheiro que já saiu num PDF.
+ *
+ * Três razões, e as três estão fechadas aqui:
+ *
+ *  1. **`if (!doc.budgetExtrasSomam) continue`** saltava exactamente os
+ *     documentos avariados. A marca EM FALTA é a avaria — ver abaixo.
+ *  2. O reconhecimento só olhava para DENTRO do documento (o escrito contra a
+ *     soma das linhas). O resíduo ficou noutro sítio: no `quotedPrice` do
+ *     pedido, que é uma tabela diferente.
+ *  3. Só examinava propostas ENVIADAS. O valor inchado vive no rascunho.
+ *
+ * ── A MARCA EM FALTA, QUE É A AVARIA DOS DOIS CASOS REAIS ─────────────────
+ *
+ * `budgetExtrasSomam` decide se a deslocação entra ou não no preço. Quando o
+ * campo está ausente, o código lê-o de duas maneiras OPOSTAS:
+ *
+ *   · `somaDosExtrasSemIva` e o dinheiro da proposta fazem
+ *     `if (!doc.budgetExtrasSomam) return 0` → ausente = **não soma**;
+ *   · quem semeia o documento a partir do pedido escreve
+ *     `budgetExtrasSomam ??= true` → ausente = **soma**.
+ *
+ * Basta a proposta passar uma vez pelo segundo caminho para a marca virar
+ * `true`, e a partir daí os adicionais contam — enquanto o `quotedPrice` foi
+ * gravado quando ainda não contavam.
+ *
+ * Medido nos dados de produção: a Mónica Teófilo tem 70,00 € de deslocação e a
+ * Tara e Marty 75,00 €, as duas com a marca ausente. O que a Líquen fatura e o
+ * que a cliente leu no PDF diferem em 86,10 € e 92,25 € com IVA.
+ *
+ * Não se escolhe por ela qual das leituras vale: mostram-se as duas, com a
+ * diferença em euros, e a decisão é dela — como em todo o resto do dinheiro
+ * desta casa.
+ */
+export interface ContaQueNaoFecha {
+  quoteId: string;
+  nome: string;
+  estado: string;
+  enviada: boolean;
+  quando: string;
+  /**
+   * `marca-em-falta` — há adicionais escritos e o documento não diz se contam.
+   * `desalinhado` — a marca é explícita, e mesmo assim o «Preço final» do
+   *   pedido não é igual à base do documento mais os adicionais.
+   */
+  tipo: "marca-em-falta" | "desalinhado";
+  /** A base do documento: só os serviços, sem IVA. */
+  base: number;
+  /** Os adicionais sem IVA — o que está em jogo. */
+  adicionais: number;
+  /** O «Preço final (sem IVA)» gravado no pedido, hoje. */
+  noPedido: number | null;
+  /** O que o pedido diria se os adicionais contassem. */
+  seSomam: number;
+  /** E se não contassem. */
+  seNaoSomam: number;
+  /** A diferença entre as duas leituras, com IVA — é o número que dói. */
+  emJogoComIva: number;
+}
+
+/**
+ * As contas que não fecham entre o DOCUMENTO e o PEDIDO.
+ *
+ * Pura, como a de cima, e pela mesma razão: é o que permite pô-la à prova com
+ * casos escritos à mão — incluindo os que NÃO podem aparecer na lista.
+ */
+export function contasQueNaoFecham(entradas: readonly Entrada[]): ContaQueNaoFecha[] {
+  const fora: ContaQueNaoFecha[] = [];
+
+  for (const e of entradas) {
+    const doc = e.doc;
+    const { base, mode, vatRate } = resolveProposalMoney(doc);
+    // Os adicionais TAL COMO ESTÃO ESCRITOS, sem perguntar à marca se contam —
+    // é precisamente a marca que está em causa.
+    const adicionais = round2(somaDosExtrasSemIva(doc.budgetExtras, { mode, vatRate }));
+    if (adicionais <= 0) continue;
+    if (!(base > 0)) continue;
+
+    const seSomam = round2(base + adicionais);
+    const seNaoSomam = round2(base);
+    const emJogoComIva = round2(adicionais * (1 + vatRate));
+
+    const comum = {
+      quoteId: e.quoteId,
+      nome: e.nome,
+      estado: e.estado,
+      enviada: e.enviada,
+      quando: e.quando,
+      base,
+      adicionais,
+      noPedido: e.quotedPrice,
+      seSomam,
+      seNaoSomam,
+      emJogoComIva,
+    };
+
+    // 1) A marca não está escrita. É a avaria, haja ou não divergência hoje:
+    //    o número vai depender de qual dos caminhos tocar no documento a
+    //    seguir, e isso não é uma coisa que se deixe ao acaso com dinheiro.
+    if (doc.budgetExtrasSomam === undefined) {
+      fora.push({ ...comum, tipo: "marca-em-falta" });
+      continue;
+    }
+
+    // 2) A marca é explícita — então o pedido TEM de bater certo com ela.
+    if (e.quotedPrice == null) continue;
+    const devia = doc.budgetExtrasSomam ? seSomam : seNaoSomam;
+    if (Math.abs(round2(e.quotedPrice - devia)) <= FOLGA) continue;
+    fora.push({ ...comum, tipo: "desalinhado" });
+  }
+
+  // As enviadas primeiro, e dentro delas as que têm mais dinheiro em jogo: é
+  // essa a ordem por que se telefona a alguém.
+  return fora.sort(
+    (a, b) => Number(b.enviada) - Number(a.enviada) || b.emJogoComIva - a.emJogoComIva,
+  );
+}
+
 export type { Entrada as EntradaParaAuditoria };
