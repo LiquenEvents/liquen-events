@@ -1456,7 +1456,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * 24 células:
    *
    *     miniatura (400 px)     20 KB por célula   →   0,4 MB nas 24
-   *     derivada  (1200 px)  ~150 KB por célula   →   3,6 MB nas 24
+   *     derivada  (1200 px)  ~200 KB por célula   →   4,8 MB nas 24
    *     original  (2200 px)   1099 KB por célula  →  26,4 MB nas 24
    *
    * E as células destas grelhas medem, medido no navegador: **~101 px aos 375,
@@ -7229,7 +7229,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <Thumb
                           url={assetUrls[path]}
                           // A cascata, do mais leve para o mais pesado. Ver
-                          // `assetMedias`: o degrau do meio poupa ~950 KB por
+                          // `assetMedias`: o degrau do meio poupa ~900 KB por
                           // célula sempre que a miniatura falha.
                           planoB={[assetMedias[path], assetOriginais[path]]}
                           estadoDosUrls={estadoDosUrls}
@@ -12403,8 +12403,8 @@ function Thumb({
    * ── O QUE É «PESADA» DEPOIS DE HAVER TRÊS DEGRAUS ────────────────────────
    *
    * Era `alvo === planoB`, que com dois degraus queria dizer exactamente «é o
-   * original». Com três, o plano B do meio é a derivada de 1200 px — ~150 KB,
-   * sete vezes a miniatura — e essa também não pode ir vinte e quatro ao mesmo
+   * original». Com três, o plano B do meio é a derivada de 1200 px — ~200 KB,
+   * dez vezes a miniatura — e essa também não pode ir vinte e quatro ao mesmo
    * tempo para o mesmo canal.
    *
    * Portanto: pesada é TUDO menos o primeiro degrau. E é também o primeiro

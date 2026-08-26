@@ -284,7 +284,7 @@ describe("GET /api/orcamento/[id]/assets", () => {
    *
    * A célula do estúdio tinha dois degraus — a miniatura e, a falhar essa, o
    * ORIGINAL. Medido a 1,6 Mbps: 20 KB → 1099 KB, para desenhar a mesma caixa
-   * de ~100 px. A derivada de 1200 px (~150 KB) já era fabricada em lote; o que
+   * de ~100 px. A derivada de 1200 px (~200 KB) já era fabricada em lote; o que
    * faltava era esta lista dizer onde ela está.
    */
   it("uma foto com a derivada de 1200 px sai com ela, para a célula ter onde cair", async () => {

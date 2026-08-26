@@ -172,12 +172,12 @@ function miniaturaAPedidoUrl(id: string, path: string): string {
  * 24 células:
  *
  *     miniatura (400 px)     20 KB por célula   →   0,4 MB nas 24
- *     derivada  (1200 px)  ~150 KB por célula   →   3,6 MB nas 24
+ *     derivada  (1200 px)  ~200 KB por célula   →   4,8 MB nas 24
  *     original  (2200 px)   1099 KB por célula  →  26,4 MB nas 24
  *
  * Uma miniatura que falhe é um acidente banal — uma assinatura de seis horas
  * que caducou numa foto da Biblioteca, um `sharp` que não correu, um pedido
- * que expirou. O que não é banal é o preço da queda: SETENTA vezes a derivada
+ * que expirou. O que não é banal é o preço da queda: cinco vezes e meia a derivada
  * do meio, para desenhar a mesma caixa de ~100 px.
  *
  * A derivada de 1200 px já existe e já é fabricada em LOTE (`derivadas.ts`,

@@ -179,7 +179,7 @@ describe("useFotoComPlanoB", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O DEGRAU DO MEIO — 150 KB EM VEZ DE 1099
+ * O DEGRAU DO MEIO — 200 KB EM VEZ DE 1099
  * ════════════════════════════════════════════════════════════════════════════
  *
  * A cascata tinha dois degraus e nada entre eles: a miniatura de 400 px

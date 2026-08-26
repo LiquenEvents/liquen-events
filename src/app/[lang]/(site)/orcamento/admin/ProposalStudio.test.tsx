@@ -6251,7 +6251,7 @@ describe("porque é que ela não vê as fotografias", () => {
    * nada pelo meio. Os pesos, medidos no estúdio a 1,6 Mbps:
    *
    *     miniatura (400 px)     20 KB    a célula desenha esta
-   *     derivada  (1200 px)  ~150 KB    ESTE degrau não existia
+   *     derivada  (1200 px)  ~200 KB    ESTE degrau não existia
    *     original  (2200 px)   1099 KB   e a queda ia direita aqui
    *
    * As células destas grelhas medem ~101 px aos 375, ~126 entre 640 e 1023 e

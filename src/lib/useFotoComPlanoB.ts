@@ -44,7 +44,7 @@ export const ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS = 2_000;
  * cinquenta e cinco vezes o peso para desenhar a MESMA caixa de ~100 px.
  *
  * E havia por onde cair: a derivada de 1200 px (`derivadas-medidas.ts`, os
- * buckets `PROPOSAL_MID_BUCKET`/`THEME_MID_BUCKET`), ~150 KB, que a página do
+ * buckets `PROPOSAL_MID_BUCKET`/`THEME_MID_BUCKET`), ~200 KB, que a página do
  * casal já usa há muito. Faltava era a cascata ter onde a pôr.
  *
  * Por isso `planoB` aceita uma LISTA, do mais leve para o mais pesado. Quem só
