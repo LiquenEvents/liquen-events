@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAdaptativo } from "./adaptativo";
 import { cn } from "./cn";
+import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * A MESMA LISTA EM DUAS FORMAS — tabela densa no computador, cartões no
@@ -134,7 +135,10 @@ export function TabelaOuCartoes<T>({
               <button
                 type="button"
                 onClick={() => aoAbrir(item)}
-                className="alvo-toque group block w-full rounded-xl border border-foreground/[0.08] bg-white p-3 text-left transition-colors hover:border-[#4d6350]/40"
+                // Sem `motion-safe:` até aqui, e nos 150 ms por omissão. A linha
+                // inteira é um alvo de toque no telemóvel — é dos sítios desta
+                // pasta onde o carregar mais precisava de resposta.
+                className={`alvo-toque group block w-full rounded-xl border border-foreground/[0.08] bg-white p-3 text-left hover:border-[#4d6350]/40 active:bg-[#4d6350]/[0.05] ${ESTADO} ${PRESSAO}`}
               >
                 {cartao(item)}
               </button>

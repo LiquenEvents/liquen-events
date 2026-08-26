@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * A segmented control (a small pill of mutually-exclusive options) for switching
@@ -124,11 +125,11 @@ export function Segmented<T extends string>({
             tabIndex={i === entryIndex ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg font-medium motion-safe:transition-colors",
+              `inline-flex items-center gap-1.5 rounded-lg font-medium ${ESTADO} ${PRESSAO}`,
               pad,
               active
                 ? "bg-white text-foreground/90 shadow-[0_1px_2px_rgba(42,38,32,0.08)]"
-                : "text-foreground/50 hover:text-foreground/75",
+                : "text-foreground/50 hover:text-foreground/75 active:bg-foreground/[0.06]",
             )}
           >
             {o.icon}

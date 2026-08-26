@@ -6,6 +6,7 @@ import { useFocusTrap } from "../useFocusTrap";
 import { useTrincoDeScroll } from "../useTrincoDeScroll";
 import { useAdaptativo } from "./adaptativo";
 import { cn } from "./cn";
+import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * UMA CAIXA QUE MUDA DE FORMA — diálogo centrado no computador, folha inferior
@@ -321,7 +322,10 @@ export function FolhaOuDialogo({
           disabled={bloqueado}
           aria-label="Fechar"
           className={cn(
-            "alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40",
+            // Este fechar não tinha transição NENHUMA — o hover entrava e saía
+            // a zero, um corte seco. É o mesmo defeito que os 20 ms tratam no
+            // carregar, só que no passar do rato.
+            `alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/70 active:bg-foreground/[0.12] disabled:opacity-40 ${ESTADO} ${PRESSAO}`,
             comoFolha ? "top-8" : "top-2",
           )}
         >

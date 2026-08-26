@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -87,10 +88,12 @@ export function Ajuda({
         aria-label={`Ajuda: ${sobre}`}
         className={cn(
           "alvo-toque flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
-          "border text-[10px] leading-none font-medium transition-colors",
+          // Era `transition-colors` à seca — sem `motion-safe:`, ou seja a animar
+          // para quem pediu para não animar. Ver `movimento.ts`.
+          `border text-[10px] leading-none font-medium ${ESTADO} ${PRESSAO}`,
           aberto
             ? "border-[#4d6350]/60 bg-[#4d6350]/10 text-[#4d6350]"
-            : "border-foreground/25 text-foreground/45 hover:border-foreground/45 hover:text-foreground/70",
+            : "border-foreground/25 text-foreground/45 hover:border-foreground/45 hover:text-foreground/70 active:bg-foreground/[0.06]",
         )}
       >
         <span aria-hidden="true">?</span>

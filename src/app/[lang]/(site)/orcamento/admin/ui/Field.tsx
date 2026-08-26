@@ -8,6 +8,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import { cn } from "./cn";
+import { ESTADO } from "./movimento";
 
 /**
  * A labelled form control with the wiring people forget: a real `<label for>`,
@@ -69,17 +70,22 @@ type SelectFieldProps = BaseProps & { as: "select" } & Omit<
 
 export type FieldProps = InputFieldProps | TextareaFieldProps | SelectFieldProps;
 
+// Um campo recebe `ESTADO` mas NÃO `PRESSAO`: encolher 2% uma caixa de
+// escrever quando lhe tocam seria movimento a fingir que houve um botão. O que
+// um campo tem é foco e contorno, e isso é estado — 120 ms.
 const CONTROL =
   "w-full rounded-xl bg-white border text-sm text-foreground/90 placeholder:text-foreground/35 " +
-  "shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors " +
-  "focus:outline-none px-3.5 py-2.5";
+  "shadow-[0_1px_2px_rgba(42,38,32,0.04)] " +
+  ESTADO +
+  " focus:outline-none px-3.5 py-2.5";
 
 // Underline variant: transparent, unboxed, a hairline that darkens on focus.
 // `rounded-none` keeps iOS Safari from re-rounding the bare input.
 const CONTROL_UNDERLINE =
   "w-full rounded-none bg-transparent border-0 border-b text-sm text-foreground/90 " +
-  "placeholder:text-foreground/30 motion-safe:transition-colors " +
-  "focus:outline-none px-0 py-2";
+  "placeholder:text-foreground/30 " +
+  ESTADO +
+  " focus:outline-none px-0 py-2";
 
 export function Field(props: FieldProps) {
   const {
