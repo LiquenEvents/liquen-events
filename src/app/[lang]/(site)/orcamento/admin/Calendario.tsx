@@ -435,10 +435,28 @@ export default function Calendario({ quotes, onOpen }: Props) {
     });
   }
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * «PRÓXIMOS EVENTOS» — OS QUE VÃO MESMO ACONTECER
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Filtrava só por data. Uma auditoria em produção contou TRÊS das seis
+   * entradas como pedidos PERDIDOS — An & Patrick, Tara e Marty, Constança
+   * Lourenço Heleno. Um trabalho que se perdeu não é um evento que se
+   * aproxima; é um casamento que vai acontecer sem a Líquen lá.
+   *
+   * Este painel serve para saber o que vem aí. Com perdidos lá dentro, metade
+   * do que ele diz é falso — e é o tipo de erro que faz alguém deixar de olhar
+   * para o painel.
+   *
+   * `rejeitado` é o estado que a casa mostra como «Perdido» (ver
+   * `estado-do-pedido.ts`). Os restantes ficam todos: um pedido ainda por
+   * responder é precisamente o que convém ver com a data a chegar.
+   */
   const upcoming = useMemo(() => {
     const today = todayKey();
     return quotes
-      .filter((q) => isDateKey(q.date) && q.date >= today)
+      .filter((q) => isDateKey(q.date) && q.date >= today && q.status !== "rejeitado")
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 6);
   }, [quotes]);
@@ -943,8 +961,20 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     <p className="font-display text-[#4d6350] text-lg font-semibold leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>
+                    {/* O ANO, quando não é este.
+                        A lista lia-se «10 Set · 24 Out · 22 Mai · 29 Mai» e
+                        parecia desordenada — está certa, são 2026 e 2027, e
+                        faltava a única coisa que o dizia. Só aparece quando é
+                        preciso: escrever «2026» em todas as linhas de uma
+                        agenda de 2026 é ruído que se aprende a saltar. */}
                     <p className="text-foreground/40 text-[9px] uppercase mt-0.5">
                       {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
+                      {new Date(q.date + "T12:00:00").getFullYear() !==
+                        new Date().getFullYear() && (
+                        <span className="ml-0.5">
+                          {String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="min-w-0">

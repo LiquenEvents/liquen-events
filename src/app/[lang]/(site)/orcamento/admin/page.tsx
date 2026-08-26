@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 import { log } from "@/lib/logger";
 import type { QuoteSummary } from "@/lib/orcamento/types";
-import AdminClient from "./AdminClient";
+import AdminClient, { VIEW_COOKIE } from "./AdminClient";
+import { NAV, type View } from "./nav";
 import MedidorDeTransbordo from "./MedidorDeTransbordo";
 import AdminLogin from "./AdminLogin";
 import { ToastProvider } from "./Toast";
@@ -62,6 +63,25 @@ export default async function AdminPage() {
 
   const { quotes, falha: falhaDosPedidos } = await getQuotes();
   // Trust the signed session name first; fall back to the display cookie.
+  /**
+   * ── A SECÇÃO COM QUE ABRIR, DECIDIDA AQUI ───────────────────────────────
+   *
+   * MEDIDO por uma auditoria, em separador limpo: a ~1 s aparecia a Visão
+   * Geral, a ~2 s a aplicação trocava sozinha para a última secção usada e o
+   * menu lateral fechava-se. Quem entrou para ver a Visão Geral via-a
+   * desaparecer-lhe da frente.
+   *
+   * A memória estava no `localStorage`, que só existe depois de a página estar
+   * desenhada — portanto a escolha dela só podia ser aplicada como uma
+   * CORRECÇÃO, à vista. O cookie é a mesma memória por aparelho, mas viaja com
+   * o pedido: o servidor desenha logo o que ela quer ver.
+   *
+   * O valor é validado contra o menu e não usado tal e qual: um cookie é
+   * escrito pelo browser e pode vir com o que lá puserem.
+   */
+  const doCookie = store.get(VIEW_COOKIE)?.value;
+  const vistaInicial = NAV.some((n) => n.id === doCookie) ? (doCookie as View) : undefined;
+
   const userName =
     session.name || store.get(ADMIN_NAME_COOKIE)?.value || process.env.ADMIN_NAME || "Equipa";
   /**
@@ -77,7 +97,12 @@ export default async function AdminPage() {
   return (
     <ToastProvider>
       <RegistoDeGravacoesProvider>
-        <AdminClient initialQuotes={quotes} userName={userName} falhaDosPedidos={falhaDosPedidos} />
+        <AdminClient
+          initialQuotes={quotes}
+          userName={userName}
+          falhaDosPedidos={falhaDosPedidos}
+          vistaInicial={vistaInicial}
+        />
         {/* Instrumento, não funcionalidade: só aparece com `?medir=1` no
             endereço. Ver o cabeçalho do ficheiro — existe porque o transbordo
             horizontal que ela vê no iPhone não se reproduz em Chromium, e a

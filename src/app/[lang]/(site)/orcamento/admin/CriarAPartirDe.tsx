@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { dataCurta } from "@/lib/data-curta";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button, EmCurso } from "./ui";
@@ -68,13 +69,6 @@ interface Props {
 type Linha =
   | { tipo: "modelo"; id: string; modelo: ModeloProposta }
   | { tipo: "proposta"; id: string; proposta: ResumoProposta; sugerida: boolean };
-
-function dataCurta(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(+d)
-    ? ""
-    : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
-}
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

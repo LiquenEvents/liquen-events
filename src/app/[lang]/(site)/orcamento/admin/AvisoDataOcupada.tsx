@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { dataCurta } from "@/lib/data-curta";
 import type { Quote } from "@/lib/orcamento/types";
 import { choquesDeData, gravidade, type Choque } from "@/lib/orcamento/choque-de-datas";
 
@@ -35,13 +36,6 @@ const PORQUE: Record<Choque["proximidade"], string> = {
   vespera: "A desmontagem de um cai na montagem do outro.",
   "dia-seguinte": "A montagem de um cai na desmontagem do outro.",
 };
-
-function dataCurta(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
-}
 
 interface Props {
   /** O pedido que se está a preparar. */

@@ -192,8 +192,23 @@ export default function EnviarModelo({ quote, onEnviado }: Props) {
           prometeu envios automáticos que não existiam não pode voltar a deixar
           isso por dizer. */}
       <p className="text-[11px] text-foreground/40 mb-3 leading-relaxed">
+        {/* ── E A FRASE DEIXOU DE MANDAR NINGUÉM A UM SÍTIO SEM PORTA ────────
+            Dizia «O texto edita-se em "Modelos de email"». Uma auditoria em
+            produção deu por isso: procurou a secção no menu e em Definições, e
+            não a encontrou.
+
+            E não é que o ecrã não exista — existe, e funciona. Está ESCONDIDO,
+            a pedido dela (ver a lista dos escondidos em `nav.tsx`). Mas o
+            `modelos-email` também não está no `NAV`, e é dele que saem o menu
+            «Mais» e a paleta ⌘K: nada no back office lá chega.
+
+            Não se corrige revelando o ecrã — quem o mandou esconder foi ela, e
+            desfazer isso por causa de uma frase era decidir por ela. Corrige-se
+            tirando a promessa: uma instrução para um sítio inalcançável é pior
+            do que não haver instrução nenhuma, porque manda procurar. O que a
+            frase tem de dizer — que nenhum destes emails sai sozinho — fica. */}
         Nenhum destes emails sai sozinho. Escolhe um para veres o texto e o destinatário; só depois
-        de confirmares é que segue. O texto edita-se em «Modelos de email».
+        de confirmares é que segue.
       </p>
 
       <div className="flex flex-wrap gap-1.5 mb-3">

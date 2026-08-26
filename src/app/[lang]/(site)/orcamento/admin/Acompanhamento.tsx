@@ -77,6 +77,30 @@ const eur = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n || 0);
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «0 €» NÃO É UM PREÇO — É A AUSÊNCIA DE UM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma auditoria ao back office em produção apanhou isto no painel «À espera de
+ * resposta»: duas clientes reais — a Ana Rita Colaço e a Catarina Martins —
+ * listadas com **0 €**. Não têm orçamento de zero euros: têm o valor por
+ * preencher. O `eur()` faz `n || 0`, e um `undefined` sai formatado como um
+ * preço legítimo.
+ *
+ * É a diferença entre «este casamento vale zero» e «ainda não sabemos quanto
+ * vale», e ela lê a primeira num painel que existe para decidir a quem
+ * telefonar primeiro.
+ *
+ * ── E A UNIDADE, QUE É A OUTRA METADE ────────────────────────────────────
+ * Palavras da auditoria: «Quase nenhum número diz se é com ou sem IVA no sítio
+ * onde aparece. Este é o problema de texto que custa dinheiro.» O `total` de
+ * uma proposta é o BRUTO (o tipo tem `subtotal`, `iva` e `total` lado a lado),
+ * portanto diz-se.
+ */
+const eurOuSemValor = (n: number | null | undefined) =>
+  typeof n === "number" && n > 0 ? `${eur(n)} c/ IVA` : "sem valor";
+
 /** Os estados que ela pode marcar a partir daqui. */
 const ESTADOS: { id: ProposalStatus; label: string; ajuda: string }[] = [
   { id: "enviada", label: "Enviada", ajuda: "Seguiu, ainda sem resposta" },
@@ -417,7 +441,7 @@ export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }:
                 className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-foreground/10 p-3"
               >
                 <span className="min-w-0 flex-1 truncate text-xs text-foreground/75">
-                  {`${p.clientName} · ${eur(p.total)}`}
+                  {`${p.clientName} · ${eurOuSemValor(p.total)}`}
                 </span>
                 {(
                   [
@@ -573,7 +597,7 @@ function LinhaCartao({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground/85">{p.clientName}</p>
           <p className="mt-0.5 text-xs text-foreground/45">
-            {eur(p.total)}
+            {eurOuSemValor(p.total)}
             {quote?.date && ` · casamento ${dataCurta(quote.date)}`}
             {quote?.location && ` · ${quote.location}`}
           </p>

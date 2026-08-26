@@ -15,6 +15,8 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { localeDoCaminho, localizeHref } from "@/lib/i18n/config";
+import { dataCurta } from "@/lib/data-curta";
 import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
@@ -300,6 +302,28 @@ const VIEW_KEYS: Record<string, View> = {
   e: "estatisticas",
 };
 const VIEW_STORAGE_KEY = "liquen-admin-view";
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA SECÇÃO, MAS NUM COOKIE — PARA O SERVIDOR A PODER LER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO por uma auditoria, em separador limpo: a ~1 s aparece a Visão Geral
+ * (desenhada no servidor), a ~2 s a aplicação troca SOZINHA para a última
+ * secção usada e o menu lateral fecha-se. Quem entrou para ver a Visão Geral
+ * vê-a desaparecer-lhe da frente.
+ *
+ * A causa é a memória estar num sítio onde o servidor não chega: o
+ * `localStorage` só existe depois de a página ter sido desenhada, portanto a
+ * escolha dela só podia ser aplicada DEPOIS — como uma correcção, à vista.
+ *
+ * Um cookie é a mesma memória por aparelho, mas viaja com o pedido. O servidor
+ * desenha logo a secção certa e não há salto nenhum para corrigir.
+ *
+ * O `localStorage` FICA, e não é redundância: é ele que continua a valer para
+ * quem tenha os cookies restringidos, e é a ponte para quem já tem uma escolha
+ * guardada e ainda não tem cookie nenhum.
+ */
+export const VIEW_COOKIE = "liquen-admin-view";
 /** A barra lateral recolhida no computador — por aparelho, como o resto. */
 const CHAVE_MENU_RECOLHIDO = "liquen-admin-menu-recolhido";
 
@@ -321,6 +345,14 @@ interface Props {
    * office abria como se ela não tivesse pedido nenhum. Ver o comentário lá.
    */
   falhaDosPedidos?: LeituraFalhada | null;
+  /**
+   * A secção com que abrir, decidida NO SERVIDOR a partir do cookie.
+   *
+   * `undefined` = não havia cookie, e o primeiro desenho é a Visão Geral. Ver
+   * `VIEW_COOKIE`: é isto que faz o salto de secção desaparecer, porque o
+   * servidor já desenha a secção certa em vez de o cliente a corrigir à vista.
+   */
+  vistaInicial?: View;
 }
 
 // Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
@@ -373,8 +405,34 @@ function COLUNAS_DE_PEDIDOS(ctx: {
   /** O pedido gravado quando alguém marca o desfecho na própria linha. */
   onDesfecho: (q: Quote) => void;
 }): Coluna<Quote>[] {
-  const diasAEsperar = (q: Quote) =>
-    Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UM CASAMENTO JÁ GANHO NÃO ESTÁ «À ESPERA» DE NADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Isto contava os dias desde a submissão para TODOS os pedidos, e a coluna
+   * desenhava-os a todos. Debaixo de um cabeçalho que diz «À espera», um
+   * trabalho ganho em Maio aparecia com «104d» — e um perdido também.
+   *
+   * O número não estava errado; a pergunta é que era outra. «Há quanto tempo
+   * este pedido entrou» e «há quanto tempo isto está parado à espera de
+   * alguém» são coisas diferentes, e esta coluna existe para a segunda: é por
+   * ela que se ordena para responder a «a quem devo responder já».
+   *
+   * Um pedido em aberto está à espera de alguém — de nós enquanto não tem
+   * proposta (`pendente`, `em_revisao`), do casal depois de ela seguir
+   * (`cotado`). Um `aceite` e um `rejeitado` não estão à espera de ninguém:
+   * acabaram. Esses passam a mostrar «—», que é a mesma marca que o resto da
+   * tabela usa para «não se aplica».
+   *
+   * `null` e não zero, pela mesma razão que está escrita em `diasDeEspera`
+   * (`lib/orcamento/espera.ts`): zero é um número, e um número debaixo desta
+   * coluna é uma afirmação sobre quanto tempo alguém está à espera.
+   */
+  const diasAEsperar = (q: Quote): number | null => {
+    if (q.status === "aceite" || q.status === "rejeitado") return null;
+    return Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
+  };
   return [
     {
       chave: "sel",
@@ -453,7 +511,11 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         const cd = eventCountdown(q.date);
         return (
           <span className="whitespace-nowrap">
-            {q.date || "—"}
+            {/* Era `q.date` cru: `2028-08-13`, o formato da base de dados, no
+                ÚNICO ecrã onde ele chegava à frente de alguém. Em todo o resto
+                da aplicação — cartões, calendário, propostas, dossier — a data
+                está escrita em português. Ver `dataCurta`. */}
+            {dataCurta(q.date) || "—"}
             {cd && cd.tone !== "past" && (
               <span
                 className={`ml-1.5 text-[10px] ${
@@ -490,9 +552,13 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       chave: "espera",
       cabecalho: "À espera",
       alinharADireita: true,
-      ordenar: (a, b) => diasAEsperar(b) - diasAEsperar(a),
+      // Os fechados vão para o FIM da ordenação, e não para o princípio: ordenar
+      // por «à espera» é procurar o que está parado há mais tempo, e um trabalho
+      // acabado no topo dessa lista era ruído no sítio de maior atenção.
+      ordenar: (a, b) => (diasAEsperar(b) ?? -1) - (diasAEsperar(a) ?? -1),
       celula: (q) => {
         const d = diasAEsperar(q);
+        if (d === null) return <span className="text-foreground/40">—</span>;
         const parado =
           (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
           d >= 14;
@@ -938,6 +1004,7 @@ export default function AdminClient({
   initialQuotes,
   userName = "Catarina",
   falhaDosPedidos = null,
+  vistaInicial,
 }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
@@ -1175,7 +1242,7 @@ export default function AdminClient({
   const quotesEtag = useRef<string | null>(null);
   /** Quando foi a última revalidação, para não a repetir a cada piscar de olhos. */
   const ultimaRevalidacao = useRef(0);
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>(vistaInicial ?? "overview");
   const [navOpen, setNavOpen] = useState(false);
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -1293,7 +1360,26 @@ export default function AdminClient({
   // Current locale, read from the path (/{lang}/orcamento/admin), to build the
   // deep link into a quote's full-screen Dossier route.
   const pathname = usePathname();
-  const lang = pathname?.split("/").filter(Boolean)[0] || "pt";
+  /**
+   * ── O LINK DO DOSSIER SAÍA DO BACK OFFICE PARA UM 404 ───────────────────
+   *
+   * Estava `pathname.split("/").filter(Boolean)[0]`, a chamar «língua» ao
+   * primeiro segmento do caminho. Mas o site é português SEM prefixo: a página
+   * canónica é `/orcamento/admin`, e nesse caminho o primeiro segmento é a
+   * palavra **`orcamento`**. O link do Dossier ficava
+   * `/orcamento/orcamento/admin/evento/{id}` — o 404 do site público, com o
+   * menu comercial e um botão que leva à homepage comercial. Sem caminho de
+   * volta ao back office a não ser escrever o URL à mão.
+   *
+   * E o destino verdadeiro é o Dossier do Evento: financeiro, pagamentos,
+   * fornecedores, produção, cronograma do dia, convidados. Estava construído,
+   * a funcionar, e inacessível pela interface.
+   *
+   * `localeDoCaminho` faz a pergunta certa (é o espelho inglês?) e
+   * `localizeHref` é quem sabe compor o endereço nas duas línguas — as mesmas
+   * funções que o resto do site já usa.
+   */
+  const locale = localeDoCaminho(pathname);
 
   /**
    * O motivo de perda acompanha a decisão do estado?
@@ -1780,15 +1866,29 @@ export default function AdminClient({
     });
   }, []);
 
-  // Restore the last view the user was on (per device). Done in an effect so it
-  // never causes an SSR/hydration mismatch.
+  /**
+   * ── A PONTE, E SÓ A PONTE ────────────────────────────────────────────────
+   *
+   * A secção passou a vir DO SERVIDOR (ver `VIEW_COOKIE`): quando o cookie já
+   * existe, o primeiro desenho já é o certo e não há nada a restaurar aqui.
+   *
+   * O que fica é o caso de quem já tinha uma escolha guardada no
+   * `localStorage` e ainda não tem cookie — a primeira visita depois desta
+   * alteração. Aí ainda há um salto, uma vez, e a gravação seguinte escreve o
+   * cookie que o faz desaparecer para sempre.
+   *
+   * `vistaInicial` a dizer que já veio decidida é o que impede isto de voltar
+   * a pôr o salto no ecrã de quem já não precisa dele.
+   */
   useEffect(() => {
+    if (vistaInicial) return;
     try {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY) as View | null;
       if (saved && NAV.some((n) => n.id === saved)) setView(saved);
     } catch {
       /* localStorage unavailable — keep default */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1805,6 +1905,19 @@ export default function AdminClient({
       localStorage.setItem(VIEW_STORAGE_KEY, view);
     } catch {
       /* ignore */
+    }
+    /**
+     * E no cookie, que é o que o servidor lê no arranque seguinte. Um ano, o
+     * mesmo horizonte do `localStorage`; `SameSite=Lax` porque isto não é uma
+     * credencial — é a preferência de que separador abrir — e `Lax` é o que
+     * deixa o cookie viajar numa navegação normal sem o oferecer a terceiros.
+     * Sem `Secure` escrito à mão: em `localhost` ele impedia a gravação, e em
+     * produção o site é servido só por HTTPS.
+     */
+    try {
+      document.cookie = `${VIEW_COOKIE}=${encodeURIComponent(view)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    } catch {
+      /* sem cookies: fica o `localStorage`, e volta a haver o salto de uma vez */
     }
   }, [view]);
 
@@ -4971,7 +5084,7 @@ export default function AdminClient({
                             {/* Full-screen cockpit for this event — the one place that
                               unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
-                              href={`/${lang}/orcamento/admin/evento/${selected.id}`}
+                              href={localizeHref(`/orcamento/admin/evento/${selected.id}`, locale)}
                               className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
                               title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                             >
