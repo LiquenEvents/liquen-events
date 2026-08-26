@@ -27,6 +27,77 @@ export type View =
   | "servicos";
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS VISTAS COMO VALOR, PARA SE PODEREM VALIDAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O tipo acima desaparece na compilação, e quem precisa de decidir se
+ * `"pedidos"` é uma vista precisa de o saber em TEMPO DE EXECUÇÃO: o endereço
+ * (`?v=…`) e o cookie são ambos escritos pelo browser e podem vir com o que lá
+ * puserem.
+ *
+ * Até agora essa pergunta respondia-se com `NAV.some((n) => n.id === x)` — e a
+ * resposta estava errada por construção. O comentário do `NAV` aqui em baixo
+ * di-lo com todas as letras: **várias vistas existem no tipo e desenham-se, mas
+ * ficam de fora do `NAV` de propósito**, para não encher o menu. Validar contra
+ * o menu é validar contra a lista errada: um endereço para uma dessas vistas
+ * era recusado e ia parar à Visão Geral, sem uma palavra.
+ *
+ * ── PORQUÊ UM `Record` E NÃO UM ARRAY ─────────────────────────────────────
+ *
+ * Porque `Record<View, true>` OBRIGA a que estejam cá todas: acrescentar uma
+ * vista ao tipo sem a acrescentar aqui não compila. Um array escrito à mão
+ * aceitava ficar incompleto em silêncio, que é exactamente a avaria que este
+ * bloco veio corrigir noutro sítio.
+ */
+const TODAS: Record<View, true> = {
+  overview: true,
+  pedidos: true,
+  kanban: true,
+  clientes: true,
+  calendario: true,
+  propostas: true,
+  acompanhamento: true,
+  "fazer-proposta": true,
+  tarefas: true,
+  fornecedores: true,
+  inventario: true,
+  material: true,
+  temas: true,
+  estatisticas: true,
+  contratos: true,
+  "modelos-email": true,
+  definicoes: true,
+  servicos: true,
+};
+
+/** As vistas todas, por ordem de declaração do tipo. */
+export const VIEWS = Object.keys(TODAS) as View[];
+
+/**
+ * `"pedidos"` → `"pedidos"`. Um lixo qualquer → `undefined`.
+ *
+ * É a única porta por onde um texto de fora — endereço ou cookie — se torna uma
+ * `View`. Devolver `undefined` e não lançar é deliberado: quem chama decide o
+ * que fazer sem nada (abrir na Visão Geral, ler o cookie a seguir), e um
+ * endereço estragado não pode ser um erro que a impeça de entrar.
+ */
+export function vistaValida(valor: string | null | undefined): View | undefined {
+  /**
+   * `Object.hasOwn` e NÃO `valor in TODAS`, e a diferença não é estilo.
+   *
+   * `in` percorre a cadeia de protótipos: `"toString" in TODAS` é `true`, e
+   * `"constructor"`, e `"valueOf"`. Escrito com `in`, um endereço
+   * `?v=toString` era dado por vista válida, entrava no estado e ia parar ao
+   * cookie — que o servidor lia no arranque seguinte.
+   *
+   * Não é teoria: a primeira versão desta função usava `in` e foi um teste
+   * desta lista que a apanhou.
+   */
+  return valor && Object.hasOwn(TODAS, valor) ? (valor as View) : undefined;
+}
+
+/**
  * Sidebar split for the calm, ChatGPT-like rail. Only the owner's DAILY CORE
  * stays visible at all times (`CORE_NAV`); everything else is tucked into a
  * collapsible "Mais" group at the bottom (`MORE_NAV`), collapsed by default, so

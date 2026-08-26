@@ -4,7 +4,7 @@ import { porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 import { log } from "@/lib/logger";
 import type { QuoteSummary } from "@/lib/orcamento/types";
 import AdminClient, { VIEW_COOKIE } from "./AdminClient";
-import { NAV, type View } from "./nav";
+import { vistaValida, type View } from "./nav";
 import MedidorDeTransbordo from "./MedidorDeTransbordo";
 import AdminLogin from "./AdminLogin";
 import { ToastProvider } from "./Toast";
@@ -53,7 +53,11 @@ async function getQuotes(): Promise<{ quotes: QuoteSummary[]; falha: LeituraFalh
   }
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const store = await cookies();
   const session = readSession(store.get(ADMIN_COOKIE)?.value);
 
@@ -79,8 +83,30 @@ export default async function AdminPage() {
    * O valor é validado contra o menu e não usado tal e qual: um cookie é
    * escrito pelo browser e pode vir com o que lá puserem.
    */
-  const doCookie = store.get(VIEW_COOKIE)?.value;
-  const vistaInicial = NAV.some((n) => n.id === doCookie) ? (doCookie as View) : undefined;
+  /**
+   * ── E O ENDEREÇO GANHA AO COOKIE ────────────────────────────────────────
+   *
+   * O cookie é a MEMÓRIA («onde é que eu ia»); o `?v=` é a INTENÇÃO («leva-me
+   * aqui»). Um favorito, um link mandado a alguém, um segundo separador aberto
+   * noutra secção — nos três casos há uma intenção escrita no endereço, e ela
+   * tem de ganhar à memória de ontem. Sem isto, abrir um favorito das Propostas
+   * levava-a à última secção usada e o favorito não servia para nada.
+   *
+   * Decidido AQUI, no servidor, e não a corrigir no cliente depois: é a mesma
+   * razão que tirou o salto de secção do arranque — uma escolha aplicada depois
+   * do primeiro desenho é uma escolha que se vê a acontecer.
+   *
+   * ── E VALIDADO CONTRA AS VISTAS, NÃO CONTRA O MENU ──────────────────────
+   *
+   * Isto dizia `NAV.some(...)`, e o `NAV` não tem as vistas todas — o próprio
+   * `nav.tsx` explica que várias ficam de fora de propósito para não encher o
+   * menu, «e ainda assim desenham-se se lá chegarem por um link directo». Não
+   * chegavam: o cookie de uma delas era recusado e ela ia parar à Visão Geral.
+   */
+  const { v } = await searchParams;
+  const doEndereco = vistaValida(typeof v === "string" ? v : undefined);
+  const doCookie = vistaValida(store.get(VIEW_COOKIE)?.value);
+  const vistaInicial: View | undefined = doEndereco ?? doCookie;
 
   const userName =
     session.name || store.get(ADMIN_NAME_COOKIE)?.value || process.env.ADMIN_NAME || "Equipa";
