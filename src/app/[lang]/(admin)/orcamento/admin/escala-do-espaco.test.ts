@@ -38,7 +38,7 @@ import { join } from "node:path";
  * com uma lista de sítios conhecidos, guarda-se procurando em todos.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
 const ler = (f: string) => readFileSync(join(RAIZ, f), "utf8");

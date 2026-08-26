@@ -61,7 +61,7 @@ export const ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS = 2_000;
  * Pelo mesmo argumento, uma volta depois. A página viva da proposta — a que o
  * CASAL abre, do outro lado da aplicação — desenha as mesmas fotografias,
  * vindas dos mesmos buckets privados, com os mesmos URLs assinados que morrem.
- * Deixá-la a importar de `(site)/orcamento/admin/` era pendurar o que o cliente
+ * Deixá-la a importar de `(admin)/orcamento/admin/` era pendurar o que o cliente
  * vê num ramo do back office, e uma cópia era garantir que as duas cascatas
  * divergiam. A regra continua a ser de quem desenha uma foto — e agora são
  * dois.

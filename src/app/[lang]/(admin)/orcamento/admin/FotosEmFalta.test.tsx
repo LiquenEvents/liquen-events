@@ -24,11 +24,11 @@ const DOC = { moodBoards: [] } as unknown as ProposalDoc;
 let responde: () => Response;
 const fetchMock = vi.fn(async () => responde());
 
-const ok = (corpo: unknown) =>
-  ({ ok: true, json: async () => corpo }) as unknown as Response;
+const ok = (corpo: unknown) => ({ ok: true, json: async () => corpo }) as unknown as Response;
 
 beforeEach(() => {
-  responde = () => ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
+  responde = () =>
+    ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -45,7 +45,8 @@ describe("quando está tudo no sítio", () => {
   });
 
   it("as fotos de fora contam-se à parte", async () => {
-    responde = () => ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 1, verificou: true });
+    responde = () =>
+      ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 1, verificou: true });
     render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
     expect(await screen.findByText(/endereço de fora/i)).toBeTruthy();
   });
@@ -98,7 +99,8 @@ describe("quando falta alguma", () => {
     const user = userEvent.setup();
     render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
     await screen.findByText(/2 fotografias não vão aparecer/i);
-    responde = () => ok({ total: 5, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
+    responde = () =>
+      ok({ total: 5, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
     await user.click(screen.getByRole("button", { name: /Já corrigi/i }));
     expect(await screen.findByText(/estão todas no sítio/i)).toBeTruthy();
   });
@@ -109,7 +111,8 @@ describe("quando falta alguma", () => {
  */
 describe("«não consegui verificar» nunca se lê como «está tudo bem»", () => {
   it("com a verificação por correr, di-lo com todas as letras", async () => {
-    responde = () => ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: false });
+    responde = () =>
+      ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: false });
     render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
     expect(await screen.findByText(/Não foi possível confirmar/i)).toBeTruthy();
     expect(screen.getByText(/não quer dizer que estejam bem/i)).toBeTruthy();

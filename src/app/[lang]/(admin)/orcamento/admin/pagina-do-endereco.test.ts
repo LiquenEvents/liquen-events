@@ -28,7 +28,7 @@ import { VIEWS, vistaValida } from "./nav";
  */
 
 const FONTE = readFileSync(
-  join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin/page.tsx"),
+  join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/page.tsx"),
   "utf8",
 );
 

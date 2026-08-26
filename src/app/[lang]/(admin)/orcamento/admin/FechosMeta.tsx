@@ -152,17 +152,15 @@ export default function FechosMeta() {
         Casamentos fechados · Meta
       </h3>
       <p className="mt-1 text-[11px] leading-snug text-foreground/35">
-        Devolve à Meta o valor dos casamentos que fecharam, para os anúncios
-        optimizarem para casamentos e não para formulários.
+        Devolve à Meta o valor dos casamentos que fecharam, para os anúncios optimizarem para
+        casamentos e não para formulários.
       </p>
 
       {aLer && <p className="mt-4 text-xs text-foreground/40">A contar…</p>}
 
       {falhouALeitura && (
         <div className="mt-4">
-          <p className="text-xs text-[#a03123]">
-            Não foi possível contar os casamentos fechados.
-          </p>
+          <p className="text-xs text-[#a03123]">Não foi possível contar os casamentos fechados.</p>
           <button
             type="button"
             onClick={() => {

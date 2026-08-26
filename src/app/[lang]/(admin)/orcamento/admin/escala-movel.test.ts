@@ -39,7 +39,7 @@ import { join } from "node:path";
  * a regra do `globals.css`, cai aqui.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
 /** O último degrau da escala da casa. Nada de texto que se leia desce daqui. */

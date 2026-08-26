@@ -27,7 +27,7 @@ import path from "node:path";
  * trás. Este teste é o que impede que voltem a ficar.
  */
 
-const ADMIN = path.join(process.cwd(), "src", "app", "[lang]", "(site)", "orcamento", "admin");
+const ADMIN = path.join(process.cwd(), "src", "app", "[lang]", "(admin)", "orcamento", "admin");
 
 function ficheiros(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {

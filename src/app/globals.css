@@ -204,6 +204,27 @@ body:has([data-orcamento-mode]) {
   --color-foreground: #2a2620;
 }
 
+/* ── AS CORES DO BACK OFFICE, NO PRIMEIRO PIXEL ─────────────────────────────
+   O `body.admin-mode` aqui em baixo faz o mesmo — e chega TARDE: a classe só
+   entra num `useEffect`, portanto o primeiro desenho sai com o creme do sítio
+   público e corrige-se à vista.
+
+   Enquanto o back office viveu dentro de `/orcamento`, isto não se notava: o
+   `data-orcamento-mode` do layout de lá já era servido pelo servidor e punha
+   uma superfície branca no primeiro pixel. Ao sair para o grupo `(admin)`
+   (achado D-01 — o menu do sítio estava MESMO montado dentro do back office),
+   deixou de haver quem o fizesse, e sem esta regra trocava-se o piscar do menu
+   por um piscar de cor. Seria o mesmo defeito com outra roupa.
+
+   `data-admin-mode` vem do `layout.tsx` do grupo, no HTML do servidor. A classe
+   `admin-mode` continua a existir e fica para o que depende mesmo de JS. */
+body:has([data-admin-mode]) {
+  --color-surface: #ffffff;
+  --color-surface-raised: #f7f7f8;
+  --color-surface-elevated: #ffffff;
+  --color-foreground: #0d0d0d;
+}
+
 /* Back office: clean white surface. */
 body.admin-mode {
   --color-surface: #ffffff;

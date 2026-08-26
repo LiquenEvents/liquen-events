@@ -5,7 +5,7 @@ import { quandoGravado } from "@/lib/quando-gravado";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { parseMoney } from "./util";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
-import { Card, Field, Button, EmptyState, EmCurso } from "@/app/[lang]/(site)/orcamento/admin/ui";
+import { Card, Field, Button, EmptyState, EmCurso } from "@/app/[lang]/(admin)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import { useTravaoDeSaida } from "./useGravacaoAutomatica";
 import { tempoEstimado } from "@/lib/custo-do-pdf";

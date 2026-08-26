@@ -57,7 +57,7 @@ import type { ThemeImage } from "@/lib/theme-types";
  *     `overflow-hidden` ou uma largura fixa → não pode ser cortado.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 const ler = (f: string) => readFileSync(join(RAIZ, f), "utf8");
 
 /** O maior valor plausível deste back office, e o que fez a conta rebentar. */

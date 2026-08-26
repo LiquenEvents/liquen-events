@@ -22,7 +22,7 @@ import { join } from "node:path";
  * porque são o mesmo sítio.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 const ADMIN = readFileSync(join(RAIZ, "AdminClient.tsx"), "utf8");
 const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 

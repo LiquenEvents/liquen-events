@@ -30,7 +30,7 @@ import { join } from "node:path";
  * enquanto ninguém a esquecer — e esquecer-se-ia no próximo componente.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 
 /** Os ecrãs da Biblioteca e do seletor — os que a Fase 7 cobre. */
 const ECRAS = [

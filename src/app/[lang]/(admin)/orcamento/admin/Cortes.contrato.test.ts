@@ -38,7 +38,7 @@ import { join } from "node:path";
  */
 
 const RAIZ = process.cwd();
-const BACK_OFFICE = "src/app/[lang]/(site)/orcamento/admin";
+const BACK_OFFICE = "src/app/[lang]/(admin)/orcamento/admin";
 
 /** Os cortes que este back office não usa, em todas as formas em que se escrevem. */
 const PROIBIDOS = new Set(["md", "xl", "2xl", "max-md", "max-xl", "max-2xl"]);

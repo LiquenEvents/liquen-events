@@ -22,7 +22,7 @@ import { join } from "node:path";
  * num refactor distraído.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 const ler = (f: string) => readFileSync(join(RAIZ, f), "utf8");
 
 const PAGAMENTOS = ler("PaymentsPanel.tsx");

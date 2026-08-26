@@ -44,7 +44,7 @@ import path from "node:path";
  */
 
 const RAIZ = path.join(process.cwd(), "src");
-const ADMIN = path.join(RAIZ, "app", "[lang]", "(site)", "orcamento", "admin");
+const ADMIN = path.join(RAIZ, "app", "[lang]", "(admin)", "orcamento", "admin");
 
 /**
  * O QUE ESTÁ ESCRITO E NÃO ESTÁ MONTADO, E PORQUÊ.

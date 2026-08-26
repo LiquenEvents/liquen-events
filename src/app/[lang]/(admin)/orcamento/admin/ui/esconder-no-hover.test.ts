@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
  *   · Tarefas 0 de 40, Inventário 0 de 20, dossier 0 de 86
  */
 
-const DIR = "src/app/[lang]/(site)/orcamento/admin";
+const DIR = "src/app/[lang]/(admin)/orcamento/admin";
 
 function ficheiros(dir: string, saida: string[] = []): string[] {
   for (const e of readdirSync(dir, { withFileTypes: true })) {

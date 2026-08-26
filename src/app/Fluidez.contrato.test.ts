@@ -235,11 +235,11 @@ function propriedadesDeKeyframes(fonte: string): { nome: string; props: string[]
  * `transition-opacity` passam todas.
  */
 const BARRAS = [
-  "src/app/[lang]/(site)/orcamento/admin/StatsDashboard.tsx",
-  "src/app/[lang]/(site)/orcamento/admin/Overview.tsx",
-  "src/app/[lang]/(site)/orcamento/admin/ProductionPlan.tsx",
-  "src/app/[lang]/(site)/orcamento/admin/ModoDeCarga.tsx",
-  "src/app/[lang]/(site)/orcamento/admin/EventChecklist.tsx",
+  "src/app/[lang]/(admin)/orcamento/admin/StatsDashboard.tsx",
+  "src/app/[lang]/(admin)/orcamento/admin/Overview.tsx",
+  "src/app/[lang]/(admin)/orcamento/admin/ProductionPlan.tsx",
+  "src/app/[lang]/(admin)/orcamento/admin/ModoDeCarga.tsx",
+  "src/app/[lang]/(admin)/orcamento/admin/EventChecklist.tsx",
   "src/app/[lang]/(site)/galeria/GaleriaClient.tsx",
 ];
 
@@ -480,7 +480,7 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
      * As setas que rodam ao abrir uma secção continuam a rodar — a rotação é
      * informação, diz se está aberta. O que desaparece é ela a rodar devagar.
      */
-    const DOSSIER = "src/app/[lang]/(site)/orcamento/admin";
+    const DOSSIER = "src/app/[lang]/(admin)/orcamento/admin";
     const semGuarda: string[] = [];
     for (const rel of ficheirosDeEcra().filter((f) => f.startsWith(DOSSIER))) {
       const fonte = semComentariosTsx(readFileSync(join(RAIZ, rel), "utf8"));
@@ -542,7 +542,7 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
     // A mesma falha estúpida do teste acima, na versão JSX: o varredor deixar
     // de encontrar etiquetas e a rede passar sobre uma lista vazia.
     const painel = semComentariosTsx(
-      readFileSync(join(RAIZ, "src/app/[lang]/(site)/orcamento/admin/StatsDashboard.tsx"), "utf8"),
+      readFileSync(join(RAIZ, "src/app/[lang]/(admin)/orcamento/admin/StatsDashboard.tsx"), "utf8"),
     );
     const etiquetas = etiquetasDeAbertura(painel);
     expect(etiquetas.length, "o varredor deixou de ver etiquetas de abertura").toBeGreaterThan(100);

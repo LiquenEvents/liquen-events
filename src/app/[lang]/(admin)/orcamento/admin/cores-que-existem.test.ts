@@ -41,7 +41,7 @@ import { join } from "node:path";
  * tentar apanhar.
  */
 
-const RAIZ = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin");
+const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
 /** Os `--color-*` declarados no bloco `@theme`. */

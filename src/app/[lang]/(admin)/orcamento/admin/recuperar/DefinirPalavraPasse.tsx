@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Card, Field, Button } from "@/app/[lang]/(site)/orcamento/admin/ui";
+import { Card, Field, Button } from "@/app/[lang]/(admin)/orcamento/admin/ui";
 
 const MINIMO = 12;
 

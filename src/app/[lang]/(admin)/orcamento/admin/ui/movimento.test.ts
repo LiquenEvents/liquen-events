@@ -25,7 +25,7 @@ import { ESTADO, PRESSAO, PROGRESSO, TOQUE_MS, ESTADO_MS, PROGRESSO_MS } from ".
  *     gera — a avaria mais cara de todas, porque é invisível.
  */
 
-const AQUI = join(process.cwd(), "src/app/[lang]/(site)/orcamento/admin/ui");
+const AQUI = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/ui");
 
 /** Tira comentários: a prosa desta pasta cita classes e números de propósito. */
 const semComentarios = (src: string) =>
