@@ -185,18 +185,61 @@ body.admin-mode {
   --color-surface-raised: #f7f7f8;
   --color-surface-elevated: #ffffff;
   --color-foreground: #0d0d0d;
-  /* ── Back-office text-contrast tokens (WCAG 1.4.3) ──
-     The admin surface is pure white, so foreground (#2a2620) at a low alpha
-     silently drops informational text below 4.5:1. These three audited levels
-     mirror the public site's .eyebrow discipline (a legible micro-heading, not a
-     ghost). Use them for INFORMATIONAL text instead of arbitrary text-foreground/NN.
-       --bo-text        ~6.4:1  strong body info (values, emails, ids, dates)
-       --bo-text-muted  ~5.6:1  secondary info — still passes AA body text
-       --bo-text-faint  ~4.1:1  decorative-only micro-labels (≥3:1; never the sole
-                                carrier of information) */
+  /* ── OS TOKENS DE TEXTO DO BACK OFFICE (WCAG 1.4.3, AA) ──────────────────
+     A superfície do back office é branca, e estes três tokens são o texto que
+     assenta nela. São `rgba` — o que o olho vê é a cor COMPOSTA, não o
+     `#0d0d0d` de partida, e é essa que tem de ser medida.
+
+     ── OS NÚMEROS QUE AQUI ESTAVAM ESTAVAM ERRADOS ────────────────────────
+     Esta lista dizia «~6,4 · ~5,6 · ~4,1». Medidos a sério, sobre branco:
+
+         token             dizia     MEDIDO    achatado    veredicto
+         --bo-text         ~6,4:1    11,63:1   #393939     passa folgado
+         --bo-text-muted   ~5,6:1     5,91:1   #646464     passa
+         --bo-text-faint   ~4,1:1      3,41:1  #8b8b8b     CHUMBAVA
+
+     Um número escrito à mão num comentário estraga-se sozinho: ninguém o
+     recalcula ao mexer no token, e a partir daí ele dá permissão a quem lê para
+     não voltar a medir. Foi ao certo o que se passou — o `faint` andou meses
+     anunciado como «≥3:1, decorativo» a medir 3,41:1, e uma auditoria em
+     produção chegou a atribuir o defeito a cores (`#ABABAB`, `#9B9B9B`) e a um
+     token (`--texto-secundario`) que não existem neste repositório.
+     `contraste-do-texto.test.ts` passou a correr a conta na CI, a partir deste
+     ficheiro, e desmente-os se voltarem a mentir.
+
+     ── PORQUE É QUE O `faint` SUBIU DE 0,48 PARA 0,58 ─────────────────────
+     A dispensa dele dos 4,5:1 assentava numa premissa — «decorativo, nunca o
+     único portador de informação». A varredura dos `.tsx` não a confirmou: dos
+     25 usos, o `faint` veste o EMAIL DO CLIENTE (`ClientMessenger.tsx`), a
+     REFERÊNCIA DO PEDIDO (`AdminClient.tsx`) e os rótulos dos destinos da barra
+     de navegação. Nada disso é decoração, e nenhum tem outra cópia ao lado a
+     dizer o mesmo. Sem a premissa, aplica-se-lhe a régua de toda a gente.
+
+     0,58 não é um número escolhido a gosto: é o MAIS CLARO que ainda passa nas
+     quatro superfícies em que o texto assenta. O degrau abaixo (0,57) mede
+     4,42:1 sobre o `--bo-tint-accent` e chumba por pouco.
+
+         fundo                            0,48 (antes)   0,58 (agora)
+         --bo-surface (branco)               3,41:1        4,77:1
+         --bo-surface-sunken #f7f7f8         3,37:1        4,67:1
+         --bo-surface-hover                  3,35:1        4,64:1
+         --bo-tint-accent                    3,32:1        4,57:1
+
+     Achatado sobre branco passa de `#8b8b8b` a `#737373`: continua um cinzento
+     suave, que é o ponto. Esta é uma marca sóbria e o texto secundário É PARA
+     SER discreto — a correcção era subir o que chumbava até ao mínimo, não
+     empurrar os cinzentos para preto. O teste guarda os dois lados: chumba
+     abaixo de 4,5:1 E chumba acima de 9:1.
+
+     Os outros dois ficam exactamente como estavam — mediram-se, passam, e
+     mexer-lhes só mudaria o aspecto sem corrigir nada.
+
+       --bo-text        11,63:1  informação forte (valores, emails, ids, datas)
+       --bo-text-muted   5,91:1  informação secundária — passa AA a texto normal
+       --bo-text-faint    4,77:1 micro-rótulos — agora também passa AA */
   --bo-text: rgba(13, 13, 13, 0.82);
   --bo-text-muted: rgba(13, 13, 13, 0.64);
-  --bo-text-faint: rgba(13, 13, 13, 0.48);
+  --bo-text-faint: rgba(13, 13, 13, 0.58);
 
   /* ── ChatGPT-app design system (back office only) ──────────────────────────
      One calm, modern surface language shared by every admin screen. Scoped to
