@@ -3,7 +3,8 @@ import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
-import { pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { chaveDoPdf, pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { urlDoPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { respostaPdf } from "@/lib/pdf-resposta";
@@ -90,22 +91,45 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // `proposal-pdf-cache.ts`; o anexo do email continua a recusar.
     // O mesmo desenho guardado que o link do email serve — a chave é o
     // conteúdo, portanto as duas portas partilham o ficheiro.
-    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
-    // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     // O nome é o mesmo do anexo que seguiu no email, para o ficheiro ser
     // reconhecível como o documento que o casal já tem.
     const ref = quote.id.replace(/[^A-Za-z0-9_-]/g, "");
-    return respostaPdf(request, pdf, {
-      nome: nomeDoFicheiroDaProposta(
-        {
-          escolhido: proposal.doc?.nomeDoFicheiro,
-          clientNames: proposal.doc?.clientNames,
-          eventDate: proposal.doc?.eventDate,
-          ref,
-        },
-        idioma,
-      ),
-    });
+    const nome = nomeDoFicheiroDaProposta(
+      {
+        escolhido: proposal.doc?.nomeDoFicheiro,
+        clientNames: proposal.doc?.clientNames,
+        eventDate: proposal.doc?.eventDate,
+        ref,
+      },
+      idioma,
+    );
+
+    /**
+     * ── SE ELE JÁ ESTÁ GUARDADO, NÃO PRECISA DE NOS ATRAVESSAR ────────────
+     *
+     * O mesmo atalho que a porta do email já tinha (`api/proposta/[token]/pdf`)
+     * e que esta não tinha. Sem ele os bytes faziam duas viagens —
+     * armazenamento → esta função → o telemóvel — e numa proposta com quarenta
+     * e seis fotografias são megabytes a passar por um sítio que não precisa de
+     * os ver, com um arranque a frio pelo meio.
+     *
+     * As duas portas partilham o ficheiro (a chave é o conteúdo), portanto o
+     * que o envio guardou serve as duas. `null` = não está lá, e aí desenha-se
+     * como antes.
+     */
+    const directo = await urlDoPdfDaProposta(proposal.id, chaveDoPdf(proposal.doc, idioma), nome);
+    if (directo) {
+      return NextResponse.redirect(directo, {
+        status: 302,
+        // O endereço expira em minutos: guardado por um cache partilhado seria
+        // um link morto servido a quem carregasse depois.
+        headers: { "Cache-Control": "private, no-store, must-revalidate" },
+      });
+    }
+
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
+    // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
+    return respostaPdf(request, pdf, { nome });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.
