@@ -1854,7 +1854,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     versao?: "pt" | "en";
   } | null>(null);
   /** A vista com as páginas lado a lado está aberta? */
-  const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
   /** As fotos escolhidas para serem movidas em conjunto — chaves `bi:ii`. */
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const hydrated = useRef(false);
@@ -7335,42 +7334,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 onMover={moverSeleccaoParaBoard}
                 onLimpar={() => setSeleccionadas(new Set())}
               />
-              {/* ── AS PÁGINAS LADO A LADO ────────────────────────────────
-                  A pergunta que o editor não deixa fazer — «isto parece tudo
-                  do mesmo casamento?» — só se responde com as folhas todas à
-                  mesma distância dos olhos.
-
-                  FORA DA GRELHA, e acima dela. Lá dentro era o TERCEIRO filho
-                  de uma grelha de duas colunas: por colocação automática, a
-                  vista ficava com a coluna do índice e a lista dos mood boards
-                  descia para a coluna de 11 rem — 176 px de largura para as
-                  fotografias todas, a partir dos 1024 px. Aqui em cima ocupa a
-                  largura toda, que é a única em que umas folhas lado a lado se
-                  comparam. */}
-              {vistaDeConjunto && (
-                <VistaDeConjunto
-                  doc={doc as ProposalDoc}
-                  ordem={ordemDosBoards}
-                  idioma={idiomaDoPdf}
-                  urls={assetUrls}
-                  originais={assetOriginais}
-                  aspetos={aspetosDasFotos}
-                  onMover={(de, para) => moverBoardParaPosicao(de, para)}
-                  onSaltar={(bi) => {
-                    const id = doc.moodBoards[bi]?.id;
-                    if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                    document
-                      .getElementById(`mood-board-${bi}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  // O salto de uma folha de texto usa o MESMO caminho da
-                  // Conferência: abre a secção se estiver dobrada e só então
-                  // leva a vista. Uma segunda maneira de saltar era uma segunda
-                  // maneira de falhar a abertura da dobra.
-                  onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
-                  onFechar={() => setVistaDeConjunto(false)}
-                />
-              )}
               {/* ── O ÍNDICE ─────────────────────────────────────────────
                   Onde a caixa dá, é uma coluna fixa ao lado; onde não dá, uma
                   tira que se percorre por cima da lista — a 390 px, uma coluna
@@ -8262,18 +8225,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     interruptor teria de mentir sobre o conjunto. */}
                     {doc.moodBoards.length > 1 && (
                       <>
-                        {/* As oito páginas à mesma distância dos olhos — a única
-                            maneira de ver se parecem todas do mesmo casamento. */}
-                        <button
-                          type="button"
-                          className={ADD_BTN}
-                          onClick={() => setVistaDeConjunto((v) => !v)}
-                          aria-pressed={vistaDeConjunto}
-                        >
-                          {vistaDeConjunto
-                            ? "Fechar a vista de conjunto"
-                            : "Ver as páginas lado a lado"}
-                        </button>
                         <button type="button" className={ADD_BTN} onClick={() => dobrarTodos(true)}>
                           Fechar todos
                         </button>
@@ -9649,6 +9600,68 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               </div>
             )}
           </Section>
+
+          {/* ══════════════════════════════════════════════════════════════
+              AS PÁGINAS LADO A LADO — NO FIM, E SEM SE PEDIR
+              ══════════════════════════════════════════════════════════════
+
+              Palavras dela: «eu quero que apareça isto automaticamente no
+              final sem pedirmos ou carregarmos para ver».
+
+              Estava atrás de um botão («Ver as páginas lado a lado»), e o
+              botão só existia com mais do que um mood board. Duas condições
+              para ver o documento inteiro, e a segunda não fazia sentido
+              nenhuma desde que esta vista deixou de ser dos mood boards e
+              passou a ser da PROPOSTA: a capa, a apresentação, o orçamento,
+              as condições e a contracapa existem com um board ou com zero.
+
+              Fica no FIM da coluna onde ela escreve, que é onde a pergunta
+              nasce — acabei, como é que isto ficou? Estava em cima, antes de
+              tudo o que a responde.
+
+              ── PORQUE É QUE ESTÁ AQUI E NÃO UM NÍVEL ACIMA ────────────────
+              O passo 1 é uma FILA (`lg:flex`): o índice, esta coluna e o
+              painel «O que vai sair». Um quarto filho ali seria uma quarta
+              COLUNA, e as folhas lado a lado espremidas numa coluna deixam de
+              se poder comparar — que é a única coisa que esta vista serve.
+              Último filho da coluna de escrita é a largura toda, e é a mesma
+              que ela já tinha quando estava em cima.
+
+              ── E PORQUE É QUE NÃO LEVA `content-visibility` ──────────────
+              Foi a primeira ideia — saltar o desenho enquanto ela não chega cá
+              abaixo. Mas o `Paineis.contrato.test.ts` proíbe escrevê-lo à mão
+              numa página, e tem razão medida: quem o usa tem de reservar a
+              altura certa, e uma reserva errada faz a página encolher debaixo
+              do dedo na primeira descida (576 px medidos em `/servicos`). O
+              molde da casa, `.cv-panel`, FIXA a altura a `--cv-h` — serve
+              bandas de altura conhecida, e esta vista tem tantas folhas quantas
+              a proposta tiver. Fixá-la era cortá-la.
+
+              Fica sem optimização nenhuma, que é o estado honesto: se algum dia
+              pesar, mede-se primeiro. */}
+          <div className="mt-6">
+            <VistaDeConjunto
+              doc={doc as ProposalDoc}
+              ordem={ordemDosBoards}
+              idioma={idiomaDoPdf}
+              urls={assetUrls}
+              originais={assetOriginais}
+              aspetos={aspetosDasFotos}
+              onMover={(de, para) => moverBoardParaPosicao(de, para)}
+              onSaltar={(bi) => {
+                const id = doc.moodBoards[bi]?.id;
+                if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+                document
+                  .getElementById(`mood-board-${bi}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              // O salto de uma folha de texto usa o MESMO caminho da
+              // Conferência: abre a secção se estiver dobrada e só então
+              // leva a vista. Uma segunda maneira de saltar era uma segunda
+              // maneira de falhar a abertura da dobra.
+              onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
+            />
+          </div>
         </div>
         {/*
          * ── A TERCEIRA ZONA ──────────────────────────────────────────────

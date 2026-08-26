@@ -3848,8 +3848,20 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
   async function medirCapas(formas: { w: number; h: number }[]) {
     // Pelo DOM e não por papel: um `<img alt="">` é decorativo e não tem
     // papel nenhum de acessibilidade — `getAllByRole("img")` não o encontra.
+    //
+    // ── E DENTRO DA SECÇÃO DAS CAPAS, NÃO NA PÁGINA TODA ─────────────────
+    // A mesma fotografia de capa aparece agora em DOIS sítios: aqui e na
+    // «Vista de conjunto», que passou a desenhar-se sozinha no fim do passo 1.
+    // Procurar `capas/` no documento inteiro trazia as duas cópias, e as
+    // `formas` são atribuídas POR ÍNDICE — a primeira forma ia parar à
+    // miniatura da vista e a capa verdadeira ficava por medir. Por medir não
+    // há aviso, e o teste caía a dizer que o aviso desapareceu.
+    //
+    // A secção é a unidade certa: é dela que o aviso fala.
     const capas = await waitFor(() => {
-      const encontradas = [...document.querySelectorAll("img")].filter((i) =>
+      const seccao = document.getElementById("sec-capas");
+      if (!seccao) throw new Error("a secção das capas ainda não está desenhada");
+      const encontradas = [...seccao.querySelectorAll("img")].filter((i) =>
         (i.getAttribute("src") ?? "").includes("capas/"),
       );
       if (encontradas.length === 0) throw new Error("as capas ainda não estão desenhadas");
@@ -4507,11 +4519,66 @@ describe("ver as páginas lado a lado", () => {
     );
   }
 
+  /**
+   * ── ESTÁ LÁ SEM SE PEDIR ────────────────────────────────────────────────
+   *
+   * Palavras dela: «eu quero que apareça isto automaticamente no final sem
+   * pedirmos ou carregarmos para ver».
+   *
+   * Havia um botão («Ver as páginas lado a lado») e o botão só existia com
+   * mais do que um mood board. O teste de antes carregava nele — o que quer
+   * dizer que provava a vista DEPOIS de um clique, que é exactamente o clique
+   * que ela não quer dar. Passa a provar que ela lá está sem ninguém lhe
+   * tocar, e que o botão desapareceu.
+   */
+  function seedUmBoard() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [{ title: "Cerimónia", annotation: "", images: ["board/a.jpg"] }],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("aparece sozinha, sem botão nenhum para a abrir", async () => {
+    seedDoisBoards();
+    renderStudio();
+    await screen.findByText("Vista de conjunto");
+    expect(screen.queryByRole("button", { name: "Ver as páginas lado a lado" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Fechar a vista de conjunto" })).toBeNull();
+    // E o painel não tem «Fechar» PRÓPRIO: não há estado nenhum para onde
+    // fechar. (Procurado DENTRO dele — «Fechar» é palavra de mais sítios.)
+    const painel = screen.getByText("Vista de conjunto").closest("div.rounded-2xl") as HTMLElement;
+    expect(within(painel).queryByRole("button", { name: "Fechar" })).toBeNull();
+  });
+
+  /**
+   * E com UM board — ou nenhum — também. O botão antigo exigia dois, o que
+   * era herança de isto ter sido uma vista dos mood boards; desde que passou a
+   * mostrar o DOCUMENTO (capa, apresentação, orçamento, condições, contracapa)
+   * a condição deixou de querer dizer nada.
+   */
+  it("e também com um só mood board, que era onde o botão nunca aparecia", async () => {
+    seedUmBoard();
+    renderStudio();
+    await screen.findByText("Vista de conjunto");
+  });
+
   it("não entra na grelha do índice — a grelha continua com duas colunas e dois filhos", async () => {
     seedDoisBoards();
     renderStudio();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Ver as páginas lado a lado" }));
 
     const vista = await screen.findByText("Vista de conjunto");
     const grelha = document.querySelector('[class*="grid-cols-[11rem"]');
@@ -4520,6 +4587,27 @@ describe("ver as páginas lado a lado", () => {
     // mandava a lista para a coluna de 176 px.
     expect(grelha!.children).toHaveLength(2);
     expect(grelha!.contains(vista)).toBe(false);
+  });
+
+  /**
+   * ── E NÃO É UMA QUARTA COLUNA ───────────────────────────────────────────
+   *
+   * O passo 1 é uma fila (`lg:flex`): índice, coluna de escrita, painel. Se a
+   * vista subisse um nível ficava lá dentro como quarto filho, e umas folhas
+   * lado a lado espremidas numa coluna não se comparam — que é a única coisa
+   * que esta vista serve. Tem de ser o último filho da COLUNA DE ESCRITA.
+   */
+  it("fica dentro da coluna de escrita, e não como mais uma coluna da fila", async () => {
+    seedDoisBoards();
+    renderStudio();
+    const vista = await screen.findByText("Vista de conjunto");
+    const fila = document.querySelector('[class*="lg:flex"][class*="lg:gap-6"]');
+    expect(fila).toBeTruthy();
+    expect(fila!.contains(vista)).toBe(true);
+    // Nenhum dos filhos directos da fila É a vista.
+    for (const filho of Array.from(fila!.children)) {
+      expect(filho.textContent === vista.textContent).toBe(false);
+    }
   });
 });
 
