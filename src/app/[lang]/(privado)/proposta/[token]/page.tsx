@@ -462,28 +462,31 @@ export default async function ProposalPage({
           </h1>
           {/*
            * ══════════════════════════════════════════════════════════════
-           * A FRASE DE INTENÇÃO, OU A DA CASA — NUNCA AS DUAS
+           * A FRASE DELA, OU FRASE NENHUMA
            * ══════════════════════════════════════════════════════════════
            *
-           * Quando ela escreveu uma frase para AQUELE casamento, é essa que se
-           * lê. A da casa («preparámos esta proposta com todo o cuidado…») é
-           * verdadeira e é de toda a gente; pô-las as duas seguidas fazia a
-           * primeira parecer o subtítulo da segunda, e a específica perdia
-           * exactamente o que a torna específica.
+           * Palavras dela: «quero retirar isto de "veja com calma". quero que
+           * apareça apenas o nome do noivo e da noiva».
            *
-           * Maior e na serifada do documento quando é dela: não é uma nota de
-           * boas-vindas, é a tese da proposta.
-           */}
-          {intencao ? (
+           * A frase da casa («Preparámos esta proposta com todo o cuidado…
+           * Vejam com calma») era verdadeira e era de toda a gente — e é isso
+           * que estava mal debaixo de dois nomes próprios. O que a abertura
+           * tem para dizer é de quem é a proposta; uma frase que serve para
+           * qualquer casal não acrescenta nada a isso e afasta o botão.
+           *
+           * Quando ela escreveu uma frase para AQUELE casamento, essa fica —
+           * é dela e é específica, que é precisamente o contrário do que saiu.
+           * Maior e na serifada do documento: não é uma nota de boas-vindas,
+           * é a tese da proposta.
+           *
+           * A da casa continua a existir no EMAIL (`proposta-doc/route.ts`),
+           * onde um corpo só com dois nomes não se lê como uma mensagem. */}
+          {intencao && (
             <p
               className="text-foreground/80 mx-auto mt-5 max-w-xl leading-relaxed text-balance"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(17px, 2.4vw, 21px)" }}
             >
               {intencao}
-            </p>
-          ) : (
-            <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
-              {t.intro}
             </p>
           )}
         </header>
