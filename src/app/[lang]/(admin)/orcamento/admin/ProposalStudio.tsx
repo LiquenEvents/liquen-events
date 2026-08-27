@@ -1136,6 +1136,96 @@ export async function gravarRascunhoNoServidor(
   return { estado: "so-local", porque };
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PREÇO QUE FICAVA SÓ NO ESTÚDIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era um `fetch` seco com um `catch` vazio, e o comentário dizia «a
+ * gravação seguinte volta a tentar». NÃO HÁ GRAVAÇÃO SEGUINTE: esta chamada só
+ * parte quando alguém MEXE no valor. Se a rede piscar na única vez que ela
+ * escreve o preço, ninguém volta a tentar nada.
+ *
+ * O que se via, e está na auditoria da casa (2.3): o Estúdio e o PDF a dizerem
+ * 9.500 €, e o cartão do pedido, a margem, as Estatísticas e as facturas a
+ * dizerem 8.000 €. Sem aviso nenhum, porque o `catch` estava vazio. É a queixa
+ * dela — «o valor enviado para o cliente tem de ser o valor que fica na
+ * proposta» — com a causa por baixo.
+ *
+ * Duas coisas mudam, e são as mesmas do rascunho aqui em cima, de propósito:
+ *
+ *  · REPETIR. Uma gravação que morre porque a ligação caiu não pode morrer à
+ *    primeira. Mesmas tentativas, mesma pausa crescente, mesmo tecto por
+ *    tentativa.
+ *  · DIZER. Quando nem à terceira chega, o ecrã passa a saber e a mostrar — com
+ *    os dois valores à vista e um botão para tentar outra vez.
+ *
+ * O que NÃO se repete é o mesmo que ali: um 4xx é o pedido que está errado
+ * (sessão caída, sobretudo), e repeti-lo dá exactamente a mesma resposta. Aí
+ * `valeTentarDeNovo` vem `false` e o ecrã não oferece um botão que não pode
+ * funcionar — é a regra que o `AvisoDeFalha` já segue.
+ *
+ * Nunca lança: quem chama está no meio da escrita de uma proposta.
+ */
+export type ResultadoDoPreco =
+  | {
+      estado: "gravado";
+      /**
+       * O pedido actualizado, para propagar ao resto do ecrã. Falta quando o
+       * servidor respondeu 200 com um corpo que não se leu — gravou na mesma,
+       * e é isso que decide o estado; o que não há é número novo para
+       * espalhar.
+       */
+      quote?: Quote;
+    }
+  | { estado: "falhou"; porque?: string; valeTentarDeNovo: boolean };
+
+export async function mandarPrecoAoPedido(
+  quoteId: string,
+  base: number | null,
+): Promise<ResultadoDoPreco> {
+  let porque: string | undefined;
+  let valeTentarDeNovo = true;
+  for (let tentativa = 1; tentativa <= GRAVACAO_TENTATIVAS; tentativa++) {
+    try {
+      const res = await fetchComTecto(
+        `/api/orcamento/${quoteId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          // `null` e não `undefined`: apagar o preço tem de chegar ao servidor,
+          // e `undefined` desaparece no JSON (o merge parcial mantinha o valor
+          // antigo). É a mesma razão que está escrita na Gestão do pedido.
+          body: JSON.stringify({ quotedPrice: base }),
+        },
+        GRAVACAO_TECTO_MS,
+      );
+      if (res.ok) {
+        // Um 200 com corpo ilegível é um 200: o servidor gravou. Insistir aqui
+        // punha um alarme vermelho por cima de trabalho que está são — e ela
+        // deixava de acreditar no alarme quando ele for verdade.
+        const atualizado = (await res.json().catch(() => null)) as Quote | null;
+        return atualizado ? { estado: "gravado", quote: atualizado } : { estado: "gravado" };
+      } else {
+        const dados = await res.json().catch(() => null);
+        porque = typeof dados?.error === "string" ? dados.error : undefined;
+        if (res.status < 500) {
+          valeTentarDeNovo = false;
+          break;
+        }
+      }
+    } catch {
+      // Rede em baixo, ou o tecto de tempo. É exactamente o caso que a
+      // repetição existe para apanhar.
+      porque = undefined;
+    }
+    if (tentativa < GRAVACAO_TENTATIVAS) {
+      await new Promise((r) => setTimeout(r, GRAVACAO_PAUSA_MS * tentativa));
+    }
+  }
+  return { estado: "falhou", porque, valeTentarDeNovo };
+}
+
 interface Props {
   quote: Quote;
   /**
@@ -1249,6 +1339,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * o servidor manda, com o nome das variáveis que resolvem.
    */
   const [naoDuraAoDeploy, setNaoDuraAoDeploy] = useState<{ aviso?: string } | null>(null);
+  /**
+   * O preço da proposta que não chegou ao pedido — ver `mandarPrecoAoPedido`.
+   * `null` é o normal: ou nunca falhou, ou a última tentativa passou.
+   */
+  const [precoPorChegar, setPrecoPorChegar] = useState<{
+    base: number | null;
+    porque?: string;
+    valeTentarDeNovo: boolean;
+  } | null>(null);
+  const [precoAGravar, setPrecoAGravar] = useState(false);
   /** O mesmo contrato do `avisouSoLocal`: o indicador di-lo sempre, o aviso
    *  grande uma vez. */
   const avisouNaoDura = useRef(false);
@@ -3243,25 +3343,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         : baseDoEcraParaOPedido(escrito, opcoes?.doc ?? doc);
     precoEnviado.current = base;
     if (gravarPreco.current) clearTimeout(gravarPreco.current);
-    gravarPreco.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/orcamento/${quote.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          // `null` e não `undefined`: apagar o preço tem de chegar ao servidor,
-          // e `undefined` desaparece no JSON (o merge parcial mantinha o
-          // valor antigo). É a mesma razão que está escrita na Gestão do pedido.
-          body: JSON.stringify({ quotedPrice: base ?? null }),
-        });
-        if (!res.ok) throw new Error("falhou");
-        const atualizado: Quote = await res.json();
-        onQuoteUpdated?.(atualizado);
-      } catch {
-        // Não interrompe a escrita da proposta: o valor fica no ecrã e no
-        // rascunho, e a gravação seguinte volta a tentar. Avisar a cada tecla
-        // seria pior do que o problema.
-      }
+    gravarPreco.current = setTimeout(() => {
+      void tentarGravarOPreco(base ?? null);
     }, 600);
+  }
+
+  /**
+   * A ida ao servidor, separada do travão das teclas — porque o botão «Tentar
+   * de novo» precisa de a chamar sem esperar 600 ms por nada.
+   */
+  async function tentarGravarOPreco(base: number | null) {
+    setPrecoAGravar(true);
+    try {
+      const r = await mandarPrecoAoPedido(quote.id, base);
+      if (r.estado === "gravado") {
+        setPrecoPorChegar(null);
+        // `quote` pode faltar num 200 de corpo ilegível — ver `ResultadoDoPreco`.
+        if (r.quote) onQuoteUpdated?.(r.quote);
+        return;
+      }
+      /**
+       * ── E AQUI DEIXA DE SE CALAR ──────────────────────────────────────
+       *
+       * O comentário antigo dizia que avisar a cada tecla seria pior do que o
+       * problema — e tinha razão. Só que a alternativa que escolheu foi não
+       * avisar de todo, e o preço ficava a divergir em silêncio.
+       *
+       * O aviso não é por tecla: é UM estado, que fica enquanto o pedido tiver
+       * um valor diferente do da proposta, e desaparece sozinho assim que uma
+       * gravação passe. Enquanto ele estiver de pé, o ecrã mostra os dois
+       * números e um botão — que é o que ela precisa de ver para decidir.
+       */
+      setPrecoPorChegar({
+        base,
+        porque: r.porque,
+        valeTentarDeNovo: r.valeTentarDeNovo,
+      });
+    } finally {
+      setPrecoAGravar(false);
+    }
   }
 
   function onTotalInput(raw: string) {
@@ -10272,6 +10392,47 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     Preenche o conteúdo e avança para pré-visualizar.
                   </span>
                 </>
+              )}
+              {/* ══════════════════════════════════════════════════════════
+                  O PREÇO QUE NÃO CHEGOU AO PEDIDO
+                  ══════════════════════════════════════════════════════════
+
+                  Fica ao lado do indicador da gravação porque é da mesma
+                  família — «onde é que o meu trabalho está» —, mas é um aviso
+                  À PARTE e não um quarto estado daquele: o rascunho pode estar
+                  guardado e o preço na mesma por chegar, e juntá-los obrigava
+                  o indicador a escolher qual das duas verdades dizia.
+
+                  Diz o que aconteceu, com o número, e o que fazer — a regra
+                  dela. Sem o número isto era «algo correu mal» com outra
+                  roupa: ela precisa de ver QUE valor ficou por gravar para
+                  saber se o cartão do pedido está certo ou não.
+              */}
+              {precoPorChegar && (
+                <span
+                  className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
+                  aria-live="assertive"
+                  title={
+                    precoPorChegar.porque ??
+                    "A proposta continua certa; o que não ficou gravado foi o valor no pedido."
+                  }
+                >
+                  <span>
+                    {precoPorChegar.base == null
+                      ? "O pedido ficou com o valor antigo"
+                      : `O pedido ficou sem o valor de ${eur(precoPorChegar.base)}`}
+                  </span>
+                  {precoPorChegar.valeTentarDeNovo && (
+                    <button
+                      type="button"
+                      className="alvo-toque foco-largo underline underline-offset-2 disabled:opacity-60"
+                      disabled={precoAGravar}
+                      onClick={() => void tentarGravarOPreco(precoPorChegar.base)}
+                    >
+                      {precoAGravar ? "A tentar…" : "Tentar de novo"}
+                    </button>
+                  )}
+                </span>
               )}
               {(gravadoEm || porGravar || soNesteComputador || naoDuraAoDeploy) &&
                 (() => {
