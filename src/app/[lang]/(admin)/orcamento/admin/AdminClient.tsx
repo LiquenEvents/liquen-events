@@ -883,16 +883,22 @@ const QuoteCard = memo(function QuoteCard({
             )}
           </div>
         )}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-          {/* A REFERÊNCIA É O FUNDO DA PILHA. `--bo-text-faint` é o degrau que
-              o `globals.css` descreve como «decorativo, nunca o único portador
-              de informação» — e é exactamente esse o papel dela: qualifica um
-              pedido que o nome, três linhas acima, já identificou. Sobe a 12 px
-              (estava a 9) porque quando SE PRECISA dela é para a ler letra a
-              letra ao telefone; o que a tira da frente é o tom, não o tamanho. */}
-          <span className="bo-text-faint text-[12px] font-mono tracking-tight" title={q.id}>
-            Ref. {shortRef(q.id)}
-          </span>
+        {/* ── A REFERÊNCIA SAIU DAQUI ─────────────────────────────────────
+            Estava nesta linha, em `font-mono`, em TODOS os pedidos da lista.
+            Perguntei-lhe se precisava dela de relance ou só ao abrir o pedido,
+            e a resposta foi «retira a referência».
+
+            Tinha razão, e a defesa que aqui estava escrita dizia-o sem dar por
+            isso: «quando SE PRECISA dela é para a ler letra a letra ao
+            telefone». Uma coisa que só se usa com o pedido já aberto não tem de
+            estar em vinte linhas de lista — está no painel de detalhe, que é
+            onde ela está quando precisa de a ler.
+
+            O que fica nesta fila é o que decide: o VALOR e a data. Sem a
+            referência à esquerda deixa de haver duas pontas para separar, por
+            isso a fila deixa de ser `justify-between` e encosta ao fim, ao pé
+            do resto dos números. */}
+        <div className="flex items-center justify-end mt-3 pt-3 border-t border-foreground/[0.07]">
           <div className="flex items-center gap-3">
             {q.quotedPrice ? (
               <span className="text-[#4d6350] text-[13px] font-semibold">

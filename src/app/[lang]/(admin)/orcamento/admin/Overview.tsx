@@ -1379,6 +1379,24 @@ export default function Overview({
     return `Tem ${bits.join(" e ")}.`;
   })();
 
+  /**
+   * ── DOIS ATALHOS, E NÃO QUATRO ────────────────────────────────────────────
+   *
+   * A análise dos dois sites de referência fecha em «no máximo dois CTA», e
+   * aqui eram quatro: «Novo pedido», «Fases dos pedidos», «Calendário» e
+   * «Tarefas». Num telemóvel de 390 px isso são DUAS FILAS inteiras de botões,
+   * logo por baixo do cumprimento e por cima de tudo o resto — o primeiro
+   * terço do ecrã de entrada gasto em navegação.
+   *
+   * Perguntei-lhe quais usa mesmo todos os dias, e a resposta foi «Novo pedido
+   * e Fases dos pedidos». Os outros dois não desaparecem: o Calendário e as
+   * Tarefas continuam no menu lateral e na barra de baixo, que é onde a
+   * navegação vive. O que sai daqui é a DUPLICAÇÃO — dois destinos a ocupar o
+   * lugar mais caro do produto para dizer o que o menu já diz.
+   *
+   * Não é uma escolha minha sobre o trabalho dela: é a escolha dela, e está
+   * aqui escrita para o dia em que alguém quiser acrescentar um quinto.
+   */
   const quickActions: { label: string; onClick: () => void; icon: React.ReactNode }[] = [
     {
       label: "Novo pedido",
@@ -1393,29 +1411,6 @@ export default function Overview({
           <rect x="3" y="4" width="4" height="16" rx="1" />
           <rect x="10" y="4" width="4" height="11" rx="1" />
           <rect x="17" y="4" width="4" height="7" rx="1" />
-        </>
-      ),
-    },
-    {
-      label: "Calendário",
-      onClick: () => onGo("calendario"),
-      icon: (
-        <>
-          <rect x="3" y="4" width="18" height="17" rx="2" />
-          <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-        </>
-      ),
-    },
-    {
-      label: "Tarefas",
-      onClick: () => onGo("tarefas"),
-      icon: (
-        <>
-          <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
-          <path
-            d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
-            strokeLinecap="round"
-          />
         </>
       ),
     },
