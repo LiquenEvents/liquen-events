@@ -410,6 +410,37 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-tinta-10: rgba(13, 13, 13, 0.1);
   --bo-tinta-13: rgba(13, 13, 13, 0.13);
 
+  /* ── UMA CURVA, DUAS VELOCIDADES, UM DEGRAU ──────────────────────────────
+     Medido nos dois sites de referência: a Pixelmatters usa
+     `cubic-bezier(.4,0,.2,1)` em tudo; a Apple usa `cubic-bezier(0,0,.5,1)`,
+     contada 23 vezes numa página. São curvas diferentes com a MESMA
+     propriedade — nenhuma tem `ease-in`. Arrancam a fundo e travam no fim, que
+     é a curva de uma coisa que já vinha a caminho. Uma coisa que acelera
+     devagar parece estar a decidir se vem.
+
+     E duas velocidades, não uma escala: 0,1 s para COR (a Apple tem
+     `background-color 0.1s linear` quinze vezes) e 0,3 s para FORMA
+     (`transform 0.3s`, vinte e três vezes). A regra por trás é a de que
+     nenhuma resposta a um clique ou a um rato passa dos 300 ms nos dois sites
+     — acima disso deixa de parecer resposta e passa a parecer processamento.
+
+     O terceiro tempo, 0,2 s, é o SINAL. Nos filtros da Pixelmatters o texto
+     acende aos 200 ms e a pílula chega aos 300: separar o «ouvi-te» do «e
+     agora mostro-te» é o que faz o clique parecer imediato e o movimento
+     parecer caro, em vez de obrigar a escolher entre os dois.
+
+     O degrau de 20 ms é a escada de atrasos que a Apple tem ESCRITA no CSS —
+     0,20 / 0,22 / 0,24 / 0,26 / 0,28 / 0,30 s. Seis degraus, e pára. O
+     desfasamento serve para o olho ler ordem de leitura; ao sexto item essa
+     informação já foi dada, e continuar só acrescenta espera. */
+  --bo-curva: cubic-bezier(0.4, 0, 0.2, 1); /* tudo o que muda de estado */
+  --bo-curva-entra: cubic-bezier(0, 0, 0.5, 1); /* o que ENTRA: avisos, painéis */
+  --bo-t-cor: 0.1s; /* cor e opacidade */
+  --bo-t-sinal: 0.2s; /* «ouvi-te» — chega antes do movimento */
+  --bo-t-forma: 0.3s; /* posição, tamanho, abertura de painel */
+  --bo-degrau: 20ms; /* escada de entrada, no máximo seis */
+  --bo-degraus-max: 5; /* o sexto degrau é o índice 5 */
+
   /* ── Hairline borders & control boundaries (neutral, ChatGPT-quiet) ── */
   --bo-hairline: var(--bo-tinta-8); /* card / divider hairline */
   --bo-hairline-strong: var(--bo-tinta-13); /* clearer separator */
@@ -1298,9 +1329,23 @@ body {
     transform: none;
   }
 }
+/* ── A ESCADA PÁRA AO SEXTO DEGRAU ────────────────────────────────────────
+   Era `--cena × 70ms`, sem tecto: quatro blocos já valiam 280 ms de espera
+   antes de o último começar, e a lista não tinha limite nenhum.
+
+   A Apple tem esta escada escrita no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
+   0,26 / 0,28 / 0,30 s — degraus de vinte milissegundos, seis, e pára. O
+   desfasamento existe para o olho ler ORDEM DE LEITURA, não para dar
+   espectáculo: ao sexto item essa informação já foi dada, e a partir daí o
+   atraso só acrescenta espera. Seis blocos a entrar em 120 ms lê-se como
+   rapidez; vinte em 400 ms lê-se como lentidão.
+
+   O `min()` é o tecto. Sem ele, uma lista de trinta linhas com `--cena` a
+   contar até trinta punha a última a começar seis décimos de segundo depois
+   da primeira — que é precisamente a sensação que isto existe para evitar. */
 .bo-cena {
-  animation: bo-cena 600ms cubic-bezier(0, 0, 0.2, 1) backwards;
-  animation-delay: calc(var(--cena, 0) * 70ms);
+  animation: bo-cena 600ms var(--bo-curva-entra) backwards;
+  animation-delay: calc(min(var(--cena, 0), var(--bo-degraus-max)) * var(--bo-degrau));
 }
 @media (prefers-reduced-motion: reduce) {
   .bo-cena {
