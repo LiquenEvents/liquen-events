@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { capturarClique } from "@/lib/ads/click-id";
-import { isTokenRoute } from "@/lib/safe-path";
+import { semAnaliticos } from "@/lib/safe-path";
 
 /** sessionStorage key holding the visitor's first-touch acquisition source. */
 export const LEAD_SOURCE_KEY = "liquen-lead-source";
@@ -32,14 +32,20 @@ export const LEAD_SOURCE_KEY = "liquen-lead-source";
  * a partir de uma página onde a regra do produto é não recolher sinal nenhum
  * que ele não tenha dado de propósito.
  *
- * Mesma guarda do `Analytics`, do `GoogleTag` e do `WebVitals` — `isTokenRoute`
- * em `safe-path.ts`, para a regra viver num sítio só.
+ * Mesma guarda do `Analytics`, do `GoogleTag` e do `WebVitals` —
+ * `semAnaliticos` em `safe-path.ts`, para a regra viver num sítio só.
+ *
+ * No back office a razão é outra e é dela: o primeiro toque da sessão ficaria
+ * gravado como `/pt/orcamento/admin`, sem campanha nenhuma. Ou seja, ela abrir
+ * a sua própria ferramenta contaminava a resposta à pergunta «de onde vêm os
+ * pedidos» — e um `gclid` nunca aterra num caminho de admin, portanto não há
+ * nada a perder.
  */
 export default function LeadSourceCapture() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (isTokenRoute(pathname)) return;
+    if (semAnaliticos(pathname)) return;
     // O identificador do clique pago é guardado SEMPRE, e antes de tudo o
     // resto: vive em localStorage com a janela de 90 dias da Google, e não em
     // sessionStorage como a atribuição acima. São coisas diferentes com prazos

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isBackOfficeRoute } from "@/lib/safe-path";
 import Link from "next/link";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
 import { ALTURA_BARRA_FIXA_PX, ehRotaSocial } from "@/lib/meta/barra";
@@ -73,7 +74,13 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
   // over the authenticated back office (…/orcamento/admin[/…], locale-prefixed
   // in EN), where it would also sit on top of the mobile nav and intercept its
   // clicks. Staying out of that surface keeps it a marketing-site concern only.
-  const isBackOffice = pathname?.includes("/orcamento/admin") ?? false;
+  //
+  // Esta regra estava aqui escrita à mão (`pathname.includes(...)`) e em mais
+  // lado nenhum — era a única peça do layout que sabia o que é o back office,
+  // enquanto os quatro analíticos ao lado não sabiam. Passou para
+  // `safe-path.ts`, que diz de si próprio: uma só definição, para não haver
+  // duas versões da verdade.
+  const isBackOffice = isBackOfficeRoute(pathname);
 
   useEffect(() => {
     // A lógica é a mesma de sempre, ao contrário: a barra já está desenhada, e

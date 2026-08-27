@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { TOKEN_PATH_PATTERN, TOKEN_PLACEHOLDER, isTokenRoute } from "@/lib/safe-path";
+import { TOKEN_PATH_PATTERN, TOKEN_PLACEHOLDER, semAnaliticos } from "@/lib/safe-path";
 
 // Google tag IDs for Líquen Events. PUBLIC identifiers — they ship in the page
 // source by design, so hard-coding them here is fine (no secret). We configure
@@ -110,19 +110,24 @@ export function bootstrapGtag(): void {
  * re-asking on every page. The library loads `afterInteractive` so it never
  * competes with first paint.
  *
- * NÃO é montado nas rotas com token (/portal/<token>, /proposta/<token>). E a
- * razão é precisamente aquela em que o banner de consentimento NÃO ajuda: com
- * o consentimento negado o gtag continua a mandar pings sem cookies, ou seja o
- * token sairia à mesma para a Google. A única defesa que funciona nessas rotas
- * é o tag não existir lá. As rotas com token não têm qualquer valor analítico
- * (não têm campanhas nem conversões), por isso não se perde medição nenhuma.
+ * NÃO é montado nas rotas com token (/portal/<token>, /proposta/<token>) nem no
+ * back office (/orcamento/admin). E a razão é precisamente aquela em que o
+ * banner de consentimento NÃO ajuda: com o consentimento negado o gtag continua
+ * a mandar pings sem cookies, ou seja o caminho da página sairia à mesma para a
+ * Google. A única defesa que funciona é o tag não existir lá. Nem um lado nem o
+ * outro têm valor analítico (não têm campanhas nem conversões), por isso não se
+ * perde medição nenhuma — ver `semAnaliticos` em `safe-path.ts`.
+ *
+ * O bootstrap em linha não precisa de guarda própria: quando `suppressed` é
+ * verdadeiro este componente não desenha NADA, e o `<script>` inline é parte do
+ * que ele desenha. Não chega ao HTML, logo não corre.
  */
 export default function GoogleTag() {
   const pathname = usePathname();
   // O `usePathname` é imune à reescrita do proxy (/portal/x → /pt/portal/x):
   // ambas as formas contêm o segmento, logo servidor e cliente decidem o mesmo
-  // e não há divergência de hidratação.
-  const suppressed = isTokenRoute(pathname);
+  // e não há divergência de hidratação. Vale igual para `/orcamento/admin`.
+  const suppressed = semAnaliticos(pathname);
 
   // Um <script> inline colocado pelo React DEPOIS do carregamento inicial não é
   // executado pelo browser. Sem isto, um cliente que abrisse o seu portal e

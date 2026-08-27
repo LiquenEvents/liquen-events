@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { isTokenRoute, sanitizeTelemetryPath } from "@/lib/safe-path";
+import { semAnaliticos, sanitizeTelemetryPath } from "@/lib/safe-path";
 
 /**
  * Reports real-user Web Vitals (LCP, CLS, INP, TTFB, FCP) to /api/vitals, so we
@@ -28,8 +28,14 @@ import { isTokenRoute, sanitizeTelemetryPath } from "@/lib/safe-path";
  * já era limpo antes de sair do aparelho — mas o que sobra continua a ser o
  * registo de uma abertura, que é precisamente o que não se pode ter.
  *
- * O `Analytics` e o `GoogleTag` já se recusavam a montar aqui (`isTokenRoute`,
+ * O `Analytics` e o `GoogleTag` já se recusavam a montar aqui (`semAnaliticos`,
  * em `safe-path.ts`); este ficou de fora dessa regra e era o furo.
+ *
+ * A mesma guarda cobre agora o back office. Aqui a telemetria não sai de casa
+ * — vai para o nosso próprio `/api` —, portanto não é uma fuga; é ruído. As
+ * medições de desempenho servem para vigiar o site público, e as sessões dela
+ * a trabalhar num ecrã de administração puxam essas médias para um sítio que
+ * não corresponde a visita nenhuma.
  *
  * A guarda está em DOIS sítios de propósito. A da entrada evita importar
  * sequer a biblioteca. A de dentro do `send` apanha o caso que a primeira não
@@ -39,7 +45,7 @@ import { isTokenRoute, sanitizeTelemetryPath } from "@/lib/safe-path";
  */
 export default function WebVitals() {
   const pathname = usePathname();
-  const privada = isTokenRoute(pathname);
+  const privada = semAnaliticos(pathname);
   // O `ref` existe para o `send` que JÁ está registado na biblioteca poder ler
   // o valor de agora, e não o que existia quando foi criado. Nasce com o valor
   // certo (o valor inicial de um `useRef` não é uma escrita durante o desenho)
