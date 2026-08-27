@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido";
+import { entrarNoBackOffice, exigirLogin } from "./semear-pedido";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -48,11 +48,27 @@ const TECTO = { js: 380, css: 60, letra: 120, total: 560 };
 /** E um teto de PEDIDOS: cada um custa uma ida e volta na linha dela. */
 const TECTO_PEDIDOS = 34;
 
+/**
+ * ── E NÃO SE SEMEIA PEDIDO NENHUM ─────────────────────────────────────────
+ *
+ * A primeira versão deste passeio semeava um, por hábito, e foi ele que o pôs
+ * vermelho: `garantirPedido` espera até trinta segundos por uma gravação, e o
+ * tecto deste passeio é esse mesmo — portanto o teste morria à espera de uma
+ * coisa de que não precisa.
+ *
+ * O PESO NÃO DEPENDE DOS DADOS. O pacote que o browser descarrega é o mesmo
+ * com um pedido ou com mil: são os mesmos ficheiros de JavaScript, a mesma
+ * folha de estilo e as mesmas duas letras. Semear era gastar meio minuto e uma
+ * escrita para medir exactamente o mesmo número.
+ */
 test("@desempenho o painel não engorda sem alguém dar por isso", async ({ page }) => {
   exigirLogin(await entrarNoBackOffice(page));
-  await garantirPedido(page);
   await page.goto("/orcamento/admin", { waitUntil: "load" });
-  await expect(page.getByRole("heading", { level: 1, name: /Visão Geral/ })).toBeVisible();
+  // Que o painel montou mesmo — medir um ecrã de entrada era medir outra coisa.
+  await expect(
+    page.getByRole("navigation", { name: /Navegação do back office/i }),
+    "o painel não montou — isto passou a medir o ecrã de entrada",
+  ).toBeVisible();
 
   const medida = await page.evaluate(() => {
     const rs = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
