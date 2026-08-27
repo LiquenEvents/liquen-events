@@ -1176,6 +1176,55 @@ body {
     overflow-x: hidden;
   }
 }
+/* ── A ARESTA QUE DIZ «HÁ MAIS POR BAIXO» ──────────────────────────────────
+   Da auditoria, F-09: «O cartão termina a meio do campo "Preço final (sem IVA)
+   €", com o campo cortado pela borda e um grande vazio branco por baixo. O
+   conteúdo continua com scroll, mas visualmente parece que a ficha acabou
+   ali.» A altura da coluna já foi medida e corrigida (ver `alturaDoDetalhe`
+   no `AdminClient`); o que faltava é a outra metade da correcção que a
+   auditoria pede — «um sombreado no fundo a indicar que há mais».
+
+   ── PORQUE É QUE ISTO NÃO TEM UMA LINHA DE JAVASCRIPT ─────────────────────
+
+   A maneira habitual é ouvir o `scroll`, comparar `scrollTop + clientHeight`
+   com `scrollHeight` e ligar/desligar uma classe. Isso é trabalho a cada
+   quadro de rolagem, no telemóvel dela, que é exactamente onde não pode
+   haver. A regra da casa são 60 fps num iPhone em 4G.
+
+   Um elemento `sticky bottom-0` colocado como ÚLTIMO filho do que rola faz o
+   mesmo de graça, e o browser trata dele na thread do compositor:
+
+     · enquanto há conteúdo por baixo, a posição natural da faixa está fora da
+       vista e ela fica colada à aresta de baixo — o esbatido paira por cima do
+       conteúdo, e lê-se «isto continua»;
+     · ao chegar ao fim, a posição natural coincide com a aresta e a faixa
+       DESCOLA — passa a esbater do fundo para o fundo, ou seja desaparece.
+
+   Não há estado, não há listener, não há re-desenho do React. E funciona com
+   `prefers-reduced-motion` sem precisar de guarda: não há animação nenhuma,
+   só uma coisa que está no seu lugar.
+
+   ── E PORQUE É QUE OCUPA ALTURA EM VEZ DE A ROUBAR ────────────────────────
+
+   Um `margin-top: -2rem` cancelava a altura — e ao chegar ao fim a faixa
+   ficava por cima das últimas 32 px de conteúdo, a esbatê-las para sempre. A
+   última linha da ficha passava a ler-se pior do que as outras, que é trocar
+   um defeito por outro. Ocupa altura: no fim são 32 px de ar antes da barra de
+   gravação, que é respiro e não vazio.
+
+   `pointer-events: none` porque, enquanto está colada, tem conteúdo VIVO por
+   baixo — campos, botões. Uma faixa que os intercepte é pior do que faixa
+   nenhuma. */
+.bo-ha-mais-abaixo {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  height: 2rem;
+  flex: none;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bo-surface), transparent);
+}
+
 /* Tactile feedback on touch devices (there's no hover to rely on) */
 @media (hover: none) and (pointer: coarse) {
   a:active,
