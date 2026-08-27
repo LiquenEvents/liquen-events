@@ -6721,6 +6721,11 @@ export default function AdminClient({
                           </div>
                         </div>
                       </div>
+                      {/* A aresta que diz «há mais por baixo» — F-09 da auditoria. Última
+                          filha do que rola, de propósito: é o `sticky` que a faz aparecer e
+                          desaparecer sozinha, sem uma linha de JavaScript a ouvir o scroll.
+                          O porquê inteiro está em `globals.css`, na regra. */}
+                      <div className="bo-ha-mais-abaixo" aria-hidden="true" />
                     </div>
 
                     {/* ── O PÉ DO PAINEL: A BARRA DE GRAVAÇÃO ─────────────
