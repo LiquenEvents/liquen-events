@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 import { log } from "@/lib/logger";
 import type { QuoteSummary } from "@/lib/orcamento/types";
+import { isDatabaseConfigured } from "@/lib/supabase";
 import AdminClient, { VIEW_COOKIE } from "./AdminClient";
 import { vistaValida, type View } from "./nav";
 import MedidorDeTransbordo from "./MedidorDeTransbordo";
@@ -128,6 +129,7 @@ export default async function AdminPage({
           userName={userName}
           falhaDosPedidos={falhaDosPedidos}
           vistaInicial={vistaInicial}
+          armazenamentoLigado={isDatabaseConfigured()}
         />
         {/* Instrumento, não funcionalidade: só aparece com `?medir=1` no
             endereço. Ver o cabeçalho do ficheiro — existe porque o transbordo

@@ -362,6 +362,24 @@ interface Props {
    * servidor já desenha a secção certa em vez de o cliente a corrigir à vista.
    */
   vistaInicial?: View;
+  /**
+   * Há armazenamento configurado neste ambiente?
+   *
+   * Decidido NO SERVIDOR, e serve uma coisa só: não deixar a varredura das
+   * versões leves arrancar onde ela não pode fazer nada. Sem isto, a primeira
+   * chamada dela levava 503 («Armazenamento indisponível») e o browser
+   * escrevia «Failed to load resource» na consola — em TODAS as entradas no
+   * back office de qualquer ambiente sem Supabase.
+   *
+   * Não é ruído inofensivo: um passeio de telemóvel que exige a consola limpa
+   * chumbou por causa disto, nas três tentativas. E uma consola com um erro
+   * fixo é uma consola onde o erro seguinte, o verdadeiro, passa despercebido.
+   *
+   * Perguntar ao servidor com um pedido era trocar um erro por outro — a rota
+   * que responde a contagem também devolve 503 sem armazenamento. Quem sabe é
+   * quem desenha a página, e por isso a resposta desce daí.
+   */
+  armazenamentoLigado?: boolean;
 }
 
 // Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
@@ -1014,6 +1032,7 @@ export default function AdminClient({
   userName = "Catarina",
   falhaDosPedidos = null,
   vistaInicial,
+  armazenamentoLigado = false,
 }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
@@ -2334,7 +2353,10 @@ export default function AdminClient({
    * Não pede rede a ela: o trabalho pesado é do servidor, e o que sai daqui é
    * um POST pequeno de cada vez.
    */
-  useEffect(() => varrerDerivadasEmFundo(), []);
+  useEffect(() => {
+    if (!armazenamentoLigado) return;
+    return varrerDerivadasEmFundo();
+  }, [armazenamentoLigado]);
 
   // Lock background scroll while the detail drawer is open as a mobile overlay
   // (mirrors the nav-drawer lock above). The inline xl panel never locks.
