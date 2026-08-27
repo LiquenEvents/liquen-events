@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { entrarNoBackOffice } from "./semear-pedido";
 
 /**
  * OS DOIS FLUXOS DE FAZER UMA PROPOSTA.
@@ -21,21 +22,15 @@ import { test, expect, type Page } from "@playwright/test";
  */
 
 async function login(page: Page): Promise<boolean> {
-  await page.goto("/orcamento/admin");
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
-  // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
-  // entra (a passkey passou a ser o primeiro).
-  await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
-  try {
-    await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
-      timeout: 8000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  // Pelo ajudante partilhado: com a sessão guardada pelo
+  // `sessao-admin.setup.ts` ele encontra o painel aberto e não gasta entrada
+  // nenhuma no tecto de oito por minuto. Sem sessão — uma máquina sem
+  // `ADMIN_PASSWORD_HASH` — enche o formulário como sempre encheu.
+  //
+  // As cinco cópias à mão que aqui estavam esperavam por um «Painel de Gestão»
+  // que deixa de aparecer assim que há sessão, e cada uma delas entrava outra
+  // vez: era essa repetição que trancava a suite à porta a meio da passagem.
+  return entrarNoBackOffice(page);
 }
 
 /** Um pedido novo, para o passeio não depender do que já lá está. */

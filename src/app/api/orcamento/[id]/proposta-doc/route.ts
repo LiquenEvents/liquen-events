@@ -1184,16 +1184,45 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * botão são o mesmo documento.
      */
     const linkDoPdf = enderecoDoPdfDaProposta(acceptUrl);
+    /**
+     * ── DOIS BOTÕES IGUAIS NÃO SÃO DUAS ACÇÕES ───────────────────────────────
+     *
+     * «Quero algo mais bonito e minimalista.» Desenhei o cartão sozinho e ficou
+     * bem; só ao desenhar o EMAIL INTEIRO é que se viu o problema — e não era o
+     * cartão.
+     *
+     * Eram dois rectângulos verdes do mesmo tamanho, um por cima do outro, a
+     * dizer «Ver a proposta →» e «Abrir a proposta →». Fazem coisas diferentes
+     * — o primeiro leva à página onde o casal responde, o segundo abre o PDF —
+     * e não havia como saber qual era qual sem ler as duas com atenção. Duas
+     * coisas com o mesmo peso não são uma hierarquia: são uma escolha que se
+     * empurra para quem lê.
+     *
+     * Um botão cheio, e um link. O botão é o que se quer que aconteça: ir à
+     * página, ler, responder. O PDF é o outro caminho para o mesmo documento —
+     * continua à vista, no corpo, acima da assinatura, que era toda a razão por
+     * que este bloco existe (antes só ia em anexo, e quem arquivasse a mensagem
+     * decidia milhares de euros a olhar para um total).
+     *
+     * ── E CONTINUA A CABER NO POLEGAR ───────────────────────────────────────
+     *
+     * O link é `inline-block` com 12 px em cima e em baixo: 44 px de alvo,
+     * contando a entrelinha de 20. Minimalismo não é encolher o que se toca —
+     * era esse o defeito de origem deste bloco, com um botão de 37 px.
+     *
+     * Em tabelas e estilos em linha, que é o que sobrevive ao Outlook.
+     */
     const cartaoDoPdf = `
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:24px 0">
-          <tr><td style="border:1px solid #d9d3c7;border-radius:6px;padding:16px 18px">
-            <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#8a8375">${esc(t.anexoEtiqueta)}</p>
-            <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#2a2620">${esc(nomeDoAnexo)}</p>
-            <a href="${linkDoPdf}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:11px 22px;border-radius:4px;font-size:13px;letter-spacing:0.04em">${esc(t.anexoBotao)}</a>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:32px 0 0;border-collapse:collapse">
+          <tr><td style="border-top:1px solid #e6dfd2;padding-top:20px">
+            <a href="${linkDoPdf}" style="display:inline-block;padding:12px 0;font-size:16px;line-height:20px;color:#4c6350;text-decoration:underline;text-underline-offset:3px">${esc(t.anexoBotao)}</a>
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#8a8375">${esc(t.anexoEtiqueta)} · ${esc(nomeDoAnexo)}</p>
           </td></tr>
         </table>`;
     /** O mesmo, para quem lê o email em texto simples. */
-    const pdfEmTexto = ["", `${t.anexoBotao}: ${linkDoPdf}`];
+    // Em texto simples a seta do botão não diz nada; quem lê assim precisa do
+    // NOME da coisa, que é o que a etiqueta é.
+    const pdfEmTexto = ["", `${t.anexoEtiqueta}: ${linkDoPdf}`];
 
     const email = escrito
       ? emailAoCliente({
@@ -1238,7 +1267,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
         <p style="font-size:14px;line-height:1.6">${esc(t.ola)} ${esc(doc.clientNames)},</p>
         ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">${esc(t.intro)}</p>
-        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">${esc(t.botao)}</a></p>${cartaoDoPdf}`,
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;border-collapse:separate">
+          <tr><td style="background:#4c6350;border-radius:8px">
+            <!-- 48 px de altura (14+20+14) e letra de 16: é o outro botão deste
+                 mesmo email, e tinha 39 px com letra de 13. Dois botões lado a
+                 lado com alturas diferentes leem-se como dois produtos. -->
+            <a href="${acceptUrl}" style="display:block;padding:14px 26px;font-size:16px;line-height:20px;color:#f7f4ee;text-decoration:none;font-weight:600;white-space:nowrap">${esc(t.botao)}</a>
+          </td></tr>
+        </table>${cartaoDoPdf}`,
             texto: [
               t.titulo,
               "",

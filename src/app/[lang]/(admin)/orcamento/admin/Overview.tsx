@@ -414,7 +414,7 @@ function AvisoConflito({
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
             {doBrowser ? "Neste browser" : "O que escreveste"}
           </p>
-          <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
             {conflito.meu || "(vazio)"}
           </p>
         </div>
@@ -422,7 +422,7 @@ function AvisoConflito({
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
             No servidor
           </p>
-          <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
             {conflito.servidor.value || "(vazio)"}
           </p>
         </div>
@@ -436,7 +436,7 @@ function AvisoConflito({
         </button>
         <button
           onClick={() => onEscolher("servidor")}
-          className={`px-3 py-1.5 rounded-lg border border-foreground/15 text-foreground/60 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+          className={`px-3 py-1.5 rounded-lg border border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
         >
           Ficar com a do servidor
         </button>
@@ -486,7 +486,7 @@ function LinhaEstado({
         Guardado no servidor{estado.quando ? ` às ${estado.quando}` : ""}
       </span>
     );
-  return <span className="text-foreground/22 text-[10px]">Guardado no servidor</span>;
+  return <span className="text-[var(--bo-text-faint)] text-[10px]">Guardado no servidor</span>;
 }
 
 /** A leitura falhou: dizê-lo é obrigatório — um "Sem notas." seria outra mentira. */
@@ -589,7 +589,7 @@ const MetaReceita = memo(function MetaReceita({
               }}
               placeholder="Ex: 15000"
               aria-label="Meta de receita deste mês"
-              className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
+              className="bo-input flex-1 px-3 py-2 text-sm text-[var(--bo-tinta-72)]"
             />
             <button
               onClick={() => void saveGoal()}
@@ -600,7 +600,7 @@ const MetaReceita = memo(function MetaReceita({
             </button>
             <button
               onClick={() => setEditingGoal(false)}
-              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
+              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-[var(--bo-text-muted)] transition-colors px-1"
               aria-label="Fechar"
             >
               ×
@@ -621,9 +621,8 @@ const MetaReceita = memo(function MetaReceita({
           <div className="flex items-end justify-between mb-2">
             <div>
               <span
-                className="font-bold"
+                className="font-light"
                 style={{
-                  fontFamily: "var(--font-playfair)",
                   fontSize: "clamp(18px, 2vw, 24px)",
                   color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
                 }}
@@ -639,7 +638,7 @@ const MetaReceita = memo(function MetaReceita({
               {Math.min(100, Math.round((wonThisMonth / goal) * 100))}%
             </span>
           </div>
-          <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+          <div className="h-2.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
             <div
               className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
               style={{
@@ -808,7 +807,7 @@ const NotasEquipa = memo(function NotasEquipa({
             }}
             aria-label="Notas da equipa"
             placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
-            className="bo-input w-full px-3 py-2 text-sm text-foreground/70 resize-none"
+            className="bo-input w-full px-3 py-2 text-sm text-[var(--bo-tinta-72)] resize-none"
           />
           <div className="flex items-center justify-between gap-3 mt-2">
             <LinhaEstado
@@ -830,7 +829,7 @@ const NotasEquipa = memo(function NotasEquipa({
         <>
           {teamNotes ? (
             <p
-              className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
+              className="text-[var(--bo-text-muted)] text-sm leading-relaxed whitespace-pre-wrap cursor-text"
               onClick={() => setEditingNotes(true)}
             >
               {teamNotes}
@@ -942,7 +941,7 @@ function AEsperaDeResposta({
   if (linhas.length === 0) return null;
   return (
     <section aria-labelledby="a-espera-de-resposta-titulo" className="bo-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-foreground/[0.07]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-[var(--bo-hairline)]">
         <div>
           <h3 id="a-espera-de-resposta-titulo" className="bo-eyebrow">
             À espera de resposta
@@ -953,8 +952,8 @@ function AEsperaDeResposta({
         </div>
         <div className="text-right">
           <p
-            className="text-[#8a6420] font-bold leading-none"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(16px, 2vw, 22px)" }}
+            className="text-[#8a6420] font-light leading-none"
+            style={{ fontSize: "clamp(16px, 2vw, 22px)" }}
           >
             {eur(pendurado)}
           </p>
@@ -963,7 +962,7 @@ function AEsperaDeResposta({
           </p>
         </div>
       </div>
-      <ul className="divide-y divide-foreground/[0.06]">
+      <ul className="divide-y divide-[var(--bo-hairline)]">
         {linhas.slice(0, 8).map(({ quote, dias, valor }) => (
           <li key={quote.id} className="px-5 py-3">
             {/* A linha inteira é UM botão, com o mesmo desenho da «Atividade
@@ -978,7 +977,7 @@ function AEsperaDeResposta({
               className={`alvo-toque !justify-between w-full flex items-center justify-between gap-3 text-left rounded ${FOCUS_RING}`}
             >
               <span className="min-w-0">
-                <span className="block text-foreground/72 text-sm font-medium truncate">
+                <span className="block text-[var(--bo-tinta-72)] text-sm font-medium truncate">
                   {quote.name}
                 </span>
                 <span className="block text-foreground/35 text-xs mt-0.5 truncate">
@@ -998,7 +997,7 @@ function AEsperaDeResposta({
         ))}
       </ul>
       {linhas.length > 8 && (
-        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-foreground/[0.06]">
+        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-[var(--bo-hairline)]">
           e mais {linhas.length - 8} — vê-as todas na lista de pedidos.
         </p>
       )}
@@ -1106,7 +1105,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
       }}
     >
       <summary
-        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-foreground/[0.03] ${FOCUS_RING}`}
+        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-[var(--bo-tinta-3)] ${FOCUS_RING}`}
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold text-[var(--bo-text)]">
@@ -1379,6 +1378,24 @@ export default function Overview({
     return `Tem ${bits.join(" e ")}.`;
   })();
 
+  /**
+   * ── DOIS ATALHOS, E NÃO QUATRO ────────────────────────────────────────────
+   *
+   * A análise dos dois sites de referência fecha em «no máximo dois CTA», e
+   * aqui eram quatro: «Novo pedido», «Fases dos pedidos», «Calendário» e
+   * «Tarefas». Num telemóvel de 390 px isso são DUAS FILAS inteiras de botões,
+   * logo por baixo do cumprimento e por cima de tudo o resto — o primeiro
+   * terço do ecrã de entrada gasto em navegação.
+   *
+   * Perguntei-lhe quais usa mesmo todos os dias, e a resposta foi «Novo pedido
+   * e Fases dos pedidos». Os outros dois não desaparecem: o Calendário e as
+   * Tarefas continuam no menu lateral e na barra de baixo, que é onde a
+   * navegação vive. O que sai daqui é a DUPLICAÇÃO — dois destinos a ocupar o
+   * lugar mais caro do produto para dizer o que o menu já diz.
+   *
+   * Não é uma escolha minha sobre o trabalho dela: é a escolha dela, e está
+   * aqui escrita para o dia em que alguém quiser acrescentar um quinto.
+   */
   const quickActions: { label: string; onClick: () => void; icon: React.ReactNode }[] = [
     {
       label: "Novo pedido",
@@ -1393,29 +1410,6 @@ export default function Overview({
           <rect x="3" y="4" width="4" height="16" rx="1" />
           <rect x="10" y="4" width="4" height="11" rx="1" />
           <rect x="17" y="4" width="4" height="7" rx="1" />
-        </>
-      ),
-    },
-    {
-      label: "Calendário",
-      onClick: () => onGo("calendario"),
-      icon: (
-        <>
-          <rect x="3" y="4" width="18" height="17" rx="2" />
-          <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-        </>
-      ),
-    },
-    {
-      label: "Tarefas",
-      onClick: () => onGo("tarefas"),
-      icon: (
-        <>
-          <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
-          <path
-            d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
-            strokeLinecap="round"
-          />
         </>
       ),
     },
@@ -1494,7 +1488,7 @@ export default function Overview({
               </svg>
             </span>
             <h3
-              className="text-foreground/80 font-bold text-base sm:text-xl mb-2"
+              className="text-[var(--bo-text)] font-bold text-base sm:text-xl mb-2"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
               {tudoArquivado ? "Está tudo arquivado." : "Ainda sem pedidos por aqui."}
@@ -1540,7 +1534,7 @@ export default function Overview({
                  ficarem da mesma altura quando aparecem juntos. */
               className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium transition-colors motion-reduce:transition-none ${
                 tudoArquivado && onVerArquivados
-                  ? "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15"
+                  ? "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
                   : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
               } ${FOCUS_RING}`}
             >
@@ -1625,7 +1619,7 @@ export default function Overview({
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
-                  : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 "
+                  : "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
               }`}
             >
               <svg
@@ -1677,7 +1671,7 @@ export default function Overview({
                     : `Próximo evento · faltam ${data.nextEventDays} dias`}
               </p>
               <h3
-                className="text-foreground/80 font-bold text-lg leading-tight truncate"
+                className="text-[var(--bo-text)] font-bold text-lg leading-tight truncate"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
                 {data.nextEvent.name}
@@ -1694,9 +1688,8 @@ export default function Overview({
             </div>
             <div className="shrink-0 text-right">
               <p
-                className="text-2xl sm:text-3xl font-bold tabular-nums"
+                className="text-2xl sm:text-3xl font-light tabular-nums"
                 style={{
-                  fontFamily: "var(--font-playfair)",
                   color:
                     data.nextEventDays <= 3
                       ? "#8a2a22"
@@ -1847,13 +1840,12 @@ export default function Overview({
                A partir de 640 tudo volta a `block`, e a ordem do DOM — número,
                rótulo, frase — é a que se vê. A ordem do DOM não muda em lado
                nenhum, portanto quem ouve a página ouve sempre o mesmo. */
-            className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            className={`foco-largo flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
             <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
-                className="font-bold leading-none"
+                className="font-light leading-none"
                 style={{
-                  fontFamily: "var(--font-playfair)",
                   fontSize: k.tamanho,
                   color: k.cor,
                 }}
@@ -1934,8 +1926,8 @@ export default function Overview({
               className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
             >
               <p
-                className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 1.9vw, 22px)" }}
+                className="order-2 ml-auto font-light leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
+                style={{ fontSize: "clamp(18px, 1.9vw, 22px)" }}
               >
                 {k.v}
               </p>
@@ -1982,7 +1974,7 @@ export default function Overview({
                 return (
                   <div key={f.id}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="flex items-center gap-2 text-foreground/55 text-xs">
+                      <span className="flex items-center gap-2 text-[var(--bo-text-muted)] text-xs">
                         <span
                           className="w-2 h-2 rounded-full"
                           style={{ background: STATUS_META[f.id].color }}
@@ -1991,7 +1983,7 @@ export default function Overview({
                       </span>
                       <span className="text-foreground/40 text-[11px] tabular-nums">{count}</span>
                     </div>
-                    <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                       <div
                         className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                         style={{
@@ -2004,14 +1996,14 @@ export default function Overview({
                 );
               })}
             </div>
-            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-[var(--bo-hairline)]">
               <span className="text-foreground/35 text-xs">
                 Pedidos que acabam em evento
                 <span className="block text-foreground/25 text-[10px]">
                   de cada 100 decididos, quantos ganhou
                 </span>
               </span>
-              <span className="text-foreground/75 text-sm font-semibold tabular-nums">
+              <span className="text-[var(--bo-tinta-72)] text-sm font-semibold tabular-nums">
                 {data.conversion}%
               </span>
             </div>
@@ -2031,8 +2023,8 @@ export default function Overview({
             <div className="grid grid-cols-2 gap-3 mb-3.5 sm:mb-5">
               <div>
                 <p
-                  className="text-[#4d6350] font-bold leading-none mb-1"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
+                  className="text-[#4d6350] font-light leading-none mb-1"
+                  style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.received)}
                 </p>
@@ -2040,8 +2032,8 @@ export default function Overview({
               </div>
               <div>
                 <p
-                  className="text-foreground/70 font-bold leading-none mb-1"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
+                  className="text-[var(--bo-tinta-72)] font-light leading-none mb-1"
+                  style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.outstanding)}
                 </p>
@@ -2052,7 +2044,7 @@ export default function Overview({
             </div>
             {data.billed > 0 ? (
               <>
-                <div className="relative h-2 rounded-full overflow-hidden bg-foreground/[0.06]">
+                <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
                   <div
                     className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
                     style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
@@ -2079,14 +2071,14 @@ export default function Overview({
                 falta receber aparecem aqui.
               </p>
             )}
-            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-[var(--bo-hairline)]">
               <span className="text-foreground/35 text-xs">
                 Valor médio por evento ganho
                 <span className="block text-foreground/25 text-[10px]">
                   quanto vale, em média, cada pedido fechado
                 </span>
               </span>
-              <span className="text-foreground/75 text-sm font-semibold tabular-nums">
+              <span className="text-[var(--bo-tinta-72)] text-sm font-semibold tabular-nums">
                 {eur(data.avgTicket)}
               </span>
             </div>
@@ -2096,7 +2088,7 @@ export default function Overview({
         {/* Needs attention + recent activity */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
           <div className="bo-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--bo-hairline)]">
               <h3 className="bo-eyebrow">Precisam de atenção</h3>
               <div className="flex items-center gap-2">
                 {data.staleCount > 0 && (
@@ -2111,7 +2103,7 @@ export default function Overview({
                 )}
               </div>
             </div>
-            <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
+            <div className="divide-y divide-[var(--bo-hairline)] max-h-[360px] overflow-y-auto">
               {data.needAction.length === 0 && (
                 <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
                   <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
@@ -2125,10 +2117,12 @@ export default function Overview({
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`w-full text-left px-5 py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
                   <div className="min-w-0">
-                    <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
+                    <p className="text-[var(--bo-tinta-72)] text-sm truncate font-medium">
+                      {q.name}
+                    </p>
                     <p className="text-foreground/30 text-xs truncate mt-0.5">
                       {eventTypeLabel(q)} · {q.guests} convidados
                     </p>
@@ -2151,7 +2145,7 @@ export default function Overview({
                     )}
                     <TempoDesde
                       iso={q.submittedAt}
-                      className="text-foreground/22 text-[10px] mt-1 block"
+                      className="text-[var(--bo-text-faint)] text-[10px] mt-1 block"
                     />
                   </div>
                 </button>
@@ -2160,17 +2154,19 @@ export default function Overview({
           </div>
 
           <div className="bo-card overflow-hidden">
-            <h3 className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
+            <h3 className="bo-eyebrow px-5 py-4 border-b border-[var(--bo-hairline)]">
               Atividade recente
             </h3>
-            <div className="divide-y divide-foreground/[0.06]">
+            <div className="divide-y divide-[var(--bo-hairline)]">
               {data.recent.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
-                  <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
+                  <span className="text-[var(--bo-text-muted)] text-xs truncate font-medium">
+                    {q.name}
+                  </span>
                   <TempoDesde
                     iso={q.submittedAt}
                     className="text-foreground/30 text-[10px] shrink-0"
@@ -2204,7 +2200,7 @@ export default function Overview({
                   </p>
                   <button
                     onClick={onNew}
-                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
                   >
                     <svg
                       width="12"

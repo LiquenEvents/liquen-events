@@ -157,7 +157,7 @@ export function CuradoriaDeFotos({
     const incluidas = historico.filter((d) => d.incluida);
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-5 py-8 text-center">
-        <p className="font-display text-lg text-foreground/85">
+        <p className="font-display text-lg text-[var(--bo-text)]">
           {incluidas.length === 0
             ? "Passaste por todas e não escolheste nenhuma."
             : `Escolheste ${incluidas.length} ${incluidas.length === 1 ? "foto" : "fotos"}.`}
@@ -249,7 +249,7 @@ export function CuradoriaDeFotos({
         style={{
           transform: arrastoX ? `translateX(${arrastoX}px) rotate(${inclinacao}deg)` : undefined,
         }}
-        className={`relative mt-2 flex min-h-0 flex-1 touch-none items-center justify-center overflow-hidden rounded-2xl border-2 bg-foreground/[0.04] focus-visible:outline-none ${
+        className={`relative mt-2 flex min-h-0 flex-1 touch-none items-center justify-center overflow-hidden rounded-2xl border-2 bg-[var(--bo-tinta-6)] focus-visible:outline-none ${
           rumo === "incluir"
             ? "border-[#4d6350]"
             : rumo === "saltar"

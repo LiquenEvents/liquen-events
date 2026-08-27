@@ -3,6 +3,16 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 /**
+ * O SELECTOR COM QUE O BACK OFFICE SE PINTA.
+ *
+ * Deixou de ser só `body.admin-mode`: a classe entra num efeito e chegava
+ * tarde de mais para o primeiro pixel. Agora é
+ * `body:is(.admin-mode, :has([data-admin-mode]))`, com o atributo servido pelo
+ * `layout.tsx` do grupo `(admin)`. A razão por extenso está no `globals.css`.
+ */
+const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
+
+/**
  * ════════════════════════════════════════════════════════════════════════════
  * UM RAIO PARA CONTEÚDO, OUTRO PARA ACÇÃO
  * ════════════════════════════════════════════════════════════════════════════
@@ -89,7 +99,7 @@ describe("os raios do back office", () => {
   });
 
   it("põe os três tokens próprios no mesmo valor", () => {
-    const b = bloco("body.admin-mode");
+    const b = bloco(SELECTOR_ADMIN);
     for (const nome of ["--bo-radius-sm", "--bo-radius", "--bo-radius-lg"]) {
       expect(b, `${nome} saiu dos 8 px`).toContain(`${nome}: 0.5rem;`);
     }

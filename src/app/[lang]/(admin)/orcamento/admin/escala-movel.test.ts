@@ -149,6 +149,6 @@ describe("a escala mínima do telemóvel", () => {
   });
 
   it("é do back office e não pinta o site público", () => {
-    expect(blocoDoChaoMovel()).toMatch(/body\.admin-mode/);
+    expect(blocoDoChaoMovel()).toMatch(/body:is\(\.admin-mode, :has\(\[data-admin-mode\]\)\)/);
   });
 });

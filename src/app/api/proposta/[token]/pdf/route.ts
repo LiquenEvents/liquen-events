@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { propostaDoLink } from "@/lib/proposta-do-link";
-import { chaveDoPdf, pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { chaveDoPdf, PropostaIncompleta } from "@/lib/proposal-pdf-chave";
 import { urlDoPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
@@ -128,6 +128,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
         headers: { "Cache-Control": "private, no-store, must-revalidate" },
       });
     }
+
+    /**
+     * ── O DESENHADOR SÓ ENTRA AQUI, E SÓ SE FOR PRECISO ────────────────────
+     *
+     * Um `import` no topo do ficheiro é pago em TODOS os pedidos. O
+     * `proposal-pdf-cache` traz o `pdf-lib` e o `sharp` atrás — medido, 212 ms
+     * de módulos — e o caminho de cima, que é o normal, não desenha nada:
+     * manda o browser directamente ao armazenamento. Pagava-se o desenhador
+     * para não o usar, exactamente no instante em que ela carrega no botão.
+     *
+     * Aqui em baixo é o caminho raro: o ficheiro ainda não está guardado, e
+     * então há mesmo que o desenhar. É o único sítio onde o custo se justifica.
+     */
+    const { pdfDaPropostaEmCache } = await import("@/lib/proposal-pdf-cache");
 
     const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.

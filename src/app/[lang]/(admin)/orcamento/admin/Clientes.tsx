@@ -276,7 +276,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Procurar cliente…"
                 aria-label="Procurar cliente"
-                className="bo-input w-full pl-10 pr-3 py-2.5 text-sm text-foreground/80 placeholder-foreground/30"
+                className="bo-input w-full pl-10 pr-3 py-2.5 text-sm text-[var(--bo-text)] placeholder-foreground/30"
               />
             </div>
             <button
@@ -298,7 +298,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#8a6420] "
-                  : "bg-foreground/[0.04] text-foreground/55 hover:bg-foreground/[0.07] hover:text-foreground/75"
+                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
               }`}
             >
               <span aria-hidden="true">★</span>
@@ -445,8 +445,8 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
           `FichaDoCliente`, montada uma vez. */}
       {emTabela && aberta && (
         <Card padding="none" className="mt-3 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-foreground/[0.07] px-5 py-3">
-            <p className="truncate text-sm font-semibold text-foreground/78">{aberta.name}</p>
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
+            <p className="truncate text-sm font-semibold text-[var(--bo-text)]">{aberta.name}</p>
             <Button size="sm" variant="ghost" onClick={() => setOpen(null)}>
               Fechar
             </Button>
@@ -546,12 +546,12 @@ function CartaoDeCliente({
       <button
         onClick={onAlternar}
         aria-expanded={aberto}
-        className="w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-foreground/[0.025] motion-safe:transition-colors"
+        className="w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
       >
         <Avatar c={c} />
 
         <div className="min-w-0 flex-1">
-          <p className="text-foreground/78 text-sm font-semibold truncate flex items-center gap-2">
+          <p className="text-[var(--bo-text)] text-sm font-semibold truncate flex items-center gap-2">
             <span className="truncate">{c.name}</span>
             {c.vip && (
               <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#8a6420] text-[8px] tracking-[0.12em] uppercase font-bold">
@@ -576,7 +576,7 @@ function CartaoDeCliente({
       </button>
 
       {aberto && (
-        <div className="border-t border-foreground/[0.07]">
+        <div className="border-t border-[var(--bo-hairline)]">
           <FichaDoCliente c={c} onOpen={onOpen} />
         </div>
       )}
@@ -600,7 +600,7 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
         <span className="flex items-center gap-2.5">
           <Avatar c={c} />
           <span className="min-w-0">
-            <span className="block truncate text-foreground/90">{c.name}</span>
+            <span className="block truncate text-[var(--bo-text)]">{c.name}</span>
             {c.vip && (
               <span className="mt-0.5 inline-flex items-center rounded-full bg-[#d6ab3a]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8a6420]">
                 ★ VIP
@@ -650,7 +650,9 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
       cabecalho: "Pedidos",
       alinharADireita: true,
       largura: "w-20",
-      celula: (c) => <span className="tabular-nums text-foreground/55">{c.quotes.length}</span>,
+      celula: (c) => (
+        <span className="tabular-nums text-[var(--bo-text-muted)]">{c.quotes.length}</span>
+      ),
     },
     {
       chave: "conversao",
@@ -733,7 +735,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
           `alvo-toque` cresce só no dedo, portanto a barra fina do
           portátil não muda. A altura de linha do texto continua a
           ser a mesma; o que cresce é a caixa em que se toca. */}
-      <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-foreground/[0.015] border-b border-foreground/[0.05]">
+      <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
         {c.phone && (
           <a
             href={`tel:${c.phone}`}
@@ -797,7 +799,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
       </div>
 
       {/* Quote rows */}
-      <div className="divide-y divide-foreground/[0.06]">
+      <div className="divide-y divide-[var(--bo-hairline)]">
         {c.quotes
           .slice()
           .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt))
@@ -805,7 +807,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
             <button
               key={q.id}
               onClick={() => onOpen(q)}
-              className="w-full text-left px-5 py-3 hover:bg-foreground/[0.025] motion-safe:transition-colors flex items-center justify-between gap-3"
+              className="w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors flex items-center justify-between gap-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -824,14 +826,16 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     </span>
                   )}
                 </div>
-                <p className="text-foreground/55 text-xs truncate">
+                <p className="text-[var(--bo-text-muted)] text-xs truncate">
                   {eventTypeLabel(q)} · {q.guests} convidados
                   {q.date
                     ? ` · ${new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
                     : ""}
                 </p>
                 {q.lostReason && (
-                  <p className="text-foreground/28 text-[10px] truncate mt-0.5">↳ {q.lostReason}</p>
+                  <p className="text-[var(--bo-text-faint)] text-[10px] truncate mt-0.5">
+                    ↳ {q.lostReason}
+                  </p>
                 )}
               </div>
               <div className="text-right shrink-0">
@@ -842,9 +846,13 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     {eur(contractedAmounts(q).gross)}
                   </span>
                 ) : q.priceBreakdown?.total ? (
-                  <span className="text-foreground/28 text-xs">≈{eur(q.priceBreakdown.total)}</span>
+                  <span className="text-[var(--bo-text-faint)] text-xs">
+                    ≈{eur(q.priceBreakdown.total)}
+                  </span>
                 ) : null}
-                <p className="text-foreground/22 text-[10px] font-mono">{q.id.slice(-8)}</p>
+                <p className="text-[var(--bo-text-faint)] text-[10px] font-mono">
+                  {q.id.slice(-8)}
+                </p>
               </div>
             </button>
           ))}

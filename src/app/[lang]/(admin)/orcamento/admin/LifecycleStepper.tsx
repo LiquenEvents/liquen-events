@@ -142,9 +142,9 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
               <span
                 className={`text-[9px] tracking-[0.08em] uppercase whitespace-nowrap transition-colors ${
                   state === "atual"
-                    ? "text-foreground/80 font-semibold"
+                    ? "text-[var(--bo-text)] font-semibold"
                     : state === "feito"
-                      ? "text-foreground/55"
+                      ? "text-[var(--bo-text-muted)]"
                       : "text-foreground/30"
                 }`}
               >

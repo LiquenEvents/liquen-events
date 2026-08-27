@@ -192,7 +192,7 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
             </p>
             <ul className="mt-1.5 flex flex-col gap-1">
               {recusadas.map((e) => (
-                <li key={e.id} className="text-foreground/60 text-[11px] leading-snug">
+                <li key={e.id} className="text-[var(--bo-text-muted)] text-[11px] leading-snug">
                   «{e.summary}»
                 </li>
               ))}

@@ -3,6 +3,16 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 /**
+ * O SELECTOR COM QUE O BACK OFFICE SE PINTA.
+ *
+ * Deixou de ser só `body.admin-mode`: a classe entra num efeito e chegava
+ * tarde de mais para o primeiro pixel. Agora é
+ * `body:is(.admin-mode, :has([data-admin-mode]))`, com o atributo servido pelo
+ * `layout.tsx` do grupo `(admin)`. A razão por extenso está no `globals.css`.
+ */
+const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
+
+/**
  * ════════════════════════════════════════════════════════════════════════════
  * A LETRA DA CASA NO BACK OFFICE
  * ════════════════════════════════════════════════════════════════════════════
@@ -65,7 +75,7 @@ describe("a letra da casa no back office", () => {
     // back office não se toca — se um dia ela também virar serifa, o ecrã de
     // trabalho fica ilegível numa densidade que é para ser lida de relance.
     const css = semComentarios(CSS);
-    const i = css.indexOf("body.admin-mode,");
+    const i = css.indexOf(`${SELECTOR_ADMIN},`);
     const bloco = css.slice(i >= 0 ? i : 0, (i >= 0 ? i : 0) + 4000);
     expect(bloco).toMatch(/font-family:\s*\n?\s*var\(--font-inter\)/);
   });

@@ -99,7 +99,7 @@ const TaskRow = memo(function TaskRow({
          linha 2 · prioridade, editar e eliminar, todos com o tamanho da casa.
        No computador nada muda: tudo cabe numa fila e o título volta a cortar
        (`sm:truncate`), que é o que mantém a densidade da lista. */
-    <div className="group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-foreground/[0.02] transition-colors">
+    <div className="group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors">
       <button
         onClick={() => onToggle(t)}
         // Sem nome acessível, isto era «botão» — dezasseis vezes, e é o que
@@ -136,7 +136,7 @@ const TaskRow = memo(function TaskRow({
       </button>
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
+          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"}`}
         >
           {t.title}
         </p>
@@ -151,7 +151,7 @@ const TaskRow = memo(function TaskRow({
             </span>
           )}
           {t.area && (
-            <span className="text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5">
+            <span className="text-foreground/30 border border-[var(--bo-hairline-strong)] rounded px-1.5 py-0.5">
               {t.area}
             </span>
           )}
@@ -233,7 +233,7 @@ const TaskRow = memo(function TaskRow({
                  desenho de 13 para 25 px SEM crescer a linha (a coluna do título
                  já mede 34) e sem margens negativas, que era o que voltaria a
                  encostar os dois um ao outro. O ícone continua com 13 px. */
-              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
               aria-label="Editar tarefa"
             >
               {LapisIcon}
@@ -243,7 +243,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
             aria-label="Eliminar"
           >
             {CaixoteIcon}
@@ -530,7 +530,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       return (
         <div
           key={t.id}
-          className="px-4 py-3 border-b border-foreground/[0.06] bg-foreground/[0.015]"
+          className="px-4 py-3 border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
         >
           <div className="flex flex-col gap-2">
             <input
@@ -541,7 +541,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 if (e.key === "Enter") saveEditTask(t.id);
                 if (e.key === "Escape") setEditingTaskId(null);
               }}
-              className="bo-input px-3 py-2 text-sm text-foreground/70 w-full"
+              className="bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] w-full"
             />
             <div className="flex flex-wrap gap-2">
               <select
@@ -549,7 +549,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 onChange={(e) =>
                   setEditTaskFields({ ...editTaskFields, priority: e.target.value as TaskPriority })
                 }
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
               >
                 <option value="alta">Alta</option>
                 <option value="normal">Normal</option>
@@ -559,18 +559,18 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 type="date"
                 value={editTaskFields.dueDate}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, dueDate: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1"
               />
               <input
                 value={editTaskFields.assignee}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, assignee: e.target.value })}
                 placeholder="Responsável"
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1 min-w-[100px]"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
               />
               <select
                 value={editTaskFields.area}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, area: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
               >
                 <option value="">Área…</option>
                 {AREAS.map((a) => (
@@ -658,7 +658,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               portátil a linha fica exactamente como estava; `!justify-start`
               porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
               a classe centra por omissão. */}
-          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-foreground/55 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
+          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
             <svg
               width="12"
               height="12"
@@ -763,10 +763,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       ) : (
         <>
           <Card padding="none" className="overflow-hidden">
-            <div className="px-5 sm:px-6 py-3.5 border-b border-foreground/[0.07] flex items-center justify-between">
+            <div className="px-5 sm:px-6 py-3.5 border-b border-[var(--bo-hairline)] flex items-center justify-between">
               <p className="bo-eyebrow">A fazer ({open.length})</p>
             </div>
-            <div className="divide-y divide-foreground/[0.06]">
+            <div className="divide-y divide-[var(--bo-hairline)]">
               {open.length === 0 ? (
                 <EmptyState
                   icon={
@@ -807,7 +807,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 {showDone ? "▾" : "▸"} Concluídas ({done.length})
               </Button>
               {showDone && (
-                <Card padding="none" className="overflow-hidden divide-y divide-foreground/[0.06]">
+                <Card
+                  padding="none"
+                  className="overflow-hidden divide-y divide-[var(--bo-hairline)]"
+                >
                   {done.map(row)}
                 </Card>
               )}

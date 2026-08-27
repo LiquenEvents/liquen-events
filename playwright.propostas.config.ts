@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { ESTADO_ADMIN } from "./e2e/estado-admin";
 
 /**
  * OS DOIS FLUXOS DE FAZER UMA PROPOSTA — com o seu próprio servidor.
@@ -28,14 +29,25 @@ const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["**/proposta-fluxos.spec.ts", "**/moodboards-arrasto.spec.ts"],
+  testMatch: [
+    "**/proposta-fluxos.spec.ts",
+    "**/moodboards-arrasto.spec.ts",
+    "**/sessao-admin.setup.ts",
+  ],
   // Em série: os dois passeios criam pedidos e mexem na mesma lista.
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : "list",
   use: { baseURL, trace: "on-first-retry" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "sessao", testMatch: /sessao-admin\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },
+      dependencies: ["sessao"],
+    },
+  ],
   webServer: {
     command: `npm run dev -- --port ${PORT}`,
     url: baseURL,

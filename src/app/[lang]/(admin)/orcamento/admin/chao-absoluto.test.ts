@@ -61,7 +61,7 @@ describe("o chão absoluto da letra", () => {
   });
 
   it("é do back office e não pinta o site público", () => {
-    expect(bloco()).toMatch(/body\.admin-mode/);
+    expect(bloco()).toMatch(/body:is\(\.admin-mode, :has\(\[data-admin-mode\]\)\)/);
   });
 
   /**

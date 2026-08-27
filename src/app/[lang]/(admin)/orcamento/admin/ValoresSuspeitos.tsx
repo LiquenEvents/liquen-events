@@ -121,9 +121,9 @@ export default function ValoresSuspeitos() {
   const limpo = suspeitas.length === 0 && naoFecham.length === 0;
 
   return (
-    <section className="mt-4 rounded-xl border border-foreground/[0.1] p-4 sm:p-5">
+    <section className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] p-4 sm:p-5">
       <h3 className="text-sm font-medium">Valores que podem ter crescido sozinhos</h3>
-      <p className="mt-1.5 text-xs leading-relaxed text-foreground/60">
+      <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-text-muted)]">
         Havia uma avaria que somava os valores adicionais outra vez a cada visita à mesma proposta —
         3.000, depois 3.140, depois 3.280. Está resolvida, mas as propostas que ficaram com o número
         inchado continuam com ele. Esta procura só <strong className="font-medium">lê</strong>: não
@@ -135,7 +135,7 @@ export default function ValoresSuspeitos() {
           type="button"
           onClick={procurar}
           disabled={aLer}
-          className="min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-foreground/[0.05] disabled:opacity-50"
+          className="min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50"
         >
           {aLer ? "A procurar…" : "Procurar"}
         </button>
@@ -154,7 +154,7 @@ export default function ValoresSuspeitos() {
       {resultado && !aLer && (
         <div className="mt-4 text-xs">
           {limpo ? (
-            <p className="text-foreground/70">
+            <p className="text-[var(--bo-tinta-72)]">
               {/* A frase diz agora O QUE FOI LIDO, e não só quantos. «7 examinadas» sem
                   dizer se os rascunhos lá estavam era exactamente o que dava a falsa
                   segurança: o valor inchado vive no rascunho, e os rascunhos ficavam
@@ -176,7 +176,7 @@ export default function ValoresSuspeitos() {
                   guarda, o ecrã abria com «0 propostas com o total acima da soma das
                   linhas» por cima da lista que interessa. */}
               {suspeitas.length > 0 && (
-                <p className="text-foreground/80">
+                <p className="text-[var(--bo-text)]">
                   <strong>
                     {suspeitas.length} {suspeitas.length === 1 ? "proposta" : "propostas"}
                   </strong>{" "}
@@ -196,7 +196,7 @@ export default function ValoresSuspeitos() {
               )}
               {naoFecham.length > 0 && (
                 <div className="mt-4 rounded-lg border border-[#c98a2e]/40 bg-[#c98a2e]/[0.07] p-3">
-                  <p className="text-foreground/80">
+                  <p className="text-[var(--bo-text)]">
                     <strong>
                       {naoFecham.length}{" "}
                       {naoFecham.length === 1 ? "conta que não fecha" : "contas que não fecham"}
@@ -207,15 +207,15 @@ export default function ValoresSuspeitos() {
                     {naoFecham.map((c) => (
                       <li
                         key={`${c.quoteId}-${c.tipo}`}
-                        className="rounded-lg border border-foreground/[0.12] bg-[var(--bo-surface,#fff)] p-2.5"
+                        className="rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#fff)] p-2.5"
                       >
-                        <p className="font-medium text-foreground/85">
+                        <p className="font-medium text-[var(--bo-text)]">
                           {c.nome}
                           {c.enviada && (
                             <span className="ml-2 text-[#8a2a22]">já seguiu para o cliente</span>
                           )}
                         </p>
-                        <p className="mt-1 leading-relaxed text-foreground/70">
+                        <p className="mt-1 leading-relaxed text-[var(--bo-tinta-72)]">
                           {c.tipo === "marca-em-falta" ? (
                             <>
                               Tem {eur(c.adicionais)} de valores adicionais e o documento{" "}
@@ -233,7 +233,7 @@ export default function ValoresSuspeitos() {
                             </>
                           )}
                         </p>
-                        <p className="mt-1 text-foreground/55">
+                        <p className="mt-1 text-[var(--bo-text-muted)]">
                           Em jogo: {eur(c.emJogoComIva)} com IVA · {dia(c.quando)}
                         </p>
                       </li>
@@ -246,10 +246,10 @@ export default function ValoresSuspeitos() {
                   {suspeitas.map((s) => (
                     <li
                       key={s.quoteId}
-                      className="rounded-lg border border-foreground/10 px-3 py-2.5"
+                      className="rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2.5"
                     >
                       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="font-medium text-foreground/85">{s.nome}</span>
+                        <span className="font-medium text-[var(--bo-text)]">{s.nome}</span>
                         <span className="text-[11px] text-foreground/45">{s.quoteId}</span>
                         {s.enviada ? (
                           <span className="rounded-full bg-[#8a2a22]/10 px-2 py-0.5 text-[10px] tracking-[0.06em] uppercase text-[#8a2a22]">
@@ -264,20 +264,20 @@ export default function ValoresSuspeitos() {
                         fazê-la de cabeça. */}
                       <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 tabular-nums">
                         <dt className="text-foreground/50">Está lá</dt>
-                        <dd className="text-foreground/85">
+                        <dd className="text-[var(--bo-text)]">
                           {eur(s.escrito)} <span className="text-foreground/40">sem IVA</span>
                           {s.enviada && (
                             <span className="text-foreground/45"> · {eur(s.comIva)} com IVA</span>
                           )}
                         </dd>
                         <dt className="text-foreground/50">As linhas somam</dt>
-                        <dd className="text-foreground/70">{eur(s.somaDasLinhas)}</dd>
+                        <dd className="text-[var(--bo-tinta-72)]">{eur(s.somaDasLinhas)}</dd>
                         <dt className="text-foreground/50">Somas a mais</dt>
-                        <dd className="text-foreground/70">
+                        <dd className="text-[var(--bo-tinta-72)]">
                           {s.somasAMais} × {eur(s.degrau)} de adicionais
                         </dd>
                         <dt className="text-foreground/50">Daria</dt>
-                        <dd className="text-foreground/85">
+                        <dd className="text-[var(--bo-text)]">
                           {eur(s.escritoCorrigido)}{" "}
                           <span className="text-foreground/40">sem IVA</span>
                           {s.enviada && (

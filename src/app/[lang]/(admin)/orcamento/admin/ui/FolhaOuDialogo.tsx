@@ -205,7 +205,7 @@ export function FolhaOuDialogo({
           {sobretitulo}
         </p>
       )}
-      <h2 id={idTitulo} className="font-display text-lg text-foreground/85">
+      <h2 id={idTitulo} className="font-display text-lg text-[var(--bo-text)]">
         {titulo}
       </h2>
       {descricao && <p className="bo-text-muted mt-1 text-sm">{descricao}</p>}
@@ -306,7 +306,7 @@ export function FolhaOuDialogo({
         {accoes && (
           <div
             className={cn(
-              "flex shrink-0 gap-2 border-t border-foreground/[0.08] px-5 py-3",
+              "flex shrink-0 gap-2 border-t border-[var(--bo-hairline)] px-5 py-3",
               // Ver `accoesQuebram`: a fila parte, e o que estiver marcado com
               // `basis-full` toma a linha toda. `items-center` porque uma
               // contagem de duas linhas ao lado de um botão fica torta sem ele.
@@ -333,7 +333,7 @@ export function FolhaOuDialogo({
             // Este fechar não tinha transição NENHUMA — o hover entrava e saía
             // a zero, um corte seco. É o mesmo defeito que os 20 ms tratam no
             // carregar, só que no passar do rato.
-            `alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/70 active:bg-foreground/[0.12] disabled:opacity-40 ${ESTADO} ${PRESSAO}`,
+            `alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] disabled:opacity-40 ${ESTADO} ${PRESSAO}`,
             comoFolha ? "top-8" : "top-2",
           )}
         >

@@ -78,7 +78,7 @@ const ROTULO = {
  */
 const PAINEL_SUSPENSO =
   "bo-entrada absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
-  "rounded-xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-suspensa)]";
+  "rounded-xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-suspensa)]";
 
 export default function ModelosParciais({
   tipo,
@@ -167,7 +167,7 @@ export default function ModelosParciais({
   // eram links de 16 px de altura, e num ecrã táctil isso é acertar numa linha
   // de texto. No computador continuam a ser o que eram.
   const botao =
-    "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-foreground/80 hover:underline";
+    "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-[var(--bo-text)] hover:underline";
 
   const podeInserir = mostrar !== "guardar" && !!onInserir;
   const podeGuardar = mostrar !== "inserir" && !!paraGuardar;
@@ -221,7 +221,7 @@ export default function ModelosParciais({
                 <li key={m.id}>
                   <button
                     type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-foreground/[0.05]"
+                    className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--bo-tinta-6)]"
                     onClick={() => {
                       const conteudo = tipo === "grupo" ? m.grupo : m.moodboard;
                       // Um modelo sem conteúdo não pode passar por inserção
@@ -248,7 +248,7 @@ export default function ModelosParciais({
 
       {aGuardar && (
         <div className={PAINEL_SUSPENSO + " p-3"}>
-          <label className="block text-[11px] text-foreground/55" htmlFor={`mp-${tipo}`}>
+          <label className="block text-[11px] text-[var(--bo-text-muted)]" htmlFor={`mp-${tipo}`}>
             Nome do modelo
           </label>
           <input

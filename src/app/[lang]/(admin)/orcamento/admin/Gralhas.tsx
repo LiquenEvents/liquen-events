@@ -56,7 +56,7 @@ export default function Gralhas({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3
           id="gralhas-titulo"
-          className="text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/70"
+          className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
         >
           Ortografia
         </h3>
@@ -70,7 +70,7 @@ export default function Gralhas({
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
         {gralhas.length === 1
           ? "Uma palavra que sai impressa parece estar sem acento."
           : `${gralhas.length} palavras que saem impressas parecem estar sem acento.`}{" "}
@@ -87,7 +87,7 @@ export default function Gralhas({
             {/* A palavra escrita e a proposta, uma ao lado da outra. Sem as
                 duas à vista, «corrigir» é um botão que faz uma coisa que não
                 se viu — e num campo que vai impresso isso não chega. */}
-            <span className="text-foreground/75">
+            <span className="text-[var(--bo-tinta-72)]">
               <span className="line-through decoration-[#8a2a22]/60">{g.escrita}</span>
               <span aria-hidden="true" className="mx-1 text-foreground/30">
                 →
@@ -97,7 +97,7 @@ export default function Gralhas({
             <button
               type="button"
               onClick={() => onCorrigir(g)}
-              className="alvo-toque rounded-md border border-foreground/15 px-2 py-0.5 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
+              className="alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
             >
               Corrigir
             </button>

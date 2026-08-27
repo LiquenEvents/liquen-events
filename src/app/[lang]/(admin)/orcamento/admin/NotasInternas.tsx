@@ -91,7 +91,7 @@ export default function NotasInternas({
         rows={compacta ? 1 : 2}
         maxLength={4000}
         placeholder={placeholder}
-        className="mt-2 w-full resize-none rounded-lg border border-[#c9a227]/25 bg-white/70 px-2.5 py-2 text-xs leading-relaxed text-foreground/80 placeholder:text-foreground/30 focus:border-[#c9a227]/60 focus:outline-none"
+        className="mt-2 w-full resize-none rounded-lg border border-[#c9a227]/25 bg-white/70 px-2.5 py-2 text-xs leading-relaxed text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-[#c9a227]/60 focus:outline-none"
       />
     </div>
   );

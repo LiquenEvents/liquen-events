@@ -292,12 +292,12 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     // O `pt-5` eram 20 px a qualquer largura. `--bo-p-vista` (12 → 24) é o
     // token que os painéis vizinhos desta zona passaram a ler para o mesmo
     // separador — um só ritmo, e 8 px de volta no telemóvel.
-    <div className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
+    <div className="border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
         <div className="flex flex-wrap items-center gap-2">
           {items.length > 0 && (
-            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
               {items.filter((i) => i.done).length}/{items.length} do plano
             </span>
           )}
@@ -373,14 +373,14 @@ export default function ProductionPlan({ quote, onChange }: Props) {
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-foreground/55 text-[11px] font-medium tracking-[0.08em] uppercase">
+                  <p className="text-[var(--bo-text-muted)] text-[11px] font-medium tracking-[0.08em] uppercase">
                     {titulo}
                   </p>
-                  <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
+                  <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5">
                     {feitos}/{itens.length}
                   </span>
                 </div>
-                <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
+                <div className="h-1 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden mb-2">
                   <div
                     className="h-full w-full origin-left bg-[#4d6350] rounded-full motion-safe:transition-transform motion-safe:duration-500"
                     style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
@@ -418,7 +418,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         </span>
                       </button>
                       <span
-                        className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
+                        className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-[var(--bo-tinta-72)]"}`}
                       >
                         {/* Sem fase não há prefixo a cortar: mostra-se inteiro. */}
                         {i.label.slice(prefixo.length)}
@@ -435,7 +435,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => removeItem(i.id)}
                         aria-label="Remover tarefa"
-                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                       >
                         ×
                       </button>
@@ -454,7 +454,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
           value={newPhase}
           onChange={(e) => setNewPhase(e.target.value)}
           aria-label="Fase"
-          className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
+          className="bo-input w-auto px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
         >
           {DECOR_PRODUCTION.map((p) => (
             <option key={p.key} value={p.key}>
@@ -470,7 +470,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
           }}
           placeholder="Nova tarefa (ex.: encomendar velas)"
           aria-label="Nova tarefa de produção"
-          className="bo-input min-w-[10rem] flex-1 px-2.5 py-2 text-xs text-foreground/80"
+          className="bo-input min-w-[10rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-text)]"
         />
         <Button
           size="sm"
@@ -483,13 +483,13 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       </div>
 
       {/* Suppliers assigned to this event — managed in Custos, shown read-only. */}
-      <div className="mt-5 pt-4 border-t border-foreground/[0.08]">
+      <div className="mt-5 pt-4 border-t border-[var(--bo-hairline)]">
         <div className="flex items-center justify-between mb-2.5">
           <p className="text-foreground/45 text-[11px] tracking-[0.1em] uppercase">
             Fornecedores atribuídos
           </p>
           {suppliers.length > 0 && (
-            <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
+            <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5">
               {suppliers.length}
             </span>
           )}
@@ -511,10 +511,10 @@ export default function ProductionPlan({ quote, onChange }: Props) {
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-xl px-3.5 py-2.5"
+                  className="flex items-center gap-2.5 bg-[var(--bo-tinta-3)] border border-[var(--bo-hairline)] rounded-xl px-3.5 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-foreground/80 text-xs font-medium truncate">{s.name}</p>
+                    <p className="text-[var(--bo-text)] text-xs font-medium truncate">{s.name}</p>
                     <p className="text-foreground/45 text-[10px]">{s.category}</p>
                   </div>
                   <span
@@ -526,7 +526,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   >
                     {estado.label}
                   </span>
-                  <span className="text-foreground/55 text-[11px] tabular-nums shrink-0">
+                  <span className="text-[var(--bo-text-muted)] text-[11px] tabular-nums shrink-0">
                     {eur2(s.estimatedCost)}
                   </span>
                 </div>

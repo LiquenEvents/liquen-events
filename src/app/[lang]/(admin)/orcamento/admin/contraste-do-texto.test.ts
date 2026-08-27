@@ -3,6 +3,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
+ * O SELECTOR COM QUE O BACK OFFICE SE PINTA.
+ *
+ * Deixou de ser só `body.admin-mode`: a classe entra num efeito e chegava
+ * tarde de mais para o primeiro pixel. Agora é
+ * `body:is(.admin-mode, :has([data-admin-mode]))`, com o atributo servido pelo
+ * `layout.tsx` do grupo `(admin)`. A razão por extenso está no `globals.css`.
+ */
+const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * O CONTRASTE DO TEXTO DO BACK OFFICE — a conta, e não a impressão
  * ═══════════════════════════════════════════════════════════════════════════
@@ -114,8 +124,35 @@ const hexParaRgb = (h: string): RGB => {
   return [0, 2, 4].map((i) => parseInt(largo.slice(i, i + 2), 16)) as RGB;
 };
 
-/** `rgba(13, 13, 13, 0.58)` → `{ cor, alpha }`; `#ffffff` → alpha 1. */
-function lerCor(valor: string): { cor: RGB; alpha: number } {
+/**
+ * `rgba(13, 13, 13, 0.58)` → `{ cor, alpha }`; `#ffffff` → alpha 1.
+ *
+ * E `var(--bo-tinta-58)` também: os três tokens de papel do texto passaram a
+ * ser APELIDOS de degraus numerados da escada da tinta — é a regra da análise
+ * («o nome diz a opacidade») com os nomes de papel por cima, que dizem o que a
+ * coisa é. Sem esta linha, este guarda rebentava com «valor de cor que não sei
+ * ler» num sítio onde o valor está perfeitamente lá, uma indirecção adiante.
+ *
+ * UM nível de indirecção, de propósito. Uma escada de apelidos de apelidos
+ * deixa de se poder ler de uma olhadela, e este teste existe para dizer que
+ * número é que uma pessoa vê no ecrã.
+ */
+function lerCor(valor: string, css: string = CSS): { cor: RGB; alpha: number } {
+  const referencia = valor.trim().match(/^var\(\s*(--[a-z0-9-]+)\s*\)$/i);
+  if (referencia) {
+    const apontado = css.match(new RegExp(`${referencia[1]}\\s*:\\s*([^;]+);`));
+    expect(
+      apontado,
+      `o token ${referencia[1]}, para onde ${valor} aponta, não existe no globals.css`,
+    ).not.toBeNull();
+    const dentro = apontado![1].trim();
+    expect(
+      dentro.startsWith("var("),
+      `${valor} aponta para ${referencia[1]}, que aponta para outro token — uma escada de ` +
+        `apelidos de apelidos deixa de se poder ler de uma olhadela`,
+    ).toBe(false);
+    return lerCor(dentro, css);
+  }
   const rgba = valor.match(/rgba?\(([^)]+)\)/);
   if (rgba) {
     const partes = rgba[1].split(",").map((p) => parseFloat(p.trim()));
@@ -139,8 +176,8 @@ function lerCor(valor: string): { cor: RGB; alpha: number } {
  * mexer-lhes aqui não deixa nada por pintar.)
  */
 function blocoAdminMode(): string {
-  const inicio = CSS.indexOf("body.admin-mode {");
-  expect(inicio, "desapareceu o bloco `body.admin-mode` do globals.css").toBeGreaterThan(-1);
+  const inicio = CSS.indexOf(`${SELECTOR_ADMIN} {`);
+  expect(inicio, `desapareceu o bloco \`${SELECTOR_ADMIN}\` do globals.css`).toBeGreaterThan(-1);
   const fim = CSS.indexOf("\n}", inicio);
   return CSS.slice(inicio, fim);
 }
@@ -148,7 +185,7 @@ function blocoAdminMode(): string {
 /** Um token declarado no bloco do back office. */
 function token(nome: string): { cor: RGB; alpha: number } {
   const m = blocoAdminMode().match(new RegExp(`${nome}\\s*:\\s*([^;]+);`));
-  expect(m, `o token ${nome} desapareceu de body.admin-mode`).not.toBeNull();
+  expect(m, `o token ${nome} desapareceu de ${SELECTOR_ADMIN}`).not.toBeNull();
   return lerCor(m![1]);
 }
 

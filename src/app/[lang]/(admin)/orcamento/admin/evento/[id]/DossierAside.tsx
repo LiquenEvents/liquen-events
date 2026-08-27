@@ -77,7 +77,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <a
                 href={`tel:${quote.phone}`}
-                className="alvo-toque !justify-start text-foreground/55 text-xs hover:text-foreground/75"
+                className="alvo-toque !justify-start text-[var(--bo-text-muted)] text-xs hover:text-[var(--bo-tinta-72)]"
               >
                 {quote.phone}
               </a>
@@ -115,12 +115,12 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
           {facts.map(({ l, v }) => (
             <div key={l}>
               <p className="text-foreground/25 text-[9px] tracking-wide uppercase mb-0.5">{l}</p>
-              <p className="text-foreground/60 text-xs">{v ?? "—"}</p>
+              <p className="text-[var(--bo-text-muted)] text-xs">{v ?? "—"}</p>
             </div>
           ))}
         </div>
         {quote.notes && (
-          <div className="mt-4 pt-3 border-t border-foreground/[0.06]">
+          <div className="mt-4 pt-3 border-t border-[var(--bo-hairline)]">
             <p className="text-foreground/25 text-[9px] tracking-wide uppercase mb-1">
               Notas do cliente
             </p>

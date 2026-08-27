@@ -244,9 +244,11 @@ describe("AdminClient shell", () => {
     renderAdmin([quote]);
 
     navTo(/Pedidos/);
-    // Before opening, the id shows once (the list row, as a shortened "Ref.");
-    // no detail drawer yet.
-    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
+    // A referência SAIU da lista — está só no painel de detalhe, por decisão
+    // dela («retira a referência»). Com o painel fechado não aparece em lado
+    // nenhum, o que torna esta contagem um sinal mais limpo do que era: 0 com o
+    // painel fechado, 1 com ele aberto.
+    expect(screen.queryAllByText(/LQ-042/)).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
 
     // The list row is a button labelled by the client's name.
@@ -259,12 +261,12 @@ describe("AdminClient shell", () => {
     // aberto sobre o resumo ficava com uma lista vazia e a primeira edição
     // gravava-a por cima da verdadeira.
     expect(await screen.findByRole("button", { name: "Fechar" })).toBeInTheDocument();
-    expect(screen.getAllByText(/LQ-042/)).toHaveLength(2);
+    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
 
     // Closing the drawer tears it down again.
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
-    expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
+    expect(screen.queryAllByText(/LQ-042/)).toHaveLength(0);
   });
 
   /**
@@ -322,9 +324,9 @@ describe("AdminClient shell", () => {
     // E o aviso NOMEIA o pedido — «Não foi possível abrir o pedido» servia
     // quatro avarias diferentes e nenhuma dizia de qual se tratava.
     expect(aviso.textContent).toContain("Sara Lopes");
-    // O painel ecoa a referência do pedido no cabeçalho; com ele fechado, a
-    // referência aparece uma vez só — na linha da lista.
-    expect(screen.getAllByText(/LQ-777/)).toHaveLength(1);
+    // O painel ecoa a referência do pedido no cabeçalho, e é o ÚNICO sítio onde
+    // ela aparece desde que saiu da lista. Com o painel fechado, zero.
+    expect(screen.queryAllByText(/LQ-777/)).toHaveLength(0);
   });
 
   /**
@@ -357,7 +359,9 @@ describe("AdminClient shell", () => {
     // coisa que não resolve nada.
     expect(await screen.findByText(/sessão expirou/i)).toBeInTheDocument();
     expect(screen.getByText(/volta a entrar/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/LQ-777/)).toHaveLength(1);
+    // O painel não abriu, e a referência só existe DENTRO dele desde que saiu
+    // da lista — portanto zero.
+    expect(screen.queryAllByText(/LQ-777/)).toHaveLength(0);
   });
 
   /**

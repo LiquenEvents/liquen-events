@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import type { Proposal } from "@/lib/orcamento/types";
 import { splitThirtySeventy } from "@/lib/money";
 import { resolveValidUntil } from "@/lib/proposal-doc";
+import fs from "node:fs";
+import path from "node:path";
 
 // ── Mock the auth + data layer + heavy PDF/mail side effects; keep the money
 //    math (proposal-doc) and the route logic real ──
@@ -1759,9 +1761,93 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
       params,
     });
     expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
-    expect(enviado().html).toContain("Abrir a proposta em PDF");
+    expect(enviado().html).toContain("Abrir a proposta");
     // E o nome do ficheiro, para o casal reconhecer que é o mesmo do anexo.
+    // Passou para baixo do botão, em letra pequena, com a frase que diz para
+    // que serve — mas continua lá, que era a razão de estar no cartão.
     expect(enviado().html).toContain("Proposta-Liquen-Events");
+  });
+
+  /**
+   * ── OS BOTÕES DESTE EMAIL ABREM-SE COM O POLEGAR ──────────────────────────
+   *
+   * São dois — «Ver a proposta» e «Abrir a proposta» — e este email abre-se
+   * quase sempre no telemóvel. Tinham 39 px e 37 px de altura, com letra de
+   * 13 px: sete píxeis abaixo dos 44 do alvo de toque da casa, num sítio onde
+   * um clique falhado é um casal a desistir de ler.
+   *
+   * A altura de um botão de email é a conta do `padding` com a entrelinha, e é
+   * isso que este teste faz — não há browser onde a medir.
+   */
+  it("e os botões do email têm os 44 px de alvo", async () => {
+    /** A altura de um botão de email é a conta do `padding` com a entrelinha. */
+    const alturas = (html: string) =>
+      [...html.matchAll(/padding:(\d+)px [^"]*?;font-size:\d+px;line-height:(\d+)px/g)].map(
+        ([, pad, lh]) => Number(pad) * 2 + Number(lh),
+      );
+
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Escrevi isto à mão." }), {
+      params,
+    });
+    const medidas = alturas(enviado().html);
+    expect(medidas.length, "não encontrei o botão do cartão do PDF").toBeGreaterThan(0);
+    for (const altura of medidas) {
+      expect(altura, `um botão do email ficou com ${altura} px de altura`).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+  });
+
+  /**
+   * ── UM BOTÃO CHEIO, UM LINK — E OS DOIS CABEM NO POLEGAR ──────────────────
+   *
+   * O email tinha DOIS rectângulos verdes do mesmo tamanho, um por cima do
+   * outro: «Ver a proposta →» e «Abrir a proposta →». Fazem coisas diferentes e
+   * não havia como saber qual era qual. Duas coisas com o mesmo peso não são
+   * uma hierarquia.
+   *
+   * Ficou um botão cheio — a página onde o casal responde — e um link para o
+   * PDF, que é o outro caminho para o mesmo documento.
+   *
+   * O que este teste guarda é a MEDIDA, que é o defeito de origem deste bloco:
+   * o botão tinha 37 px e o irmão 39, num email que se abre quase sempre no
+   * telemóvel. Minimalismo não é encolher o que se toca.
+   *
+   * Lê-se da fonte e não do email enviado: os dois não aparecem juntos em
+   * nenhum caminho que a fixture consiga montar, e um teste que só mede o que a
+   * fixture alcança deixava um por medir — que é como ele chegou aos 39.
+   */
+  it("o botão e o link do email têm os 44 px de alvo", () => {
+    const fonte = fs.readFileSync(
+      path.join(process.cwd(), "src/app/api/orcamento/[id]/proposta-doc/route.ts"),
+      "utf8",
+    );
+    const alvos = [
+      ...fonte.matchAll(/padding:(\d+)px [^";]*;font-size:(\d+)px;line-height:(\d+)px/g),
+    ].map(([, pad, letra, lh]) => ({
+      altura: Number(pad) * 2 + Number(lh),
+      letra: Number(letra),
+    }));
+    expect(
+      alvos.length,
+      "não encontrei o botão e o link do PDF na fonte da rota",
+    ).toBeGreaterThanOrEqual(2);
+    for (const a of alvos) {
+      expect(a.altura, `um alvo do email tem ${a.altura} px de altura`).toBeGreaterThanOrEqual(44);
+      expect(a.letra, `um alvo do email tem letra de ${a.letra} px`).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  it("e há UM só botão cheio — o segundo virou link", () => {
+    const fonte = fs.readFileSync(
+      path.join(process.cwd(), "src/app/api/orcamento/[id]/proposta-doc/route.ts"),
+      "utf8",
+    );
+    const cheios = [...fonte.matchAll(/background:#4c6350;border-radius/g)];
+    expect(
+      cheios.length,
+      "voltou a haver dois rectângulos verdes iguais no mesmo email — não se distinguem",
+    ).toBe(1);
   });
 
   it("e o texto simples leva o mesmo endereço, que ali não há botões", async () => {

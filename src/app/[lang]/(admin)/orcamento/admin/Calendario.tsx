@@ -165,18 +165,18 @@ function AddEventModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Adicionar ao calendário — ${dateLabel}`}
-        className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
+        className="relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
-            <p className="text-foreground/75 text-sm capitalize">{dateLabel}</p>
+            <p className="text-[var(--bo-tinta-72)] text-sm capitalize">{dateLabel}</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
+            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-[var(--bo-text-muted)] motion-safe:transition-colors"
           >
             ×
           </button>
@@ -191,7 +191,7 @@ function AddEventModal({
                 type="button"
                 aria-pressed={form.kind === k}
                 onClick={() => setForm((f) => ({ ...f, kind: k }))}
-                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-foreground/15 hover:border-foreground/30"}`}
+                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-[var(--bo-hairline-strong)] hover:border-foreground/30"}`}
                 style={
                   form.kind === k
                     ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
@@ -543,7 +543,11 @@ export default function Calendario({ quotes, onOpen }: Props) {
             seis filetes de 1 px — 41 px por dia, três abaixo do mínimo de 44.
             Com 12 px sobram 319, e cada dia fica com 44. É a diferença entre
             acertar no dia certo e abrir o do lado. */}
-        <Card padding="lg" className="!p-3 sm:!p-8">
+        <Card
+          padding="lg"
+          style={{ "--cena": 0 } as React.CSSProperties}
+          className="bo-cena !p-3 sm:!p-8"
+        >
           {/* ── Header: month title + quiet controls on one row ──────────────
               …e em DUAS quando não cabem numa. MEDIDO num telemóvel de 390×844:
               «Agosto 2026» mostrava 90 px dos 103 de que precisa, e lia-se
@@ -560,7 +564,16 @@ export default function Calendario({ quotes, onOpen }: Props) {
               título encolhia até 0 em vez de empurrar os botões para baixo. */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="min-w-[12rem]">
-              <h3 className="font-display text-foreground/90 text-xl sm:text-2xl leading-tight">
+              {/* O mês é o TÍTULO deste ecrã, e estava a 20/24 px — o mesmo
+                  degrau de um subtítulo qualquer. A grelha por baixo é o herói,
+                  mas quem diz DE QUE mês ela é, é esta linha; num ecrã que se
+                  navega mês a mês, saber onde se está não pode ser letra
+                  miudinha. Sobe para o degrau de display da casa, na letra da
+                  casa. */}
+              <h3
+                className="font-display leading-tight text-[var(--bo-text)]"
+                style={{ fontSize: "clamp(26px, 3.5vw, 36px)" }}
+              >
                 {MONTHS[month]} {year}
               </h3>
               <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1.5">
@@ -580,7 +593,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 Exportar
               </Button>
               <div
-                className="flex items-center rounded-xl border border-foreground/[0.08] p-0.5"
+                className="flex items-center rounded-xl border border-[var(--bo-hairline)] p-0.5"
                 role="group"
                 aria-label="Navegação do mês"
               >
@@ -656,7 +669,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
           <div
             role="group"
             aria-label={`Calendário de ${MONTHS[month]} ${year}`}
-            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-foreground/[0.06] bg-foreground/[0.06]"
+            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)]"
           >
             {cells.map((c) => {
               if (!c.inMonth) {
@@ -666,7 +679,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     aria-hidden="true"
                     className="min-h-[52px] sm:min-h-[80px] bg-white p-1.5 sm:p-2"
                   >
-                    <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/[0.15]">
+                    <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
                       {c.day}
                     </span>
                   </div>
@@ -769,7 +782,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
                         title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-foreground/[0.035] text-foreground/65 hover:bg-foreground/[0.07] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -787,7 +800,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-foreground/[0.035] text-foreground/65 hover:line-through hover:bg-foreground/[0.07] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -847,8 +860,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
           {/* ── Day peek: everything on the selected day, with real targets ── */}
           {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
-            <div className="mt-5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-foreground/[0.06]">
+            <div className="mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
                 <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
                 <div className="flex items-center gap-1">
                   <Button variant="subtle" size="sm" onClick={() => openAdd(selectedDay)}>
@@ -865,12 +878,12 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   </Button>
                 </div>
               </div>
-              <div className="divide-y divide-foreground/[0.05]">
+              <div className="divide-y divide-[var(--bo-hairline)]">
                 {selectedQuotes.map((q) => (
                   <button
                     key={q.id}
                     onClick={() => onOpen(q)}
-                    className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-foreground/[0.03] motion-safe:transition-colors"
+                    className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
                   >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
@@ -878,7 +891,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-foreground/75 text-xs font-medium truncate">
+                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
                         {q.name}
                       </span>
                       <span className="block text-foreground/40 text-[10px] truncate">
@@ -899,7 +912,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-foreground/75 text-xs font-medium truncate">
+                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
                         {ev.time ? `${ev.time} · ` : ""}
                         {ev.title}
                       </span>
@@ -945,20 +958,24 @@ export default function Calendario({ quotes, onOpen }: Props) {
         </Card>
 
         {/* Upcoming */}
-        <Card padding="none" className="overflow-hidden self-start">
-          <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
+        <Card
+          padding="none"
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className="bo-cena overflow-hidden self-start"
+        >
+          <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-[var(--bo-hairline)]">
             Próximos eventos
           </p>
-          <div className="divide-y divide-foreground/[0.06]">
+          <div className="divide-y divide-[var(--bo-hairline)]">
             {upcoming.map((q) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-foreground/[0.02] motion-safe:transition-colors"
+                className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">
-                    <p className="font-display text-[#4d6350] text-lg font-semibold leading-none">
+                    <p className="text-[#4d6350] text-lg font-light leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>
                     {/* O ANO, quando não é este.
@@ -978,7 +995,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-foreground/70 text-xs font-medium truncate">{q.name}</p>
+                    <p className="text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                      {q.name}
+                    </p>
                     <p className="text-foreground/40 text-[11px] truncate">
                       {eventTypeLabel(q)} · {q.guests} convidados
                     </p>

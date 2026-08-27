@@ -126,7 +126,7 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
           id={menuId}
           role="menu"
           aria-label="Mais ações"
-          className="bo-entrada absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-foreground/[0.08] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
+          className="bo-entrada absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-[var(--bo-hairline)] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
         >
           {items.map((item, idx) => (
             <button
@@ -153,7 +153,7 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
                 triggerRef.current?.focus();
                 item.onClick();
               }}
-              className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-foreground/75 motion-safe:transition-colors hover:bg-foreground/[0.05] hover:text-foreground/90"
+              className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--bo-tinta-72)] motion-safe:transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
             >
               {item.icon && (
                 <span className="mt-0.5 shrink-0 text-foreground/45" aria-hidden="true">

@@ -210,15 +210,15 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
       )}
 
       {!suportado ? (
-        <p className="text-sm leading-relaxed text-foreground/60">
+        <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
           Este browser não sabe trabalhar com passkeys. Continua a entrar com a palavra-passe, ou
           abre o back office no Safari ou no Chrome do teu telemóvel.
         </p>
       ) : (
         <>
           {/* ── Registar este aparelho ── */}
-          <div className="rounded-xl border border-foreground/10 p-4">
-            <p className="text-sm font-medium text-foreground/80">Registar este aparelho</p>
+          <div className="rounded-xl border border-[var(--bo-hairline-strong)] p-4">
+            <p className="text-sm font-medium text-[var(--bo-text)]">Registar este aparelho</p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/50">
               A chave fica guardada dentro deste aparelho e nunca sai de lá. Num site que imite o
               nosso, ela simplesmente não existe — é isso que impede um engano.
@@ -255,7 +255,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                 {dispositivos.map((d) => (
                   <li
                     key={d.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-foreground/10 px-3 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2.5"
                   >
                     {aRenomear?.id === d.id ? (
                       <>
@@ -290,7 +290,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                         </Button>
                         <button
                           onClick={() => setARenomear(null)}
-                          className="alvo-toque shrink-0 rounded-md px-2 py-1 text-xs text-foreground/50 hover:text-foreground/80"
+                          className="alvo-toque shrink-0 rounded-md px-2 py-1 text-xs text-foreground/50 hover:text-[var(--bo-text)]"
                         >
                           Cancelar
                         </button>
@@ -298,7 +298,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                     ) : (
                       <>
                         <div className="min-w-0">
-                          <p className="truncate text-sm text-foreground/80">{d.deviceLabel}</p>
+                          <p className="truncate text-sm text-[var(--bo-text)]">{d.deviceLabel}</p>
                           <p className="text-xs text-foreground/45">
                             Última entrada: {quando(d.lastUsedAt)}
                           </p>
@@ -306,7 +306,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                         <div className="flex shrink-0 items-center gap-1">
                           <button
                             onClick={() => setARenomear({ id: d.id, nome: d.deviceLabel })}
-                            className="alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                            className="alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
                           >
                             Mudar nome
                           </button>

@@ -57,7 +57,7 @@ const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
   em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/18 text-[#4d6350]" },
   cotado: { label: "Proposta enviada", classe: "bg-[#4d6350]/25 text-[#4d6350]" },
   aceite: { label: "Ganho", classe: "bg-[#4d6350]/35 text-[#4d6350]" },
-  rejeitado: { label: "Perdido", classe: "bg-foreground/[0.08] text-foreground/30" },
+  rejeitado: { label: "Perdido", classe: "bg-[var(--bo-tinta-10)] text-foreground/30" },
 };
 
 /** Estados que ainda não têm proposta enviada — os que este ecrã existe para
@@ -227,7 +227,9 @@ export default function FazerProposta({
                   nome, que é a âncora do "para quem é isto", e o botão de
                   trocar. */}
               <p className="bo-eyebrow mb-1">Proposta para</p>
-              <p className="truncate text-base font-medium text-foreground/85">{escolhido.name}</p>
+              <p className="truncate text-base font-medium text-[var(--bo-text)]">
+                {escolhido.name}
+              </p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
               Trocar de cliente
@@ -260,7 +262,7 @@ export default function FazerProposta({
         <div className="flex flex-col gap-3">
           <div>
             <p className="bo-eyebrow mb-1.5">Passo 1 de 2</p>
-            <p className="text-sm text-foreground/70">
+            <p className="text-sm text-[var(--bo-tinta-72)]">
               Para quem é a proposta?{" "}
               {porFazer > 0 && (
                 <span className="text-foreground/45">
@@ -276,7 +278,7 @@ export default function FazerProposta({
               onChange={(e) => setProcura(e.target.value)}
               placeholder="Procurar por nome, email, local…"
               aria-label="Procurar cliente"
-              className="bo-input min-w-[14rem] flex-1 px-3 py-2.5 text-sm text-foreground/75"
+              className="bo-input min-w-[14rem] flex-1 px-3 py-2.5 text-sm text-[var(--bo-tinta-72)]"
             />
             <Button variant="secondary" onClick={onNovoPedido}>
               Cliente novo
@@ -319,7 +321,7 @@ export default function FazerProposta({
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
                 filtro === f.id
                   ? "bg-[#1b2119] text-white "
-                  : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
+                  : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"
               }`}
             >
               {f.label} · {f.n}
@@ -359,7 +361,7 @@ export default function FazerProposta({
               // Um estado que não conheçamos mostra-se cru e em cinzento, em vez
               // de rebentar o ecrã inteiro — a razão está em `status-meta.ts`.
               label: q.status,
-              classe: "bg-foreground/[0.08] text-foreground/40",
+              classe: "bg-[var(--bo-tinta-10)] text-foreground/40",
             };
             return (
               <li key={q.id}>
@@ -368,8 +370,8 @@ export default function FazerProposta({
                   onClick={() => onSelect(q.id)}
                   className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left motion-safe:transition-colors ${
                     espera
-                      ? "border-foreground/[0.09] bg-white hover:border-[#4d6350]/40"
-                      : "border-foreground/[0.06] bg-foreground/[0.015] hover:border-foreground/20"
+                      ? "border-[var(--bo-hairline)] bg-white hover:border-[#4d6350]/40"
+                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"
                   }`}
                 >
                   {/* AS ETIQUETAS VÊM PRIMEIRO, E É DE PROPÓSITO.
@@ -405,7 +407,7 @@ export default function FazerProposta({
                     </span>
                     <span className="min-w-0">
                       <span
-                        className={`block truncate text-sm font-medium ${espera ? "text-foreground/85" : "text-foreground/55"}`}
+                        className={`block truncate text-sm font-medium ${espera ? "text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"}`}
                       >
                         {q.name}
                       </span>

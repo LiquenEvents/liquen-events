@@ -41,7 +41,7 @@ export function SugestaoDeNome({
   const arrumado = arrumarNomeDeTema(valor);
 
   return (
-    <p className={`mt-1.5 text-xs leading-relaxed text-foreground/55 ${className}`}>
+    <p className={`mt-1.5 text-xs leading-relaxed text-[var(--bo-text-muted)] ${className}`}>
       Queres dizer{" "}
       <button
         type="button"

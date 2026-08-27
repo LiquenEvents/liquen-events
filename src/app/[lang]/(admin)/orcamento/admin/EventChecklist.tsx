@@ -355,11 +355,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
     // e a 1440, e nesta zona do dossier há vários painéis destes empilhados.
     // `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma vista:
     // 12 px de volta no telemóvel, computador na mesma.
-    <section className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
+    <section className="border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Checklist de Produção</p>
         {items.length > 0 && (
-          <span className="shrink-0 rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+          <span className="shrink-0 rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
             {doneCount}/{items.length}
           </span>
         )}
@@ -390,7 +390,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
       ) : (
         <>
           <div
-            className="mb-5 h-1.5 overflow-hidden rounded-full bg-foreground/[0.06]"
+            className="mb-5 h-1.5 overflow-hidden rounded-full bg-[var(--bo-tinta-6)]"
             role="progressbar"
             aria-valuenow={pct}
             aria-valuemin={0}
@@ -412,7 +412,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 type="button"
                 onClick={markAll}
                 disabled={doneCount === items.length}
-                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors"
+                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors"
               >
                 Marcar todas
               </button>
@@ -420,7 +420,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 <button
                   type="button"
                   onClick={clearCompleted}
-                  className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 motion-safe:transition-colors"
+                  className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] motion-safe:transition-colors"
                 >
                   Limpar concluídas
                 </button>
@@ -430,7 +430,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
               <button
                 type="button"
                 onClick={addTemplateItems}
-                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 motion-safe:transition-colors"
+                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] motion-safe:transition-colors"
               >
                 Adicionar itens do modelo ({missingFromTemplate.length})
               </button>
@@ -444,7 +444,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
           {anular && (
             <div
               role="status"
-              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-foreground/[0.04] px-3 py-2 text-xs text-foreground/70"
+              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
             >
               <span>{anular.texto}</span>
               <Button size="sm" variant="ghost" onClick={anular.repor}>
@@ -456,7 +456,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
             {items.map((i) => (
               <li
                 key={i.id}
-                className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-foreground/[0.02]"
+                className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-[var(--bo-tinta-3)]"
               >
                 {/* ── O ALVO CRESCE, O QUADRADO NÃO ────────────────────────
                     Medido a 375 px com a checklist cheia: este botão dava
@@ -515,7 +515,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       aria-label="Editar item"
-                      className="bo-input flex-1 px-2 py-0.5 text-sm text-foreground/80"
+                      className="bo-input flex-1 px-2 py-0.5 text-sm text-[var(--bo-text)]"
                     />
                     {/* Num telemóvel não há Escape, e tudo o que tira o foco
                         GRAVA — ver `DesistirDaEdicao`. */}
@@ -531,7 +531,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                     // porque `alvo-toque` centra por omissão e este texto é
                     // corrido, alinhado à esquerda.
                     className={`alvo-toque !justify-start flex-1 rounded-md text-left text-sm leading-snug decoration-dotted underline-offset-2 hover:underline ${
-                      i.done ? "text-foreground/35 line-through" : "text-foreground/75"
+                      i.done ? "text-foreground/35 line-through" : "text-[var(--bo-tinta-72)]"
                     }`}
                   >
                     {i.label}
@@ -547,7 +547,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(i.id)}
-                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
+                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
                   aria-label={`Remover ${i.label}`}
                 >
                   <svg

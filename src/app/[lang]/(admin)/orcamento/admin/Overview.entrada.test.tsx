@@ -93,6 +93,23 @@ afterEach(() => {
 });
 
 describe("a entrada da Visão Geral", () => {
+  it("tem DOIS atalhos, e são os que ela usa", async () => {
+    // A análise fecha em «no máximo dois CTA», e eram quatro: num telemóvel de
+    // 390 px, duas filas inteiras de botões logo por baixo do cumprimento.
+    //
+    // Perguntei-lhe quais usa mesmo todos os dias e a resposta foi «Novo pedido
+    // e Fases dos pedidos». O Calendário e as Tarefas não desapareceram —
+    // continuam no menu e na barra de baixo, que é onde a navegação vive. O que
+    // saiu daqui foi a DUPLICAÇÃO.
+    desenhar();
+    const nomes = ["Novo pedido", "Fases dos pedidos", "Calendário", "Tarefas"];
+    const presentes = nomes.filter((n) => screen.queryAllByRole("button", { name: n }).length > 0);
+    expect(presentes, "os atalhos da Visão Geral deixaram de ser dois").toEqual([
+      "Novo pedido",
+      "Fases dos pedidos",
+    ]);
+  });
+
   it("nasce fechada — é esse o ponto", () => {
     desenhar();
     const g = gaveta();

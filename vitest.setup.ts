@@ -19,3 +19,34 @@ import "@testing-library/jest-dom/vitest";
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function scrollIntoView() {};
 }
+
+/**
+ * `ResizeObserver`, que o jsdom também não implementa.
+ *
+ * Quem o usa aqui é a pílula deslizante do `ui/Segmented`: ela segue o segmento
+ * activo quando ele muda de tamanho ou passa para a linha de baixo, e num ecrã
+ * estreito isso acontece a sério. Sem o esboço, o teste rebenta com um
+ * `ReferenceError` dentro de um efeito — e o erro que se lê não tem nada a ver
+ * com o que se está a medir.
+ *
+ * Um esboço INERTE, e não um espião: o jsdom não tem disposição nenhuma, todos
+ * os elementos medem zero, e portanto não há redimensionamento nenhum para
+ * observar. O que estes testes medem é o que existe no DOM e o que se anuncia —
+ * a posição da pílula mede-se num browser a sério, no passeio do Playwright.
+ */
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    // O construtor recebe a função, como o verdadeiro, mesmo não a usando. Sem
+    // ele, a análise estática desta casa resolvia `new ResizeObserver(medir)`
+    // do `ui/Segmented.tsx` para ESTE esboço — uma classe anónima sem
+    // construtor — e acusava «argumento a mais no construtor». Um alerta a
+    // apontar para código de produção, nascido de um esboço de teste, é pior do
+    // que não ter alerta nenhum: ensina a ignorá-los.
+    constructor(_aoMudar: ResizeObserverCallback) {
+      void _aoMudar;
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}

@@ -33,7 +33,7 @@ function Cell({
   return (
     <div className="bo-card px-4 py-3.5 flex flex-col justify-center">
       <p className="text-foreground/30 text-[9px] tracking-[0.22em] uppercase mb-1.5">{label}</p>
-      <p className={`text-lg font-semibold leading-none ${tone ?? "text-foreground/80"}`}>
+      <p className={`text-lg font-semibold leading-none ${tone ?? "text-[var(--bo-text)]"}`}>
         {value}
       </p>
       {sub && <p className="text-foreground/35 text-[10px] mt-1">{sub}</p>}

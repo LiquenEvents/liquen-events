@@ -123,7 +123,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
+    <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
       <div className="flex items-center justify-between gap-3 mb-5">
         <p className="bo-eyebrow">Responder ao cliente</p>
         {quote.email && <span className="bo-text-faint text-xs truncate">{quote.email}</span>}
@@ -137,7 +137,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
               key={i}
               className="rounded-2xl bg-[#4d6350]/[0.06] border border-[#4d6350]/15 px-3.5 py-2.5"
             >
-              <p className="text-foreground/70 text-xs leading-relaxed whitespace-pre-wrap">
+              <p className="text-[var(--bo-tinta-72)] text-xs leading-relaxed whitespace-pre-wrap">
                 {m.body}
               </p>
               <p className="text-foreground/40 text-[10px] mt-1.5">

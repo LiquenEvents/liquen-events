@@ -65,7 +65,7 @@ export function Card({ padding = "md", className, children, ...rest }: CardProps
   return (
     <div
       className={cn(
-        "rounded-2xl border border-foreground/[0.08] bg-white ",
+        "rounded-2xl border border-[var(--bo-hairline)] bg-white ",
         PADDING[padding],
         className,
       )}
@@ -108,10 +108,12 @@ export function SectionCard({
           <div className="min-w-0">
             {eyebrow && <p className="bo-eyebrow mb-2">{eyebrow}</p>}
             {title && (
-              <h2 className="font-display text-lg leading-tight text-foreground/90">{title}</h2>
+              <h2 className="font-display text-lg leading-tight text-[var(--bo-text)]">{title}</h2>
             )}
             {description && (
-              <p className="mt-1.5 text-sm leading-relaxed text-foreground/55">{description}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+                {description}
+              </p>
             )}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

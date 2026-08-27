@@ -109,7 +109,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-[#4d6350] text-white hover:bg-[#415440]",
   // Outline on white — secondary emphasis.
   //
-  // Era `border-foreground/15` com `text-foreground/80`, e lia-se como
+  // Era `border-[var(--bo-hairline-strong)]` com `text-[var(--bo-text)]`, e lia-se como
   // DESACTIVADO: o estado desactivado é este mesmo desenho com `opacity-45`
   // por cima, e a diferença entre os dois era pequena de mais para se notar.
   // Na entrada isso é grave — «Entrar com palavra-passe» é o caminho de quem
@@ -119,14 +119,14 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // os 10,2:1 de antes). Continua a ser claramente secundário ao lado do verde
   // cheio do passkey — o que muda é ler-se como disponível.
   secondary:
-    "bg-white text-foreground/90 border border-foreground/28 hover:border-foreground/45 hover:bg-foreground/[0.03] hover:text-foreground " +
+    "bg-white text-[var(--bo-text)] border border-foreground/28 hover:border-foreground/45 hover:bg-[var(--bo-tinta-3)] hover:text-foreground " +
     // A pressão aprofunda a MESMA tinta do hover (0,03 → 0,07). Sem cor nova:
     // é o passo de opacidade que o `DESIGN.md` já usa para hierarquia.
-    "active:bg-foreground/[0.07]",
+    "active:bg-[var(--bo-tinta-6)]",
   // Quiet until hovered — for toolbars and low-emphasis rows.
   ghost:
-    "bg-transparent text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground/80 " +
-    "active:bg-foreground/[0.12]",
+    "bg-transparent text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] " +
+    "active:bg-[var(--bo-tinta-10)]",
   // Soft moss tint — an in-context "yes, this one" without full weight.
   subtle: "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/[0.16] active:bg-[#4d6350]/[0.24]",
   // Dark red solid (~5:1 on white) — destructive actions.

@@ -76,14 +76,14 @@ export default async function CarregamentoDoPedido({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-6 py-10 text-center">
-      <h1 className="font-serif text-2xl text-foreground/85">Ainda não há lista de carga</h1>
-      <p className="text-sm leading-relaxed text-foreground/60">
+      <h1 className="font-display text-2xl text-[var(--bo-text)]">Ainda não há lista de carga</h1>
+      <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
         Este evento ainda não tem checklist de material gerada. Gera-a no pedido, em «Produção», e
         este endereço passa a abrir a carga.
       </p>
       <a
         href={`${raiz}/orcamento/admin`}
-        className="alvo-toque mx-auto inline-flex items-center rounded-xl border border-foreground/20 px-4 text-sm text-foreground/75"
+        className="alvo-toque mx-auto inline-flex items-center rounded-xl border border-foreground/20 px-4 text-sm text-[var(--bo-tinta-72)]"
       >
         Ir para o back office
       </a>

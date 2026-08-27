@@ -151,7 +151,7 @@ export function TabelaOuCartoes<T>({
        * entre cada duas linhas.
        */
       <ul
-        className="flex flex-col divide-y divide-foreground/[0.07] overflow-hidden rounded-xl border border-foreground/[0.08] bg-white"
+        className="flex flex-col divide-y divide-[var(--bo-hairline)] overflow-hidden rounded-xl border border-[var(--bo-hairline)] bg-white"
         aria-label={legenda}
       >
         {ordenados.map((item) => (
@@ -165,7 +165,10 @@ export function TabelaOuCartoes<T>({
                 // Sem `motion-safe:` até aqui, e nos 150 ms por omissão. A linha
                 // inteira é um alvo de toque no telemóvel — é dos sítios desta
                 // pasta onde o carregar mais precisava de resposta.
-                className={`alvo-toque group block w-full p-3.5 text-left hover:bg-[#4d6350]/[0.04] active:bg-[#4d6350]/[0.08] ${ESTADO} ${PRESSAO}`}
+                /* `foco-largo`: esta linha é uma CAIXA de 80 px, não um botão. O anel
+                   de base, colado a ela, lê-se como moldura da linha; com quatro
+                   píxeis de folga lê-se como foco. Ver a nota no `globals.css`. */
+                className={`alvo-toque foco-largo group block w-full p-3.5 text-left hover:bg-[#4d6350]/[0.04] active:bg-[#4d6350]/[0.08] ${ESTADO} ${PRESSAO}`}
               >
                 {cartao(item)}
               </button>
@@ -213,12 +216,12 @@ export function TabelaOuCartoes<T>({
       tabIndex={rolavel ? 0 : undefined}
       role={rolavel ? "region" : undefined}
       aria-label={rolavel ? legenda : undefined}
-      className="overflow-x-auto rounded-xl border border-foreground/[0.08] bg-white"
+      className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)] bg-white"
     >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{legenda}</caption>
         <thead>
-          <tr className="border-b border-foreground/[0.08]">
+          <tr className="border-b border-[var(--bo-hairline)]">
             {visiveis.map((c) => (
               <th
                 key={c.chave}
@@ -248,7 +251,7 @@ export function TabelaOuCartoes<T>({
                           : { chave: c.chave, ascendente: true },
                       )
                     }
-                    className="inline-flex items-center gap-1 hover:text-foreground/70"
+                    className="inline-flex items-center gap-1 hover:text-[var(--bo-tinta-72)]"
                   >
                     {c.cabecalho}
                     <span aria-hidden className="text-[9px]">
@@ -271,8 +274,8 @@ export function TabelaOuCartoes<T>({
                 // `group` para o `MenuDeAccoes` se poder revelar ao passar o
                 // rato pela LINHA inteira — e não só por cima do próprio botão,
                 // que obrigava a adivinhar onde ele está.
-                "group border-b border-foreground/[0.05] last:border-0",
-                aoAbrir && "cursor-pointer hover:bg-foreground/[0.03]",
+                "group border-b border-[var(--bo-hairline)] last:border-0",
+                aoAbrir && "cursor-pointer hover:bg-[var(--bo-tinta-3)]",
               )}
             >
               {visiveis.map((c, i) => (

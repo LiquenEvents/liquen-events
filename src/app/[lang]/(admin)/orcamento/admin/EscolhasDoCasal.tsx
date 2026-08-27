@@ -66,7 +66,7 @@ export default function EscolhasDoCasal({
           pergunta errada; `flex-wrap` sozinho responde à certa — «cabe?» — e a
           contagem passa para a linha de baixo exactamente quando não cabe. */}
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="text-foreground/70 text-[11px] uppercase tracking-[0.18em]">
+        <h3 className="text-[var(--bo-tinta-72)] text-[11px] uppercase tracking-[0.18em]">
           À escolha do casal
         </h3>
         {porResponder > 0 && (
@@ -82,7 +82,7 @@ export default function EscolhasDoCasal({
             key={escolha.id}
             className="rounded-lg border border-[var(--bo-hairline)] px-3 py-2.5"
           >
-            <p className="text-foreground/75 text-sm">{escolha.titulo}</p>
+            <p className="text-[var(--bo-tinta-72)] text-sm">{escolha.titulo}</p>
 
             {estado.tipo === "escolhida" && (
               <p className="mt-1 text-sm">

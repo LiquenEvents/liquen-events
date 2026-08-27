@@ -982,7 +982,7 @@ function ImportChip({ job }: { job: ImportJob }) {
       role="group"
       aria-label="Fotos a caminho da proposta"
       className={`pointer-events-auto rounded-xl border bg-white px-4 py-3 shadow-[var(--bo-sombra-suspensa)] ${
-        settled && failed > 0 ? "border-[#8a2a22]/25" : "border-foreground/10"
+        settled && failed > 0 ? "border-[#8a2a22]/25" : "border-[var(--bo-hairline-strong)]"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -992,7 +992,7 @@ function ImportChip({ job }: { job: ImportJob }) {
           {job.photos.slice(0, 4).map((p) => (
             <span
               key={p.path}
-              className={`block h-7 w-7 overflow-hidden rounded-md border-2 border-white bg-foreground/[0.06] ${
+              className={`block h-7 w-7 overflow-hidden rounded-md border-2 border-white bg-[var(--bo-tinta-6)] ${
                 p.state === "pending" ? "opacity-55" : ""
               } ${p.state === "failed" ? "ring-2 ring-[#8a2a22]/60" : ""}`}
             >
@@ -1003,12 +1003,16 @@ function ImportChip({ job }: { job: ImportJob }) {
             </span>
           ))}
           {total > 4 && (
-            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-foreground/[0.08] text-[10px] text-foreground/70">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-[var(--bo-tinta-10)] text-[10px] text-[var(--bo-tinta-72)]">
               +{total - 4}
             </span>
           )}
         </div>
-        <p role="status" aria-live="polite" className="min-w-0 flex-1 text-sm text-foreground/80">
+        <p
+          role="status"
+          aria-live="polite"
+          className="min-w-0 flex-1 text-sm text-[var(--bo-text)]"
+        >
           {message}
         </p>
       </div>
@@ -1020,7 +1024,7 @@ function ImportChip({ job }: { job: ImportJob }) {
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={done + failed}
-          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
         >
           <div
             className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -2192,7 +2196,7 @@ export default function ThemePicker({
 
             O `lg:` fica: não é uma largura, é a MUDANÇA DE FORMA (faixa →
             coluna), e está sincronizado com o salto do painel para as 70 rem. */}
-        <div className="@container shrink-0 border-b border-foreground/[0.06] px-5 py-3 lg:flex lg:w-56 lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-3">
+        <div className="@container shrink-0 border-b border-[var(--bo-hairline)] px-5 py-3 lg:flex lg:w-56 lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-3">
           {loadingThemes ? (
             <div className="flex gap-2">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -2204,7 +2208,7 @@ export default function ThemePicker({
                  temas — e o convite a criar o primeiro mandava-a refazer o que
                  já tem. Aqui diz-se o que se passou e o passo a dar. */
             <div>
-              <p className="text-sm text-foreground/75">Não foi possível ler os temas.</p>
+              <p className="text-sm text-[var(--bo-tinta-72)]">Não foi possível ler os temas.</p>
               <p className="bo-text-muted mt-1 text-xs">{falhaTemas.mensagem}</p>
             </div>
           ) : themes.length === 0 ? (
@@ -2304,7 +2308,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded
                       aria-label="Fechar a procura"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
                     >
                       <svg
                         width="15"
@@ -2327,7 +2331,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded={false}
                       aria-label="Procurar tema"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
                     >
                       <svg
                         width="16"
@@ -2377,7 +2381,7 @@ export default function ThemePicker({
                            nome curto ao lado de um comprido lia-se como duas
                            listas — e é a coluna que a pessoa percorre com os
                            olhos de cima a baixo. */
-                      className="shrink-0 snap-start text-foreground/75 lg:w-full lg:!justify-start lg:truncate"
+                      className="shrink-0 snap-start text-[var(--bo-tinta-72)] lg:w-full lg:!justify-start lg:truncate"
                       /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o
                          rato chegar ao separador e o clique passam ~150–300 ms
                          — que é praticamente o que a rota demora. Buscar aí faz
@@ -2390,7 +2394,9 @@ export default function ThemePicker({
                       onTouchStart={() => prefetchTheme(t.id)}
                     >
                       {t.name}
-                      <span className="tabular-nums text-foreground/55">{themeCountLabel(t)}</span>
+                      <span className="tabular-nums text-[var(--bo-text-muted)]">
+                        {themeCountLabel(t)}
+                      </span>
                     </Button>
                   ))}
                 </div>
@@ -2402,8 +2408,8 @@ export default function ThemePicker({
                   um beco: passa a dizer o que se procurou e a ter o caminho de
                   volta no mesmo sítio onde se lê o problema. */}
               {temasVisiveis.length === 0 && (
-                <div className="rounded-xl border border-dashed border-foreground/15 px-4 py-3 text-center">
-                  <p className="text-sm text-foreground/75">
+                <div className="rounded-xl border border-dashed border-[var(--bo-hairline-strong)] px-4 py-3 text-center">
+                  <p className="text-sm text-[var(--bo-tinta-72)]">
                     Nenhum tema com «{procuraTema.trim()}».
                   </p>
                   <p className="bo-text-muted mt-0.5 text-xs">
@@ -2469,7 +2475,7 @@ export default function ThemePicker({
             que diz um número é também um botão que se pode recusar antes de
             carregar nele. */}
           {multiple && images.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-foreground/[0.06] px-5 py-2.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--bo-hairline)] px-5 py-2.5">
               <Button size="sm" variant="ghost" onClick={selectAllVisible} disabled={atLimit}>
                 {hasMore
                   ? `Escolher as ${images.length} já mostradas`
@@ -2510,7 +2516,7 @@ export default function ThemePicker({
                 `alinhar="direita"` porque o botão está encostado à margem: um
                 painel a crescer para a direita a partir daqui saía do diálogo. */}
               <Ajuda sobre="como escolher fotos" alinhar="direita" className="ml-auto">
-                <span className="block text-[11px] font-medium text-foreground/80">
+                <span className="block text-[11px] font-medium text-[var(--bo-text)]">
                   Como escolher
                 </span>
                 <ul className="mt-1.5 space-y-1">
@@ -2578,7 +2584,7 @@ export default function ThemePicker({
                     // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
                     // está vazio seria mentira, e mandava-a carregar tudo outra vez.
                     <div className="py-8 text-center">
-                      <p className="text-sm text-foreground/75">
+                      <p className="text-sm text-[var(--bo-tinta-72)]">
                         Não foi possível ler a pasta deste tema agora.
                       </p>
                       <p className="bo-text-muted mt-1 text-xs">
@@ -2684,12 +2690,12 @@ export default function ThemePicker({
                              quadrado agora é o INVÓLUCRO (ver `celula-saltavel`
                              em globals.css) — é isso que deixa o browser saltar
                              a célula sem ela colapsar. */
-                                className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
+                                className={`relative block h-full w-full overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-all ${
                                   failed
                                     ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
                                     : on
                                       ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
-                                      : "border-foreground/[0.1] hover:border-[#4d6350]/45"
+                                      : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/45"
                                 } ${blocked ? "opacity-50" : ""}`}
                               >
                                 <Photo image={im} priority={i < ABOVE_FOLD} />
@@ -2825,7 +2831,7 @@ export default function ThemePicker({
         // `flex-1` — sem isto, este aviso era o que encolhia para dar altura à
         // grelha, e a frase ficava cortada a meio.
         <div className="shrink-0 border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
-          <p className="text-sm text-foreground/80">
+          <p className="text-sm text-[var(--bo-text)]">
             {plural(failedPaths.length, "foto não entrou", "fotos não entraram")} na proposta.
           </p>
           <p className="bo-text-muted mt-0.5 text-xs">
@@ -2926,7 +2932,7 @@ function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
      * Sem `lqip` (fotos anteriores à migração) fica o fundo neutro de sempre.
      */
     <div
-      className="h-full w-full bg-foreground/[0.04] bg-cover bg-center"
+      className="h-full w-full bg-[var(--bo-tinta-6)] bg-cover bg-center"
       style={image.lqip ? { backgroundImage: `url("${image.lqip}")` } : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3004,7 +3010,7 @@ function Preview({
       }}
       className="absolute inset-0 z-10 flex flex-col bg-white"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-foreground/[0.08] px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
         <p className="bo-text-muted text-xs">
           Foto {index + 1} de {count}
           {used ? " · já nesta proposta" : ""}
@@ -3013,7 +3019,7 @@ function Preview({
           Voltar à grelha
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-foreground/[0.04] p-3">
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-[var(--bo-tinta-6)] p-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image.url}
@@ -3025,7 +3031,7 @@ function Preview({
           className="max-h-full max-w-full object-contain"
         />
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-foreground/[0.08] px-5 py-3">
+      <div className="flex items-center justify-between gap-2 border-t border-[var(--bo-hairline)] px-5 py-3">
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => onStep(-1)} disabled={index === 0}>
             ← Anterior

@@ -1231,7 +1231,7 @@ export default function Temas() {
           {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
               tem é o projecto em pausa manda-a correr o schema por nada. */}
           <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">{blocked.titulo}</p>
-          <p className="text-sm leading-relaxed text-foreground/75">{blocked.texto}</p>
+          <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">{blocked.texto}</p>
         </Card>
       )}
 
@@ -1265,7 +1265,7 @@ export default function Temas() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Procurar tema…"
                   aria-label="Procurar tema por nome ou nota"
-                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
+                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
                 />
               </div>
               {/* O TAMANHO DA BIBLIOTECA, dito por ela própria. Era preciso
@@ -1327,7 +1327,7 @@ export default function Temas() {
                       setOrdem(o);
                       guardarOrdem(o);
                     }}
-                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
+                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-[var(--bo-tinta-72)]"
                   >
                     {ORDENS.map((o) => (
                       <option key={o.valor} value={o.valor}>
@@ -1339,7 +1339,7 @@ export default function Temas() {
                 <div
                   role="group"
                   aria-label="Tamanho dos cartões"
-                  className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
+                  className="flex overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)]"
                 >
                   {(
                     [
@@ -1357,8 +1357,8 @@ export default function Temas() {
                       }}
                       className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
                         densidade === valor
-                          ? "bg-foreground/[0.06] text-foreground/70"
-                          : "text-foreground/40 hover:text-foreground/60"
+                          ? "bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
+                          : "text-foreground/40 hover:text-[var(--bo-text-muted)]"
                       }`}
                     >
                       {rotulo}
@@ -1381,8 +1381,8 @@ export default function Temas() {
                 onClick={() => setVerArquivados((v) => !v)}
                 className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
                   verArquivados
-                    ? "border-foreground/20 bg-foreground/[0.06] text-foreground/70"
-                    : "border-foreground/[0.1] text-foreground/40 hover:text-foreground/60"
+                    ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
+                    : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-[var(--bo-text-muted)]"
                 }`}
               >
                 Arquivados ({arquivados})
@@ -1596,7 +1596,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left motion-safe:transition-colors hover:border-[#4d6350]/40"
+                className="block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left motion-safe:transition-colors hover:border-[#4d6350]/40"
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -1623,7 +1623,7 @@ export default function Temas() {
 
                     A moldura é 4:3 SEMPRE: é ela que mantém a primeira linha
                     alinhada quando as fotos têm proporções diferentes. */}
-                <div className="aspect-[4/3] w-full overflow-hidden bg-foreground/[0.04]">
+                <div className="aspect-[4/3] w-full overflow-hidden bg-[var(--bo-tinta-6)]">
                   {t.coverUrl ? (
                     <ImagemComPlanoB
                       src={t.coverUrl}
@@ -1656,7 +1656,7 @@ export default function Temas() {
                       do que o vizinho e a grelha perdia a linha de base. Ao
                       fim de duas linhas ainda pode cortar — mas aí já se leu o
                       que distingue. */}
-                  <p className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-foreground/85">
+                  <p className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-[var(--bo-text)]">
                     {t.name}
                   </p>
                   {/* ══════════════════════════════════════════════════════
@@ -2013,7 +2013,7 @@ function Photo({
        acabou de ser feita no browser, ainda em memória, de uma foto carregada
        há segundos. Essa aparece na hora e não precisa de placeholder nenhum. */
     <div
-      className="h-full w-full bg-foreground/[0.04] bg-cover bg-center"
+      className="h-full w-full bg-[var(--bo-tinta-6)] bg-cover bg-center"
       style={image.lqip && !localSrc ? { backgroundImage: `url("${image.lqip}")` } : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3408,7 +3408,7 @@ function ThemeFolder({
                   }
                 }}
                 aria-label="Nome do tema"
-                className="bo-input px-3 py-1.5 text-sm text-foreground/85"
+                className="bo-input px-3 py-1.5 text-sm text-[var(--bo-text)]"
               />
               <SugestaoDeNome valor={name} onAceitar={setName} />
             </div>
@@ -3416,7 +3416,7 @@ function ThemeFolder({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className="alvo-toque font-display text-xl text-foreground/85 hover:text-[#4d6350]"
+              className="alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-[#4d6350]"
               title="Renomear tema"
             >
               {theme.name}
@@ -3457,7 +3457,7 @@ function ThemeFolder({
           meio aparentemente parado antes de a primeira entrar na grelha. */}
       {verifying && (
         <Card padding="sm" className="mb-4">
-          <p className="text-sm text-foreground/80">
+          <p className="text-sm text-[var(--bo-text)]">
             A verificar {plural(verifying.total, "foto", "fotos")} — {verifying.done} de{" "}
             {verifying.total}…
           </p>
@@ -3470,7 +3470,7 @@ function ThemeFolder({
       {progress && (
         <Card padding="sm" className="mb-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm text-foreground/80">
+            <p className="text-sm text-[var(--bo-text)]">
               A carregar <strong className="font-medium">{progress.done}</strong> de{" "}
               {plural(progress.total, "foto", "fotos")}…
             </p>
@@ -3482,7 +3482,7 @@ function ThemeFolder({
             aria-valuemin={0}
             aria-valuemax={progress.total}
             aria-valuenow={progress.done}
-            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
           >
             <div
               className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -3503,7 +3503,7 @@ function ThemeFolder({
           {thumbJob?.running ? (
             <>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm text-foreground/80">
+                <p className="text-sm text-[var(--bo-text)]">
                   A gerar miniaturas —{" "}
                   <strong className="font-medium">
                     {plural(thumbJob.generated, "criada", "criadas")}
@@ -3519,7 +3519,7 @@ function ThemeFolder({
                 aria-valuemin={0}
                 aria-valuemax={thumbJob.total ?? undefined}
                 aria-valuenow={thumbJob.cursor}
-                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
                   className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -3544,7 +3544,7 @@ function ThemeFolder({
             </>
           ) : (
             <>
-              <p className="text-sm text-foreground/80">
+              <p className="text-sm text-[var(--bo-text)]">
                 {missingThumbs
                   ? "Há fotos antigas sem miniatura — a grelha está a mostrar as fotos em tamanho real (uns 2,6 MB cada), e é por isso que este tema demora a abrir."
                   : "As miniaturas deste tema estão feitas."}
@@ -3576,7 +3576,7 @@ function ThemeFolder({
 
       {failed.length > 0 && (
         <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
-          <p className="text-sm text-foreground/80">
+          <p className="text-sm text-[var(--bo-text)]">
             {plural(failed.length, "foto não subiu", "fotos não subiram")}. Os ficheiros ficaram
             guardados — não é preciso voltar a escolhê-los.
           </p>
@@ -3597,7 +3597,7 @@ function ThemeFolder({
           botão, e por LOTE: nunca uma pergunta foto a foto. */}
       {skipped.length > 0 && (
         <Card padding="sm" className="mb-4">
-          <p className="text-sm text-foreground/80">
+          <p className="text-sm text-[var(--bo-text)]">
             {plural(skipped.length, "foto não foi adicionada", "fotos não foram adicionadas")} —{" "}
             {skipped.some((s) => s.reason === "no-tema") &&
             skipped.some((s) => s.reason === "no-lote")
@@ -3624,7 +3624,7 @@ function ThemeFolder({
                 title={`${s.file.name} — ${
                   s.reason === "no-lote" ? "repetida neste arrasto" : "já estava no tema"
                 }`}
-                className="h-14 w-14 overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
+                className="h-14 w-14 overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
               >
                 <SkippedThumb file={s.file} track={trackUrl} />
               </li>
@@ -3650,7 +3650,7 @@ function ThemeFolder({
           número em que ela tem de agir, e as fotos continuam aqui. */}
       {copyReport && (
         <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
-          <p className="text-sm text-foreground/80">
+          <p className="text-sm text-[var(--bo-text)]">
             {copyReport.failed.length > 0
               ? `${copyReport.failed.length} de ${
                   copyReport.copied.length + copyReport.existing.length + copyReport.failed.length
@@ -3698,7 +3698,7 @@ function ThemeFolder({
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 backdrop-blur">
-              <p className="text-sm text-foreground/85">
+              <p className="text-sm text-[var(--bo-text)]">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
               <span className="bo-text-muted hidden text-xs sm:inline">
@@ -3814,7 +3814,7 @@ function ThemeFolder({
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
         // `GRELHA_DE_FOTOS`.
         className={`@container rounded-2xl border border-dashed p-4 motion-safe:transition-colors ${
-          drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-foreground/[0.14]"
+          drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-[var(--bo-hairline-strong)]"
         }`}
       >
         {loading ? (
@@ -3827,7 +3827,7 @@ function ThemeFolder({
           // Falha de leitura NÃO é "tema sem fotos": dizer-lhe para arrastar
           // fotos aqui seria convidá-la a duplicar o que já lá está.
           <div className="py-12 text-center">
-            <p className="text-sm text-foreground/75">
+            <p className="text-sm text-[var(--bo-tinta-72)]">
               Não foi possível ler a pasta deste tema agora.
             </p>
             <p className="bo-text-muted mt-1 text-xs">
@@ -3859,7 +3859,7 @@ function ThemeFolder({
                   key={p.id}
                   aria-hidden
                   title={`${p.name} — a carregar`}
-                  className="relative aspect-square overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
+                  className="relative aspect-square overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
                 >
                   {p.src ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -3912,10 +3912,10 @@ function ThemeFolder({
                     // nem descodifica esta célula. A altura não depende disso
                     // (é `aspect-square` numa coluna de largura fixa), por
                     // isso a barra de deslocamento não mexe. Ver globals.css.
-                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-[opacity,box-shadow] ${
+                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-[opacity,box-shadow] ${
                       isSelected
                         ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
-                        : "border-foreground/[0.1]"
+                        : "border-[var(--bo-hairline-strong)]"
                     } ${dragFrom === i ? "opacity-40" : ""} ${
                       dragOver === i && dragFrom !== null && dragFrom !== i
                         ? "ring-2 ring-[#4d6350]"

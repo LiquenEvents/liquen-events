@@ -239,7 +239,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
 
   return (
     <Card padding="none" className="overflow-hidden">
-      <div className="px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
+      <div className="px-5 sm:px-6 py-4 border-b border-[var(--bo-hairline)]">
         <p className="bo-eyebrow">Agenda · próximos {DAYS_AHEAD} dias</p>
         <p className="mt-1 text-xs leading-relaxed text-foreground/45">
           Eventos, tarefas e pagamentos que se aproximam. Cada linha indica o tipo.
@@ -270,7 +270,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
             /* A LER não é VAZIO. Enquanto as duas listas não voltarem, esta
                agenda não sabe nada sobre os próximos dias — e uma frase que
                diga o contrário chega sempre antes da resposta. */
-            <div role="status" aria-busy="true" className="divide-y divide-foreground/[0.06]">
+            <div role="status" aria-busy="true" className="divide-y divide-[var(--bo-hairline)]">
               <SkeletonRow />
               <SkeletonRow />
               <SkeletonRow />
@@ -314,7 +314,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
           )
         ) : (
           days.map((key) => (
-            <div key={key} className="border-b border-foreground/[0.06] last:border-0">
+            <div key={key} className="border-b border-[var(--bo-hairline)] last:border-0">
               <p
                 className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-[#4d6350]" : "text-foreground/40"}`}
               >
@@ -333,7 +333,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                     <div key={i} className="relative">
                       <Wrap
                         onClick={it.onClick}
-                        className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? "hover:bg-foreground/[0.02] motion-safe:transition-colors cursor-pointer" : ""}`}
+                        className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? "hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors cursor-pointer" : ""}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -345,7 +345,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                           </span>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="text-foreground/70 text-sm truncate">{it.title}</p>
+                          <p className="text-[var(--bo-tinta-72)] text-sm truncate">{it.title}</p>
                           {it.sub && (
                             <p className="text-foreground/40 text-[11px] truncate capitalize">
                               {it.sub}

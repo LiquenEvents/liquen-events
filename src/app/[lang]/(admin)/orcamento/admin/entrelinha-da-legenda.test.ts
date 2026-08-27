@@ -3,6 +3,41 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
+ * O SELECTOR COM QUE O BACK OFFICE SE PINTA.
+ *
+ * Deixou de ser só `body.admin-mode`: a classe entra num efeito e chegava
+ * tarde de mais para o primeiro pixel. Agora é
+ * `body:is(.admin-mode, :has([data-admin-mode]))`, com o atributo servido pelo
+ * `layout.tsx` do grupo `(admin)`. A razão por extenso está no `globals.css`.
+ */
+const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
+
+/** Tira todos os `:where(…)` de um selector, contando os parêntesis. */
+function semWhere(selector: string): string {
+  let fora = "";
+  for (let i = 0; i < selector.length; ) {
+    if (!selector.startsWith(":where(", i)) {
+      fora += selector[i];
+      i += 1;
+      continue;
+    }
+    let nivel = 0;
+    i += ":where".length;
+    for (; i < selector.length; i += 1) {
+      if (selector[i] === "(") nivel += 1;
+      else if (selector[i] === ")") {
+        nivel -= 1;
+        if (nivel === 0) {
+          i += 1;
+          break;
+        }
+      }
+    }
+  }
+  return fora;
+}
+
+/**
  * ════════════════════════════════════════════════════════════════════════════
  * A ENTRELINHA VAI COM O TAMANHO — 3,2 px por linha, no telemóvel dela
  * ════════════════════════════════════════════════════════════════════════════
@@ -71,7 +106,7 @@ describe("a entrelinha da legenda", () => {
 
   it("é aplicada aos cinco degraus que o chão levanta", () => {
     const bloco = chaoDoTelemovel();
-    const regra = bloco.slice(bloco.indexOf(":where(body.admin-mode)"));
+    const regra = bloco.slice(bloco.indexOf(`:where(${SELECTOR_ADMIN})`));
     for (const px of [7, 8, 9, 10, 11]) {
       expect(regra, `o degrau de ${px}px ficou de fora da entrelinha`).toContain(
         `.text-\\[${px}px\\]`,
@@ -149,10 +184,16 @@ describe("a entrelinha da legenda", () => {
     expect(i).toBeGreaterThan(-1);
     // O selector é tudo o que está entre a chaveta anterior e esta declaração.
     const selector = bloco.slice(bloco.lastIndexOf("}", i) + 1, bloco.lastIndexOf("{", i));
-    expect(selector).toContain(":where(body.admin-mode)");
+    expect(selector).toContain(`:where(${SELECTOR_ADMIN})`);
     expect(selector).toMatch(/:where\(\s*\.text-/);
     // Nada fora de um `:where()`: nem uma classe, nem um elemento solto.
-    const foraDeWhere = selector.replace(/:where\([\s\S]*?\)/g, "").trim();
+    //
+    // O corte conta os parêntesis em vez de parar no primeiro `)`. Tem de o
+    // fazer desde que o selector do back office passou a
+    // `:where(body:is(.admin-mode, :has([data-admin-mode])))`: com um regex
+    // não-guloso sobravam dois `))` e o teste acusava especificidade que não
+    // existe.
+    const foraDeWhere = semWhere(selector).trim();
     expect(
       foraDeWhere,
       `sobrou selector fora de :where() — «${foraDeWhere}» — e isso dá-lhe ` +

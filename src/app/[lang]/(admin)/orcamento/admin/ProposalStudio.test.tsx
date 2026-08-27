@@ -7002,17 +7002,41 @@ describe("o que falta para enviar, no passo de enviar", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * O QUE VEIO DO PEDIDO FICA ASSINALADO
+ * O QUE VEIO DO PEDIDO **NÃO** FICA ASSINALADO
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * O pré-preenchimento já existia. O que não existia era dizê-lo: um campo
- * semeado a partir do formulário do casal lia-se exactamente como um campo
- * escrito por ela — e um campo escrito por ela não se relê.
+ * Este bloco estava ao contrário, e o ecrã dela é que decidiu.
  *
- * O anel laranja é o MESMO da cópia de outra proposta, e a confirmação é a
- * mesma: tocar-lhe.
+ * O anel laranja acendia em todos os campos semeados a partir do formulário do
+ * casal. A intenção era boa — um campo semeado lia-se como um campo escrito por
+ * ela, e um campo escrito por ela não se relê. O resultado não era: SEIS anéis à
+ * volta de seis campos, em todas as propostas, sempre, e ela a ter de tocar num
+ * a um para os apagar. Palavras dela, com a fotografia ao lado: «fica com essas
+ * coisas à volta amarelas e eu quero tirar isso».
+ *
+ * Um aviso que está sempre ligado não é um aviso; é decoração que ensina a não
+ * olhar — e a partir do dia em que ela deixa de olhar, também não vê o anel no
+ * caso em que ele importa.
+ *
+ * ── O CASO EM QUE IMPORTA FICA ────────────────────────────────────────────
+ *
+ * A proposta COPIADA DE OUTRA. Aí os campos trazem mesmo o casal de outra
+ * pessoa, e é a única forma de a duplicação fazer mal em vez de bem: uma
+ * proposta enviada com o nome ou a data de outro casamento. Esse caminho
+ * continua a acender, e tem passeio próprio a guardá-lo
+ * (`e2e/proposta-fluxos.spec.ts`, «os campos copiados ficam assinalados»).
+ *
+ * O que os testes daqui guardam agora é o contrário do que guardavam: que abrir
+ * uma proposta não põe anel nenhum.
+ *
+ * E o GESTO de confirmar — tocar no campo apaga o anel — deixa de ter teste
+ * aqui, de propósito. Em jsdom já não há como chegar ao estado «por confirmar»
+ * pela porta da frente: só a cópia o produz, e a cópia precisa de outra proposta
+ * no servidor. Cheguei a escrever um teste que punha a classe à mão e verificava
+ * que ela desaparecia — mas isso mede o meu fingimento, não o produto. O gesto
+ * é medido onde é verdadeiro: num browser, no passeio da cópia.
  */
-describe("os campos semeados do pedido ficam marcados", () => {
+describe("o que veio do pedido não pede confirmação", () => {
   const comTudo = {
     ...quote,
     date: "2026-09-12",
@@ -7032,40 +7056,24 @@ describe("os campos semeados do pedido ficam marcados", () => {
   const anelDe = (rotulo: string) =>
     screen.getByLabelText(rotulo).closest("div")?.className.includes("ring-2") ?? false;
 
-  it("acende o anel nos campos que o pedido respondeu", async () => {
+  it("abre sem anel nenhum, mesmo com o pedido todo respondido", async () => {
     renderCom(comTudo);
-    await waitFor(() => expect(anelDe("Clientes")).toBe(true));
-    expect(anelDe("Data")).toBe(true);
-    expect(anelDe("Local")).toBe(true);
-    expect(anelDe("Convidados")).toBe(true);
-    // Os três que não tinham anel nenhum antes desta alteração.
-    expect(anelDe("Tipo de evento")).toBe(true);
-    expect(anelDe("Cerimónia")).toBe(true);
+    // Espera pelo ecrã montado com os dados do pedido — senão isto passava por
+    // medir uma proposta que ainda não tinha semeado nada.
+    await waitFor(() => expect(screen.getByLabelText("Clientes")).toHaveValue("Maria & Zé"));
+    for (const campo of [
+      "Clientes",
+      "Data",
+      "Local",
+      "Convidados",
+      "Tipo de evento",
+      "Cerimónia",
+    ]) {
+      expect(anelDe(campo), `«${campo}» voltou a abrir com o anel laranja`).toBe(false);
+    }
   });
 
-  it("não acende num campo que o pedido não soube responder", async () => {
-    // CONTROLO POSITIVO do teste de cima: o mesmo ecrã, com o mesmo mecanismo
-    // ligado, deixa em paz o que está vazio. Um anel à volta de uma caixa em
-    // branco não pede confirmação nenhuma — pede que se ignore o anel.
-    renderCom(comTudo);
-    await waitFor(() => expect(anelDe("Clientes")).toBe(true));
-    expect(screen.getByLabelText("Hora")).toHaveValue("");
-    expect(anelDe("Hora")).toBe(false);
-  });
-
-  it("tocar no campo é a confirmação", async () => {
-    renderCom(comTudo);
-    const user = userEvent.setup();
-    await waitFor(() => expect(anelDe("Cerimónia")).toBe(true));
-    await user.type(screen.getByLabelText("Cerimónia"), " e religiosa");
-    expect(anelDe("Cerimónia")).toBe(false);
-    // E só nesse — confirmar um não confirma os outros.
-    expect(anelDe("Local")).toBe(true);
-  });
-
-  it("um rascunho já começado não pede confirmação nenhuma", async () => {
-    // O rascunho é trabalho DELA. Pedir-lhe que confirme o que ela própria
-    // escreveu é o caminho mais curto para o anel deixar de querer dizer algo.
+  it("e um rascunho já começado também não", async () => {
     seedDraft(0);
     renderCom(comTudo);
     await waitFor(() => expect(screen.getByLabelText("Clientes")).toHaveValue("Maria & Zé"));
@@ -7074,17 +7082,6 @@ describe("os campos semeados do pedido ficam marcados", () => {
   });
 });
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * A MESMA FOTOGRAFIA DUAS VEZES NA MESMA PROPOSTA
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * É o único caso em que o casal vê a mesma fotografia duas vezes no documento
- * que recebe, e é quase sempre um engano — arrastou-se em vez de mover, ou
- * duplicou-se um board e esqueceu-se de trocar uma foto.
- *
- * Assinalada NAS DUAS: assinalar só a segunda obrigava a procurar a primeira.
- */
 describe("fotos repetidas dentro da mesma proposta", () => {
   /** Dois boards, com a mesma foto no primeiro lugar de cada um. */
   function seedComRepetida() {

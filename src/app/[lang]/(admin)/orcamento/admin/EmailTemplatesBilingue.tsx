@@ -75,7 +75,7 @@ interface PedidoParaPreVisualizar {
 type Idioma = "pt" | "en";
 type Campo = "assunto" | "corpo";
 
-const inputCls = "bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22";
+const inputCls = "bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22";
 const VERDE = "#5F7C66";
 
 /** Um payload que não tem a forma certa ignora-se — nunca parte o ecrã. */
@@ -540,10 +540,10 @@ export default function EmailTemplatesBilingue() {
     <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
       {/* ── A lista ── */}
       <div className="bo-card overflow-hidden self-start">
-        <div className="px-4 py-3 border-b border-foreground/[0.07]">
+        <div className="px-4 py-3 border-b border-[var(--bo-hairline)]">
           <p className="bo-eyebrow">Modelos ({modelos.length})</p>
         </div>
-        <div className="divide-y divide-foreground/[0.06]">
+        <div className="divide-y divide-[var(--bo-hairline)]">
           {modelos.map((m) => {
             const activo = m.chave === chave;
             const temIngles = !!m.en.subject.trim() || !!m.en.body.trim();
@@ -552,11 +552,11 @@ export default function EmailTemplatesBilingue() {
                 key={m.chave}
                 onClick={() => abrir(m, idioma)}
                 className={`w-full text-left px-4 py-3 transition-colors ${
-                  activo ? "bg-[#5F7C66]/10" : "hover:bg-foreground/[0.02]"
+                  activo ? "bg-[#5F7C66]/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
                 <p
-                  className={`text-sm ${activo ? "text-[#4d6350] font-medium" : "text-foreground/70"}`}
+                  className={`text-sm ${activo ? "text-[#4d6350] font-medium" : "text-[var(--bo-tinta-72)]"}`}
                 >
                   {m.nome}
                   {!temIngles && (
@@ -589,7 +589,7 @@ export default function EmailTemplatesBilingue() {
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
                 <p className="bo-eyebrow">A editar</p>
-                <p className="text-sm text-foreground/70 mt-1">{modelo.nome}</p>
+                <p className="text-sm text-[var(--bo-tinta-72)] mt-1">{modelo.nome}</p>
               </div>
               <div className="flex flex-wrap shrink-0 items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={abrirHistorico}>
@@ -718,8 +718,8 @@ export default function EmailTemplatesBilingue() {
             </div>
             <p className="text-[11px] text-foreground/40 mb-4 leading-relaxed">
               Selecciona o texto e carrega — ele passa a aparecer só nesse caso. Trocando{" "}
-              <span className="font-mono text-foreground/55">evento_data</span> por outro nome, a
-              regra passa a ser sobre esse dado.
+              <span className="font-mono text-[var(--bo-text-muted)]">evento_data</span> por outro
+              nome, a regra passa a ser sobre esse dado.
             </p>
 
             <label htmlFor="etb-corpo" className="bo-eyebrow block mb-1.5">
@@ -747,7 +747,7 @@ export default function EmailTemplatesBilingue() {
             )}
 
             {historicoAberto && (
-              <div className="mt-5 border-t border-foreground/[0.07] pt-4">
+              <div className="mt-5 border-t border-[var(--bo-hairline)] pt-4">
                 {/* A contagem também espera: «(0)» é uma afirmação, e faz-se
                     com a lista na mão, não a caminho dela nem depois de a
                     leitura ter falhado. */}
@@ -842,10 +842,10 @@ export default function EmailTemplatesBilingue() {
               da Líquen entra sozinha: não precisas de te despedir.
             </p>
 
-            <div className="rounded-lg border border-foreground/[0.08] overflow-hidden">
-              <div className="px-3 py-2 bg-foreground/[0.03] border-b border-foreground/[0.06]">
+            <div className="rounded-lg border border-[var(--bo-hairline)] overflow-hidden">
+              <div className="px-3 py-2 bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
                 <p className="text-[10px] text-foreground/40">Assunto</p>
-                <p className="text-sm text-foreground/75 break-words">
+                <p className="text-sm text-[var(--bo-tinta-72)] break-words">
                   {renderizarAssunto(assunto, valores) || (
                     <span className="text-foreground/30">(sem assunto)</span>
                   )}
@@ -861,7 +861,7 @@ export default function EmailTemplatesBilingue() {
             </div>
 
             {/* ── O teste ── */}
-            <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+            <div className="mt-4 border-t border-[var(--bo-hairline)] pt-4">
               <label htmlFor="etb-teste" className="bo-eyebrow block mb-1.5">
                 Enviar um teste
               </label>

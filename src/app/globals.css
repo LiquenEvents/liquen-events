@@ -205,9 +205,8 @@ body:has([data-orcamento-mode]) {
 }
 
 /* ── AS CORES DO BACK OFFICE, NO PRIMEIRO PIXEL ─────────────────────────────
-   O `body.admin-mode` aqui em baixo faz o mesmo — e chega TARDE: a classe só
-   entra num `useEffect`, portanto o primeiro desenho sai com o creme do sítio
-   público e corrige-se à vista.
+   A classe `admin-mode` chega TARDE: entra num `useEffect`, portanto o
+   primeiro desenho sairia com o creme do sítio público e corrigia-se à vista.
 
    Enquanto o back office viveu dentro de `/orcamento`, isto não se notava: o
    `data-orcamento-mode` do layout de lá já era servido pelo servidor e punha
@@ -216,8 +215,22 @@ body:has([data-orcamento-mode]) {
    deixou de haver quem o fizesse, e sem esta regra trocava-se o piscar do menu
    por um piscar de cor. Seria o mesmo defeito com outra roupa.
 
-   `data-admin-mode` vem do `layout.tsx` do grupo, no HTML do servidor. A classe
-   `admin-mode` continua a existir e fica para o que depende mesmo de JS. */
+   `data-admin-mode` vem do `layout.tsx` do grupo, no HTML do servidor.
+
+   ── E O MESMO VALE PARA TUDO O RESTO ──────────────────────────────────────
+   As cores foram as primeiras a ser resgatadas, mas ficaram trinta regras
+   presas em `body.admin-mode` — e com elas a LETRA. A que mais se via: o back
+   office pede `uppercase` em ~15 ecrãs e é este ficheiro que o desliga; até a
+   classe chegar, a barra de baixo do telemóvel dizia «VISÃO GERAL PEDIDOS
+   FAZER PROPOSTA» em maiúsculas espaçadas, e depois encolhia para minúsculas.
+   Num iPhone com 4G fraco, entre o HTML e a hidratação vão segundos: era esse
+   o «piscar inicial».
+
+   Por isso todas passaram a `body:is(.admin-mode, :has([data-admin-mode]))`.
+   Os dois braços têm a mesma especificidade que `body.admin-mode` tinha, por
+   isso nada na cascata muda de lugar; o que muda é a altura a que chegam. A
+   classe fica para o que depende mesmo de JS — e como marca de que o painel
+   hidratou. */
 body:has([data-admin-mode]) {
   --color-surface: #ffffff;
   --color-surface-raised: #f7f7f8;
@@ -277,7 +290,7 @@ body:has([data-admin-mode]) {
 }
 
 /* Back office: clean white surface. */
-body.admin-mode {
+body:is(.admin-mode, :has([data-admin-mode])) {
   --color-surface: #ffffff;
   --color-surface-raised: #f7f7f8;
   --color-surface-elevated: #ffffff;
@@ -334,9 +347,39 @@ body.admin-mode {
        --bo-text        11,63:1  informação forte (valores, emails, ids, datas)
        --bo-text-muted   5,91:1  informação secundária — passa AA a texto normal
        --bo-text-faint    4,77:1 micro-rótulos — agora também passa AA */
-  --bo-text: rgba(13, 13, 13, 0.82);
-  --bo-text-muted: rgba(13, 13, 13, 0.64);
-  --bo-text-faint: rgba(13, 13, 13, 0.58);
+  /* ── E A ESCADA DA TINTA CONTINUA AQUI, PARA O TEXTO ─────────────────────
+     Os degraus dos riscos e dos fundos estão mais abaixo (3, 6, 8, 10, 13). Os
+     do texto são estes quatro — e são QUATRO, e não os seis da análise, por
+     uma razão que não é gosto:
+
+     O fundo do back office é BRANCO. A escala de dez opacidades da Pixelmatters
+     funciona porque o site deles é escuro; aqui, 48% de preto sobre branco dá
+     ~3,5:1 e CHUMBA a norma (WCAG 1.4.3 pede 4,5:1 para texto normal). O
+     degrau `--ink-48` da proposta não pode carregar letra nenhuma nesta casa, e
+     o `--ink-32` muito menos.
+
+     A norma é o tecto, e é ela que decide onde a escada acaba. Medido sobre
+     branco, achatado:
+
+         tinta-82   11,63:1   títulos, valores, texto forte
+         tinta-72    8,03:1   corpo
+         tinta-64    5,91:1   apoio, metadados, datas
+         tinta-58    4,77:1   micro-rótulos — o ÚLTIMO degrau que passa
+
+     Abaixo de 58 não há degrau nenhum, porque abaixo de 58 não há texto que
+     passe. Quem precisar de mais claro está a desenhar um ícone ou um traço, e
+     esses têm a sua própria escada.
+
+     Os três nomes de PAPEL ficam, como apelidos: estão em centenas de sítios,
+     dizem o que a coisa é, e têm o contraste medido escrito ao lado. */
+  --bo-tinta-82: rgba(13, 13, 13, 0.82);
+  --bo-tinta-72: rgba(13, 13, 13, 0.72);
+  --bo-tinta-64: rgba(13, 13, 13, 0.64);
+  --bo-tinta-58: rgba(13, 13, 13, 0.58);
+
+  --bo-text: var(--bo-tinta-82);
+  --bo-text-muted: var(--bo-tinta-64);
+  --bo-text-faint: var(--bo-tinta-58);
 
   /* ── ChatGPT-app design system (back office only) ──────────────────────────
      One calm, modern surface language shared by every admin screen. Scoped to
@@ -351,9 +394,89 @@ body.admin-mode {
   --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
   --bo-tint-accent: rgba(76, 99, 80, 0.1); /* soft moss call-out fill */
 
+  /* ── UMA TINTA, CINCO DEGRAUS COM O NÚMERO NO NOME ───────────────────────
+     A análise da Pixelmatters trouxe o achado que arruma isto: eles não têm
+     paleta de cinzentos nenhuma. Têm UMA cor — branco — e uma escala de dez
+     opacidades cujo NOME É A OPACIDADE (`--px-white-8` … `--px-white-80`). Com
+     uma paleta, cada componente novo obriga a uma decisão de cor («este risco
+     é #E5E5E5 ou #EBEBEB?»); com uma escala, a pergunta passa a ser «isto é um
+     risco de cartão ou um separador?» — e a resposta escolhe-se numa lista.
+
+     Aqui a tinta é preta e o fundo é branco, portanto a escala é sobre o
+     preto. Contado antes de escrever isto, só nos riscos e nos fundos do back
+     office: QUARENTA E SETE grafias diferentes em 588 chamadas —
+     `bg-foreground/[0.015]`, `[0.018]`, `[0.02]`, `[0.025]`, `[0.03]`,
+     `[0.035]`, `[0.04]`… Cinco valores separados por meio por cento não são
+     hierarquia nenhuma: são pessoas diferentes a escrever a mesma coisa em
+     dias diferentes, que foi exactamente a queixa dela — «o mesmo tipo de
+     texto secundário tem tons diferentes em Pedidos e em Propostas».
+
+     Cinco degraus, com o número no nome:
+
+       tinta-3    zebra de lista, fundo de campo em repouso
+       tinta-6    linha sob o rato, bloco assente na página
+       tinta-8    RISCO — moldura de cartão, divisória          (= hairline)
+       tinta-10   seleccionado, carregado
+       tinta-13   SEPARADOR claro, moldura que se quer ver      (= hairline-strong)
+
+     Os dois nomes de papel que já existiam ficam, agora como apelidos: são
+     usados em centenas de sítios e dizem o que a coisa É, que é a segunda
+     metade da regra dela.
+
+     ── PORQUE É QUE ISTO SÃO 588 EDIÇÕES E OS RAIOS FORAM CINCO LINHAS ──────
+
+     Porque a alfa do Tailwind fica COZIDA na classe: `bg-foreground/[0.04]`
+     compila para uma cor literal, não para uma variável — ao contrário do
+     `rounded-lg`, que passa por `--radius-lg` e por isso se colapsou aqui em
+     cima sem tocar num ecrã. E 124 das 588 chamadas trazem variante
+     (`hover:`, `group-hover:`, `active:`), que compila para outro selector
+     ainda: apanhar só as sem variante deixava uma linha a 6% em repouso a
+     escurecer para 4% ao passar o rato. Editar a chamada é o único sítio onde
+     isto fica verdadeiro — e tem a vantagem de quem lê o código passar a ver o
+     nome do degrau em vez de um número mágico. */
+  --bo-tinta-3: rgba(13, 13, 13, 0.03);
+  --bo-tinta-6: rgba(13, 13, 13, 0.06);
+  --bo-tinta-8: rgba(13, 13, 13, 0.08);
+  --bo-tinta-10: rgba(13, 13, 13, 0.1);
+  --bo-tinta-13: rgba(13, 13, 13, 0.13);
+
+  /* ── A ESCADA DE ENTRADA: DEGRAUS DE 20 ms, SEIS, E PÁRA ─────────────────
+     A Apple tem esta escada ESCRITA no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
+     0,26 / 0,28 / 0,30 s. Degraus de vinte milissegundos, seis, e pára. O
+     desfasamento existe para o olho ler ORDEM DE LEITURA, não para dar
+     espectáculo: ao sexto item essa informação já foi dada, e a partir daí o
+     atraso só acrescenta espera.
+
+     ── E AS CURVAS E OS TEMPOS DA ANÁLISE? JÁ CÁ ESTAVAM ───────────────────
+
+     A análise pede «uma curva para o sítio inteiro, sem ease-in» e propõe a
+     `cubic-bezier(.4,0,.2,1)` da Pixelmatters. Escrevi-a aqui como um token
+     novo e estava errado: esta casa JÁ tem uma curva única — a
+     `--ease-out: cubic-bezier(0.16, 1, 0.3, 1)` do `:root`, que é também o
+     `--default-transition-timing-function` do `@theme`, ou seja, sai em todos
+     os ~322 utilitários `transition-*` sem ninguém a pedir. Cumpre o princípio
+     («arranca depressa, trava, zero ease-in») e cumpre-o com mais desaceleração
+     do que qualquer das duas referências.
+
+     E a curva que eu tinha acrescentado é, letra por letra, a que esta casa
+     RECUSOU por escrito: o comentário do `@theme` conta que ~300 transições
+     estavam nela por omissão e foram convergidas de propósito para a
+     assinatura, e o `ui/movimento.ts` diz «não se desfaz isso a partir daqui».
+     Acrescentar uma segunda curva era fazer ao movimento o que os quarenta e
+     sete cinzentos faziam à cor — que é o defeito que este trabalho todo veio
+     tirar.
+
+     Os TEMPOS, o mesmo: 0,1 s / 0,2 s / 0,3 s são a proposta da análise, e a
+     casa já tem três degraus escolhidos e medidos — 20 ms para o toque, 120 ms
+     para o estado, 250 ms para o que se move (`lib/motion/tokens.ts`,
+     `ui/movimento.ts`). Ficam esses. O que a análise acrescenta de novo, e que
+     aqui faltava mesmo, é o DEGRAU DE GRUPO com tecto. */
+  --bo-degrau: 20ms; /* escada de entrada, no máximo seis */
+  --bo-degraus-max: 5; /* o sexto degrau é o índice 5 */
+
   /* ── Hairline borders & control boundaries (neutral, ChatGPT-quiet) ── */
-  --bo-hairline: rgba(13, 13, 13, 0.08); /* card / divider hairline */
-  --bo-hairline-strong: rgba(13, 13, 13, 0.13); /* clearer separator */
+  --bo-hairline: var(--bo-tinta-8); /* card / divider hairline */
+  --bo-hairline-strong: var(--bo-tinta-13); /* clearer separator */
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
   --bo-control-border: rgba(13, 13, 13, 0.55);
 
@@ -544,8 +667,8 @@ body.admin-mode {
 }
 
 /* Display / working headings: tighter tracking for the calm modern-sans look. */
-body.admin-mode :is(h1, h2, h3, h4),
-body.admin-mode .font-display {
+body:is(.admin-mode, :has([data-admin-mode])) :is(h1, h2, h3, h4),
+body:is(.admin-mode, :has([data-admin-mode])) .font-display {
   letter-spacing: -0.02em;
 }
 
@@ -557,9 +680,9 @@ body.admin-mode .font-display {
    marketing site keeps its editorial caps. Every admin screen now reads in
    calm sentence case with quiet spacing, like a modern product app (ChatGPT/
    Linear). Data fields keep their true case via the block below. */
-body.admin-mode .uppercase,
-body.admin-mode .bo-eyebrow,
-body.admin-mode .eyebrow {
+body:is(.admin-mode, :has([data-admin-mode])) .uppercase,
+body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow,
+body:is(.admin-mode, :has([data-admin-mode])) .eyebrow {
   text-transform: none;
   letter-spacing: 0.005em;
 }
@@ -568,34 +691,34 @@ body.admin-mode .eyebrow {
    phone number or a reference id must never be transformed. (Now that the
    interface is sentence case this is mostly redundant, but it also resets the
    letter-spacing on typed fields, so it stays.) */
-body.admin-mode input,
-body.admin-mode textarea,
-body.admin-mode select,
-body.admin-mode [contenteditable],
-body.admin-mode .bo-input,
-body.admin-mode a[href^="mailto:"],
-body.admin-mode a[href^="tel:"],
-body.admin-mode .font-mono,
-body.admin-mode [data-keep-case] {
+body:is(.admin-mode, :has([data-admin-mode])) input,
+body:is(.admin-mode, :has([data-admin-mode])) textarea,
+body:is(.admin-mode, :has([data-admin-mode])) select,
+body:is(.admin-mode, :has([data-admin-mode])) [contenteditable],
+body:is(.admin-mode, :has([data-admin-mode])) .bo-input,
+body:is(.admin-mode, :has([data-admin-mode])) a[href^="mailto:"],
+body:is(.admin-mode, :has([data-admin-mode])) a[href^="tel:"],
+body:is(.admin-mode, :has([data-admin-mode])) .font-mono,
+body:is(.admin-mode, :has([data-admin-mode])) [data-keep-case] {
   text-transform: none;
   letter-spacing: normal;
 }
 
 /* Moss is the single admin accent — even the text selection picks it up instead
    of the site-wide gold. */
-body.admin-mode ::selection {
+body:is(.admin-mode, :has([data-admin-mode])) ::selection {
   background: rgba(99, 122, 95, 0.22);
   color: #2a2620;
 }
 /* Matching utilities so the tokens can be applied like the Tailwind text-* class
    they replace. */
-body.admin-mode .bo-text {
+body:is(.admin-mode, :has([data-admin-mode])) .bo-text {
   color: var(--bo-text);
 }
-body.admin-mode .bo-text-muted {
+body:is(.admin-mode, :has([data-admin-mode])) .bo-text-muted {
   color: var(--bo-text-muted);
 }
-body.admin-mode .bo-text-faint {
+body:is(.admin-mode, :has([data-admin-mode])) .bo-text-faint {
   color: var(--bo-text-faint);
 }
 
@@ -655,7 +778,8 @@ body.admin-mode .bo-text-faint {
    `@layer`, de propósito — os utilitários do Tailwind vivem numa camada, e
    sem isto o `text-[9px]` da chamada ganhava outra vez. */
 @media (max-width: 1023.98px) {
-  body.admin-mode :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[7px\]) {
+  body:is(.admin-mode, :has([data-admin-mode]))
+    :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[7px\]) {
     font-size: var(--bo-fs-caption);
     letter-spacing: 0.01em;
   }
@@ -664,7 +788,7 @@ body.admin-mode .bo-text-faint {
      e é ela que titula QUASE TODAS as secções do painel («Agenda · próximos»,
      «Precisam de atenção», «Fases dos pedidos»). Ficavam nove títulos por
      baixo do chão num ecrã onde os títulos são o mapa. */
-  body.admin-mode .bo-eyebrow {
+  body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow {
     font-size: var(--bo-fs-caption);
     letter-spacing: 0.04em;
   }
@@ -714,7 +838,7 @@ body.admin-mode .bo-text-faint {
      E continua a ganhar à HERANÇA, que é o que se quer: uma declaração, seja de
      que camada for, ganha sempre ao valor herdado. */
   @layer utilities {
-    :where(body.admin-mode)
+    :where(body:is(.admin-mode, :has([data-admin-mode])))
       :where(.text-\[7px\], .text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
       line-height: var(--bo-lh-caption);
     }
@@ -754,7 +878,7 @@ body.admin-mode .bo-text-faint {
    O `letter-spacing` acompanha pela mesma geometria que está escrita acima:
    subir o corpo sem desapertar o espacejamento troca letra pequena por texto
    transbordado. */
-body.admin-mode :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
+body:is(.admin-mode, :has([data-admin-mode])) :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
   font-size: var(--bo-fs-caption);
   letter-spacing: 0.01em;
 }
@@ -800,7 +924,7 @@ body.admin-mode :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
    Fora de `@layer`, de propósito: os utilitários do Tailwind vivem numa camada,
    e sem isto o `text-foreground/40` da chamada ganhava outra vez. É a mesma
    nota que o chão da letra tem escrita. */
-body.admin-mode
+body:is(.admin-mode, :has([data-admin-mode]))
   :is(
     .text-foreground\/25,
     .text-foreground\/30,
@@ -810,7 +934,7 @@ body.admin-mode
   ) {
   color: var(--bo-text-faint);
 }
-body.admin-mode :is(.text-foreground\/50, .text-foreground\/55) {
+body:is(.admin-mode, :has([data-admin-mode])) :is(.text-foreground\/50, .text-foreground\/55) {
   color: var(--bo-text-muted);
 }
 
@@ -871,6 +995,27 @@ body.admin-mode :is(.text-foreground\/50, .text-foreground\/55) {
    every white page keeps the navbar exactly as it was. */
 body:has([data-cream-page]) [data-public-nav] {
   --color-moss: var(--color-moss-dark);
+}
+
+/* ── O MESMO ANEL, DOIS AFASTAMENTOS ──────────────────────────────────────
+   Da análise da loja da Apple: `--sk-focus-offset: 1px` nos controlos e
+   `--sk-focus-offset-container: 3px` nos contentores. Dois afastamentos, e a
+   razão é boa — um anel colado a um cartão grande LÊ-SE COMO BORDA, não como
+   foco. É o detalhe que separa «temos foco visível» de «temos um sistema de
+   foco».
+
+   Aqui o anel de base já tem dois píxeis de folga (a auréola da cor da
+   superfície, antes do musgo). Esta classe abre-a para quatro, e é para os
+   alvos que são CAIXAS e não controlos: uma linha inteira de uma lista, um
+   cartão de dinheiro com cem píxeis de altura. Num botão de 32 px, quatro
+   píxeis de folga seriam um halo à volta de nada; numa linha de 80, dois
+   píxeis colados à moldura são indistinguíveis da moldura.
+
+   Mesma cor, mesma espessura, mesma transição: o que muda é a distância. */
+.foco-largo:focus-visible {
+  box-shadow:
+    0 0 0 4px var(--color-surface),
+    0 0 0 6px rgba(76, 97, 80, 0.95);
 }
 
 /* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
@@ -1238,9 +1383,23 @@ body {
     transform: none;
   }
 }
+/* ── A ESCADA PÁRA AO SEXTO DEGRAU ────────────────────────────────────────
+   Era `--cena × 70ms`, sem tecto: quatro blocos já valiam 280 ms de espera
+   antes de o último começar, e a lista não tinha limite nenhum.
+
+   A Apple tem esta escada escrita no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
+   0,26 / 0,28 / 0,30 s — degraus de vinte milissegundos, seis, e pára. O
+   desfasamento existe para o olho ler ORDEM DE LEITURA, não para dar
+   espectáculo: ao sexto item essa informação já foi dada, e a partir daí o
+   atraso só acrescenta espera. Seis blocos a entrar em 120 ms lê-se como
+   rapidez; vinte em 400 ms lê-se como lentidão.
+
+   O `min()` é o tecto. Sem ele, uma lista de trinta linhas com `--cena` a
+   contar até trinta punha a última a começar seis décimos de segundo depois
+   da primeira — que é precisamente a sensação que isto existe para evitar. */
 .bo-cena {
-  animation: bo-cena 600ms cubic-bezier(0, 0, 0.2, 1) backwards;
-  animation-delay: calc(var(--cena, 0) * 70ms);
+  animation: bo-cena 600ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--cena, 0), var(--bo-degraus-max)) * var(--bo-degrau));
 }
 @media (prefers-reduced-motion: reduce) {
   .bo-cena {
@@ -1840,7 +1999,7 @@ body:has([data-orcamento-mode]) .scroll-progress {
 }
 
 /* ── Back-office: full-screen tool surface (clean & minimal) ── */
-body.admin-mode nav[data-public-nav] {
+body:is(.admin-mode, :has([data-admin-mode])) nav[data-public-nav] {
   display: none !important;
 }
 /* O `padding-top: 0` do `<main>` VIVIA AQUI, e era um salto de 0,128 de CLS.
@@ -1850,19 +2009,19 @@ body.admin-mode nav[data-public-nav] {
    Passou para o `className` de cada raiz do back office (`-mt-24`), que vai no
    HTML do servidor. O que fica nesta classe é só o que NÃO mexe no layout. */
 /* Drop the film grain inside the tool for a crisper, calmer surface */
-body.admin-mode::before {
+body:is(.admin-mode, :has([data-admin-mode]))::before {
   display: none !important;
 }
 /* Scrollbars for the white admin surface */
-body.admin-mode ::-webkit-scrollbar {
+body:is(.admin-mode, :has([data-admin-mode])) ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
-body.admin-mode ::-webkit-scrollbar-thumb {
+body:is(.admin-mode, :has([data-admin-mode])) ::-webkit-scrollbar-thumb {
   background: rgba(42, 38, 32, 0.12);
   border-radius: 999px;
 }
-body.admin-mode ::-webkit-scrollbar-thumb:hover {
+body:is(.admin-mode, :has([data-admin-mode])) ::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 122, 95, 0.45);
 }
 

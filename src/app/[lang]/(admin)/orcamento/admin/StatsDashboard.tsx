@@ -67,13 +67,12 @@ function Kpi({
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
-        accent ? "bg-[#4d6350]/[0.05] border-[#4d6350]/20" : "bg-white border-foreground/[0.08] "
+        accent ? "bg-[#4d6350]/[0.05] border-[#4d6350]/20" : "bg-white border-[var(--bo-hairline)] "
       }`}
     >
       <p
-        className={`font-bold leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-foreground/82"}`}
+        className={`font-light leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-[var(--bo-text)]"}`}
         style={{
-          fontFamily: "var(--font-playfair)",
           fontSize: small ? "clamp(18px, 1.9vw, 24px)" : "clamp(22px, 2.6vw, 34px)",
         }}
       >
@@ -120,7 +119,7 @@ function VBars({
               {valueLabel}
             </span>
             <div
-              className="w-full bg-foreground/5 rounded-sm relative"
+              className="w-full bg-[var(--bo-tinta-6)] rounded-sm relative"
               style={{ height: "100%" }}
               role="img"
               aria-label={`${d.label}: ${valueLabel}`}
@@ -146,12 +145,12 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
       {data.map((d, i) => (
         <div key={i}>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-foreground/55 text-xs">{d.label}</span>
+            <span className="text-[var(--bo-text-muted)] text-xs">{d.label}</span>
             <span className="text-foreground/35 text-[10px] tabular-nums">
               {d.value} · {Math.round((d.value / total) * 100)}%
             </span>
           </div>
-          <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
             <div
               className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
               style={{
@@ -184,11 +183,11 @@ function Section({
   return (
     <details
       open={defaultOpen}
-      className="group rounded-2xl border border-foreground/[0.08] bg-white overflow-hidden"
+      className="group rounded-2xl border border-[var(--bo-hairline)] bg-white overflow-hidden"
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
-          <span className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase font-medium">
+          <span className="text-[var(--bo-text-muted)] text-[10px] tracking-[0.3em] uppercase font-medium">
             {title}
           </span>
           {hint && <p className="mt-1 text-[11px] text-foreground/35 leading-snug">{hint}</p>}
@@ -693,7 +692,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               {/* received vs outstanding bar */}
               {stats.received + stats.outstanding > 0 && (
                 <div>
-                  <div className="relative h-2 rounded-full overflow-hidden bg-foreground/6">
+                  <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
                     <div
                       className="absolute inset-0 origin-left bg-moss motion-safe:transition-transform motion-safe:duration-700"
                       style={{
@@ -725,11 +724,11 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                   Sem pagamentos previstos para os próximos 60 dias.
                 </p>
               ) : (
-                <div className="flex flex-col divide-y divide-foreground/6">
+                <div className="flex flex-col divide-y divide-[var(--bo-hairline)]">
                   {stats.upcoming.map((p) => (
                     <div key={p.id} className="flex items-center justify-between py-2.5">
                       <div className="min-w-0">
-                        <p className="text-foreground/65 text-sm truncate">{p.name}</p>
+                        <p className="text-[var(--bo-text-muted)] text-sm truncate">{p.name}</p>
                         <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
                       </div>
                       <div className="text-right shrink-0 ml-3">
@@ -796,7 +795,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                     return (
                       <div key={row.label}>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-foreground/55 text-xs truncate max-w-[45%]">
+                          <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[45%]">
                             {row.label}
                           </span>
                           <div className="flex items-center gap-3 shrink-0">
@@ -811,7 +810,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                             </span>
                           </div>
                         </div>
-                        <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                           <div
                             className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                             style={{
@@ -878,14 +877,14 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               return (
                 <div key={row.label}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-foreground/55 text-xs truncate max-w-[70%]">
+                    <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[70%]">
                       {row.label}
                     </span>
                     <span className="text-foreground/35 text-[10px] tabular-nums shrink-0">
                       {row.value}× · {Math.round((row.value / total) * 100)}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                     <div
                       className="h-full w-full origin-left rounded-full bg-[#8a8a82]/60 motion-safe:transition-transform motion-safe:duration-700"
                       style={{
@@ -907,7 +906,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
             {stats.referralConvRows.map((row) => (
               <div key={row.label}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-foreground/55 text-xs truncate max-w-[55%]">
+                  <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[55%]">
                     {row.label}
                   </span>
                   <div className="flex items-center gap-3 shrink-0">
@@ -924,7 +923,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                     </span>
                   </div>
                 </div>
-                <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                   <div
                     className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                     style={{

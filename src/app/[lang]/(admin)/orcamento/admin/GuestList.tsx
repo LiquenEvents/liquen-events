@@ -178,7 +178,7 @@ export default function GuestList({ quote, onChange }: Props) {
     // E o `pt-6` do separador eram 24 px de ar por cima do título a qualquer
     // largura. `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma
     // vista, o mesmo que os painéis vizinhos passaram a ler.
-    <section className="@container border-t border-foreground/10 pt-[var(--bo-p-vista)]">
+    <section className="@container border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Lista de Convidados</p>
         {/* ── OS DOIS BOTÕES DE ÍCONE DESTA BARRA ──────────────────────────
@@ -244,7 +244,7 @@ export default function GuestList({ quote, onChange }: Props) {
               }
               className="px-2 alvo-toque"
             />
-            <span className="ml-1 shrink-0 rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+            <span className="ml-1 shrink-0 rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
               {guests.length} {guests.length === 1 ? "grupo" : "grupos"}
             </span>
           </div>
@@ -258,26 +258,26 @@ export default function GuestList({ quote, onChange }: Props) {
           ser o do painel (26 rem, o mesmo dos quadrados de dinheiro dos
           painéis vizinhos), onde as quatro colunas têm 90 px cada. */}
       <div className="mb-5 grid grid-cols-2 gap-2.5 @min-[26rem]:grid-cols-4">
-        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
+        <div className="rounded-xl bg-[var(--bo-tinta-6)] p-3 text-center">
           <p className="text-base font-semibold text-[#4d6350]">{totals.confirmed}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Confirm.
           </p>
         </div>
-        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
-          <p className="text-base font-semibold text-foreground/65">{totals.pending}</p>
+        <div className="rounded-xl bg-[var(--bo-tinta-6)] p-3 text-center">
+          <p className="text-base font-semibold text-[var(--bo-text-muted)]">{totals.pending}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Pendente
           </p>
         </div>
-        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
+        <div className="rounded-xl bg-[var(--bo-tinta-6)] p-3 text-center">
           <p className="text-base font-semibold text-[#8a2a22]">{totals.declined}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Recusados
           </p>
         </div>
-        <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
-          <p className="text-base font-semibold text-foreground/65">
+        <div className="rounded-xl bg-[var(--bo-tinta-6)] p-3 text-center">
+          <p className="text-base font-semibold text-[var(--bo-text-muted)]">
             {totals.confirmed}
             <span className="font-normal text-foreground/40">/{estimate || "—"}</span>
           </p>
@@ -293,10 +293,10 @@ export default function GuestList({ quote, onChange }: Props) {
           {guests.map((g) => (
             <li
               key={g.id}
-              className="group flex flex-wrap items-center gap-2.5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] px-3 py-2.5"
+              className="group flex flex-wrap items-center gap-2.5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] px-3 py-2.5"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground/80">{g.name}</p>
+                <p className="truncate text-sm font-medium text-[var(--bo-text)]">{g.name}</p>
                 {g.note && (
                   <p className="truncate text-[11px] text-foreground/40" title={g.note}>
                     {g.note}
@@ -310,7 +310,7 @@ export default function GuestList({ quote, onChange }: Props) {
                   value={g.party || ""}
                   onChange={(e) => setPartyOf(g.id, e.target.value)}
                   onBlur={() => commitPartyOf(g.id)}
-                  className="bo-input w-14 px-1.5 py-1 text-center text-xs text-foreground/75"
+                  className="bo-input w-14 px-1.5 py-1 text-center text-xs text-[var(--bo-tinta-72)]"
                   aria-label={`Convidados no grupo ${g.name}`}
                 />
                 convidados
@@ -358,7 +358,7 @@ export default function GuestList({ quote, onChange }: Props) {
                     os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
               <button
                 onClick={() => remove(g.id)}
-                className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
+                className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
                 aria-label={`Remover ${g.name}`}
               >
                 <svg
@@ -378,7 +378,7 @@ export default function GuestList({ quote, onChange }: Props) {
           ))}
         </ul>
       ) : (
-        <p className="mb-5 rounded-xl bg-foreground/[0.02] px-4 py-6 text-center text-sm leading-relaxed text-foreground/50">
+        <p className="mb-5 rounded-xl bg-[var(--bo-tinta-3)] px-4 py-6 text-center text-sm leading-relaxed text-foreground/50">
           Ainda sem convidados. Adiciona a primeira pessoa ou família abaixo — o número de
           confirmados atualiza-se sozinho.
         </p>

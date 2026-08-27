@@ -289,16 +289,16 @@ export default function SessaoExpirada() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="sessao-expirada-titulo"
-        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-foreground/10 bg-white p-6 shadow-[var(--bo-sombra-modal)]"
+        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]"
       >
         <p className="bo-eyebrow">Sessão</p>
         <h2
           id="sessao-expirada-titulo"
-          className="font-display mt-1 text-xl leading-tight text-foreground/90"
+          className="font-display mt-1 text-xl leading-tight text-[var(--bo-text)]"
         >
           A tua sessão expirou
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/60">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--bo-text-muted)]">
           {porGravar > 0
             ? "Nada se perdeu: o que estavas a escrever continua aqui, nesta página. Entra outra vez e é guardado logo a seguir."
             : "Nada se perdeu — esta página continua como estava. Entra outra vez para continuares."}
@@ -317,9 +317,9 @@ export default function SessaoExpirada() {
               {aEntrarComDispositivo ? "A confirmar…" : "Entrar com este dispositivo"}
             </Button>
             <div className="my-4 flex items-center gap-3" aria-hidden="true">
-              <span className="h-px flex-1 bg-foreground/10" />
+              <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
               <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35">ou</span>
-              <span className="h-px flex-1 bg-foreground/10" />
+              <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
             </div>
           </>
         )}
@@ -375,7 +375,7 @@ export default function SessaoExpirada() {
               onChange={(e) => setManterSessao(e.target.checked)}
               className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
             />
-            <span className="text-xs leading-relaxed text-foreground/60">
+            <span className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
               Manter a sessão iniciada 30 dias neste aparelho.
             </span>
           </label>
@@ -407,7 +407,7 @@ export default function SessaoExpirada() {
         <button
           type="button"
           onClick={sairEVoltarAEntrada}
-          className="alvo-toque mt-4 w-full text-center text-xs text-foreground/45 underline underline-offset-4 hover:text-foreground/70"
+          className="alvo-toque mt-4 w-full text-center text-xs text-foreground/45 underline underline-offset-4 hover:text-[var(--bo-tinta-72)]"
         >
           {porGravar > 0
             ? "Prefiro sair e voltar à entrada (perde-se o que não foi guardado)"

@@ -156,7 +156,7 @@ function ValidadeChip({ p }: { p: Proposal }) {
           ? "bg-[#8a2a22]/10 text-[#8a2a22]"
           : exp.tone === "soon"
             ? "bg-[#b5894a]/12 text-[#8a6420]"
-            : "bg-foreground/[0.05] text-foreground/45"
+            : "bg-[var(--bo-tinta-6)] text-foreground/45"
       }`}
     >
       {exp.label}
@@ -181,7 +181,7 @@ function ValidadeChip({ p }: { p: Proposal }) {
 function LugarDoCliente({ lugar }: { lugar: LugarNoCliente }) {
   return (
     <span
-      className="ml-1.5 inline-flex shrink-0 items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bo-text-muted)] align-middle"
+      className="ml-1.5 inline-flex shrink-0 items-center rounded-full bg-[var(--bo-tinta-6)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bo-text-muted)] align-middle"
       title={explicacaoDoLugar(lugar)}
     >
       {etiquetaDoLugar(lugar)}
@@ -475,7 +475,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
           </svg>
         </div>
         <div>
-          <p className="text-foreground/90 text-sm font-medium">
+          <p className="text-[var(--bo-text)] text-sm font-medium">
             Não foi possível carregar as propostas
           </p>
           <p className="text-foreground/50 text-xs mt-1">
@@ -531,7 +531,10 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
   return (
     <div className="flex flex-col gap-6">
       {/* One calm line saying what this screen is for */}
-      <p className="text-sm leading-relaxed text-foreground/55">
+      <p
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena text-sm leading-relaxed text-[var(--bo-text-muted)]"
+      >
         Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites.
       </p>
 
@@ -563,31 +566,63 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         A linha que os concilia está logo a seguir aos avisos, à entrada da
         lista — que é onde o outro número aparece.
       */}
-      <div className="flex flex-col gap-2">
+      <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena flex flex-col gap-2">
         <p className="bo-eyebrow text-foreground/40">
           Por pedido · conta-se a proposta mais recente de cada um
         </p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { v: String(pedidos), l: "Pedidos com proposta", accent: true },
-            { v: eur(totalSent), l: "Valor enviado aos clientes", accent: false },
-            { v: eur(totalWon), l: "Valor já ganho", accent: true },
-            { v: `${acceptRate}%`, l: "Propostas aceites", accent: false },
-          ].map((k) => (
-            <Card
-              key={k.l}
-              padding="sm"
-              className={`flex flex-col gap-2 ${k.accent ? "bg-[#4d6350]/[0.05] ring-1 ring-inset ring-[#4d6350]/15" : ""}`}
+        {/* ══════════════════════════════════════════════════════════════════
+            UM NÚMERO MANDA, OS OUTROS TRÊS ACOMPANHAM
+            ══════════════════════════════════════════════════════════════════
+
+            Eram quatro cartões com o MESMO peso — `clamp(20px, 2.2vw, 28px)`
+            nos quatro — e dois deles pintados de verde, sem que a cor
+            distinguisse coisa nenhuma: o verde caía no «Pedidos com proposta»
+            e no «Valor já ganho», que não são da mesma família. É o mesmo
+            defeito que a Visão Geral tinha e que o padrão 08 já lá corrigiu.
+
+            O herói deste ecrã é o VALOR JÁ GANHO. A pergunta a que este ecrã
+            responde é «as propostas que enviei estão a dar dinheiro?», e é esse
+            o número que a responde — não a contagem de pedidos, que é
+            arrumação, nem a percentagem, que é a mesma resposta dita de uma
+            maneira em que ela já disse não confiar.
+
+            A cor sai dos cartões e o tamanho fica com o trabalho: 48 px contra
+            22 é uma diferença que se lê antes de se ler o rótulo. O verde volta
+            a ser só do herói — «cor só na acção», que é a regra que os dois
+            cartões pintados estavam a gastar à toa. */}
+        <div className="flex flex-col gap-3">
+          <Card padding="sm" className="flex flex-col gap-2">
+            <p
+              className="font-light leading-none tabular-nums text-[#4d6350]"
+              style={{ fontSize: "clamp(32px, 4.6vw, 48px)" }}
             >
-              <p
-                className={`font-display font-semibold leading-none tabular-nums ${k.accent ? "text-[#4d6350]" : "text-foreground/90"}`}
-                style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}
-              >
-                {k.v}
-              </p>
-              <p className="bo-eyebrow text-foreground/45">{k.l}</p>
-            </Card>
-          ))}
+              {eur(totalWon)}
+            </p>
+            <p className="bo-eyebrow text-foreground/45">Valor já ganho</p>
+          </Card>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {[
+              // O rótulo fica INTEIRO. Encurtei-o para «Enviado aos clientes» por
+              // caber melhor em três colunas, e dois testes caíram — os que
+              // guardam que este valor não conta a proposta por enviar e não
+              // conta o mesmo pedido duas vezes. Tinham razão em cair: o rótulo
+              // é como ela chama ao número, e encurtá-lo por causa da largura é
+              // deixar a coluna decidir o vocabulário.
+              { v: eur(totalSent), l: "Valor enviado aos clientes" },
+              { v: `${acceptRate}%`, l: "Propostas aceites" },
+              { v: String(pedidos), l: "Pedidos com proposta" },
+            ].map((k) => (
+              <Card key={k.l} padding="sm" className="flex flex-col gap-1.5">
+                <p
+                  className="font-light leading-none tabular-nums text-[var(--bo-text)]"
+                  style={{ fontSize: "clamp(19px, 2vw, 22px)" }}
+                >
+                  {k.v}
+                </p>
+                <p className="bo-eyebrow text-foreground/45">{k.l}</p>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -654,7 +689,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       )}
 
       {/* Filter */}
-      <div className="flex flex-col gap-2">
+      <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena flex flex-col gap-2">
         <div className="max-w-full overflow-x-auto pb-1 -mb-1">
           <Segmented
             ariaLabel="Filtrar propostas por estado"
@@ -686,7 +721,11 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       </div>
 
       {/* List */}
-      <Card padding="none" className="overflow-hidden">
+      <Card
+        padding="none"
+        style={{ "--cena": 3 } as React.CSSProperties}
+        className="bo-cena overflow-hidden"
+      >
         {filtered.length === 0 ? (
           <EmptyState
             icon={
@@ -728,7 +767,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                     const lugar = lugares.get(p.id);
                     return (
                       <span className="block">
-                        <span className="block text-foreground/90">
+                        <span className="block text-[var(--bo-text)]">
                           <span className="truncate align-middle">{p.clientName}</span>
                           {lugar && <LugarDoCliente lugar={lugar} />}
                         </span>
@@ -770,7 +809,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                   alinharADireita: true,
                   ordenar: (a, b) => a.total - b.total,
                   celula: (p) => (
-                    <span className="font-semibold tabular-nums text-foreground/90">
+                    <span className="font-semibold tabular-nums text-[var(--bo-text)]">
                       {eur(p.total)}
                     </span>
                   ),
@@ -795,7 +834,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 // legibilidade das que decidem.
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground/90">
+                    <p className="text-sm font-medium text-[var(--bo-text)]">
                       <span className="truncate align-middle">{p.clientName}</span>
                       {lugares.get(p.id) && <LugarDoCliente lugar={lugares.get(p.id)!} />}
                     </p>
@@ -805,7 +844,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <span className="text-sm font-semibold tabular-nums text-foreground/90">
+                    <span className="text-sm font-semibold tabular-nums text-[var(--bo-text)]">
                       {eur(p.total)}
                     </span>
                     <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />

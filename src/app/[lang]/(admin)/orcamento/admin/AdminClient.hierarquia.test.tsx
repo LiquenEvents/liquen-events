@@ -164,10 +164,8 @@ describe("o que o cartão de pedido põe à frente", () => {
 
     const nome = tamanhoDe("Rita e Tomás");
     const email = tamanhoDe("rita.tomas@example.pt");
-    const referencia = tamanhoDe(/^Ref\./);
 
     expect(nome).toBeGreaterThan(email);
-    expect(email).toBeGreaterThanOrEqual(referencia);
     // E o nome não é «um bocadinho maior»: 14 contra 12 não se lê como
     // hierarquia nenhuma a meio de uma lista.
     expect(nome).toBeGreaterThanOrEqual(17);
@@ -185,17 +183,26 @@ describe("o que o cartão de pedido põe à frente", () => {
     for (const t of ["Rita e Tomás", "rita.tomas@example.pt"] as const) {
       expect(tamanhoDe(t)).toBeGreaterThanOrEqual(12);
     }
-    expect(tamanhoDe(/^Ref\./)).toBeGreaterThanOrEqual(12);
   });
 
-  it("a referência é o detalhe mais apagado, e não compete com o nome", () => {
+  it("a referência já não está na lista — está no pedido aberto", () => {
+    // ── ISTO ERA O CONTRÁRIO, E MUDOU POR DECISÃO DELA ────────────────────
+    //
+    // Este caso exigia que a referência estivesse no cartão, no degrau mais
+    // apagado. A defesa que aqui estava escrita dizia, sem dar por isso, que
+    // ela não pertencia à lista: «quando SE PRECISA dela é para a ler letra a
+    // letra ao telefone» — ou seja, com o pedido já aberto.
+    //
+    // Perguntei-lhe se precisava dela de relance, e a resposta foi «retira a
+    // referência». Saiu de vinte linhas de lista e ficou onde se usa: no painel
+    // de detalhe.
+    //
+    // O caso fica, ao contrário: a referência NÃO volta ao cartão. É a maneira
+    // fácil de desfazer isto sem querer — basta alguém achar que «ficava bem
+    // ali um identificador».
     renderAdmin();
     irParaPedidos();
-    const ref = screen.getByText(/^Ref\./);
-    // O degrau `faint` do `globals.css` é exactamente para isto: «micro-rótulos
-    // decorativos, nunca o único portador de informação». A referência
-    // qualifica — o nome já lá está por cima.
-    expect(ref.className).toMatch(/bo-text-faint|text-\[var\(--bo-text-faint\)\]/);
-    expect(screen.getByText("Rita e Tomás").className).not.toMatch(/faint/);
+    expect(screen.queryByText(/^Ref\./), "a referência voltou à lista de pedidos").toBeNull();
+    expect(screen.getByText("Rita e Tomás")).toBeInTheDocument();
   });
 });
