@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import type { Proposal } from "@/lib/orcamento/types";
 import { splitThirtySeventy } from "@/lib/money";
 import { resolveValidUntil } from "@/lib/proposal-doc";
+import fs from "node:fs";
+import path from "node:path";
 
 // ── Mock the auth + data layer + heavy PDF/mail side effects; keep the money
 //    math (proposal-doc) and the route logic real ──
@@ -1759,9 +1761,80 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
       params,
     });
     expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
-    expect(enviado().html).toContain("Abrir a proposta em PDF");
+    expect(enviado().html).toContain("Abrir a proposta");
     // E o nome do ficheiro, para o casal reconhecer que é o mesmo do anexo.
+    // Passou para baixo do botão, em letra pequena, com a frase que diz para
+    // que serve — mas continua lá, que era a razão de estar no cartão.
     expect(enviado().html).toContain("Proposta-Liquen-Events");
+    expect(enviado().html).toContain("É o mesmo documento que segue em anexo");
+  });
+
+  /**
+   * ── OS BOTÕES DESTE EMAIL ABREM-SE COM O POLEGAR ──────────────────────────
+   *
+   * São dois — «Ver a proposta» e «Abrir a proposta» — e este email abre-se
+   * quase sempre no telemóvel. Tinham 39 px e 37 px de altura, com letra de
+   * 13 px: sete píxeis abaixo dos 44 do alvo de toque da casa, num sítio onde
+   * um clique falhado é um casal a desistir de ler.
+   *
+   * A altura de um botão de email é a conta do `padding` com a entrelinha, e é
+   * isso que este teste faz — não há browser onde a medir.
+   */
+  it("e os botões do email têm os 44 px de alvo", async () => {
+    /** A altura de um botão de email é a conta do `padding` com a entrelinha. */
+    const alturas = (html: string) =>
+      [...html.matchAll(/padding:(\d+)px [^"]*?;font-size:\d+px;line-height:(\d+)px/g)].map(
+        ([, pad, lh]) => Number(pad) * 2 + Number(lh),
+      );
+
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Escrevi isto à mão." }), {
+      params,
+    });
+    const medidas = alturas(enviado().html);
+    expect(medidas.length, "não encontrei o botão do cartão do PDF").toBeGreaterThan(0);
+    for (const altura of medidas) {
+      expect(altura, `um botão do email ficou com ${altura} px de altura`).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+  });
+
+  /**
+   * ── E OS DOIS BOTÕES DESTE EMAIL MEDEM O MESMO ────────────────────────────
+   *
+   * São dois — «Ver a proposta» e «Abrir a proposta» — e no corpo de recurso
+   * aparecem um debaixo do outro. Tinham 39 px e 37 px de altura, com letra de
+   * 13 px: sete píxeis abaixo dos 44 do alvo de toque da casa, num email que
+   * se abre quase sempre no telemóvel e onde um clique falhado é um casal a
+   * desistir de ler.
+   *
+   * Lê-se da FONTE e não do email enviado, de propósito: os dois botões não
+   * aparecem os dois em nenhum dos caminhos que este ficheiro consegue montar
+   * — o do modelo guardado leva só um. Um teste que só mede o que a fixture
+   * alcança deixava o outro por medir, que é como ele chegou aos 39.
+   */
+  it("e os dois botões do email são desenhados com a mesma medida", () => {
+    const fonte = fs.readFileSync(
+      path.join(process.cwd(), "src/app/api/orcamento/[id]/proposta-doc/route.ts"),
+      "utf8",
+    );
+    const desenhos = [
+      ...fonte.matchAll(/padding:(\d+)px \d+px;font-size:(\d+)px;line-height:(\d+)px/g),
+    ].map(([, pad, fs_, lh]) => ({
+      altura: Number(pad) * 2 + Number(lh),
+      letra: Number(fs_),
+    }));
+    expect(desenhos.length, "não encontrei os dois botões na fonte da rota").toBe(2);
+    for (const d of desenhos) {
+      expect(d.altura, `um botão tem ${d.altura} px de altura`).toBeGreaterThanOrEqual(44);
+      expect(d.letra, `um botão tem letra de ${d.letra} px`).toBeGreaterThanOrEqual(16);
+    }
+    expect(
+      new Set(desenhos.map((d) => `${d.altura}/${d.letra}`)).size,
+      `os dois botões do mesmo email não medem o mesmo: ${desenhos
+        .map((d) => `${d.altura}px/${d.letra}px`)
+        .join(" e ")} — leem-se como dois produtos`,
+    ).toBe(1);
   });
 
   it("e o texto simples leva o mesmo endereço, que ali não há botões", async () => {

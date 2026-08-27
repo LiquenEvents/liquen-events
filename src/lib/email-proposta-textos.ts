@@ -221,6 +221,14 @@ export interface TextosDoEmailDaProposta {
    * é preciso rolar a mensagem inteira para dar com ele.
    */
   anexoEtiqueta: string;
+  /**
+   * A frase que ENCABEÇA o cartão do PDF, no lugar onde antes estava o nome do
+   * ficheiro. O que ali interessa é o que se ganha ao carregar, não como o
+   * ficheiro se chama.
+   */
+  anexoTitulo: string;
+  /** A nota por baixo do botão, que liga o cartão ao anexo lá em baixo. */
+  anexoNota: (nome: string) => string;
   /** O botão desse cartão. */
   anexoBotao: string;
 }
@@ -236,7 +244,9 @@ const PT: TextosDoEmailDaProposta = {
   verOnline: "Ver online:",
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "pt"),
   anexoEtiqueta: "Proposta em PDF",
-  anexoBotao: "Abrir a proposta em PDF",
+  anexoTitulo: "A proposta completa, para ler com calma.",
+  anexoNota: (nome) => `É o mesmo documento que segue em anexo — ${nome}`,
+  anexoBotao: "Abrir a proposta →",
 };
 
 const EN: TextosDoEmailDaProposta = {
@@ -256,7 +266,9 @@ const EN: TextosDoEmailDaProposta = {
    */
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "en"),
   anexoEtiqueta: "Proposal PDF",
-  anexoBotao: "Open the proposal PDF",
+  anexoTitulo: "The full proposal, to read at your own pace.",
+  anexoNota: (nome) => `It is the same document attached below — ${nome}`,
+  anexoBotao: "Open the proposal →",
 };
 
 /**

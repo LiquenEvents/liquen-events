@@ -1184,16 +1184,51 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * botão são o mesmo documento.
      */
     const linkDoPdf = enderecoDoPdfDaProposta(acceptUrl);
+    /**
+     * ── O CARTÃO, REDESENHADO ────────────────────────────────────────────────
+     *
+     * «Quero melhorar isto de forma absurda.» O que lá estava tinha quatro
+     * defeitos, e três deles medem-se:
+     *
+     *  · O BOTÃO tinha 37 px de altura (11+13+11) e letra de 13 px. É o único
+     *    botão de um email que se abre quase sempre no telemóvel, e ficava
+     *    sete píxeis abaixo dos 44 do alvo de toque. Agora tem 48 (14+20+14) e
+     *    letra de 16 — e ocupa a largura toda, que num ecrã estreito é a
+     *    diferença entre acertar e tentar duas vezes.
+     *  · O NOME DO FICHEIRO era a coisa mais alta do cartão a seguir ao botão:
+     *    sessenta caracteres técnicos a 14 px. Serve para o casal reconhecer
+     *    que o anexo e o botão são o mesmo documento — e isso é uma NOTA, não
+     *    um título. Passou para baixo do botão, pequeno, com a frase que
+     *    explica para que serve. O título passa a dizer o que se ganha ao
+     *    carregar.
+     *  · DOIS RAIOS sem razão — 6 px no cartão, 4 px no botão. Um cartão e um
+     *    controlo, dois papéis, dois valores: 10 e 8. É a mesma regra dos
+     *    raios do back office.
+     *  · E o cartão era uma caixa branca com um risco bege, que num email
+     *    lê-se como bloco de sistema. Passa a assentar no creme da casa — o
+     *    mesmo `#f7f4ee` do sítio —, e lê-se como parte da carta.
+     *
+     * Tudo em tabelas e estilos em linha, que é o que sobrevive ao Outlook: o
+     * botão é um `<a>` em bloco dentro de um `<td>` com fundo, e não um
+     * elemento com `flex`, que lá não existe.
+     */
     const cartaoDoPdf = `
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:24px 0">
-          <tr><td style="border:1px solid #d9d3c7;border-radius:6px;padding:16px 18px">
-            <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#8a8375">${esc(t.anexoEtiqueta)}</p>
-            <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#2a2620">${esc(nomeDoAnexo)}</p>
-            <a href="${linkDoPdf}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:11px 22px;border-radius:4px;font-size:13px;letter-spacing:0.04em">${esc(t.anexoBotao)}</a>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:28px 0;border-collapse:collapse">
+          <tr><td style="background:#f7f4ee;border:1px solid #e6dfd2;border-radius:10px;padding:22px">
+            <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#8a8375">${esc(t.anexoEtiqueta)}</p>
+            <p style="margin:0 0 18px;font-size:17px;line-height:1.4;color:#2a2620">${esc(t.anexoTitulo)}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate">
+              <tr><td style="background:#4c6350;border-radius:8px">
+                <a href="${linkDoPdf}" style="display:block;padding:14px 26px;font-size:16px;line-height:20px;color:#f7f4ee;text-decoration:none;font-weight:600;white-space:nowrap">${esc(t.anexoBotao)}</a>
+              </td></tr>
+            </table>
+            <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#8a8375">${esc(t.anexoNota(nomeDoAnexo))}</p>
           </td></tr>
         </table>`;
     /** O mesmo, para quem lê o email em texto simples. */
-    const pdfEmTexto = ["", `${t.anexoBotao}: ${linkDoPdf}`];
+    // Em texto simples a seta do botão não diz nada; quem lê assim precisa do
+    // NOME da coisa, que é o que a etiqueta é.
+    const pdfEmTexto = ["", `${t.anexoEtiqueta}: ${linkDoPdf}`];
 
     const email = escrito
       ? emailAoCliente({
@@ -1238,7 +1273,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
         <p style="font-size:14px;line-height:1.6">${esc(t.ola)} ${esc(doc.clientNames)},</p>
         ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">${esc(t.intro)}</p>
-        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">${esc(t.botao)}</a></p>${cartaoDoPdf}`,
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;border-collapse:separate">
+          <tr><td style="background:#4c6350;border-radius:8px">
+            <!-- 48 px de altura (14+20+14) e letra de 16: é o outro botão deste
+                 mesmo email, e tinha 39 px com letra de 13. Dois botões lado a
+                 lado com alturas diferentes leem-se como dois produtos. -->
+            <a href="${acceptUrl}" style="display:block;padding:14px 26px;font-size:16px;line-height:20px;color:#f7f4ee;text-decoration:none;font-weight:600;white-space:nowrap">${esc(t.botao)}</a>
+          </td></tr>
+        </table>${cartaoDoPdf}`,
             texto: [
               t.titulo,
               "",
