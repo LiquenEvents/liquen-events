@@ -204,11 +204,11 @@ export function AvisoDeArmazenamento() {
   return (
     <div
       role="alert"
-      className="mb-4 rounded-xl border border-[#a03a1a]/30 bg-[#f6e6df]/60 px-4 py-3 text-sm"
+      className="mb-4 rounded-xl border border-[#8a2a22]/30 bg-[#f6e6df]/60 px-4 py-3 text-sm"
     >
       {falarDoArmazenamento && (
         <>
-          <p className="font-medium text-[#a03a1a]">{estado.titulo}</p>
+          <p className="font-medium text-[#8a2a22]">{estado.titulo}</p>
           <p className="bo-text-muted mt-1">{estado.oQueFazer}</p>
           {estado.fotosOQueFazer && estado.fotos === "sem-resposta" && (
             <p className="bo-text-muted mt-1">{estado.fotosOQueFazer}</p>
@@ -223,7 +223,7 @@ export function AvisoDeArmazenamento() {
           proposta. É a avaria mais cara que esta casa teve, e a mais calada. */}
       {(estado.colunasEmFalta?.length ?? 0) > 0 && (
         <>
-          <p className={`font-medium text-[#a03a1a] ${falarDoArmazenamento ? "mt-3" : ""}`}>
+          <p className={`font-medium text-[#8a2a22] ${falarDoArmazenamento ? "mt-3" : ""}`}>
             {estado.colunasTitulo}
           </p>
           <p className="bo-text-muted mt-1">{estado.colunasOQueFazer}</p>
@@ -232,7 +232,7 @@ export function AvisoDeArmazenamento() {
       {estado.copia?.avisar && (
         <>
           <p
-            className={`font-medium text-[#a03a1a] ${
+            className={`font-medium text-[#8a2a22] ${
               falarDoArmazenamento || (estado.colunasEmFalta?.length ?? 0) > 0 ? "mt-3" : ""
             }`}
           >

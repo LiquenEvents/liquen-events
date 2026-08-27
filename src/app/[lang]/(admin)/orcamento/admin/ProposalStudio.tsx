@@ -9678,7 +9678,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     de o PDF sair, não depois de o casal perguntar. As frases
                     vêm feitas de `totaisDaProposta`. */}
                 {!totais.fecha && (
-                  <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[#c0392b]/35 bg-[#c0392b]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[#a03123]">
+                  <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]">
                     {totais.porQueNaoFecha.map((porque) => (
                       <li key={porque}>⚠ As contas não fecham: {porque}.</li>
                     ))}
@@ -9953,7 +9953,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 {/\{[^}\s]{1,24}\}/.test(mensagemAoCliente) && (
                   <p
                     aria-live="polite"
-                    className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]"
+                    className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
                   >
                     <span aria-hidden="true">⚠</span>
                     <span>
@@ -10030,7 +10030,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               {fotosPorConfirmar > 0 && (
                 <p
                   aria-live="polite"
-                  className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]"
+                  className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
                 >
                   <span aria-hidden="true">⏳</span>
                   <span>
@@ -10286,7 +10286,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       // também seja anunciado a quem não olha para aqui.
                       className={
                         alarme
-                          ? "ml-2 rounded-full bg-[#c0392b]/12 px-2 py-0.5 text-[11px] font-semibold text-[#a03123]"
+                          ? "ml-2 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
                           : "ml-2 text-[11px] text-foreground/35"
                       }
                       aria-live={alarme ? "assertive" : "polite"}
@@ -11750,7 +11750,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         <span className="bo-eyebrow">Só para si</span>
         <span className="text-xs text-foreground/70">
           Margem{" "}
-          <strong className={`font-semibold ${magra ? "text-[#b5654a]" : "text-[#4d6350]"}`}>
+          <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-[#4d6350]"}`}>
             {eur(total.margem)} · {Math.round(total.percentagem)}%
           </strong>
         </span>
@@ -11875,7 +11875,7 @@ function PreviewSummary({
       {/* O resumo mostra as fotos a caminho esbatidas; dizer quantas são evita
           que um PDF gerado agora — que não as leva — pareça um erro. */}
       {fotosPorConfirmar > 0 && (
-        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[#b5654a]">
+        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[#8a2a22]">
           {fotosPorConfirmar === 1
             ? "1 foto ainda está a entrar na proposta e não entra num PDF gerado agora."
             : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}

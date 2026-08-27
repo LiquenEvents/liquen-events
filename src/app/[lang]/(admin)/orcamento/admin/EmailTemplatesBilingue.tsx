@@ -556,7 +556,7 @@ export default function EmailTemplatesBilingue() {
                 }`}
               >
                 <p
-                  className={`text-sm ${activo ? "text-[#5F7C66] font-medium" : "text-foreground/70"}`}
+                  className={`text-sm ${activo ? "text-[#4d6350] font-medium" : "text-foreground/70"}`}
                 >
                   {m.nome}
                   {!temIngles && (
@@ -628,7 +628,7 @@ export default function EmailTemplatesBilingue() {
                     className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
                       activo
                         ? "bg-[#5F7C66] text-white"
-                        : "bg-[#5F7C66]/10 text-[#5F7C66] hover:bg-[#5F7C66]/20"
+                        : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
                     }`}
                   >
                     {l === "pt" ? "Português" : "English"}
@@ -681,7 +681,7 @@ export default function EmailTemplatesBilingue() {
                         className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${
                           grupo.grupo === "remetente"
                             ? "bg-[#8a5d13]/10 text-[#8a5d13] hover:bg-[#8a5d13]/20"
-                            : "bg-[#5F7C66]/10 text-[#5F7C66] hover:bg-[#5F7C66]/20"
+                            : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
                         }`}
                       >
                         {v.rotulo}
@@ -703,7 +703,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(false)}
-                className="px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#5F7C66] hover:bg-[#5F7C66]/20 transition-colors"
+                className="px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 transition-colors"
               >
                 só se houver data
               </button>
@@ -711,7 +711,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(true)}
-                className="px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#5F7C66] hover:bg-[#5F7C66]/20 transition-colors"
+                className="px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 transition-colors"
               >
                 só se NÃO houver data
               </button>
@@ -824,7 +824,7 @@ export default function EmailTemplatesBilingue() {
             {falhaNosPedidos !== null && (
               <div
                 role="alert"
-                className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[#f6e6df]/60 px-3 py-2 text-[11px] leading-relaxed text-[#a03a1a]"
+                className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[#f6e6df]/60 px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]"
               >
                 <span>
                   Não foi possível ler os pedidos para pré-visualizar

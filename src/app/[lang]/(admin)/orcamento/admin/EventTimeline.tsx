@@ -320,9 +320,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
       {colisoes.length > 0 && (
         <div
           role="alert"
-          className="mb-5 rounded-xl border border-[#a03a1a]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-[#a03a1a]">
+          <p className="font-medium text-[#8a2a22]">
             Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o guião mudou noutro sítio
             entretanto.
           </p>

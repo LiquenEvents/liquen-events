@@ -527,8 +527,8 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
           className="flex items-stretch gap-0 overflow-x-auto pb-1 -mx-1 px-1"
         >
           {stage === "perdido" ? (
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#b5654a]/12 text-[#b5654a] text-[11px] tracking-[0.12em] uppercase font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#b5654a]" />
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#8a2a22]/12 text-[#8a2a22] text-[11px] tracking-[0.12em] uppercase font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#8a2a22]" />
               Negócio perdido
             </span>
           ) : (

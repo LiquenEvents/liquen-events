@@ -183,7 +183,7 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
         {recusadas.length > 0 && (
           <div
             role="alert"
-            className="rounded-xl border border-[#b5654a]/40 bg-[#b5654a]/[0.07] px-4 py-3"
+            className="rounded-xl border border-[#8a2a22]/40 bg-[#8a2a22]/[0.07] px-4 py-3"
           >
             <p className="text-[#8a4632] text-xs font-medium leading-snug">
               {recusadas.length === 1
@@ -205,7 +205,7 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
               type="button"
               onClick={tentarGravarDeNovo}
               disabled={aTentar}
-              className="alvo-toque mt-2.5 rounded-lg border border-[#b5654a]/40 px-3 py-1.5 text-[11px] font-medium text-[#8a4632] transition-colors hover:bg-[#b5654a]/10 disabled:opacity-45"
+              className="alvo-toque mt-2.5 rounded-lg border border-[#8a2a22]/40 px-3 py-1.5 text-[11px] font-medium text-[#8a4632] transition-colors hover:bg-[#8a2a22]/10 disabled:opacity-45"
             >
               {aTentar ? "A tentar…" : "Tentar de novo"}
             </button>

@@ -95,7 +95,7 @@ describe("as linhas de pagamento no telemóvel", () => {
   });
 
   it("dá 44 × 44 ao botão de remover um pagamento", () => {
-    expect(PAGAMENTOS).toMatch(/className="alvo-toque text-foreground\/45 hover:text-\[#b5654a\]/);
+    expect(PAGAMENTOS).toMatch(/className="alvo-toque text-foreground\/45 hover:text-\[#8a2a22\]/);
   });
 });
 

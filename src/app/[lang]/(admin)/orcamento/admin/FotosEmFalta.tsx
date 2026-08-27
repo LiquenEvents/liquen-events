@@ -157,7 +157,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
 
   return (
     <>
-      <div className={`${CAIXA} bg-[#c0392b]/10 text-[#a03123]`} role="alert">
+      <div className={`${CAIXA} bg-[#8a2a22]/10 text-[#8a2a22]`} role="alert">
         <p className="font-semibold">
           {r.emFalta.length === 1
             ? "1 fotografia não vai aparecer ao casal."

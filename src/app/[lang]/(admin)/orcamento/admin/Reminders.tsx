@@ -246,17 +246,17 @@ export default function Reminders({ quotes, onOpen }: Props) {
               disabled={!r.quote}
               className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 motion-safe:transition-colors ${r.quote ? "hover:bg-foreground/[0.02] cursor-pointer" : "cursor-default"}`}
             >
-              <span style={{ color: r.urgent ? "#b5654a" : "#9aa36a" }}>{icon(r.kind)}</span>
+              <span style={{ color: r.urgent ? "#8a2a22" : "#9aa36a" }}>{icon(r.kind)}</span>
               <div className="min-w-0 flex-1">
                 <p className="text-foreground/70 text-xs truncate font-medium">{r.text}</p>
                 <p
-                  className={`text-[10px] truncate ${r.urgent ? "text-[#b5654a]" : "text-foreground/40"}`}
+                  className={`text-[10px] truncate ${r.urgent ? "text-[#8a2a22]" : "text-foreground/40"}`}
                 >
                   {r.sub}
                 </p>
               </div>
               {r.urgent && (
-                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[#b5654a]/12 text-[#b5654a]">
+                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[#8a2a22]/12 text-[#8a2a22]">
                   Urgente
                 </span>
               )}

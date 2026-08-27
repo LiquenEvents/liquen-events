@@ -694,7 +694,7 @@ export function printEventDossier(q: Quote): void {
     .facts3 .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #888; }
     .facts3 .v { font-size: 13px; font-weight: 600; }
     .green { color: #3a5c39; }
-    .red { color: #a03a1a; }
+    .red { color: #8a2a22; }
     .grey { color: #777; }
     table { width: 100%; border-collapse: collapse; }
     th { text-align: left; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #999; padding: 7px 6px; border-bottom: 2px solid #ddd; }

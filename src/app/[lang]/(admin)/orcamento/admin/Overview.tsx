@@ -105,7 +105,7 @@ function Delta({ now, prev }: { now: number; prev: number }) {
     <span
       aria-label={`${up ? "a subir" : "a descer"} ${Math.abs(pct)}% face ao mês anterior`}
       className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
-        up ? "text-[#8aad85]" : "text-[#c08457]"
+        up ? "text-[#4d6350]" : "text-[#8a6420]"
       }`}
     >
       <svg
@@ -402,7 +402,7 @@ function AvisoConflito({
   return (
     <div
       role="alert"
-      className="mt-3 rounded-xl border border-[#b5654a]/30 bg-[#b5654a]/[0.06] p-3 text-left"
+      className="mt-3 rounded-xl border border-[#8a2a22]/30 bg-[#8a2a22]/[0.06] p-3 text-left"
     >
       <p className="text-[#8f4a33] text-xs font-semibold leading-snug">
         {doBrowser
@@ -463,7 +463,7 @@ function LinhaEstado({
   if (estado.tipo === "erro") {
     const texto = estado.texto;
     return (
-      <span role="alert" className="text-[#b5654a] text-[10px] leading-snug">
+      <span role="alert" className="text-[#8a2a22] text-[10px] leading-snug">
         Não foi possível guardar — o texto está só neste ecrã. {estado.mensagem}{" "}
         <button
           onClick={() => onTentarDeNovo(texto)}
@@ -475,7 +475,7 @@ function LinhaEstado({
     );
   }
   if (estado.tipo === "conflito") {
-    return <span className="text-[#b5654a] text-[10px]">Duas versões por resolver.</span>;
+    return <span className="text-[#8a2a22] text-[10px]">Duas versões por resolver.</span>;
   }
   if (porGravar) return <span className="text-foreground/40 text-[10px]">Por guardar…</span>;
   if (estado.tipo === "a-guardar")
@@ -492,7 +492,7 @@ function LinhaEstado({
 /** A leitura falhou: dizê-lo é obrigatório — um "Sem notas." seria outra mentira. */
 function AvisoLeitura({ onRecarregar }: { onRecarregar: () => void }) {
   return (
-    <p role="alert" className="text-[#b5654a] text-xs leading-relaxed">
+    <p role="alert" className="text-[#8a2a22] text-xs leading-relaxed">
       Não foi possível ler o que está guardado no servidor.{" "}
       <button onClick={onRecarregar} className={`underline font-semibold rounded ${FOCUS_RING}`}>
         Tentar de novo
@@ -953,7 +953,7 @@ function AEsperaDeResposta({
         </div>
         <div className="text-right">
           <p
-            className="text-[#7c854b] font-bold leading-none"
+            className="text-[#8a6420] font-bold leading-none"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(16px, 2vw, 22px)" }}
           >
             {eur(pendurado)}
@@ -1528,7 +1528,7 @@ export default function Overview({
           onClick={() => onOpen(data.nextEvent!)}
           className={`w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none ${FOCUS_RING} ${
             data.nextEventDays <= 3
-              ? "bg-[#b5654a]/[0.07] border-[#b5654a]/25 hover:border-[#b5654a]/40"
+              ? "bg-[#8a2a22]/[0.07] border-[#8a2a22]/25 hover:border-[#8a2a22]/40"
               : data.nextEventDays <= 7
                 ? "bg-amber-500/[0.05] border-amber-500/20 hover:border-amber-500/35"
                 : "bg-[#4d6350]/[0.05] border-[#4d6350]/20 hover:border-[#4d6350]/35"
@@ -1541,7 +1541,7 @@ export default function Overview({
                 style={{
                   color:
                     data.nextEventDays <= 3
-                      ? "#b5654a"
+                      ? "#8a2a22"
                       : data.nextEventDays <= 7
                         ? "#b5894a"
                         : "#4d6350",
@@ -1576,7 +1576,7 @@ export default function Overview({
                   fontFamily: "var(--font-playfair)",
                   color:
                     data.nextEventDays <= 3
-                      ? "#b5654a"
+                      ? "#8a2a22"
                       : data.nextEventDays <= 7
                         ? "#b5894a"
                         : "#4d6350",
@@ -1796,7 +1796,7 @@ export default function Overview({
             <h3 className="bo-eyebrow">Fases dos pedidos</h3>
             <button
               onClick={() => onGo("kanban")}
-              className={`alvo-toque text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               Abrir →
             </button>
@@ -1848,7 +1848,7 @@ export default function Overview({
             <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
             <button
               onClick={onGoStats}
-              className={`alvo-toque text-[#4d6350] hover:text-[#637a5f] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
             >
               Ver tudo →
             </button>

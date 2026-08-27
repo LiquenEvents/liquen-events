@@ -207,7 +207,7 @@ export default function ModelosParciais({
       {aberto && (
         <div className={PAINEL_SUSPENSO + " p-1"}>
           {naoDeuParaLer ? (
-            <p className="px-3 py-2 text-xs text-[#a03123]">
+            <p className="px-3 py-2 text-xs text-[#8a2a22]">
               Não deu para ler os modelos guardados. Volta a tentar — os que tinhas continuam lá.
             </p>
           ) : modelos.length === 0 ? (

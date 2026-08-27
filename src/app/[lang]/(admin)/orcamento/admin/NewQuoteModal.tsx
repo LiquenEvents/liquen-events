@@ -130,7 +130,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
                 <path d="M12 9v4M12 17h.01" />
               </svg>
               <div className="min-w-0">
-                <p className="text-[#a9781f] text-xs font-semibold mb-0.5">
+                <p className="text-[#8a6420] text-xs font-semibold mb-0.5">
                   Este e-mail já tem {duplicates.length} pedido{duplicates.length !== 1 ? "s" : ""}{" "}
                   registado{duplicates.length !== 1 ? "s" : ""}
                 </p>

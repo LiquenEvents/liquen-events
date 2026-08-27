@@ -38,7 +38,7 @@ const STATUS_COLOR: Record<string, string> = {
 const KIND_META: Record<CalendarEventKind, { label: string; color: string }> = {
   reuniao: { label: "Reunião", color: "#7a8caa" },
   evento: { label: "Evento", color: "#7c854b" },
-  bloqueio: { label: "Data fechada", color: "#b5654a" },
+  bloqueio: { label: "Data fechada", color: "#8a2a22" },
   nota: { label: "Nota", color: "#a08a5a" },
 };
 

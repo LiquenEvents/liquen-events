@@ -547,7 +547,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
               <span
                 className={`ml-1.5 text-[10px] ${
                   cd.tone === "today" || cd.tone === "soon"
-                    ? "font-medium text-[#b5654a]"
+                    ? "font-medium text-[#8a2a22]"
                     : "text-foreground/45"
                 }`}
               >
@@ -720,7 +720,7 @@ const QuoteCard = memo(function QuoteCard({
               <span
                 className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-semibold tracking-[0.1em] uppercase ${
                   tom === "urgente"
-                    ? "bg-[#b5654a]/15 text-[#b5654a]"
+                    ? "bg-[#8a2a22]/15 text-[#8a2a22]"
                     : tom === "aviso"
                       ? "bg-[#c08a3e]/15 text-[#8a6420]"
                       : "bg-foreground/[0.06] text-foreground/45"
@@ -746,7 +746,7 @@ const QuoteCard = memo(function QuoteCard({
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
                     q.followUpAt < todayStr
-                      ? "bg-[#b5654a]/15 text-[#b5654a]"
+                      ? "bg-[#8a2a22]/15 text-[#8a2a22]"
                       : "bg-[#637a5f]/15 text-[#4d6350]"
                   }`}
                   title={q.followUpAt < todayStr ? "Seguimento em atraso" : "Seguimento hoje"}
@@ -812,7 +812,7 @@ const QuoteCard = memo(function QuoteCard({
                 <span
                   className={
                     cd.tone === "today" || cd.tone === "soon"
-                      ? "text-[#b5654a] font-semibold"
+                      ? "text-[#8a2a22] font-semibold"
                       : "text-[var(--bo-text)] font-medium"
                   }
                 >
@@ -5069,7 +5069,7 @@ export default function AdminClient({
                 <button
                   onClick={() => deleteSelected(seleccionadosAVista)}
                   disabled={bulkBusy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#b5654a]/25 text-[#b5654a]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#b5654a]/10 hover:text-[#b5654a] transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#8a2a22]/25 text-[#8a2a22]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] transition-colors disabled:opacity-50"
                 >
                   Apagar ({seleccionadosAVista.length})
                 </button>
@@ -5824,7 +5824,7 @@ export default function AdminClient({
                                         Custos {formatPrice(costs)} · Margem{" "}
                                         <span
                                           className={
-                                            margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"
+                                            margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"
                                           }
                                         >
                                           {formatPrice(margin)}
@@ -5849,7 +5849,7 @@ export default function AdminClient({
                                       const cd = eventCountdown(editDate);
                                       return cd ? (
                                         <p
-                                          className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/40"}`}
+                                          className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[#8a2a22]" : "text-foreground/40"}`}
                                         >
                                           {cd.label}
                                         </p>
@@ -5874,7 +5874,7 @@ export default function AdminClient({
                                     }
                                     onChange={(e) => setEditGuests(e.target.value)}
                                     className={`bo-input px-3 py-2 text-sm text-foreground/80 w-full${
-                                      erroDeConvidados ? " border-[#b5654a]" : ""
+                                      erroDeConvidados ? " border-[#8a2a22]" : ""
                                     }`}
                                   />
                                   {/* O `min={0}` do input não trava nada — o
@@ -5884,7 +5884,7 @@ export default function AdminClient({
                                   {erroDeConvidados && (
                                     <p
                                       id="erro-dos-convidados"
-                                      className="mt-1 text-[10px] leading-relaxed text-[#b5654a]"
+                                      className="mt-1 text-[10px] leading-relaxed text-[#8a2a22]"
                                     >
                                       {erroDeConvidados}
                                     </p>
@@ -5968,7 +5968,7 @@ export default function AdminClient({
                                     obrigatório» — porque não é: há pedidos que
                                     só têm telefone, e isso é legítimo. */}
                                   {!editEmail.trim() && (
-                                    <p className="mt-1 text-[10px] leading-relaxed text-[#b5654a]">
+                                    <p className="mt-1 text-[10px] leading-relaxed text-[#8a2a22]">
                                       Sem email, a proposta é gravada e o link continua a servir,
                                       mas não é enviada a ninguém.
                                     </p>
@@ -6765,7 +6765,7 @@ export default function AdminClient({
                                 aria-live={alarme ? "assertive" : "polite"}
                                 className={
                                   alarme
-                                    ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[#a03123]"
+                                    ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[#8a2a22]"
                                     : "flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
                                 }
                               >

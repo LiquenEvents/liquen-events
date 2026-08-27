@@ -58,7 +58,7 @@ const KIND_LABEL: Record<ItemKind, string> = {
 const KIND_COLOR: Record<ItemKind, string> = {
   evento: "#7c854b",
   agenda: "#7a8caa",
-  tarefa: "#b5654a",
+  tarefa: "#8a2a22",
   pagamento: "#b5894a",
   seguimento: "#637a5f",
 };
@@ -209,7 +209,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
           title: t.title,
           sub: t.assignee ? `Resp.: ${t.assignee}` : t.area,
           kind: "tarefa",
-          color: "#b5654a",
+          color: "#8a2a22",
         });
       }
     }
@@ -253,7 +253,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
             completa — e a diferença entre as duas é uma tarefa que ninguém faz
             hoje. Fica em cima do primeiro dia, que é onde o olho começa. */}
         {falha && days.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#a03a1a]/20 bg-[#f6e6df]/40 px-5 py-2.5 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-2.5 sm:px-6">
             <p className="bo-text-muted min-w-0 flex-1 text-[11px] leading-snug">
               Falta aqui o que não deu para ler — {oQueFaltou}. O que está em baixo vem dos pedidos,
               e está certo.

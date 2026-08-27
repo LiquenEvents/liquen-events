@@ -359,7 +359,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
       )}
 
       {aviso && (
-        <p role="alert" className="mt-2 text-[#b5654a] text-[11px] leading-snug">
+        <p role="alert" className="mt-2 text-[#8a2a22] text-[11px] leading-snug">
           {aviso}
         </p>
       )}

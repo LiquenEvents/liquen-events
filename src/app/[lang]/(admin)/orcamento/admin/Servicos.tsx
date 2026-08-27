@@ -147,7 +147,7 @@ export default function Servicos() {
   if (erro && servicos === null) {
     return (
       <Card padding="md">
-        <p className="text-xs leading-relaxed text-[#b5654a]">{erro}</p>
+        <p className="text-xs leading-relaxed text-[#8a2a22]">{erro}</p>
       </Card>
     );
   }

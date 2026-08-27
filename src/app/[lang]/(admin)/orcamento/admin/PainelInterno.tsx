@@ -136,12 +136,12 @@ function CampoKm({
             emitido.current = leitura.valor;
             onKm(leitura.valor);
           }}
-          className={`bo-input w-20 px-2 py-1.5 text-xs${erro ? " border-[#b5654a]" : ""}`}
+          className={`bo-input w-20 px-2 py-1.5 text-xs${erro ? " border-[#8a2a22]" : ""}`}
         />
         <span className="text-[11px] text-foreground/45">km, num sentido</span>
       </label>
       {erro ? (
-        <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
+        <span id={idErro} className="text-[10px] leading-relaxed text-[#8a2a22]">
           {erro}
         </span>
       ) : (
@@ -315,7 +315,7 @@ export default function PainelInterno({
         {/* Os dois sinais que valem um olhar mesmo com o painel fechado. */}
         <span className="ml-auto flex items-center gap-1.5">
           {magra && (
-            <span className="rounded-full bg-[#b5654a]/15 px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase text-[#8a4632]">
+            <span className="rounded-full bg-[#8a2a22]/15 px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase text-[#8a4632]">
               margem {total!.percentagem}%
             </span>
           )}
@@ -414,7 +414,7 @@ export default function PainelInterno({
                             l?.percentagem === null
                               ? "text-foreground/25"
                               : l!.percentagem! < margemMinima
-                                ? "text-[#b5654a]"
+                                ? "text-[#8a2a22]"
                                 : "text-foreground/60"
                           }`}
                         >
@@ -443,7 +443,7 @@ export default function PainelInterno({
 
               {total && (
                 <p
-                  className={`mt-3 text-xs leading-relaxed ${magra ? "text-[#b5654a]" : "text-foreground/60"}`}
+                  className={`mt-3 text-xs leading-relaxed ${magra ? "text-[#8a2a22]" : "text-foreground/60"}`}
                 >
                   Margem de {eur(total.margem)} em {eur(total.precoComparavel)} —{" "}
                   <strong className="font-semibold">{total.percentagem}%</strong>

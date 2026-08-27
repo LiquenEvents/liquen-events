@@ -692,19 +692,19 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           <div
             className={`${QUADRADO} ${
               outstanding > 0
-                ? "@min-[26rem]:border-[#b5654a]/35 @min-[26rem]:bg-[#b5654a]/[0.05]"
+                ? "@min-[26rem]:border-[#8a2a22]/35 @min-[26rem]:bg-[#8a2a22]/[0.05]"
                 : NEUTRO
             }`}
           >
             <p
               className={`${VALOR} ${
-                outstanding > 0 ? "text-lg text-[#b5654a]" : "text-base text-foreground/45"
+                outstanding > 0 ? "text-lg text-[#8a2a22]" : "text-base text-foreground/45"
               }`}
             >
               {eur2(outstanding)}
             </p>
             <p
-              className={`${ROTULO} ${outstanding > 0 ? "text-[#b5654a]/70" : "text-foreground/40"}`}
+              className={`${ROTULO} ${outstanding > 0 ? "text-[#8a2a22]/70" : "text-foreground/40"}`}
             >
               Em falta
             </p>
@@ -748,7 +748,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           className="flex items-start gap-2.5 rounded-lg border border-[#c99a3a]/40 bg-[#c99a3a]/[0.08] px-3.5 py-2.5 mb-4"
         >
           <svg
-            className="text-[#a9781f] shrink-0 mt-0.5"
+            className="text-[#8a6420] shrink-0 mt-0.5"
             width="15"
             height="15"
             viewBox="0 0 24 24"
@@ -763,7 +763,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             />
           </svg>
           <div className="min-w-0">
-            <p className="text-[#a9781f] text-xs font-medium leading-snug">
+            <p className="text-[#8a6420] text-xs font-medium leading-snug">
               Recebido excede o total contratado ({eur2(headlinePaid)} de {eur2(total)}).
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
@@ -877,7 +877,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       {/* Linha de altura fixa para o erro / atalho de teclado. */}
       <p
         className={`min-h-[1.1rem] leading-[1.1rem] text-[10px] mt-1.5 ${
-          formError ? "text-[#b5654a]" : "text-foreground/35"
+          formError ? "text-[#8a2a22]" : "text-foreground/35"
         }`}
         role={formError ? "alert" : undefined}
       >
@@ -956,7 +956,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               key={p.id}
               className={`group ${GRID} rounded-lg px-2 py-1.5 motion-safe:transition-colors ${
                 isFailed
-                  ? "border border-[#b5654a]/50 bg-[#b5654a]/[0.06]"
+                  ? "border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06]"
                   : "border border-transparent hover:bg-foreground/[0.03]"
               }`}
             >
@@ -1008,7 +1008,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               )}
 
               <span
-                className={`text-[11px] tabular-nums truncate ${overdue ? "text-[#b5654a]" : "text-foreground/45"}`}
+                className={`text-[11px] tabular-nums truncate ${overdue ? "text-[#8a2a22]" : "text-foreground/45"}`}
                 title={overdue ? "Em atraso" : undefined}
               >
                 {fmtRowDate(p.date)}
@@ -1043,7 +1043,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   <button
                     type="button"
                     onClick={retryFailed}
-                    className="rounded-md border border-[#b5654a]/50 px-1.5 py-0.5 text-[10px] text-[#b5654a] hover:bg-[#b5654a]/10"
+                    className="rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10"
                   >
                     Repetir
                   </button>
@@ -1065,7 +1065,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                       // apagar dinheiro do registo, e é o alvo mais pequeno da
                       // linha — aqui a centragem do `alvo-toque` é a certa,
                       // porque o conteúdo é um símbolo.
-                      className="alvo-toque text-foreground/45 hover:text-[#b5654a] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all p-1"
+                      className="alvo-toque text-foreground/45 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all p-1"
                       aria-label={`Remover ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
                     >
                       ×
@@ -1081,7 +1081,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             com "Repetir" — em vez de desaparecer com um toast. */}
         {ghostFailed && failed?.ghost && (
           <div
-            className={`${GRID} rounded-lg border border-[#b5654a]/50 bg-[#b5654a]/[0.06] px-2 py-1.5`}
+            className={`${GRID} rounded-lg border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06] px-2 py-1.5`}
           >
             <span className="text-foreground/60 text-xs truncate">
               {KIND_LABEL[failed.ghost.kind]}
@@ -1092,13 +1092,13 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             <span className="text-foreground/45 text-[11px] tabular-nums truncate">
               {fmtRowDate(failed.ghost.date)}
             </span>
-            <span className="text-[#b5654a] text-[11px] truncate">Não guardado</span>
+            <span className="text-[#8a2a22] text-[11px] truncate">Não guardado</span>
             <span className="text-foreground/40 text-[9px] tracking-[0.1em] uppercase">—</span>
             <div className="flex items-center justify-end gap-0.5">
               <button
                 type="button"
                 onClick={retryFailed}
-                className="rounded-md border border-[#b5654a]/50 px-1.5 py-0.5 text-[10px] text-[#b5654a] hover:bg-[#b5654a]/10"
+                className="rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10"
               >
                 Repetir
               </button>
@@ -1106,7 +1106,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 type="button"
                 onClick={() => setFailed(null)}
                 aria-label="Descartar registo não guardado"
-                className="text-foreground/45 hover:text-[#b5654a] p-1"
+                className="text-foreground/45 hover:text-[#8a2a22] p-1"
               >
                 ×
               </button>

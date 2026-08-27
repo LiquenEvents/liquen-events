@@ -193,7 +193,7 @@ export default function BotaoGuardarTudo() {
               className={
                 frases.tudoBem
                   ? "flex-1 text-[12px] font-semibold text-foreground/80"
-                  : "flex-1 text-[12px] font-semibold text-[#a03123]"
+                  : "flex-1 text-[12px] font-semibold text-[#8a2a22]"
               }
             >
               {frases.titulo}
@@ -230,7 +230,7 @@ export default function BotaoGuardarTudo() {
                   key={l.nome}
                   className={
                     l.mau
-                      ? "text-[11px] leading-snug text-[#a03123]"
+                      ? "text-[11px] leading-snug text-[#8a2a22]"
                       : "text-[11px] leading-snug text-foreground/55"
                   }
                 >
