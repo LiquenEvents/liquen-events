@@ -1044,6 +1044,99 @@ interface Props {
   onVerArquivados?: () => void;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE FICA ATRÁS DE UM TOQUE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Nove dos treze blocos da Visão Geral vivem aqui dentro. Não é um arquivo
+ * morto — é a diferença entre «o que preciso de saber agora» e «o que quero
+ * consultar quando for a isso».
+ *
+ * ── PORQUÊ UM `<details>` NATIVO E NÃO UM ESTADO DO REACT ─────────────────
+ *
+ * Porque assim isto abre sem uma linha de JavaScript, responde ao teclado sem
+ * ninguém escrever um `onKeyDown`, e — a parte que se esquece — o «localizar na
+ * página» do browser encontra o que está lá dentro MESMO FECHADO, e abre-o. Um
+ * `{aberto && …}` em React apagava o conteúdo do DOM: quem procurasse
+ * «Margarida» com o ⌘F não a encontrava, e concluía, com razão, que ela não
+ * estava no ecrã.
+ *
+ * ── O RÓTULO DIZ O QUE LÁ ESTÁ ───────────────────────────────────────────
+ *
+ * A regra da casa é nunca deixar alguém sem saber o que está a acontecer.
+ * «Mais» sozinho seria uma gaveta anónima, e uma gaveta anónima não se abre —
+ * desconfia-se dela. Por isso a linha de baixo enumera o que lá está dentro,
+ * pelo nome com que ela os conhece.
+ *
+ * ── E A ESCOLHA DELA FICA ────────────────────────────────────────────────
+ *
+ * Se abrir, fica aberto da próxima vez. Quem gosta de ver tudo não tem de
+ * carregar todos os dias no mesmo sítio — e quem não gosta nunca mais lá mexe.
+ * A leitura é num efeito e não no desenho: o servidor não sabe o que está no
+ * armazenamento do telemóvel dela, e desenhar coisas diferentes dos dois lados
+ * é o defeito de hidratação que esta casa já apanhou noutro sítio.
+ */
+const CHAVE_DO_MAIS = "liquen-visao-geral-mais";
+
+function MaisDoPainel({ children }: { children: React.ReactNode }) {
+  const [aberto, setAberto] = useState(false);
+
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (localStorage.getItem(CHAVE_DO_MAIS) === "1") setAberto(true);
+    } catch {
+      /* armazenamento bloqueado — fica fechado, que é o estado por omissão */
+    }
+  }, []);
+
+  return (
+    <details
+      className="bo-mais"
+      open={aberto}
+      onToggle={(e) => {
+        const agora = (e.currentTarget as HTMLDetailsElement).open;
+        setAberto(agora);
+        try {
+          localStorage.setItem(CHAVE_DO_MAIS, agora ? "1" : "0");
+        } catch {
+          /* sem armazenamento, a escolha vale só para esta visita */
+        }
+      }}
+    >
+      <summary
+        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-foreground/[0.03] ${FOCUS_RING}`}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-[var(--bo-text)]">
+            Mais do painel
+          </span>
+          <span className="bo-text-muted mt-0.5 block text-[12px] leading-snug">
+            Contadores, notas da equipa, meta do mês, lembretes, agenda, fases dos pedidos, dinheiro
+            recebido, o que precisa de atenção e a atividade recente.
+          </span>
+        </span>
+        <svg
+          className="bo-mais-seta mt-1 shrink-0 text-foreground/40"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden="true"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="mt-[var(--bo-gap-vista)] flex flex-col gap-[var(--bo-gap-vista)]">
+        {children}
+      </div>
+    </details>
+  );
+}
+
 export default function Overview({
   quotes,
   userName,
@@ -1473,8 +1566,37 @@ export default function Overview({
     // O espaço entre os blocos de topo é o token da escala (`globals.css`):
     // 20 px abaixo de 640, 28 a partir daí — o valor que esta vista já tinha.
     <div className="flex flex-col gap-[var(--bo-gap-vista)]">
+      {/* ══════════════════════════════════════════════════════════════════
+          A ENTRADA: QUATRO BLOCOS, E O RESTO ATRÁS DE UM TOQUE
+          ══════════════════════════════════════════════════════════════════
+
+          Palavras dela, a olhar para o deploy verdadeiro: «o back office está
+          com a mesma estrutura, não me diz nada — eu gostava mesmo de o levar
+          ao nível da Apple e da Pixelmatters».
+
+          O que faltava não era superfície. Esta vista tinha TREZE blocos
+          empilhados, todos visíveis ao mesmo tempo. A apple.com mostra seis, e
+          cada um ocupa um ecrã inteiro. Nenhuma afinação de cor ou de raio
+          salva uma página que diz treze coisas de uma vez.
+
+          Ficam QUATRO à vista, e são os que respondem à pergunta de quem abre
+          isto de manhã — «o que é que me espera?»:
+
+            1. quem é ela e o que pode fazer já;
+            2. o próximo evento;
+            3. o dinheiro;
+            4. quem está à espera de resposta.
+
+          Os outros nove NÃO foram apagados: passam para dentro do `<details>`
+          lá em baixo, que diz pelo nome o que lá tem. É reversível — uma
+          decisão de composição, não de dados.
+      */}
+
       {/* Greeting + quick actions */}
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+      <div
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5"
+      >
         <div>
           <p className="text-foreground/30 text-[10px] tracking-[0.4em] uppercase mb-2">
             {dateLabel}
@@ -1526,7 +1648,8 @@ export default function Overview({
       {data.nextEvent && data.nextEventDays !== null && data.nextEventDays <= 30 && (
         <button
           onClick={() => onOpen(data.nextEvent!)}
-          className={`w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none ${FOCUS_RING} ${
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className={`bo-cena w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none ${FOCUS_RING} ${
             data.nextEventDays <= 3
               ? "bg-[#8a2a22]/[0.07] border-[#8a2a22]/25 hover:border-[#8a2a22]/40"
               : data.nextEventDays <= 7
@@ -1718,7 +1841,10 @@ export default function Overview({
                nenhum, portanto quem ouve a página ouve sempre o mesmo. */
             className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
-            <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
+            <div
+              style={{ "--cena": 2 } as React.CSSProperties}
+              className="bo-cena order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between"
+            >
               <p
                 className="font-bold leading-none"
                 style={{
@@ -1758,335 +1884,342 @@ export default function Overview({
         ))}
       </div>
 
-      {/* Os contadores de trabalho — quantos, e não quanto. Ficam por baixo dos
-          três de dinheiro, e trazem agora a mesma linha de apoio à vista.
-          Mesma forma dos três de cima no telemóvel, e de propósito: são duas
-          leituras — «o dinheiro» e «o trabalho» — e duas caixas dizem isso
-          melhor do que seis cartões todos iguais empilhados. Os números são
-          contagens curtas, portanto as linhas ficam ainda mais baixas. */}
-      <div className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent">
-        {[
-          {
-            v: String(data.active),
-            l: "Pedidos ativos",
-            hint: "ainda em aberto, seja em que fase for",
-            go: () => onGo("pedidos"),
-          },
-          {
-            v: String(data.pendingReview),
-            l: "Por responder",
-            hint: "esperam uma proposta nossa",
-            go: () => onGo("pedidos"),
-          },
-          {
-            v: String(data.eventsThisWeek),
-            l: "Próximos 7 dias",
-            hint: "eventos já agendados",
-            go: () => onGo("calendario"),
-          },
-        ].map((k) => (
-          <button
-            key={k.l}
-            onClick={k.go}
-            aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-            className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
-          >
-            <p
-              className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 1.9vw, 22px)" }}
-            >
-              {k.v}
-            </p>
-            {/* Era `text-[9px]` no tom `faint` — o degrau que o próprio
-                `globals.css` marca como «decorativo, nunca o único portador de
-                informação». Só que ERA o único: sem ele o número é um algarismo
-                solto. Passa a 15 px no tom de texto a sério. */}
-            {/* `lg:` e não `sm:`, pela mesma razão do bloco de cima: entre 640
-                e 1023 o `sm:text-[9px]` reabria a fresta por baixo do chão. */}
-            <p className="order-1 text-[15px] font-semibold text-[var(--bo-text)] sm:mt-2 lg:text-[9px] lg:font-medium lg:tracking-[0.25em] lg:uppercase lg:text-[var(--bo-text-faint)]">
-              {k.l}
-            </p>
-            <p className="order-3 mt-1 w-full text-[12px] leading-snug bo-text-muted sm:w-auto">
-              {k.hint}
-            </p>
-          </button>
-        ))}
+      <div style={{ "--cena": 3 } as React.CSSProperties} className="bo-cena">
+        <AEsperaDeResposta
+          linhas={data.semResposta}
+          pendurado={data.pendurado}
+          userName={userName}
+          onOpen={onOpen}
+          onQuoteAtualizado={onQuoteAtualizado}
+        />
       </div>
 
-      <AEsperaDeResposta
-        linhas={data.semResposta}
-        pendurado={data.pendurado}
-        userName={userName}
-        onOpen={onOpen}
-        onQuoteAtualizado={onQuoteAtualizado}
-      />
-
-      <PainelEquipa wonThisMonth={data.wonThisMonth} />
-
-      {/* Reminders — derived urgent items */}
-      <MemoReminders quotes={quotes} onOpen={onOpen} />
-
-      {/* Agenda — events, calendar entries, tasks & payments due */}
-      <MemoAgenda quotes={quotes} onOpen={onOpen} />
-
-      {/* Pipeline funnel + financial pulse */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Funnel */}
-        <div className="bo-card p-[var(--bo-p-cartao)]">
-          <div className="flex items-center justify-between mb-3.5 sm:mb-5">
-            <h3 className="bo-eyebrow">Fases dos pedidos</h3>
+      <MaisDoPainel>
+        {/* Os contadores de trabalho — quantos, e não quanto. Ficam por baixo dos
+            três de dinheiro, e trazem agora a mesma linha de apoio à vista.
+            Mesma forma dos três de cima no telemóvel, e de propósito: são duas
+            leituras — «o dinheiro» e «o trabalho» — e duas caixas dizem isso
+            melhor do que seis cartões todos iguais empilhados. Os números são
+            contagens curtas, portanto as linhas ficam ainda mais baixas. */}
+        <div className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent">
+          {[
+            {
+              v: String(data.active),
+              l: "Pedidos ativos",
+              hint: "ainda em aberto, seja em que fase for",
+              go: () => onGo("pedidos"),
+            },
+            {
+              v: String(data.pendingReview),
+              l: "Por responder",
+              hint: "esperam uma proposta nossa",
+              go: () => onGo("pedidos"),
+            },
+            {
+              v: String(data.eventsThisWeek),
+              l: "Próximos 7 dias",
+              hint: "eventos já agendados",
+              go: () => onGo("calendario"),
+            },
+          ].map((k) => (
             <button
-              onClick={() => onGo("kanban")}
-              className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              key={k.l}
+              onClick={k.go}
+              aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
+              className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
             >
-              Abrir →
+              <p
+                className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 1.9vw, 22px)" }}
+              >
+                {k.v}
+              </p>
+              {/* Era `text-[9px]` no tom `faint` — o degrau que o próprio
+                  `globals.css` marca como «decorativo, nunca o único portador de
+                  informação». Só que ERA o único: sem ele o número é um algarismo
+                  solto. Passa a 15 px no tom de texto a sério. */}
+              {/* `lg:` e não `sm:`, pela mesma razão do bloco de cima: entre 640
+                  e 1023 o `sm:text-[9px]` reabria a fresta por baixo do chão. */}
+              <p className="order-1 text-[15px] font-semibold text-[var(--bo-text)] sm:mt-2 lg:text-[9px] lg:font-medium lg:tracking-[0.25em] lg:uppercase lg:text-[var(--bo-text-faint)]">
+                {k.l}
+              </p>
+              <p className="order-3 mt-1 w-full text-[12px] leading-snug bo-text-muted sm:w-auto">
+                {k.hint}
+              </p>
             </button>
-          </div>
-          <div className="flex flex-col gap-3">
-            {FUNNEL.map((f) => {
-              const count = data.byStatus[f.id] ?? 0;
-              return (
-                <div key={f.id}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="flex items-center gap-2 text-foreground/55 text-xs">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: STATUS_META[f.id].color }}
+          ))}
+        </div>
+
+        <PainelEquipa wonThisMonth={data.wonThisMonth} />
+
+        {/* Reminders — derived urgent items */}
+        <MemoReminders quotes={quotes} onOpen={onOpen} />
+
+        {/* Agenda — events, calendar entries, tasks & payments due */}
+        <MemoAgenda quotes={quotes} onOpen={onOpen} />
+
+        {/* Pipeline funnel + financial pulse */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Funnel */}
+          <div className="bo-card p-[var(--bo-p-cartao)]">
+            <div className="flex items-center justify-between mb-3.5 sm:mb-5">
+              <h3 className="bo-eyebrow">Fases dos pedidos</h3>
+              <button
+                onClick={() => onGo("kanban")}
+                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              >
+                Abrir →
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {FUNNEL.map((f) => {
+                const count = data.byStatus[f.id] ?? 0;
+                return (
+                  <div key={f.id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="flex items-center gap-2 text-foreground/55 text-xs">
+                        <span
+                          className="w-2 h-2 rounded-full"
+                          style={{ background: STATUS_META[f.id].color }}
+                        />
+                        {f.label}
+                      </span>
+                      <span className="text-foreground/40 text-[11px] tabular-nums">{count}</span>
+                    </div>
+                    <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                      <div
+                        className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+                        style={{
+                          transform: `scaleX(${fraccaoDaBarra(count, data.funnelMax)})`,
+                          background: STATUS_META[f.id].color,
+                        }}
                       />
-                      {f.label}
-                    </span>
-                    <span className="text-foreground/40 text-[11px] tabular-nums">{count}</span>
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
-                    <div
-                      className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
-                      style={{
-                        transform: `scaleX(${fraccaoDaBarra(count, data.funnelMax)})`,
-                        background: STATUS_META[f.id].color,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
-            <span className="text-foreground/35 text-xs">
-              Pedidos que acabam em evento
-              <span className="block text-foreground/25 text-[10px]">
-                de cada 100 decididos, quantos ganhou
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
+              <span className="text-foreground/35 text-xs">
+                Pedidos que acabam em evento
+                <span className="block text-foreground/25 text-[10px]">
+                  de cada 100 decididos, quantos ganhou
+                </span>
               </span>
-            </span>
-            <span className="text-foreground/75 text-sm font-semibold tabular-nums">
-              {data.conversion}%
-            </span>
-          </div>
-        </div>
-
-        {/* Financial pulse */}
-        <div className="bo-card p-[var(--bo-p-cartao)]">
-          <div className="flex items-center justify-between mb-3.5 sm:mb-5">
-            <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
-            <button
-              onClick={onGoStats}
-              className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
-            >
-              Ver tudo →
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-3.5 sm:mb-5">
-            <div>
-              <p
-                className="text-[#4d6350] font-bold leading-none mb-1"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
-              >
-                {eur(data.received)}
-              </p>
-              <p className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase">Recebido</p>
-            </div>
-            <div>
-              <p
-                className="text-foreground/70 font-bold leading-none mb-1"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
-              >
-                {eur(data.outstanding)}
-              </p>
-              <p className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase">A receber</p>
-            </div>
-          </div>
-          {data.billed > 0 ? (
-            <>
-              <div className="relative h-2 rounded-full overflow-hidden bg-foreground/[0.06]">
-                <div
-                  className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
-                  style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
-                />
-                <div
-                  className="absolute inset-0 origin-left bg-[#c0a060]/70 motion-safe:transition-transform motion-safe:duration-700"
-                  style={{
-                    transform: `translateX(${fraccaoDaBarra(data.received, data.billed) * 100}%) scaleX(${fraccaoDaBarra(data.outstanding, data.billed)})`,
-                  }}
-                />
-              </div>
-              <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#4d6350]" /> Recebido
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#c0a060]/70" /> Por receber
-                </span>
-              </div>
-            </>
-          ) : (
-            <p className="text-foreground/40 text-xs leading-relaxed">
-              Ainda sem pagamentos registados. Assim que registar o primeiro, o recebido e o que
-              falta receber aparecem aqui.
-            </p>
-          )}
-          <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
-            <span className="text-foreground/35 text-xs">
-              Valor médio por evento ganho
-              <span className="block text-foreground/25 text-[10px]">
-                quanto vale, em média, cada pedido fechado
+              <span className="text-foreground/75 text-sm font-semibold tabular-nums">
+                {data.conversion}%
               </span>
-            </span>
-            <span className="text-foreground/75 text-sm font-semibold tabular-nums">
-              {eur(data.avgTicket)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Needs attention + recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
-        <div className="bo-card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
-            <h3 className="bo-eyebrow">Precisam de atenção</h3>
-            <div className="flex items-center gap-2">
-              {data.staleCount > 0 && (
-                <span className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-semibold">
-                  {data.staleCount} parado{data.staleCount !== 1 ? "s" : ""}
-                </span>
-              )}
-              {data.needAction.length > 0 && (
-                <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
-                  {data.needAction.length}
-                </span>
-              )}
             </div>
           </div>
-          <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
-            {data.needAction.length === 0 && (
-              <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
-                <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
-                <p className="text-foreground/35 text-xs mt-1.5 leading-relaxed">
-                  Não há pedidos à tua espera. Bom trabalho — aproveita para preparar os próximos
-                  eventos.
+
+          {/* Financial pulse */}
+          <div className="bo-card p-[var(--bo-p-cartao)]">
+            <div className="flex items-center justify-between mb-3.5 sm:mb-5">
+              <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
+              <button
+                onClick={onGoStats}
+                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+              >
+                Ver tudo →
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3.5 sm:mb-5">
+              <div>
+                <p
+                  className="text-[#4d6350] font-bold leading-none mb-1"
+                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
+                >
+                  {eur(data.received)}
+                </p>
+                <p className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase">Recebido</p>
+              </div>
+              <div>
+                <p
+                  className="text-foreground/70 font-bold leading-none mb-1"
+                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
+                >
+                  {eur(data.outstanding)}
+                </p>
+                <p className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase">
+                  A receber
                 </p>
               </div>
-            )}
-            {data.needAction.slice(0, 8).map(({ q, daysSince, isStale }) => (
-              <button
-                key={q.id}
-                onClick={() => onOpen(q)}
-                className={`w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
-              >
-                <div className="min-w-0">
-                  <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
-                  <p className="text-foreground/30 text-xs truncate mt-0.5">
-                    {eventTypeLabel(q)} · {q.guests} convidados
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  {isStale ? (
-                    <span className="inline-flex items-center gap-1 text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 font-semibold">
-                      {daysSince}d parado
-                    </span>
-                  ) : (
-                    <span
-                      className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
-                      style={{
-                        background: `${metaFor(STATUS_META, q.status).color}18`,
-                        color: metaFor(STATUS_META, q.status).color,
-                      }}
-                    >
-                      {metaFor(STATUS_META, q.status).label}
-                    </span>
-                  )}
-                  <TempoDesde
-                    iso={q.submittedAt}
-                    className="text-foreground/22 text-[10px] mt-1 block"
+            </div>
+            {data.billed > 0 ? (
+              <>
+                <div className="relative h-2 rounded-full overflow-hidden bg-foreground/[0.06]">
+                  <div
+                    className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
+                    style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
+                  />
+                  <div
+                    className="absolute inset-0 origin-left bg-[#c0a060]/70 motion-safe:transition-transform motion-safe:duration-700"
+                    style={{
+                      transform: `translateX(${fraccaoDaBarra(data.received, data.billed) * 100}%) scaleX(${fraccaoDaBarra(data.outstanding, data.billed)})`,
+                    }}
                   />
                 </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="bo-card overflow-hidden">
-          <h3 className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
-            Atividade recente
-          </h3>
-          <div className="divide-y divide-foreground/[0.06]">
-            {data.recent.map((q) => (
-              <button
-                key={q.id}
-                onClick={() => onOpen(q)}
-                className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
-              >
-                <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
-                <TempoDesde
-                  iso={q.submittedAt}
-                  className="text-foreground/30 text-[10px] shrink-0"
-                />
-              </button>
-            ))}
-            {/* ── «AINDA SEM MOVIMENTOS POR AQUI.» ─────────────────────────
-                Cinco palavras que não diziam nem o que é este painel, nem
-                porque é que está vazio, nem o que fazer a seguir. Uma frase
-                dessas, num canto de um ecrã cheio, lê-se como uma parte da
-                página que não carregou.
-
-                Passa a dizer as três coisas — o que a lista mostra, porque é
-                que não tem nada, e o passo a dar — sem virar alarme: uma
-                atividade recente vazia é o estado normal de quem ainda não
-                recebeu o primeiro pedido.
-
-                NOTA para quem vier a seguir: hoje isto está fora de alcance.
-                Esta lista são os `quotes` ordenados por data, e um `quotes`
-                vazio é apanhado lá em cima pelo ecrã de boas-vindas, que
-                devolve antes de se chegar aqui. Fica escrito na mesma, porque
-                o dia em que a Visão Geral deixar de ter esse atalho — ou em que
-                a lista passar a ter janela — este é o texto certo. */}
-            {data.recent.length === 0 && (
-              <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-10">
-                <p className="text-foreground/45 text-sm">Ainda sem movimentos por aqui.</p>
-                <p className="text-foreground/30 text-xs mt-1.5 leading-relaxed">
-                  Esta lista são os últimos pedidos que entraram, do mais recente para trás.
-                  Enquanto não entrar nenhum — pelo formulário do site ou criado à mão — fica assim.
-                </p>
-                <button
-                  onClick={onNew}
-                  className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                  </svg>
-                  Criar um pedido
-                </button>
-              </div>
+                <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#4d6350]" /> Recebido
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#c0a060]/70" /> Por receber
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-foreground/40 text-xs leading-relaxed">
+                Ainda sem pagamentos registados. Assim que registar o primeiro, o recebido e o que
+                falta receber aparecem aqui.
+              </p>
             )}
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
+              <span className="text-foreground/35 text-xs">
+                Valor médio por evento ganho
+                <span className="block text-foreground/25 text-[10px]">
+                  quanto vale, em média, cada pedido fechado
+                </span>
+              </span>
+              <span className="text-foreground/75 text-sm font-semibold tabular-nums">
+                {eur(data.avgTicket)}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Needs attention + recent activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
+          <div className="bo-card overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+              <h3 className="bo-eyebrow">Precisam de atenção</h3>
+              <div className="flex items-center gap-2">
+                {data.staleCount > 0 && (
+                  <span className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-semibold">
+                    {data.staleCount} parado{data.staleCount !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {data.needAction.length > 0 && (
+                  <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
+                    {data.needAction.length}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
+              {data.needAction.length === 0 && (
+                <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
+                  <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
+                  <p className="text-foreground/35 text-xs mt-1.5 leading-relaxed">
+                    Não há pedidos à tua espera. Bom trabalho — aproveita para preparar os próximos
+                    eventos.
+                  </p>
+                </div>
+              )}
+              {data.needAction.slice(0, 8).map(({ q, daysSince, isStale }) => (
+                <button
+                  key={q.id}
+                  onClick={() => onOpen(q)}
+                  className={`w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
+                    <p className="text-foreground/30 text-xs truncate mt-0.5">
+                      {eventTypeLabel(q)} · {q.guests} convidados
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {isStale ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 font-semibold">
+                        {daysSince}d parado
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
+                        style={{
+                          background: `${metaFor(STATUS_META, q.status).color}18`,
+                          color: metaFor(STATUS_META, q.status).color,
+                        }}
+                      >
+                        {metaFor(STATUS_META, q.status).label}
+                      </span>
+                    )}
+                    <TempoDesde
+                      iso={q.submittedAt}
+                      className="text-foreground/22 text-[10px] mt-1 block"
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bo-card overflow-hidden">
+            <h3 className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
+              Atividade recente
+            </h3>
+            <div className="divide-y divide-foreground/[0.06]">
+              {data.recent.map((q) => (
+                <button
+                  key={q.id}
+                  onClick={() => onOpen(q)}
+                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                >
+                  <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
+                  <TempoDesde
+                    iso={q.submittedAt}
+                    className="text-foreground/30 text-[10px] shrink-0"
+                  />
+                </button>
+              ))}
+              {/* ── «AINDA SEM MOVIMENTOS POR AQUI.» ─────────────────────────
+                  Cinco palavras que não diziam nem o que é este painel, nem
+                  porque é que está vazio, nem o que fazer a seguir. Uma frase
+                  dessas, num canto de um ecrã cheio, lê-se como uma parte da
+                  página que não carregou.
+
+                  Passa a dizer as três coisas — o que a lista mostra, porque é
+                  que não tem nada, e o passo a dar — sem virar alarme: uma
+                  atividade recente vazia é o estado normal de quem ainda não
+                  recebeu o primeiro pedido.
+
+                  NOTA para quem vier a seguir: hoje isto está fora de alcance.
+                  Esta lista são os `quotes` ordenados por data, e um `quotes`
+                  vazio é apanhado lá em cima pelo ecrã de boas-vindas, que
+                  devolve antes de se chegar aqui. Fica escrito na mesma, porque
+                  o dia em que a Visão Geral deixar de ter esse atalho — ou em que
+                  a lista passar a ter janela — este é o texto certo. */}
+              {data.recent.length === 0 && (
+                <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-10">
+                  <p className="text-foreground/45 text-sm">Ainda sem movimentos por aqui.</p>
+                  <p className="text-foreground/30 text-xs mt-1.5 leading-relaxed">
+                    Esta lista são os últimos pedidos que entraram, do mais recente para trás.
+                    Enquanto não entrar nenhum — pelo formulário do site ou criado à mão — fica
+                    assim.
+                  </p>
+                  <button
+                    onClick={onNew}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                    </svg>
+                    Criar um pedido
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </MaisDoPainel>
     </div>
   );
 }

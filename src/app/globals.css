@@ -1195,6 +1195,84 @@ body {
     overflow-x: hidden;
   }
 }
+/* ── A ENTRADA DA VISÃO GERAL, EM CASCATA ────────────────────────────────
+   Palavras dela sobre o deploy verdadeiro: «não me diz nada — eu gostava de o
+   levar ao nível da Apple e da Pixelmatters». Uma das coisas que faltava é
+   esta: a página aparecia inteira de uma vez, como um documento a ser
+   despejado. Um ecrã que se monta à frente de quem chega lê-se como uma coisa
+   que foi PREPARADA para ele.
+
+   ── OS NÚMEROS, E DE ONDE VÊM ─────────────────────────────────────────────
+
+   600 ms de duração: a análise separa dois regimes — 200–320 ms para ESTADOS
+   (o que responde ao dedo) e 600–1500 ms para APRESENTAÇÃO (o que o sistema
+   mostra). Isto é apresentação, e fica no degrau mais rápido dela: um painel
+   de trabalho não é um site institucional, e ela abre-o vinte vezes por dia.
+
+   70 ms entre blocos: a análise mede escalonamentos de 20–200 ms nos dois
+   sites. Com quatro blocos, 70 dá 210 ms do primeiro ao último — a cascata
+   lê-se e acaba antes de alguém ter tempo de a achar lenta.
+
+   12 px de deslocação: a regra é «distância proporcional à importância e
+   sempre pequena» (menu 4 px, aviso 8 px, página inteira 32 px). Um bloco
+   dentro de uma página não é a página: 12 px.
+
+   A curva é `cubic-bezier(0, 0, 0.2, 1)` — só desacelera. É quem APRESENTA que
+   está a mover-se, e o que apresenta nunca deve ganhar balanço nem passar do
+   sítio. Zero `bounce`, zero `overshoot`, como nos dois sites de referência.
+
+   ── O `backwards` É LOAD-BEARING, E JÁ CUSTOU UM DEFEITO ─────────────────
+   Sem ele o bloco pinta-se na posição final durante o atraso e só depois salta
+   para trás para começar — o piscar que a cascata existe para não ter. E o
+   `to` termina em `transform: none` de propósito: um `transform` que ficasse
+   pendurado criava um bloco contentor e partia qualquer `position: fixed` lá
+   dentro. Foi exactamente isso que aconteceu com o `.view-in` e a gaveta de
+   detalhe. */
+@keyframes bo-cena {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bo-cena {
+  animation: bo-cena 600ms cubic-bezier(0, 0, 0.2, 1) backwards;
+  animation-delay: calc(var(--cena, 0) * 70ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-cena {
+    animation: none;
+  }
+}
+
+/* ── E O QUE FICA ATRÁS DE UM TOQUE ──────────────────────────────────────
+   A Visão Geral tinha TREZE blocos empilhados, todos visíveis ao mesmo tempo.
+   Nove passaram para dentro de um `<details>`. Nenhum foi apagado — e é por
+   ser um `<details>` nativo que continua a abrir sem uma linha de JavaScript,
+   a responder ao teclado e a ser encontrado pelo «localizar na página» do
+   browser mesmo fechado. */
+.bo-mais > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.bo-mais > summary::-webkit-details-marker {
+  display: none;
+}
+.bo-mais > summary .bo-mais-seta {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+.bo-mais[open] > summary .bo-mais-seta {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-mais > summary .bo-mais-seta {
+    transition: none;
+  }
+}
+
 /* ── A ARESTA QUE DIZ «HÁ MAIS POR BAIXO» ──────────────────────────────────
    Da auditoria, F-09: «O cartão termina a meio do campo "Preço final (sem IVA)
    €", com o campo cortado pela borda e um grande vazio branco por baixo. O
