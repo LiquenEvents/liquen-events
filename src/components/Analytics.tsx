@@ -3,7 +3,7 @@
 import Script from "next/script";
 import { usePathname } from "next/navigation";
 import PlausibleTracker from "./PlausibleTracker";
-import { isTokenRoute } from "@/lib/safe-path";
+import { semAnaliticos } from "@/lib/safe-path";
 
 /**
  * Privacy-friendly analytics (Plausible) — cookieless, no consent banner needed,
@@ -26,8 +26,11 @@ export default function Analytics() {
   if (!domain) return null;
   // Nas rotas com token o Plausible reportaria o caminho da página — que ali É
   // o segredo do cliente — para o plausible.io. Cookieless não quer dizer
-  // inofensivo: o token seguiria na mesma para fora. Não se monta ali.
-  if (isTokenRoute(pathname)) return null;
+  // inofensivo: o token seguiria na mesma para fora. Não se monta ali. E no
+  // back office também não: as horas dela a trabalhar não são tráfego do site,
+  // e contá-las estraga a taxa de conversão que o painel mostra. A regra vive
+  // toda em `semAnaliticos`, com o porquê por extenso.
+  if (semAnaliticos(pathname)) return null;
   const src = process.env.NEXT_PUBLIC_PLAUSIBLE_SRC || "https://plausible.io/js/script.js";
   let origin = "";
   try {

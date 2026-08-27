@@ -49,3 +49,53 @@ export function sanitizeTelemetryPath(path: string): string {
 export function isTokenRoute(path: string | null | undefined): boolean {
   return !!path && new RegExp(TOKEN_PATH_PATTERN).test(path);
 }
+
+/**
+ * O back office.
+ *
+ * ── O `/admin` E O LIMITE A SEGUIR SÃO OBRIGATÓRIOS ───────────────────────
+ *
+ * `/orcamento` SECO é o formulário público de pedido de orçamento — a página
+ * de conversão do site, aquela cujo `generate_lead` alimenta a campanha de
+ * Ads. Um padrão que apanhasse `/orcamento` apagava a medição do funil todo e
+ * ninguém dava por isso: o número não desaparece, encolhe.
+ *
+ * O `(?:[/?#]|$)` fecha a outra ponta. Sem ele, `/orcamento/administrativo`
+ * ou `/orcamento/admin-publico` — que hoje não existem — passavam a calar-se
+ * calados no dia em que alguém os criasse.
+ *
+ * Não leva prefixo de língua de propósito: o `usePathname` tanto pode dar
+ * `/orcamento/admin` como `/pt/orcamento/admin` (o proxy reescreve), e as duas
+ * formas contêm o segmento. É a mesma razão que já está escrita no
+ * `GoogleTag.tsx` para as rotas com token: servidor e cliente decidem o mesmo,
+ * logo não há divergência de hidratação.
+ */
+export const BACK_OFFICE_PATH_PATTERN = "/orcamento/admin(?:[/?#]|$)";
+
+/** `true` quando o caminho é uma página do back office. */
+export function isBackOfficeRoute(path: string | null | undefined): boolean {
+  return !!path && new RegExp(BACK_OFFICE_PATH_PATTERN).test(path);
+}
+
+/**
+ * `true` quando NENHUM analítico de terceiros deve ser montado — as rotas com
+ * token e o back office.
+ *
+ * ── PORQUE É QUE O BACK OFFICE ENTRA AQUI ─────────────────────────────────
+ *
+ * 1. O que sai. O gtag reporta o `page_location` de cada ecrã interno para a
+ *    propriedade GA4/Ads. Quem tenha acesso a essa conta — uma agência, um
+ *    prestador, alguém que já saiu — passa a ler os caminhos de trabalho dela.
+ *    E o banner de consentimento não ajuda: com o consentimento NEGADO o gtag
+ *    continua a mandar pings sem cookies. É o argumento que já estava escrito
+ *    no `GoogleTag.tsx` para as rotas com token, e vale aqui igual.
+ * 2. O que fica sujo. As horas dela a trabalhar contam como tráfego do site.
+ *    A taxa de conversão que o próprio painel mostra é calculada por cima
+ *    disso — o número está errado e parece bem.
+ * 3. O que custa. `gtag.js` mais `plausible.js` a competir com a hidratação do
+ *    back office, no telemóvel dela, em 4G de quinta. Não há nada a medir ali
+ *    que pague isso.
+ */
+export function semAnaliticos(path: string | null | undefined): boolean {
+  return isTokenRoute(path) || isBackOfficeRoute(path);
+}
