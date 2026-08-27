@@ -147,13 +147,28 @@ describe("a entrada da Visão Geral", () => {
     expect(gaveta()!.open).toBe(true);
   });
 
-  it("a cascata de entrada existe, e os quatro têm ordem", () => {
+  it("a cascata de entrada existe, e cada bloco tem a SUA vez", () => {
+    // ── ESTE CASO JÁ DEIXOU PASSAR UM DEFEITO, E POR ISSO ENDURECEU ────────
+    //
+    // A primeira versão contentava-se com «há três ou mais» e «há mais do que
+    // uma ordem distinta». Passava — e o browser mostrou `0, 2, 2, 2, 3`: o
+    // `2` três vezes, porque a classe tinha caído DENTRO do `.map()` dos três
+    // números do dinheiro. Os três cartões animavam-se cada um por si e o
+    // bloco a que pertencem não se animava de todo.
+    //
+    // Uma cascata de blocos que anima filhos não é uma cascata: é um tremor.
+    // O que se exige agora é o que define uma: UM elemento por vez, e vezes
+    // que não se repetem.
     desenhar();
-    const cenas = Array.from(document.querySelectorAll(".bo-cena"));
+    const cenas = Array.from(document.querySelectorAll<HTMLElement>(".bo-cena"));
     expect(cenas.length, "a entrada deixou de ser encenada").toBeGreaterThanOrEqual(3);
-    const ordens = cenas.map((e) => (e as HTMLElement).style.getPropertyValue("--cena"));
-    // Sem ordens distintas não há cascata nenhuma — é tudo ao mesmo tempo com
-    // uma classe a mais.
-    expect(new Set(ordens).size).toBeGreaterThan(1);
+    const ordens = cenas.map((e) => e.style.getPropertyValue("--cena"));
+    expect(
+      ordens.length - new Set(ordens).size,
+      `há blocos a partilhar a mesma vez na cascata: ${ordens.join(", ")}`,
+    ).toBe(0);
+    // E as vezes são números, e começam no princípio.
+    expect(ordens.every((o) => /^\d+$/.test(o))).toBe(true);
+    expect(Math.min(...ordens.map(Number))).toBe(0);
   });
 });
