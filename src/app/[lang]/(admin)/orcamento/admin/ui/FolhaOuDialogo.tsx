@@ -236,7 +236,7 @@ export function FolhaOuDialogo({
         aria-labelledby={sobretitulo ? `${idTitulo}-sobre ${idTitulo}` : idTitulo}
         style={comoFolha && arrasto ? { transform: `translateY(${arrasto}px)` } : undefined}
         className={cn(
-          "relative z-10 flex flex-col overflow-hidden bg-[var(--bo-surface,#ffffff)] shadow-xl",
+          "relative z-10 flex flex-col overflow-hidden bg-[var(--bo-surface,#ffffff)] shadow-[var(--bo-sombra-modal)]",
           comoFolha
             ? cn(
                 // `dvh` e não `vh`: com a barra do browser à vista, `100vh` é

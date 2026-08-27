@@ -403,7 +403,7 @@ export default function EventTasks({ quote, userName }: Props) {
               className={`group flex items-start gap-3 rounded-xl border p-3 motion-safe:transition-all ${
                 task.done
                   ? "border-foreground/[0.05] bg-foreground/[0.015] opacity-60"
-                  : "border-foreground/[0.08] bg-white shadow-[0_1px_2px_rgba(42,38,32,0.04)] hover:shadow"
+                  : "border-foreground/[0.08] bg-white hover:shadow"
               }`}
             >
               {/* 18×18 medidos a 375 px. É a caixa que fecha uma tarefa do

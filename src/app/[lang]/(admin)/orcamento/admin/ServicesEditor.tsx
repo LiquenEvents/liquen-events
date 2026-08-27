@@ -1106,7 +1106,7 @@ export default function ServicesEditor({
       {removal && (
         <div
           role="status"
-          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-foreground/10 bg-white px-4 py-3 text-sm shadow-xl shadow-black/10"
+          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-foreground/10 bg-white px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
         >
           <span className="text-foreground/75">{removal.label}</span>
           <button
@@ -1159,7 +1159,9 @@ function SortableRow({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${className ?? ""} ${
-        isDragging ? "relative z-10 bg-white opacity-95 shadow-lg ring-2 ring-[#4d6350]" : ""
+        isDragging
+          ? "relative z-10 bg-white opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-[#4d6350]"
+          : ""
       }`}
     >
       {children({

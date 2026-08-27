@@ -65,7 +65,7 @@ export function Card({ padding = "md", className, children, ...rest }: CardProps
   return (
     <div
       className={cn(
-        "rounded-2xl border border-foreground/[0.08] bg-white shadow-[0_1px_2px_rgba(42,38,32,0.04)]",
+        "rounded-2xl border border-foreground/[0.08] bg-white ",
         PADDING[padding],
         className,
       )}

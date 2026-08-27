@@ -311,10 +311,38 @@ body.admin-mode {
   --bo-radius: 0.75rem; /* 12px — inputs, buttons, segmented */
   --bo-radius-lg: 1rem; /* 16px — cards & panels */
 
-  /* ── Soft shadows ── */
-  --bo-shadow-sm: 0 1px 2px rgba(13, 13, 13, 0.04); /* resting surfaces */
-  --bo-shadow:
-    0 1px 3px rgba(13, 13, 13, 0.05), 0 8px 24px -14px rgba(13, 13, 13, 0.09); /* elevated */
+  /* ── DUAS SOMBRAS, E NENHUMA DELAS NO CONTEÚDO ───────────────────────────
+     Eram dezasseis. Um censo ao back office contou **90 sombras** em **16
+     valores distintos** — quatro escadas do Tailwind (`sm`/`md`/`lg`/`xl`/
+     `2xl`), sete sombras escritas à mão entre parênteses rectos, e dois destes
+     tokens.
+
+     A análise à apple.com e à pixelmatters.com mediu, nos dois sites, o mesmo
+     número: **zero** `box-shadow` no conteúdo. A elevação faz-se A MUDAR A COR
+     DA SUPERFÍCIE — #F5F5F7 → #FFFFFF na Apple, #000 → #141414 → #1F1F1F na
+     Pixelmatters. A sombra fica reservada ao que está mesmo POR CIMA da
+     página: um diálogo, um menu suspenso, um aviso, um cartão a ser arrastado.
+
+     Fica isso, e só isso:
+
+       SUSPENSA  o que flutua e volta a fechar — menus, avisos, barras coladas,
+                 o cartão em arrasto. Perto, curta, ainda ligada à página.
+       MODAL     o que TAPA a página — diálogos e folhas. Mais longe e mais
+                 espalhada, porque é isso que diz «isto está à frente de tudo».
+
+     Sem sombra nenhuma no conteúdo. Um cartão distingue-se do que está por
+     baixo por ser branco sobre o cinzento da página, mais um fio de moldura —
+     que é o que a `.bo-card` aqui em baixo passa a fazer.
+
+     Porque é que isto SE VÊ e a escada da letra não se via: uma sombra de
+     `0 1px 2px rgba(…,0.04)` num ecrã de telemóvel ao sol é indistinguível de
+     não haver sombra — pagava-se o desenho e não se recebia nada. Noventa
+     vezes. O que se vê é a página deixar de ser um mar de caixas todas ao
+     mesmo nível e passar a ter dois: o chão, e o que está em cima dele. */
+  --bo-sombra-suspensa:
+    0 4px 12px -2px rgba(13, 13, 13, 0.1), 0 2px 4px -2px rgba(13, 13, 13, 0.06);
+  --bo-sombra-modal:
+    0 24px 48px -12px rgba(13, 13, 13, 0.18), 0 8px 16px -8px rgba(13, 13, 13, 0.1);
 
   /* ── Single accent: Líquen moss ── */
   --bo-accent: #4c6350; /* moss-dark — primary actions / active states */
@@ -1884,7 +1912,8 @@ body[data-menu-open] .whatsapp-fixed {
   border: 1px solid var(--bo-hairline, rgba(42, 38, 32, 0.08));
   /* Roomier corners (rounded-2xl) — the calm container the redesign leans on. */
   border-radius: var(--bo-radius-lg, 1rem);
-  box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
+  /* Sem sombra: o branco sobre o cinzento da página mais o fio da moldura já
+     dizem que isto está em cima. Ver os dois tokens de sombra lá em cima. */
 }
 /* A LARGURA POR OMISSÃO DE UM CAMPO, E SÓ ELA, VIVE NUMA CAMADA.
    ─────────────────────────────────────────────────────────────────────────
@@ -1920,7 +1949,8 @@ body[data-menu-open] .whatsapp-fixed {
   /* ≥3:1 non-text contrast so the field boundary is identifiable (WCAG 1.4.11). */
   border: 1px solid var(--bo-control-border, rgba(42, 38, 32, 0.5));
   border-radius: var(--bo-radius, 0.75rem);
-  box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
+  /* Sem sombra: a moldura a 3:1 aqui em cima é o que identifica o campo
+     (WCAG 1.4.11), e era ela que já estava a fazer o trabalho todo. */
   /* Keep the focus transition to border only: the global :focus-visible moss
      ring stays the keyboard focus indicator (not overridden here). */
   transition: border-color 0.2s var(--ease-out);

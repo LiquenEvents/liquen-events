@@ -1426,7 +1426,7 @@ export default function Overview({
                    de 44 px do dedo: media 37 px de altura, e é o único caminho
                    para sair de um ecrã que não tem mais nada. Só cresce com
                    dedo — com rato fica exactamente como está desenhado. */
-                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm transition-colors motion-reduce:transition-none mb-3 ${FOCUS_RING}`}
+                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors motion-reduce:transition-none mb-3 ${FOCUS_RING}`}
               >
                 <svg
                   width="13"
@@ -1445,7 +1445,7 @@ export default function Overview({
               onClick={onNew}
               /* `alvo-toque` pela mesma razão do botão acima — e para os dois
                  ficarem da mesma altura quando aparecem juntos. */
-              className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium shadow-sm transition-colors motion-reduce:transition-none ${
+              className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium transition-colors motion-reduce:transition-none ${
                 tudoArquivado && onVerArquivados
                   ? "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15"
                   : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
@@ -1502,8 +1502,8 @@ export default function Overview({
               onClick={a.onClick}
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
-                  ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm"
-                  : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 shadow-sm"
+                  ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
+                  : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 "
               }`}
             >
               <svg
@@ -1526,7 +1526,7 @@ export default function Overview({
       {data.nextEvent && data.nextEventDays !== null && data.nextEventDays <= 30 && (
         <button
           onClick={() => onOpen(data.nextEvent!)}
-          className={`w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none hover:shadow-md ${FOCUS_RING} ${
+          className={`w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none ${FOCUS_RING} ${
             data.nextEventDays <= 3
               ? "bg-[#b5654a]/[0.07] border-[#b5654a]/25 hover:border-[#b5654a]/40"
               : data.nextEventDays <= 7
@@ -2026,7 +2026,7 @@ export default function Overview({
                 </p>
                 <button
                   onClick={onNew}
-                  className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 shadow-sm transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                  className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
                 >
                   <svg
                     width="12"

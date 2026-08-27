@@ -379,7 +379,7 @@ export function CartaoDeBoard({
       // `scroll-mt`: o back office tem uma barra fixa no topo, e sem margem de
       // deslocamento o salto do índice deixa o cabeçalho do board por baixo dela.
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`scroll-mt-24 ${className} ${isDragging ? "relative z-10 opacity-90 shadow-lg ring-2 ring-[#4d6350]" : ""}`}
+      className={`scroll-mt-24 ${className} ${isDragging ? "relative z-10 opacity-90 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-[#4d6350]" : ""}`}
     >
       {children({ ...attributes, ...listeners })}
     </div>

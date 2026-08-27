@@ -75,7 +75,7 @@ export type FieldProps = InputFieldProps | TextareaFieldProps | SelectFieldProps
 // um campo tem é foco e contorno, e isso é estado — 120 ms.
 const CONTROL =
   "w-full rounded-xl bg-white border text-sm text-foreground/90 placeholder:text-foreground/35 " +
-  "shadow-[0_1px_2px_rgba(42,38,32,0.04)] " +
+  " " +
   ESTADO +
   " focus:outline-none px-3.5 py-2.5";
 

@@ -161,7 +161,7 @@ export default function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Pesquisar e navegar"
-        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white shadow-[0_24px_60px_-12px_rgba(27,33,25,0.35)]"
+        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white shadow-[var(--bo-sombra-modal)]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >

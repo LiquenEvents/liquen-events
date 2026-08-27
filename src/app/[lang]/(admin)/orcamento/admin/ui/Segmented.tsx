@@ -128,7 +128,7 @@ export function Segmented<T extends string>({
               `inline-flex items-center gap-1.5 rounded-lg font-medium ${ESTADO} ${PRESSAO}`,
               pad,
               active
-                ? "bg-white text-foreground/90 shadow-[0_1px_2px_rgba(42,38,32,0.08)]"
+                ? "bg-white text-foreground/90 "
                 : "text-foreground/50 hover:text-foreground/75 active:bg-foreground/[0.06]",
             )}
           >

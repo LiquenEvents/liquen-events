@@ -279,7 +279,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         role="dialog"
         aria-modal="true"
         aria-label="Repor cópia de segurança"
-        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-2xl"
+        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-modal)]"
       >
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b border-foreground/[0.07] px-6 py-4">

@@ -106,7 +106,7 @@ export function Ajuda({
           // do cartão em qualquer largura de ecrã — desde que cresça para o
           // lado onde há espaço, que é o que `alinhar` escolhe.
           className={cn(
-            "absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-foreground/15 bg-white p-3 text-[11px] leading-relaxed text-foreground/70 normal-case tracking-normal shadow-[0_6px_20px_rgba(42,38,32,0.10)]",
+            "absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-foreground/15 bg-white p-3 text-[11px] leading-relaxed text-foreground/70 normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
             alinhar === "direita" ? "right-0" : "left-0",
           )}
         >

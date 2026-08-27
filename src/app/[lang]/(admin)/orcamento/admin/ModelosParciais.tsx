@@ -78,7 +78,7 @@ const ROTULO = {
  */
 const PAINEL_SUSPENSO =
   "absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
-  "rounded-xl border border-foreground/10 bg-white shadow-lg";
+  "rounded-xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-suspensa)]";
 
 export default function ModelosParciais({
   tipo,

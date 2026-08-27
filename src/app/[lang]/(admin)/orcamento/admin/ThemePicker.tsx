@@ -981,7 +981,7 @@ function ImportChip({ job }: { job: ImportJob }) {
     <div
       role="group"
       aria-label="Fotos a caminho da proposta"
-      className={`pointer-events-auto rounded-xl border bg-white px-4 py-3 shadow-xl shadow-black/10 ${
+      className={`pointer-events-auto rounded-xl border bg-white px-4 py-3 shadow-[var(--bo-sombra-suspensa)] ${
         settled && failed > 0 ? "border-[#8a2a22]/25" : "border-foreground/10"
       }`}
     >

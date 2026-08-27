@@ -105,7 +105,7 @@ export default function MedidorDeTransbordo() {
 
   return (
     <div
-      className="fixed bottom-24 left-2 right-2 z-[100] max-h-[45vh] overflow-auto rounded-xl border border-[#8a2a22] bg-white/95 p-3 text-[11px] leading-tight shadow-xl"
+      className="fixed bottom-24 left-2 right-2 z-[100] max-h-[45vh] overflow-auto rounded-xl border border-[#8a2a22] bg-white/95 p-3 text-[11px] leading-tight shadow-[var(--bo-sombra-suspensa)]"
       style={{ backdropFilter: "blur(4px)" }}
     >
       <button

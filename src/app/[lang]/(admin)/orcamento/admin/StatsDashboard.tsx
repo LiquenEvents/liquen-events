@@ -67,9 +67,7 @@ function Kpi({
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
-        accent
-          ? "bg-[#4d6350]/[0.05] border-[#4d6350]/20"
-          : "bg-white border-foreground/[0.08] shadow-sm"
+        accent ? "bg-[#4d6350]/[0.05] border-[#4d6350]/20" : "bg-white border-foreground/[0.08] "
       }`}
     >
       <p
@@ -186,7 +184,7 @@ function Section({
   return (
     <details
       open={defaultOpen}
-      className="group rounded-2xl border border-foreground/[0.08] bg-white shadow-sm overflow-hidden"
+      className="group rounded-2xl border border-foreground/[0.08] bg-white overflow-hidden"
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">

@@ -119,7 +119,7 @@ const KanbanCard = memo(function KanbanCard({
       }}
       /* `transition-all` obrigava o browser a considerar TODAS as propriedades
          animáveis do cartão a cada realce; só a sombra e a moldura mudam. */
-      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-foreground/[0.07] bg-white p-3.5 shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-[box-shadow,border-color,opacity,transform] hover:shadow-md hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-foreground/[0.07] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,transform] hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
         dragging ? "opacity-40 motion-safe:rotate-1" : ""
       }`}
     >

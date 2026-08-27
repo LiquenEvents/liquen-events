@@ -131,7 +131,7 @@ export function PaginaEmConstrucao({
         type="button"
         onClick={alternar}
         aria-expanded={false}
-        className={`z-10 flex items-center gap-1.5 rounded-full border border-foreground/15 bg-white/95 px-3 py-1.5 text-xs shadow-sm backdrop-blur ${flutuante}`}
+        className={`z-10 flex items-center gap-1.5 rounded-full border border-foreground/15 bg-white/95 px-3 py-1.5 text-xs backdrop-blur ${flutuante}`}
       >
         <span className="tabular-nums text-foreground/75">
           {total} {total === 1 ? "foto" : "fotos"}
@@ -143,7 +143,7 @@ export function PaginaEmConstrucao({
 
   return (
     <div
-      className={`z-10 rounded-xl border border-foreground/15 bg-white/95 p-2 shadow-md backdrop-blur ${
+      className={`z-10 rounded-xl border border-foreground/15 bg-white/95 p-2 shadow-[var(--bo-sombra-suspensa)] backdrop-blur ${
         ancorada ? "w-full" : "w-[7.5rem]"
       } ${flutuante}`}
       aria-label="A página em construção"

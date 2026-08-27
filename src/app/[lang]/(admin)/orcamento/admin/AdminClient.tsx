@@ -631,10 +631,10 @@ const QuoteCard = memo(function QuoteCard({
     <div
       className={`relative rounded-xl border transition-all duration-200 motion-reduce:transition-none ${
         isCurrent
-          ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
+          ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
           : isSelected
             ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
-            : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
+            : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white "
       }`}
     >
       {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
@@ -3615,7 +3615,7 @@ export default function AdminClient({
           `pt-24` para cancelar, e o `<main>` que faltava está no layout do
           grupo. Enquanto os dois se cruzaram, a raiz começava a `top: -96px` —
           os primeiros 96 px do back office estavam fora do ecrã. */}
-      <div className="min-h-screen bg-surface flex">
+      <div className="min-h-screen bg-[var(--bo-surface-sunken)] flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         {/* Repor uma cópia troca os dados TODOS no servidor, e a lista que está
             aqui em memória não tem como saber o que mudou. É o único sítio onde
@@ -3700,7 +3700,7 @@ export default function AdminClient({
         <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
           <aside
             inert={navEhGaveta && !navOpen}
-            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
+            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
               navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
             } ${
               /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
@@ -4329,7 +4329,7 @@ export default function AdminClient({
                   <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
-                    className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors shadow-sm"
+                    className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors "
                     title="Criar pedido manualmente"
                   >
                     <svg
@@ -4683,7 +4683,7 @@ export default function AdminClient({
                        se pode procurar continua dito por inteiro no
                        `aria-label`, que é quem serve o leitor de ecrã. */
                     placeholder="Procurar pedidos…"
-                    className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 shadow-sm transition-colors"
+                    className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 transition-colors"
                   />
                   <kbd className="pointer-coarse:hidden absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] text-[var(--bo-text-faint)] lg:block">
                     /
@@ -4696,7 +4696,7 @@ export default function AdminClient({
                   onClick={() => setFiltrosAbertos((v) => !v)}
                   aria-expanded={filtrosAbertos}
                   aria-controls="painel-filtros-pedidos"
-                  className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium shadow-sm transition-colors ${
+                  className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium transition-colors ${
                     filtrosActivos > 0
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
                       : "bg-white border-foreground/[0.09] text-foreground/60"
@@ -4732,7 +4732,7 @@ export default function AdminClient({
                 <button
                   onClick={() => setMineOnly((v) => !v)}
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
-                  className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border shadow-sm transition-all ${
+                  className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border transition-all ${
                     mineOnly
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
                       : "bg-white border-foreground/[0.09] text-foreground/45 hover:text-foreground/65"
@@ -4756,7 +4756,7 @@ export default function AdminClient({
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
                   aria-label="Filtrar por categoria"
-                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                 >
                   <option value="all">Todas as categorias</option>
                   {CATEGORIES.map((c) => (
@@ -4769,7 +4769,7 @@ export default function AdminClient({
                   value={filterEspera}
                   onChange={(e) => setFilterEspera(e.target.value as typeof filterEspera)}
                   aria-label="Filtrar por tempo de espera"
-                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                 >
                   <option value="all">Qualquer espera</option>
                   <option value="3">Espera há 3+ dias</option>
@@ -4780,7 +4780,7 @@ export default function AdminClient({
                     value={filterMes}
                     onChange={(e) => setFilterMes(e.target.value)}
                     aria-label="Filtrar por mês do evento"
-                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                   >
                     <option value="all">Todos os meses</option>
                     {mesesDisponiveis.map((m) => (
@@ -4795,7 +4795,7 @@ export default function AdminClient({
                     value={filterRegiao}
                     onChange={(e) => setFilterRegiao(e.target.value)}
                     aria-label="Filtrar por região"
-                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                   >
                     <option value="all">Todas as regiões</option>
                     {regioesDisponiveis.map((r) => (
@@ -4810,7 +4810,7 @@ export default function AdminClient({
                     value={filterPlanner}
                     onChange={(e) => setFilterPlanner(e.target.value)}
                     aria-label="Filtrar por planner"
-                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                   >
                     <option value="all">Todas as planners</option>
                     {plannersDisponiveis.map((n) => (
@@ -4827,7 +4827,7 @@ export default function AdminClient({
                   /* `col-span-2` no telemóvel: «Quem espera há mais tempo» não
                      cabe em meia largura, e um selector com o rótulo cortado
                      não diz por que ordem a lista está. */
-                  className="col-span-2 flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  className="col-span-2 flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                 >
                   <option value="espera">Quem espera há mais tempo</option>
                   <option value="recent">Mais recentes</option>
@@ -4848,7 +4848,7 @@ export default function AdminClient({
                   // Media 85x38 e passava despercebido porque, a 375 px, ficava
                   // fora da margem — os filtros novos mudaram a dobra da barra
                   // e trouxeram-no para dentro do ecrã, onde a régua o apanhou.
-                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors shadow-sm whitespace-nowrap"
+                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors whitespace-nowrap"
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
@@ -4889,7 +4889,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -4899,7 +4899,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -4913,7 +4913,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -4941,7 +4941,7 @@ export default function AdminClient({
                     onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
                     className={`alvo-toque px-3 py-1 rounded-full text-[10px] font-medium tracking-wide transition-all duration-150 ${
                       tagFilter === t
-                        ? "bg-[#4d6350] text-white shadow-sm"
+                        ? "bg-[#4d6350] text-white "
                         : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"
                     }`}
                   >
@@ -5008,7 +5008,7 @@ export default function AdminClient({
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
                 >
                   Exportar seleção
                 </button>
@@ -5020,7 +5020,7 @@ export default function AdminClient({
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors shadow-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -5032,7 +5032,7 @@ export default function AdminClient({
                 <button
                   onClick={() => deleteSelected(seleccionadosAVista)}
                   disabled={bulkBusy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#b5654a]/25 text-[#b5654a]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#b5654a]/10 hover:text-[#b5654a] transition-colors shadow-sm disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#b5654a]/25 text-[#b5654a]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#b5654a]/10 hover:text-[#b5654a] transition-colors disabled:opacity-50"
                 >
                   Apagar ({seleccionadosAVista.length})
                 </button>
@@ -5181,7 +5181,7 @@ export default function AdminClient({
                        que rola fica por cima dele: o `sticky` do estúdio cola
                        ali e nunca mais o tapa, sem guerra de `z-index` e sem o
                        estúdio ter de saber que existe um pé por baixo. */
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-lg sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)] border-foreground/[0.08] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-foreground/[0.08] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]"
                     // A altura medida ganha à classe — e só existe na coluna do
                     // computador. Ver `alturaDoDetalhe`.
                     style={
@@ -5582,7 +5582,7 @@ export default function AdminClient({
                                     });
                                   }
                                 }}
-                                className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white shadow-sm motion-safe:transition-colors hover:bg-[#415440]"
+                                className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white motion-safe:transition-colors hover:bg-[#415440]"
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
@@ -6233,8 +6233,8 @@ export default function AdminClient({
                                   }}
                                   className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
-                                      ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-[0_2px_12px_rgba(77,99,80,0.10)]"
-                                      : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] hover:shadow-sm"
+                                      ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
+                                      : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] "
                                   }`}
                                 >
                                   <span

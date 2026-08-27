@@ -318,7 +318,7 @@ export default function FazerProposta({
               aria-pressed={filtro === f.id}
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
                 filtro === f.id
-                  ? "bg-[#1b2119] text-white shadow-sm"
+                  ? "bg-[#1b2119] text-white "
                   : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
               }`}
             >

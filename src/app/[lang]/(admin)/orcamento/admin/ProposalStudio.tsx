@@ -10165,7 +10165,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            `--bo-barra-accao` (ver o `ResizeObserver` lá em cima) e o
            `Toast.tsx` soma-a à distância a que já se punha do fundo. Ficam os
            dois visíveis, e nenhum tapa o outro. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:py-3 lg:bottom-0"
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
@@ -10873,7 +10873,7 @@ function FantasmaDaFoto({
   const caminho = doc.moodBoards[Number(partes[1])]?.images[Number(partes[2])];
   const url = caminho ? urls[caminho] : undefined;
   return (
-    <div className="h-24 w-24 overflow-hidden rounded-lg border border-white/40 bg-foreground/10 shadow-xl">
+    <div className="h-24 w-24 overflow-hidden rounded-lg border border-white/40 bg-foreground/10 shadow-[var(--bo-sombra-suspensa)]">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -12180,7 +12180,7 @@ function SelectorDeLayout({
               onClick={() => onEscolher(op)}
               className={`w-[5.75rem] rounded-lg border p-1.5 text-left motion-safe:transition-colors ${
                 activo
-                  ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] shadow-[0_1px_2px_rgba(42,38,32,0.08)]"
+                  ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] "
                   : "border-foreground/[0.1] bg-white hover:border-[#4d6350]/40"
               }`}
             >

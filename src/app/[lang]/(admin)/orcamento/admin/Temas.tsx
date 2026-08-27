@@ -1596,7 +1596,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors hover:border-[#4d6350]/40"
+                className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left motion-safe:transition-colors hover:border-[#4d6350]/40"
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -3697,7 +3697,7 @@ function ThemeFolder({
       {(selectedCount > 0 || emBloco) && (
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 backdrop-blur">
               <p className="text-sm text-foreground/85">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
@@ -3747,7 +3747,7 @@ function ThemeFolder({
             /* Fundo opaco por baixo: o cartão da espera é translúcido de
                propósito (é um tom sobre o papel), e colado ao topo passava a
                ter as fotos a rolar por trás. */
-            <div className="rounded-xl bg-white/95 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
+            <div className="rounded-xl bg-white/95 backdrop-blur">
               <EmCurso
                 titulo={
                   emBloco.tipo === "transferir" ? "A transferir as fotos…" : "A remover as fotos…"

@@ -292,7 +292,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
               <div
                 role="menu"
                 aria-label="Cor do texto"
-                className="absolute z-10 mt-1 flex gap-1 rounded-lg border border-foreground/10 bg-white p-1.5 shadow-md"
+                className="absolute z-10 mt-1 flex gap-1 rounded-lg border border-foreground/10 bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
               >
                 {BRAND_TEXT_COLORS.map((c) => (
                   <button
@@ -412,7 +412,7 @@ function TbButton({
       aria-expanded={onOpen ? !!expanded : undefined}
       onMouseDown={onRun ? (e) => e.preventDefault() : undefined}
       onClick={onOpen ?? onRun}
-      className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-foreground/70 hover:bg-white hover:text-foreground/90 hover:shadow-[0_1px_2px_rgba(42,38,32,0.08)] motion-safe:transition-colors"
+      className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-foreground/70 hover:bg-white hover:text-foreground/90 motion-safe:transition-colors"
     >
       {children}
     </button>

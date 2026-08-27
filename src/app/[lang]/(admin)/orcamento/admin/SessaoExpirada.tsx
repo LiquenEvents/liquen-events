@@ -289,7 +289,7 @@ export default function SessaoExpirada() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="sessao-expirada-titulo"
-        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-foreground/10 bg-white p-6 shadow-2xl"
+        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-foreground/10 bg-white p-6 shadow-[var(--bo-sombra-modal)]"
       >
         <p className="bo-eyebrow">Sessão</p>
         <h2

@@ -41,8 +41,17 @@ the global `:focus-visible` moss ring (so primitives don't hand-roll focus).
 - **Card padding:** `p-4` (sm) · `p-5 sm:p-6` (md, default) · `p-6 sm:p-8` (lg).
 - **Vertical rhythm:** `PageHeader` reserves `pb-6`; section headers use `mb-5`;
   label→control gap is `gap-1.5`. Prefer generous whitespace over dividers.
-- **Shadows:** `shadow-[0_1px_2px_rgba(42,38,32,0.04)]` for resting surfaces,
-  a slightly stronger soft shadow only for elevated/active states.
+- **Sombras — nenhuma no conteúdo.** Um cartão, um painel, uma linha de lista
+  ou um campo NÃO levam sombra: distinguem-se por serem brancos sobre o cinzento
+  da página (`--bo-surface-sunken`) mais o fio de `--bo-hairline`. Havia 90
+  sombras em 16 valores; ficaram duas, e as duas são para o que está POR CIMA da
+  página, nunca dentro dela:
+  - `shadow-[var(--bo-sombra-suspensa)]` — menus, avisos, barras coladas ao
+    fundo, o cartão a ser arrastado. Fecha-se e a página volta.
+  - `shadow-[var(--bo-sombra-modal)]` — diálogos e folhas, que tapam a página.
+
+  Se um elemento deixa de flutuar num ecrã largo (a gaveta do menu, o painel de
+  detalhe), a sombra tem de sair nesse ponto de quebra: `lg:shadow-none`.
 - **Motion:** everything is gated behind `motion-safe:`; reduced-motion users
   get no press-scale, spin, or tween. Never signal state by colour alone.
 

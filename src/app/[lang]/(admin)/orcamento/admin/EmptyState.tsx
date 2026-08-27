@@ -48,7 +48,7 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
          */
         <button
           onClick={action.onClick}
-          className="alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm"
+          className="alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors "
         >
           {action.label}
         </button>

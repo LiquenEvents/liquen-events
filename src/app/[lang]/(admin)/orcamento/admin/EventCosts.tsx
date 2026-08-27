@@ -445,7 +445,7 @@ export default function EventCosts({ quote, onChange }: Props) {
           {items.map((it) => (
             <div
               key={it.id}
-              className="group rounded-xl border border-foreground/[0.08] bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
+              className="group rounded-xl border border-foreground/[0.08] bg-white px-3.5 py-3 "
             >
               <div className="flex items-center gap-2.5">
                 <div className="min-w-0 flex-1">

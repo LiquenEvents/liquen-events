@@ -1077,7 +1077,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               aria-label="Taxa de IVA"
               value={vatRate}
               onChange={(e) => setVatRate(Number(e.target.value))}
-              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-foreground/70 shadow-[0_1px_2px_rgba(42,38,32,0.04)] focus:outline-none focus:border-foreground/40"
+              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-foreground/70 focus:outline-none focus:border-foreground/40"
             >
               <option value={0.23}>23%</option>
               <option value={0.13}>13%</option>

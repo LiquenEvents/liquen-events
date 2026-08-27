@@ -49,7 +49,7 @@ export default function FinanceZone({ quote, onQuoteChange }: Props) {
   return (
     <section
       id="zone-financeiro"
-      className="scroll-mt-40 flex flex-col gap-[var(--bo-gap-vista)] border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]"
+      className="scroll-mt-40 flex flex-col gap-[var(--bo-gap-vista)] border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:p-[var(--bo-p-cartao)]"
     >
       <p className="bo-eyebrow">Financeiro</p>
 

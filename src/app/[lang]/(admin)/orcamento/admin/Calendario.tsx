@@ -165,7 +165,7 @@ function AddEventModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Adicionar ao calendário — ${dateLabel}`}
-        className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-2xl"
+        className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-5">

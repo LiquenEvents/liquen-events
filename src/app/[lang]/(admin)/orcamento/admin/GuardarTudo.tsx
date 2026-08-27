@@ -116,7 +116,7 @@ export default function BotaoGuardarTudo() {
         title={titulo}
         className={
           quantos > 0
-            ? "alvo-toque flex items-center gap-2 rounded-lg bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white shadow-sm transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
+            ? "alvo-toque flex items-center gap-2 rounded-lg bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
             : "alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] transition-colors hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11"
         }
       >
@@ -186,7 +186,7 @@ export default function BotaoGuardarTudo() {
           // sempre, que é o problema de origem.
           role={frases.tudoBem ? "status" : "alert"}
           aria-live={frases.tudoBem ? "polite" : "assertive"}
-          className="absolute right-0 pointer-coarse:right-4 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--bo-hairline)] bg-white p-3 text-left shadow-xl"
+          className="absolute right-0 pointer-coarse:right-4 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--bo-hairline)] bg-white p-3 text-left shadow-[var(--bo-sombra-suspensa)]"
         >
           <div className="flex items-start gap-2">
             <p

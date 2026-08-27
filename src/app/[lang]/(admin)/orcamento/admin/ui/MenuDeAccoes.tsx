@@ -161,7 +161,7 @@ export function MenuDeAccoes({
             <div
               role="menu"
               aria-label={`Acções de ${sobre}`}
-              className="absolute right-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-xl border border-foreground/[0.1] bg-[var(--bo-surface,#ffffff)] py-1 shadow-lg"
+              className="absolute right-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-xl border border-foreground/[0.1] bg-[var(--bo-surface,#ffffff)] py-1 shadow-[var(--bo-sombra-suspensa)]"
             >
               {noMenu.map((a, i) => {
                 // Uma linha a separar antes da primeira destrutiva: é o que

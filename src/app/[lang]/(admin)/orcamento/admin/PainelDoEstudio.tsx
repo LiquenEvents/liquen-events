@@ -211,7 +211,7 @@ export default function PainelDoEstudio({
                   onClick={() => setVista(id)}
                   className={`flex-1 rounded-[6px] px-2 py-1.5 text-[11px] motion-safe:transition-colors ${
                     vista === id
-                      ? "bg-white text-foreground/85 shadow-[0_1px_2px_rgba(42,38,32,0.08)]"
+                      ? "bg-white text-foreground/85 "
                       : "text-foreground/55 hover:text-foreground/80"
                   }`}
                 >

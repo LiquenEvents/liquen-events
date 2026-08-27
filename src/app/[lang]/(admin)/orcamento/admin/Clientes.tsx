@@ -297,7 +297,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               // esta barra quer no portátil.
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
                 vipOnly
-                  ? "bg-[#d6ab3a]/15 text-[#b88f28] shadow-[0_1px_2px_rgba(42,38,32,0.06)]"
+                  ? "bg-[#d6ab3a]/15 text-[#b88f28] "
                   : "bg-foreground/[0.04] text-foreground/55 hover:bg-foreground/[0.07] hover:text-foreground/75"
               }`}
             >

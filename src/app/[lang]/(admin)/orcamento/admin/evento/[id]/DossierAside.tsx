@@ -45,7 +45,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
        ~40 de largura devolvidos. A partir de 640 volta o cartão. */
     <div className="flex flex-col gap-[var(--bo-gap-vista)]">
       {/* Contacto */}
-      <div className="border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]">
+      <div className="border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:p-[var(--bo-p-cartao)]">
         <p className="bo-eyebrow mb-3">Contacto</p>
         {/* ── OS TRÊS ALVOS QUE SÓ EXISTEM NO TELEMÓVEL ──────────────────────
             Medidos a 375 px: o email 301×16, o telefone 63×16, o WhatsApp
@@ -109,7 +109,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
           estreito. Duas colunas assim que houver 15 rem de caixa (~114 px por
           coluna, que é o mínimo em que «Casamento» cabe numa linha); abaixo
           disso, uma. */}
-      <div className="@container border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]">
+      <div className="@container border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:p-[var(--bo-p-cartao)]">
         <p className="bo-eyebrow mb-3">Evento</p>
         <div className="grid grid-cols-1 @min-[15rem]:grid-cols-2 gap-3">
           {facts.map(({ l, v }) => (
@@ -130,7 +130,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
       </div>
 
       {/* Registo de atividade */}
-      <div className="border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]">
+      <div className="border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:p-[var(--bo-p-cartao)]">
         <ActivityLog quote={quote} actor={actor} onAddEntry={onAddEntry} />
       </div>
     </div>
