@@ -237,8 +237,16 @@ export function FolhaOuDialogo({
         style={comoFolha && arrasto ? { transform: `translateY(${arrasto}px)` } : undefined}
         className={cn(
           "relative z-10 flex flex-col overflow-hidden bg-[var(--bo-surface,#ffffff)] shadow-[var(--bo-sombra-modal)]",
+          // ── DE ONDE ELA VEM ────────────────────────────────────────────
+          // A folha sobe (8 px), o diálogo desce (4 px): cada um vem do lado
+          // onde vai ficar. A animação não tem `fill-mode`, portanto larga o
+          // elemento ao fim dos 240 ms e NÃO fica a disputar o `transform`
+          // que o arrasto da folha escreve em `style` — e o arrasto só começa
+          // depois de a folha estar parada.
+          "bo-entrada",
           comoFolha
             ? cn(
+                "bo-entrada-folha",
                 // `dvh` e não `vh`: com a barra do browser à vista, `100vh` é
                 // maior do que o que se vê, e o rodapé com as acções ficava
                 // debaixo dela.

@@ -77,7 +77,7 @@ const ROTULO = {
  * garantia, em CSS, de que o que está escrito lá dentro se lê inteiro.
  */
 const PAINEL_SUSPENSO =
-  "absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
+  "bo-entrada absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
   "rounded-xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-suspensa)]";
 
 export default function ModelosParciais({

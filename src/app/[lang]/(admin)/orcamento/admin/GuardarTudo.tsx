@@ -186,7 +186,7 @@ export default function BotaoGuardarTudo() {
           // sempre, que é o problema de origem.
           role={frases.tudoBem ? "status" : "alert"}
           aria-live={frases.tudoBem ? "polite" : "assertive"}
-          className="absolute right-0 pointer-coarse:right-4 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--bo-hairline)] bg-white p-3 text-left shadow-[var(--bo-sombra-suspensa)]"
+          className="bo-entrada absolute right-0 pointer-coarse:right-4 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--bo-hairline)] bg-white p-3 text-left shadow-[var(--bo-sombra-suspensa)]"
         >
           <div className="flex items-start gap-2">
             <p

@@ -126,7 +126,7 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
           id={menuId}
           role="menu"
           aria-label="Mais ações"
-          className="absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-foreground/[0.08] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
+          className="bo-entrada absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-foreground/[0.08] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
         >
           {items.map((item, idx) => (
             <button

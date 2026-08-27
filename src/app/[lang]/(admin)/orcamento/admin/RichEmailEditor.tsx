@@ -292,7 +292,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
               <div
                 role="menu"
                 aria-label="Cor do texto"
-                className="absolute z-10 mt-1 flex gap-1 rounded-lg border border-foreground/10 bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
+                className="bo-entrada absolute z-10 mt-1 flex gap-1 rounded-lg border border-foreground/10 bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
               >
                 {BRAND_TEXT_COLORS.map((c) => (
                   <button

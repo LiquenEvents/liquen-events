@@ -1960,6 +1960,70 @@ body[data-menu-open] .whatsapp-fixed {
   animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   O QUE APARECE, APARECE DE ALGUM SÍTIO — QUATRO PÍXEIS
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela, a olhar para o back office: «em termos de design e animações
+   ou seja coisas a olho nu não vi mesmo diferenças nenhumas».
+
+   O CENSO, no dia em que isto se escreveu. Contei os sinais de entrada — uma
+   deslocação, uma opacidade a subir, uma transição à montagem — nos nove
+   sítios do back office que APARECEM por cima da página:
+
+       MenuDeAccoes · Ajuda · FolhaOuDialogo · MoreMenu · ModelosParciais
+       CommandPalette · GuardarTudo · RichEmailEditor · Toast
+
+   Oito dos nove não tinham nenhum: piscavam para lá de existir. O nono (o
+   Toast) deslocava-se 12 px.
+
+   A análise à apple.com e à pixelmatters.com mede a regra e mede a distância:
+
+       um item de menu       4 px
+       um aviso              8 px
+       uma página inteira   32 px
+
+   «O movimento serve para indicar direcção e origem, não para chamar
+   atenção.» E a curva não é qualquer uma: quando é o SISTEMA que apresenta —
+   que é o caso de tudo o que está nesta lista — a curva só desacelera,
+   `cubic-bezier(0, 0, 0.2, 1)`. O elemento entra em velocidade e assenta,
+   como se tivesse peso. Nos dois sites, ZERO curvas com salto ou recuo.
+
+   ── PORQUE É QUE ISTO NÃO ATRASA NADA ────────────────────────────────────
+
+   Regra dela: «nenhuma animação pode atrasar uma tarefa». Estes 240 ms não
+   atrasam: o elemento está no sítio e clicável desde o primeiro fotograma —
+   só chega lá com quatro píxeis de deslocação e a opacidade a subir. Não há
+   `animation-fill-mode`, portanto no fim a animação larga o elemento e não
+   fica a pesar sobre nada — nem sobre o `transform` que a folha do telemóvel
+   usa para o arrasto.
+
+   Só `transform` e `opacity`, que é o que o telemóvel dela consegue compor a
+   60 fps sem tocar no layout. E `prefers-reduced-motion` desliga tudo. */
+@keyframes bo-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(var(--bo-entrada-y, -4px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.bo-entrada {
+  animation: bo-entrada 240ms cubic-bezier(0, 0, 0.2, 1);
+}
+/* A folha do telemóvel sobe, porque é de baixo que ela vem. Oito e não quatro:
+   é a distância de um aviso, e a folha é maior do que um menu. */
+.bo-entrada-folha {
+  --bo-entrada-y: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-entrada {
+    animation: none;
+  }
+}
+
 /* ── Back-office: shared component primitives ──
    The admin tool standardises on white cards with a hairline border + soft
    shadow, forest-green (#1b2119) for dark accents and #4d6350 for the green

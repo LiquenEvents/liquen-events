@@ -167,7 +167,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       onFocus={pause}
       onBlur={resume}
       className={`pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm bg-white border border-foreground/10 rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)] transition-all duration-300 ${
-        shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+        shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
       }`}
     >
       <span
