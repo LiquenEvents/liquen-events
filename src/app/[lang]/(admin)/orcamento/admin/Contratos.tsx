@@ -414,7 +414,7 @@ export default function Contratos() {
                 de quem se está a ver por cima. É o MESMO `ContractDetails` do
                 cartão, montado uma vez. */}
             {emTabela && aberto && (
-              <div className="mt-3 rounded-xl border border-foreground/[0.08] bg-foreground/[0.015] p-4">
+              <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-medium text-foreground/80">
                     {aberto.clientName || "—"}
@@ -462,7 +462,7 @@ function ContractDetails({ c }: { c: Contract }) {
         </div>
       </div>
       <p className="bo-eyebrow text-foreground/40 mb-2">Termos aceites (cópia guardada)</p>
-      <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10 bg-white p-4">
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-[var(--bo-hairline-strong)] bg-white p-4">
         <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-foreground/60">
           {c.termsSnapshot || "Sem cópia dos termos guardada."}
         </pre>
@@ -485,7 +485,7 @@ function PdfDoContrato({ id }: { id: string }) {
       href={`/api/contratos/${id}/pdf`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/80"
       title="Descarregar contrato em PDF"
     >
       PDF
@@ -514,7 +514,7 @@ function CartaoDeContrato({
 }) {
   return (
     <div
-      className={`rounded-xl border border-foreground/[0.08] bg-white p-4 ${
+      className={`rounded-xl border border-[var(--bo-hairline)] bg-white p-4 ${
         c.status === "pendente" ? "opacity-70" : ""
       }`}
     >

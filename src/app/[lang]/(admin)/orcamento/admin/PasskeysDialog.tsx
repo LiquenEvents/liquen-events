@@ -217,7 +217,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
       ) : (
         <>
           {/* ── Registar este aparelho ── */}
-          <div className="rounded-xl border border-foreground/10 p-4">
+          <div className="rounded-xl border border-[var(--bo-hairline-strong)] p-4">
             <p className="text-sm font-medium text-foreground/80">Registar este aparelho</p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/50">
               A chave fica guardada dentro deste aparelho e nunca sai de lá. Num site que imite o
@@ -255,7 +255,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                 {dispositivos.map((d) => (
                   <li
                     key={d.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-foreground/10 px-3 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2.5"
                   >
                     {aRenomear?.id === d.id ? (
                       <>
@@ -306,7 +306,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                         <div className="flex shrink-0 items-center gap-1">
                           <button
                             onClick={() => setARenomear({ id: d.id, nome: d.deviceLabel })}
-                            className="alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                            className="alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/80"
                           >
                             Mudar nome
                           </button>

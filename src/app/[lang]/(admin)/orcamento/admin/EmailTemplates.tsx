@@ -701,10 +701,10 @@ function EditorClassico() {
     <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
       {/* Left: template list */}
       <div className="bo-card overflow-hidden self-start">
-        <div className="px-4 py-3 border-b border-foreground/[0.07]">
+        <div className="px-4 py-3 border-b border-[var(--bo-hairline)]">
           <p className="bo-eyebrow">Modelos ({templates.length})</p>
         </div>
-        <div className="divide-y divide-foreground/[0.06]">
+        <div className="divide-y divide-[var(--bo-hairline)]">
           {templates.map((t) => {
             const active = t.key === selectedKey;
             return (
@@ -712,7 +712,7 @@ function EditorClassico() {
                 key={t.key}
                 onClick={() => trocarDeModelo(t)}
                 className={`w-full text-left px-4 py-3 transition-colors ${
-                  active ? "bg-[#4d6350]/10" : "hover:bg-foreground/[0.02]"
+                  active ? "bg-[#4d6350]/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
                 <p
@@ -907,8 +907,8 @@ function EditorClassico() {
               da Líquen (Catarina Gaspar, contactos e logótipo) entra sozinha — não precisas de te
               despedir nem de repetir o nome da empresa.
             </p>
-            <div className="rounded-lg border border-foreground/[0.08] overflow-hidden">
-              <div className="px-3 py-2 bg-foreground/[0.03] border-b border-foreground/[0.06]">
+            <div className="rounded-lg border border-[var(--bo-hairline)] overflow-hidden">
+              <div className="px-3 py-2 bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
                 <p className="text-[10px] text-foreground/40">Assunto</p>
                 <p className="text-sm text-foreground/75 truncate">
                   {previewSubject || <span className="text-foreground/30">(sem assunto)</span>}

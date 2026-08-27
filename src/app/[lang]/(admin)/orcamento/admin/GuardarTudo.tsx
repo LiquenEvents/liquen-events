@@ -208,7 +208,7 @@ export default function BotaoGuardarTudo() {
               type="button"
               onClick={accao.dispensarResposta}
               aria-label="Fechar"
-              className="alvo-toque -mt-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/35 hover:bg-foreground/[0.06] hover:text-foreground/70"
+              className="alvo-toque -mt-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
             >
               <svg
                 width="13"

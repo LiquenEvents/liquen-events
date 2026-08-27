@@ -126,7 +126,7 @@ export default function MedidorDeTransbordo() {
           </p>
           <ol className="mt-1.5 flex flex-col gap-1.5">
             {resultado.culpados.slice(0, 12).map((c, i) => (
-              <li key={i} className="rounded border border-foreground/15 p-1.5">
+              <li key={i} className="rounded border border-[var(--bo-hairline-strong)] p-1.5">
                 <span className="font-semibold">
                   {c.quanto} px pela {c.lado}
                 </span>{" "}

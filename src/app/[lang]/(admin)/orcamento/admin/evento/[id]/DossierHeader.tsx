@@ -24,7 +24,7 @@ import { useDesceu } from "../../ui/adaptativo";
  * 44×44 onde se toca com o dedo, sem mexer no desenho. */
 const TOOL_LINK =
   "alvo-toque inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-foreground/55 " +
-  "hover:bg-foreground/[0.06] hover:text-foreground/80 motion-safe:transition-colors " +
+  "hover:bg-[var(--bo-tinta-6)] hover:text-foreground/80 motion-safe:transition-colors " +
   "motion-safe:duration-150";
 
 /**
@@ -190,7 +190,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
   const zone = zoneFor(next.kind);
 
   return (
-    <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07]">
+    <header className="sticky top-0 z-20 bg-white/97 border-b border-[var(--bo-hairline)]">
       <div
         className={`px-4 sm:px-6 lg:px-10 flex flex-col ${
           desceu ? "py-2 gap-2" : "py-[var(--bo-p-vista)] gap-[var(--bo-gap-vista)]"
@@ -351,7 +351,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               </a>
 
               {/* Separador subtil entre partilha e impressão/calendário. */}
-              <span aria-hidden className="w-px h-4 bg-foreground/10 mx-1" />
+              <span aria-hidden className="w-px h-4 bg-[var(--bo-tinta-10)] mx-1" />
 
               <Button
                 variant="ghost"

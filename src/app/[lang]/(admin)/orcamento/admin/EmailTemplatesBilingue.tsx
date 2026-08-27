@@ -540,10 +540,10 @@ export default function EmailTemplatesBilingue() {
     <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
       {/* ── A lista ── */}
       <div className="bo-card overflow-hidden self-start">
-        <div className="px-4 py-3 border-b border-foreground/[0.07]">
+        <div className="px-4 py-3 border-b border-[var(--bo-hairline)]">
           <p className="bo-eyebrow">Modelos ({modelos.length})</p>
         </div>
-        <div className="divide-y divide-foreground/[0.06]">
+        <div className="divide-y divide-[var(--bo-hairline)]">
           {modelos.map((m) => {
             const activo = m.chave === chave;
             const temIngles = !!m.en.subject.trim() || !!m.en.body.trim();
@@ -552,7 +552,7 @@ export default function EmailTemplatesBilingue() {
                 key={m.chave}
                 onClick={() => abrir(m, idioma)}
                 className={`w-full text-left px-4 py-3 transition-colors ${
-                  activo ? "bg-[#5F7C66]/10" : "hover:bg-foreground/[0.02]"
+                  activo ? "bg-[#5F7C66]/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
                 <p
@@ -747,7 +747,7 @@ export default function EmailTemplatesBilingue() {
             )}
 
             {historicoAberto && (
-              <div className="mt-5 border-t border-foreground/[0.07] pt-4">
+              <div className="mt-5 border-t border-[var(--bo-hairline)] pt-4">
                 {/* A contagem também espera: «(0)» é uma afirmação, e faz-se
                     com a lista na mão, não a caminho dela nem depois de a
                     leitura ter falhado. */}
@@ -842,8 +842,8 @@ export default function EmailTemplatesBilingue() {
               da Líquen entra sozinha: não precisas de te despedir.
             </p>
 
-            <div className="rounded-lg border border-foreground/[0.08] overflow-hidden">
-              <div className="px-3 py-2 bg-foreground/[0.03] border-b border-foreground/[0.06]">
+            <div className="rounded-lg border border-[var(--bo-hairline)] overflow-hidden">
+              <div className="px-3 py-2 bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
                 <p className="text-[10px] text-foreground/40">Assunto</p>
                 <p className="text-sm text-foreground/75 break-words">
                   {renderizarAssunto(assunto, valores) || (
@@ -861,7 +861,7 @@ export default function EmailTemplatesBilingue() {
             </div>
 
             {/* ── O teste ── */}
-            <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+            <div className="mt-4 border-t border-[var(--bo-hairline)] pt-4">
               <label htmlFor="etb-teste" className="bo-eyebrow block mb-1.5">
                 Enviar um teste
               </label>

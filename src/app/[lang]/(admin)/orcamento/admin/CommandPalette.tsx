@@ -161,11 +161,11 @@ export default function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Pesquisar e navegar"
-        className="bo-entrada relative w-full max-w-xl overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white shadow-[var(--bo-sombra-modal)]"
+        className="bo-entrada relative w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white shadow-[var(--bo-sombra-modal)]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
-        <div className="flex items-center gap-3 border-b border-foreground/[0.07] px-4 py-3.5">
+        <div className="flex items-center gap-3 border-b border-[var(--bo-hairline)] px-4 py-3.5">
           <svg
             className="shrink-0 text-foreground/40"
             width="18"
@@ -204,7 +204,7 @@ export default function CommandPalette({
               instrução impossível de seguir, e o que restava para fechar era
               tocar no fundo escuro — que não é um controlo, é uma coisa que se
               descobre por acaso. */}
-          <kbd className="pointer-coarse:hidden rounded-md border border-foreground/15 px-1.5 py-0.5 text-[10px] tracking-wider text-foreground/45">
+          <kbd className="pointer-coarse:hidden rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] tracking-wider text-foreground/45">
             ESC
           </kbd>
           <button
@@ -258,14 +258,14 @@ export default function CommandPalette({
                         onClose();
                       }}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left motion-safe:transition-colors ${
-                        isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-foreground/[0.04]"
+                        isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-[var(--bo-tinta-6)]"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
                           isActive
                             ? "bg-[#4d6350]/[0.16] text-[#4d6350]"
-                            : "bg-foreground/[0.05] text-foreground/40"
+                            : "bg-[var(--bo-tinta-6)] text-foreground/40"
                         }`}
                         aria-hidden="true"
                       >
@@ -327,15 +327,24 @@ export default function CommandPalette({
             ecrã de toque é uma barra a ocupar altura para dizer três coisas
             que não se podem fazer — e a altura, num telemóvel, é o que falta
             para ver os resultados. */}
-        <div className="pointer-coarse:hidden flex items-center gap-4 border-t border-foreground/[0.07] px-4 py-2.5 text-[11px] text-foreground/45">
+        <div className="pointer-coarse:hidden flex items-center gap-4 border-t border-[var(--bo-hairline)] px-4 py-2.5 text-[11px] text-foreground/45">
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">↑↓</kbd> navegar
+            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
+              ↑↓
+            </kbd>{" "}
+            navegar
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">↵</kbd> abrir
+            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
+              ↵
+            </kbd>{" "}
+            abrir
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded-md border border-foreground/15 px-1.5 py-0.5">esc</kbd> fechar
+            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
+              esc
+            </kbd>{" "}
+            fechar
           </span>
         </div>
       </div>

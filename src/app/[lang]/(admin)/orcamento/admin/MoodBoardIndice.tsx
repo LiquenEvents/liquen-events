@@ -234,7 +234,7 @@ function EntradaDoIndice({
             ? "border-[#4d6350]/55 bg-[#4d6350]/[0.07] text-foreground/85"
             : vazio
               ? "border-dashed border-foreground/20 text-foreground/45"
-              : "border-foreground/10 text-foreground/75 hover:border-foreground/25"
+              : "border-[var(--bo-hairline-strong)] text-foreground/75 hover:border-foreground/25"
         }`}
       >
         <span className="text-foreground/30 tabular-nums">{pos + 1}</span>

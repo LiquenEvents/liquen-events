@@ -288,7 +288,7 @@ export default function FundirTemas({
                 aria-valuemin={0}
                 aria-valuemax={progress.total}
                 aria-valuenow={progress.done}
-                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
                   className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -368,10 +368,10 @@ export default function FundirTemas({
                 className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
                   on
                     ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
-                    : "border-foreground/[0.1] hover:border-[#4d6350]/40"
+                    : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/40"
                 }`}
               >
-                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-foreground/[0.06]">
+                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--bo-tinta-6)]">
                   {t.coverUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

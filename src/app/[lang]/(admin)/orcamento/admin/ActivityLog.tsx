@@ -233,7 +233,7 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
       </div>
 
       {mode !== null && (
-        <div className="mb-4 rounded-2xl border border-dashed border-foreground/15 bg-foreground/[0.02] p-4">
+        <div className="mb-4 rounded-2xl border border-dashed border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
           <Field
             as="textarea"
             label={mode === "call" ? "Registar chamada" : "Adicionar nota"}
@@ -289,7 +289,7 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
 
       <div className="relative">
         {entries.length > 1 && (
-          <div className="absolute left-3 top-3 bottom-3 w-px bg-foreground/[0.07]" />
+          <div className="absolute left-3 top-3 bottom-3 w-px bg-[var(--bo-tinta-6)]" />
         )}
         <div className="flex flex-col">
           {entries.map((entry, i) => {

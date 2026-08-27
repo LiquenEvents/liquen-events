@@ -982,7 +982,7 @@ function ImportChip({ job }: { job: ImportJob }) {
       role="group"
       aria-label="Fotos a caminho da proposta"
       className={`pointer-events-auto rounded-xl border bg-white px-4 py-3 shadow-[var(--bo-sombra-suspensa)] ${
-        settled && failed > 0 ? "border-[#8a2a22]/25" : "border-foreground/10"
+        settled && failed > 0 ? "border-[#8a2a22]/25" : "border-[var(--bo-hairline-strong)]"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -992,7 +992,7 @@ function ImportChip({ job }: { job: ImportJob }) {
           {job.photos.slice(0, 4).map((p) => (
             <span
               key={p.path}
-              className={`block h-7 w-7 overflow-hidden rounded-md border-2 border-white bg-foreground/[0.06] ${
+              className={`block h-7 w-7 overflow-hidden rounded-md border-2 border-white bg-[var(--bo-tinta-6)] ${
                 p.state === "pending" ? "opacity-55" : ""
               } ${p.state === "failed" ? "ring-2 ring-[#8a2a22]/60" : ""}`}
             >
@@ -1003,7 +1003,7 @@ function ImportChip({ job }: { job: ImportJob }) {
             </span>
           ))}
           {total > 4 && (
-            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-foreground/[0.08] text-[10px] text-foreground/70">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-[var(--bo-tinta-10)] text-[10px] text-foreground/70">
               +{total - 4}
             </span>
           )}
@@ -1020,7 +1020,7 @@ function ImportChip({ job }: { job: ImportJob }) {
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={done + failed}
-          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
         >
           <div
             className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -2192,7 +2192,7 @@ export default function ThemePicker({
 
             O `lg:` fica: não é uma largura, é a MUDANÇA DE FORMA (faixa →
             coluna), e está sincronizado com o salto do painel para as 70 rem. */}
-        <div className="@container shrink-0 border-b border-foreground/[0.06] px-5 py-3 lg:flex lg:w-56 lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-3">
+        <div className="@container shrink-0 border-b border-[var(--bo-hairline)] px-5 py-3 lg:flex lg:w-56 lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-3">
           {loadingThemes ? (
             <div className="flex gap-2">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -2304,7 +2304,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded
                       aria-label="Fechar a procura"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/85"
                     >
                       <svg
                         width="15"
@@ -2327,7 +2327,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded={false}
                       aria-label="Procurar tema"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/85"
                     >
                       <svg
                         width="16"
@@ -2402,7 +2402,7 @@ export default function ThemePicker({
                   um beco: passa a dizer o que se procurou e a ter o caminho de
                   volta no mesmo sítio onde se lê o problema. */}
               {temasVisiveis.length === 0 && (
-                <div className="rounded-xl border border-dashed border-foreground/15 px-4 py-3 text-center">
+                <div className="rounded-xl border border-dashed border-[var(--bo-hairline-strong)] px-4 py-3 text-center">
                   <p className="text-sm text-foreground/75">
                     Nenhum tema com «{procuraTema.trim()}».
                   </p>
@@ -2469,7 +2469,7 @@ export default function ThemePicker({
             que diz um número é também um botão que se pode recusar antes de
             carregar nele. */}
           {multiple && images.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-foreground/[0.06] px-5 py-2.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--bo-hairline)] px-5 py-2.5">
               <Button size="sm" variant="ghost" onClick={selectAllVisible} disabled={atLimit}>
                 {hasMore
                   ? `Escolher as ${images.length} já mostradas`
@@ -2684,12 +2684,12 @@ export default function ThemePicker({
                              quadrado agora é o INVÓLUCRO (ver `celula-saltavel`
                              em globals.css) — é isso que deixa o browser saltar
                              a célula sem ela colapsar. */
-                                className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
+                                className={`relative block h-full w-full overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-all ${
                                   failed
                                     ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
                                     : on
                                       ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
-                                      : "border-foreground/[0.1] hover:border-[#4d6350]/45"
+                                      : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/45"
                                 } ${blocked ? "opacity-50" : ""}`}
                               >
                                 <Photo image={im} priority={i < ABOVE_FOLD} />
@@ -2926,7 +2926,7 @@ function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
      * Sem `lqip` (fotos anteriores à migração) fica o fundo neutro de sempre.
      */
     <div
-      className="h-full w-full bg-foreground/[0.04] bg-cover bg-center"
+      className="h-full w-full bg-[var(--bo-tinta-6)] bg-cover bg-center"
       style={image.lqip ? { backgroundImage: `url("${image.lqip}")` } : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3004,7 +3004,7 @@ function Preview({
       }}
       className="absolute inset-0 z-10 flex flex-col bg-white"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-foreground/[0.08] px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
         <p className="bo-text-muted text-xs">
           Foto {index + 1} de {count}
           {used ? " · já nesta proposta" : ""}
@@ -3013,7 +3013,7 @@ function Preview({
           Voltar à grelha
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-foreground/[0.04] p-3">
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-[var(--bo-tinta-6)] p-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image.url}
@@ -3025,7 +3025,7 @@ function Preview({
           className="max-h-full max-w-full object-contain"
         />
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-foreground/[0.08] px-5 py-3">
+      <div className="flex items-center justify-between gap-2 border-t border-[var(--bo-hairline)] px-5 py-3">
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => onStep(-1)} disabled={index === 0}>
             ← Anterior

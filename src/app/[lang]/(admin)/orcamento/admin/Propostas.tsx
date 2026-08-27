@@ -156,7 +156,7 @@ function ValidadeChip({ p }: { p: Proposal }) {
           ? "bg-[#8a2a22]/10 text-[#8a2a22]"
           : exp.tone === "soon"
             ? "bg-[#b5894a]/12 text-[#8a6420]"
-            : "bg-foreground/[0.05] text-foreground/45"
+            : "bg-[var(--bo-tinta-6)] text-foreground/45"
       }`}
     >
       {exp.label}
@@ -181,7 +181,7 @@ function ValidadeChip({ p }: { p: Proposal }) {
 function LugarDoCliente({ lugar }: { lugar: LugarNoCliente }) {
   return (
     <span
-      className="ml-1.5 inline-flex shrink-0 items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bo-text-muted)] align-middle"
+      className="ml-1.5 inline-flex shrink-0 items-center rounded-full bg-[var(--bo-tinta-6)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bo-text-muted)] align-middle"
       title={explicacaoDoLugar(lugar)}
     >
       {etiquetaDoLugar(lugar)}

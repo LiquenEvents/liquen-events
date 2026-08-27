@@ -292,12 +292,12 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     // O `pt-5` eram 20 px a qualquer largura. `--bo-p-vista` (12 → 24) é o
     // token que os painéis vizinhos desta zona passaram a ler para o mesmo
     // separador — um só ritmo, e 8 px de volta no telemóvel.
-    <div className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
+    <div className="border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
         <div className="flex flex-wrap items-center gap-2">
           {items.length > 0 && (
-            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
               {items.filter((i) => i.done).length}/{items.length} do plano
             </span>
           )}
@@ -376,11 +376,11 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   <p className="text-foreground/55 text-[11px] font-medium tracking-[0.08em] uppercase">
                     {titulo}
                   </p>
-                  <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
+                  <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5">
                     {feitos}/{itens.length}
                   </span>
                 </div>
-                <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
+                <div className="h-1 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden mb-2">
                   <div
                     className="h-full w-full origin-left bg-[#4d6350] rounded-full motion-safe:transition-transform motion-safe:duration-500"
                     style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
@@ -483,13 +483,13 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       </div>
 
       {/* Suppliers assigned to this event — managed in Custos, shown read-only. */}
-      <div className="mt-5 pt-4 border-t border-foreground/[0.08]">
+      <div className="mt-5 pt-4 border-t border-[var(--bo-hairline)]">
         <div className="flex items-center justify-between mb-2.5">
           <p className="text-foreground/45 text-[11px] tracking-[0.1em] uppercase">
             Fornecedores atribuídos
           </p>
           {suppliers.length > 0 && (
-            <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
+            <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5">
               {suppliers.length}
             </span>
           )}
@@ -511,7 +511,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-xl px-3.5 py-2.5"
+                  className="flex items-center gap-2.5 bg-[var(--bo-tinta-3)] border border-[var(--bo-hairline)] rounded-xl px-3.5 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-foreground/80 text-xs font-medium truncate">{s.name}</p>

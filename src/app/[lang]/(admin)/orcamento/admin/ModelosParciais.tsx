@@ -78,7 +78,7 @@ const ROTULO = {
  */
 const PAINEL_SUSPENSO =
   "bo-entrada absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
-  "rounded-xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-suspensa)]";
+  "rounded-xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-suspensa)]";
 
 export default function ModelosParciais({
   tipo,
@@ -221,7 +221,7 @@ export default function ModelosParciais({
                 <li key={m.id}>
                   <button
                     type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-foreground/[0.05]"
+                    className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--bo-tinta-6)]"
                     onClick={() => {
                       const conteudo = tipo === "grupo" ? m.grupo : m.moodboard;
                       // Um modelo sem conteúdo não pode passar por inserção

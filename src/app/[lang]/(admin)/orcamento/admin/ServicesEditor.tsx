@@ -98,7 +98,7 @@ const ROW_ACTIONS =
  *  que acertar ao lado custa uma remoção que não se queria. */
 const ICON_BTN =
   "alvo-toque inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground/60 " +
-  "hover:bg-foreground/[0.07] hover:text-foreground/90 disabled:opacity-30 " +
+  "hover:bg-[var(--bo-tinta-6)] hover:text-foreground/90 disabled:opacity-30 " +
   "disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors";
 
 /** Os campos onde se escreve: o marcador continua a ser um `<input>` («a)» tem
@@ -762,7 +762,7 @@ export default function ServicesEditor({
                 <SortableRow
                   key={gid}
                   id={gid}
-                  className="rounded-lg border border-foreground/[0.08] bg-foreground/[0.015] p-2.5"
+                  className="rounded-lg border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-2.5"
                 >
                   {({ handleProps }) => (
                     <>
@@ -879,7 +879,7 @@ export default function ServicesEditor({
                                   // razão (ver o comentário no título do
                                   // grupo) — falta só aplicar aqui o que ali já
                                   // estava certo.
-                                  className="group/row flex flex-wrap items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-foreground/[0.03] focus-within:bg-foreground/[0.03]"
+                                  className="group/row flex flex-wrap items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-[var(--bo-tinta-3)] focus-within:bg-[var(--bo-tinta-3)]"
                                 >
                                   {({ handleProps }) => (
                                     <>
@@ -1106,7 +1106,7 @@ export default function ServicesEditor({
       {removal && (
         <div
           role="status"
-          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-foreground/10 bg-white px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
+          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-[var(--bo-hairline-strong)] bg-white px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
         >
           <span className="text-foreground/75">{removal.label}</span>
           <button

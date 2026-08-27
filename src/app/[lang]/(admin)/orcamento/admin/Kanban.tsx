@@ -119,7 +119,7 @@ const KanbanCard = memo(function KanbanCard({
       }}
       /* `transition-all` obrigava o browser a considerar TODAS as propriedades
          animáveis do cartão a cada realce; só a sombra e a moldura mudam. */
-      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-foreground/[0.07] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,transform] hover:border-foreground/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,transform] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
         dragging ? "opacity-40 motion-safe:rotate-1" : ""
       }`}
     >
@@ -168,7 +168,7 @@ const KanbanCard = memo(function KanbanCard({
           </span>
         </div>
       )}
-      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-foreground/[0.06]">
+      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[var(--bo-hairline)]">
         {q.quotedPrice ? (
           // Com IVA, para bater com o «Total» da coluna e os KPIs do topo —
           // o mesmo cartão não pode mostrar um número numa unidade e a coluna
@@ -223,7 +223,7 @@ const KanbanCard = memo(function KanbanCard({
                   onMove(q, -1);
                 }}
                 aria-label="Mover para a coluna anterior"
-                className="alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-foreground/[0.05] text-foreground/40 active:bg-foreground/10"
+                className="alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--bo-tinta-6)] text-foreground/40 active:bg-[var(--bo-tinta-10)]"
               >
                 <svg
                   width="11"
@@ -605,7 +605,7 @@ export default function Kanban({
               className={`flex-shrink-0 w-[276px] rounded-2xl border motion-safe:transition-[background-color,border-color,box-shadow] motion-safe:duration-200 ${
                 overCol === col.id
                   ? "border-[#637a5f]/50 bg-[#637a5f]/[0.05] ring-2 ring-[#637a5f]/20"
-                  : "border-foreground/[0.07] bg-foreground/[0.018]"
+                  : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
               }`}
             >
               <div className="flex items-center justify-between px-4 py-3.5">
@@ -615,7 +615,7 @@ export default function Kanban({
                     {col.label}
                   </span>
                 </div>
-                <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.06] rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5 min-w-[20px] text-center">
                   {items.length}
                 </span>
               </div>
@@ -673,7 +673,7 @@ export default function Kanban({
               </div>
 
               {value > 0 && (
-                <div className="px-4 py-2.5 border-t border-foreground/[0.07] flex items-center justify-between">
+                <div className="px-4 py-2.5 border-t border-[var(--bo-hairline)] flex items-center justify-between">
                   <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase">
                     Total (com IVA)
                   </span>

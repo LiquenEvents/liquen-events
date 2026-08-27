@@ -108,7 +108,7 @@ export default function FolhaDaProposta({
   return (
     <div
       className={`relative w-full overflow-hidden rounded-md border ${
-        daCapa ? "border-transparent" : "border-foreground/15 bg-white"
+        daCapa ? "border-transparent" : "border-[var(--bo-hairline-strong)] bg-white"
       }`}
       style={{
         aspectRatio: `${PAGINA_W} / ${PAGINA_H}`,

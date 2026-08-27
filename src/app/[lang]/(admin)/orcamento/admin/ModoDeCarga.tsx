@@ -124,7 +124,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
     <div className="pb-24">
       {/* O contador acompanha o scroll. Numa lista de 40 itens, ter de subir ao
           topo para saber quanto falta é o que faz perder a conta. */}
-      <div className="sticky top-0 z-20 -mx-4 mb-3 border-b border-foreground/[0.08] bg-[var(--bo-surface,#ffffff)] px-4 py-3">
+      <div className="sticky top-0 z-20 -mx-4 mb-3 border-b border-[var(--bo-hairline)] bg-[var(--bo-surface,#ffffff)] px-4 py-3">
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="sm" onClick={onSair}>
             ← Sair
@@ -149,7 +149,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
         </div>
         {/* Barra de progresso: ao sol, um número pequeno lê-se mal; uma barra
             cheia vê-se de relance. */}
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bo-tinta-10)]">
           <div
             className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-200"
             style={{ transform: `scaleX(${fraccaoDaBarra(feitos, total)})` }}
@@ -179,7 +179,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                 className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors ${
                   feito
                     ? "border-[#4d6350]/40 bg-[#e7efe4]"
-                    : "border-foreground/[0.1] bg-white active:bg-foreground/[0.04]"
+                    : "border-[var(--bo-hairline-strong)] bg-white active:bg-[var(--bo-tinta-6)]"
                 }`}
                 // 64 px: bem acima do mínimo de 44, porque aqui não se está
                 // sentado nem a olhar com atenção.

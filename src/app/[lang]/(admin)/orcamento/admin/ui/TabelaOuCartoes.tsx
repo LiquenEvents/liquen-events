@@ -151,7 +151,7 @@ export function TabelaOuCartoes<T>({
        * entre cada duas linhas.
        */
       <ul
-        className="flex flex-col divide-y divide-foreground/[0.07] overflow-hidden rounded-xl border border-foreground/[0.08] bg-white"
+        className="flex flex-col divide-y divide-[var(--bo-hairline)] overflow-hidden rounded-xl border border-[var(--bo-hairline)] bg-white"
         aria-label={legenda}
       >
         {ordenados.map((item) => (
@@ -213,12 +213,12 @@ export function TabelaOuCartoes<T>({
       tabIndex={rolavel ? 0 : undefined}
       role={rolavel ? "region" : undefined}
       aria-label={rolavel ? legenda : undefined}
-      className="overflow-x-auto rounded-xl border border-foreground/[0.08] bg-white"
+      className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)] bg-white"
     >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{legenda}</caption>
         <thead>
-          <tr className="border-b border-foreground/[0.08]">
+          <tr className="border-b border-[var(--bo-hairline)]">
             {visiveis.map((c) => (
               <th
                 key={c.chave}
@@ -271,8 +271,8 @@ export function TabelaOuCartoes<T>({
                 // `group` para o `MenuDeAccoes` se poder revelar ao passar o
                 // rato pela LINHA inteira — e não só por cima do próprio botão,
                 // que obrigava a adivinhar onde ele está.
-                "group border-b border-foreground/[0.05] last:border-0",
-                aoAbrir && "cursor-pointer hover:bg-foreground/[0.03]",
+                "group border-b border-[var(--bo-hairline)] last:border-0",
+                aoAbrir && "cursor-pointer hover:bg-[var(--bo-tinta-3)]",
               )}
             >
               {visiveis.map((c, i) => (

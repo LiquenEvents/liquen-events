@@ -19,7 +19,7 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
        que não há nada, iguais a 375 e a 1440. Lê o mesmo token, para os dois
        vazios do back office não poderem discordar. */
     <div className="flex flex-col items-center justify-center text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)]">
-      <div className="w-12 h-12 rounded-2xl bg-foreground/[0.04] flex items-center justify-center text-foreground/25 mb-3 sm:mb-4">
+      <div className="w-12 h-12 rounded-2xl bg-[var(--bo-tinta-6)] flex items-center justify-center text-foreground/25 mb-3 sm:mb-4">
         {icon ?? (
           <svg
             width="22"

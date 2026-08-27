@@ -738,7 +738,7 @@ function Catalogo() {
 
       {/* ── Pré-visualização da importação ──────────────────────────────── */}
       {plano && (
-        <div className="mt-4 rounded-xl border border-foreground/12 bg-foreground/[0.02] p-4">
+        <div className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <p className="text-sm font-medium">Antes de gravar:</p>
             <p className="text-sm text-foreground/75">
@@ -802,7 +802,7 @@ function Catalogo() {
       )}
 
       {adding && (
-        <div className="mt-4 rounded-xl border border-foreground/12 p-4">
+        <div className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] p-4">
           {campos(form, setForm)}
           <div className="mt-3 flex items-center gap-2">
             <Button size="sm" onClick={add} disabled={saving || !form.name.trim()}>
@@ -837,7 +837,7 @@ function Catalogo() {
           }
         />
       ) : (
-        <ul className="mt-4 divide-y divide-foreground/[0.08]">
+        <ul className="mt-4 divide-y divide-[var(--bo-hairline)]">
           {visiveis.map((i) =>
             editingId === i.id ? (
               <li key={i.id} className="py-4">

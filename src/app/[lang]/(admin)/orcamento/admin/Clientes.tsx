@@ -298,7 +298,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#8a6420] "
-                  : "bg-foreground/[0.04] text-foreground/55 hover:bg-foreground/[0.07] hover:text-foreground/75"
+                  : "bg-[var(--bo-tinta-6)] text-foreground/55 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/75"
               }`}
             >
               <span aria-hidden="true">★</span>
@@ -445,7 +445,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
           `FichaDoCliente`, montada uma vez. */}
       {emTabela && aberta && (
         <Card padding="none" className="mt-3 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-foreground/[0.07] px-5 py-3">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
             <p className="truncate text-sm font-semibold text-foreground/78">{aberta.name}</p>
             <Button size="sm" variant="ghost" onClick={() => setOpen(null)}>
               Fechar
@@ -546,7 +546,7 @@ function CartaoDeCliente({
       <button
         onClick={onAlternar}
         aria-expanded={aberto}
-        className="w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-foreground/[0.025] motion-safe:transition-colors"
+        className="w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
       >
         <Avatar c={c} />
 
@@ -576,7 +576,7 @@ function CartaoDeCliente({
       </button>
 
       {aberto && (
-        <div className="border-t border-foreground/[0.07]">
+        <div className="border-t border-[var(--bo-hairline)]">
           <FichaDoCliente c={c} onOpen={onOpen} />
         </div>
       )}
@@ -733,7 +733,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
           `alvo-toque` cresce só no dedo, portanto a barra fina do
           portátil não muda. A altura de linha do texto continua a
           ser a mesma; o que cresce é a caixa em que se toca. */}
-      <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-foreground/[0.015] border-b border-foreground/[0.05]">
+      <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
         {c.phone && (
           <a
             href={`tel:${c.phone}`}
@@ -797,7 +797,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
       </div>
 
       {/* Quote rows */}
-      <div className="divide-y divide-foreground/[0.06]">
+      <div className="divide-y divide-[var(--bo-hairline)]">
         {c.quotes
           .slice()
           .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt))
@@ -805,7 +805,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
             <button
               key={q.id}
               onClick={() => onOpen(q)}
-              className="w-full text-left px-5 py-3 hover:bg-foreground/[0.025] motion-safe:transition-colors flex items-center justify-between gap-3"
+              className="w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors flex items-center justify-between gap-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">

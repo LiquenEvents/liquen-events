@@ -80,7 +80,7 @@ export function NomesPorArrumar({
   };
 
   return (
-    <div className="mb-4 rounded-xl border border-foreground/[0.12] bg-[#f7f4ee]/60 px-4 py-3 text-sm">
+    <div className="mb-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60 px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="text-foreground/75">
           {arrumos.length === 1

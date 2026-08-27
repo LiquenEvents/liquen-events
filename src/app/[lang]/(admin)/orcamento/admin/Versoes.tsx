@@ -229,7 +229,7 @@ export default function Versoes({
   return (
     <section
       aria-labelledby="versoes-titulo"
-      className="mt-5 rounded-2xl border border-foreground/12 bg-foreground/[0.015] p-4"
+      className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4"
     >
       <h3
         id="versoes-titulo"
@@ -287,7 +287,7 @@ export default function Versoes({
           const numero = versoes.length - i;
           const expandida = aberta === v.id;
           return (
-            <li key={v.id} className="rounded-xl border border-foreground/10 p-3">
+            <li key={v.id} className="rounded-xl border border-[var(--bo-hairline-strong)] p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="text-xs font-medium text-foreground/80">
                   {`Versão ${numero} · ${quando(v.enviadaEm)} · ${eur(v.total)}`}
@@ -320,7 +320,7 @@ export default function Versoes({
               </div>
 
               {expandida && (
-                <ul className="mt-2 flex flex-col gap-1 border-t border-foreground/10 pt-2">
+                <ul className="mt-2 flex flex-col gap-1 border-t border-[var(--bo-hairline-strong)] pt-2">
                   {v.mudancas.map((m, j) => (
                     <li key={j} className="text-xs leading-relaxed text-foreground/65">
                       <span className="text-foreground/40">{m.onde} · </span>

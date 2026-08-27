@@ -1339,7 +1339,7 @@ export default function Temas() {
                 <div
                   role="group"
                   aria-label="Tamanho dos cartões"
-                  className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
+                  className="flex overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)]"
                 >
                   {(
                     [
@@ -1357,7 +1357,7 @@ export default function Temas() {
                       }}
                       className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
                         densidade === valor
-                          ? "bg-foreground/[0.06] text-foreground/70"
+                          ? "bg-[var(--bo-tinta-6)] text-foreground/70"
                           : "text-foreground/40 hover:text-foreground/60"
                       }`}
                     >
@@ -1381,8 +1381,8 @@ export default function Temas() {
                 onClick={() => setVerArquivados((v) => !v)}
                 className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
                   verArquivados
-                    ? "border-foreground/20 bg-foreground/[0.06] text-foreground/70"
-                    : "border-foreground/[0.1] text-foreground/40 hover:text-foreground/60"
+                    ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-foreground/70"
+                    : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-foreground/60"
                 }`}
               >
                 Arquivados ({arquivados})
@@ -1596,7 +1596,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left motion-safe:transition-colors hover:border-[#4d6350]/40"
+                className="block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left motion-safe:transition-colors hover:border-[#4d6350]/40"
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -1623,7 +1623,7 @@ export default function Temas() {
 
                     A moldura é 4:3 SEMPRE: é ela que mantém a primeira linha
                     alinhada quando as fotos têm proporções diferentes. */}
-                <div className="aspect-[4/3] w-full overflow-hidden bg-foreground/[0.04]">
+                <div className="aspect-[4/3] w-full overflow-hidden bg-[var(--bo-tinta-6)]">
                   {t.coverUrl ? (
                     <ImagemComPlanoB
                       src={t.coverUrl}
@@ -2013,7 +2013,7 @@ function Photo({
        acabou de ser feita no browser, ainda em memória, de uma foto carregada
        há segundos. Essa aparece na hora e não precisa de placeholder nenhum. */
     <div
-      className="h-full w-full bg-foreground/[0.04] bg-cover bg-center"
+      className="h-full w-full bg-[var(--bo-tinta-6)] bg-cover bg-center"
       style={image.lqip && !localSrc ? { backgroundImage: `url("${image.lqip}")` } : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3482,7 +3482,7 @@ function ThemeFolder({
             aria-valuemin={0}
             aria-valuemax={progress.total}
             aria-valuenow={progress.done}
-            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
           >
             <div
               className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -3519,7 +3519,7 @@ function ThemeFolder({
                 aria-valuemin={0}
                 aria-valuemax={thumbJob.total ?? undefined}
                 aria-valuenow={thumbJob.cursor}
-                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+                className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
                   className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
@@ -3624,7 +3624,7 @@ function ThemeFolder({
                 title={`${s.file.name} — ${
                   s.reason === "no-lote" ? "repetida neste arrasto" : "já estava no tema"
                 }`}
-                className="h-14 w-14 overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
+                className="h-14 w-14 overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
               >
                 <SkippedThumb file={s.file} track={trackUrl} />
               </li>
@@ -3814,7 +3814,7 @@ function ThemeFolder({
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
         // `GRELHA_DE_FOTOS`.
         className={`@container rounded-2xl border border-dashed p-4 motion-safe:transition-colors ${
-          drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-foreground/[0.14]"
+          drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-[var(--bo-hairline-strong)]"
         }`}
       >
         {loading ? (
@@ -3859,7 +3859,7 @@ function ThemeFolder({
                   key={p.id}
                   aria-hidden
                   title={`${p.name} — a carregar`}
-                  className="relative aspect-square overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04]"
+                  className="relative aspect-square overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
                 >
                   {p.src ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -3912,10 +3912,10 @@ function ThemeFolder({
                     // nem descodifica esta célula. A altura não depende disso
                     // (é `aspect-square` numa coluna de largura fixa), por
                     // isso a barra de deslocamento não mexe. Ver globals.css.
-                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-[opacity,box-shadow] ${
+                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-[opacity,box-shadow] ${
                       isSelected
                         ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
-                        : "border-foreground/[0.1]"
+                        : "border-[var(--bo-hairline-strong)]"
                     } ${dragFrom === i ? "opacity-40" : ""} ${
                       dragOver === i && dragFrom !== null && dragFrom !== i
                         ? "ring-2 ring-[#4d6350]"

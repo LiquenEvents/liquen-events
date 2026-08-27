@@ -309,7 +309,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
           </span>
         )}
         {dados.evento?.status === "devolvida" && (
-          <span className="rounded-full bg-foreground/[0.07] px-2 py-0.5 text-[11px] font-medium text-foreground/60">
+          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2 py-0.5 text-[11px] font-medium text-foreground/60">
             Material devolvido
           </span>
         )}
@@ -332,7 +332,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
               <p className="mb-1.5 text-[11px] tracking-[0.14em] text-foreground/55 uppercase">
                 {categoria}
               </p>
-              <ul className="divide-y divide-foreground/[0.06]">
+              <ul className="divide-y divide-[var(--bo-hairline)]">
                 {linhas.map((i) => (
                   <li key={i.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
                     {i.critical && (

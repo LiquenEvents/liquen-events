@@ -525,7 +525,7 @@ export default function DefinicoesProposta() {
         </label>
 
         {/* ── O que isto faz, em euros ─────────────────────────────────── */}
-        <div className="mt-4 rounded-xl bg-foreground/[0.02] p-3">
+        <div className="mt-4 rounded-xl bg-[var(--bo-tinta-3)] p-3">
           {contaSuspensa ? (
             <p className="text-[11px] leading-relaxed text-foreground/60">
               <strong className="font-semibold text-foreground/85">—</strong> Não mostro o custo por

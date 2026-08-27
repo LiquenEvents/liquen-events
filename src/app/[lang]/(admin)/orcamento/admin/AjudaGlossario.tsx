@@ -45,7 +45,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
         <span className="pointer-coarse:hidden">
           {" "}
           ou com a tecla{" "}
-          <kbd className="text-[10px] text-foreground/55 bg-foreground/[0.06] border border-foreground/12 rounded px-1.5 py-0.5 leading-none">
+          <kbd className="text-[10px] text-foreground/55 bg-[var(--bo-tinta-6)] border border-[var(--bo-hairline-strong)] rounded px-1.5 py-0.5 leading-none">
             ?
           </kbd>
         </span>
@@ -76,7 +76,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
         </ol>
       </section>
 
-      <div className="h-px bg-foreground/[0.07] my-6" />
+      <div className="h-px bg-[var(--bo-tinta-6)] my-6" />
 
       {/* ── Glossário ── */}
       <section>

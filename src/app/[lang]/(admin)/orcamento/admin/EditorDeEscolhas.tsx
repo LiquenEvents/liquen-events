@@ -85,7 +85,7 @@ export interface FotoDisponivel {
 const CAIXA =
   "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-foreground/85 placeholder:text-foreground/30 focus:border-[#4d6350] focus:outline-none";
 const BOTAO_MAGRO =
-  "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] text-foreground/60 transition-colors hover:bg-foreground/[0.04]";
+  "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] text-foreground/60 transition-colors hover:bg-[var(--bo-tinta-6)]";
 
 export default function EditorDeEscolhas({
   escolhas,
@@ -395,7 +395,7 @@ export default function EditorDeEscolhas({
                         {/* A miniatura, quando há. É o que faz a lista de
                             opções ser legível de relance no meio de quatro. */}
                         {opcao.imagem && (
-                          <span className="mt-0.5 block h-10 w-10 shrink-0 overflow-hidden rounded-md bg-foreground/[0.06]">
+                          <span className="mt-0.5 block h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--bo-tinta-6)]">
                             {foto?.url && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
@@ -516,7 +516,7 @@ export default function EditorDeEscolhas({
                                           loading="lazy"
                                         />
                                       ) : (
-                                        <span className="block h-full w-full bg-foreground/[0.06]" />
+                                        <span className="block h-full w-full bg-[var(--bo-tinta-6)]" />
                                       )}
                                     </button>
                                   ))}

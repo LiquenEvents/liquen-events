@@ -60,7 +60,7 @@ const QUADRADO =
  * escreveram — é a armadilha que o `globals.css` conta por extenso a propósito
  * do `.alvo-toque`. Assim cada quadrado traz UMA cor, e não há empate a desfazer.
  */
-const NEUTRO = "@min-[26rem]:border-foreground/[0.06] @min-[26rem]:bg-foreground/[0.02]";
+const NEUTRO = "@min-[26rem]:border-[var(--bo-hairline)] @min-[26rem]:bg-[var(--bo-tinta-3)]";
 
 /** O número. `whitespace-nowrap` é o que impede «202 889,00 €» de partir em duas. */
 const VALOR =
@@ -572,7 +572,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
    * na prática, portanto o desenho não muda — cresce a caixa em que se toca.
    */
   const chip =
-    "alvo-toque rounded-full border border-foreground/[0.12] bg-foreground/[0.02] px-2.5 py-1 " +
+    "alvo-toque rounded-full border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-2.5 py-1 " +
     "text-[11px] tabular-nums text-foreground/65 hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
     "motion-safe:transition-colors";
   const ghostFailed = Boolean(failed?.ghost && !payments.some((p) => p.id === failed.id));
@@ -585,7 +585,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
     // largura. `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma
     // vista, e é o que os painéis vizinhos desta zona do dossier passaram a
     // ler: um separador que mede o mesmo em todos, e 8 px de volta aqui.
-    <div className="@container border-t border-foreground/10 pt-[var(--bo-p-vista)]">
+    <div className="@container border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
       <div className="flex items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Pagamentos</p>
         {/* Contract reference */}
@@ -654,7 +654,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           Container query e não `sm:`: num iPad a 768 px o `sm:` disparava e o
           painel continuava com os mesmos 279. A partir de 26 rem volta a grelha
           de três cartões, como sempre esteve. */}
-      <div className="flex flex-col divide-y divide-foreground/[0.08] rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] mb-1.5 @min-[26rem]:grid @min-[26rem]:grid-cols-3 @min-[26rem]:gap-2.5 @min-[26rem]:divide-y-0 @min-[26rem]:rounded-none @min-[26rem]:border-0 @min-[26rem]:bg-transparent">
+      <div className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] mb-1.5 @min-[26rem]:grid @min-[26rem]:grid-cols-3 @min-[26rem]:gap-2.5 @min-[26rem]:divide-y-0 @min-[26rem]:rounded-none @min-[26rem]:border-0 @min-[26rem]:bg-transparent">
         <div className={`${QUADRADO} ${NEUTRO}`}>
           <p className={`${VALOR} text-base text-foreground/85`}>{eur2(total)}</p>
           <p className={`${ROTULO} text-foreground/40`}>Total (c/ IVA)</p>
@@ -722,7 +722,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           aria-valuemax={100}
           aria-valuenow={Math.round(pct)}
           aria-valuetext={`${Math.round(pct)}% recebido de ${eur2(total)}`}
-          className="flex h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+          className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
         >
           <div className="h-full bg-[#4d6350]" style={{ width: `${pct}%` }} />
           <div className="h-full bg-[#4d6350]/35" style={{ width: `${pctDraft}%` }} />
@@ -957,7 +957,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               className={`group ${GRID} rounded-lg px-2 py-1.5 motion-safe:transition-colors ${
                 isFailed
                   ? "border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06]"
-                  : "border border-transparent hover:bg-foreground/[0.03]"
+                  : "border border-transparent hover:bg-[var(--bo-tinta-3)]"
               }`}
             >
               <span className="text-foreground/75 text-xs truncate">{KIND_LABEL[p.kind]}</span>
@@ -999,7 +999,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   // formulário por cima. Media 137,5 × 24 px no telemóvel — é o
                   // botão que abre a edição do valor, e 24 px é meia polpa de
                   // dedo.
-                  className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-foreground/[0.06] ${
+                  className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-[var(--bo-tinta-6)] ${
                     p.paid ? "text-[#4d6350]" : "text-foreground/55"
                   }`}
                 >
@@ -1032,7 +1032,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 className={`rounded-md px-1.5 py-0.5 pointer-coarse:min-h-11 text-[9px] tracking-[0.1em] uppercase text-center motion-safe:transition-colors ${
                   p.paid
                     ? "bg-[#4d6350]/15 text-[#4d6350] hover:bg-[#4d6350]/25"
-                    : "bg-foreground/[0.06] text-foreground/50 hover:bg-foreground/[0.12]"
+                    : "bg-[var(--bo-tinta-6)] text-foreground/50 hover:bg-[var(--bo-tinta-10)]"
                 }`}
               >
                 {p.paid ? "Pago" : "Pendente"}

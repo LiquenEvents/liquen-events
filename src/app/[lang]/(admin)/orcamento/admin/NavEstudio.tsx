@@ -206,7 +206,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
                   aqui
                     ? "bg-[#4d6350]/[0.08]"
-                    : "bg-foreground/[0.04] hover:bg-foreground/[0.07] lg:bg-transparent lg:hover:bg-foreground/[0.04]"
+                    : "bg-[var(--bo-tinta-6)] hover:bg-[var(--bo-tinta-6)] lg:bg-transparent lg:hover:bg-[var(--bo-tinta-6)]"
                 }`}
               >
                 <span
@@ -275,7 +275,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
           permanente no ecrã mais apertado da casa para dizer, mais longe do
           botão, o que já está dito ao lado dele. */}
       {faltas.length > 0 && (
-        <div className="mt-4 hidden border-t border-foreground/10 pt-3 lg:block">
+        <div className="mt-4 hidden border-t border-[var(--bo-hairline-strong)] pt-3 lg:block">
           {/*
            * ── «TALVEZ QUEIRA» NÃO QUERIA DIZER NADA ──────────────────────
            *

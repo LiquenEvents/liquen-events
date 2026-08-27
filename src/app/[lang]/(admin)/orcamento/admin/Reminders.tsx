@@ -232,19 +232,19 @@ export default function Reminders({ quotes, onOpen }: Props) {
 
   return (
     <Card padding="none" className="overflow-hidden">
-      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
+      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[var(--bo-hairline)]">
         <p className="bo-eyebrow">Lembretes</p>
         <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
           {reminders.length}
         </span>
       </div>
-      <ul className="divide-y divide-foreground/[0.06] max-h-[340px] overflow-y-auto">
+      <ul className="divide-y divide-[var(--bo-hairline)] max-h-[340px] overflow-y-auto">
         {reminders.map((r, i) => (
           <li key={i}>
             <button
               onClick={() => r.quote && onOpen(r.quote)}
               disabled={!r.quote}
-              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 motion-safe:transition-colors ${r.quote ? "hover:bg-foreground/[0.02] cursor-pointer" : "cursor-default"}`}
+              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 motion-safe:transition-colors ${r.quote ? "hover:bg-[var(--bo-tinta-3)] cursor-pointer" : "cursor-default"}`}
             >
               <span style={{ color: r.urgent ? "#8a2a22" : "#9aa36a" }}>{icon(r.kind)}</span>
               <div className="min-w-0 flex-1">

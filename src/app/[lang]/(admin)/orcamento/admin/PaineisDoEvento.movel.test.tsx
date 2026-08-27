@@ -346,8 +346,14 @@ describe("o separador de cada painel lê `--bo-p-vista`", () => {
       "PaymentsPanel.tsx",
     ]) {
       const src = ler(f);
-      expect(src, f).toMatch(/border-t border-foreground\/10 pt-\[var\(--bo-p-vista\)\]/);
-      expect(src, f).not.toMatch(/border-t border-foreground\/10 pt-[56]\b/);
+      // O risco deixou de ser `border-foreground/10` escrito à mão e passou a
+      // pedir um degrau da escada da tinta — ver `escada-da-tinta.test.ts`. O
+      // que este teste guarda continua a ser o mesmo: que o separador existe e
+      // que o espaço por baixo dele vem do token da vista, e não de um 5 ou um
+      // 6 escolhidos ali.
+      const RISCO = "border-t border-\\[var\\(--bo-hairline-strong\\)\\]";
+      expect(src, f).toMatch(new RegExp(`${RISCO} pt-\\[var\\(--bo-p-vista\\)\\]`));
+      expect(src, f).not.toMatch(new RegExp(`${RISCO} pt-[56]\\b`));
     }
   });
 

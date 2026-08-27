@@ -121,7 +121,7 @@ export default function ValoresSuspeitos() {
   const limpo = suspeitas.length === 0 && naoFecham.length === 0;
 
   return (
-    <section className="mt-4 rounded-xl border border-foreground/[0.1] p-4 sm:p-5">
+    <section className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] p-4 sm:p-5">
       <h3 className="text-sm font-medium">Valores que podem ter crescido sozinhos</h3>
       <p className="mt-1.5 text-xs leading-relaxed text-foreground/60">
         Havia uma avaria que somava os valores adicionais outra vez a cada visita à mesma proposta —
@@ -135,7 +135,7 @@ export default function ValoresSuspeitos() {
           type="button"
           onClick={procurar}
           disabled={aLer}
-          className="min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-foreground/[0.05] disabled:opacity-50"
+          className="min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50"
         >
           {aLer ? "A procurar…" : "Procurar"}
         </button>
@@ -207,7 +207,7 @@ export default function ValoresSuspeitos() {
                     {naoFecham.map((c) => (
                       <li
                         key={`${c.quoteId}-${c.tipo}`}
-                        className="rounded-lg border border-foreground/[0.12] bg-[var(--bo-surface,#fff)] p-2.5"
+                        className="rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#fff)] p-2.5"
                       >
                         <p className="font-medium text-foreground/85">
                           {c.nome}
@@ -246,7 +246,7 @@ export default function ValoresSuspeitos() {
                   {suspeitas.map((s) => (
                     <li
                       key={s.quoteId}
-                      className="rounded-lg border border-foreground/10 px-3 py-2.5"
+                      className="rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2.5"
                     >
                       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <span className="font-medium text-foreground/85">{s.nome}</span>

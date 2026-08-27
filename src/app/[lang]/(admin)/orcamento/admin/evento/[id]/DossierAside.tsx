@@ -120,7 +120,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
           ))}
         </div>
         {quote.notes && (
-          <div className="mt-4 pt-3 border-t border-foreground/[0.06]">
+          <div className="mt-4 pt-3 border-t border-[var(--bo-hairline)]">
             <p className="text-foreground/25 text-[9px] tracking-wide uppercase mb-1">
               Notas do cliente
             </p>

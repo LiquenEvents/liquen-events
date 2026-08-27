@@ -282,10 +282,10 @@ export default function CriarAPartirDe({
         role="dialog"
         aria-modal="true"
         aria-labelledby="cad-titulo"
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-modal)]"
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
         onKeyDown={teclas}
       >
-        <div className="border-b border-foreground/10 px-5 py-4">
+        <div className="border-b border-[var(--bo-hairline-strong)] px-5 py-4">
           <h2 id="cad-titulo" className="font-serif text-lg text-foreground/85">
             Criar a partir de…
           </h2>
@@ -339,7 +339,7 @@ export default function CriarAPartirDe({
                     className={`w-full rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
                       i === ativo
                         ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
-                        : "border-transparent hover:border-foreground/10"
+                        : "border-transparent hover:border-[var(--bo-hairline-strong)]"
                     }`}
                   >
                     <span className="flex flex-wrap items-baseline justify-between gap-2">
@@ -389,7 +389,7 @@ export default function CriarAPartirDe({
           </ul>
         </div>
 
-        <div className="flex items-center justify-between border-t border-foreground/10 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-[var(--bo-hairline-strong)] px-5 py-3">
           <p className="text-[11px] text-foreground/40">↑ ↓ percorre · Enter escolhe · Esc fecha</p>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancelar

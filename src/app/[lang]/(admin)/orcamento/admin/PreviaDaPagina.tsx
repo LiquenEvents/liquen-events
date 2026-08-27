@@ -143,7 +143,7 @@ export default function PreviaDaPagina({
   return (
     <figure className="m-0">
       <div
-        className="relative w-full overflow-hidden rounded-md border border-foreground/15 bg-white"
+        className="relative w-full overflow-hidden rounded-md border border-[var(--bo-hairline-strong)] bg-white"
         style={{
           aspectRatio: `${PAGINA_W} / ${PAGINA_H}`,
           // Sem isto, os `cqw` de baixo medem-se à JANELA. Ver o cabeçalho.
@@ -207,7 +207,7 @@ export default function PreviaDaPagina({
         {caixas.map((c, i) => (
           <span
             key={i}
-            className="absolute overflow-hidden bg-foreground/[0.06] ring-[0.5px] ring-foreground/15"
+            className="absolute overflow-hidden bg-[var(--bo-tinta-6)] ring-[0.5px] ring-[var(--bo-hairline-strong)]"
             style={{
               left: pct(c.x, PAGINA_W),
               // O y do PDF é medido a partir do FUNDO: `bottom` em vez de `top`.

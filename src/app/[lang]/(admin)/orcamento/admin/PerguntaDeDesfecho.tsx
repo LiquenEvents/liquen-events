@@ -226,7 +226,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
 
   return (
     <div
-      className={`${compacto ? "mt-3 pt-3 border-t border-foreground/[0.07]" : "rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.04] p-4"}`}
+      className={`${compacto ? "mt-3 pt-3 border-t border-[var(--bo-hairline)]" : "rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.04] p-4"}`}
       // O gesto vive dentro de cartões que são eles próprios um botão de abrir.
       // Sem isto, tocar em «Ganho» abria o pedido por baixo da marcação.
       onClick={(e) => e.stopPropagation()}
@@ -258,7 +258,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                       type="button"
                       onClick={() => void guardarMotivo(m)}
                       disabled={motivoAGravar !== null}
-                      className={`${botao} border-foreground/15 text-foreground/55 hover:border-foreground/30`}
+                      className={`${botao} border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-foreground/30`}
                     >
                       {motivoAGravar === m ? "A guardar…" : NOME_DO_MOTIVO[m]}
                     </button>
@@ -351,7 +351,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
             type="button"
             disabled={fase.tipo === "a-gravar"}
             onClick={() => void marcar("perdido")}
-            className={`${botao} border-foreground/15 text-foreground/55 hover:border-foreground/35 hover:text-foreground/80`}
+            className={`${botao} border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-foreground/35 hover:text-foreground/80`}
           >
             Perdido
           </button>

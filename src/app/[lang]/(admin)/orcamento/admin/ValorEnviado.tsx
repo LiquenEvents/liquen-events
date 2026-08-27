@@ -103,7 +103,7 @@ export default function ValorEnviado() {
   const lista = divergentes ?? [];
 
   return (
-    <section className="mt-4 rounded-xl border border-foreground/[0.1] p-4 sm:p-5">
+    <section className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] p-4 sm:p-5">
       <h3 className="text-sm font-medium">Pedidos com valor diferente do que foi enviado</h3>
       <p className="mt-1.5 text-xs leading-relaxed text-foreground/60">
         Quando uma proposta sai, o valor que vai no PDF fica guardado com ela. Isto compara esse
@@ -117,7 +117,7 @@ export default function ValorEnviado() {
           type="button"
           onClick={procurar}
           disabled={aLer || aCorrigir}
-          className="min-h-11 rounded-full border border-foreground/20 px-4 text-sm hover:bg-foreground/[0.05] disabled:opacity-50"
+          className="min-h-11 rounded-full border border-foreground/20 px-4 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50"
         >
           {aLer ? "A procurar…" : "Procurar"}
         </button>
@@ -174,7 +174,7 @@ export default function ValorEnviado() {
                 </strong>{" "}
                 com valor diferente do que saiu no PDF.
               </p>
-              <ul className="mt-3 flex flex-col divide-y divide-foreground/[0.07] rounded-lg border border-foreground/[0.08]">
+              <ul className="mt-3 flex flex-col divide-y divide-[var(--bo-hairline)] rounded-lg border border-[var(--bo-hairline)]">
                 {lista.map((d) => (
                   <li key={d.quoteId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-3">
                     <span className="min-w-0 flex-1 truncate font-medium text-foreground/85">

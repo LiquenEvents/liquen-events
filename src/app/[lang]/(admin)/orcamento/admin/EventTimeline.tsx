@@ -273,12 +273,12 @@ export default function EventTimeline({ quote, onChange }: Props) {
     // e a 1440, e nesta zona do dossier há vários painéis destes empilhados.
     // `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma vista:
     // 12 px de volta no telemóvel, computador na mesma.
-    <section className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
+    <section className="border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Cronograma do Dia</p>
         {items.length > 0 && (
           <div className="flex shrink-0 items-center gap-1.5">
-            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
               {items.length} {items.length === 1 ? "momento" : "momentos"}
             </span>
             <button
@@ -288,7 +288,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
               aria-label="Imprimir guião do dia"
               // 27×27 medidos a 375 px — um botão de ícone sem rótulo, que é
               // a classe de alvo mais fácil de falhar com o polegar.
-              className="alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-foreground/[0.06] hover:text-foreground/75 motion-safe:transition-colors"
+              className="alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/75 motion-safe:transition-colors"
             >
               <svg
                 width="15"
@@ -366,12 +366,12 @@ export default function EventTimeline({ quote, onChange }: Props) {
       ) : (
         <div className="relative mb-5 pl-1">
           {/* vertical line */}
-          <div className="absolute left-[3.25rem] top-3 bottom-3 w-px bg-foreground/10" />
+          <div className="absolute left-[3.25rem] top-3 bottom-3 w-px bg-[var(--bo-tinta-10)]" />
           <ul className="flex flex-col">
             {items.map((i) => (
               <li
                 key={i.id}
-                className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-foreground/[0.02]"
+                className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-[var(--bo-tinta-3)]"
               >
                 {editing?.id === i.id && editing.field === "time" ? (
                   /* ── A SAÍDA, PARA QUEM NÃO TEM ESCAPE ──────────────────

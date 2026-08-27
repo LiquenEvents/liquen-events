@@ -95,7 +95,7 @@ export default function VistaDeConjunto({
   const deInspiracao = paginas.flatMap((p, i) => (p.especie === "moodboard" ? [i] : []));
 
   return (
-    <div className="mb-4 rounded-2xl border border-foreground/10 bg-foreground/[0.02] p-4">
+    <div className="mb-4 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div>
           <p className="bo-eyebrow">Vista de conjunto</p>
@@ -196,7 +196,7 @@ export default function VistaDeConjunto({
                       onClick={() => onMover(pos, paraTras)}
                       disabled={paraTras < 0}
                       aria-label={`Mover a página ${i + 1} para trás`}
-                      className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-foreground/[0.07] disabled:opacity-30"
+                      className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-[var(--bo-tinta-6)] disabled:opacity-30"
                     >
                       <span aria-hidden="true">←</span>
                     </button>
@@ -205,7 +205,7 @@ export default function VistaDeConjunto({
                       onClick={() => onMover(pos, paraAFrente)}
                       disabled={paraAFrente < 0}
                       aria-label={`Mover a página ${i + 1} para a frente`}
-                      className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-foreground/[0.07] disabled:opacity-30"
+                      className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-[var(--bo-tinta-6)] disabled:opacity-30"
                     >
                       <span aria-hidden="true">→</span>
                     </button>

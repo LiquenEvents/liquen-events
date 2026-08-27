@@ -183,7 +183,7 @@ export default function EnviarModelo({ quote, onEnviado }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
+    <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
       <div className="flex items-center justify-between gap-3 mb-1.5">
         <p className="bo-eyebrow">Enviar um modelo</p>
         {quote.email && <span className="bo-text-faint text-xs truncate">{quote.email}</span>}
@@ -229,7 +229,7 @@ export default function EnviarModelo({ quote, onEnviado }: Props) {
       </div>
 
       {previsao && (
-        <div className="rounded-2xl border border-foreground/15 bg-foreground/[0.02] p-3.5 mb-3">
+        <div className="rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-3.5 mb-3">
           <dl className="text-xs mb-2.5">
             <div className="flex gap-2">
               <dt className="text-foreground/40 w-16 shrink-0">Para</dt>

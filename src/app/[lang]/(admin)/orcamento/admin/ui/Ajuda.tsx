@@ -93,7 +93,7 @@ export function Ajuda({
           `border text-[10px] leading-none font-medium ${ESTADO} ${PRESSAO}`,
           aberto
             ? "border-[#4d6350]/60 bg-[#4d6350]/10 text-[#4d6350]"
-            : "border-foreground/25 text-foreground/45 hover:border-foreground/45 hover:text-foreground/70 active:bg-foreground/[0.06]",
+            : "border-foreground/25 text-foreground/45 hover:border-foreground/45 hover:text-foreground/70 active:bg-[var(--bo-tinta-6)]",
         )}
       >
         <span aria-hidden="true">?</span>
@@ -106,7 +106,7 @@ export function Ajuda({
           // do cartão em qualquer largura de ecrã — desde que cresça para o
           // lado onde há espaço, que é o que `alinhar` escolhe.
           className={cn(
-            "bo-entrada absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-foreground/15 bg-white p-3 text-[11px] leading-relaxed text-foreground/70 normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
+            "bo-entrada absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-[var(--bo-hairline-strong)] bg-white p-3 text-[11px] leading-relaxed text-foreground/70 normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
             alinhar === "direita" ? "right-0" : "left-0",
           )}
         >

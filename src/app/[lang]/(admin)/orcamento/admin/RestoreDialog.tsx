@@ -279,10 +279,10 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         role="dialog"
         aria-modal="true"
         aria-label="Repor cópia de segurança"
-        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-modal)]"
+        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
       >
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between border-b border-foreground/[0.07] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--bo-hairline)] px-6 py-4">
           <div>
             <p className="bo-eyebrow">Repor cópia de segurança</p>
             <p className="bo-text-muted mt-0.5 text-xs">
@@ -369,13 +369,13 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
               ))}
 
               {/* A tabela do ensaio */}
-              <div className="overflow-x-auto rounded-xl border border-foreground/[0.08]">
+              <div className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)]">
                 <table className="w-full min-w-[34rem] text-left text-sm">
                   <caption className="sr-only">
                     O que aconteceria a cada conjunto de dados se repusesse esta cópia
                   </caption>
                   <thead>
-                    <tr className="border-b border-foreground/[0.08] bg-foreground/[0.02]">
+                    <tr className="border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]">
                       <th scope="col" className="px-3 py-2 font-medium text-foreground/60">
                         Conjunto
                       </th>
@@ -410,7 +410,10 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                   </thead>
                   <tbody>
                     {plano.datasets.map((d) => (
-                      <tr key={d.key} className="border-b border-foreground/[0.05] last:border-0">
+                      <tr
+                        key={d.key}
+                        className="border-b border-[var(--bo-hairline)] last:border-0"
+                      >
                         <th scope="row" className="px-3 py-2 font-normal text-foreground/80">
                           {d.label}
                           {d.skipped && (
@@ -446,7 +449,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
               {/* Numeração fiscal */}
               {plano.counters.length > 0 && (
-                <div className="rounded-xl border border-foreground/[0.08] px-4 py-3">
+                <div className="rounded-xl border border-[var(--bo-hairline)] px-4 py-3">
                   <p className="text-foreground/30 text-[10px] uppercase tracking-[0.25em]">
                     Numeração de faturas
                   </p>
@@ -563,11 +566,11 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                 </div>
               )}
 
-              <div className="overflow-x-auto rounded-xl border border-foreground/[0.08]">
+              <div className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)]">
                 <table className="w-full min-w-[22rem] text-left text-sm">
                   <caption className="sr-only">Conjuntos repostos</caption>
                   <thead>
-                    <tr className="border-b border-foreground/[0.08] bg-foreground/[0.02]">
+                    <tr className="border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]">
                       <th scope="col" className="px-3 py-2 font-medium text-foreground/60">
                         Conjunto
                       </th>
@@ -587,7 +590,10 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                   </thead>
                   <tbody>
                     {resultado.applied.map((a) => (
-                      <tr key={a.key} className="border-b border-foreground/[0.05] last:border-0">
+                      <tr
+                        key={a.key}
+                        className="border-b border-[var(--bo-hairline)] last:border-0"
+                      >
                         <th scope="row" className="px-3 py-2 font-normal text-foreground/80">
                           {a.label}
                         </th>
@@ -612,7 +618,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         </div>
 
         {/* Rodapé */}
-        <div className="flex items-center justify-end gap-2 border-t border-foreground/[0.08] px-6 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--bo-hairline)] px-6 py-4">
           {fase === "plano" && (
             <Button variant="ghost" size="sm" onClick={reiniciar} disabled={ocupado}>
               Escolher outro ficheiro

@@ -99,7 +99,7 @@ const TaskRow = memo(function TaskRow({
          linha 2 · prioridade, editar e eliminar, todos com o tamanho da casa.
        No computador nada muda: tudo cabe numa fila e o título volta a cortar
        (`sm:truncate`), que é o que mantém a densidade da lista. */
-    <div className="group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-foreground/[0.02] transition-colors">
+    <div className="group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors">
       <button
         onClick={() => onToggle(t)}
         // Sem nome acessível, isto era «botão» — dezasseis vezes, e é o que
@@ -151,7 +151,7 @@ const TaskRow = memo(function TaskRow({
             </span>
           )}
           {t.area && (
-            <span className="text-foreground/30 border border-foreground/12 rounded px-1.5 py-0.5">
+            <span className="text-foreground/30 border border-[var(--bo-hairline-strong)] rounded px-1.5 py-0.5">
               {t.area}
             </span>
           )}
@@ -530,7 +530,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       return (
         <div
           key={t.id}
-          className="px-4 py-3 border-b border-foreground/[0.06] bg-foreground/[0.015]"
+          className="px-4 py-3 border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
         >
           <div className="flex flex-col gap-2">
             <input
@@ -763,10 +763,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       ) : (
         <>
           <Card padding="none" className="overflow-hidden">
-            <div className="px-5 sm:px-6 py-3.5 border-b border-foreground/[0.07] flex items-center justify-between">
+            <div className="px-5 sm:px-6 py-3.5 border-b border-[var(--bo-hairline)] flex items-center justify-between">
               <p className="bo-eyebrow">A fazer ({open.length})</p>
             </div>
-            <div className="divide-y divide-foreground/[0.06]">
+            <div className="divide-y divide-[var(--bo-hairline)]">
               {open.length === 0 ? (
                 <EmptyState
                   icon={
@@ -807,7 +807,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 {showDone ? "▾" : "▸"} Concluídas ({done.length})
               </Button>
               {showDone && (
-                <Card padding="none" className="overflow-hidden divide-y divide-foreground/[0.06]">
+                <Card
+                  padding="none"
+                  className="overflow-hidden divide-y divide-[var(--bo-hairline)]"
+                >
                   {done.map(row)}
                 </Card>
               )}

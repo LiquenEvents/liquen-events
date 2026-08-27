@@ -113,7 +113,7 @@ export function Segmented<T extends string>({
         // descrevia isto como «uma pequena pílula de opções mutuamente
         // exclusivas» — passou a sê-lo. Ver a nota no `ui/Button.tsx`: a curva
         // máxima é de quem se clica.
-        "inline-flex flex-wrap items-center gap-1 rounded-full border border-foreground/[0.08] bg-foreground/[0.04] p-1",
+        "inline-flex flex-wrap items-center gap-1 rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)] p-1",
         className,
       )}
     >
@@ -133,7 +133,7 @@ export function Segmented<T extends string>({
               pad,
               active
                 ? "bg-white text-foreground/90 "
-                : "text-foreground/50 hover:text-foreground/75 active:bg-foreground/[0.06]",
+                : "text-foreground/50 hover:text-foreground/75 active:bg-[var(--bo-tinta-6)]",
             )}
           >
             {o.icon}

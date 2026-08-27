@@ -57,7 +57,7 @@ const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
   em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/18 text-[#4d6350]" },
   cotado: { label: "Proposta enviada", classe: "bg-[#4d6350]/25 text-[#4d6350]" },
   aceite: { label: "Ganho", classe: "bg-[#4d6350]/35 text-[#4d6350]" },
-  rejeitado: { label: "Perdido", classe: "bg-foreground/[0.08] text-foreground/30" },
+  rejeitado: { label: "Perdido", classe: "bg-[var(--bo-tinta-10)] text-foreground/30" },
 };
 
 /** Estados que ainda não têm proposta enviada — os que este ecrã existe para
@@ -319,7 +319,7 @@ export default function FazerProposta({
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
                 filtro === f.id
                   ? "bg-[#1b2119] text-white "
-                  : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
+                  : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/65"
               }`}
             >
               {f.label} · {f.n}
@@ -359,7 +359,7 @@ export default function FazerProposta({
               // Um estado que não conheçamos mostra-se cru e em cinzento, em vez
               // de rebentar o ecrã inteiro — a razão está em `status-meta.ts`.
               label: q.status,
-              classe: "bg-foreground/[0.08] text-foreground/40",
+              classe: "bg-[var(--bo-tinta-10)] text-foreground/40",
             };
             return (
               <li key={q.id}>
@@ -368,8 +368,8 @@ export default function FazerProposta({
                   onClick={() => onSelect(q.id)}
                   className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left motion-safe:transition-colors ${
                     espera
-                      ? "border-foreground/[0.09] bg-white hover:border-[#4d6350]/40"
-                      : "border-foreground/[0.06] bg-foreground/[0.015] hover:border-foreground/20"
+                      ? "border-[var(--bo-hairline)] bg-white hover:border-[#4d6350]/40"
+                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"
                   }`}
                 >
                   {/* AS ETIQUETAS VÊM PRIMEIRO, E É DE PROPÓSITO.

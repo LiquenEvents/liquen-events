@@ -273,7 +273,7 @@ export default function EmailDoEnvio({
   return (
     <section
       aria-labelledby="email-do-envio-titulo"
-      className="mt-5 rounded-2xl border border-foreground/12 bg-white/70 p-4"
+      className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-white/70 p-4"
     >
       <h3 id="email-do-envio-titulo" className="font-display text-base text-foreground/85">
         O email que o cliente vai receber
@@ -492,14 +492,14 @@ export default function EmailDoEnvio({
           preenchidas» — é ver a FORMA: os parágrafos, o assunto por cima e o
           fecho da casa que entra sozinho. Fechado por omissão porque o caminho
           curto é enviar, e aberto num toque para quem quiser confirmar. */}
-      <details className="mt-4 rounded-xl border border-foreground/12 bg-[#f7f4ee]/60">
+      <details className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60">
         <summary className="cursor-pointer list-none px-3 py-2 text-xs text-foreground/65">
           <span aria-hidden="true">▸ </span>Ver como o cliente o recebe
         </summary>
-        <div className="border-t border-foreground/10 px-3 py-3">
+        <div className="border-t border-[var(--bo-hairline-strong)] px-3 py-3">
           <p className="text-xs text-foreground/50">Assunto</p>
           <p className="text-sm text-foreground/85">{assunto || "—"}</p>
-          <div className="mt-3 border-t border-foreground/10 pt-3">
+          <div className="mt-3 border-t border-[var(--bo-hairline-strong)] pt-3">
             {corpo
               .split(/\n[ \t]*\n/)
               .map((p) => p.trim())
@@ -512,7 +512,7 @@ export default function EmailDoEnvio({
                   {paragrafo}
                 </p>
               ))}
-            <p className="mt-3 border-t border-foreground/10 pt-3 text-xs leading-relaxed text-foreground/50">
+            <p className="mt-3 border-t border-[var(--bo-hairline-strong)] pt-3 text-xs leading-relaxed text-foreground/50">
               A seguir entra a assinatura da Líquen (Catarina Gaspar e contactos) e o PDF em anexo.
               {temLigacaoDaProposta(corpo)
                 ? ` O ${MARCADOR_DA_LIGACAO} vira o endereço da proposta no momento do envio — ele só existe quando a proposta é criada.`

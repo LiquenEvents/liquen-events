@@ -357,7 +357,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
           carregamento, por isso nunca sai do ecrã. */}
       <header
         ref={cabecalho}
-        className="sticky top-0 z-10 border-b border-foreground/10 bg-white/95 px-4 py-3 backdrop-blur"
+        className="sticky top-0 z-10 border-b border-[var(--bo-hairline-strong)] bg-white/95 px-4 py-3 backdrop-blur"
       >
         <p className="truncate text-sm text-foreground/70">{titulo}</p>
         <p className="text-2xl font-medium tabular-nums">
@@ -370,7 +370,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
           aria-valuemin={0}
           aria-valuemax={p.total}
           aria-valuenow={p.carregados}
-          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
+          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
         >
           {/* `scaleX` e não `width`: mudar a largura obriga o telemóvel a
               refazer a disposição a cada marcação, e este é o ecrã que corre
@@ -405,7 +405,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
               type="button"
               onClick={() => setVeiculo("todos")}
               className={`shrink-0 rounded-full px-3 py-1 text-xs ${
-                veiculo === "todos" ? "bg-foreground/[0.10]" : "bg-foreground/[0.04]"
+                veiculo === "todos" ? "bg-[var(--bo-tinta-10)]" : "bg-[var(--bo-tinta-6)]"
               }`}
             >
               Todas
@@ -416,7 +416,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 type="button"
                 onClick={() => setVeiculo(v)}
                 className={`shrink-0 rounded-full px-3 py-1 text-xs ${
-                  veiculo === v ? "bg-foreground/[0.10]" : "bg-foreground/[0.04]"
+                  veiculo === v ? "bg-[var(--bo-tinta-10)]" : "bg-[var(--bo-tinta-6)]"
                 }`}
               >
                 {v}
@@ -471,7 +471,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                         type="button"
                         onClick={() => marcar(i)}
                         aria-pressed={carregado}
-                        className="flex min-h-[56px] w-full items-center gap-3 border-b border-foreground/[0.06] px-4 text-left active:bg-foreground/[0.04]"
+                        className="flex min-h-[56px] w-full items-center gap-3 border-b border-[var(--bo-hairline)] px-4 text-left active:bg-[var(--bo-tinta-6)]"
                       >
                         <span
                           aria-hidden
@@ -513,7 +513,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
       {/* Barra fixa: o gesto que fecha o carregamento fica sempre ao alcance do
           polegar, sem ter de rolar até ao fim de 41 linhas. */}
       {itens.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-foreground/10 bg-white/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-[var(--bo-hairline-strong)] bg-white/95 p-4 backdrop-blur">
           {fechada ? (
             /* O DESFECHO À VISTA, e uma saída.
                Uma acção que não deixa marca é indistinguível de uma que não
@@ -547,7 +547,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => setConfirmar(false)}
-                  className="min-h-[48px] flex-1 rounded-xl bg-foreground/[0.06] px-4"
+                  className="min-h-[48px] flex-1 rounded-xl bg-[var(--bo-tinta-6)] px-4"
                 >
                   Voltar
                 </button>

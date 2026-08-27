@@ -92,7 +92,7 @@ export default function PorTraduzir({
             <button
               type="button"
               onClick={() => onFicarEmPortugues(c)}
-              className="alvo-toque rounded-md border border-foreground/15 px-2 py-0.5 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
+              className="alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
             >
               Ficar em português
             </button>

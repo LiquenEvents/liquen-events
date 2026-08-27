@@ -123,7 +123,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
+    <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
       <div className="flex items-center justify-between gap-3 mb-5">
         <p className="bo-eyebrow">Responder ao cliente</p>
         {quote.email && <span className="bo-text-faint text-xs truncate">{quote.email}</span>}

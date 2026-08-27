@@ -92,7 +92,7 @@ const MAX_LOTES = 400;
 const fotografias = (n: number) => `${n} ${n === 1 ? "fotografia" : "fotografias"}`;
 
 const BOTAO_VAZADO =
-  "min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-foreground/[0.05] disabled:opacity-50";
+  "min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -308,7 +308,7 @@ export default function Miniaturas() {
   const visiveis = tudoAVista ? comProblema : comProblema.slice(0, LINHAS_A_MOSTRAR);
 
   return (
-    <section className="rounded-xl border border-foreground/[0.1] p-4 sm:p-5">
+    <section className="rounded-xl border border-[var(--bo-hairline-strong)] p-4 sm:p-5">
       <h3 className="text-sm font-medium">Miniaturas das fotografias</h3>
       {/* Duas frases, porque são duas coisas. A primeira é uma avaria e diz o
           que custa; a segunda é uma optimização e diz que não parte nada. Ter

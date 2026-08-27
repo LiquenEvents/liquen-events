@@ -289,7 +289,7 @@ export default function SessaoExpirada() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="sessao-expirada-titulo"
-        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-foreground/10 bg-white p-6 shadow-[var(--bo-sombra-modal)]"
+        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]"
       >
         <p className="bo-eyebrow">Sessão</p>
         <h2
@@ -317,9 +317,9 @@ export default function SessaoExpirada() {
               {aEntrarComDispositivo ? "A confirmar…" : "Entrar com este dispositivo"}
             </Button>
             <div className="my-4 flex items-center gap-3" aria-hidden="true">
-              <span className="h-px flex-1 bg-foreground/10" />
+              <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
               <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35">ou</span>
-              <span className="h-px flex-1 bg-foreground/10" />
+              <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
             </div>
           </>
         )}

@@ -235,7 +235,7 @@ export default function Servicos() {
                         </p>
                       )}
                       <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px]">
-                        <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 tracking-[0.08em] uppercase text-foreground/45">
+                        <span className="rounded-full bg-[var(--bo-tinta-6)] px-2 py-0.5 tracking-[0.08em] uppercase text-foreground/45">
                           {s.categoria || "Outros"}
                         </span>
                         {s.nomeEn ? (

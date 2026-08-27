@@ -101,7 +101,7 @@ export default function ShortcutsModal({ open, onClose }: Props) {
                     {it.keys.map((kk) => (
                       <kbd
                         key={kk}
-                        className="min-w-[22px] text-center text-[10px] text-foreground/55 bg-foreground/[0.06] border border-foreground/12 rounded px-1.5 py-1 leading-none"
+                        className="min-w-[22px] text-center text-[10px] text-foreground/55 bg-[var(--bo-tinta-6)] border border-[var(--bo-hairline-strong)] rounded px-1.5 py-1 leading-none"
                       >
                         {kk}
                       </kbd>

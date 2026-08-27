@@ -81,7 +81,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
 
   if (estado === "falhou" || !r?.verificou) {
     return (
-      <div className={`${CAIXA} bg-foreground/[0.04] text-foreground/60`}>
+      <div className={`${CAIXA} bg-[var(--bo-tinta-6)] text-foreground/60`}>
         Não foi possível confirmar as fotografias.{" "}
         <strong className="font-medium">Isto não quer dizer que estejam bem.</strong>{" "}
         <button type="button" onClick={() => void verificar()} className="alvo-toque underline">

@@ -469,11 +469,11 @@ export default function AdminLogin() {
               </p>
 
               <div className="my-4 flex items-center gap-3" aria-hidden="true">
-                <span className="h-px flex-1 bg-foreground/10" />
+                <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
                 <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35">
                   ou
                 </span>
-                <span className="h-px flex-1 bg-foreground/10" />
+                <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
               </div>
             </div>
           )}
@@ -686,7 +686,7 @@ export default function AdminLogin() {
           ) : (
             <form
               onSubmit={pedirLigacao}
-              className="mt-5 flex flex-col gap-3 border-t border-foreground/10 pt-5"
+              className="mt-5 flex flex-col gap-3 border-t border-[var(--bo-hairline-strong)] pt-5"
               onFocus={aoFocarCampo}
               onBlur={aoSairDoCampo}
             >
@@ -754,7 +754,7 @@ export default function AdminLogin() {
               React: abre sem JavaScript, é focável e anunciável por omissão, e
               o browser trata do resto. */}
           {temPasskeys && (
-            <details className="group mt-5 border-t border-foreground/10 pt-4">
+            <details className="group mt-5 border-t border-[var(--bo-hairline-strong)] pt-4">
               {/* `alvo-toque`: MEDIDO a 375×667 com toque emulado, este resumo
                   dava 293×16 px. Dezasseis píxeis de altura — a altura da
                   própria letra — e é o único caminho para o que está lá dentro,

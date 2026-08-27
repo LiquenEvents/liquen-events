@@ -364,9 +364,55 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
   --bo-tint-accent: rgba(76, 99, 80, 0.1); /* soft moss call-out fill */
 
+  /* ── UMA TINTA, CINCO DEGRAUS COM O NÚMERO NO NOME ───────────────────────
+     A análise da Pixelmatters trouxe o achado que arruma isto: eles não têm
+     paleta de cinzentos nenhuma. Têm UMA cor — branco — e uma escala de dez
+     opacidades cujo NOME É A OPACIDADE (`--px-white-8` … `--px-white-80`). Com
+     uma paleta, cada componente novo obriga a uma decisão de cor («este risco
+     é #E5E5E5 ou #EBEBEB?»); com uma escala, a pergunta passa a ser «isto é um
+     risco de cartão ou um separador?» — e a resposta escolhe-se numa lista.
+
+     Aqui a tinta é preta e o fundo é branco, portanto a escala é sobre o
+     preto. Contado antes de escrever isto, só nos riscos e nos fundos do back
+     office: QUARENTA E SETE grafias diferentes em 588 chamadas —
+     `bg-foreground/[0.015]`, `[0.018]`, `[0.02]`, `[0.025]`, `[0.03]`,
+     `[0.035]`, `[0.04]`… Cinco valores separados por meio por cento não são
+     hierarquia nenhuma: são pessoas diferentes a escrever a mesma coisa em
+     dias diferentes, que foi exactamente a queixa dela — «o mesmo tipo de
+     texto secundário tem tons diferentes em Pedidos e em Propostas».
+
+     Cinco degraus, com o número no nome:
+
+       tinta-3    zebra de lista, fundo de campo em repouso
+       tinta-6    linha sob o rato, bloco assente na página
+       tinta-8    RISCO — moldura de cartão, divisória          (= hairline)
+       tinta-10   seleccionado, carregado
+       tinta-13   SEPARADOR claro, moldura que se quer ver      (= hairline-strong)
+
+     Os dois nomes de papel que já existiam ficam, agora como apelidos: são
+     usados em centenas de sítios e dizem o que a coisa É, que é a segunda
+     metade da regra dela.
+
+     ── PORQUE É QUE ISTO SÃO 588 EDIÇÕES E OS RAIOS FORAM CINCO LINHAS ──────
+
+     Porque a alfa do Tailwind fica COZIDA na classe: `bg-foreground/[0.04]`
+     compila para uma cor literal, não para uma variável — ao contrário do
+     `rounded-lg`, que passa por `--radius-lg` e por isso se colapsou aqui em
+     cima sem tocar num ecrã. E 124 das 588 chamadas trazem variante
+     (`hover:`, `group-hover:`, `active:`), que compila para outro selector
+     ainda: apanhar só as sem variante deixava uma linha a 6% em repouso a
+     escurecer para 4% ao passar o rato. Editar a chamada é o único sítio onde
+     isto fica verdadeiro — e tem a vantagem de quem lê o código passar a ver o
+     nome do degrau em vez de um número mágico. */
+  --bo-tinta-3: rgba(13, 13, 13, 0.03);
+  --bo-tinta-6: rgba(13, 13, 13, 0.06);
+  --bo-tinta-8: rgba(13, 13, 13, 0.08);
+  --bo-tinta-10: rgba(13, 13, 13, 0.1);
+  --bo-tinta-13: rgba(13, 13, 13, 0.13);
+
   /* ── Hairline borders & control boundaries (neutral, ChatGPT-quiet) ── */
-  --bo-hairline: rgba(13, 13, 13, 0.08); /* card / divider hairline */
-  --bo-hairline-strong: rgba(13, 13, 13, 0.13); /* clearer separator */
+  --bo-hairline: var(--bo-tinta-8); /* card / divider hairline */
+  --bo-hairline-strong: var(--bo-tinta-13); /* clearer separator */
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
   --bo-control-border: rgba(13, 13, 13, 0.55);
 

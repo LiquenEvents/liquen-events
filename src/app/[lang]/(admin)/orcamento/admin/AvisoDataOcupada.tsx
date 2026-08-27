@@ -134,7 +134,7 @@ export default function AvisoDataOcupada({
               return (
                 <li
                   key={c.outro.id}
-                  className="rounded-xl border border-foreground/[0.08] bg-[var(--bo-surface,#fff)]/70 p-3"
+                  className="rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface,#fff)]/70 p-3"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <p className="min-w-0 text-xs leading-relaxed">

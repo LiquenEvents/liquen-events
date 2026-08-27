@@ -286,7 +286,7 @@ export default function PainelInterno({
   const magra = total !== null && total.percentagem < margemMinima;
 
   return (
-    <div className="mt-5 rounded-2xl border border-foreground/[0.10] bg-foreground/[0.015]">
+    <div className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)]">
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
@@ -328,7 +328,7 @@ export default function PainelInterno({
       </button>
 
       {aberto && (
-        <div className="border-t border-foreground/[0.08] p-4">
+        <div className="border-t border-[var(--bo-hairline)] p-4">
           {/* ── Custo e margem por linha ──────────────────────────────── */}
           {(doc.budgetItems ?? []).length === 0 ? (
             <p className="text-xs text-foreground/45">
@@ -471,7 +471,7 @@ export default function PainelInterno({
               um esquecimento, é uma escolha, e avisar sobre ele ensinava-a a
               ignorar o aviso. */}
           {esquecidos.length > 0 && (
-            <div className="mt-5 border-t border-foreground/[0.08] pt-4">
+            <div className="mt-5 border-t border-[var(--bo-hairline)] pt-4">
               <span className="bo-eyebrow">Costuma incluir</span>
               <ul className="mt-1.5 flex flex-col gap-1">
                 {esquecidos.map((o) => (
@@ -488,7 +488,7 @@ export default function PainelInterno({
           )}
 
           {/* ── Deslocação ───────────────────────────────────────────── */}
-          <div className="mt-5 border-t border-foreground/[0.08] pt-4">
+          <div className="mt-5 border-t border-[var(--bo-hairline)] pt-4">
             <span className="bo-eyebrow">Deslocação</span>
 
             {/* Os quilómetros primeiro, porque são o que decide tudo o resto —

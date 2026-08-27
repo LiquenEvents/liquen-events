@@ -436,7 +436,7 @@ function AvisoConflito({
         </button>
         <button
           onClick={() => onEscolher("servidor")}
-          className={`px-3 py-1.5 rounded-lg border border-foreground/15 text-foreground/60 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+          className={`px-3 py-1.5 rounded-lg border border-[var(--bo-hairline-strong)] text-foreground/60 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
         >
           Ficar com a do servidor
         </button>
@@ -638,7 +638,7 @@ const MetaReceita = memo(function MetaReceita({
               {Math.min(100, Math.round((wonThisMonth / goal) * 100))}%
             </span>
           </div>
-          <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+          <div className="h-2.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
             <div
               className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
               style={{
@@ -941,7 +941,7 @@ function AEsperaDeResposta({
   if (linhas.length === 0) return null;
   return (
     <section aria-labelledby="a-espera-de-resposta-titulo" className="bo-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-foreground/[0.07]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-[var(--bo-hairline)]">
         <div>
           <h3 id="a-espera-de-resposta-titulo" className="bo-eyebrow">
             À espera de resposta
@@ -962,7 +962,7 @@ function AEsperaDeResposta({
           </p>
         </div>
       </div>
-      <ul className="divide-y divide-foreground/[0.06]">
+      <ul className="divide-y divide-[var(--bo-hairline)]">
         {linhas.slice(0, 8).map(({ quote, dias, valor }) => (
           <li key={quote.id} className="px-5 py-3">
             {/* A linha inteira é UM botão, com o mesmo desenho da «Atividade
@@ -997,7 +997,7 @@ function AEsperaDeResposta({
         ))}
       </ul>
       {linhas.length > 8 && (
-        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-foreground/[0.06]">
+        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-[var(--bo-hairline)]">
           e mais {linhas.length - 8} — vê-as todas na lista de pedidos.
         </p>
       )}
@@ -1105,7 +1105,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
       }}
     >
       <summary
-        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-foreground/[0.03] ${FOCUS_RING}`}
+        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-[var(--bo-tinta-3)] ${FOCUS_RING}`}
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold text-[var(--bo-text)]">
@@ -1534,7 +1534,7 @@ export default function Overview({
                  ficarem da mesma altura quando aparecem juntos. */
               className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium transition-colors motion-reduce:transition-none ${
                 tudoArquivado && onVerArquivados
-                  ? "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15"
+                  ? "bg-white border border-[var(--bo-hairline)] text-foreground/55 hover:text-foreground/80 hover:border-[var(--bo-hairline-strong)]"
                   : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
               } ${FOCUS_RING}`}
             >
@@ -1619,7 +1619,7 @@ export default function Overview({
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
-                  : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 "
+                  : "bg-white border border-[var(--bo-hairline)] text-foreground/55 hover:text-foreground/80 hover:border-[var(--bo-hairline-strong)] "
               }`}
             >
               <svg
@@ -1983,7 +1983,7 @@ export default function Overview({
                       </span>
                       <span className="text-foreground/40 text-[11px] tabular-nums">{count}</span>
                     </div>
-                    <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                       <div
                         className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                         style={{
@@ -1996,7 +1996,7 @@ export default function Overview({
                 );
               })}
             </div>
-            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-[var(--bo-hairline)]">
               <span className="text-foreground/35 text-xs">
                 Pedidos que acabam em evento
                 <span className="block text-foreground/25 text-[10px]">
@@ -2044,7 +2044,7 @@ export default function Overview({
             </div>
             {data.billed > 0 ? (
               <>
-                <div className="relative h-2 rounded-full overflow-hidden bg-foreground/[0.06]">
+                <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
                   <div
                     className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
                     style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
@@ -2071,7 +2071,7 @@ export default function Overview({
                 falta receber aparecem aqui.
               </p>
             )}
-            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-[var(--bo-hairline)]">
               <span className="text-foreground/35 text-xs">
                 Valor médio por evento ganho
                 <span className="block text-foreground/25 text-[10px]">
@@ -2088,7 +2088,7 @@ export default function Overview({
         {/* Needs attention + recent activity */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
           <div className="bo-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--bo-hairline)]">
               <h3 className="bo-eyebrow">Precisam de atenção</h3>
               <div className="flex items-center gap-2">
                 {data.staleCount > 0 && (
@@ -2103,7 +2103,7 @@ export default function Overview({
                 )}
               </div>
             </div>
-            <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
+            <div className="divide-y divide-[var(--bo-hairline)] max-h-[360px] overflow-y-auto">
               {data.needAction.length === 0 && (
                 <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
                   <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
@@ -2117,7 +2117,7 @@ export default function Overview({
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`w-full text-left px-5 py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
                   <div className="min-w-0">
                     <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
@@ -2152,15 +2152,15 @@ export default function Overview({
           </div>
 
           <div className="bo-card overflow-hidden">
-            <h3 className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
+            <h3 className="bo-eyebrow px-5 py-4 border-b border-[var(--bo-hairline)]">
               Atividade recente
             </h3>
-            <div className="divide-y divide-foreground/[0.06]">
+            <div className="divide-y divide-[var(--bo-hairline)]">
               {data.recent.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
                   <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
                   <TempoDesde
@@ -2196,7 +2196,7 @@ export default function Overview({
                   </p>
                   <button
                     onClick={onNew}
-                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-foreground/55 hover:text-foreground/80 hover:border-[var(--bo-hairline-strong)] transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
                   >
                     <svg
                       width="12"

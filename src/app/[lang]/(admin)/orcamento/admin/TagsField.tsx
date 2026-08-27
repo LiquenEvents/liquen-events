@@ -159,7 +159,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
             <button
               key={s}
               onClick={() => add(s)}
-              className="px-2.5 py-1 rounded-full bg-foreground/[0.05] text-foreground/45 text-[11px] hover:bg-foreground/[0.09] hover:text-foreground/70 transition-colors"
+              className="px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-foreground/70 transition-colors"
             >
               + {s}
             </button>

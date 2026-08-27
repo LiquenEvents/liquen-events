@@ -301,7 +301,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
     `alvo-toque rounded-full px-3 py-1.5 text-xs transition-colors ${
       activo
         ? "bg-[#4d6350] text-white"
-        : "bg-foreground/[0.05] text-foreground/60 hover:bg-foreground/[0.09]"
+        : "bg-[var(--bo-tinta-6)] text-foreground/60 hover:bg-[var(--bo-tinta-10)]"
     }`;
 
   return (
@@ -388,7 +388,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
             e um tema que mostrasse "o que ainda não etiquetei" esvaziava-se
             sozinho à medida que o trabalho fosse sendo feito. */}
         {exigidas.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-foreground/[0.07] pt-3">
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--bo-hairline)] pt-3">
             <input
               value={nomeDoTema}
               onChange={(ev) => setNomeDoTema(ev.target.value)}
@@ -511,7 +511,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
           estúdio já usa, escrito no mesmo token; era só propagá-lo. `lg:bottom-0`
           porque acima de 1024 a navegação é lateral e não há nada por baixo. */}
       {seleccionadas.size > 0 && (
-        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-foreground/[0.1] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[var(--bo-sombra-suspensa)] lg:bottom-0">
+        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[var(--bo-sombra-suspensa)] lg:bottom-0">
           <div className="flex flex-wrap items-center gap-3">
             {/* `role="status"` porque o número muda com o teclado e com o
                 Shift+clique, e quem não vê o ecrã tem de ouvir quantas leva —

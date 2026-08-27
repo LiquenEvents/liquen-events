@@ -1065,7 +1065,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       </Button>
 
       {/* Totals */}
-      <div className="rounded-xl bg-foreground/[0.035] p-4 flex flex-col gap-2 mb-5">
+      <div className="rounded-xl bg-[var(--bo-tinta-3)] p-4 flex flex-col gap-2 mb-5">
         <div className="flex justify-between text-sm">
           <span className="text-foreground/55">Subtotal</span>
           <span className="text-foreground/75">{eur(subtotal)}</span>
@@ -1087,7 +1087,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           </span>
           <span className="text-foreground/75">{eur(vat)}</span>
         </div>
-        <div className="flex justify-between text-base font-medium pt-2 border-t border-foreground/10">
+        <div className="flex justify-between text-base font-medium pt-2 border-t border-[var(--bo-hairline-strong)]">
           <span className="text-foreground/75">Total</span>
           <span className="text-[#4d6350] font-semibold">{eur(total)}</span>
         </div>

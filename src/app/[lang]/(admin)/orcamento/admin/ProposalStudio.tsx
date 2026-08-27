@@ -6649,7 +6649,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   );
 
   return (
-    <div className="border-t border-foreground/10 pt-5">
+    <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
       {/* EMPILHA no telemóvel, em vez de repartir a largura.
           O que estava aqui era um `flex` em linha com o texto de um lado e três
           botões do outro, marcados `shrink-0`. A 375 px os botões ficavam com
@@ -6852,7 +6852,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       )}
 
       {nomeModelo !== null && (
-        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
+        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-3">
           <label className="flex-1 min-w-[14rem]">
             <span className="bo-eyebrow">Nome do modelo</span>
             <input
@@ -6993,7 +6993,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 bilingue
                   ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
-                  : "border-foreground/15 text-foreground/60 hover:border-foreground/30 hover:text-foreground/80"
+                  : "border-[var(--bo-hairline-strong)] text-foreground/60 hover:border-foreground/30 hover:text-foreground/80"
               }`}
               title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
             >
@@ -7056,7 +7056,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   type="button"
                   disabled={!traducaoLigada}
                   onClick={() => void traduzirTudo()}
-                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <span aria-hidden="true">⇄</span>
                   Traduzir para inglês
@@ -7613,7 +7613,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             className={`@container rounded-2xl border p-4 ${
                               fechado
                                 ? "border-[#4d6350]/35 bg-[#4d6350]/[0.04]"
-                                : "border-foreground/[0.08] bg-foreground/[0.015]"
+                                : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
                             }`}
                           >
                             {(pega) => (
@@ -7626,7 +7626,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     type="button"
                                     {...pega}
                                     aria-label={`Arrastar o mood board ${pos + 1}`}
-                                    className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70 active:cursor-grabbing"
+                                    className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70 active:cursor-grabbing"
                                   >
                                     <span aria-hidden="true">⠿</span>
                                   </button>
@@ -7644,7 +7644,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         ? `Abrir o mood board ${pos + 1}`
                                         : `Fechar o mood board ${pos + 1}`
                                     }
-                                    className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70"
+                                    className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
                                   >
                                     <span aria-hidden="true">{dobrado ? "▸" : "▾"}</span>
                                   </button>
@@ -7725,7 +7725,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs transition-colors ${
                                       fechado
                                         ? "bg-[#4d6350]/15 text-[#4d6350]"
-                                        : "text-foreground/35 hover:bg-foreground/[0.06] hover:text-foreground/70"
+                                        : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
                                     }`}
                                   >
                                     <span aria-hidden="true">{fechado ? "🔒" : "🔓"}</span>
@@ -7745,7 +7745,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       aria-label={`Arrumar por cor as fotografias do mood board ${pos + 1}`}
                                       title="Arrumar as fotografias por cor"
                                       disabled={fechado}
-                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40"
+                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70 disabled:opacity-40"
                                     >
                                       <span aria-hidden="true">◑</span>
                                     </button>
@@ -7754,7 +7754,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     type="button"
                                     onClick={() => duplicarBoard(bi)}
                                     aria-label={`Duplicar o mood board ${pos + 1}`}
-                                    className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70"
+                                    className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
                                   >
                                     <span aria-hidden="true">⧉</span>
                                   </button>
@@ -7792,7 +7792,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       {b.images.slice(0, 8).map((path, ii) => (
                                         <span
                                           key={ii}
-                                          className="h-9 w-9 shrink-0 overflow-hidden rounded border border-foreground/10 bg-foreground/[0.04]"
+                                          className="h-9 w-9 shrink-0 overflow-hidden rounded border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
                                         >
                                           {assetUrls[path] ? (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -8449,7 +8449,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
                     key={pi}
-                    className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                    className="rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <input
@@ -8734,7 +8734,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             key={`preco:${i}:${l.preco}`}
                             className={`bo-input px-2.5 py-2 text-right text-xs ${
                               semPreco
-                                ? "border-dashed bg-foreground/[0.02] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
+                                ? "border-dashed bg-[var(--bo-tinta-3)] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
                                 : "font-medium text-foreground/90"
                             }`}
                             defaultValue={l.preco === null ? "" : String(l.preco)}
@@ -8898,7 +8898,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     const v = totaisDasVersoes(doc as ProposalDoc);
                     if (!v) return null;
                     return (
-                      <div className="mt-1 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
+                      <div className="mt-1 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2.5">
                         {/* O IMPACTO, na frase que ela pediu: quantos estão
                             marcados, e quanto vale a proposta com eles. */}
                         <p className="text-xs leading-relaxed text-foreground/70">
@@ -9520,7 +9520,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   controlo, não a informação. */}
               <div className="@container flex flex-col gap-1.5">
                 <span className="bo-eyebrow">IVA</span>
-                <div className="rounded-xl border border-foreground/12 px-3 py-2.5 text-[11px]">
+                <div className="rounded-xl border border-[var(--bo-hairline-strong)] px-3 py-2.5 text-[11px]">
                   {/* A leitura é do modo DESTE documento, não do que a casa faz
                       hoje. Uma proposta antiga gravada em «IVA incluído» tem o
                       bruto no `totalAmount`; mostrar-lhe a leitura de «acresce»
@@ -9619,7 +9619,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 assim: enquanto o ecrã tivesse a sua conta e o gerador a dele,
                 divergiam, e já divergiram (ver `proposal-budget.ts`). */}
             {money.gross > 0 && (
-              <div className="mt-5 rounded-2xl border border-foreground/10 bg-foreground/[0.015] p-4">
+              <div className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
                 <span className="bo-eyebrow">Totais</span>
                 <dl className="mt-2.5 flex flex-col gap-1.5 text-xs">
                   <LinhaDeTotal rotulo="Subtotal dos serviços" valor={eur(totais.servicos)} />
@@ -10187,7 +10187,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            `--bo-barra-accao` (ver o `ResizeObserver` lá em cima) e o
            `Toast.tsx` soma-a à distância a que já se punha do fundo. Ficam os
            dois visíveis, e nenhum tapa o outro. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3 lg:bottom-0"
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
@@ -10844,7 +10844,7 @@ function LinhaDeTotal({
   return (
     <div
       className={`flex items-center justify-between gap-3 ${
-        regua ? "border-t border-foreground/10 pt-1.5" : ""
+        regua ? "border-t border-[var(--bo-hairline-strong)] pt-1.5" : ""
       }`}
     >
       <dt className={forte ? "text-foreground/75" : "text-foreground/55"}>{rotulo}</dt>
@@ -10895,7 +10895,7 @@ function FantasmaDaFoto({
   const caminho = doc.moodBoards[Number(partes[1])]?.images[Number(partes[2])];
   const url = caminho ? urls[caminho] : undefined;
   return (
-    <div className="h-24 w-24 overflow-hidden rounded-lg border border-white/40 bg-foreground/10 shadow-[var(--bo-sombra-suspensa)]">
+    <div className="h-24 w-24 overflow-hidden rounded-lg border border-white/40 bg-[var(--bo-tinta-10)] shadow-[var(--bo-sombra-suspensa)]">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -11264,13 +11264,15 @@ function AccoesDaFoto({
                 className={`alvo-toque !justify-start flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors disabled:opacity-30 ${
                   a.destrutiva
                     ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07]"
-                    : "text-foreground/80 hover:bg-foreground/[0.05]"
-                } ${primeiraDestrutiva ? "mt-1 border-t border-foreground/[0.08] pt-3" : ""}`}
+                    : "text-foreground/80 hover:bg-[var(--bo-tinta-6)]"
+                } ${primeiraDestrutiva ? "mt-1 border-t border-[var(--bo-hairline)] pt-3" : ""}`}
               >
                 <span
                   aria-hidden="true"
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[13px] ${
-                    a.activa ? "bg-[#4d6350] text-white" : "bg-foreground/[0.06] text-foreground/60"
+                    a.activa
+                      ? "bg-[#4d6350] text-white"
+                      : "bg-[var(--bo-tinta-6)] text-foreground/60"
                   }`}
                 >
                   {a.glifo}
@@ -11355,7 +11357,7 @@ function AvisoDeOrdem({
 }) {
   if (!mostrar) return null;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2">
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2">
       <p className="min-w-[16rem] flex-1 text-[11px] leading-relaxed text-foreground/55">
         {onde} estão pela ordem da lista de <strong className="font-medium">Serviços</strong>, que é
         a ordem por que o PDF sai — e não pela ordem em que foram escritas. Arruma os Serviços e
@@ -11364,7 +11366,7 @@ function AvisoDeOrdem({
       <button
         type="button"
         onClick={onFixar}
-        className="alvo-toque shrink-0 rounded-lg border border-foreground/15 px-2.5 py-1 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
+        className="alvo-toque shrink-0 rounded-lg border border-[var(--bo-hairline-strong)] px-2.5 py-1 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
       >
         Arrumar eu
       </button>
@@ -11531,12 +11533,12 @@ function StepNav({
               className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium motion-safe:transition-colors inline-flex items-center ${
                 active
                   ? "bg-[#4d6350] text-white"
-                  : "text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground/80"
+                  : "text-foreground/50 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/80"
               }`}
             >
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
-                  active ? "bg-white/25 text-white" : "bg-foreground/[0.08] text-foreground/50"
+                  active ? "bg-white/25 text-white" : "bg-[var(--bo-tinta-10)] text-foreground/50"
                 }`}
               >
                 {sent && s.id === "enviar" ? "✓" : s.n}
@@ -11561,7 +11563,7 @@ function StepNav({
 /** Linha "rótulo → valor" para os resumos (pré-visualização e envio). */
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-foreground/[0.06] pb-1.5">
+    <div className="flex items-baseline justify-between gap-3 border-b border-[var(--bo-hairline)] pb-1.5">
       <dt className="text-foreground/45">{label}</dt>
       <dd className="text-right text-foreground/85">{value}</dd>
     </div>
@@ -11653,7 +11655,7 @@ function PreviewThumb({
   return (
     <div
       aria-busy={pendente || aCarregar || undefined}
-      className={`relative aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${
+      className={`relative aspect-[4/3] overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)] ${
         pendente ? "opacity-45" : ""
       }`}
     >
@@ -11745,7 +11747,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
   const magra = total.percentagem < limite;
 
   return (
-    <div className="mt-3 border-t border-foreground/[0.08] pt-2.5">
+    <div className="mt-3 border-t border-[var(--bo-hairline)] pt-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="bo-eyebrow">Só para si</span>
         <span className="text-xs text-foreground/70">
@@ -11939,7 +11941,7 @@ function PreviewSummary({
         </div>
       )}
 
-      <div className="mt-5 rounded-2xl border border-foreground/[0.08] bg-foreground/[0.02] p-4">
+      <div className="mt-5 rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4">
         {money.gross > 0 ? (
           <dl className="flex flex-col gap-1.5 text-sm">
             <div className="flex items-baseline justify-between">
@@ -11950,7 +11952,7 @@ function PreviewSummary({
               <dt className="text-foreground/50">IVA ({Math.round(money.vatRate * 100)}%)</dt>
               <dd className="text-foreground/80">{eur(money.vat)}</dd>
             </div>
-            <div className="flex items-baseline justify-between border-t border-foreground/[0.08] pt-1.5">
+            <div className="flex items-baseline justify-between border-t border-[var(--bo-hairline)] pt-1.5">
               <dt className="font-medium text-foreground/70">Com IVA</dt>
               <dd className="text-base text-foreground/90">{eur(money.gross)}</dd>
             </div>
@@ -12203,10 +12205,10 @@ function SelectorDeLayout({
               className={`w-[5.75rem] rounded-lg border p-1.5 text-left motion-safe:transition-colors ${
                 activo
                   ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] "
-                  : "border-foreground/[0.1] bg-white hover:border-[#4d6350]/40"
+                  : "border-[var(--bo-hairline-strong)] bg-white hover:border-[#4d6350]/40"
               }`}
             >
-              <span className="block overflow-hidden rounded-[3px] border border-foreground/[0.08] bg-white">
+              <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-white">
                 <DiagramaDeLayout
                   layout={op ?? sugerido}
                   aspectos={aspectos}
@@ -12686,8 +12688,8 @@ function Thumb({
       // esticava-se à altura da linha e o `aspect-ratio` era ignorado — que é
       // exactamente o contrário do que se quer aqui.
       style={aspeto ? { aspectRatio: String(aspeto) } : undefined}
-      className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-opacity motion-safe:duration-500 ${
-        foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
+      className={`group relative overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-opacity motion-safe:duration-500 ${
+        foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-[var(--bo-hairline-strong)]"
       } ${pendente ? "opacity-45" : ""} ${aspeto ? "self-start" : ""} ${className}`}
     >
       {desenhaImagem ? (
@@ -12790,7 +12792,7 @@ function Thumb({
                     aoTentarDeNovo?.();
                     tentarDeNovo();
                   }}
-                  className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-foreground/[0.06]"
+                  className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-[var(--bo-tinta-6)]"
                 >
                   Tentar novamente
                 </button>
@@ -12845,7 +12847,7 @@ function Thumb({
                   type="button"
                   onClick={aoTentarDeNovo}
                   aria-label="Ir buscar outra vez as fotografias desta proposta"
-                  className="mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-foreground/[0.06]"
+                  className="mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-[var(--bo-tinta-6)]"
                 >
                   Tentar
                 </button>
@@ -13022,7 +13024,7 @@ function UploadArea({
       } ${
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
-          : "border-foreground/[0.18] bg-foreground/[0.02] hover:border-[#4d6350]/45"
+          : "border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] hover:border-[#4d6350]/45"
       }`}
     >
       <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">{label}</span>

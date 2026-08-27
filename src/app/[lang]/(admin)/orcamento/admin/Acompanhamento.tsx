@@ -445,7 +445,7 @@ export default function Acompanhamento({
       {porRegistar.length > 0 && (
         <section
           aria-labelledby="versao-escolhida-titulo"
-          className="rounded-2xl border border-foreground/[0.10] bg-foreground/[0.015] p-4"
+          className="rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4"
         >
           <h3 id="versao-escolhida-titulo" className="bo-eyebrow">
             Ficaram com que versão?
@@ -458,7 +458,7 @@ export default function Acompanhamento({
             {porRegistar.map((p) => (
               <li
                 key={p.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-foreground/10 p-3"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--bo-hairline-strong)] p-3"
               >
                 <span className="min-w-0 flex-1 truncate text-xs text-foreground/75">
                   {`${p.clientName} · ${eurOuSemValor(p.total)}`}
@@ -485,7 +485,7 @@ export default function Acompanhamento({
                         },
                       )
                     }
-                    className="alvo-toque rounded-full border border-foreground/12 px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85 disabled:opacity-50"
+                    className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85 disabled:opacity-50"
                   >
                     {v.label}
                   </button>
@@ -609,7 +609,7 @@ function LinhaCartao({
       ? "border-[#8a2a22]/45"
       : urgencia === "expira-ja"
         ? "border-[#c08a3e]/45"
-        : "border-foreground/[0.08]";
+        : "border-[var(--bo-hairline)]";
 
   return (
     <div className={`rounded-2xl border bg-[var(--bo-surface,#fff)] p-4 ${borda}`}>
@@ -674,7 +674,7 @@ function LinhaCartao({
               className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors disabled:opacity-50 ${
                 activo
                   ? "border-[#4d6350] bg-[#4d6350] text-white"
-                  : "border-foreground/12 text-foreground/55 hover:border-[#4d6350]/40 hover:text-foreground/85"
+                  : "border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-[#4d6350]/40 hover:text-foreground/85"
               }`}
             >
               {e.label}
@@ -685,7 +685,7 @@ function LinhaCartao({
           type="button"
           onClick={() => setSeguimentoAberto((v) => !v)}
           aria-expanded={seguimentoAberto}
-          className="alvo-toque rounded-full border border-foreground/12 px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-foreground/30 hover:text-foreground/85"
+          className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-foreground/30 hover:text-foreground/85"
         >
           {p.followUpAt ? "Mudar seguimento" : "Marcar seguimento"}
         </button>
@@ -693,7 +693,7 @@ function LinhaCartao({
 
       {/* ── Seguimento ──────────────────────────────────────────────────── */}
       {seguimentoAberto && (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-foreground/[0.02] p-3">
+        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-[var(--bo-tinta-3)] p-3">
           <label className="flex flex-col gap-1">
             <span className="text-[10px] tracking-[0.1em] uppercase text-foreground/50">
               Voltar a falar em
@@ -749,7 +749,7 @@ function LinhaCartao({
 
       {/* ── Porque é que se perdeu ──────────────────────────────────────── */}
       {aRecusar && (
-        <div className="mt-3 rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] p-3">
+        <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-3">
           <p className="text-[11px] text-foreground/60">
             Porque é que se perdeu? Fica só do lado de cá, e é o que permite saber daqui a um ano
             quantas se perderam por preço.
@@ -763,8 +763,8 @@ function LinhaCartao({
                 onClick={() => setMotivo(m.id)}
                 className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors ${
                   motivo === m.id
-                    ? "border-foreground/40 bg-foreground/[0.08] text-foreground/80"
-                    : "border-foreground/12 text-foreground/55 hover:border-foreground/30"
+                    ? "border-foreground/40 bg-[var(--bo-tinta-10)] text-foreground/80"
+                    : "border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-foreground/30"
                 }`}
               >
                 {m.label}
