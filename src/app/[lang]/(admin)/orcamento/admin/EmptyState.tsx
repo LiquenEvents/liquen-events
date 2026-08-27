@@ -34,7 +34,7 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
           </svg>
         )}
       </div>
-      <p className="text-foreground/55 text-sm font-medium">{title}</p>
+      <p className="text-[var(--bo-text-faint)] text-sm font-medium">{title}</p>
       {hint && <p className="text-foreground/30 text-xs mt-1.5 max-w-xs">{hint}</p>}
       {action && (
         /**

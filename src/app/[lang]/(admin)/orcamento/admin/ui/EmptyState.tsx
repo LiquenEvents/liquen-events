@@ -73,7 +73,7 @@ export function EmptyState({
           </svg>
         )}
       </div>
-      <p className="text-base font-medium text-foreground/85">{title}</p>
+      <p className="text-base font-medium text-[var(--bo-text)]">{title}</p>
       {description && (
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-foreground/50">{description}</p>
       )}

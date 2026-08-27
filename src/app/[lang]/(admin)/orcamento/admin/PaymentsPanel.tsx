@@ -573,7 +573,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
    */
   const chip =
     "alvo-toque rounded-full border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-2.5 py-1 " +
-    "text-[11px] tabular-nums text-foreground/65 hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
+    "text-[11px] tabular-nums text-[var(--bo-text-muted)] hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
     "motion-safe:transition-colors";
   const ghostFailed = Boolean(failed?.ghost && !payments.some((p) => p.id === failed.id));
 
@@ -605,7 +605,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               if (e.key === "Enter") saveContractRef();
             }}
             placeholder="2026-001"
-            className={`bo-input w-24 px-2.5 py-1.5 text-xs text-foreground/80 ${savingRef ? "opacity-50" : ""}`}
+            className={`bo-input w-24 px-2.5 py-1.5 text-xs text-[var(--bo-text)] ${savingRef ? "opacity-50" : ""}`}
             title="Número de referência do contrato"
           />
         </div>
@@ -656,7 +656,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           de três cartões, como sempre esteve. */}
       <div className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] mb-1.5 @min-[26rem]:grid @min-[26rem]:grid-cols-3 @min-[26rem]:gap-2.5 @min-[26rem]:divide-y-0 @min-[26rem]:rounded-none @min-[26rem]:border-0 @min-[26rem]:bg-transparent">
         <div className={`${QUADRADO} ${NEUTRO}`}>
-          <p className={`${VALOR} text-base text-foreground/85`}>{eur2(total)}</p>
+          <p className={`${VALOR} text-base text-[var(--bo-text)]`}>{eur2(total)}</p>
           <p className={`${ROTULO} text-foreground/40`}>Total (c/ IVA)</p>
           <p className={NOTA}>
             s/ IVA {eur2(totalNet)} · IVA {eur2(totalIva)}
@@ -732,7 +732,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           o texto muda enquanto se escreve, a altura nunca (zero saltos). */}
       <p className="text-foreground/35 text-[10px] min-h-[1.1rem] leading-[1.1rem] mt-1.5 mb-3">
         {draftValid && paidOnAdd && total > 0 ? (
-          <span className="text-foreground/55 tabular-nums">
+          <span className="text-[var(--bo-text-faint)] tabular-nums">
             Com este registo: recebido {eur2(previewPaid)} · em falta {eur2(previewOutstanding)}
           </span>
         ) : (
@@ -800,7 +800,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           aria-label="Tipo de pagamento"
           value={kind}
           onChange={(e) => pickKind(e.target.value as PaymentKind)}
-          className="bo-input px-2 py-2 text-xs text-foreground/70"
+          className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
         >
           {kindOptions.map((k) => (
             <option key={k} value={k}>
@@ -821,14 +821,14 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             if (formError) setFormError(null);
           }}
           placeholder="0,00"
-          className="bo-input px-2 py-2 text-xs text-right tabular-nums text-foreground/85"
+          className="bo-input px-2 py-2 text-xs text-right tabular-nums text-[var(--bo-text)]"
         />
         <input
           type="date"
           aria-label="Data do pagamento"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="bo-input px-2 py-2 text-xs text-foreground/70"
+          className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
         />
         <input
           type="text"
@@ -837,7 +837,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="MB Way…"
-          className="bo-input px-2 py-2 text-xs text-foreground/70"
+          className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
         />
         {/* ── 163×18 NUM TELEMÓVEL ────────────────────────────────────────
             MEDIDO a 375 px: o alvo deste interruptor era 163×18 — menos de
@@ -850,7 +850,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             Cresce o RÓTULO, não o quadrado: o HTML manda o toque no rótulo
             activar o controlo, e o desenho fica igual. `alvo-toque` só age sob
             `(pointer: coarse)`. */}
-        <label className="alvo-toque !justify-start inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-foreground/65">
+        <label className="alvo-toque !justify-start inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-[var(--bo-text-muted)]">
           <input
             type="checkbox"
             checked={paidOnAdd}
@@ -960,7 +960,9 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   : "border border-transparent hover:bg-[var(--bo-tinta-3)]"
               }`}
             >
-              <span className="text-foreground/75 text-xs truncate">{KIND_LABEL[p.kind]}</span>
+              <span className="text-[var(--bo-tinta-72)] text-xs truncate">
+                {KIND_LABEL[p.kind]}
+              </span>
 
               {editingId === p.id ? (
                 <span className="flex items-center gap-1">
@@ -981,7 +983,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                         cancelEdit();
                       }
                     }}
-                    className="bo-input px-1.5 py-1 text-xs text-right tabular-nums text-foreground/85"
+                    className="bo-input px-1.5 py-1 text-xs text-right tabular-nums text-[var(--bo-text)]"
                   />
                   {/* Num telemóvel não há Escape, e tudo o que tira o foco
                       GRAVA — ver `DesistirDaEdicao`. */}
@@ -1000,7 +1002,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   // botão que abre a edição do valor, e 24 px é meia polpa de
                   // dedo.
                   className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-[var(--bo-tinta-6)] ${
-                    p.paid ? "text-[#4d6350]" : "text-foreground/55"
+                    p.paid ? "text-[#4d6350]" : "text-[var(--bo-text-faint)]"
                   }`}
                 >
                   {eur2(p.amount)}
@@ -1083,10 +1085,10 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           <div
             className={`${GRID} rounded-lg border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06] px-2 py-1.5`}
           >
-            <span className="text-foreground/60 text-xs truncate">
+            <span className="text-[var(--bo-text-muted)] text-xs truncate">
               {KIND_LABEL[failed.ghost.kind]}
             </span>
-            <span className="text-foreground/60 text-xs font-semibold tabular-nums text-right px-1.5">
+            <span className="text-[var(--bo-text-muted)] text-xs font-semibold tabular-nums text-right px-1.5">
               {eur2(failed.ghost.amount)}
             </span>
             <span className="text-foreground/45 text-[11px] tabular-nums truncate">

@@ -167,7 +167,7 @@ export default function ModelosParciais({
   // eram links de 16 px de altura, e num ecrã táctil isso é acertar numa linha
   // de texto. No computador continuam a ser o que eram.
   const botao =
-    "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-foreground/80 hover:underline";
+    "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-[var(--bo-text)] hover:underline";
 
   const podeInserir = mostrar !== "guardar" && !!onInserir;
   const podeGuardar = mostrar !== "inserir" && !!paraGuardar;
@@ -248,7 +248,7 @@ export default function ModelosParciais({
 
       {aGuardar && (
         <div className={PAINEL_SUSPENSO + " p-3"}>
-          <label className="block text-[11px] text-foreground/55" htmlFor={`mp-${tipo}`}>
+          <label className="block text-[11px] text-[var(--bo-text-faint)]" htmlFor={`mp-${tipo}`}>
             Nome do modelo
           </label>
           <input

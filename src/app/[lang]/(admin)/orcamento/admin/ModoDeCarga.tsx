@@ -130,7 +130,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
             ← Sair
           </Button>
           <div className="min-w-0 flex-1">
-            <p role="status" className="text-lg font-medium text-foreground/85">
+            <p role="status" className="text-lg font-medium text-[var(--bo-text)]">
               {feitos} de {total} carregados
             </p>
             {semRede && (
@@ -207,7 +207,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                 <span className="min-w-0 flex-1">
                   <span
                     className={`block truncate text-base ${
-                      feito ? "text-foreground/45 line-through" : "text-foreground/85"
+                      feito ? "text-foreground/45 line-through" : "text-[var(--bo-text)]"
                     }`}
                   >
                     {i.name}
@@ -218,7 +218,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                     número maior da linha depois do nome. */}
                 <span
                   className={`shrink-0 text-xl tabular-nums ${
-                    feito ? "text-foreground/35" : "text-foreground/70"
+                    feito ? "text-foreground/35" : "text-[var(--bo-tinta-72)]"
                   }`}
                 >
                   {i.quantity}

@@ -35,7 +35,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
       nivel={90}
     >
       {/* ── Boas-vindas ── */}
-      <p className="text-foreground/55 text-sm leading-relaxed mb-6">
+      <p className="text-[var(--bo-text-faint)] text-sm leading-relaxed mb-6">
         Bem-vindo(a). Esta janela explica, em poucas palavras, como funciona o back-office e o que
         significa cada termo que vais encontrar. Podes voltar aqui sempre que precisares — abre com
         o botão “?” no topo
@@ -45,7 +45,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
         <span className="pointer-coarse:hidden">
           {" "}
           ou com a tecla{" "}
-          <kbd className="text-[10px] text-foreground/55 bg-[var(--bo-tinta-6)] border border-[var(--bo-hairline-strong)] rounded px-1.5 py-0.5 leading-none">
+          <kbd className="text-[10px] text-[var(--bo-text-faint)] bg-[var(--bo-tinta-6)] border border-[var(--bo-hairline-strong)] rounded px-1.5 py-0.5 leading-none">
             ?
           </kbd>
         </span>
@@ -68,7 +68,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
                 {i + 1}
               </span>
               <div className="min-w-0">
-                <p className="text-foreground/75 text-sm font-medium">{it.step}</p>
+                <p className="text-[var(--bo-tinta-72)] text-sm font-medium">{it.step}</p>
                 <p className="text-foreground/50 text-sm leading-relaxed">{it.desc}</p>
               </div>
             </li>
@@ -90,7 +90,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
         <dl className="flex flex-col gap-4">
           {GLOSSARY.map((it) => (
             <div key={it.term}>
-              <dt className="text-foreground/75 text-sm font-medium">{it.term}</dt>
+              <dt className="text-[var(--bo-tinta-72)] text-sm font-medium">{it.term}</dt>
               <dd className="text-foreground/50 text-sm leading-relaxed">{it.def}</dd>
             </div>
           ))}

@@ -114,7 +114,7 @@ function CampoKm({
   return (
     <div className="mt-1.5 flex flex-col gap-1">
       <label className="flex items-center gap-2">
-        <span className="text-[11px] text-foreground/55">Quilómetros até ao local</span>
+        <span className="text-[11px] text-[var(--bo-text-faint)]">Quilómetros até ao local</span>
         <input
           type="text"
           inputMode="numeric"
@@ -306,7 +306,7 @@ export default function PainelInterno({
         </span>
         {/* `shrink-0`: três palavras, e é o título da secção — não pode ser o
             que cede espaço quando o resto da linha não cabe. */}
-        <span className="shrink-0 text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/60">
+        <span className="shrink-0 text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-text-muted)]">
           Só para ti
         </span>
         <span className="min-w-0 text-[11px] text-foreground/40">
@@ -378,10 +378,10 @@ export default function PainelInterno({
                         {/* `col-span-3` no telemóvel: a fila de cima é só o
                             nome, e com 309 px de largura o `truncate` já quase
                             nunca corta — os nomes desta casa pedem 178 a 318. */}
-                        <span className="col-span-3 truncate text-xs text-foreground/70 sm:col-span-1">
+                        <span className="col-span-3 truncate text-xs text-[var(--bo-tinta-72)] sm:col-span-1">
                           {item || <span className="text-foreground/30">(sem nome)</span>}
                         </span>
-                        <span className="text-right text-xs text-foreground/55">
+                        <span className="text-right text-xs text-[var(--bo-text-faint)]">
                           {l?.preco === null ? "—" : eur(l!.preco!)}
                         </span>
                         <input
@@ -415,7 +415,7 @@ export default function PainelInterno({
                               ? "text-foreground/25"
                               : l!.percentagem! < margemMinima
                                 ? "text-[#8a2a22]"
-                                : "text-foreground/60"
+                                : "text-[var(--bo-text-muted)]"
                           }`}
                         >
                           {l?.percentagem === null ? "—" : `${l!.percentagem}%`}
@@ -443,7 +443,7 @@ export default function PainelInterno({
 
               {total && (
                 <p
-                  className={`mt-3 text-xs leading-relaxed ${magra ? "text-[#8a2a22]" : "text-foreground/60"}`}
+                  className={`mt-3 text-xs leading-relaxed ${magra ? "text-[#8a2a22]" : "text-[var(--bo-text-muted)]"}`}
                 >
                   Margem de {eur(total.margem)} em {eur(total.precoComparavel)} —{" "}
                   <strong className="font-semibold">{total.percentagem}%</strong>
@@ -475,8 +475,8 @@ export default function PainelInterno({
               <span className="bo-eyebrow">Costuma incluir</span>
               <ul className="mt-1.5 flex flex-col gap-1">
                 {esquecidos.map((o) => (
-                  <li key={o.nome} className="text-xs leading-relaxed text-foreground/55">
-                    <span className="text-foreground/75">{o.nome}</span>
+                  <li key={o.nome} className="text-xs leading-relaxed text-[var(--bo-text-faint)]">
+                    <span className="text-[var(--bo-tinta-72)]">{o.nome}</span>
                     <span className="text-foreground/40">{` — em ${o.em} de ${o.de} propostas parecidas`}</span>
                   </li>
                 ))}
@@ -503,8 +503,8 @@ export default function PainelInterno({
               </p>
             ) : (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <p className="text-xs leading-relaxed text-foreground/60">
-                  <strong className="font-semibold text-foreground/85">
+                <p className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                  <strong className="font-semibold text-[var(--bo-text)]">
                     {eur(deslocacao.valor)}
                   </strong>{" "}
                   <span className="text-foreground/45">— {deslocacao.formula}</span>

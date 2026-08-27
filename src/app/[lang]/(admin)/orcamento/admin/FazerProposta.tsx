@@ -227,7 +227,9 @@ export default function FazerProposta({
                   nome, que é a âncora do "para quem é isto", e o botão de
                   trocar. */}
               <p className="bo-eyebrow mb-1">Proposta para</p>
-              <p className="truncate text-base font-medium text-foreground/85">{escolhido.name}</p>
+              <p className="truncate text-base font-medium text-[var(--bo-text)]">
+                {escolhido.name}
+              </p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
               Trocar de cliente
@@ -260,7 +262,7 @@ export default function FazerProposta({
         <div className="flex flex-col gap-3">
           <div>
             <p className="bo-eyebrow mb-1.5">Passo 1 de 2</p>
-            <p className="text-sm text-foreground/70">
+            <p className="text-sm text-[var(--bo-tinta-72)]">
               Para quem é a proposta?{" "}
               {porFazer > 0 && (
                 <span className="text-foreground/45">
@@ -276,7 +278,7 @@ export default function FazerProposta({
               onChange={(e) => setProcura(e.target.value)}
               placeholder="Procurar por nome, email, local…"
               aria-label="Procurar cliente"
-              className="bo-input min-w-[14rem] flex-1 px-3 py-2.5 text-sm text-foreground/75"
+              className="bo-input min-w-[14rem] flex-1 px-3 py-2.5 text-sm text-[var(--bo-tinta-72)]"
             />
             <Button variant="secondary" onClick={onNovoPedido}>
               Cliente novo
@@ -319,7 +321,7 @@ export default function FazerProposta({
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
                 filtro === f.id
                   ? "bg-[#1b2119] text-white "
-                  : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/65"
+                  : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"
               }`}
             >
               {f.label} · {f.n}
@@ -405,7 +407,7 @@ export default function FazerProposta({
                     </span>
                     <span className="min-w-0">
                       <span
-                        className={`block truncate text-sm font-medium ${espera ? "text-foreground/85" : "text-foreground/55"}`}
+                        className={`block truncate text-sm font-medium ${espera ? "text-[var(--bo-text)]" : "text-[var(--bo-text-faint)]"}`}
                       >
                         {q.name}
                       </span>

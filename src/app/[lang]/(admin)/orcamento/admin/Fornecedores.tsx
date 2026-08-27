@@ -388,7 +388,7 @@ export default function Fornecedores() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Procurar fornecedor…"
               aria-label="Procurar fornecedores"
-              className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
+              className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
             />
           </div>
         }
@@ -539,7 +539,7 @@ export default function Fornecedores() {
                     <button
                       onClick={() => setEditingId(null)}
                       aria-label="Fechar edição"
-                      className="text-sm text-foreground/30 transition-colors hover:text-foreground/60"
+                      className="text-sm text-foreground/30 transition-colors hover:text-[var(--bo-text-muted)]"
                     >
                       ×
                     </button>
@@ -612,7 +612,7 @@ export default function Fornecedores() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-foreground/78 text-sm font-semibold truncate">
+                        <p className="text-[var(--bo-text)] text-sm font-semibold truncate">
                           {s.name}
                         </p>
                         {s.preferred && (
@@ -667,21 +667,21 @@ export default function Fornecedores() {
                             { preferred: !s.preferred },
                           )
                         }
-                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-foreground/55 hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
+                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-faint)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
                         {EstrelaIcon(!!s.preferred)}
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Editar"
                       >
                         {LapisIcon}
                       </button>
                       <button
                         onClick={() => remove(s.id)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Remover"
                       >
                         ×

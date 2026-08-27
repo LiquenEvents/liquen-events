@@ -217,7 +217,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 />
                 <span className="min-w-0 flex-1">
                   <span
-                    className={`block truncate text-xs ${aqui ? "font-medium text-foreground/85" : "text-foreground/65"}`}
+                    className={`block truncate text-xs ${aqui ? "font-medium text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"}`}
                   >
                     {s.titulo}
                   </span>
@@ -297,7 +297,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 <button
                   type="button"
                   onClick={() => saltarPara(f.seccao)}
-                  className="flex w-full items-start gap-1.5 text-left text-[11px] leading-snug text-foreground/55 hover:text-foreground/85"
+                  className="flex w-full items-start gap-1.5 text-left text-[11px] leading-snug text-[var(--bo-text-faint)] hover:text-[var(--bo-text)]"
                 >
                   <span
                     aria-hidden

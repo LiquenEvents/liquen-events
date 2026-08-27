@@ -136,7 +136,7 @@ const TaskRow = memo(function TaskRow({
       </button>
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
+          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"}`}
         >
           {t.title}
         </p>
@@ -233,7 +233,7 @@ const TaskRow = memo(function TaskRow({
                  desenho de 13 para 25 px SEM crescer a linha (a coluna do título
                  já mede 34) e sem margens negativas, que era o que voltaria a
                  encostar os dois um ao outro. O ícone continua com 13 px. */
-              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
               aria-label="Editar tarefa"
             >
               {LapisIcon}
@@ -243,7 +243,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
             aria-label="Eliminar"
           >
             {CaixoteIcon}
@@ -541,7 +541,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 if (e.key === "Enter") saveEditTask(t.id);
                 if (e.key === "Escape") setEditingTaskId(null);
               }}
-              className="bo-input px-3 py-2 text-sm text-foreground/70 w-full"
+              className="bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] w-full"
             />
             <div className="flex flex-wrap gap-2">
               <select
@@ -549,7 +549,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 onChange={(e) =>
                   setEditTaskFields({ ...editTaskFields, priority: e.target.value as TaskPriority })
                 }
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
               >
                 <option value="alta">Alta</option>
                 <option value="normal">Normal</option>
@@ -559,18 +559,18 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 type="date"
                 value={editTaskFields.dueDate}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, dueDate: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1"
               />
               <input
                 value={editTaskFields.assignee}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, assignee: e.target.value })}
                 placeholder="Responsável"
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1 min-w-[100px]"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
               />
               <select
                 value={editTaskFields.area}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, area: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
+                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
               >
                 <option value="">Área…</option>
                 {AREAS.map((a) => (
@@ -658,7 +658,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               portátil a linha fica exactamente como estava; `!justify-start`
               porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
               a classe centra por omissão. */}
-          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-foreground/55 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
+          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-faint)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
             <svg
               width="12"
               height="12"

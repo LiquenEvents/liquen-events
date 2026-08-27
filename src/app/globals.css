@@ -347,9 +347,39 @@ body:is(.admin-mode, :has([data-admin-mode])) {
        --bo-text        11,63:1  informação forte (valores, emails, ids, datas)
        --bo-text-muted   5,91:1  informação secundária — passa AA a texto normal
        --bo-text-faint    4,77:1 micro-rótulos — agora também passa AA */
-  --bo-text: rgba(13, 13, 13, 0.82);
-  --bo-text-muted: rgba(13, 13, 13, 0.64);
-  --bo-text-faint: rgba(13, 13, 13, 0.58);
+  /* ── E A ESCADA DA TINTA CONTINUA AQUI, PARA O TEXTO ─────────────────────
+     Os degraus dos riscos e dos fundos estão mais abaixo (3, 6, 8, 10, 13). Os
+     do texto são estes quatro — e são QUATRO, e não os seis da análise, por
+     uma razão que não é gosto:
+
+     O fundo do back office é BRANCO. A escala de dez opacidades da Pixelmatters
+     funciona porque o site deles é escuro; aqui, 48% de preto sobre branco dá
+     ~3,5:1 e CHUMBA a norma (WCAG 1.4.3 pede 4,5:1 para texto normal). O
+     degrau `--ink-48` da proposta não pode carregar letra nenhuma nesta casa, e
+     o `--ink-32` muito menos.
+
+     A norma é o tecto, e é ela que decide onde a escada acaba. Medido sobre
+     branco, achatado:
+
+         tinta-82   11,63:1   títulos, valores, texto forte
+         tinta-72    8,03:1   corpo
+         tinta-64    5,91:1   apoio, metadados, datas
+         tinta-58    4,77:1   micro-rótulos — o ÚLTIMO degrau que passa
+
+     Abaixo de 58 não há degrau nenhum, porque abaixo de 58 não há texto que
+     passe. Quem precisar de mais claro está a desenhar um ícone ou um traço, e
+     esses têm a sua própria escada.
+
+     Os três nomes de PAPEL ficam, como apelidos: estão em centenas de sítios,
+     dizem o que a coisa é, e têm o contraste medido escrito ao lado. */
+  --bo-tinta-82: rgba(13, 13, 13, 0.82);
+  --bo-tinta-72: rgba(13, 13, 13, 0.72);
+  --bo-tinta-64: rgba(13, 13, 13, 0.64);
+  --bo-tinta-58: rgba(13, 13, 13, 0.58);
+
+  --bo-text: var(--bo-tinta-82);
+  --bo-text-muted: var(--bo-tinta-64);
+  --bo-text-faint: var(--bo-tinta-58);
 
   /* ── ChatGPT-app design system (back office only) ──────────────────────────
      One calm, modern surface language shared by every admin screen. Scoped to

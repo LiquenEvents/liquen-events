@@ -190,7 +190,7 @@ export default function PreviaDaPagina({
           {TXT.sobretitulo.texto}
         </p>
         <p
-          className="absolute truncate font-serif italic text-foreground/85"
+          className="absolute truncate font-serif italic text-[var(--bo-text)]"
           style={estiloDaLinha(TXT.titulo)}
         >
           {titulo?.trim() || "sem título"}

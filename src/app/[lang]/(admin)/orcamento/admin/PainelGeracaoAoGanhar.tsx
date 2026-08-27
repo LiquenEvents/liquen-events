@@ -142,11 +142,11 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
       <div>
         <h3
           id="painel-geracao-titulo"
-          className="text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/70"
+          className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--bo-tinta-72)]"
         >
           Produção a partir da proposta ganha
         </h3>
-        <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
           A partir dos serviços da proposta e do total já resolvido. Nunca apaga o que já está
           escrito à mão — só acrescenta o que falta.
         </p>
@@ -171,7 +171,7 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
             {(Object.keys(ROTULOS) as (keyof typeof ROTULOS)[]).map((chave) => (
               <li
                 key={chave}
-                className="flex items-center justify-between text-xs text-foreground/75"
+                className="flex items-center justify-between text-xs text-[var(--bo-tinta-72)]"
               >
                 <span>{ROTULOS[chave]}</span>
                 <span className="tabular-nums text-foreground/50">
@@ -194,7 +194,7 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
 
       {estado.fase === "gerado" && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-foreground/75" data-testid="resultado-geracao">
+          <p className="text-xs text-[var(--bo-tinta-72)]" data-testid="resultado-geracao">
             Gerado: {estado.resultado.material.linhas} de material ·{" "}
             {estado.resultado.montagem.linhas} de montagem · {estado.resultado.calendario.linhas}{" "}
             datas-chave · {estado.resultado.pagamentos.linhas} de pagamentos.

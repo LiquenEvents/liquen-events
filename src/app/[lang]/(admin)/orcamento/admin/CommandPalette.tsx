@@ -197,7 +197,7 @@ export default function CommandPalette({
             aria-controls={listaId}
             aria-autocomplete="list"
             aria-activedescendant={results.length > 0 ? idDaOpcao(active) : undefined}
-            className="flex-1 bg-transparent text-[15px] text-foreground/90 placeholder-foreground/35 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] text-[var(--bo-text)] placeholder-foreground/35 focus:outline-none"
           />
           {/* FECHAR: uma tecla em quem tem teclado, um botão em quem não tem.
               Aqui só havia a etiqueta "ESC". Num telemóvel isso é uma
@@ -300,7 +300,7 @@ export default function CommandPalette({
                       </span>
                       <span
                         className={`min-w-0 flex-1 truncate text-sm ${
-                          isActive ? "font-medium text-[#4d6350]" : "text-foreground/75"
+                          isActive ? "font-medium text-[#4d6350]" : "text-[var(--bo-tinta-72)]"
                         }`}
                       >
                         {c.label}

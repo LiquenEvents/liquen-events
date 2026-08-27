@@ -231,7 +231,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
         </p>
       )}
       <p
-        className="absolute truncate font-serif text-foreground/85"
+        className="absolute truncate font-serif text-[var(--bo-text)]"
         style={{
           left: pct(PAGINA_M, PAGINA_W),
           right: pct(PAGINA_M, PAGINA_W),
@@ -286,7 +286,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
               <p
                 key={i}
                 className={`truncate ${
-                  rubrica ? "font-serif text-foreground/75" : "text-foreground/55"
+                  rubrica ? "font-serif text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-faint)]"
                 }`}
                 style={{
                   fontSize: cq(rubrica ? 11 : CORPO),

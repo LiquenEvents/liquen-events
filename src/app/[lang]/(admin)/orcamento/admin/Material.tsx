@@ -741,7 +741,7 @@ function Catalogo() {
         <div className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <p className="text-sm font-medium">Antes de gravar:</p>
-            <p className="text-sm text-foreground/75">
+            <p className="text-sm text-[var(--bo-tinta-72)]">
               <strong>{plano.novos}</strong> novos · <strong>{plano.atualizados}</strong>{" "}
               atualizados
               {plano.erros > 0 && (
@@ -754,7 +754,7 @@ function Catalogo() {
           </div>
 
           {plano.erros > 0 && (
-            <ul className="mt-3 space-y-1 text-xs text-foreground/70">
+            <ul className="mt-3 space-y-1 text-xs text-[var(--bo-tinta-72)]">
               {plano.linhas
                 .filter((l) => l.estado === "erro")
                 .slice(0, 8)

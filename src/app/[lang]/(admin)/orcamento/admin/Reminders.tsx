@@ -248,7 +248,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
             >
               <span style={{ color: r.urgent ? "#8a2a22" : "#9aa36a" }}>{icon(r.kind)}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-foreground/70 text-xs truncate font-medium">{r.text}</p>
+                <p className="text-[var(--bo-tinta-72)] text-xs truncate font-medium">{r.text}</p>
                 <p
                   className={`text-[10px] truncate ${r.urgent ? "text-[#8a2a22]" : "text-foreground/40"}`}
                 >

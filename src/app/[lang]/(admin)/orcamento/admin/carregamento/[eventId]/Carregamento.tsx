@@ -359,10 +359,10 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         ref={cabecalho}
         className="sticky top-0 z-10 border-b border-[var(--bo-hairline-strong)] bg-white/95 px-4 py-3 backdrop-blur"
       >
-        <p className="truncate text-sm text-foreground/70">{titulo}</p>
+        <p className="truncate text-sm text-[var(--bo-tinta-72)]">{titulo}</p>
         <p className="text-2xl font-medium tabular-nums">
           {p.carregados} <span className="text-foreground/45">de {p.total}</span>{" "}
-          <span className="text-base text-foreground/60">carregados</span>
+          <span className="text-base text-[var(--bo-text-muted)]">carregados</span>
         </p>
         <div
           role="progressbar"
@@ -383,7 +383,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         </div>
         {(!online || pendentesDeste > 0) && (
           <p
-            className={`mt-2 text-xs ${envioFalhou && online ? "text-[#8a2a22]" : "text-foreground/60"}`}
+            className={`mt-2 text-xs ${envioFalhou && online ? "text-[#8a2a22]" : "text-[var(--bo-text-muted)]"}`}
           >
             {!online && "Sem rede. "}
             {pendentesDeste > 0 &&
@@ -446,7 +446,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
             />
           </div>
         ) : (
-          <p className="px-4 py-10 text-center text-sm text-foreground/60">
+          <p className="px-4 py-10 text-center text-sm text-[var(--bo-text-muted)]">
             Sem checklist. Gera-a primeiro no pedido, no computador.
           </p>
         )
@@ -456,7 +456,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         <div role="group" aria-label="Material a carregar">
           {porCategoria.map(([categoria, linhas]) => (
             <section key={categoria}>
-              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-foreground/55 uppercase backdrop-blur">
+              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-[var(--bo-text-faint)] uppercase backdrop-blur">
                 {categoria}
               </h2>
               <ul>
@@ -491,12 +491,12 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                             {i.name}
                           </span>
                           {i.note && (
-                            <span className="block truncate text-xs text-foreground/55">
+                            <span className="block truncate text-xs text-[var(--bo-text-faint)]">
                               {i.note}
                             </span>
                           )}
                         </span>
-                        <span className="shrink-0 text-sm tabular-nums text-foreground/70">
+                        <span className="shrink-0 text-sm tabular-nums text-[var(--bo-tinta-72)]">
                           {i.qty}
                           {i.unit ? ` ${i.unit}` : ""}
                         </span>
@@ -522,16 +522,21 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="min-w-0 flex-1 text-sm">
                 <strong className="font-medium text-[#4d6350]">Carrinha dada por carregada</strong>
-                {horaDoFecho && <span className="text-foreground/60"> às {horaDoFecho}</span>}
+                {horaDoFecho && (
+                  <span className="text-[var(--bo-text-muted)]"> às {horaDoFecho}</span>
+                )}
                 {p.carregados < p.total && (
-                  <span className="text-foreground/55"> · {p.total - p.carregados} por marcar</span>
+                  <span className="text-[var(--bo-text-faint)]">
+                    {" "}
+                    · {p.total - p.carregados} por marcar
+                  </span>
                 )}
               </p>
               {estado !== "devolvida" && (
                 <button
                   type="button"
                   onClick={() => marcarFecho("preparada")}
-                  className="alvo-toque shrink-0 rounded-lg px-2 text-xs text-foreground/60 underline decoration-dotted underline-offset-2"
+                  className="alvo-toque shrink-0 rounded-lg px-2 text-xs text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2"
                 >
                   Reabrir
                 </button>

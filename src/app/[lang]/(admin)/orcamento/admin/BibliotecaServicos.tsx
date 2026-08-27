@@ -138,7 +138,9 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
                     }}
                     className="alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)]"
                   >
-                    <span className="block text-xs font-medium text-foreground/80">{s.nome}</span>
+                    <span className="block text-xs font-medium text-[var(--bo-text)]">
+                      {s.nome}
+                    </span>
                     {s.descricao && (
                       <span className="mt-0.5 block truncate text-[11px] text-foreground/45">
                         {s.descricao}

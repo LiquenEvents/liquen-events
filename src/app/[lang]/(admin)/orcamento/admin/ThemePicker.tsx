@@ -1003,12 +1003,16 @@ function ImportChip({ job }: { job: ImportJob }) {
             </span>
           ))}
           {total > 4 && (
-            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-[var(--bo-tinta-10)] text-[10px] text-foreground/70">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-white bg-[var(--bo-tinta-10)] text-[10px] text-[var(--bo-tinta-72)]">
               +{total - 4}
             </span>
           )}
         </div>
-        <p role="status" aria-live="polite" className="min-w-0 flex-1 text-sm text-foreground/80">
+        <p
+          role="status"
+          aria-live="polite"
+          className="min-w-0 flex-1 text-sm text-[var(--bo-text)]"
+        >
           {message}
         </p>
       </div>
@@ -2204,7 +2208,7 @@ export default function ThemePicker({
                  temas — e o convite a criar o primeiro mandava-a refazer o que
                  já tem. Aqui diz-se o que se passou e o passo a dar. */
             <div>
-              <p className="text-sm text-foreground/75">Não foi possível ler os temas.</p>
+              <p className="text-sm text-[var(--bo-tinta-72)]">Não foi possível ler os temas.</p>
               <p className="bo-text-muted mt-1 text-xs">{falhaTemas.mensagem}</p>
             </div>
           ) : themes.length === 0 ? (
@@ -2304,7 +2308,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded
                       aria-label="Fechar a procura"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/85"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
                     >
                       <svg
                         width="15"
@@ -2327,7 +2331,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded={false}
                       aria-label="Procurar tema"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/85"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
                     >
                       <svg
                         width="16"
@@ -2377,7 +2381,7 @@ export default function ThemePicker({
                            nome curto ao lado de um comprido lia-se como duas
                            listas — e é a coluna que a pessoa percorre com os
                            olhos de cima a baixo. */
-                      className="shrink-0 snap-start text-foreground/75 lg:w-full lg:!justify-start lg:truncate"
+                      className="shrink-0 snap-start text-[var(--bo-tinta-72)] lg:w-full lg:!justify-start lg:truncate"
                       /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o
                          rato chegar ao separador e o clique passam ~150–300 ms
                          — que é praticamente o que a rota demora. Buscar aí faz
@@ -2390,7 +2394,9 @@ export default function ThemePicker({
                       onTouchStart={() => prefetchTheme(t.id)}
                     >
                       {t.name}
-                      <span className="tabular-nums text-foreground/55">{themeCountLabel(t)}</span>
+                      <span className="tabular-nums text-[var(--bo-text-faint)]">
+                        {themeCountLabel(t)}
+                      </span>
                     </Button>
                   ))}
                 </div>
@@ -2403,7 +2409,7 @@ export default function ThemePicker({
                   volta no mesmo sítio onde se lê o problema. */}
               {temasVisiveis.length === 0 && (
                 <div className="rounded-xl border border-dashed border-[var(--bo-hairline-strong)] px-4 py-3 text-center">
-                  <p className="text-sm text-foreground/75">
+                  <p className="text-sm text-[var(--bo-tinta-72)]">
                     Nenhum tema com «{procuraTema.trim()}».
                   </p>
                   <p className="bo-text-muted mt-0.5 text-xs">
@@ -2510,7 +2516,7 @@ export default function ThemePicker({
                 `alinhar="direita"` porque o botão está encostado à margem: um
                 painel a crescer para a direita a partir daqui saía do diálogo. */}
               <Ajuda sobre="como escolher fotos" alinhar="direita" className="ml-auto">
-                <span className="block text-[11px] font-medium text-foreground/80">
+                <span className="block text-[11px] font-medium text-[var(--bo-text)]">
                   Como escolher
                 </span>
                 <ul className="mt-1.5 space-y-1">
@@ -2578,7 +2584,7 @@ export default function ThemePicker({
                     // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
                     // está vazio seria mentira, e mandava-a carregar tudo outra vez.
                     <div className="py-8 text-center">
-                      <p className="text-sm text-foreground/75">
+                      <p className="text-sm text-[var(--bo-tinta-72)]">
                         Não foi possível ler a pasta deste tema agora.
                       </p>
                       <p className="bo-text-muted mt-1 text-xs">
@@ -2825,7 +2831,7 @@ export default function ThemePicker({
         // `flex-1` — sem isto, este aviso era o que encolhia para dar altura à
         // grelha, e a frase ficava cortada a meio.
         <div className="shrink-0 border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
-          <p className="text-sm text-foreground/80">
+          <p className="text-sm text-[var(--bo-text)]">
             {plural(failedPaths.length, "foto não entrou", "fotos não entraram")} na proposta.
           </p>
           <p className="bo-text-muted mt-0.5 text-xs">

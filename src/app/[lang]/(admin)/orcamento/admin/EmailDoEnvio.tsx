@@ -275,7 +275,7 @@ export default function EmailDoEnvio({
       aria-labelledby="email-do-envio-titulo"
       className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-white/70 p-4"
     >
-      <h3 id="email-do-envio-titulo" className="font-display text-base text-foreground/85">
+      <h3 id="email-do-envio-titulo" className="font-display text-base text-[var(--bo-text)]">
         O email que o cliente vai receber
       </h3>
 
@@ -285,14 +285,14 @@ export default function EmailDoEnvio({
       <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <dt className="text-foreground/50">Para</dt>
-          <dd className="min-w-0 break-words text-foreground/85">
+          <dd className="min-w-0 break-words text-[var(--bo-text)]">
             {destinatario?.nome ? `${destinatario.nome} · ` : ""}
             {destinatario?.email || "—"}
           </dd>
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2">
           <dt className="text-foreground/50">Assina</dt>
-          <dd className="min-w-0 break-words text-foreground/85">
+          <dd className="min-w-0 break-words text-[var(--bo-text)]">
             {remetente || "—"}
             {/* Não é um campo, e diz-se porquê no sítio onde alguém procuraria
                 o campo. */}
@@ -328,7 +328,7 @@ export default function EmailDoEnvio({
       {erro && (
         <p
           aria-live="polite"
-          className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75"
+          className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>
@@ -373,7 +373,7 @@ export default function EmailDoEnvio({
         />
         {reposicao && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-foreground/55">
+            <span className="text-xs text-[var(--bo-text-faint)]">
               O texto que tinhas escrito foi substituído pelo modelo.
             </span>
             <Button
@@ -403,7 +403,7 @@ export default function EmailDoEnvio({
       {porPreencher.length > 0 && (
         <p
           aria-live="polite"
-          className="mt-4 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/40 bg-[#c98a2e]/[0.07] px-3 py-2 text-xs leading-relaxed text-foreground/75"
+          className="mt-4 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/40 bg-[#c98a2e]/[0.07] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>
@@ -417,7 +417,7 @@ export default function EmailDoEnvio({
       {avisos.map((a) => (
         <p
           key={a}
-          className="mt-2 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70"
+          className="mt-2 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>{a}</span>
@@ -427,12 +427,12 @@ export default function EmailDoEnvio({
       {/* Apagar o marcador é uma escolha legítima (há quem prefira falar
           antes), mas não pode ser uma escolha por acidente. */}
       {semLigacao && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-foreground/55">
+        <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-text-faint)]">
           <span aria-hidden="true">·</span>
           <span>
             O texto não tem a ligação da proposta. O casal fica com o PDF em anexo e mais nada — se
             quiseres a ligação, escreve{" "}
-            <code className="text-foreground/75">{MARCADOR_DA_LIGACAO}</code> onde ela deve
+            <code className="text-[var(--bo-tinta-72)]">{MARCADOR_DA_LIGACAO}</code> onde ela deve
             aparecer.
           </span>
         </p>
@@ -444,7 +444,7 @@ export default function EmailDoEnvio({
           dizer um ficheiro e o email a levar outro. */}
       <dl className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
         <dt className="text-foreground/50">Anexo</dt>
-        <dd className="min-w-0 break-all text-foreground/85">
+        <dd className="min-w-0 break-all text-[var(--bo-text)]">
           {nomeDoAnexo}
           <span className="ml-1.5 whitespace-nowrap text-xs text-foreground/50">
             {bytesDoAnexo > 0
@@ -493,12 +493,12 @@ export default function EmailDoEnvio({
           fecho da casa que entra sozinho. Fechado por omissão porque o caminho
           curto é enviar, e aberto num toque para quem quiser confirmar. */}
       <details className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60">
-        <summary className="cursor-pointer list-none px-3 py-2 text-xs text-foreground/65">
+        <summary className="cursor-pointer list-none px-3 py-2 text-xs text-[var(--bo-text-muted)]">
           <span aria-hidden="true">▸ </span>Ver como o cliente o recebe
         </summary>
         <div className="border-t border-[var(--bo-hairline-strong)] px-3 py-3">
           <p className="text-xs text-foreground/50">Assunto</p>
-          <p className="text-sm text-foreground/85">{assunto || "—"}</p>
+          <p className="text-sm text-[var(--bo-text)]">{assunto || "—"}</p>
           <div className="mt-3 border-t border-[var(--bo-hairline-strong)] pt-3">
             {corpo
               .split(/\n[ \t]*\n/)
@@ -507,7 +507,7 @@ export default function EmailDoEnvio({
               .map((paragrafo, i) => (
                 <p
                   key={i}
-                  className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85"
+                  className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--bo-text)]"
                 >
                   {paragrafo}
                 </p>

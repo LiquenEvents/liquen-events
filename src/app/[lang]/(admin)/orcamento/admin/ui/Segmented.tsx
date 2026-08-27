@@ -227,8 +227,8 @@ export function Segmented<T extends string>({
                 ? // O fundo próprio é a rede de antes de a pílula existir. Sai
                   // no instante em que ela está medida e no sítio — nunca há
                   // dois fundos, e nunca há nenhum.
-                  cn("text-foreground/90", !temMarca && "bg-white")
-                : "text-foreground/50 hover:text-foreground/75 active:bg-[var(--bo-tinta-6)]",
+                  cn("text-[var(--bo-text)]", !temMarca && "bg-white")
+                : "text-foreground/50 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-6)]",
             )}
           >
             {o.icon}

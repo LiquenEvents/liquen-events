@@ -171,12 +171,12 @@ function AddEventModal({
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
-            <p className="text-foreground/75 text-sm capitalize">{dateLabel}</p>
+            <p className="text-[var(--bo-tinta-72)] text-sm capitalize">{dateLabel}</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
+            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-[var(--bo-text-muted)] motion-safe:transition-colors"
           >
             ×
           </button>
@@ -571,7 +571,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   miudinha. Sobe para o degrau de display da casa, na letra da
                   casa. */}
               <h3
-                className="font-display leading-tight text-foreground/90"
+                className="font-display leading-tight text-[var(--bo-text)]"
                 style={{ fontSize: "clamp(26px, 3.5vw, 36px)" }}
               >
                 {MONTHS[month]} {year}
@@ -782,7 +782,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
                         title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-foreground/65 hover:bg-[var(--bo-tinta-6)] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -800,7 +800,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-foreground/65 hover:line-through hover:bg-[var(--bo-tinta-6)] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -891,7 +891,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-foreground/75 text-xs font-medium truncate">
+                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
                         {q.name}
                       </span>
                       <span className="block text-foreground/40 text-[10px] truncate">
@@ -912,7 +912,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-foreground/75 text-xs font-medium truncate">
+                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
                         {ev.time ? `${ev.time} · ` : ""}
                         {ev.title}
                       </span>
@@ -995,7 +995,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-foreground/70 text-xs font-medium truncate">{q.name}</p>
+                    <p className="text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                      {q.name}
+                    </p>
                     <p className="text-foreground/40 text-[11px] truncate">
                       {eventTypeLabel(q)} · {q.guests} convidados
                     </p>

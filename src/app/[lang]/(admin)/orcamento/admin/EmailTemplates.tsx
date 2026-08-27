@@ -95,7 +95,7 @@ const DESCRIPTIONS: Record<string, string> = {
 type Mode = "visual" | "advanced";
 type Field = "subject" | "visual" | "advanced";
 
-const inputCls = "bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22";
+const inputCls = "bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22";
 
 /** The body as stored/sent, given the current editor state. */
 function computeBody(mode: Mode, doc: RichDoc, html: string): string {
@@ -716,7 +716,7 @@ function EditorClassico() {
                 }`}
               >
                 <p
-                  className={`text-sm truncate ${active ? "text-[#4d6350] font-medium" : "text-foreground/70"}`}
+                  className={`text-sm truncate ${active ? "text-[#4d6350] font-medium" : "text-[var(--bo-tinta-72)]"}`}
                 >
                   {t.name}
                   {/* A MARCA DO TRABALHO POR PUBLICAR.
@@ -753,7 +753,7 @@ function EditorClassico() {
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
                 <p className="bo-eyebrow">A editar</p>
-                <p className="text-sm text-foreground/70 mt-1 truncate">{selected.name}</p>
+                <p className="text-sm text-[var(--bo-tinta-72)] mt-1 truncate">{selected.name}</p>
                 <p className="text-[11px] text-foreground/40 mt-1 leading-snug">
                   {DESCRIPTIONS[selected.key] ?? "Modelo de email."}
                 </p>
@@ -840,7 +840,7 @@ function EditorClassico() {
                 <button
                   type="button"
                   onClick={switchToAdvanced}
-                  className="text-[11px] text-foreground/35 hover:text-foreground/60 underline underline-offset-2"
+                  className="text-[11px] text-foreground/35 hover:text-[var(--bo-text-muted)] underline underline-offset-2"
                 >
                   HTML avançado
                 </button>
@@ -883,8 +883,8 @@ function EditorClassico() {
                 />
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
                   Modo secundário para quem sabe HTML. Os campos entre chavetas (ex.:{" "}
-                  <span className="font-mono text-foreground/55">{"{nome}"}</span>) são substituídos
-                  no envio. À direita vê como fica.
+                  <span className="font-mono text-[var(--bo-text-faint)]">{"{nome}"}</span>) são
+                  substituídos no envio. À direita vê como fica.
                 </p>
               </>
             )}
@@ -910,7 +910,7 @@ function EditorClassico() {
             <div className="rounded-lg border border-[var(--bo-hairline)] overflow-hidden">
               <div className="px-3 py-2 bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
                 <p className="text-[10px] text-foreground/40">Assunto</p>
-                <p className="text-sm text-foreground/75 truncate">
+                <p className="text-sm text-[var(--bo-tinta-72)] truncate">
                   {previewSubject || <span className="text-foreground/30">(sem assunto)</span>}
                 </p>
               </div>

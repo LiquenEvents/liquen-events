@@ -62,11 +62,11 @@ export function PageHeader({
     >
       <div className="min-w-0">
         {eyebrow && <p className="bo-eyebrow mb-1.5 sm:mb-2.5">{eyebrow}</p>}
-        <Heading className="font-display text-2xl leading-tight text-foreground/90 sm:text-3xl">
+        <Heading className="font-display text-2xl leading-tight text-[var(--bo-text)] sm:text-3xl">
           {title}
         </Heading>
         {subtitle && (
-          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground/55 sm:mt-2">
+          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[var(--bo-text-faint)] sm:mt-2">
             {subtitle}
           </p>
         )}

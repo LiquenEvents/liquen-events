@@ -276,7 +276,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Procurar cliente…"
                 aria-label="Procurar cliente"
-                className="bo-input w-full pl-10 pr-3 py-2.5 text-sm text-foreground/80 placeholder-foreground/30"
+                className="bo-input w-full pl-10 pr-3 py-2.5 text-sm text-[var(--bo-text)] placeholder-foreground/30"
               />
             </div>
             <button
@@ -298,7 +298,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#8a6420] "
-                  : "bg-[var(--bo-tinta-6)] text-foreground/55 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/75"
+                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-faint)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
               }`}
             >
               <span aria-hidden="true">★</span>
@@ -446,7 +446,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
       {emTabela && aberta && (
         <Card padding="none" className="mt-3 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
-            <p className="truncate text-sm font-semibold text-foreground/78">{aberta.name}</p>
+            <p className="truncate text-sm font-semibold text-[var(--bo-text)]">{aberta.name}</p>
             <Button size="sm" variant="ghost" onClick={() => setOpen(null)}>
               Fechar
             </Button>
@@ -551,7 +551,7 @@ function CartaoDeCliente({
         <Avatar c={c} />
 
         <div className="min-w-0 flex-1">
-          <p className="text-foreground/78 text-sm font-semibold truncate flex items-center gap-2">
+          <p className="text-[var(--bo-text)] text-sm font-semibold truncate flex items-center gap-2">
             <span className="truncate">{c.name}</span>
             {c.vip && (
               <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#8a6420] text-[8px] tracking-[0.12em] uppercase font-bold">
@@ -600,7 +600,7 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
         <span className="flex items-center gap-2.5">
           <Avatar c={c} />
           <span className="min-w-0">
-            <span className="block truncate text-foreground/90">{c.name}</span>
+            <span className="block truncate text-[var(--bo-text)]">{c.name}</span>
             {c.vip && (
               <span className="mt-0.5 inline-flex items-center rounded-full bg-[#d6ab3a]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8a6420]">
                 ★ VIP
@@ -650,7 +650,9 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
       cabecalho: "Pedidos",
       alinharADireita: true,
       largura: "w-20",
-      celula: (c) => <span className="tabular-nums text-foreground/55">{c.quotes.length}</span>,
+      celula: (c) => (
+        <span className="tabular-nums text-[var(--bo-text-faint)]">{c.quotes.length}</span>
+      ),
     },
     {
       chave: "conversao",
@@ -824,7 +826,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     </span>
                   )}
                 </div>
-                <p className="text-foreground/55 text-xs truncate">
+                <p className="text-[var(--bo-text-faint)] text-xs truncate">
                   {eventTypeLabel(q)} · {q.guests} convidados
                   {q.date
                     ? ` · ${new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`

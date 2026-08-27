@@ -315,7 +315,7 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
                 </div>
                 <div className="flex-1 min-w-0 pt-0.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-foreground/65 text-xs font-medium leading-snug whitespace-pre-line">
+                    <p className="text-[var(--bo-text-muted)] text-xs font-medium leading-snug whitespace-pre-line">
                       {entry.summary}
                     </p>
                     <span className="text-foreground/22 text-[10px] shrink-0 whitespace-nowrap">

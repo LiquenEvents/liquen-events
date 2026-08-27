@@ -345,7 +345,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                           </span>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="text-foreground/70 text-sm truncate">{it.title}</p>
+                          <p className="text-[var(--bo-tinta-72)] text-sm truncate">{it.title}</p>
                           {it.sub && (
                             <p className="text-foreground/40 text-[11px] truncate capitalize">
                               {it.sub}

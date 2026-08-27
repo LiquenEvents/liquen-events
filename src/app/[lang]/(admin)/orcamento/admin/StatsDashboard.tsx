@@ -71,7 +71,7 @@ function Kpi({
       }`}
     >
       <p
-        className={`font-light leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-foreground/82"}`}
+        className={`font-light leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-[var(--bo-text)]"}`}
         style={{
           fontSize: small ? "clamp(18px, 1.9vw, 24px)" : "clamp(22px, 2.6vw, 34px)",
         }}
@@ -145,7 +145,7 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
       {data.map((d, i) => (
         <div key={i}>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-foreground/55 text-xs">{d.label}</span>
+            <span className="text-[var(--bo-text-faint)] text-xs">{d.label}</span>
             <span className="text-foreground/35 text-[10px] tabular-nums">
               {d.value} · {Math.round((d.value / total) * 100)}%
             </span>
@@ -187,7 +187,7 @@ function Section({
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
-          <span className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase font-medium">
+          <span className="text-[var(--bo-text-faint)] text-[10px] tracking-[0.3em] uppercase font-medium">
             {title}
           </span>
           {hint && <p className="mt-1 text-[11px] text-foreground/35 leading-snug">{hint}</p>}
@@ -728,7 +728,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                   {stats.upcoming.map((p) => (
                     <div key={p.id} className="flex items-center justify-between py-2.5">
                       <div className="min-w-0">
-                        <p className="text-foreground/65 text-sm truncate">{p.name}</p>
+                        <p className="text-[var(--bo-text-muted)] text-sm truncate">{p.name}</p>
                         <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
                       </div>
                       <div className="text-right shrink-0 ml-3">
@@ -795,7 +795,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                     return (
                       <div key={row.label}>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-foreground/55 text-xs truncate max-w-[45%]">
+                          <span className="text-[var(--bo-text-faint)] text-xs truncate max-w-[45%]">
                             {row.label}
                           </span>
                           <div className="flex items-center gap-3 shrink-0">
@@ -877,7 +877,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               return (
                 <div key={row.label}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-foreground/55 text-xs truncate max-w-[70%]">
+                    <span className="text-[var(--bo-text-faint)] text-xs truncate max-w-[70%]">
                       {row.label}
                     </span>
                     <span className="text-foreground/35 text-[10px] tabular-nums shrink-0">
@@ -906,7 +906,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
             {stats.referralConvRows.map((row) => (
               <div key={row.label}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-foreground/55 text-xs truncate max-w-[55%]">
+                  <span className="text-[var(--bo-text-faint)] text-xs truncate max-w-[55%]">
                     {row.label}
                   </span>
                   <div className="flex items-center gap-3 shrink-0">

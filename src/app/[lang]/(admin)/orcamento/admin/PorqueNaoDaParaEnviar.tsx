@@ -102,7 +102,7 @@ function PorqueTrava({
       // não a meio de uma frase que esteja a escrever.
       role="status"
       aria-live="polite"
-      className="max-w-lg rounded-xl border border-[#8a2a22]/30 bg-[#8a2a22]/[0.05] px-3 py-2 text-xs leading-relaxed text-foreground/75"
+      className="max-w-lg rounded-xl border border-[#8a2a22]/30 bg-[#8a2a22]/[0.05] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
     >
       {travam.length > 0 ? (
         <>
@@ -117,7 +117,7 @@ function PorqueTrava({
                 <button
                   type="button"
                   onClick={() => onIr(f)}
-                  className="alvo-invisivel group flex w-full items-baseline gap-1.5 text-left text-foreground/75 transition-colors hover:text-foreground"
+                  className="alvo-invisivel group flex w-full items-baseline gap-1.5 text-left text-[var(--bo-tinta-72)] transition-colors hover:text-foreground"
                 >
                   <span aria-hidden="true" className="text-foreground/35">
                     ·
@@ -127,7 +127,7 @@ function PorqueTrava({
                   </span>
                   <span
                     aria-hidden="true"
-                    className="shrink-0 text-foreground/30 group-hover:text-foreground/60"
+                    className="shrink-0 text-foreground/30 group-hover:text-[var(--bo-text-muted)]"
                   >
                     →
                   </span>
@@ -135,7 +135,7 @@ function PorqueTrava({
               </li>
             ))}
           </ul>
-          <p className="mt-1.5 text-foreground/55">
+          <p className="mt-1.5 text-[var(--bo-text-faint)]">
             Toca numa linha para ir ao sítio onde se preenche.
           </p>
         </>

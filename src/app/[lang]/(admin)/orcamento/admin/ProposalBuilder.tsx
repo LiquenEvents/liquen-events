@@ -850,10 +850,10 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
     <Card>
       <div className="mb-5">
         <p className="bo-eyebrow mb-1.5">Proposta</p>
-        <h3 className="font-display text-lg leading-tight text-foreground/90">
+        <h3 className="font-display text-lg leading-tight text-[var(--bo-text)]">
           Criar e enviar proposta (PDF)
         </h3>
-        <p className="mt-1.5 text-sm leading-relaxed text-foreground/55">
+        <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-faint)]">
           Compõe as linhas, define o IVA e envia o PDF ao cliente. O que escreveres fica guardado
           sozinho — podes sair daqui e voltar mais tarde.
         </p>
@@ -922,7 +922,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           aria-label="Confirmar substituição das linhas"
           className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
         >
-          <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-foreground/80">
+          <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-[var(--bo-text)]">
             {modeloAConfirmar.pergunta}
           </span>
           {/* Cancelar não escreve NADA: fecha a pergunta e a tabela fica onde
@@ -954,7 +954,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           quer que ela estivesse a ouvir a seguir. */}
       {linhaRemovida && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
-          <span className="min-w-0 flex-1 text-xs leading-relaxed text-foreground/70">
+          <span className="min-w-0 flex-1 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
             {linhaRemovida.frase} Pode anular durante {linhaRemovida.segundos}s.
           </span>
           <button
@@ -995,7 +995,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         inexistentes.
       */}
       <div className="@container flex flex-col gap-2 mb-2">
-        <div className="hidden @min-[24rem]:flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+        <div className="hidden @min-[24rem]:flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--bo-text-faint)]">
           <span className="flex-1">Descrição</span>
           <span className="w-16 text-center">Qt.</span>
           <span className="w-24 text-right">Unit. €</span>
@@ -1067,17 +1067,17 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       {/* Totals */}
       <div className="rounded-xl bg-[var(--bo-tinta-3)] p-4 flex flex-col gap-2 mb-5">
         <div className="flex justify-between text-sm">
-          <span className="text-foreground/55">Subtotal</span>
-          <span className="text-foreground/75">{eur(subtotal)}</span>
+          <span className="text-[var(--bo-text-faint)]">Subtotal</span>
+          <span className="text-[var(--bo-tinta-72)]">{eur(subtotal)}</span>
         </div>
         <div className="flex justify-between text-sm items-center">
-          <span className="text-foreground/55 flex items-center gap-2">
+          <span className="text-[var(--bo-text-faint)] flex items-center gap-2">
             IVA
             <select
               aria-label="Taxa de IVA"
               value={vatRate}
               onChange={(e) => setVatRate(Number(e.target.value))}
-              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-foreground/70 focus:outline-none focus:border-foreground/40"
+              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/40"
             >
               <option value={0.23}>23%</option>
               <option value={0.13}>13%</option>
@@ -1085,10 +1085,10 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               <option value={0}>0%</option>
             </select>
           </span>
-          <span className="text-foreground/75">{eur(vat)}</span>
+          <span className="text-[var(--bo-tinta-72)]">{eur(vat)}</span>
         </div>
         <div className="flex justify-between text-base font-medium pt-2 border-t border-[var(--bo-hairline-strong)]">
-          <span className="text-foreground/75">Total</span>
+          <span className="text-[var(--bo-tinta-72)]">Total</span>
           <span className="text-[#4d6350] font-semibold">{eur(total)}</span>
         </div>
       </div>

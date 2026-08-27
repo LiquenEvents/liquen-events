@@ -301,7 +301,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
     `alvo-toque rounded-full px-3 py-1.5 text-xs transition-colors ${
       activo
         ? "bg-[#4d6350] text-white"
-        : "bg-[var(--bo-tinta-6)] text-foreground/60 hover:bg-[var(--bo-tinta-10)]"
+        : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-10)]"
     }`;
 
   return (
@@ -311,7 +311,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
           ← Temas
         </Button>
         <div>
-          <h2 className="font-display text-lg text-foreground/85">Rever etiquetas</h2>
+          <h2 className="font-display text-lg text-[var(--bo-text)]">Rever etiquetas</h2>
           <p className="bo-text-muted text-xs">
             {carregando ? "A procurar…" : `${total} ${total === 1 ? "foto" : "fotos"}`}
           </p>
@@ -321,7 +321,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
       {blocked && (
         <Card padding="sm" className="mb-5 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
           <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">Falta um passo de instalação</p>
-          <p className="text-sm leading-relaxed text-foreground/75">{blocked}</p>
+          <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">{blocked}</p>
         </Card>
       )}
 
@@ -516,7 +516,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
             {/* `role="status"` porque o número muda com o teclado e com o
                 Shift+clique, e quem não vê o ecrã tem de ouvir quantas leva —
                 é a única confirmação de que a selecção fez o que se queria. */}
-            <p role="status" className="text-sm text-foreground/75">
+            <p role="status" className="text-sm text-[var(--bo-tinta-72)]">
               <strong>{seleccionadas.size}</strong>{" "}
               {seleccionadas.size === 1 ? "foto escolhida" : "fotos escolhidas"}
             </p>

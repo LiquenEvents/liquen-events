@@ -609,7 +609,7 @@ export default function MaterialListas() {
                     {anular && (
                       <div
                         role="status"
-                        className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-foreground/70"
+                        className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
                       >
                         <span>{anular.texto}</span>
                         <Button size="sm" variant="ghost" onClick={anular.repor}>

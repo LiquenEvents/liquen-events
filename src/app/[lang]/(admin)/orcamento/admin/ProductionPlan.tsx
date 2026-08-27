@@ -297,7 +297,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         <p className="bo-eyebrow">Produção Decor</p>
         <div className="flex flex-wrap items-center gap-2">
           {items.length > 0 && (
-            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
+            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-faint)]">
               {items.filter((i) => i.done).length}/{items.length} do plano
             </span>
           )}
@@ -373,7 +373,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-foreground/55 text-[11px] font-medium tracking-[0.08em] uppercase">
+                  <p className="text-[var(--bo-text-faint)] text-[11px] font-medium tracking-[0.08em] uppercase">
                     {titulo}
                   </p>
                   <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5">
@@ -418,7 +418,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         </span>
                       </button>
                       <span
-                        className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
+                        className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-[var(--bo-tinta-72)]"}`}
                       >
                         {/* Sem fase não há prefixo a cortar: mostra-se inteiro. */}
                         {i.label.slice(prefixo.length)}
@@ -435,7 +435,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => removeItem(i.id)}
                         aria-label="Remover tarefa"
-                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                       >
                         ×
                       </button>
@@ -454,7 +454,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
           value={newPhase}
           onChange={(e) => setNewPhase(e.target.value)}
           aria-label="Fase"
-          className="bo-input w-auto px-2.5 py-2 text-xs text-foreground/70"
+          className="bo-input w-auto px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
         >
           {DECOR_PRODUCTION.map((p) => (
             <option key={p.key} value={p.key}>
@@ -470,7 +470,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
           }}
           placeholder="Nova tarefa (ex.: encomendar velas)"
           aria-label="Nova tarefa de produção"
-          className="bo-input min-w-[10rem] flex-1 px-2.5 py-2 text-xs text-foreground/80"
+          className="bo-input min-w-[10rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-text)]"
         />
         <Button
           size="sm"
@@ -514,7 +514,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   className="flex items-center gap-2.5 bg-[var(--bo-tinta-3)] border border-[var(--bo-hairline)] rounded-xl px-3.5 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-foreground/80 text-xs font-medium truncate">{s.name}</p>
+                    <p className="text-[var(--bo-text)] text-xs font-medium truncate">{s.name}</p>
                     <p className="text-foreground/45 text-[10px]">{s.category}</p>
                   </div>
                   <span
@@ -526,7 +526,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   >
                     {estado.label}
                   </span>
-                  <span className="text-foreground/55 text-[11px] tabular-nums shrink-0">
+                  <span className="text-[var(--bo-text-faint)] text-[11px] tabular-nums shrink-0">
                     {eur2(s.estimatedCost)}
                   </span>
                 </div>

@@ -233,7 +233,7 @@ export default function Versoes({
     >
       <h3
         id="versoes-titulo"
-        className="text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/70"
+        className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
       >
         Versões enviadas
       </h3>
@@ -241,7 +241,7 @@ export default function Versoes({
       {/* ── O que está no ecrã, comparado com a última que seguiu ─────────── */}
       {ultimoDoc && (
         <div className="mt-3 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.05] p-3">
-          <p className="text-xs font-medium text-foreground/75">
+          <p className="text-xs font-medium text-[var(--bo-tinta-72)]">
             {porEnviar.length === 0
               ? "Esta versão está igual à última enviada"
               : porEnviar.length === 1
@@ -251,7 +251,7 @@ export default function Versoes({
           {porEnviar.length > 0 && (
             <ul className="mt-2 flex flex-col gap-1">
               {porEnviar.map((m, i) => (
-                <li key={i} className="text-xs leading-relaxed text-foreground/65">
+                <li key={i} className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
                   <span className="text-foreground/40">{m.onde} · </span>
                   {m.texto}
                 </li>
@@ -268,7 +268,9 @@ export default function Versoes({
               <p className="text-[11px] font-medium tracking-[0.08em] uppercase text-foreground/50">
                 Para o email
               </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-foreground/70">{paragrafo}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                {paragrafo}
+              </p>
               <button
                 type="button"
                 onClick={() => onInserirNaMensagem(paragrafo)}
@@ -289,14 +291,14 @@ export default function Versoes({
           return (
             <li key={v.id} className="rounded-xl border border-[var(--bo-hairline-strong)] p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <span className="text-xs font-medium text-foreground/80">
+                <span className="text-xs font-medium text-[var(--bo-text)]">
                   {`Versão ${numero} · ${quando(v.enviadaEm)} · ${eur(v.total)}`}
                 </span>
                 <span className="text-[11px] text-foreground/45">
                   {ESTADO[v.estado] ?? v.estado}
                 </span>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/55">{v.resumo}</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">{v.resumo}</p>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {v.mudancas.length > 1 && (
@@ -304,7 +306,7 @@ export default function Versoes({
                     type="button"
                     onClick={() => setAberta(expandida ? null : v.id)}
                     aria-expanded={expandida}
-                    className="alvo-toque text-[11px] text-foreground/55 underline underline-offset-2 hover:text-foreground/80"
+                    className="alvo-toque text-[11px] text-[var(--bo-text-faint)] underline underline-offset-2 hover:text-[var(--bo-text)]"
                   >
                     {expandida ? "Esconder o que mudou" : "Ver o que mudou"}
                   </button>
@@ -322,7 +324,7 @@ export default function Versoes({
               {expandida && (
                 <ul className="mt-2 flex flex-col gap-1 border-t border-[var(--bo-hairline-strong)] pt-2">
                   {v.mudancas.map((m, j) => (
-                    <li key={j} className="text-xs leading-relaxed text-foreground/65">
+                    <li key={j} className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
                       <span className="text-foreground/40">{m.onde} · </span>
                       {m.texto}
                     </li>

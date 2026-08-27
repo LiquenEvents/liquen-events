@@ -286,7 +286,7 @@ export default function CriarAPartirDe({
         onKeyDown={teclas}
       >
         <div className="border-b border-[var(--bo-hairline-strong)] px-5 py-4">
-          <h2 id="cad-titulo" className="font-serif text-lg text-foreground/85">
+          <h2 id="cad-titulo" className="font-serif text-lg text-[var(--bo-text)]">
             Criar a partir de…
           </h2>
           <p className="mt-1 text-xs text-foreground/50">
@@ -343,7 +343,7 @@ export default function CriarAPartirDe({
                     }`}
                   >
                     <span className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-foreground/85">
+                      <span className="text-sm font-medium text-[var(--bo-text)]">
                         {linha.tipo === "modelo" ? linha.modelo.nome : linha.proposta.clientName}
                       </span>
                       <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em]">

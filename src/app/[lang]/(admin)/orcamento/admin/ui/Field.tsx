@@ -74,7 +74,7 @@ export type FieldProps = InputFieldProps | TextareaFieldProps | SelectFieldProps
 // escrever quando lhe tocam seria movimento a fingir que houve um botão. O que
 // um campo tem é foco e contorno, e isso é estado — 120 ms.
 const CONTROL =
-  "w-full rounded-xl bg-white border text-sm text-foreground/90 placeholder:text-foreground/35 " +
+  "w-full rounded-xl bg-white border text-sm text-[var(--bo-text)] placeholder:text-foreground/35 " +
   " " +
   ESTADO +
   " focus:outline-none px-3.5 py-2.5";
@@ -82,7 +82,7 @@ const CONTROL =
 // Underline variant: transparent, unboxed, a hairline that darkens on focus.
 // `rounded-none` keeps iOS Safari from re-rounding the bare input.
 const CONTROL_UNDERLINE =
-  "w-full rounded-none bg-transparent border-0 border-b text-sm text-foreground/90 " +
+  "w-full rounded-none bg-transparent border-0 border-b text-sm text-[var(--bo-text)] " +
   "placeholder:text-foreground/30 " +
   ESTADO +
   " focus:outline-none px-0 py-2";

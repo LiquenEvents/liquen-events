@@ -123,7 +123,7 @@ export function MenuDeAccoes({
             `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
             a.destrutiva
               ? "text-[#8a3d2f] active:bg-[#8a3d2f]/[0.12]"
-              : "text-foreground/45 hover:text-foreground/70 active:bg-[var(--bo-tinta-10)]",
+              : "text-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
             // O coração deste componente: só se esconde onde há mesmo rato.
             "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
           )}
@@ -142,7 +142,7 @@ export function MenuDeAccoes({
             aria-expanded={aberto}
             onClick={() => setAberto((v) => !v)}
             className={cn(
-              `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:text-foreground/70 active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
+              `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
               // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
               // menu deixava o menu a flutuar sem nada que o segurasse.
               aberto
@@ -186,7 +186,7 @@ export function MenuDeAccoes({
                       `alvo-toque flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
                       a.destrutiva
                         ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07] active:bg-[#8a3d2f]/[0.14]"
-                        : "text-foreground/75 hover:bg-[var(--bo-tinta-6)] active:bg-[var(--bo-tinta-10)]",
+                        : "text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)] active:bg-[var(--bo-tinta-10)]",
                       primeiraDestrutiva && "mt-1 border-t border-[var(--bo-hairline)] pt-3",
                     )}
                   >

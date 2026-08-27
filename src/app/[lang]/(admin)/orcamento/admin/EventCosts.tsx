@@ -355,7 +355,7 @@ export default function EventCosts({ quote, onChange }: Props) {
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Fornecedores &amp; Custos</p>
         {items.length > 0 && (
-          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-0.5 text-[11px] tabular-nums text-foreground/55">
+          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-0.5 text-[11px] tabular-nums text-[var(--bo-text-faint)]">
             {items.length}
           </span>
         )}
@@ -417,7 +417,7 @@ export default function EventCosts({ quote, onChange }: Props) {
           moldura, os números ao centro. No computador não muda nada. */}
       <div className="mb-5 flex flex-col divide-y divide-[var(--bo-hairline)] rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] @min-[26rem]:grid @min-[26rem]:grid-cols-3 @min-[26rem]:gap-2.5 @min-[26rem]:divide-y-0 @min-[26rem]:rounded-none @min-[26rem]:border-0 @min-[26rem]:bg-transparent">
         <div className={QUADRADO}>
-          <p className={`${VALOR} text-foreground/80`}>{eur2(totals.revenueNet)}</p>
+          <p className={`${VALOR} text-[var(--bo-text)]`}>{eur2(totals.revenueNet)}</p>
           <p className={ROTULO}>Receita (s/ IVA)</p>
           <p className={NOTA}>c/ IVA {eur2(amounts.gross)}</p>
         </div>
@@ -449,7 +449,7 @@ export default function EventCosts({ quote, onChange }: Props) {
             >
               <div className="flex items-center gap-2.5">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground/80">{it.name}</p>
+                  <p className="truncate text-sm font-medium text-[var(--bo-text)]">{it.name}</p>
                   <p className="text-[11px] text-foreground/45">{it.category}</p>
                 </div>
                 {/* Parece uma pastilha de estado, mas é um botão: cada toque
@@ -489,7 +489,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(it.id)}
-                  className="alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                  className="alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-faint)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                   aria-label="Remover"
                 >
                   <svg

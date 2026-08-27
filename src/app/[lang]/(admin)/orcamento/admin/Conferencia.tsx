@@ -88,11 +88,11 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto, idiom
     >
       <h3
         id="conferencia-titulo"
-        className="text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/70"
+        className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
       >
         Conferência
       </h3>
-      <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
         {travam === 1
           ? "Uma coisa impede o envio — está em primeiro, a vermelho. O resto é para olhar."
           : travam > 1
@@ -118,10 +118,14 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto, idiom
            */
           const frase = (
             <span>
-              <span className={v.severidade === "ok" ? "text-foreground/45" : "text-foreground/75"}>
+              <span
+                className={
+                  v.severidade === "ok" ? "text-foreground/45" : "text-[var(--bo-tinta-72)]"
+                }
+              >
                 {v.titulo}
               </span>
-              {v.detalhe && <span className="text-foreground/55"> — {v.detalhe}</span>}
+              {v.detalhe && <span className="text-[var(--bo-text-faint)]"> — {v.detalhe}</span>}
               {/* O leitor de ecrã ouve a gravidade, que a cor e o símbolo só
                   dizem a quem vê. */}
               <span className="sr-only">

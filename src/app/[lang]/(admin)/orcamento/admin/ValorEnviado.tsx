@@ -105,7 +105,7 @@ export default function ValorEnviado() {
   return (
     <section className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] p-4 sm:p-5">
       <h3 className="text-sm font-medium">Pedidos com valor diferente do que foi enviado</h3>
-      <p className="mt-1.5 text-xs leading-relaxed text-foreground/60">
+      <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-text-muted)]">
         Quando uma proposta sai, o valor que vai no PDF fica guardado com ela. Isto compara esse
         valor com o «Preço final» de cada pedido e mostra os que não batem certo. Corrigir põe o
         pedido no <strong className="font-medium">valor que o casal recebeu</strong> — nunca ao
@@ -159,7 +159,7 @@ export default function ValorEnviado() {
       {divergentes && !aLer && !aCorrigir && (
         <div className="mt-4 text-xs">
           {lista.length === 0 ? (
-            <p className="text-foreground/70">
+            <p className="text-[var(--bo-tinta-72)]">
               Todos os {examinados} {examinados === 1 ? "pedido tem" : "pedidos têm"} o valor que
               saiu na proposta.{" "}
               <span className="text-foreground/50">
@@ -168,7 +168,7 @@ export default function ValorEnviado() {
             </p>
           ) : (
             <>
-              <p className="text-foreground/80">
+              <p className="text-[var(--bo-text)]">
                 <strong>
                   {lista.length} {lista.length === 1 ? "pedido" : "pedidos"}
                 </strong>{" "}
@@ -177,7 +177,7 @@ export default function ValorEnviado() {
               <ul className="mt-3 flex flex-col divide-y divide-[var(--bo-hairline)] rounded-lg border border-[var(--bo-hairline)]">
                 {lista.map((d) => (
                   <li key={d.quoteId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-3">
-                    <span className="min-w-0 flex-1 truncate font-medium text-foreground/85">
+                    <span className="min-w-0 flex-1 truncate font-medium text-[var(--bo-text)]">
                       {d.nome}
                     </span>
                     <span className="tabular-nums text-foreground/45 line-through">

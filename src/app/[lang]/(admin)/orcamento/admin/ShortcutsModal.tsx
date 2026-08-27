@@ -96,12 +96,12 @@ export default function ShortcutsModal({ open, onClose }: Props) {
             <div className="flex flex-col gap-2">
               {g.items.map((it) => (
                 <div key={it.label} className="flex items-center justify-between gap-4">
-                  <span className="text-foreground/55 text-sm">{it.label}</span>
+                  <span className="text-[var(--bo-text-faint)] text-sm">{it.label}</span>
                   <span className="flex items-center gap-1 shrink-0">
                     {it.keys.map((kk) => (
                       <kbd
                         key={kk}
-                        className="min-w-[22px] text-center text-[10px] text-foreground/55 bg-[var(--bo-tinta-6)] border border-[var(--bo-hairline-strong)] rounded px-1.5 py-1 leading-none"
+                        className="min-w-[22px] text-center text-[10px] text-[var(--bo-text-faint)] bg-[var(--bo-tinta-6)] border border-[var(--bo-hairline-strong)] rounded px-1.5 py-1 leading-none"
                       >
                         {kk}
                       </kbd>

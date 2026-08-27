@@ -55,7 +55,7 @@ export default function PorTraduzir({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3
           id="por-traduzir-titulo"
-          className="text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/70"
+          className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
         >
           Por traduzir
         </h3>
@@ -69,7 +69,7 @@ export default function PorTraduzir({
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
         {faltam.length === 1
           ? "Um campo não tem versão inglesa e vai sair em português."
           : `${faltam.length} campos não têm versão inglesa e vão sair em português.`}{" "}
@@ -86,13 +86,13 @@ export default function PorTraduzir({
             {/* O texto português à vista. Sem ele, «Serviços · linha 3» não diz
                 nada a quem não tem o documento à frente — e decidir se um campo
                 precisa de tradução é olhar para o que lá está escrito. */}
-            <span className="min-w-0 text-foreground/75">
+            <span className="min-w-0 text-[var(--bo-tinta-72)]">
               {c.texto.length > 48 ? `${c.texto.slice(0, 48)}…` : c.texto}
             </span>
             <button
               type="button"
               onClick={() => onFicarEmPortugues(c)}
-              className="alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
+              className="alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
             >
               Ficar em português
             </button>

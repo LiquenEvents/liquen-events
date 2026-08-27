@@ -251,7 +251,7 @@ export function TabelaOuCartoes<T>({
                           : { chave: c.chave, ascendente: true },
                       )
                     }
-                    className="inline-flex items-center gap-1 hover:text-foreground/70"
+                    className="inline-flex items-center gap-1 hover:text-[var(--bo-tinta-72)]"
                   >
                     {c.cabecalho}
                     <span aria-hidden className="text-[9px]">
