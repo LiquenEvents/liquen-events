@@ -47,11 +47,11 @@ const ler = (...p: string[]) =>
 const GRELHAS = [
   {
     onde: "seletor de temas (ThemePicker.tsx)",
-    fonte: ler("src", "app", "[lang]", "(site)", "orcamento", "admin", "ThemePicker.tsx"),
+    fonte: ler("src", "app", "[lang]", "(admin)", "orcamento", "admin", "ThemePicker.tsx"),
   },
   {
     onde: "grelha de fotos de um tema (Temas.tsx)",
-    fonte: ler("src", "app", "[lang]", "(site)", "orcamento", "admin", "Temas.tsx"),
+    fonte: ler("src", "app", "[lang]", "(admin)", "orcamento", "admin", "Temas.tsx"),
   },
 ];
 

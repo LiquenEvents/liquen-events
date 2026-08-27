@@ -204,6 +204,78 @@ body:has([data-orcamento-mode]) {
   --color-foreground: #2a2620;
 }
 
+/* ── AS CORES DO BACK OFFICE, NO PRIMEIRO PIXEL ─────────────────────────────
+   O `body.admin-mode` aqui em baixo faz o mesmo — e chega TARDE: a classe só
+   entra num `useEffect`, portanto o primeiro desenho sai com o creme do sítio
+   público e corrige-se à vista.
+
+   Enquanto o back office viveu dentro de `/orcamento`, isto não se notava: o
+   `data-orcamento-mode` do layout de lá já era servido pelo servidor e punha
+   uma superfície branca no primeiro pixel. Ao sair para o grupo `(admin)`
+   (achado D-01 — o menu do sítio estava MESMO montado dentro do back office),
+   deixou de haver quem o fizesse, e sem esta regra trocava-se o piscar do menu
+   por um piscar de cor. Seria o mesmo defeito com outra roupa.
+
+   `data-admin-mode` vem do `layout.tsx` do grupo, no HTML do servidor. A classe
+   `admin-mode` continua a existir e fica para o que depende mesmo de JS. */
+body:has([data-admin-mode]) {
+  --color-surface: #ffffff;
+  --color-surface-raised: #f7f7f8;
+  --color-surface-elevated: #ffffff;
+  --color-foreground: #0d0d0d;
+
+  /* ── UM RAIO PARA CONTEÚDO, OUTRO PARA ACÇÃO ─────────────────────────────
+     Eram NOVE, em 664 chamadas:
+
+         164  rounded-xl (12 px)      42  rounded (4 px)
+         157  rounded-full            8   rounded-sm (4 px)
+         140  rounded-lg (8 px)       6   rounded-none
+         84   rounded-md (6 px)       3   rounded-t-2xl
+         60   rounded-2xl (16 px)
+
+     Nove valores é o mesmo que valor nenhum: um cartão a 16, o painel ao lado
+     a 12 e o campo lá dentro a 8 não são uma hierarquia — são três pessoas a
+     escrever a mesma coisa em três dias diferentes.
+
+     A análise mediu os dois sites de referência e ambos têm DOIS: a Apple,
+     pílula de 980 px nos 33 botões e raio ZERO nos tiles e nas imagens; a
+     Pixelmatters, 8 px em cartões e imagens e 32 px (pílula) em botões e
+     navegação. A regra é a mesma nos dois — «o raio máximo está reservado ao
+     elemento clicável».
+
+     Aqui:  CONTEÚDO 8 px  ·  ACÇÃO pílula.
+
+     ── PORQUE É QUE ISTO SÃO CINCO LINHAS E NÃO 456 EDIÇÕES ────────────────
+
+     Porque no Tailwind v4 o `.rounded-lg` compila para
+     `border-radius: var(--radius-lg)` — a escala inteira passa por variáveis.
+     Redefini-las aqui, no elemento que já marca o back office, colapsa as
+     cinco escadas nas 456 chamadas SEM tocar num único ficheiro de ecrã, e
+     sem tocar no sítio público, que nunca tem este atributo.
+
+     O `rounded-full` (157) já é a pílula e fica. A acção passa a pedi-la nos
+     dois primitivos que a servem — `ui/Button.tsx` (151 botões) e
+     `ui/Segmented.tsx`.
+
+     ── E O `rounded` SECO, QUE FICA NOS 4 PX ───────────────────────────────
+
+     42 chamadas, e não sobem para 8. Fui vê-las uma a uma: são TODAS
+     miudezas com menos de 20 px de altura — as teclas de atalho («⌘K»), as
+     pegas de arrasto de 4×4, as etiquetas de 9 px em maiúsculas, as barras do
+     esqueleto, as miniaturas de 9×9. A 8 px, uma etiqueta de 16 px de altura
+     fica quase pílula e uma miniatura de 9 px fica quase círculo — o raio
+     deixa de ser proporção e passa a ser deformação.
+
+     É um terceiro valor e digo-o: a própria Apple, além da pílula, tem «5, 6,
+     8 e 14 px em casos pontuais». A regra que este bloco fecha é a das
+     SUPERFÍCIES e dos CONTROLOS; a miudez sub-20 px é outra escala. */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
+}
+
 /* Back office: clean white surface. */
 body.admin-mode {
   --color-surface: #ffffff;
@@ -285,15 +357,49 @@ body.admin-mode {
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
   --bo-control-border: rgba(13, 13, 13, 0.55);
 
-  /* ── Rounded radii — chips → controls → cards (rounded-lg/xl/2xl) ── */
-  --bo-radius-sm: 0.625rem; /* 10px — inner chips / pills */
-  --bo-radius: 0.75rem; /* 12px — inputs, buttons, segmented */
-  --bo-radius-lg: 1rem; /* 16px — cards & panels */
+  /* ── O MESMO RAIO, PEDIDO POR TRÊS NOMES ────────────────────────────────
+     Eram 10, 12 e 16 px — «chips», «controlos», «cartões». Três degraus para
+     uma diferença que ninguém consegue apontar num ecrã de telemóvel.
+     Passam a valer os mesmos 8 px que a escala do Tailwind (ver o bloco em
+     `body:has([data-admin-mode])`). Os nomes ficam porque há ~20 sítios que
+     os pedem, e trocá-los era ruído sem ganho — mas já não escondem três
+     valores. */
+  --bo-radius-sm: 0.5rem;
+  --bo-radius: 0.5rem;
+  --bo-radius-lg: 0.5rem;
 
-  /* ── Soft shadows ── */
-  --bo-shadow-sm: 0 1px 2px rgba(13, 13, 13, 0.04); /* resting surfaces */
-  --bo-shadow:
-    0 1px 3px rgba(13, 13, 13, 0.05), 0 8px 24px -14px rgba(13, 13, 13, 0.09); /* elevated */
+  /* ── DUAS SOMBRAS, E NENHUMA DELAS NO CONTEÚDO ───────────────────────────
+     Eram dezasseis. Um censo ao back office contou **90 sombras** em **16
+     valores distintos** — quatro escadas do Tailwind (`sm`/`md`/`lg`/`xl`/
+     `2xl`), sete sombras escritas à mão entre parênteses rectos, e dois destes
+     tokens.
+
+     A análise à apple.com e à pixelmatters.com mediu, nos dois sites, o mesmo
+     número: **zero** `box-shadow` no conteúdo. A elevação faz-se A MUDAR A COR
+     DA SUPERFÍCIE — #F5F5F7 → #FFFFFF na Apple, #000 → #141414 → #1F1F1F na
+     Pixelmatters. A sombra fica reservada ao que está mesmo POR CIMA da
+     página: um diálogo, um menu suspenso, um aviso, um cartão a ser arrastado.
+
+     Fica isso, e só isso:
+
+       SUSPENSA  o que flutua e volta a fechar — menus, avisos, barras coladas,
+                 o cartão em arrasto. Perto, curta, ainda ligada à página.
+       MODAL     o que TAPA a página — diálogos e folhas. Mais longe e mais
+                 espalhada, porque é isso que diz «isto está à frente de tudo».
+
+     Sem sombra nenhuma no conteúdo. Um cartão distingue-se do que está por
+     baixo por ser branco sobre o cinzento da página, mais um fio de moldura —
+     que é o que a `.bo-card` aqui em baixo passa a fazer.
+
+     Porque é que isto SE VÊ e a escada da letra não se via: uma sombra de
+     `0 1px 2px rgba(…,0.04)` num ecrã de telemóvel ao sol é indistinguível de
+     não haver sombra — pagava-se o desenho e não se recebia nada. Noventa
+     vezes. O que se vê é a página deixar de ser um mar de caixas todas ao
+     mesmo nível e passar a ter dois: o chão, e o que está em cima dele. */
+  --bo-sombra-suspensa:
+    0 4px 12px -2px rgba(13, 13, 13, 0.1), 0 2px 4px -2px rgba(13, 13, 13, 0.06);
+  --bo-sombra-modal:
+    0 24px 48px -12px rgba(13, 13, 13, 0.18), 0 8px 16px -8px rgba(13, 13, 13, 0.1);
 
   /* ── Single accent: Líquen moss ── */
   --bo-accent: #4c6350; /* moss-dark — primary actions / active states */
@@ -1851,7 +1957,105 @@ body[data-menu-open] .whatsapp-fixed {
      transform afterwards. A persistent transform creates a containing block
      and would break the position:fixed detail drawer nested inside (it would
      anchor to the padded view wrapper instead of the viewport on mobile). */
-  animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+
+  /* ── 240 ms E A CURVA DE QUEM APRESENTA ──────────────────────────────────
+     Eram 0,4 s com `cubic-bezier(0.16, 1, 0.3, 1)`.
+
+     A análise de craft escreve, sobre esta casa, «06 · Estados em 200–320 ms —
+     estado actual: trocas de secção SEM TRANSIÇÃO». Sobre este ponto está
+     errada, e MEDIDO no browser ao trocar de Pedidos para Propostas:
+
+         animationName   view-in
+         duration        0.4s
+         transform       translateY(3.39px) aos 60 ms
+         opacity         0.577 aos 60 ms
+
+     Havia transição, corria, e via-se. O que estava desalinhado era o número.
+
+     Regra 1 da análise: há DUAS velocidades e só duas — 200 a 320 ms para
+     estados, 600 a 1500 ms para apresentações. «Se uma animação hesitar entre
+     as duas, está no sítio errado.» Os 400 ms hesitavam: longos de mais para
+     um estado, curtos de mais para uma apresentação.
+
+     Regra 2: a curva diz quem começou o movimento. Isto é o sistema a
+     apresentar um ecrã, portanto SÓ DESACELERA — a mesma
+     `cubic-bezier(0, 0, 0.2, 1)` da `.bo-entrada`. A anterior
+     (`0.16, 1, 0.3, 1`) é um travão muito mais violento: chega a 85% da
+     distância no primeiro quinto do tempo, o que a faz ler como um salto
+     seguido de uma espera.
+
+     240 ms, o mesmo número da `.bo-entrada`: dentro da banda dos estados, e um
+     só número para o back office inteiro em vez de dois parecidos.
+
+     Os 8 px ficam. A análise reserva 32 px para uma PÁGINA inteira a
+     apresentar-se; aqui o cromado não sai do sítio — muda o conteúdo dentro
+     dele —, e 8 px é a distância certa para dizer «isto é outro ecrã» sem o
+     atirar de longe. */
+  animation: view-in 240ms cubic-bezier(0, 0, 0.2, 1) backwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O QUE APARECE, APARECE DE ALGUM SÍTIO — QUATRO PÍXEIS
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela, a olhar para o back office: «em termos de design e animações
+   ou seja coisas a olho nu não vi mesmo diferenças nenhumas».
+
+   O CENSO, no dia em que isto se escreveu. Contei os sinais de entrada — uma
+   deslocação, uma opacidade a subir, uma transição à montagem — nos nove
+   sítios do back office que APARECEM por cima da página:
+
+       MenuDeAccoes · Ajuda · FolhaOuDialogo · MoreMenu · ModelosParciais
+       CommandPalette · GuardarTudo · RichEmailEditor · Toast
+
+   Oito dos nove não tinham nenhum: piscavam para lá de existir. O nono (o
+   Toast) deslocava-se 12 px.
+
+   A análise à apple.com e à pixelmatters.com mede a regra e mede a distância:
+
+       um item de menu       4 px
+       um aviso              8 px
+       uma página inteira   32 px
+
+   «O movimento serve para indicar direcção e origem, não para chamar
+   atenção.» E a curva não é qualquer uma: quando é o SISTEMA que apresenta —
+   que é o caso de tudo o que está nesta lista — a curva só desacelera,
+   `cubic-bezier(0, 0, 0.2, 1)`. O elemento entra em velocidade e assenta,
+   como se tivesse peso. Nos dois sites, ZERO curvas com salto ou recuo.
+
+   ── PORQUE É QUE ISTO NÃO ATRASA NADA ────────────────────────────────────
+
+   Regra dela: «nenhuma animação pode atrasar uma tarefa». Estes 240 ms não
+   atrasam: o elemento está no sítio e clicável desde o primeiro fotograma —
+   só chega lá com quatro píxeis de deslocação e a opacidade a subir. Não há
+   `animation-fill-mode`, portanto no fim a animação larga o elemento e não
+   fica a pesar sobre nada — nem sobre o `transform` que a folha do telemóvel
+   usa para o arrasto.
+
+   Só `transform` e `opacity`, que é o que o telemóvel dela consegue compor a
+   60 fps sem tocar no layout. E `prefers-reduced-motion` desliga tudo. */
+@keyframes bo-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(var(--bo-entrada-y, -4px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.bo-entrada {
+  animation: bo-entrada 240ms cubic-bezier(0, 0, 0.2, 1);
+}
+/* A folha do telemóvel sobe, porque é de baixo que ela vem. Oito e não quatro:
+   é a distância de um aviso, e a folha é maior do que um menu. */
+.bo-entrada-folha {
+  --bo-entrada-y: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-entrada {
+    animation: none;
+  }
 }
 
 /* ── Back-office: shared component primitives ──
@@ -1863,7 +2067,8 @@ body[data-menu-open] .whatsapp-fixed {
   border: 1px solid var(--bo-hairline, rgba(42, 38, 32, 0.08));
   /* Roomier corners (rounded-2xl) — the calm container the redesign leans on. */
   border-radius: var(--bo-radius-lg, 1rem);
-  box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
+  /* Sem sombra: o branco sobre o cinzento da página mais o fio da moldura já
+     dizem que isto está em cima. Ver os dois tokens de sombra lá em cima. */
 }
 /* A LARGURA POR OMISSÃO DE UM CAMPO, E SÓ ELA, VIVE NUMA CAMADA.
    ─────────────────────────────────────────────────────────────────────────
@@ -1899,7 +2104,8 @@ body[data-menu-open] .whatsapp-fixed {
   /* ≥3:1 non-text contrast so the field boundary is identifiable (WCAG 1.4.11). */
   border: 1px solid var(--bo-control-border, rgba(42, 38, 32, 0.5));
   border-radius: var(--bo-radius, 0.75rem);
-  box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
+  /* Sem sombra: a moldura a 3:1 aqui em cima é o que identifica o campo
+     (WCAG 1.4.11), e era ela que já estava a fazer o trabalho todo. */
   /* Keep the focus transition to border only: the global :focus-visible moss
      ring stays the keyboard focus indicator (not overridden here). */
   transition: border-color 0.2s var(--ease-out);

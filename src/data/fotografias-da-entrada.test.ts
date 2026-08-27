@@ -7,7 +7,7 @@ import { GALLERY_WIDTHS } from "@/app/[lang]/(site)/galeria/gallery-image-loader
 import {
   ESCADA_FAIXA,
   ESCADA_PAINEL,
-} from "@/app/[lang]/(site)/orcamento/admin/EntradaComFotografia";
+} from "@/app/[lang]/(admin)/orcamento/admin/EntradaComFotografia";
 
 const ROOT = path.join(__dirname, "..", "..");
 const BLUR_MAP: Record<string, string> = JSON.parse(

@@ -1,5 +1,5 @@
 import type { ActivityEntry, MotivoDeRecusa, Quote, QuoteStatus } from "./types";
-import { parseMoney } from "@/app/[lang]/(site)/orcamento/admin/util";
+import { parseMoney } from "@/app/[lang]/(admin)/orcamento/admin/util";
 import { NOME_DO_MOTIVO } from "./analise-de-propostas";
 
 /**
