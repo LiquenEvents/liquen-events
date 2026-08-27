@@ -1656,7 +1656,7 @@ export default function Temas() {
                       do que o vizinho e a grelha perdia a linha de base. Ao
                       fim de duas linhas ainda pode cortar — mas aí já se leu o
                       que distingue. */}
-                  <p className="font-display line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-foreground/85">
+                  <p className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-foreground/85">
                     {t.name}
                   </p>
                   {/* ══════════════════════════════════════════════════════

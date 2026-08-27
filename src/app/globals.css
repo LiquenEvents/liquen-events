@@ -445,16 +445,35 @@ body.admin-mode {
   --bo-lh-caption: 1.35;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
-  /* Calm "ChatGPT-app" look: the back office uses one clean humanist sans
-     (Inter, already loaded via next/font) for BOTH working text and headings.
-     Redefining --font-playfair INSIDE .admin-mode means the `font-display`
-     class and any inline `var(--font-playfair)` resolve to Inter too, so the
-     display titles read as a quiet modern sans instead of a serif or the old
-     technical grotesque — the public marketing site (outside .admin-mode)
-     keeps Playfair/Inter untouched. */
-  --font-playfair:
-    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* ── A LETRA DA CASA VOLTA AOS TÍTULOS ────────────────────────────────
+     Aqui estavam três linhas a redefinir `--font-playfair` para o Inter DENTRO
+     do back office, com a justificação de dar um ar «calm ChatGPT-app»: uma só
+     sans humanista para o texto de trabalho E para os títulos.
+
+     A intenção era boa e o efeito foi outro. Palavras dela, a olhar para o
+     deploy verdadeiro: «o back office está com a mesma estrutura, não me diz
+     nada». Uma das razões é esta linha. Os 38 sítios que pedem a letra de
+     display — os títulos de página, o nome do casal, os números do dinheiro —
+     pediam-na e recebiam Inter. O back office ficou calmo e ficou sem cara
+     nenhuma: exactamente a mesma letra do resto da interface, do rótulo de
+     11 px ao número de 48.
+
+     O site público sempre teve o Playfair nos títulos. A ferramenta com que ela
+     trabalha o dia inteiro é da mesma casa, e não havia razão para ser a única
+     página da Líquen sem a letra da Líquen.
+
+     ── O QUE ISTO **NÃO** FAZ ──────────────────────────────────────────────
+     O texto de trabalho continua todo em Inter — a `font-family` da raiz, aqui
+     mesmo por baixo, não se toca. O Playfair volta SÓ onde alguém pediu
+     `font-display` ou escreveu `var(--font-playfair)`, e esses 38 sítios são
+     todos títulos e números grandes. Foram contados um a um: o mais pequeno
+     está a 16 px, e o único que estava abaixo disso (uma descrição de 14 px na
+     Biblioteca de Temas) deixou de ser display, porque era prosa e não título.
+
+     O Playfair tem altura-de-x baixa: a 14 px lê-se como um Inter de 12,5, e o
+     chão da casa são 12. É por isso que a fronteira é 16 e está guardada por
+     teste (`letra-da-casa.test.ts`) — sem ela, o primeiro `font-display` numa
+     legenda pequena reabre o problema sem ninguém dar por isso. */
 
   /* Clean humanist sans for all working admin text; system-ui stack behind it so
      there is never a network dependency. */
@@ -1176,6 +1195,84 @@ body {
     overflow-x: hidden;
   }
 }
+/* ── A ENTRADA DA VISÃO GERAL, EM CASCATA ────────────────────────────────
+   Palavras dela sobre o deploy verdadeiro: «não me diz nada — eu gostava de o
+   levar ao nível da Apple e da Pixelmatters». Uma das coisas que faltava é
+   esta: a página aparecia inteira de uma vez, como um documento a ser
+   despejado. Um ecrã que se monta à frente de quem chega lê-se como uma coisa
+   que foi PREPARADA para ele.
+
+   ── OS NÚMEROS, E DE ONDE VÊM ─────────────────────────────────────────────
+
+   600 ms de duração: a análise separa dois regimes — 200–320 ms para ESTADOS
+   (o que responde ao dedo) e 600–1500 ms para APRESENTAÇÃO (o que o sistema
+   mostra). Isto é apresentação, e fica no degrau mais rápido dela: um painel
+   de trabalho não é um site institucional, e ela abre-o vinte vezes por dia.
+
+   70 ms entre blocos: a análise mede escalonamentos de 20–200 ms nos dois
+   sites. Com quatro blocos, 70 dá 210 ms do primeiro ao último — a cascata
+   lê-se e acaba antes de alguém ter tempo de a achar lenta.
+
+   12 px de deslocação: a regra é «distância proporcional à importância e
+   sempre pequena» (menu 4 px, aviso 8 px, página inteira 32 px). Um bloco
+   dentro de uma página não é a página: 12 px.
+
+   A curva é `cubic-bezier(0, 0, 0.2, 1)` — só desacelera. É quem APRESENTA que
+   está a mover-se, e o que apresenta nunca deve ganhar balanço nem passar do
+   sítio. Zero `bounce`, zero `overshoot`, como nos dois sites de referência.
+
+   ── O `backwards` É LOAD-BEARING, E JÁ CUSTOU UM DEFEITO ─────────────────
+   Sem ele o bloco pinta-se na posição final durante o atraso e só depois salta
+   para trás para começar — o piscar que a cascata existe para não ter. E o
+   `to` termina em `transform: none` de propósito: um `transform` que ficasse
+   pendurado criava um bloco contentor e partia qualquer `position: fixed` lá
+   dentro. Foi exactamente isso que aconteceu com o `.view-in` e a gaveta de
+   detalhe. */
+@keyframes bo-cena {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bo-cena {
+  animation: bo-cena 600ms cubic-bezier(0, 0, 0.2, 1) backwards;
+  animation-delay: calc(var(--cena, 0) * 70ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-cena {
+    animation: none;
+  }
+}
+
+/* ── E O QUE FICA ATRÁS DE UM TOQUE ──────────────────────────────────────
+   A Visão Geral tinha TREZE blocos empilhados, todos visíveis ao mesmo tempo.
+   Nove passaram para dentro de um `<details>`. Nenhum foi apagado — e é por
+   ser um `<details>` nativo que continua a abrir sem uma linha de JavaScript,
+   a responder ao teclado e a ser encontrado pelo «localizar na página» do
+   browser mesmo fechado. */
+.bo-mais > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.bo-mais > summary::-webkit-details-marker {
+  display: none;
+}
+.bo-mais > summary .bo-mais-seta {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+.bo-mais[open] > summary .bo-mais-seta {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bo-mais > summary .bo-mais-seta {
+    transition: none;
+  }
+}
+
 /* ── A ARESTA QUE DIZ «HÁ MAIS POR BAIXO» ──────────────────────────────────
    Da auditoria, F-09: «O cartão termina a meio do campo "Preço final (sem IVA)
    €", com o campo cortado pela borda e um grande vazio branco por baixo. O

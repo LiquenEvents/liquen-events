@@ -59,12 +59,27 @@ function grupoDoDinheiro(): string {
   return CODIGO.slice(i, seguinte);
 }
 
-/** Os contadores — do «Pedidos ativos» até ao fim do bloco. */
+/**
+ * Os contadores — do «Pedidos ativos» até ao vizinho seguinte.
+ *
+ * O vizinho MUDOU. Este localizador dizia «até ao `<AEsperaDeResposta`», e
+ * deixou de servir no dia em que a Visão Geral foi recomposta: o «à espera de
+ * resposta» subiu para a entrada e os contadores desceram para dentro da
+ * gaveta do «Mais do painel». O `indexOf` devolvia -1, a fatia saía ao
+ * contrário e o caso caía por uma razão que não era a que ele mede.
+ *
+ * Fica agora preso ao `<PainelEquipa`, que é quem está a seguir. E se ELE
+ * também se mexer um dia, o `expect` abaixo diz porquê em vez de deixar o
+ * teste falhar sozinho a apontar para o sítio errado.
+ */
 function grupoDosContadores(): string {
   const i = CODIGO.indexOf("Pedidos ativos");
   expect(i, "não encontrei o grupo dos contadores").toBeGreaterThan(-1);
-  const fim = CODIGO.indexOf("<AEsperaDeResposta", i);
-  expect(fim).toBeGreaterThan(i);
+  const fim = CODIGO.indexOf("<PainelEquipa", i);
+  expect(
+    fim,
+    "o vizinho a seguir aos contadores mudou — actualiza este localizador",
+  ).toBeGreaterThan(i);
   return CODIGO.slice(i, fim);
 }
 
