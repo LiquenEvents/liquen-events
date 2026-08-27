@@ -1637,10 +1637,48 @@ export default function Overview({
        * poder confiar nos valores; encolher o bloco à custa dela seria trocar
        * este problema pelo pior.
        */}
+      {/**
+       * ── UM NÚMERO MANDA, OS OUTROS CINCO ACOMPANHAM ──────────────────────
+       *
+       * A análise dos dois sites de referência traz esta regra como padrão 08:
+       * «no máximo dois CTA» — e, no ecrã de entrada, um só número herói. Aqui
+       * eram SEIS números com o mesmo peso: os três de dinheiro todos a
+       * `clamp(24px, 3vw, 34px)`, e os três de trabalho logo por baixo a
+       * `clamp(18px, 2.2vw, 26px)`. Entre 34 e 26 não há hierarquia nenhuma —
+       * há seis coisas a pedir a mesma atenção, que é o mesmo que nenhuma
+       * pedir. Palavras dela, na altura em que estes três nasceram: «Não dá
+       * para perceber qual é o dinheiro que ganhamos.» Dar-lhes nomes que ela
+       * usa resolveu METADE do problema; a outra metade é de tamanho.
+       *
+       * Três degraus, e não seis iguais:
+       *
+       *     GANHO        clamp(32px, 4.6vw, 48px)   o número da pergunta
+       *     à espera     clamp(20px, 2.4vw, 26px)   o mesmo dinheiro, por decidir
+       *     recebido     clamp(20px, 2.4vw, 26px)
+       *     contadores   clamp(18px, 1.9vw, 22px)   quantos, não quanto
+       *
+       * A 1024 o herói fica 1,85× maior do que os dois ao lado; a 390, 1,6×.
+       * Abaixo de 1,5× o olho lê «dois tamanhos parecidos» em vez de «este
+       * primeiro»; acima de 2× num telemóvel o número de seis dígitos com o
+       * separador de milhares começa a partir a linha.
+       *
+       * A coluna do herói também é mais larga (`1.4fr` contra `1fr`) a partir
+       * de 640. Não é enfeite: a 48 px, «13.257,85 €» precisa de mais largura
+       * do que «0 €», e uma célula que se ajusta ao maior conteúdo é a única
+       * que nunca quebra em duas linhas.
+       *
+       * Os contadores DESCEM (26 → 22). Se só o herói subisse, os cinco de
+       * baixo continuavam empatados entre si — o padrão pede uma FILA
+       * secundária, não um pódio com cinco segundos lugares. E são contagens
+       * de um ou dois algarismos: 22 px chega-lhes de sobra.
+       *
+       * Nada disto mexe numa conta, num rótulo ou numa frase de apoio. É só
+       * tamanho — o que muda é para onde o olho vai primeiro ao abrir o painel.
+       */}
       <div
         role="group"
         aria-label="Dinheiro — ganho, à espera e recebido"
-        className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
+        className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-[1.4fr_1fr_1fr] sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
       >
         {[
           {
@@ -1649,6 +1687,7 @@ export default function Overview({
             hint: "propostas que marcaste como ganhas, ao valor confirmado com IVA",
             delta: { now: data.wonThisMonth, prev: data.wonLastMonth },
             cor: "#3a5c39",
+            tamanho: "clamp(32px, 4.6vw, 48px)",
             go: onGoStats,
           },
           {
@@ -1656,6 +1695,7 @@ export default function Overview({
             l: "À espera",
             hint: "propostas enviadas, ainda sem resposta marcada, com IVA",
             cor: "#7c854b",
+            tamanho: "clamp(20px, 2.4vw, 26px)",
             go: () => onGo("kanban"),
           },
           {
@@ -1663,6 +1703,7 @@ export default function Overview({
             l: "Recebido",
             hint: "pagamentos que já estão dados como recebidos",
             cor: "#4d6350",
+            tamanho: "clamp(20px, 2.4vw, 26px)",
             go: onGoStats,
           },
         ].map((k) => (
@@ -1682,7 +1723,7 @@ export default function Overview({
                 className="font-bold leading-none"
                 style={{
                   fontFamily: "var(--font-playfair)",
-                  fontSize: "clamp(24px, 3vw, 34px)",
+                  fontSize: k.tamanho,
                   color: k.cor,
                 }}
               >
@@ -1752,7 +1793,7 @@ export default function Overview({
           >
             <p
               className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2.2vw, 26px)" }}
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 1.9vw, 22px)" }}
             >
               {k.v}
             </p>

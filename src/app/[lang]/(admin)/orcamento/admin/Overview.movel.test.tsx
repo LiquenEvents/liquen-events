@@ -97,8 +97,12 @@ describe("os três números do dinheiro no telemóvel", () => {
     // caixa, separados por um risco, em vez de três caixas com ar entre elas.
     expect(g.className).toMatch(/\bdivide-y\b/);
     expect(g.className).toMatch(/\bborder\b/);
-    // E a grelha de três só entra no corte `sm` da casa (640).
-    expect(g.className).toMatch(/sm:grid-cols-3/);
+    // E a grelha de três só entra no corte `sm` da casa (640). As colunas
+    // deixaram de ser iguais quando o «Ganho» passou a número herói (padrão
+    // 08) — o que este caso guarda é que SÃO TRÊS e que só existem a partir
+    // de 640, não a largura de cada uma. Essa é do
+    // `numero-heroi-da-visao-geral.test.ts`.
+    expect(g.className).toMatch(/sm:grid-cols-(3\b|\[[^\]]*fr_[^\]]*fr_[^\]]*fr\])/);
     expect(g.className).toMatch(/sm:divide-y-0/);
   });
 
