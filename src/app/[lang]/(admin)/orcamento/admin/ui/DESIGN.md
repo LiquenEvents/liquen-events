@@ -89,6 +89,16 @@ the global `:focus-visible` moss ring (so primitives don't hand-roll focus).
 
   Se um elemento deixa de flutuar num ecrã largo (a gaveta do menu, o painel de
   detalhe), a sombra tem de sair nesse ponto de quebra: `lg:shadow-none`.
+- **Números — um manda, os outros acompanham.** Num ecrã que abre com vários
+  números, UM é o herói e os restantes são fila secundária. A distância mínima
+  entre o herói e o degrau abaixo é **1,5×** em toda a gama do `clamp()`; abaixo
+  disso o olho lê «dois tamanhos parecidos» em vez de «este primeiro». Na Visão
+  Geral são três degraus — `clamp(32px, 4.6vw, 48px)` no «Ganho»,
+  `clamp(20px, 2.4vw, 26px)` nos dois de dinheiro ao lado,
+  `clamp(18px, 1.9vw, 22px)` nos contadores. A coluna do herói é mais larga
+  (`1.4fr` contra `1fr`): um número herói que parte em duas linhas deixa de o
+  ser. Guardado por `numero-heroi-da-visao-geral.test.ts` (a razão) e por
+  `e2e/numero-heroi.spec.ts` (o caber, medido num browser).
 - **Motion:** everything is gated behind `motion-safe:`; reduced-motion users
   get no press-scale, spin, or tween. Never signal state by colour alone.
 
