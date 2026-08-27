@@ -445,16 +445,35 @@ body.admin-mode {
   --bo-lh-caption: 1.35;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
-  /* Calm "ChatGPT-app" look: the back office uses one clean humanist sans
-     (Inter, already loaded via next/font) for BOTH working text and headings.
-     Redefining --font-playfair INSIDE .admin-mode means the `font-display`
-     class and any inline `var(--font-playfair)` resolve to Inter too, so the
-     display titles read as a quiet modern sans instead of a serif or the old
-     technical grotesque — the public marketing site (outside .admin-mode)
-     keeps Playfair/Inter untouched. */
-  --font-playfair:
-    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* ── A LETRA DA CASA VOLTA AOS TÍTULOS ────────────────────────────────
+     Aqui estavam três linhas a redefinir `--font-playfair` para o Inter DENTRO
+     do back office, com a justificação de dar um ar «calm ChatGPT-app»: uma só
+     sans humanista para o texto de trabalho E para os títulos.
+
+     A intenção era boa e o efeito foi outro. Palavras dela, a olhar para o
+     deploy verdadeiro: «o back office está com a mesma estrutura, não me diz
+     nada». Uma das razões é esta linha. Os 38 sítios que pedem a letra de
+     display — os títulos de página, o nome do casal, os números do dinheiro —
+     pediam-na e recebiam Inter. O back office ficou calmo e ficou sem cara
+     nenhuma: exactamente a mesma letra do resto da interface, do rótulo de
+     11 px ao número de 48.
+
+     O site público sempre teve o Playfair nos títulos. A ferramenta com que ela
+     trabalha o dia inteiro é da mesma casa, e não havia razão para ser a única
+     página da Líquen sem a letra da Líquen.
+
+     ── O QUE ISTO **NÃO** FAZ ──────────────────────────────────────────────
+     O texto de trabalho continua todo em Inter — a `font-family` da raiz, aqui
+     mesmo por baixo, não se toca. O Playfair volta SÓ onde alguém pediu
+     `font-display` ou escreveu `var(--font-playfair)`, e esses 38 sítios são
+     todos títulos e números grandes. Foram contados um a um: o mais pequeno
+     está a 16 px, e o único que estava abaixo disso (uma descrição de 14 px na
+     Biblioteca de Temas) deixou de ser display, porque era prosa e não título.
+
+     O Playfair tem altura-de-x baixa: a 14 px lê-se como um Inter de 12,5, e o
+     chão da casa são 12. É por isso que a fronteira é 16 e está guardada por
+     teste (`letra-da-casa.test.ts`) — sem ela, o primeiro `font-display` numa
+     legenda pequena reabre o problema sem ninguém dar por isso. */
 
   /* Clean humanist sans for all working admin text; system-ui stack behind it so
      there is never a network dependency. */
