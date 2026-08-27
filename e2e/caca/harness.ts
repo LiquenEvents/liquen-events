@@ -306,7 +306,29 @@ export async function entrar(page: Page): Promise<boolean> {
  * (Que os botões da gaveta fechada continuem alcançáveis por teclado é, esse
  * sim, um achado — está registado no percurso do foco, não aqui.)
  */
-export async function irPara(page: Page, rotulo: RegExp) {
+/**
+ * O NOME DO DESTINO PODE TRAZER UM DISTINTIVO ATRÁS.
+ *
+ * Na barra lateral, o «Pedidos» leva um `<span class="sr-only">, 9 por
+ * responder</span>` — de propósito: quem ouve a página tem de saber que há
+ * trabalho à espera antes de lá entrar. Só que isso entra no NOME ACESSÍVEL, e
+ * um `/^Pedidos$/` deixa de casar assim que existe um pedido por responder.
+ *
+ * Escrito assim, o passeio só passava com a lista VAZIA. Foi o que aconteceu:
+ * verde durante meses, e vermelho no dia em que outro teste da mesma passagem
+ * semeou um pedido primeiro — com uma mensagem («Não consegui chegar à vista»)
+ * que se lê como navegação partida.
+ *
+ * A tolerância pára na vírgula, e isso importa: `/^Propostas$/` continua a NÃO
+ * casar com «Propostas Aceites», que é um destino diferente.
+ */
+function comDistintivo(rotulo: RegExp): RegExp {
+  if (!rotulo.source.endsWith("$")) return rotulo;
+  return new RegExp(`${rotulo.source.slice(0, -1)}(?:,.*)?$`, rotulo.flags);
+}
+
+export async function irPara(page: Page, rotuloPedido: RegExp) {
+  const rotulo = comDistintivo(rotuloPedido);
   const largura = page.viewportSize()?.width ?? 1440;
   const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
 
@@ -375,7 +397,7 @@ export async function irPara(page: Page, rotulo: RegExp) {
     await page.waitForTimeout(250);
   }
 
-  throw new Error(`Não consegui chegar à vista ${rotulo} em ${largura}px`);
+  throw new Error(`Não consegui chegar à vista ${rotuloPedido} em ${largura}px`);
 }
 
 // ── As guardas ────────────────────────────────────────────────────────────

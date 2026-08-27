@@ -365,6 +365,29 @@ test.describe("Back office — mobile", () => {
 
     await expectErgonomiaTactil(page, "Visão Geral (inicial)");
 
+    // E OUTRA VEZ COM O «MAIS DO PAINEL» ABERTO.
+    //
+    // Nove blocos da Visão Geral vivem dentro dessa gaveta e chegam FECHADOS.
+    // O auditor deixou de os medir fechados de propósito — a razão está por
+    // extenso no `visivel()` do `ergonomia-tactil.mjs` —, e deixar a coisa
+    // assim trocava um vermelho falso por um silêncio: nove blocos que ela vê
+    // todos os dias e que nenhuma medição voltava a tocar.
+    //
+    // Abre-se pelo `<summary>`, que é como ela abre.
+    const mais = page
+      .getByRole("group")
+      .filter({ hasText: /Mais do painel/ })
+      .first();
+    // Sem `if`: há um pedido semeado, portanto a Visão Geral não é o ecrã de
+    // boas-vindas e a gaveta EXISTE. Um `if` aqui era um salto silencioso — o
+    // dia em que ela deixasse de existir, esta medição desaparecia sem ninguém
+    // dar por isso.
+    await expect(mais, "a Visão Geral já não tem a gaveta «Mais do painel»").toHaveCount(1);
+    await page.getByText("Mais do painel", { exact: true }).click();
+    await expect(mais).toHaveAttribute("open", "");
+    await expectErgonomiaTactil(page, "Visão Geral (com «Mais do painel» aberto)");
+    await page.getByText("Mais do painel", { exact: true }).click();
+
     const errorBoundary = page.getByRole("heading", { name: /Ocorreu um erro inesperado/i });
 
     for (const view of VIEWS) {

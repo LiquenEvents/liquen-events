@@ -111,6 +111,29 @@ export const AUDITOR = `(() => {
       if (cp.display === "none" || cp.visibility === "hidden") return false;
     }
     if (el.closest("[inert],[aria-hidden=true]")) return false;
+    // DENTRO DE UM \`<details>\` FECHADO.
+    //
+    // Medido no Chromium 141: um \`<button>\` dentro de um \`<details>\` FECHADO
+    // devolve \`display: inline-block\`, \`visibility: visible\` e uma caixa com
+    // tamanho e posição — como se estivesse aberto. Não é uma esquisitice: o
+    // conteúdo fechado é \`content-visibility: hidden\`, que PRESERVA o estado
+    // de layout de propósito (é o que faz abrir ser instantâneo). Nenhuma das
+    // linhas acima o apanha, porque nenhuma é falsa.
+    //
+    // Sem isto, o «Mais do painel» da Visão Geral — nove blocos que só
+    // aparecem quando ela abre a gaveta — entrava em TODAS as medições como
+    // conteúdo à vista, com posições que ninguém desenhou. Foi assim que
+    // «Pedidos ativos», invisível no ecrã, apareceu acusado de estar por baixo
+    // da barra de baixo.
+    //
+    // O \`<summary>\` continua a contar: esse vê-se fechado ou aberto, e é nele
+    // que se toca.
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      if (p.tagName === "DETAILS" && !p.open) {
+        const resumo = p.querySelector(":scope > summary");
+        if (!resumo || !resumo.contains(el)) return false;
+      }
+    }
     return true;
   }
 
