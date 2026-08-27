@@ -50,7 +50,12 @@ import {
 } from "@/lib/tempo-activo";
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
-import { guestRangeLabel, ceremonyTypeLabel, eventTypeName } from "@/lib/orcamento/data";
+import {
+  guestRangeLabel,
+  ceremonyTypeLabel,
+  spaceTypeLabel,
+  eventTypeName,
+} from "@/lib/orcamento/data";
 import { log } from "@/lib/logger";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
@@ -368,7 +373,35 @@ function initialDoc(quote: Quote): StudioDoc {
     clientNames: nomesDoCasal(quote) || (quote.name ?? ""),
     eventType: eventTypeLabel(quote),
     eventDate: formatEventDate(quote.date),
-    location: quote.location ?? "",
+    /**
+     * ── O LOCAL LEVA O ESPAÇO ATRÁS ──────────────────────────────────────────
+     *
+     * «Quero que o sistema coloque logo isto no back office, nos espaços a
+     * fazer a proposta.» Fui contar o que o pedido responde contra o que a
+     * proposta recebia: das sete respostas, SEIS já chegavam sozinhas — o
+     * casal, a data, os convidados, o local, a cerimónia, e os pontos de
+     * decoração, que viram as linhas do orçamento.
+     *
+     * Faltava o ESPAÇO. O casal responde «Exterior», «Interior» ou «Interior e
+     * exterior», e essa resposta morria no pedido: quem escrevia a proposta
+     * tinha de voltar lá para se lembrar se era ao ar livre.
+     *
+     * Vai junto ao local, com um ponto a separar — «Setúbal Alentejo ·
+     * Exterior» — e não num campo novo. Uma linha a mais no documento do casal
+     * é uma decisão sobre o papel que sai; um local mais completo é a mesma
+     * linha a dizer mais. E o casal, ao ler, vê que percebemos o que respondeu.
+     *
+     * Como tudo o resto aqui, é uma SEMENTE: o campo continua editável, e o
+     * local da proposta acaba quase sempre mais preciso do que o do pedido
+     * («Herdade da Malhadinha» em vez de «Alentejo»). Quando ela o reescrever,
+     * reescreve a linha inteira, que é o que já fazia.
+     *
+     * Sem espaço respondido, fica só o local — nunca um ponto pendurado no fim.
+     */
+    location: [quote.location ?? "", spaceTypeLabel(quote.spaceType)]
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .join(" · "),
     // Sem número exacto, vale a ordem de grandeza que o casal deu ("100 a 150").
     // Escrever "0 pax" era pior do que não escrever nada.
     guests: quote.guests ? `${quote.guests} pax` : guestRangeLabel(quote.guestsRange),
