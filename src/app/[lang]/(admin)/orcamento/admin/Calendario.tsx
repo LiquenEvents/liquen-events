@@ -543,7 +543,11 @@ export default function Calendario({ quotes, onOpen }: Props) {
             seis filetes de 1 px — 41 px por dia, três abaixo do mínimo de 44.
             Com 12 px sobram 319, e cada dia fica com 44. É a diferença entre
             acertar no dia certo e abrir o do lado. */}
-        <Card padding="lg" className="!p-3 sm:!p-8">
+        <Card
+          padding="lg"
+          style={{ "--cena": 0 } as React.CSSProperties}
+          className="bo-cena !p-3 sm:!p-8"
+        >
           {/* ── Header: month title + quiet controls on one row ──────────────
               …e em DUAS quando não cabem numa. MEDIDO num telemóvel de 390×844:
               «Agosto 2026» mostrava 90 px dos 103 de que precisa, e lia-se
@@ -560,7 +564,16 @@ export default function Calendario({ quotes, onOpen }: Props) {
               título encolhia até 0 em vez de empurrar os botões para baixo. */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="min-w-[12rem]">
-              <h3 className="font-display text-foreground/90 text-xl sm:text-2xl leading-tight">
+              {/* O mês é o TÍTULO deste ecrã, e estava a 20/24 px — o mesmo
+                  degrau de um subtítulo qualquer. A grelha por baixo é o herói,
+                  mas quem diz DE QUE mês ela é, é esta linha; num ecrã que se
+                  navega mês a mês, saber onde se está não pode ser letra
+                  miudinha. Sobe para o degrau de display da casa, na letra da
+                  casa. */}
+              <h3
+                className="font-display leading-tight text-foreground/90"
+                style={{ fontSize: "clamp(26px, 3.5vw, 36px)" }}
+              >
                 {MONTHS[month]} {year}
               </h3>
               <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1.5">
@@ -945,7 +958,11 @@ export default function Calendario({ quotes, onOpen }: Props) {
         </Card>
 
         {/* Upcoming */}
-        <Card padding="none" className="overflow-hidden self-start">
+        <Card
+          padding="none"
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className="bo-cena overflow-hidden self-start"
+        >
           <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
             Próximos eventos
           </p>
