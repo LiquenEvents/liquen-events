@@ -3,6 +3,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
+ * O SELECTOR COM QUE O BACK OFFICE SE PINTA.
+ *
+ * Deixou de ser só `body.admin-mode`: a classe entra num efeito e chegava
+ * tarde de mais para o primeiro pixel. Agora é
+ * `body:is(.admin-mode, :has([data-admin-mode]))`, com o atributo servido pelo
+ * `layout.tsx` do grupo `(admin)`. A razão por extenso está no `globals.css`.
+ */
+const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * O CONTRASTE DO TEXTO DO BACK OFFICE — a conta, e não a impressão
  * ═══════════════════════════════════════════════════════════════════════════
@@ -139,8 +149,8 @@ function lerCor(valor: string): { cor: RGB; alpha: number } {
  * mexer-lhes aqui não deixa nada por pintar.)
  */
 function blocoAdminMode(): string {
-  const inicio = CSS.indexOf("body.admin-mode {");
-  expect(inicio, "desapareceu o bloco `body.admin-mode` do globals.css").toBeGreaterThan(-1);
+  const inicio = CSS.indexOf(`${SELECTOR_ADMIN} {`);
+  expect(inicio, `desapareceu o bloco \`${SELECTOR_ADMIN}\` do globals.css`).toBeGreaterThan(-1);
   const fim = CSS.indexOf("\n}", inicio);
   return CSS.slice(inicio, fim);
 }
@@ -148,7 +158,7 @@ function blocoAdminMode(): string {
 /** Um token declarado no bloco do back office. */
 function token(nome: string): { cor: RGB; alpha: number } {
   const m = blocoAdminMode().match(new RegExp(`${nome}\\s*:\\s*([^;]+);`));
-  expect(m, `o token ${nome} desapareceu de body.admin-mode`).not.toBeNull();
+  expect(m, `o token ${nome} desapareceu de ${SELECTOR_ADMIN}`).not.toBeNull();
   return lerCor(m![1]);
 }
 

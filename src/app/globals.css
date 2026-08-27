@@ -205,9 +205,8 @@ body:has([data-orcamento-mode]) {
 }
 
 /* ── AS CORES DO BACK OFFICE, NO PRIMEIRO PIXEL ─────────────────────────────
-   O `body.admin-mode` aqui em baixo faz o mesmo — e chega TARDE: a classe só
-   entra num `useEffect`, portanto o primeiro desenho sai com o creme do sítio
-   público e corrige-se à vista.
+   A classe `admin-mode` chega TARDE: entra num `useEffect`, portanto o
+   primeiro desenho sairia com o creme do sítio público e corrigia-se à vista.
 
    Enquanto o back office viveu dentro de `/orcamento`, isto não se notava: o
    `data-orcamento-mode` do layout de lá já era servido pelo servidor e punha
@@ -216,8 +215,22 @@ body:has([data-orcamento-mode]) {
    deixou de haver quem o fizesse, e sem esta regra trocava-se o piscar do menu
    por um piscar de cor. Seria o mesmo defeito com outra roupa.
 
-   `data-admin-mode` vem do `layout.tsx` do grupo, no HTML do servidor. A classe
-   `admin-mode` continua a existir e fica para o que depende mesmo de JS. */
+   `data-admin-mode` vem do `layout.tsx` do grupo, no HTML do servidor.
+
+   ── E O MESMO VALE PARA TUDO O RESTO ──────────────────────────────────────
+   As cores foram as primeiras a ser resgatadas, mas ficaram trinta regras
+   presas em `body.admin-mode` — e com elas a LETRA. A que mais se via: o back
+   office pede `uppercase` em ~15 ecrãs e é este ficheiro que o desliga; até a
+   classe chegar, a barra de baixo do telemóvel dizia «VISÃO GERAL PEDIDOS
+   FAZER PROPOSTA» em maiúsculas espaçadas, e depois encolhia para minúsculas.
+   Num iPhone com 4G fraco, entre o HTML e a hidratação vão segundos: era esse
+   o «piscar inicial».
+
+   Por isso todas passaram a `body:is(.admin-mode, :has([data-admin-mode]))`.
+   Os dois braços têm a mesma especificidade que `body.admin-mode` tinha, por
+   isso nada na cascata muda de lugar; o que muda é a altura a que chegam. A
+   classe fica para o que depende mesmo de JS — e como marca de que o painel
+   hidratou. */
 body:has([data-admin-mode]) {
   --color-surface: #ffffff;
   --color-surface-raised: #f7f7f8;
@@ -277,7 +290,7 @@ body:has([data-admin-mode]) {
 }
 
 /* Back office: clean white surface. */
-body.admin-mode {
+body:is(.admin-mode, :has([data-admin-mode])) {
   --color-surface: #ffffff;
   --color-surface-raised: #f7f7f8;
   --color-surface-elevated: #ffffff;
@@ -544,8 +557,8 @@ body.admin-mode {
 }
 
 /* Display / working headings: tighter tracking for the calm modern-sans look. */
-body.admin-mode :is(h1, h2, h3, h4),
-body.admin-mode .font-display {
+body:is(.admin-mode, :has([data-admin-mode])) :is(h1, h2, h3, h4),
+body:is(.admin-mode, :has([data-admin-mode])) .font-display {
   letter-spacing: -0.02em;
 }
 
@@ -557,9 +570,9 @@ body.admin-mode .font-display {
    marketing site keeps its editorial caps. Every admin screen now reads in
    calm sentence case with quiet spacing, like a modern product app (ChatGPT/
    Linear). Data fields keep their true case via the block below. */
-body.admin-mode .uppercase,
-body.admin-mode .bo-eyebrow,
-body.admin-mode .eyebrow {
+body:is(.admin-mode, :has([data-admin-mode])) .uppercase,
+body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow,
+body:is(.admin-mode, :has([data-admin-mode])) .eyebrow {
   text-transform: none;
   letter-spacing: 0.005em;
 }
@@ -568,34 +581,34 @@ body.admin-mode .eyebrow {
    phone number or a reference id must never be transformed. (Now that the
    interface is sentence case this is mostly redundant, but it also resets the
    letter-spacing on typed fields, so it stays.) */
-body.admin-mode input,
-body.admin-mode textarea,
-body.admin-mode select,
-body.admin-mode [contenteditable],
-body.admin-mode .bo-input,
-body.admin-mode a[href^="mailto:"],
-body.admin-mode a[href^="tel:"],
-body.admin-mode .font-mono,
-body.admin-mode [data-keep-case] {
+body:is(.admin-mode, :has([data-admin-mode])) input,
+body:is(.admin-mode, :has([data-admin-mode])) textarea,
+body:is(.admin-mode, :has([data-admin-mode])) select,
+body:is(.admin-mode, :has([data-admin-mode])) [contenteditable],
+body:is(.admin-mode, :has([data-admin-mode])) .bo-input,
+body:is(.admin-mode, :has([data-admin-mode])) a[href^="mailto:"],
+body:is(.admin-mode, :has([data-admin-mode])) a[href^="tel:"],
+body:is(.admin-mode, :has([data-admin-mode])) .font-mono,
+body:is(.admin-mode, :has([data-admin-mode])) [data-keep-case] {
   text-transform: none;
   letter-spacing: normal;
 }
 
 /* Moss is the single admin accent — even the text selection picks it up instead
    of the site-wide gold. */
-body.admin-mode ::selection {
+body:is(.admin-mode, :has([data-admin-mode])) ::selection {
   background: rgba(99, 122, 95, 0.22);
   color: #2a2620;
 }
 /* Matching utilities so the tokens can be applied like the Tailwind text-* class
    they replace. */
-body.admin-mode .bo-text {
+body:is(.admin-mode, :has([data-admin-mode])) .bo-text {
   color: var(--bo-text);
 }
-body.admin-mode .bo-text-muted {
+body:is(.admin-mode, :has([data-admin-mode])) .bo-text-muted {
   color: var(--bo-text-muted);
 }
-body.admin-mode .bo-text-faint {
+body:is(.admin-mode, :has([data-admin-mode])) .bo-text-faint {
   color: var(--bo-text-faint);
 }
 
@@ -655,7 +668,8 @@ body.admin-mode .bo-text-faint {
    `@layer`, de propósito — os utilitários do Tailwind vivem numa camada, e
    sem isto o `text-[9px]` da chamada ganhava outra vez. */
 @media (max-width: 1023.98px) {
-  body.admin-mode :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[7px\]) {
+  body:is(.admin-mode, :has([data-admin-mode]))
+    :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[7px\]) {
     font-size: var(--bo-fs-caption);
     letter-spacing: 0.01em;
   }
@@ -664,7 +678,7 @@ body.admin-mode .bo-text-faint {
      e é ela que titula QUASE TODAS as secções do painel («Agenda · próximos»,
      «Precisam de atenção», «Fases dos pedidos»). Ficavam nove títulos por
      baixo do chão num ecrã onde os títulos são o mapa. */
-  body.admin-mode .bo-eyebrow {
+  body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow {
     font-size: var(--bo-fs-caption);
     letter-spacing: 0.04em;
   }
@@ -714,7 +728,7 @@ body.admin-mode .bo-text-faint {
      E continua a ganhar à HERANÇA, que é o que se quer: uma declaração, seja de
      que camada for, ganha sempre ao valor herdado. */
   @layer utilities {
-    :where(body.admin-mode)
+    :where(body:is(.admin-mode, :has([data-admin-mode])))
       :where(.text-\[7px\], .text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
       line-height: var(--bo-lh-caption);
     }
@@ -754,7 +768,7 @@ body.admin-mode .bo-text-faint {
    O `letter-spacing` acompanha pela mesma geometria que está escrita acima:
    subir o corpo sem desapertar o espacejamento troca letra pequena por texto
    transbordado. */
-body.admin-mode :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
+body:is(.admin-mode, :has([data-admin-mode])) :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
   font-size: var(--bo-fs-caption);
   letter-spacing: 0.01em;
 }
@@ -800,7 +814,7 @@ body.admin-mode :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
    Fora de `@layer`, de propósito: os utilitários do Tailwind vivem numa camada,
    e sem isto o `text-foreground/40` da chamada ganhava outra vez. É a mesma
    nota que o chão da letra tem escrita. */
-body.admin-mode
+body:is(.admin-mode, :has([data-admin-mode]))
   :is(
     .text-foreground\/25,
     .text-foreground\/30,
@@ -810,7 +824,7 @@ body.admin-mode
   ) {
   color: var(--bo-text-faint);
 }
-body.admin-mode :is(.text-foreground\/50, .text-foreground\/55) {
+body:is(.admin-mode, :has([data-admin-mode])) :is(.text-foreground\/50, .text-foreground\/55) {
   color: var(--bo-text-muted);
 }
 
@@ -1840,7 +1854,7 @@ body:has([data-orcamento-mode]) .scroll-progress {
 }
 
 /* ── Back-office: full-screen tool surface (clean & minimal) ── */
-body.admin-mode nav[data-public-nav] {
+body:is(.admin-mode, :has([data-admin-mode])) nav[data-public-nav] {
   display: none !important;
 }
 /* O `padding-top: 0` do `<main>` VIVIA AQUI, e era um salto de 0,128 de CLS.
@@ -1850,19 +1864,19 @@ body.admin-mode nav[data-public-nav] {
    Passou para o `className` de cada raiz do back office (`-mt-24`), que vai no
    HTML do servidor. O que fica nesta classe é só o que NÃO mexe no layout. */
 /* Drop the film grain inside the tool for a crisper, calmer surface */
-body.admin-mode::before {
+body:is(.admin-mode, :has([data-admin-mode]))::before {
   display: none !important;
 }
 /* Scrollbars for the white admin surface */
-body.admin-mode ::-webkit-scrollbar {
+body:is(.admin-mode, :has([data-admin-mode])) ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
-body.admin-mode ::-webkit-scrollbar-thumb {
+body:is(.admin-mode, :has([data-admin-mode])) ::-webkit-scrollbar-thumb {
   background: rgba(42, 38, 32, 0.12);
   border-radius: 999px;
 }
-body.admin-mode ::-webkit-scrollbar-thumb:hover {
+body:is(.admin-mode, :has([data-admin-mode])) ::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 122, 95, 0.45);
 }
 
