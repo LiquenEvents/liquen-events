@@ -176,7 +176,7 @@ export default function CaixaInglesa({
     "aria-label": `${rotulo} (inglês)`,
     className: `${className ?? ""} ${
       desactualizada
-        ? "border-[#c0392b]/50 bg-[#c0392b]/[0.05]"
+        ? "border-[#8a2a22]/50 bg-[#8a2a22]/[0.05]"
         : porTraduzir
           ? "border-dashed border-[#c08a3e]/60 bg-[#4d6350]/[0.04]"
           : "bg-[#4d6350]/[0.04]"
@@ -210,7 +210,7 @@ export default function CaixaInglesa({
           <input {...comuns} type="text" />
         )}
         {desactualizada && (
-          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px] leading-snug text-[#a03123]">
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px] leading-snug text-[#8a2a22]">
             <span>O português mudou depois desta tradução.</span>
             {aoConfirmar && (
               <button

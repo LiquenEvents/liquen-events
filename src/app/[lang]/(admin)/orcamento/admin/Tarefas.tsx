@@ -12,7 +12,7 @@ import { metaFor } from "./status-meta";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
-  alta: { label: "Alta", color: "#b5654a" },
+  alta: { label: "Alta", color: "#8a2a22" },
   normal: { label: "Normal", color: "#9aa36a" },
   baixa: { label: "Baixa", color: "#8a8a82" },
 };
@@ -142,7 +142,7 @@ const TaskRow = memo(function TaskRow({
         </p>
         <div className="text-[10px] mt-0.5 flex items-center gap-2 flex-wrap">
           {t.dueDate && (
-            <span className={overdue ? "text-[#b5654a]" : "text-foreground/30"}>
+            <span className={overdue ? "text-[#8a2a22]" : "text-foreground/30"}>
               {overdue ? "Atrasada · " : ""}
               {new Date(t.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
                 day: "numeric",
@@ -243,7 +243,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#b5654a] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
             aria-label="Eliminar"
           >
             {CaixoteIcon}

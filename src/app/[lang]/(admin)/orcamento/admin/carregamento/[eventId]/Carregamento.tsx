@@ -487,7 +487,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                           <span
                             className={`block truncate ${carregado ? "text-foreground/45 line-through" : ""}`}
                           >
-                            {i.critical && <span className="text-[#a03a1a]">▲ </span>}
+                            {i.critical && <span className="text-[#8a2a22]">▲ </span>}
                             {i.name}
                           </span>
                           {i.note && (

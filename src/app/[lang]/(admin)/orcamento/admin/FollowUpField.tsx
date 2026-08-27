@@ -133,7 +133,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
       {value && (
         <p
           id={hintId}
-          className={`text-[10px] mt-2 ${overdue ? "text-[#b5654a]" : isToday ? "text-[#4d6350]" : "text-foreground/35"}`}
+          className={`text-[10px] mt-2 ${overdue ? "text-[#8a2a22]" : isToday ? "text-[#4d6350]" : "text-foreground/35"}`}
         >
           {overdue
             ? "Seguimento em atraso"

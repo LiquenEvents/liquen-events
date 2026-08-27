@@ -12,7 +12,7 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 const RSVP_META: Record<RsvpStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },
   confirmado: { label: "Confirmado", color: "#4d6350" },
-  recusado: { label: "Recusado", color: "#b5654a" },
+  recusado: { label: "Recusado", color: "#8a2a22" },
 };
 
 interface Props {
@@ -271,7 +271,7 @@ export default function GuestList({ quote, onChange }: Props) {
           </p>
         </div>
         <div className="rounded-xl bg-foreground/[0.04] p-3 text-center">
-          <p className="text-base font-semibold text-[#b5654a]">{totals.declined}</p>
+          <p className="text-base font-semibold text-[#8a2a22]">{totals.declined}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Recusados
           </p>

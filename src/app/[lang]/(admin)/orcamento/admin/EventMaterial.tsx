@@ -336,7 +336,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
                 {linhas.map((i) => (
                   <li key={i.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
                     {i.critical && (
-                      <span className="text-[#a03a1a]" aria-label="crítico" title="Crítico">
+                      <span className="text-[#8a2a22]" aria-label="crítico" title="Crítico">
                         ▲
                       </span>
                     )}

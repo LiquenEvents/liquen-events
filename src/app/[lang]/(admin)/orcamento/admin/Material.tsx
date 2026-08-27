@@ -747,7 +747,7 @@ function Catalogo() {
               {plano.erros > 0 && (
                 <>
                   {" · "}
-                  <strong className="text-[#a03a1a]">{plano.erros}</strong> por perceber
+                  <strong className="text-[#8a2a22]">{plano.erros}</strong> por perceber
                 </>
               )}
             </p>
@@ -861,7 +861,7 @@ function Catalogo() {
                   {i.unit ? ` ${i.unit}` : ""}
                 </span>
                 {abaixoDoMinimo(i) && (
-                  <span className="rounded-md bg-[#f6e6df] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[#a03a1a] uppercase">
+                  <span className="rounded-md bg-[#f6e6df] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[#8a2a22] uppercase">
                     Repor (mín. {i.minStock})
                   </span>
                 )}

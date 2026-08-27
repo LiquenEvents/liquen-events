@@ -149,7 +149,7 @@ function ValidadeChip({ p }: { p: Proposal }) {
         exp.tone === "expired"
           ? "bg-[#8a2a22]/10 text-[#8a2a22]"
           : exp.tone === "soon"
-            ? "bg-[#b5894a]/12 text-[#a9781f]"
+            ? "bg-[#b5894a]/12 text-[#8a6420]"
             : "bg-foreground/[0.05] text-foreground/45"
       }`}
     >
@@ -590,7 +590,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       {pending > 0 && (
         <div className="flex items-center gap-3 rounded-2xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] px-4 py-3">
           <svg
-            className="shrink-0 text-[#a9781f]"
+            className="shrink-0 text-[#8a6420]"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -603,7 +603,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4M12 16h.01" />
           </svg>
-          <p className="text-[#a9781f] text-sm leading-snug">
+          <p className="text-[#8a6420] text-sm leading-snug">
             <strong className="font-semibold">
               {pending} proposta{pending !== 1 ? "s" : ""} enviada{pending !== 1 ? "s" : ""}
             </strong>{" "}

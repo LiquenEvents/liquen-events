@@ -390,7 +390,7 @@ export default function FazerProposta({
                         <span
                           className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] uppercase ring-1 ring-inset ${
                             choque === "grave"
-                              ? "bg-[#b5654a]/15 text-[#8a4632] ring-[#b5654a]/45"
+                              ? "bg-[#8a2a22]/15 text-[#8a4632] ring-[#8a2a22]/45"
                               : "bg-[#c08a3e]/18 text-[#8a6420] ring-[#c08a3e]/45"
                           }`}
                         >

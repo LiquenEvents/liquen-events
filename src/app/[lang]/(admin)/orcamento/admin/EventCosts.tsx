@@ -372,9 +372,9 @@ export default function EventCosts({ quote, onChange }: Props) {
       {colisoes.length > 0 && (
         <div
           role="alert"
-          className="mb-5 rounded-xl border border-[#a03a1a]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-[#a03a1a]">
+          <p className="font-medium text-[#8a2a22]">
             Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: os custos mudaram noutro sítio
             entretanto.
           </p>
@@ -422,7 +422,7 @@ export default function EventCosts({ quote, onChange }: Props) {
           <p className={NOTA}>c/ IVA {eur2(amounts.gross)}</p>
         </div>
         <div className={QUADRADO}>
-          <p className={`${VALOR} text-[#a4642f]`}>{eur2(totals.actualNet)}</p>
+          <p className={`${VALOR} text-[#8a6420]`}>{eur2(totals.actualNet)}</p>
           <p className={ROTULO}>Custos (s/ IVA)</p>
           <p className={NOTA}>c/ IVA {eur2(totals.actual)}</p>
         </div>
@@ -565,7 +565,7 @@ export default function EventCosts({ quote, onChange }: Props) {
             // Sem esta linha, o formulário de quem não conseguiu ler o
             // diretório é igual ao de quem ainda não tem nenhum fornecedor
             // guardado — e o nome escrito à mão nasce solto do diretório.
-            <p className="text-[11px] text-[#a03a1a]">
+            <p className="text-[11px] text-[#8a2a22]">
               Não deu para ler o diretório de fornecedores. Podes escrever o nome à mão, ou
               atualizar a página para o voltar a tentar.
             </p>

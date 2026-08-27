@@ -12,7 +12,7 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   baixa: "#8a8a82",
   normal: "#7c854b",
-  alta: "#b5654a",
+  alta: "#8a2a22",
 };
 
 const PRIORITY_LABEL: Record<TaskPriority, string> = {

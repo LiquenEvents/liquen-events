@@ -411,7 +411,7 @@ export default function Acompanhamento({
         <Card padding="sm">
           <p className="bo-eyebrow mb-1">Prazo a acabar</p>
           <p
-            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[#b5654a]" : "text-foreground/85"}`}
+            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[#8a2a22]" : "text-foreground/85"}`}
           >
             {expirando.length}
           </p>
@@ -425,7 +425,7 @@ export default function Acompanhamento({
         <Card padding="sm" className="col-span-2 @min-[26rem]:col-span-1">
           <p className="bo-eyebrow mb-1">Seguimentos devidos</p>
           <p
-            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[#c08a3e]" : "text-foreground/85"}`}
+            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[#8a6420]" : "text-foreground/85"}`}
           >
             {devidos.length}
           </p>
@@ -606,7 +606,7 @@ function LinhaCartao({
 
   const borda =
     urgencia === "expirada"
-      ? "border-[#b5654a]/45"
+      ? "border-[#8a2a22]/45"
       : urgencia === "expira-ja"
         ? "border-[#c08a3e]/45"
         : "border-foreground/[0.08]";
@@ -635,7 +635,7 @@ function LinhaCartao({
           <span
             className={
               validade < 0
-                ? "text-[#b5654a]"
+                ? "text-[#8a2a22]"
                 : validade <= 7
                   ? "text-[#8a6420]"
                   : "text-foreground/50"

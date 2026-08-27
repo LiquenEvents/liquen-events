@@ -135,7 +135,7 @@ const KanbanCard = memo(function KanbanCard({
           <span
             className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold ${
               q.followUpAt < todayKey
-                ? "bg-[#b5654a]/15 text-[#b5654a]"
+                ? "bg-[#8a2a22]/15 text-[#8a2a22]"
                 : "bg-[#637a5f]/15 text-[#4d6350]"
             }`}
             title={q.followUpAt < todayKey ? "Seguimento em atraso" : "Seguimento hoje"}
@@ -182,7 +182,7 @@ const KanbanCard = memo(function KanbanCard({
         <div className="flex items-center gap-2">
           {q.date && (
             <span
-              className={`text-[10px] ${soon ? "text-[#b5654a] font-medium" : "text-foreground/30"}`}
+              className={`text-[10px] ${soon ? "text-[#8a2a22] font-medium" : "text-foreground/30"}`}
               title={cd ? cd.label : undefined}
             >
               {new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {

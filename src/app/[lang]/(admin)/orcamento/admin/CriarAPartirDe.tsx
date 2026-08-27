@@ -312,7 +312,7 @@ export default function CriarAPartirDe({
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {aCarregar && <p className="p-4 text-sm text-foreground/50">A carregar…</p>}
           {!aCarregar && naoDeuParaLer && linhas.length === 0 && (
-            <p className="p-4 text-sm text-[#a03123]">
+            <p className="p-4 text-sm text-[#8a2a22]">
               Não deu para ler as propostas anteriores. Fecha e volta a abrir — o que já fizeste
               continua guardado.
             </p>

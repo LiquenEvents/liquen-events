@@ -342,7 +342,7 @@ export default function EditorDeEscolhas({
                     // À VISTA no telemóvel — é a regra desta casa desde o «×»
                     // das fotos: um botão que apaga não pode ser invisível e
                     // continuar a apanhar o dedo.
-                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-foreground/55 transition-colors hover:bg-[#c0392b]/10 hover:text-[#a03123] pointer-coarse:h-8 pointer-coarse:w-8"
+                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-foreground/55 transition-colors hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8"
                     onClick={() => pedirParaApagarEscolha(i)}
                   >
                     ×
@@ -375,7 +375,7 @@ export default function EditorDeEscolhas({
                     </button>
                     <button
                       type="button"
-                      className={`${BOTAO_MAGRO} border-[#c0392b]/35 text-[#a03123] hover:bg-[#c0392b]/10`}
+                      className={`${BOTAO_MAGRO} border-[#8a2a22]/35 text-[#8a2a22] hover:bg-[#8a2a22]/10`}
                       onClick={() => {
                         onChange(lista.filter((e) => e.id !== escolha.id));
                         setAApagar(null);

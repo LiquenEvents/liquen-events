@@ -24,13 +24,39 @@ From `@theme` in `globals.css`, available as Tailwind utilities:
 | `--color-cream` | `#f7f4ee` | off-white accents (not admin page bg) |
 | `--font-display` / `font-display` | Playfair | **all headings/titles** |
 
-Admin surface is **white**. Text hierarchy is expressed with foreground opacity
-(`text-foreground/90` … `/55` … `/45`) and the audited `.bo-text*` classes for
-informational text. Danger uses `#8a2a22` (a dark red that clears WCAG AA on
-white) — never plain red.
+O CHÃO do back office é `#f7f7f8`; os CARTÕES é que são brancos. É essa
+diferença que faz um cartão ler-se como estando por cima — não há sombra
+nenhuma a ajudar (ver o bloco das sombras acima).
+
+A hierarquia do texto faz-se com a opacidade da tinta (`text-foreground/90` …
+`/55` … `/45`) e com as classes `.bo-text*`, que estão auditadas.
+
+**As cores com significado, e são três.** Cada uma escolhida por medição, não
+por gosto — o número é o contraste sobre o cartão branco:
+
+| papel | cor | contraste | onde |
+| --- | --- | --- | --- |
+| perigo, erro | `#8a2a22` | 8,62 : 1 | mensagens de erro, acções destrutivas |
+| aviso, atenção | `#8a6420` | 5,35 : 1 | prazos a passar, valores fora do previsto |
+| acção, positivo | `#4d6350` | 6,53 : 1 | botões, estados activos, subidas |
+
+Nada mais tem cor. Um número não fica laranja por ser importante — fica maior,
+ou mais escuro.
+
+── E ESTA REGRA JÁ CÁ ESTAVA ESCRITA ─────────────────────────────────────
+
+Este parágrafo dizia, antes: «Danger uses `#8a2a22` — never plain red». Estava
+certo, e o back office tinha CINCO vermelhos em uso ao mesmo tempo. O mais
+usado — `#b5654a`, 101 vezes, 56 delas como texto de erro — media 4,26:1 sobre
+branco e 3,98 sobre o chão novo: abaixo do mínimo, em texto de 10 e 11 px.
+
+Uma regra escrita não é uma regra garantida. Agora há um teste que a mede a
+partir do código (`contraste-das-cores-escritas.test.ts`), e a razão de ele ser
+estático está lá explicada: o passeio de contraste que já existia só vê o que
+está no ecrã, e uma mensagem de erro só aparece quando há erro.
 
 Existing CSS classes reused: `.bo-eyebrow` (uppercase micro-heading), `.bo-card`
-language (white + hairline border + soft shadow), `.bo-input` field styling, and
+language (branco + fio de moldura, sem sombra), `.bo-input` field styling, and
 the global `:focus-visible` moss ring (so primitives don't hand-roll focus).
 
 ## Spacing & radii scale

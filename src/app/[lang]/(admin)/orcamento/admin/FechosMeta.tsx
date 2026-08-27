@@ -160,7 +160,7 @@ export default function FechosMeta() {
 
       {falhouALeitura && (
         <div className="mt-4">
-          <p className="text-xs text-[#a03123]">Não foi possível contar os casamentos fechados.</p>
+          <p className="text-xs text-[#8a2a22]">Não foi possível contar os casamentos fechados.</p>
           <button
             type="button"
             onClick={() => {
@@ -194,7 +194,7 @@ export default function FechosMeta() {
               mudar o que ela faz a seguir, por isso é a que dá nas vistas. */}
           {quantos > 0 && maisUrgente <= 2 && (
             <p
-              className="mt-2 rounded-lg bg-[#c0392b]/10 px-3 py-2 text-[12px] font-semibold text-[#a03123]"
+              className="mt-2 rounded-lg bg-[#8a2a22]/10 px-3 py-2 text-[12px] font-semibold text-[#8a2a22]"
               // Anunciado a quem não olha para aqui: é um prazo, não decoração.
               aria-live="polite"
             >
@@ -263,7 +263,7 @@ export default function FechosMeta() {
               className={`mt-4 rounded-lg px-3 py-2 text-[12px] leading-snug ${
                 desfecho.enviados > 0
                   ? "bg-[#4d6350]/10 text-[#3c5140]"
-                  : "bg-[#c0392b]/10 text-[#a03123]"
+                  : "bg-[#8a2a22]/10 text-[#8a2a22]"
               }`}
               role="status"
             >
@@ -288,7 +288,7 @@ export default function FechosMeta() {
               janela»: esse número é dinheiro que a conta da Meta já não vai
               contar, e é a prova de que a rotina falhou — não um detalhe. */}
           {perdidos.length > 0 && (
-            <p className="mt-4 text-[12px] leading-snug text-[#a03123]">
+            <p className="mt-4 text-[12px] leading-snug text-[#8a2a22]">
               {perdidos.length}{" "}
               {perdidos.length === 1
                 ? "casamento fechado já não pode ser enviado"

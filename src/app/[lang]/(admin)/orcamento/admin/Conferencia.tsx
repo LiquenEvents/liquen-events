@@ -42,7 +42,7 @@ import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
  */
 
 const MARCA: Record<Severidade, { simbolo: string; cor: string }> = {
-  erro: { simbolo: "✕", cor: "text-[#b5654a]" },
+  erro: { simbolo: "✕", cor: "text-[#8a2a22]" },
   aviso: { simbolo: "!", cor: "text-[#8a6420]" },
   ok: { simbolo: "✓", cor: "text-[#4d6350]" },
 };
@@ -80,7 +80,7 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto, idiom
       aria-labelledby="conferencia-titulo"
       className={`mt-5 rounded-2xl border p-4 ${
         travam > 0
-          ? "border-[#b5654a]/45 bg-[#b5654a]/[0.06]"
+          ? "border-[#8a2a22]/45 bg-[#8a2a22]/[0.06]"
           : reparos
             ? "border-[#c08a3e]/40 bg-[#c08a3e]/[0.05]"
             : "border-[#4d6350]/25 bg-[#4d6350]/[0.04]"

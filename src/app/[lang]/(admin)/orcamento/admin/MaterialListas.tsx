@@ -489,11 +489,11 @@ export default function MaterialListas() {
                               key={l.id}
                               className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2"
                             >
-                              <span className={item ? "" : "text-[#a03a1a]"}>
+                              <span className={item ? "" : "text-[#8a2a22]"}>
                                 {item?.name ?? "(item removido do catálogo)"}
                               </span>
                               {l.critical && (
-                                <span className="rounded bg-[#f6e6df] px-1.5 text-[10px] font-medium tracking-wide text-[#a03a1a] uppercase">
+                                <span className="rounded bg-[#f6e6df] px-1.5 text-[10px] font-medium tracking-wide text-[#8a2a22] uppercase">
                                   crítico
                                 </span>
                               )}

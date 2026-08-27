@@ -96,8 +96,8 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
   if (perdido) {
     return (
       <div className="pt-3" aria-label="Fase do pedido">
-        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#b5654a]/12 text-[#b5654a] text-[10px] tracking-[0.12em] uppercase font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#b5654a]" aria-hidden />
+        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#8a2a22]/12 text-[#8a2a22] text-[10px] tracking-[0.12em] uppercase font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#8a2a22]" aria-hidden />
           Negócio perdido
         </span>
       </div>

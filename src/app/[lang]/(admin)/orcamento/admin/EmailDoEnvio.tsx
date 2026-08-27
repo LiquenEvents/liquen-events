@@ -328,7 +328,7 @@ export default function EmailDoEnvio({
       {erro && (
         <p
           aria-live="polite"
-          className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#b5654a]/35 bg-[#b5654a]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75"
+          className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75"
         >
           <span aria-hidden="true">⚠</span>
           <span>

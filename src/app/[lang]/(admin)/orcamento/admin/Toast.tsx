@@ -111,7 +111,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 const DOT: Record<ToastKind, string> = {
   success: "#7c854b",
-  error: "#b5654a",
+  error: "#8a2a22",
   info: "#8a8a82",
 };
 

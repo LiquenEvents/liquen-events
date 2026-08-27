@@ -147,7 +147,7 @@ function Numero({
             emitido.current = leitura.valor;
             onChange(leitura.valor);
           }}
-          className={`bo-input w-24 px-2.5 py-2 text-xs${erro ? " border-[#b5654a]" : ""}`}
+          className={`bo-input w-24 px-2.5 py-2 text-xs${erro ? " border-[#8a2a22]" : ""}`}
         />
         <span className="text-[11px] text-foreground/45">{unidade}</span>
       </span>
@@ -169,7 +169,7 @@ function Numero({
        * assumido.
        */}
       {erro ? (
-        <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
+        <span id={idErro} className="text-[10px] leading-relaxed text-[#8a2a22]">
           {erro}
         </span>
       ) : (
@@ -227,11 +227,11 @@ function Texto({
           onErro(escrito.trim() ? null : "Escreve a terra de onde parte a carrinha (ex.: Évora).");
           onChange(escrito);
         }}
-        className={`bo-input w-56 px-2.5 py-2 text-xs${erro ? " border-[#b5654a]" : ""}`}
+        className={`bo-input w-56 px-2.5 py-2 text-xs${erro ? " border-[#8a2a22]" : ""}`}
       />
       {/* A mesma troca do campo de número, e pela mesma razão — ver lá. */}
       {erro ? (
-        <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
+        <span id={idErro} className="text-[10px] leading-relaxed text-[#8a2a22]">
           {erro}
         </span>
       ) : (
@@ -358,7 +358,7 @@ export default function DefinicoesProposta() {
   if (erro) {
     return (
       <Card padding="md">
-        <p className="text-xs leading-relaxed text-[#b5654a]">{erro}</p>
+        <p className="text-xs leading-relaxed text-[#8a2a22]">{erro}</p>
       </Card>
     );
   }
@@ -409,7 +409,7 @@ export default function DefinicoesProposta() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-foreground/85">Deslocação</h2>
           <span
-            className={`text-[11px] ${desactualizado ? "text-[#b5654a]" : "text-foreground/45"}`}
+            className={`text-[11px] ${desactualizado ? "text-[#8a2a22]" : "text-foreground/45"}`}
           >
             {idade(p.definidoEm.deslocacao)}
           </span>

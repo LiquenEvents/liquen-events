@@ -868,7 +868,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           <p
             className={
               estado === "so-neste-computador"
-                ? "mt-2 inline-flex rounded-full bg-[#c0392b]/12 px-2 py-0.5 text-[11px] font-semibold text-[#a03123]"
+                ? "mt-2 inline-flex rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
                 : "mt-2 text-[11px] text-foreground/35"
             }
             aria-live={estado === "so-neste-computador" ? "assertive" : "polite"}

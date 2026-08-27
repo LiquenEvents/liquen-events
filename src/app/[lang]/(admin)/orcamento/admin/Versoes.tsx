@@ -337,7 +337,7 @@ export default function Versoes({
       <p className="mt-3 text-[11px] leading-relaxed text-foreground/45">
         Repor escreve a versão antiga no rascunho — não envia nada ao cliente.
       </p>
-      {erro && <p className="mt-2 text-xs text-[#b5654a]">Alguma coisa falhou. Tenta outra vez.</p>}
+      {erro && <p className="mt-2 text-xs text-[#8a2a22]">Alguma coisa falhou. Tenta outra vez.</p>}
     </section>
   );
 }

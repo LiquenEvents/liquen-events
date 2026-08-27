@@ -975,7 +975,7 @@ export default function EmailTemplates() {
       className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
         vista === chave
           ? "bg-[#5F7C66] text-white"
-          : "bg-[#5F7C66]/10 text-[#5F7C66] hover:bg-[#5F7C66]/20"
+          : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
       }`}
     >
       {rotulo}

@@ -100,7 +100,7 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
         </Button>
       </div>
 
-      {erro && <p className="mt-2 text-[11px] leading-relaxed text-[#b5654a]">{erro}</p>}
+      {erro && <p className="mt-2 text-[11px] leading-relaxed text-[#8a2a22]">{erro}</p>}
 
       {!erro && servicos === null && (
         <p className="mt-2 text-[11px] text-foreground/40">A carregar…</p>

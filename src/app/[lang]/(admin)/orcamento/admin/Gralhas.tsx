@@ -88,7 +88,7 @@ export default function Gralhas({
                 duas à vista, «corrigir» é um botão que faz uma coisa que não
                 se viu — e num campo que vai impresso isso não chega. */}
             <span className="text-foreground/75">
-              <span className="line-through decoration-[#b5654a]/60">{g.escrita}</span>
+              <span className="line-through decoration-[#8a2a22]/60">{g.escrita}</span>
               <span aria-hidden="true" className="mx-1 text-foreground/30">
                 →
               </span>
