@@ -623,7 +623,6 @@ const MetaReceita = memo(function MetaReceita({
               <span
                 className="font-bold"
                 style={{
-                  fontFamily: "var(--font-playfair)",
                   fontSize: "clamp(18px, 2vw, 24px)",
                   color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
                 }}
@@ -954,7 +953,7 @@ function AEsperaDeResposta({
         <div className="text-right">
           <p
             className="text-[#8a6420] font-bold leading-none"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(16px, 2vw, 22px)" }}
+            style={{ fontSize: "clamp(16px, 2vw, 22px)" }}
           >
             {eur(pendurado)}
           </p>
@@ -1691,7 +1690,6 @@ export default function Overview({
               <p
                 className="text-2xl sm:text-3xl font-bold tabular-nums"
                 style={{
-                  fontFamily: "var(--font-playfair)",
                   color:
                     data.nextEventDays <= 3
                       ? "#8a2a22"
@@ -1848,7 +1846,6 @@ export default function Overview({
               <p
                 className="font-bold leading-none"
                 style={{
-                  fontFamily: "var(--font-playfair)",
                   fontSize: k.tamanho,
                   color: k.cor,
                 }}
@@ -1930,7 +1927,7 @@ export default function Overview({
             >
               <p
                 className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 1.9vw, 22px)" }}
+                style={{ fontSize: "clamp(18px, 1.9vw, 22px)" }}
               >
                 {k.v}
               </p>
@@ -2027,7 +2024,7 @@ export default function Overview({
               <div>
                 <p
                   className="text-[#4d6350] font-bold leading-none mb-1"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
+                  style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.received)}
                 </p>
@@ -2036,7 +2033,7 @@ export default function Overview({
               <div>
                 <p
                   className="text-foreground/70 font-bold leading-none mb-1"
-                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2vw, 24px)" }}
+                  style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.outstanding)}
                 </p>

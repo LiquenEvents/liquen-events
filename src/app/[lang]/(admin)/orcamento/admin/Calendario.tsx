@@ -975,7 +975,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               >
                 <div className="flex items-center gap-3">
                   <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">
-                    <p className="font-display text-[#4d6350] text-lg font-semibold leading-none">
+                    <p className="text-[#4d6350] text-lg font-semibold leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>
                     {/* O ANO, quando não é este.

@@ -501,7 +501,7 @@ export default function Kanban({
         ].map((k) => (
           <Card key={k.l} padding="sm" className="p-4 sm:p-5">
             <p
-              className="font-display font-semibold leading-none mb-2 text-foreground/85 tabular-nums"
+              className="font-semibold leading-none mb-2 text-foreground/85 tabular-nums"
               style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
             >
               {k.v}

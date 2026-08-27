@@ -593,7 +593,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         <div className="flex flex-col gap-3">
           <Card padding="sm" className="flex flex-col gap-2">
             <p
-              className="font-display leading-none tabular-nums text-[#4d6350]"
+              className="leading-none tabular-nums text-[#4d6350]"
               style={{ fontSize: "clamp(32px, 4.6vw, 48px)" }}
             >
               {eur(totalWon)}
@@ -614,7 +614,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
             ].map((k) => (
               <Card key={k.l} padding="sm" className="flex flex-col gap-1.5">
                 <p
-                  className="font-display font-semibold leading-none tabular-nums text-foreground/90"
+                  className="font-semibold leading-none tabular-nums text-foreground/90"
                   style={{ fontSize: "clamp(19px, 2vw, 22px)" }}
                 >
                   {k.v}

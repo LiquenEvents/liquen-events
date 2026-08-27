@@ -73,7 +73,6 @@ function Kpi({
       <p
         className={`font-bold leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-foreground/82"}`}
         style={{
-          fontFamily: "var(--font-playfair)",
           fontSize: small ? "clamp(18px, 1.9vw, 24px)" : "clamp(22px, 2.6vw, 34px)",
         }}
       >

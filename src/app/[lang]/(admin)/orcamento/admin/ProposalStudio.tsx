@@ -11952,7 +11952,7 @@ function PreviewSummary({
             </div>
             <div className="flex items-baseline justify-between border-t border-foreground/[0.08] pt-1.5">
               <dt className="font-medium text-foreground/70">Com IVA</dt>
-              <dd className="font-display text-base text-foreground/90">{eur(money.gross)}</dd>
+              <dd className="text-base text-foreground/90">{eur(money.gross)}</dd>
             </div>
             {/* A PERCENTAGEM É A DO DOCUMENTO. Este resumo dizia «Sinal 30%»
                 escrito à letra ao lado do valor certo: numa proposta a 40%
