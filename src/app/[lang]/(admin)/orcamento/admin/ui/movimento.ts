@@ -176,3 +176,28 @@ export const PRESSAO = "motion-safe:active:scale-[0.98] motion-safe:active:durat
  */
 export const PROGRESSO =
   "motion-safe:transition-transform motion-safe:duration-[250ms] motion-safe:ease-out";
+
+/**
+ * A MARCA QUE ANDA — o indicador deslizante do `Segmented`.
+ *
+ * Medido na Pixelmatters: numa barra de filtros o segmento activo não muda de
+ * cor de repente; há um indicador que ANDA de um segmento para o outro. E o
+ * detalhe que faz a diferença é a assimetria — lá o texto acende aos 200 ms e a
+ * pílula só chega aos 300. Separar o sinal («ouvi-te») do movimento («e agora
+ * mostro-te») é o que faz o clique parecer imediato e o movimento parecer caro,
+ * em vez de obrigar a escolher entre os dois. Com os dois tempos iguais, o
+ * clique parece lento.
+ *
+ * Aqui a assimetria é a mesma e a distância é maior: o texto entra nos 120 ms
+ * do `ESTADO` (que já tinha) e a marca nos 250 ms do degrau `elemento` — «uma
+ * coisa a mover-se», que é exactamente o que ela é. Não se importam os números
+ * da análise; importa-se a ordem, com os degraus da casa.
+ *
+ * `translate` e não `transform`: no Tailwind v4 a classe emite a propriedade
+ * autónoma, e é essa que o componente escreve no `style`. `width` acompanha
+ * porque «Todas · 2» e «Aceites» não medem o mesmo — e não custa quadro nenhum,
+ * porque a marca é `absolute` e não faz remedir ninguém à volta.
+ */
+export const MARCA_MS = DUR_ELEMENTO_MS;
+
+export const MARCA = "motion-safe:transition-[translate,width] motion-safe:duration-[250ms]";
