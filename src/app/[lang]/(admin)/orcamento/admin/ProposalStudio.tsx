@@ -2753,6 +2753,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       return;
     }
     if (nadaPorGravar()) return;
+    /**
+     * ── JÁ ESTÁ MARCADO: NÃO VOLTAR A MANDAR ─────────────────────────────
+     *
+     * Sem isto, este efeito chamava `setPorGravar(true)` a CADA passagem
+     * enquanto houvesse trabalho por gravar. O valor é sempre o mesmo, e por
+     * isso parece inofensivo — só que a lista de dependências aqui em baixo
+     * tem objectos que nascem outra vez a cada desenho (`doc`, `assetUrls`,
+     * `themeOrigins`). Efeito que corre em todos os desenhos + `setState` sem
+     * guarda = desenho → efeito → `setState` → desenho, e o React corta ao fim
+     * de algumas dezenas com «Maximum update depth exceeded».
+     *
+     * Apanhado no CI, no passeio de esforço do editor (50 linhas escritas
+     * seguidas), e antes disso na Biblioteca de Temas: dois erros de runtime
+     * por corrida, INTERMITENTES — passavam à repetição. Um erro que passa à
+     * repetição é o pior tipo: existe, faz o ecrã cair no aviso global, e
+     * ninguém o vai investigar porque «às vezes passa».
+     *
+     * `porGravarRef` é um espelho fiel do estado — sobem juntos aqui e descem
+     * juntos ao gravar — portanto perguntar-lhe é perguntar ao estado sem o
+     * pôr nas dependências.
+     */
+    if (porGravarRef.current) return;
     porGravarRef.current = true;
     setPorGravar(true);
     // A mensagem do envio conta como trabalho por gravar: sem ela nesta lista, o
