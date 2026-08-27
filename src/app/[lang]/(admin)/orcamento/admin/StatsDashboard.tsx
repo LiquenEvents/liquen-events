@@ -1,5 +1,6 @@
 "use client";
 
+import { corDeTexto } from "./status-meta";
 import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
@@ -791,7 +792,10 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                   const maxMargin = Math.max(1, ...stats.profitability.byType.map((r) => r.margin));
                   return stats.profitability.byType.map((row) => {
                     const pct = Math.round(row.marginPct);
-                    const color = pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82";
+                    // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
+                    const color = corDeTexto(
+                      pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82",
+                    );
                     return (
                       <div key={row.label}>
                         <div className="flex items-center justify-between mb-1.5">
@@ -916,7 +920,10 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                     <span
                       className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
                       style={{
-                        color: row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                        // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
+                        color: corDeTexto(
+                          row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                        ),
                       }}
                     >
                       {row.rate}%

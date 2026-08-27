@@ -8,7 +8,7 @@ import { todayKey } from "./util";
 import { Button, Card, EmptyState, Field, MenuDeAccoes, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -184,7 +184,8 @@ const TaskRow = memo(function TaskRow({
             className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-sm shrink-0"
             style={{
               background: `${metaFor(PRIORITY_META, t.priority).color}22`,
-              color: metaFor(PRIORITY_META, t.priority).color,
+              // A cor de ESCREVER, não a de preencher: medido 2,40:1 antes.
+              color: corDeTexto(metaFor(PRIORITY_META, t.priority).color),
             }}
           >
             {metaFor(PRIORITY_META, t.priority).label}

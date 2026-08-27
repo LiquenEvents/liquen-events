@@ -44,7 +44,7 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
  */
 
 const KIND_CHIP: Record<MaterialKind, { bg: string; text: string }> = {
-  consumivel: { bg: "#f6efe1", text: "#8a6d2f" },
+  consumivel: { bg: "#f6efe1", text: "#84692d" }, // 4,26:1 → 4,55:1 sobre #f6efe1
   reutilizavel: { bg: "#e7efe4", text: "#3a5c39" },
 };
 
