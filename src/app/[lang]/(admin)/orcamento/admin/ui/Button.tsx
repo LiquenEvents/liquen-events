@@ -125,7 +125,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
     "active:bg-[var(--bo-tinta-6)]",
   // Quiet until hovered — for toolbars and low-emphasis rows.
   ghost:
-    "bg-transparent text-[var(--bo-text-faint)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] " +
+    "bg-transparent text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] " +
     "active:bg-[var(--bo-tinta-10)]",
   // Soft moss tint — an in-context "yes, this one" without full weight.
   subtle: "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/[0.16] active:bg-[#4d6350]/[0.24]",

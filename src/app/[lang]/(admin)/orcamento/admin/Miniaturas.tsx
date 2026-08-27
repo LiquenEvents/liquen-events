@@ -399,12 +399,12 @@ export default function Miniaturas() {
                 </p>
               )}
               {semLeve > 0 && (
-                <p className="text-[var(--bo-text-faint)]">
+                <p className="text-[var(--bo-text-muted)]">
                   {fotografias(semLeve)} ainda sem versão leve. Não parte nada; é peso a mais.
                 </p>
               )}
               {comProblema.length > 0 && (
-                <ul className="mt-2 space-y-0.5 text-[var(--bo-text-faint)]">
+                <ul className="mt-2 space-y-0.5 text-[var(--bo-text-muted)]">
                   {visiveis.map((l) => (
                     <li key={`${l.origem}/${l.pasta}`} className="truncate">
                       <span className="text-[var(--bo-tinta-72)]">{l.nome}</span>
@@ -448,7 +448,7 @@ export default function Miniaturas() {
           <p className="font-medium">
             {falhadas.length === 1 ? "Uma não deu:" : `${falhadas.length} não deram:`}
           </p>
-          <ul className="mt-1 space-y-0.5 text-[var(--bo-text-faint)]">
+          <ul className="mt-1 space-y-0.5 text-[var(--bo-text-muted)]">
             {falhadas.slice(0, 8).map((f) => (
               <li key={f}>{f}</li>
             ))}

@@ -883,7 +883,7 @@ function EditorClassico() {
                 />
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
                   Modo secundário para quem sabe HTML. Os campos entre chavetas (ex.:{" "}
-                  <span className="font-mono text-[var(--bo-text-faint)]">{"{nome}"}</span>) são
+                  <span className="font-mono text-[var(--bo-text-muted)]">{"{nome}"}</span>) são
                   substituídos no envio. À direita vê como fica.
                 </p>
               </>

@@ -677,7 +677,7 @@ export default function Kanban({
                   <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase">
                     Total (com IVA)
                   </span>
-                  <span className="text-[var(--bo-text-faint)] text-[11px] font-semibold tabular-nums">
+                  <span className="text-[var(--bo-text-muted)] text-[11px] font-semibold tabular-nums">
                     {eur(value)}
                   </span>
                 </div>

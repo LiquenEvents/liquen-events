@@ -233,7 +233,7 @@ const TaskRow = memo(function TaskRow({
                  desenho de 13 para 25 px SEM crescer a linha (a coluna do título
                  já mede 34) e sem margens negativas, que era o que voltaria a
                  encostar os dois um ao outro. O ícone continua com 13 px. */
-              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
               aria-label="Editar tarefa"
             >
               {LapisIcon}
@@ -243,7 +243,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
             aria-label="Eliminar"
           >
             {CaixoteIcon}
@@ -658,7 +658,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               portátil a linha fica exactamente como estava; `!justify-start`
               porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
               a classe centra por omissão. */}
-          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-faint)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
             <svg
               width="12"
               height="12"

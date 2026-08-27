@@ -286,7 +286,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
               <p
                 key={i}
                 className={`truncate ${
-                  rubrica ? "font-serif text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-faint)]"
+                  rubrica ? "font-serif text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-muted)]"
                 }`}
                 style={{
                   fontSize: cq(rubrica ? 11 : CORPO),

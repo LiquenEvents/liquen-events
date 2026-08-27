@@ -718,7 +718,7 @@ export default function EmailTemplatesBilingue() {
             </div>
             <p className="text-[11px] text-foreground/40 mb-4 leading-relaxed">
               Selecciona o texto e carrega — ele passa a aparecer só nesse caso. Trocando{" "}
-              <span className="font-mono text-[var(--bo-text-faint)]">evento_data</span> por outro
+              <span className="font-mono text-[var(--bo-text-muted)]">evento_data</span> por outro
               nome, a regra passa a ser sobre esse dado.
             </p>
 

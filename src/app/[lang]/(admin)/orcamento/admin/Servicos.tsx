@@ -175,7 +175,7 @@ export default function Servicos() {
                 era o rótulo que estava baixo — não a caixa. `alvo-toque` no
                 `label`, como nas listas base do Material, cresce o alvo sem
                 mexer no quadrado desenhado. */}
-            <label className="alvo-toque !justify-start flex items-center gap-2 text-[11px] text-[var(--bo-text-faint)]">
+            <label className="alvo-toque !justify-start flex items-center gap-2 text-[11px] text-[var(--bo-text-muted)]">
               <input
                 type="checkbox"
                 checked={mostrarArquivados}
@@ -230,7 +230,7 @@ export default function Servicos() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--bo-text)]">{s.nome}</p>
                       {s.descricao && (
-                        <p className="mt-0.5 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+                        <p className="mt-0.5 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                           {s.descricao}
                         </p>
                       )}

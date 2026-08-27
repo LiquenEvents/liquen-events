@@ -69,7 +69,7 @@ export default function PorTraduzir({
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
         {faltam.length === 1
           ? "Um campo não tem versão inglesa e vai sair em português."
           : `${faltam.length} campos não têm versão inglesa e vão sair em português.`}{" "}

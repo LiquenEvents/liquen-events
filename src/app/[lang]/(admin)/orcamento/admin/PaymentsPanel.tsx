@@ -732,7 +732,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           o texto muda enquanto se escreve, a altura nunca (zero saltos). */}
       <p className="text-foreground/35 text-[10px] min-h-[1.1rem] leading-[1.1rem] mt-1.5 mb-3">
         {draftValid && paidOnAdd && total > 0 ? (
-          <span className="text-[var(--bo-text-faint)] tabular-nums">
+          <span className="text-[var(--bo-text-muted)] tabular-nums">
             Com este registo: recebido {eur2(previewPaid)} · em falta {eur2(previewOutstanding)}
           </span>
         ) : (
@@ -1002,7 +1002,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   // botão que abre a edição do valor, e 24 px é meia polpa de
                   // dedo.
                   className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-[var(--bo-tinta-6)] ${
-                    p.paid ? "text-[#4d6350]" : "text-[var(--bo-text-faint)]"
+                    p.paid ? "text-[#4d6350]" : "text-[var(--bo-text-muted)]"
                   }`}
                 >
                   {eur2(p.amount)}

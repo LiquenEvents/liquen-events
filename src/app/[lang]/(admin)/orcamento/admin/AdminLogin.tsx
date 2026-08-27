@@ -407,7 +407,7 @@ export default function AdminLogin() {
             <h1 className="font-display text-2xl leading-tight text-[var(--bo-text)]">
               Painel de Gestão
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--bo-text-faint)]">
+            <p className="mt-2 text-sm leading-relaxed text-[var(--bo-text-muted)]">
               {/* «Bem-vinda» presumia que quem entra é mulher. Hoje é verdade e
                   amanhã deixa de ser — e a frase não ganha nada com o género:
                   o que ela faz é dizer o que se segue. */}
@@ -690,7 +690,7 @@ export default function AdminLogin() {
               onFocus={aoFocarCampo}
               onBlur={aoSairDoCampo}
             >
-              <p className="text-xs leading-relaxed text-[var(--bo-text-faint)]">
+              <p className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
                 Escreve o teu email e enviamos-te uma ligação para definires uma palavra-passe nova.
                 A ligação serve uma vez e dura 30 minutos.
               </p>
@@ -765,7 +765,7 @@ export default function AdminLogin() {
               <summary className="alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
                 Mudaste de telemóvel ou de computador?
               </summary>
-              <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+              <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                 Entra aqui com o email e a palavra-passe. Já dentro, abre{" "}
                 <span className="font-medium text-[var(--bo-tinta-72)]">«{ONDE_SE_REGISTA}»</span>,
                 no fundo da barra lateral, e regista este aparelho. Da próxima vez entras só com o

@@ -342,7 +342,7 @@ export default function EditorDeEscolhas({
                     // À VISTA no telemóvel — é a regra desta casa desde o «×»
                     // das fotos: um botão que apaga não pode ser invisível e
                     // continuar a apanhar o dedo.
-                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-faint)] transition-colors hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8"
+                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-muted)] transition-colors hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8"
                     onClick={() => pedirParaApagarEscolha(i)}
                   >
                     ×

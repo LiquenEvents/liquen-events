@@ -318,11 +318,11 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
                     <p className="text-[var(--bo-text-muted)] text-xs font-medium leading-snug whitespace-pre-line">
                       {entry.summary}
                     </p>
-                    <span className="text-foreground/22 text-[10px] shrink-0 whitespace-nowrap">
+                    <span className="text-[var(--bo-text-faint)] text-[10px] shrink-0 whitespace-nowrap">
                       {timeLabel(entry.at)}
                     </span>
                   </div>
-                  <p className="text-foreground/28 text-[10px] mt-0.5">
+                  <p className="text-[var(--bo-text-faint)] text-[10px] mt-0.5">
                     {m.label}
                     {entry.actor ? ` · ${entry.actor}` : ""}
                   </p>

@@ -298,7 +298,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#8a6420] "
-                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-faint)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
               }`}
             >
               <span aria-hidden="true">★</span>
@@ -651,7 +651,7 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
       alinharADireita: true,
       largura: "w-20",
       celula: (c) => (
-        <span className="tabular-nums text-[var(--bo-text-faint)]">{c.quotes.length}</span>
+        <span className="tabular-nums text-[var(--bo-text-muted)]">{c.quotes.length}</span>
       ),
     },
     {
@@ -826,14 +826,16 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     </span>
                   )}
                 </div>
-                <p className="text-[var(--bo-text-faint)] text-xs truncate">
+                <p className="text-[var(--bo-text-muted)] text-xs truncate">
                   {eventTypeLabel(q)} · {q.guests} convidados
                   {q.date
                     ? ` · ${new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
                     : ""}
                 </p>
                 {q.lostReason && (
-                  <p className="text-foreground/28 text-[10px] truncate mt-0.5">↳ {q.lostReason}</p>
+                  <p className="text-[var(--bo-text-faint)] text-[10px] truncate mt-0.5">
+                    ↳ {q.lostReason}
+                  </p>
                 )}
               </div>
               <div className="text-right shrink-0">
@@ -844,9 +846,13 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     {eur(contractedAmounts(q).gross)}
                   </span>
                 ) : q.priceBreakdown?.total ? (
-                  <span className="text-foreground/28 text-xs">≈{eur(q.priceBreakdown.total)}</span>
+                  <span className="text-[var(--bo-text-faint)] text-xs">
+                    ≈{eur(q.priceBreakdown.total)}
+                  </span>
                 ) : null}
-                <p className="text-foreground/22 text-[10px] font-mono">{q.id.slice(-8)}</p>
+                <p className="text-[var(--bo-text-faint)] text-[10px] font-mono">
+                  {q.id.slice(-8)}
+                </p>
               </div>
             </button>
           ))}

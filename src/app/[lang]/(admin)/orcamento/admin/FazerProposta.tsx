@@ -407,7 +407,7 @@ export default function FazerProposta({
                     </span>
                     <span className="min-w-0">
                       <span
-                        className={`block truncate text-sm font-medium ${espera ? "text-[var(--bo-text)]" : "text-[var(--bo-text-faint)]"}`}
+                        className={`block truncate text-sm font-medium ${espera ? "text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"}`}
                       >
                         {q.name}
                       </span>

@@ -77,7 +77,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <a
                 href={`tel:${quote.phone}`}
-                className="alvo-toque !justify-start text-[var(--bo-text-faint)] text-xs hover:text-[var(--bo-tinta-72)]"
+                className="alvo-toque !justify-start text-[var(--bo-text-muted)] text-xs hover:text-[var(--bo-tinta-72)]"
               >
                 {quote.phone}
               </a>

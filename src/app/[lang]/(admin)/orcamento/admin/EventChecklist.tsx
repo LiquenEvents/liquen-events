@@ -359,7 +359,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Checklist de Produção</p>
         {items.length > 0 && (
-          <span className="shrink-0 rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-faint)]">
+          <span className="shrink-0 rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
             {doneCount}/{items.length}
           </span>
         )}
@@ -547,7 +547,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(i.id)}
-                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-faint)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
+                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
                   aria-label={`Remover ${i.label}`}
                 >
                   <svg

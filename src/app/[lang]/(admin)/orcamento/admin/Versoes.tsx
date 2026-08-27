@@ -298,7 +298,7 @@ export default function Versoes({
                   {ESTADO[v.estado] ?? v.estado}
                 </span>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">{v.resumo}</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">{v.resumo}</p>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {v.mudancas.length > 1 && (
@@ -306,7 +306,7 @@ export default function Versoes({
                     type="button"
                     onClick={() => setAberta(expandida ? null : v.id)}
                     aria-expanded={expandida}
-                    className="alvo-toque text-[11px] text-[var(--bo-text-faint)] underline underline-offset-2 hover:text-[var(--bo-text)]"
+                    className="alvo-toque text-[11px] text-[var(--bo-text-muted)] underline underline-offset-2 hover:text-[var(--bo-text)]"
                   >
                     {expandida ? "Esconder o que mudou" : "Ver o que mudou"}
                   </button>

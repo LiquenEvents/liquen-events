@@ -92,7 +92,7 @@ export default function AvisoDataOcupada({
               ? "Já há um evento nesta data"
               : `Já há ${choques.length} eventos à volta desta data`}
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">{motivo}</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">{motivo}</p>
 
           <ul className="mt-3 flex flex-col gap-2.5">
             {choques.map((c) => {

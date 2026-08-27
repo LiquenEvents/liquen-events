@@ -248,7 +248,7 @@ export default function ModelosParciais({
 
       {aGuardar && (
         <div className={PAINEL_SUSPENSO + " p-3"}>
-          <label className="block text-[11px] text-[var(--bo-text-faint)]" htmlFor={`mp-${tipo}`}>
+          <label className="block text-[11px] text-[var(--bo-text-muted)]" htmlFor={`mp-${tipo}`}>
             Nome do modelo
           </label>
           <input

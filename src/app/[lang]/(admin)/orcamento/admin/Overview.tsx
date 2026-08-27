@@ -486,7 +486,7 @@ function LinhaEstado({
         Guardado no servidor{estado.quando ? ` às ${estado.quando}` : ""}
       </span>
     );
-  return <span className="text-foreground/22 text-[10px]">Guardado no servidor</span>;
+  return <span className="text-[var(--bo-text-faint)] text-[10px]">Guardado no servidor</span>;
 }
 
 /** A leitura falhou: dizê-lo é obrigatório — um "Sem notas." seria outra mentira. */
@@ -829,7 +829,7 @@ const NotasEquipa = memo(function NotasEquipa({
         <>
           {teamNotes ? (
             <p
-              className="text-[var(--bo-text-faint)] text-sm leading-relaxed whitespace-pre-wrap cursor-text"
+              className="text-[var(--bo-text-muted)] text-sm leading-relaxed whitespace-pre-wrap cursor-text"
               onClick={() => setEditingNotes(true)}
             >
               {teamNotes}
@@ -1534,7 +1534,7 @@ export default function Overview({
                  ficarem da mesma altura quando aparecem juntos. */
               className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium transition-colors motion-reduce:transition-none ${
                 tudoArquivado && onVerArquivados
-                  ? "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
+                  ? "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
                   : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
               } ${FOCUS_RING}`}
             >
@@ -1619,7 +1619,7 @@ export default function Overview({
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
-                  : "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
+                  : "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
               }`}
             >
               <svg
@@ -1974,7 +1974,7 @@ export default function Overview({
                 return (
                   <div key={f.id}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="flex items-center gap-2 text-[var(--bo-text-faint)] text-xs">
+                      <span className="flex items-center gap-2 text-[var(--bo-text-muted)] text-xs">
                         <span
                           className="w-2 h-2 rounded-full"
                           style={{ background: STATUS_META[f.id].color }}
@@ -2145,7 +2145,7 @@ export default function Overview({
                     )}
                     <TempoDesde
                       iso={q.submittedAt}
-                      className="text-foreground/22 text-[10px] mt-1 block"
+                      className="text-[var(--bo-text-faint)] text-[10px] mt-1 block"
                     />
                   </div>
                 </button>
@@ -2164,7 +2164,7 @@ export default function Overview({
                   onClick={() => onOpen(q)}
                   className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
-                  <span className="text-[var(--bo-text-faint)] text-xs truncate font-medium">
+                  <span className="text-[var(--bo-text-muted)] text-xs truncate font-medium">
                     {q.name}
                   </span>
                   <TempoDesde
@@ -2200,7 +2200,7 @@ export default function Overview({
                   </p>
                   <button
                     onClick={onNew}
-                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
                   >
                     <svg
                       width="12"

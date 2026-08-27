@@ -4326,7 +4326,7 @@ export default function AdminClient({
                   // No telemóvel vive na gaveta (ver lá o porquê): aqui os
                   // 50 px que ocupava eram quase metade do que sobrava para o
                   // título da vista.
-                  className="alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-faint)] transition-colors"
+                  className="alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)] transition-colors"
                 >
                   <svg
                     width="16"
@@ -5703,7 +5703,7 @@ export default function AdminClient({
                           <SectionCard eyebrow="Gestão do pedido" padding="md">
                             <div className="flex flex-col gap-5">
                               {/* Factos do evento — contexto compacto, só leitura. */}
-                              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--bo-text-faint)]">
+                              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--bo-text-muted)]">
                                 {[
                                   {
                                     l: "Tipo",
@@ -6176,7 +6176,7 @@ export default function AdminClient({
                                   navigator.clipboard?.writeText(selected.email);
                                   toast("Email copiado", "success");
                                 }}
-                                className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-[var(--bo-text-faint)]"
+                                className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-[var(--bo-text-muted)]"
                                 title="Copiar email"
                                 aria-label="Copiar email"
                               >
@@ -6264,7 +6264,7 @@ export default function AdminClient({
                           {/* Section header — the command centre of the pedido. */}
                           <div className="flex flex-col gap-1.5">
                             <p className="bo-eyebrow">Ferramentas do pedido</p>
-                            <p className="text-xs leading-relaxed text-[var(--bo-text-faint)]">
+                            <p className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
                               Tudo o que precisa para preparar, cobrar e propor — num só lugar.
                             </p>
                           </div>
@@ -6329,7 +6329,7 @@ export default function AdminClient({
                                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
                                       active
                                         ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
-                                        : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-faint)]"
+                                        : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                                     }`}
                                   >
                                     {tab.icon}
@@ -6353,7 +6353,7 @@ export default function AdminClient({
                                       className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
                                         active
                                           ? "bg-[#4d6350]/15 text-[#4d6350]"
-                                          : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-faint)]"
+                                          : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                                       }`}
                                     >
                                       {badge}
@@ -6425,7 +6425,7 @@ export default function AdminClient({
                                   cresce sob `(pointer: coarse)`; no portátil
                                   fica como estava. */}
                                   <details className="group border-t border-[var(--bo-hairline-strong)] pt-4">
-                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-faint)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
+                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
                                       <svg
                                         className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
                                         width="14"
@@ -6733,7 +6733,7 @@ export default function AdminClient({
 
                                   {/* Activity history — de-emphasised, collapsed by default. */}
                                   <details className="group border-t border-[var(--bo-hairline-strong)] pt-4">
-                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-faint)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
+                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
                                       <svg
                                         className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
                                         width="14"

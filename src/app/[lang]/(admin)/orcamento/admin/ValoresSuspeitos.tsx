@@ -233,7 +233,7 @@ export default function ValoresSuspeitos() {
                             </>
                           )}
                         </p>
-                        <p className="mt-1 text-[var(--bo-text-faint)]">
+                        <p className="mt-1 text-[var(--bo-text-muted)]">
                           Em jogo: {eur(c.emJogoComIva)} com IVA · {dia(c.quando)}
                         </p>
                       </li>

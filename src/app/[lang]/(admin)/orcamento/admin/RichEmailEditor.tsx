@@ -352,7 +352,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
             <button
               type="button"
               onClick={() => setButtonOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-faint)] hover:bg-[var(--bo-tinta-6)]"
+              className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)]"
             >
               Cancelar
             </button>
@@ -460,7 +460,7 @@ function MiniForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-faint)] hover:bg-[var(--bo-tinta-6)]"
+          className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)]"
         >
           Cancelar
         </button>

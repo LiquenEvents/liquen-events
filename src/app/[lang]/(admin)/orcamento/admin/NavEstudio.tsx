@@ -297,7 +297,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 <button
                   type="button"
                   onClick={() => saltarPara(f.seccao)}
-                  className="flex w-full items-start gap-1.5 text-left text-[11px] leading-snug text-[var(--bo-text-faint)] hover:text-[var(--bo-text)]"
+                  className="flex w-full items-start gap-1.5 text-left text-[11px] leading-snug text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
                 >
                   <span
                     aria-hidden

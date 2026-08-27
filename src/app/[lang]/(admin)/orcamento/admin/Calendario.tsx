@@ -679,7 +679,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     aria-hidden="true"
                     className="min-h-[52px] sm:min-h-[80px] bg-white p-1.5 sm:p-2"
                   >
-                    <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/[0.15]">
+                    <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
                       {c.day}
                     </span>
                   </div>

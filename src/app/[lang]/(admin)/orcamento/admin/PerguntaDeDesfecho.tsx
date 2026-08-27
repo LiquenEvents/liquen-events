@@ -258,7 +258,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                       type="button"
                       onClick={() => void guardarMotivo(m)}
                       disabled={motivoAGravar !== null}
-                      className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-faint)] hover:border-foreground/30`}
+                      className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30`}
                     >
                       {motivoAGravar === m ? "A guardar…" : NOME_DO_MOTIVO[m]}
                     </button>
@@ -334,7 +334,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`text-[var(--bo-text-faint)] ${compacto ? "text-[11px]" : "text-sm"} mr-1`}
+            className={`text-[var(--bo-text-muted)] ${compacto ? "text-[11px]" : "text-sm"} mr-1`}
           >
             Já responderam?
           </span>
@@ -353,7 +353,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
             type="button"
             disabled={fase.tipo === "a-gravar"}
             onClick={() => void marcar("perdido")}
-            className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-faint)] hover:border-foreground/35 hover:text-[var(--bo-text)]`}
+            className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/35 hover:text-[var(--bo-text)]`}
           >
             Perdido
           </button>

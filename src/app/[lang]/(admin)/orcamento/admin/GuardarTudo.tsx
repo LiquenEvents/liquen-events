@@ -231,7 +231,7 @@ export default function BotaoGuardarTudo() {
                   className={
                     l.mau
                       ? "text-[11px] leading-snug text-[#8a2a22]"
-                      : "text-[11px] leading-snug text-[var(--bo-text-faint)]"
+                      : "text-[11px] leading-snug text-[var(--bo-text-muted)]"
                   }
                 >
                   <span aria-hidden>{l.mau ? "⚠ " : "✓ "}</span>

@@ -373,7 +373,7 @@ export default function EmailDoEnvio({
         />
         {reposicao && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[var(--bo-text-faint)]">
+            <span className="text-xs text-[var(--bo-text-muted)]">
               O texto que tinhas escrito foi substituído pelo modelo.
             </span>
             <Button
@@ -427,7 +427,7 @@ export default function EmailDoEnvio({
       {/* Apagar o marcador é uma escolha legítima (há quem prefira falar
           antes), mas não pode ser uma escolha por acidente. */}
       {semLigacao && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+        <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-text-muted)]">
           <span aria-hidden="true">·</span>
           <span>
             O texto não tem a ligação da proposta. O casal fica com o PDF em anexo e mais nada — se

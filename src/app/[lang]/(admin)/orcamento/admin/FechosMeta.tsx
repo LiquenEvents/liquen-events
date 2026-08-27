@@ -148,7 +148,7 @@ export default function FechosMeta() {
 
   return (
     <section className="rounded-2xl border border-[var(--bo-hairline)] bg-white p-6 ">
-      <h3 className="text-[var(--bo-text-faint)] text-[10px] font-medium uppercase tracking-[0.3em]">
+      <h3 className="text-[var(--bo-text-muted)] text-[10px] font-medium uppercase tracking-[0.3em]">
         Casamentos fechados · Meta
       </h3>
       <p className="mt-1 text-[11px] leading-snug text-foreground/35">
@@ -168,7 +168,7 @@ export default function FechosMeta() {
               setFalhouALeitura(false);
               void ler();
             }}
-            className="alvo-toque mt-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] transition-colors hover:bg-[var(--bo-tinta-6)]"
+            className="alvo-toque mt-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)]"
           >
             Tentar outra vez
           </button>
@@ -209,7 +209,7 @@ export default function FechosMeta() {
           )}
 
           {!relatorio.configurada && (
-            <p className="mt-3 rounded-lg bg-[var(--bo-tinta-6)] px-3 py-2 text-[12px] leading-snug text-[var(--bo-text-faint)]">
+            <p className="mt-3 rounded-lg bg-[var(--bo-tinta-6)] px-3 py-2 text-[12px] leading-snug text-[var(--bo-text-muted)]">
               O envio ainda não está ligado: faltam as variáveis{" "}
               <code className="font-mono text-[11px]">META_DATASET_ID</code> e{" "}
               <code className="font-mono text-[11px]">META_CAPI_ACCESS_TOKEN</code> nas Definições
@@ -248,7 +248,7 @@ export default function FechosMeta() {
                 <button
                   type="button"
                   onClick={() => setAPerguntar(false)}
-                  className="alvo-toque rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] transition-colors hover:bg-[var(--bo-tinta-6)] pointer-coarse:min-h-11"
+                  className="alvo-toque rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)] pointer-coarse:min-h-11"
                 >
                   Cancelar
                 </button>

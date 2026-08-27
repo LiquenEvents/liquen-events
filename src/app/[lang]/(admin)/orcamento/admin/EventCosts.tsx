@@ -355,7 +355,7 @@ export default function EventCosts({ quote, onChange }: Props) {
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Fornecedores &amp; Custos</p>
         {items.length > 0 && (
-          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-0.5 text-[11px] tabular-nums text-[var(--bo-text-faint)]">
+          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-0.5 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
             {items.length}
           </span>
         )}
@@ -489,7 +489,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(it.id)}
-                  className="alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-faint)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                  className="alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                   aria-label="Remover"
                 >
                   <svg

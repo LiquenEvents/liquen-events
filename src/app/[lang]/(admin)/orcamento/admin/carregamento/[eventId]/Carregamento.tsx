@@ -456,7 +456,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         <div role="group" aria-label="Material a carregar">
           {porCategoria.map(([categoria, linhas]) => (
             <section key={categoria}>
-              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-[var(--bo-text-faint)] uppercase backdrop-blur">
+              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-[var(--bo-text-muted)] uppercase backdrop-blur">
                 {categoria}
               </h2>
               <ul>
@@ -491,7 +491,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                             {i.name}
                           </span>
                           {i.note && (
-                            <span className="block truncate text-xs text-[var(--bo-text-faint)]">
+                            <span className="block truncate text-xs text-[var(--bo-text-muted)]">
                               {i.note}
                             </span>
                           )}
@@ -526,7 +526,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                   <span className="text-[var(--bo-text-muted)]"> às {horaDoFecho}</span>
                 )}
                 {p.carregados < p.total && (
-                  <span className="text-[var(--bo-text-faint)]">
+                  <span className="text-[var(--bo-text-muted)]">
                     {" "}
                     · {p.total - p.carregados} por marcar
                   </span>

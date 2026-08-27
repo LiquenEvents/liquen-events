@@ -142,14 +142,13 @@ describe("a escada da tinta do back office", () => {
         const [tudo, valor] = m;
         const alfa = valor.startsWith("[") ? Number(valor.slice(1, -1)) : Number(valor) / 100;
         if (alfa < 0.55) continue;
+        // A fronteira de baixo é 55, e o degrau dela é o 64 — NÃO o 58. O
+        // `globals.css` já tem um chão que sobe `/50 … /55` para o
+        // `--bo-text-muted`; mandá-los para o `faint` BAIXAVA-os de 5,91:1 para
+        // 4,77:1. Passava a norma na mesma, e por isso nenhum teste dava por
+        // isso — foi o que quase aconteceu.
         const degrau =
-          alfa >= 0.78
-            ? "--bo-text"
-            : alfa >= 0.7
-              ? "--bo-tinta-72"
-              : alfa >= 0.6
-                ? "--bo-text-muted"
-                : "--bo-text-faint";
+          alfa >= 0.78 ? "--bo-text" : alfa >= 0.7 ? "--bo-tinta-72" : "--bo-text-muted";
         soltos.push(`  ${path.relative(RAIZ, f)}: \`${tudo}\` → \`text-[var(${degrau})]\``);
       }
     }
@@ -158,6 +157,63 @@ describe("a escada da tinta do back office", () => {
       soltos,
       `${soltos.length} cinzento(s) de texto escritos à mão em vez de um degrau da escada.\n` +
         soltos.slice(0, 20).join("\n"),
+    ).toEqual([]);
+  });
+
+  /**
+   * ── E OS CINZENTOS QUE ESCAPAM AO CHÃO DO `globals.css` ───────────────────
+   *
+   * O `globals.css` tem um chão que sobe `text-foreground/25 … /55` para os
+   * tokens medidos, porque abaixo disso não se passa a norma. Só que o chão é
+   * uma LISTA de classes, e uma opacidade que não esteja na lista escapa-lhe:
+   * `/15`, `/20`, `/22`, `/28` e `/[0.15]` renderizavam entre 1,3:1 e 2,3:1.
+   *
+   * Contados: dezassete. Oito eram TEXTO que ela lê — «Guardado no servidor», a
+   * razão por que uma proposta se perdeu, os números do calendário, a hora de
+   * cada movimento — e foram para o `--bo-text-faint`. Os outros nove não são
+   * texto, e por isso ficam:
+   *
+   *  · dois `aria-hidden` — separadores desenhados, que ninguém lê;
+   *  · seis botões de ÍCONE que são de propósito quase invisíveis em repouso e
+   *    acendem ao passar o rato — e que já trazem `sem-rato:` a pô-los no
+   *    degrau medido onde não há rato, que é onde ela trabalha;
+   *  · a lupa dentro do campo de procura, que é decoração de um campo que já
+   *    tem rótulo.
+   *
+   * A lista está PRESA aqui. Um cinzento novo abaixo do chão, em qualquer outro
+   * sítio, põe isto vermelho — e quem o escrever tem de dizer porquê.
+   */
+  it("e os cinzentos abaixo do chão são só os nove que não são texto", () => {
+    const CHAO = new Set([25, 30, 35, 40, 45, 50, 55]);
+    const CONHECIDOS = [
+      "PaymentsPanel.tsx", // aria-hidden
+      "ProposalStudio.tsx", // aria-hidden
+      "ProductionPlan.tsx", // ícone com `sem-rato:`
+      "Tarefas.tsx", // ícone com `sem-rato:` (×2)
+      "Fornecedores.tsx", // ícone com `sem-rato:` (×3)
+      "AdminClient.tsx", // lupa do campo de procura
+    ];
+    const padrao = /\btext-foreground\/(\[[0-9.]+\]|[0-9]+)/g;
+    const novos: string[] = [];
+
+    for (const f of ficheirosDeEcra(RAIZ)) {
+      const nome = path.basename(f);
+      const texto = fs.readFileSync(f, "utf8");
+      for (const m of texto.matchAll(padrao)) {
+        const valor = m[1];
+        const alfa = valor.startsWith("[") ? Number(valor.slice(1, -1)) * 100 : Number(valor);
+        if (alfa >= 55 || CHAO.has(alfa)) continue;
+        if (CONHECIDOS.includes(nome)) continue;
+        novos.push(`  ${path.relative(RAIZ, f)}: \`${m[0]}\``);
+      }
+    }
+
+    expect(
+      novos,
+      `${novos.length} cinzento(s) abaixo do chão do \`globals.css\` num sítio novo.\n` +
+        `Se for TEXTO, sobe para \`text-[var(--bo-text-faint)]\` — abaixo de 58% nada passa a ` +
+        `norma. Se for ícone ou desenho, acrescenta o ficheiro à lista deste teste com a razão.\n` +
+        novos.join("\n"),
     ).toEqual([]);
   });
 });

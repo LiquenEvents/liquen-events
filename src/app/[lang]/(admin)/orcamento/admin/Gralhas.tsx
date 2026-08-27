@@ -70,7 +70,7 @@ export default function Gralhas({
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
         {gralhas.length === 1
           ? "Uma palavra que sai impressa parece estar sem acento."
           : `${gralhas.length} palavras que saem impressas parecem estar sem acento.`}{" "}

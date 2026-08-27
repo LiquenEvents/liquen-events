@@ -23,7 +23,7 @@ import { useDesceu } from "../../ui/adaptativo";
  * desta barra. Os `h-8` continuam a mandar no rato; a classe só põe o chão de
  * 44×44 onde se toca com o dedo, sem mexer no desenho. */
 const TOOL_LINK =
-  "alvo-toque inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-[var(--bo-text-faint)] " +
+  "alvo-toque inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-[var(--bo-text-muted)] " +
   "hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] motion-safe:transition-colors " +
   "motion-safe:duration-150";
 
@@ -258,7 +258,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
             {/* Tipo · data · local. É a ficha do evento, lê-se à chegada, e
                 está toda outra vez na coluna lateral. */}
             {!desceu && titleBits.length > 0 && (
-              <p className="text-[var(--bo-text-faint)] text-sm mt-1.5 truncate">
+              <p className="text-[var(--bo-text-muted)] text-sm mt-1.5 truncate">
                 {titleBits.join(" · ")}
               </p>
             )}
@@ -459,7 +459,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               <p className="text-[var(--bo-text)] text-sm font-medium leading-snug mb-1.5">
                 {next.label}
               </p>
-              <p className="text-[var(--bo-text-faint)] text-xs leading-relaxed mb-4">
+              <p className="text-[var(--bo-text-muted)] text-xs leading-relaxed mb-4">
                 {next.hint}
               </p>
               {/* O botão da próxima acção media 148×40 — quatro píxeis abaixo do
@@ -571,7 +571,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                         current
                           ? "text-[var(--bo-text)] font-semibold"
                           : reached
-                            ? "text-[var(--bo-text-faint)]"
+                            ? "text-[var(--bo-text-muted)]"
                             : "text-foreground/30"
                       }`}
                     >

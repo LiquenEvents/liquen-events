@@ -297,7 +297,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         <p className="bo-eyebrow">Produção Decor</p>
         <div className="flex flex-wrap items-center gap-2">
           {items.length > 0 && (
-            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-faint)]">
+            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
               {items.filter((i) => i.done).length}/{items.length} do plano
             </span>
           )}
@@ -373,7 +373,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[var(--bo-text-faint)] text-[11px] font-medium tracking-[0.08em] uppercase">
+                  <p className="text-[var(--bo-text-muted)] text-[11px] font-medium tracking-[0.08em] uppercase">
                     {titulo}
                   </p>
                   <span className="text-foreground/35 text-[10px] tabular-nums bg-[var(--bo-tinta-6)] rounded-full px-2 py-0.5">
@@ -435,7 +435,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => removeItem(i.id)}
                         aria-label="Remover tarefa"
-                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                       >
                         ×
                       </button>
@@ -526,7 +526,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   >
                     {estado.label}
                   </span>
-                  <span className="text-[var(--bo-text-faint)] text-[11px] tabular-nums shrink-0">
+                  <span className="text-[var(--bo-text-muted)] text-[11px] tabular-nums shrink-0">
                     {eur2(s.estimatedCost)}
                   </span>
                 </div>

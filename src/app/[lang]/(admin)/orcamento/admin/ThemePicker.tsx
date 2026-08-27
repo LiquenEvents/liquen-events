@@ -2394,7 +2394,7 @@ export default function ThemePicker({
                       onTouchStart={() => prefetchTheme(t.id)}
                     >
                       {t.name}
-                      <span className="tabular-nums text-[var(--bo-text-faint)]">
+                      <span className="tabular-nums text-[var(--bo-text-muted)]">
                         {themeCountLabel(t)}
                       </span>
                     </Button>

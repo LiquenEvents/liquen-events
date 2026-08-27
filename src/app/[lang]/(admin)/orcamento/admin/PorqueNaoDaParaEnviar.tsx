@@ -135,7 +135,7 @@ function PorqueTrava({
               </li>
             ))}
           </ul>
-          <p className="mt-1.5 text-[var(--bo-text-faint)]">
+          <p className="mt-1.5 text-[var(--bo-text-muted)]">
             Toca numa linha para ir ao sítio onde se preenche.
           </p>
         </>

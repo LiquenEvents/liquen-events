@@ -259,7 +259,7 @@ export default function Contratos() {
   return (
     <div>
       {/* One calm line saying what this screen is for */}
-      <p className="mb-6 text-sm leading-relaxed text-[var(--bo-text-faint)]">
+      <p className="mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]">
         Cada contrato é a prova de que o cliente aceitou a proposta. Aparecem aqui automaticamente,
         com a data e o nome de quem aceitou.
       </p>
@@ -485,7 +485,7 @@ function PdfDoContrato({ id }: { id: string }) {
       href={`/api/contratos/${id}/pdf`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-faint)] transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
       title="Descarregar contrato em PDF"
     >
       PDF

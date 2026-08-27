@@ -415,7 +415,7 @@ export default function DefinicoesProposta() {
             {idade(p.definidoEm.deslocacao)}
           </span>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
           A deslocação é uma conta: quilómetros de ida e volta a partir de{" "}
           {d.base.trim() || "onde a casa está"}, vezes o custo de cada quilómetro. O gasóleo muda
           todas as semanas — este número tem de ser teu, não do programa.
@@ -581,7 +581,7 @@ export default function DefinicoesProposta() {
           <h2 className="text-sm font-medium text-[var(--bo-text)]">Margem mínima</h2>
           <span className="text-[11px] text-foreground/45">{idade(p.definidoEm.margem)}</span>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
           Abaixo desta percentagem o estúdio avisa enquanto escreve a proposta. Não impede nada — há
           eventos que se fazem com margem baixa de propósito.
         </p>

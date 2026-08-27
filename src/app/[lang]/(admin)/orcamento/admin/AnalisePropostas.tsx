@@ -211,7 +211,7 @@ export default function AnalisePropostas() {
                     style={{ width: `${Math.max(2, m.pct)}%` }}
                   />
                 </span>
-                <span className="w-24 shrink-0 text-right text-xs text-[var(--bo-text-faint)]">
+                <span className="w-24 shrink-0 text-right text-xs text-[var(--bo-text-muted)]">
                   {`${m.n} · ${m.pct}%`}
                 </span>
               </li>

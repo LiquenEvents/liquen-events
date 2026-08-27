@@ -66,7 +66,7 @@ export function PageHeader({
           {title}
         </Heading>
         {subtitle && (
-          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[var(--bo-text-faint)] sm:mt-2">
+          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[var(--bo-text-muted)] sm:mt-2">
             {subtitle}
           </p>
         )}

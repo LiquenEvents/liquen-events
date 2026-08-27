@@ -6792,7 +6792,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               </button>
               <button
                 type="button"
-                className="alvo-toque text-xs text-[var(--bo-text-faint)] underline-offset-2 hover:underline"
+                className="alvo-toque text-xs text-[var(--bo-text-muted)] underline-offset-2 hover:underline"
                 onClick={manterOsValoresDesteAparelho}
               >
                 Manter os deste aparelho
@@ -7423,7 +7423,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           {/* Mood boards — decoracao only */}
           {isDeco && (
             <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
-              <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-faint)]">
+              <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
                 grupos de imagens de inspiração para o cliente
               </p>
               <AvisoDeOrdem
@@ -7904,7 +7904,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         .sort((x, y) => x - y)
                                         .map((i) => `${i + 1}.ª`);
                                       return (
-                                        <p className="mb-2 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+                                        <p className="mb-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                                           <span aria-hidden="true">◐ </span>
                                           {fora.length === 1
                                             ? `A ${quais[0]} fotografia destoa da paleta desta página.`
@@ -8857,11 +8857,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         quando há preços por linha para contar. */}
                     {contagem.total > 0 &&
                       (contagem.comPreco === 0 && parseMoneyText(totalInput) > 0 ? (
-                        <span className="text-xs text-[var(--bo-text-faint)]">
+                        <span className="text-xs text-[var(--bo-text-muted)]">
                           Preço definido no total — as linhas não levam valor
                         </span>
                       ) : contagem.comPreco > 0 ? (
-                        <span className="text-xs text-[var(--bo-text-faint)]">
+                        <span className="text-xs text-[var(--bo-text-muted)]">
                           {contagem.frase}
                         </span>
                       ) : null)}
@@ -9534,10 +9534,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   </span>
                   {money.base > 0 && (
                     <>
-                      <span className="mt-0.5 block text-[var(--bo-text-faint)]">
+                      <span className="mt-0.5 block text-[var(--bo-text-muted)]">
                         base {eur(duasFormas[vatMode].base)} · IVA {eur(duasFormas[vatMode].iva)}
                       </span>
-                      <span className="block text-[var(--bo-text-faint)]">
+                      <span className="block text-[var(--bo-text-muted)]">
                         o cliente paga{" "}
                         <strong className="font-semibold text-[var(--bo-text)]">
                           {eur(duasFormas[vatMode].total)}
@@ -10217,7 +10217,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 existe para responder a «quanto vai a proposta», não para abrir
                 a discussão que o bloco de totais já resolve.
                 Ficam o total sem IVA, o total a pagar e o estado de guardado. */}
-            <p className="mr-auto min-w-0 truncate text-xs text-[var(--bo-text-faint)]">
+            <p className="mr-auto min-w-0 truncate text-xs text-[var(--bo-text-muted)]">
               {/* ── A ETIQUETA VIAJA COM O NÚMERO ────────────────────────────
                   A escolha acima — no telemóvel, o que o CLIENTE paga — estava
                   certa. O que estava errado era a palavra: «Total» ficava FORA
@@ -10598,7 +10598,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <li key={`${c.where}:${c.unit}`}>· {fraseDeCorte(c)}</li>
                     ))}
                   </ul>
-                  <p className="mt-1.5 text-[var(--bo-text-faint)]">
+                  <p className="mt-1.5 text-[var(--bo-text-muted)]">
                     Volta ao conteúdo para encurtar o que ficou cortado, ou envia assim mesmo se for
                     de propósito.
                   </p>
@@ -10851,7 +10851,7 @@ function LinhaDeTotal({
         regua ? "border-t border-[var(--bo-hairline-strong)] pt-1.5" : ""
       }`}
     >
-      <dt className={forte ? "text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-faint)]"}>
+      <dt className={forte ? "text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-muted)]"}>
         {rotulo}
       </dt>
       <dd
@@ -10963,7 +10963,7 @@ function BarraDaSeleccao({
       <button
         type="button"
         onClick={onLimpar}
-        className="alvo-toque text-xs font-medium text-[var(--bo-text-faint)] transition-colors hover:text-[var(--bo-text)]"
+        className="alvo-toque text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:text-[var(--bo-text)]"
       >
         Limpar
       </button>
@@ -11364,7 +11364,7 @@ function AvisoDeOrdem({
   if (!mostrar) return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2">
-      <p className="min-w-[16rem] flex-1 text-[11px] leading-relaxed text-[var(--bo-text-faint)]">
+      <p className="min-w-[16rem] flex-1 text-[11px] leading-relaxed text-[var(--bo-text-muted)]">
         {onde} estão pela ordem da lista de <strong className="font-medium">Serviços</strong>, que é
         a ordem por que o PDF sai — e não pela ordem em que foram escritas. Arruma os Serviços e
         isto acompanha.
@@ -11875,7 +11875,7 @@ function PreviewSummary({
   const fotosPorConfirmar = countPendingImages(doc);
   return (
     <Section title="Resumo da proposta">
-      <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-faint)]">
+      <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
         Esta é a forma da proposta que o cliente vai receber. Para o documento completo, usa
         «Descarregar PDF».
       </p>
@@ -11940,7 +11940,7 @@ function PreviewSummary({
             {extras.map((e, i) => (
               <li key={i} className="flex items-baseline justify-between gap-3">
                 <span>{e.label || "—"}</span>
-                <span className="text-[var(--bo-text-faint)]">{e.valueText || "—"}</span>
+                <span className="text-[var(--bo-text-muted)]">{e.valueText || "—"}</span>
               </li>
             ))}
           </ul>
@@ -12225,7 +12225,7 @@ function SelectorDeLayout({
                   elevação, e o `aria-checked` diz o mesmo a quem ouve. */}
               <span
                 className={`mt-1 block text-[10px] leading-tight ${
-                  activo ? "font-semibold text-[var(--bo-text)]" : "text-[var(--bo-text-faint)]"
+                  activo ? "font-semibold text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"
                 }`}
               >
                 {rotulo}
@@ -12741,7 +12741,7 @@ function Thumb({
                perdeu) e se o problema é dela (não é). O resto está escrito no
                `title` e, por extenso, no comentário da escuta lá em cima. */
             <>
-              <span className="font-medium text-[var(--bo-text-faint)]">Fotografia guardada</span>
+              <span className="font-medium text-[var(--bo-text-muted)]">Fotografia guardada</span>
               {/* Curta porque tem de CABER: a caixa tem 104 px de altura e
                   `overflow-hidden`, e a frase inteira levava o «Abrir ficheiro»
                   para fora do corte. A explicação toda vai no `title` — é a
@@ -12775,7 +12775,7 @@ function Thumb({
                   caixa desta altura, cada linha custa uma coisa que já lá
                   estava. */}
               <span
-                className="font-medium text-[var(--bo-text-faint)]"
+                className="font-medium text-[var(--bo-text-muted)]"
                 title="A fotografia está guardada. Não consegui mostrá-la neste ecrã."
               >
                 Imagem guardada
@@ -12839,7 +12839,7 @@ function Thumb({
                   a captura mostrava o «Tentar» encostado ao corte de baixo. Numa
                   caixa de 75 px, cada linha custa uma coisa que já lá estava. */}
               <span
-                className="font-medium text-[var(--bo-text-faint)]"
+                className="font-medium text-[var(--bo-text-muted)]"
                 title={
                   estadoDosUrls === "falhou"
                     ? "Não consegui ir buscar as fotografias desta proposta."

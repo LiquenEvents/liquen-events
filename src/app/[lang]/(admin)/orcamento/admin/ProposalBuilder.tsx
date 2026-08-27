@@ -853,7 +853,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         <h3 className="font-display text-lg leading-tight text-[var(--bo-text)]">
           Criar e enviar proposta (PDF)
         </h3>
-        <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-faint)]">
+        <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-muted)]">
           Compõe as linhas, define o IVA e envia o PDF ao cliente. O que escreveres fica guardado
           sozinho — podes sair daqui e voltar mais tarde.
         </p>
@@ -995,7 +995,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         inexistentes.
       */}
       <div className="@container flex flex-col gap-2 mb-2">
-        <div className="hidden @min-[24rem]:flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--bo-text-faint)]">
+        <div className="hidden @min-[24rem]:flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--bo-text-muted)]">
           <span className="flex-1">Descrição</span>
           <span className="w-16 text-center">Qt.</span>
           <span className="w-24 text-right">Unit. €</span>
@@ -1067,11 +1067,11 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       {/* Totals */}
       <div className="rounded-xl bg-[var(--bo-tinta-3)] p-4 flex flex-col gap-2 mb-5">
         <div className="flex justify-between text-sm">
-          <span className="text-[var(--bo-text-faint)]">Subtotal</span>
+          <span className="text-[var(--bo-text-muted)]">Subtotal</span>
           <span className="text-[var(--bo-tinta-72)]">{eur(subtotal)}</span>
         </div>
         <div className="flex justify-between text-sm items-center">
-          <span className="text-[var(--bo-text-faint)] flex items-center gap-2">
+          <span className="text-[var(--bo-text-muted)] flex items-center gap-2">
             IVA
             <select
               aria-label="Taxa de IVA"

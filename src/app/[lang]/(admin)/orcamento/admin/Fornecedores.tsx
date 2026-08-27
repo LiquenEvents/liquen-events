@@ -667,21 +667,21 @@ export default function Fornecedores() {
                             { preferred: !s.preferred },
                           )
                         }
-                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-faint)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
+                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-muted)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
                         {EstrelaIcon(!!s.preferred)}
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Editar"
                       >
                         {LapisIcon}
                       </button>
                       <button
                         onClick={() => remove(s.id)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-faint)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Remover"
                       >
                         ×

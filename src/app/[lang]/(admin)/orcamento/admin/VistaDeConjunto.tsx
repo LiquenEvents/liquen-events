@@ -111,7 +111,7 @@ export default function VistaDeConjunto({
           <button
             type="button"
             onClick={onFechar}
-            className="alvo-toque text-[11px] font-medium text-[var(--bo-text-faint)] transition-colors hover:text-[var(--bo-text)]"
+            className="alvo-toque text-[11px] font-medium text-[var(--bo-text-muted)] transition-colors hover:text-[var(--bo-text)]"
           >
             Fechar
           </button>

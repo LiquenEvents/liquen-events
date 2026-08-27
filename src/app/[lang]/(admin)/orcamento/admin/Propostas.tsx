@@ -533,7 +533,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       {/* One calm line saying what this screen is for */}
       <p
         style={{ "--cena": 0 } as React.CSSProperties}
-        className="bo-cena text-sm leading-relaxed text-[var(--bo-text-faint)]"
+        className="bo-cena text-sm leading-relaxed text-[var(--bo-text-muted)]"
       >
         Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites.
       </p>

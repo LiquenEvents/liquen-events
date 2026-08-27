@@ -329,7 +329,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
         <div className="mt-4 space-y-4">
           {porCategoria.map(([categoria, linhas]) => (
             <div key={categoria}>
-              <p className="mb-1.5 text-[11px] tracking-[0.14em] text-[var(--bo-text-faint)] uppercase">
+              <p className="mb-1.5 text-[11px] tracking-[0.14em] text-[var(--bo-text-muted)] uppercase">
                 {categoria}
               </p>
               <ul className="divide-y divide-[var(--bo-hairline)]">

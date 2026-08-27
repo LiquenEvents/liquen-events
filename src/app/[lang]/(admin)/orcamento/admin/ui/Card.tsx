@@ -111,7 +111,7 @@ export function SectionCard({
               <h2 className="font-display text-lg leading-tight text-[var(--bo-text)]">{title}</h2>
             )}
             {description && (
-              <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-faint)]">
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-muted)]">
                 {description}
               </p>
             )}

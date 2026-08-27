@@ -114,7 +114,7 @@ function CampoKm({
   return (
     <div className="mt-1.5 flex flex-col gap-1">
       <label className="flex items-center gap-2">
-        <span className="text-[11px] text-[var(--bo-text-faint)]">Quilómetros até ao local</span>
+        <span className="text-[11px] text-[var(--bo-text-muted)]">Quilómetros até ao local</span>
         <input
           type="text"
           inputMode="numeric"
@@ -381,7 +381,7 @@ export default function PainelInterno({
                         <span className="col-span-3 truncate text-xs text-[var(--bo-tinta-72)] sm:col-span-1">
                           {item || <span className="text-foreground/30">(sem nome)</span>}
                         </span>
-                        <span className="text-right text-xs text-[var(--bo-text-faint)]">
+                        <span className="text-right text-xs text-[var(--bo-text-muted)]">
                           {l?.preco === null ? "—" : eur(l!.preco!)}
                         </span>
                         <input
@@ -475,7 +475,7 @@ export default function PainelInterno({
               <span className="bo-eyebrow">Costuma incluir</span>
               <ul className="mt-1.5 flex flex-col gap-1">
                 {esquecidos.map((o) => (
-                  <li key={o.nome} className="text-xs leading-relaxed text-[var(--bo-text-faint)]">
+                  <li key={o.nome} className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
                     <span className="text-[var(--bo-tinta-72)]">{o.nome}</span>
                     <span className="text-foreground/40">{` — em ${o.em} de ${o.de} propostas parecidas`}</span>
                   </li>

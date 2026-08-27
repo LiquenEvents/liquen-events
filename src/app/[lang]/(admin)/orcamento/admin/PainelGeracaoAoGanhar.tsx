@@ -146,7 +146,7 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
         >
           Produção a partir da proposta ganha
         </h3>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-faint)]">
+        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
           A partir dos serviços da proposta e do total já resolvido. Nunca apaga o que já está
           escrito à mão — só acrescenta o que falta.
         </p>

@@ -144,7 +144,7 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
                   state === "atual"
                     ? "text-[var(--bo-text)] font-semibold"
                     : state === "feito"
-                      ? "text-[var(--bo-text-faint)]"
+                      ? "text-[var(--bo-text-muted)]"
                       : "text-foreground/30"
                 }`}
               >

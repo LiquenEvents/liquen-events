@@ -212,7 +212,7 @@ export default function PainelDoEstudio({
                   className={`flex-1 rounded-[6px] px-2 py-1.5 text-[11px] motion-safe:transition-colors ${
                     vista === id
                       ? "bg-white text-[var(--bo-text)] "
-                      : "text-[var(--bo-text-faint)] hover:text-[var(--bo-text)]"
+                      : "text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
                   }`}
                 >
                   {rotulo}
