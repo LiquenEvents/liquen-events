@@ -83,7 +83,7 @@ const SOMBRA = /(?:[a-z@-]+:)*shadow-(?:\[[^\]]*\]|[a-z0-9-]+)/g;
 function semComentarios(fonte: string): string {
   // A lição já custou três testes que passavam a olhar para a prosa dos meus
   // próprios comentários: o que se procura é CÓDIGO.
-  return fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  return fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[^\S\n]*\/\/.*$/gm, "");
 }
 
 describe("as sombras do back office", () => {

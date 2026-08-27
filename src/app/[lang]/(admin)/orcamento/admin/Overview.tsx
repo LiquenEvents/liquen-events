@@ -430,7 +430,7 @@ function AvisoConflito({
       <div className="flex flex-wrap gap-2 mt-2.5">
         <button
           onClick={() => onEscolher("meu")}
-          className={`px-3 py-1.5 rounded-lg bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+          className={`px-3 py-1.5 rounded-full bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
         >
           {doBrowser ? "Guardar as deste browser" : "Guardar a minha por cima"}
         </button>
@@ -594,7 +594,7 @@ const MetaReceita = memo(function MetaReceita({
             <button
               onClick={() => void saveGoal()}
               disabled={estado.tipo === "a-guardar"}
-              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-xl hover:bg-[#2a3227] transition-colors whitespace-nowrap disabled:opacity-50"
+              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] transition-colors whitespace-nowrap disabled:opacity-50"
             >
               {estado.tipo === "a-guardar" ? "A guardar…" : "Guardar"}
             </button>
@@ -1426,7 +1426,7 @@ export default function Overview({
                    de 44 px do dedo: media 37 px de altura, e é o único caminho
                    para sair de um ecrã que não tem mais nada. Só cresce com
                    dedo — com rato fica exactamente como está desenhado. */
-                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors motion-reduce:transition-none mb-3 ${FOCUS_RING}`}
+                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors motion-reduce:transition-none mb-3 ${FOCUS_RING}`}
               >
                 <svg
                   width="13"

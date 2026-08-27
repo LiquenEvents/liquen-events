@@ -35,9 +35,20 @@ the global `:focus-visible` moss ring (so primitives don't hand-roll focus).
 
 ## Spacing & radii scale
 
-- **Radii:** `rounded-lg` (0.5rem) inner chips → `rounded-xl` (0.75rem) controls
-  (buttons, inputs, segmented) → **`rounded-2xl` (1rem) cards & panels**. The
-  redesign leans on `rounded-2xl` for every container surface.
+- **Raios — dois, e o segundo é de quem se clica.** Havia nove valores em 664
+  chamadas; a análise mediu dois nos dois sites de referência, com a mesma
+  regra: «o raio máximo está reservado ao elemento clicável».
+  - **Conteúdo: 8 px.** Cartões, painéis, diálogos, campos, linhas de lista,
+    menus. Não é preciso pedi-lo: `rounded-sm/md/lg/xl/2xl` valem TODOS 8 px
+    dentro do back office — a escala do Tailwind está colapsada num sítio só
+    (`body:has([data-admin-mode])` no `globals.css`), porque no v4 cada degrau
+    compila para `var(--radius-*)`.
+  - **Acção: pílula.** `rounded-full`. Vem de graça no primitivo `Button` e no
+    `Segmented`; um botão de fundo cheio escrito à mão tem de a pedir, e há um
+    teste que chumba se não a pedir.
+  - **Miudezas sub-20 px: `rounded` (4 px).** Teclas de atalho, pegas de
+    arrasto, etiquetas de 9 px, miniaturas. A 8 px deformavam-se. É o terceiro
+    valor, e é deliberado.
 - **Card padding:** `p-4` (sm) · `p-5 sm:p-6` (md, default) · `p-6 sm:p-8` (lg).
 - **Vertical rhythm:** `PageHeader` reserves `pb-6`; section headers use `mb-5`;
   label→control gap is `gap-1.5`. Prefer generous whitespace over dividers.

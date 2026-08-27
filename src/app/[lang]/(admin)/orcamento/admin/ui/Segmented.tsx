@@ -109,7 +109,11 @@ export function Segmented<T extends string>({
         // sentido. Passar para a linha de baixo não custa nada e mantém as duas
         // legíveis — num ecrã largo continuam lado a lado, porque só quebra
         // quando não cabe.
-        "inline-flex flex-wrap items-center gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.04] p-1",
+        // `rounded-full` nos dois: a caixa e cada segmento. O DESIGN.md já
+        // descrevia isto como «uma pequena pílula de opções mutuamente
+        // exclusivas» — passou a sê-lo. Ver a nota no `ui/Button.tsx`: a curva
+        // máxima é de quem se clica.
+        "inline-flex flex-wrap items-center gap-1 rounded-full border border-foreground/[0.08] bg-foreground/[0.04] p-1",
         className,
       )}
     >
@@ -125,7 +129,7 @@ export function Segmented<T extends string>({
             tabIndex={i === entryIndex ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cn(
-              `inline-flex items-center gap-1.5 rounded-lg font-medium ${ESTADO} ${PRESSAO}`,
+              `inline-flex items-center gap-1.5 rounded-full font-medium ${ESTADO} ${PRESSAO}`,
               pad,
               active
                 ? "bg-white text-foreground/90 "

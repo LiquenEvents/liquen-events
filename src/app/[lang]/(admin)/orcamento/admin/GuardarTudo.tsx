@@ -116,7 +116,7 @@ export default function BotaoGuardarTudo() {
         title={titulo}
         className={
           quantos > 0
-            ? "alvo-toque flex items-center gap-2 rounded-lg bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
+            ? "alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
             : "alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] transition-colors hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11"
         }
       >

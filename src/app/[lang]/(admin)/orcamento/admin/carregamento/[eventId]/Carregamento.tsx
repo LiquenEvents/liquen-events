@@ -504,7 +504,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => marcarFecho("carregada")}
-                  className="min-h-[48px] flex-1 rounded-xl bg-[#4d6350] px-4 text-white"
+                  className="min-h-[48px] flex-1 rounded-full bg-[#4d6350] px-4 text-white"
                 >
                   Seguir assim
                 </button>
@@ -517,7 +517,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 if (p.criticosPorCarregar.length > 0) setConfirmar(true);
                 else marcarFecho("carregada");
               }}
-              className="min-h-[52px] w-full rounded-xl bg-[#4d6350] px-4 text-white disabled:opacity-45"
+              className="min-h-[52px] w-full rounded-full bg-[#4d6350] px-4 text-white disabled:opacity-45"
               disabled={p.carregados === 0}
             >
               {p.carregados === p.total

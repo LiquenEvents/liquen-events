@@ -266,7 +266,7 @@ export default function ModelosParciais({
             </button>
             <button
               type="button"
-              className="rounded-lg bg-[#4d6350] px-3 py-1.5 text-xs text-white disabled:opacity-40"
+              className="rounded-full bg-[#4d6350] px-3 py-1.5 text-xs text-white disabled:opacity-40"
               disabled={!nome.trim()}
               onClick={() => void guardar()}
             >

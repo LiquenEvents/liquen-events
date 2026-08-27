@@ -345,7 +345,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
             <button
               type="button"
               onClick={confirmButton}
-              className="px-3 py-1.5 rounded-lg text-xs bg-[#4d6350] text-white hover:bg-[#415440]"
+              className="px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440]"
             >
               Inserir botão
             </button>
@@ -453,7 +453,7 @@ function MiniForm({
         <button
           type="button"
           onClick={onConfirm}
-          className="px-3 py-1.5 rounded-lg text-xs bg-[#4d6350] text-white hover:bg-[#415440]"
+          className="px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440]"
         >
           {confirmLabel}
         </button>

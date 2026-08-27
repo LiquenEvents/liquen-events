@@ -223,7 +223,7 @@ export default function FechosMeta() {
               type="button"
               disabled={!relatorio.configurada || aEnviar}
               onClick={() => setAPerguntar(true)}
-              className="alvo-toque mt-4 rounded-lg bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11"
+              className="alvo-toque mt-4 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11"
             >
               {aEnviar ? "A enviar…" : "Enviar à Meta"}
             </button>
@@ -241,7 +241,7 @@ export default function FechosMeta() {
                 <button
                   type="button"
                   onClick={() => void enviar()}
-                  className="alvo-toque rounded-lg bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
+                  className="alvo-toque rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
                 >
                   Enviar
                 </button>

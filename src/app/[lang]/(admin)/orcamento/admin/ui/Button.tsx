@@ -64,8 +64,28 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * toque a 20 ms (o corte seco desaparece sem custar latência) e o estado nos
  * 120 ms do degrau `micro` da casa.
  */
+/**
+ * ── `rounded-full` E NÃO `rounded-xl`: A CURVA É DE QUEM SE CLICA ──────────
+ *
+ * A análise mediu os dois sites de referência e os dois dizem o mesmo com
+ * números diferentes: a Apple põe `border-radius: 980px` em 33 elementos — «os
+ * botões são TODOS pílulas» — e deixa os tiles e as imagens a raio zero; a
+ * Pixelmatters põe 32 px (pílula) nos botões e na navegação e 8 px nos cartões
+ * e nas imagens. «O raio máximo está reservado ao elemento clicável.»
+ *
+ * Aqui o conteúdo passou todo para 8 px de uma vez, colapsando a escala do
+ * Tailwind no `globals.css`. Se este primitivo ficasse em `rounded-xl`, os 151
+ * botões que passam por ele ficavam com o MESMO canto do cartão onde assentam
+ * — e a distinção que este bloco inteiro serve para criar desaparecia no sítio
+ * onde ela mais conta.
+ *
+ * Uma linha, 151 botões. Os 34 `<button>` em cru do back office ficam nos 8 px
+ * de propósito: são separadores, linhas de lista e botões de ícone dentro de
+ * barras — coisas que se clicam mas que SÃO a superfície, e não uma acção
+ * assente nela. A pílula é para o que se destaca do que está por baixo.
+ */
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium tracking-[0.02em] " +
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium tracking-[0.02em] " +
   "select-none whitespace-nowrap disabled:opacity-45 disabled:pointer-events-none " +
   `${ESTADO} ${PRESSAO}`;
 

@@ -223,6 +223,57 @@ body:has([data-admin-mode]) {
   --color-surface-raised: #f7f7f8;
   --color-surface-elevated: #ffffff;
   --color-foreground: #0d0d0d;
+
+  /* ── UM RAIO PARA CONTEÚDO, OUTRO PARA ACÇÃO ─────────────────────────────
+     Eram NOVE, em 664 chamadas:
+
+         164  rounded-xl (12 px)      42  rounded (4 px)
+         157  rounded-full            8   rounded-sm (4 px)
+         140  rounded-lg (8 px)       6   rounded-none
+         84   rounded-md (6 px)       3   rounded-t-2xl
+         60   rounded-2xl (16 px)
+
+     Nove valores é o mesmo que valor nenhum: um cartão a 16, o painel ao lado
+     a 12 e o campo lá dentro a 8 não são uma hierarquia — são três pessoas a
+     escrever a mesma coisa em três dias diferentes.
+
+     A análise mediu os dois sites de referência e ambos têm DOIS: a Apple,
+     pílula de 980 px nos 33 botões e raio ZERO nos tiles e nas imagens; a
+     Pixelmatters, 8 px em cartões e imagens e 32 px (pílula) em botões e
+     navegação. A regra é a mesma nos dois — «o raio máximo está reservado ao
+     elemento clicável».
+
+     Aqui:  CONTEÚDO 8 px  ·  ACÇÃO pílula.
+
+     ── PORQUE É QUE ISTO SÃO CINCO LINHAS E NÃO 456 EDIÇÕES ────────────────
+
+     Porque no Tailwind v4 o `.rounded-lg` compila para
+     `border-radius: var(--radius-lg)` — a escala inteira passa por variáveis.
+     Redefini-las aqui, no elemento que já marca o back office, colapsa as
+     cinco escadas nas 456 chamadas SEM tocar num único ficheiro de ecrã, e
+     sem tocar no sítio público, que nunca tem este atributo.
+
+     O `rounded-full` (157) já é a pílula e fica. A acção passa a pedi-la nos
+     dois primitivos que a servem — `ui/Button.tsx` (151 botões) e
+     `ui/Segmented.tsx`.
+
+     ── E O `rounded` SECO, QUE FICA NOS 4 PX ───────────────────────────────
+
+     42 chamadas, e não sobem para 8. Fui vê-las uma a uma: são TODAS
+     miudezas com menos de 20 px de altura — as teclas de atalho («⌘K»), as
+     pegas de arrasto de 4×4, as etiquetas de 9 px em maiúsculas, as barras do
+     esqueleto, as miniaturas de 9×9. A 8 px, uma etiqueta de 16 px de altura
+     fica quase pílula e uma miniatura de 9 px fica quase círculo — o raio
+     deixa de ser proporção e passa a ser deformação.
+
+     É um terceiro valor e digo-o: a própria Apple, além da pílula, tem «5, 6,
+     8 e 14 px em casos pontuais». A regra que este bloco fecha é a das
+     SUPERFÍCIES e dos CONTROLOS; a miudez sub-20 px é outra escala. */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
 }
 
 /* Back office: clean white surface. */
@@ -306,10 +357,16 @@ body.admin-mode {
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
   --bo-control-border: rgba(13, 13, 13, 0.55);
 
-  /* ── Rounded radii — chips → controls → cards (rounded-lg/xl/2xl) ── */
-  --bo-radius-sm: 0.625rem; /* 10px — inner chips / pills */
-  --bo-radius: 0.75rem; /* 12px — inputs, buttons, segmented */
-  --bo-radius-lg: 1rem; /* 16px — cards & panels */
+  /* ── O MESMO RAIO, PEDIDO POR TRÊS NOMES ────────────────────────────────
+     Eram 10, 12 e 16 px — «chips», «controlos», «cartões». Três degraus para
+     uma diferença que ninguém consegue apontar num ecrã de telemóvel.
+     Passam a valer os mesmos 8 px que a escala do Tailwind (ver o bloco em
+     `body:has([data-admin-mode])`). Os nomes ficam porque há ~20 sítios que
+     os pedem, e trocá-los era ruído sem ganho — mas já não escondem três
+     valores. */
+  --bo-radius-sm: 0.5rem;
+  --bo-radius: 0.5rem;
+  --bo-radius-lg: 0.5rem;
 
   /* ── DUAS SOMBRAS, E NENHUMA DELAS NO CONTEÚDO ───────────────────────────
      Eram dezasseis. Um censo ao back office contou **90 sombras** em **16

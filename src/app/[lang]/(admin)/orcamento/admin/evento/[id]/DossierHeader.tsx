@@ -470,7 +470,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   href={portalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
                 >
                   {next.label}
                   <svg
@@ -489,7 +489,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 <button
                   type="button"
                   onClick={() => onScrollTo(zone)}
-                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
                 >
                   {next.label}
                   <svg

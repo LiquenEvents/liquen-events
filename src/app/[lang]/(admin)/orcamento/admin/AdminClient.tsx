@@ -4329,7 +4329,7 @@ export default function AdminClient({
                   <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
-                    className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-lg hover:bg-[#2a3227] transition-colors "
+                    className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] transition-colors "
                     title="Criar pedido manualmente"
                   >
                     <svg
@@ -4889,7 +4889,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -4899,7 +4899,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -4913,7 +4913,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -5582,7 +5582,7 @@ export default function AdminClient({
                                     });
                                   }
                                 }}
-                                className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white motion-safe:transition-colors hover:bg-[#415440]"
+                                className="flex w-full items-center gap-3 rounded-full bg-[#4d6350] px-5 py-4 text-left text-white motion-safe:transition-colors hover:bg-[#415440]"
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">

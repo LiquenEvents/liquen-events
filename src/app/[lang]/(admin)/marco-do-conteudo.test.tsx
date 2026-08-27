@@ -100,5 +100,5 @@ function semComentarios(fonte: string): string {
   return fonte
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+    .replace(/^[^\S\n]*\/\/.*$/gm, "");
 }

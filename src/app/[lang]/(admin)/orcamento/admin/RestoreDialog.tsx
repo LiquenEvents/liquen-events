@@ -343,7 +343,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                     const f = e.target.files?.[0];
                     if (f) void escolherFicheiro(f);
                   }}
-                  className="block w-full text-sm text-foreground/70 file:mr-3 file:rounded-xl file:border-0 file:bg-[#4d6350] file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
+                  className="block w-full text-sm text-foreground/70 file:mr-3 file:rounded-full file:border-0 file:bg-[#4d6350] file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
                 />
               </label>
               {ocupado && <p className="bo-text-muted mt-3 text-sm">A ler a cópia…</p>}
