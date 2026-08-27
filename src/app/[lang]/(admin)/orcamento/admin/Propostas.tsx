@@ -10,6 +10,12 @@ import type { SegmentedOption } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { metaFor } from "./status-meta";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
+import {
+  lugaresNoCliente,
+  etiquetaDoLugar,
+  explicacaoDoLugar,
+  type LugarNoCliente,
+} from "@/lib/orcamento/propostas-do-mesmo-cliente";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -154,6 +160,31 @@ function ValidadeChip({ p }: { p: Proposal }) {
       }`}
     >
       {exp.label}
+    </span>
+  );
+}
+
+/**
+ * ── «MELANIE E SEBASTIEN» APARECE DUAS VEZES ──────────────────────────────
+ *
+ * A-01 da auditoria. A lista continua a mostrar TUDO o que mostrava — cada
+ * proposta é um documento com o seu valor, o seu estado e a sua validade, e
+ * esconder uma atrás da outra tirava-lhe da vista a que estava a expirar.
+ *
+ * O que muda é que cada linha passa a saber que não está sozinha. É essa a
+ * pergunta que ela faz quando vê o mesmo nome duas vezes: *é um engano meu, ou
+ * são mesmo duas propostas?*
+ *
+ * O tom é neutro de propósito — não é um aviso, é um facto. Um cliente com
+ * três propostas não tem nada de errado; o que estava errado era não se saber.
+ */
+function LugarDoCliente({ lugar }: { lugar: LugarNoCliente }) {
+  return (
+    <span
+      className="ml-1.5 inline-flex shrink-0 items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bo-text-muted)] align-middle"
+      title={explicacaoDoLugar(lugar)}
+    >
+      {etiquetaDoLugar(lugar)}
     </span>
   );
 }
@@ -337,6 +368,16 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
     },
     [setProposals, toast],
   );
+
+  /**
+   * Contado sobre TODAS as propostas, e não sobre as filtradas.
+   *
+   * Se fosse sobre a lista visível, filtrar por «Aceites» transformava «2.ª de
+   * 3» em «1.ª de 1» — o número passava a descrever o filtro em vez de
+   * descrever o cliente, e desaparecia exactamente quando ela está a comparar
+   * duas propostas do mesmo casal.
+   */
+  const lugares = useMemo(() => lugaresNoCliente(proposals), [proposals]);
 
   const filtered = useMemo(
     () =>
@@ -683,12 +724,20 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                   chave: "cliente",
                   cabecalho: "Cliente",
                   ordenar: (a, b) => a.clientName.localeCompare(b.clientName, "pt"),
-                  celula: (p) => (
-                    <span className="block">
-                      <span className="block truncate text-foreground/90">{p.clientName}</span>
-                      <span className="bo-text-muted block truncate text-xs">{p.clientEmail}</span>
-                    </span>
-                  ),
+                  celula: (p) => {
+                    const lugar = lugares.get(p.id);
+                    return (
+                      <span className="block">
+                        <span className="block text-foreground/90">
+                          <span className="truncate align-middle">{p.clientName}</span>
+                          {lugar && <LugarDoCliente lugar={lugar} />}
+                        </span>
+                        <span className="bo-text-muted block truncate text-xs">
+                          {p.clientEmail}
+                        </span>
+                      </span>
+                    );
+                  },
                 },
                 { chave: "estado", cabecalho: "Estado", celula: (p) => <EstadoChip p={p} /> },
                 { chave: "validade", cabecalho: "Validade", celula: (p) => <ValidadeChip p={p} /> },
@@ -746,8 +795,9 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 // legibilidade das que decidem.
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground/90">
-                      {p.clientName}
+                    <p className="text-sm font-medium text-foreground/90">
+                      <span className="truncate align-middle">{p.clientName}</span>
+                      {lugares.get(p.id) && <LugarDoCliente lugar={lugares.get(p.id)!} />}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <EstadoChip p={p} />
