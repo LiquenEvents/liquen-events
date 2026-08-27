@@ -430,6 +430,7 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // nomes dos noivos e o dinheiro de cada um. Só lê — mas o que lê é a base
   // inteira, e é a leitura que a guarda protege.
   { path: "./admin/valores-suspeitos/route", methods: ["GET"] },
+  { path: "./admin/valor-enviado/route", methods: ["GET", "POST"] },
   // O estado do armazenamento diz se a base de dados responde, se a tabela
   // existe e se a chave em uso tem permissões — o mapa da instalação, com os
   // nomes das variáveis a confirmar. E a verificação ESCREVE (é assim que ela é

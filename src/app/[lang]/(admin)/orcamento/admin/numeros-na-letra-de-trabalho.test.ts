@@ -113,3 +113,70 @@ describe("os números do back office", () => {
     );
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E SEM NEGRITO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, com a fila dos KPI à frente: «mas retira o negrito de todos».
+ *
+ * O painel que ela tinha apontado como referência — a «Análise de propostas» —
+ * já desenhava os seus números em `font-light`. Os outros estavam em
+ * `font-bold`. Não é só peso: um número grande a 700 grita, e num painel onde
+ * há oito deles ao lado uns dos outros, oito a gritar é o mesmo que nenhum
+ * falar. A hierarquia destes ecrãs é de TAMANHO — foi isso que se construiu no
+ * padrão 08 —, e o peso estava a competir com ela.
+ *
+ * Guarda-se a ausência do negrito nos números que encabeçam um cartão. Os
+ * números miudinhos das tabelas (11 px) ficam de fora de propósito: a essa
+ * medida o peso é legibilidade e não ênfase.
+ */
+describe("o peso dos números", () => {
+  const GRANDES = [
+    ["Overview.tsx", /aria-label="Dinheiro — ganho, à espera e recebido"/],
+    ["StatsDashboard.tsx", null],
+    ["Propostas.tsx", /Por pedido · conta-se a proposta mais recente/],
+  ] as const;
+
+  it("nenhum número de cartão está a negrito", () => {
+    // ── O QUE CONTA COMO «NÚMERO DE CARTÃO» ────────────────────────────────
+    //
+    // A primeira versão deste caso dizia «tem `tabular-nums` e não é de 11 px»
+    // e apanhava sete linhas que não são disto: valores de 14 px encostados a
+    // uma fila («Valor médio por evento ganho  1.234 €»), números dentro de uma
+    // FRASE do estúdio, e até o título de uma página — que entrou por ter
+    // `leading-none`.
+    //
+    // Nesses sítios o peso não é ênfase decorativa: é o que separa o número da
+    // prosa à volta. O que ela pediu foi outra coisa — os números GRANDES que
+    // encabeçam um cartão, que estavam a 700 e a gritar todos ao mesmo tempo.
+    //
+    // O sinal de «grande» é o tamanho declarado ali mesmo: um `clamp()` que
+    // comece em 16 px ou mais, ou um degrau `text-2xl` para cima. E um título
+    // em letra de display nunca é um número, por muito `leading-none` que
+    // tenha.
+    const GRANDE = /clamp\(\s*(1[6-9]|[2-9]\d)px|text-(2xl|3xl|4xl|5xl)\b/;
+    const faltas: string[] = [];
+    for (const f of ficheiros()) {
+      const linhas = semComentarios(readFileSync(f, "utf8")).split("\n");
+      linhas.forEach((l, n) => {
+        if (!/font-(bold|semibold)/.test(l)) return;
+        const janela = linhas.slice(n, n + 4).join("\n");
+        if (/font-display|var\(--font-playfair\)/.test(janela)) return;
+        if (!GRANDE.test(janela)) return;
+        faltas.push(`${f}:${n + 1}`);
+      });
+    }
+    expect(faltas, `números de cartão a negrito em:\n  ${faltas.join("\n  ")}`).toEqual([]);
+  });
+
+  it("e o bloco do dinheiro da Visão Geral está mesmo leve", () => {
+    const src = semComentarios(readFileSync(`${RAIZ}Overview.tsx`, "utf8"));
+    const i = src.indexOf(GRANDES[0][1]!.source.replace(/\\/g, ""));
+    expect(i).toBeGreaterThan(-1);
+    const grupo = src.slice(i, src.indexOf("Pedidos ativos", i));
+    expect(grupo).toMatch(/font-light/);
+    expect(grupo).not.toMatch(/font-bold/);
+  });
+});

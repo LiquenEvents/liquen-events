@@ -621,7 +621,7 @@ const MetaReceita = memo(function MetaReceita({
           <div className="flex items-end justify-between mb-2">
             <div>
               <span
-                className="font-bold"
+                className="font-light"
                 style={{
                   fontSize: "clamp(18px, 2vw, 24px)",
                   color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
@@ -952,7 +952,7 @@ function AEsperaDeResposta({
         </div>
         <div className="text-right">
           <p
-            className="text-[#8a6420] font-bold leading-none"
+            className="text-[#8a6420] font-light leading-none"
             style={{ fontSize: "clamp(16px, 2vw, 22px)" }}
           >
             {eur(pendurado)}
@@ -1688,7 +1688,7 @@ export default function Overview({
             </div>
             <div className="shrink-0 text-right">
               <p
-                className="text-2xl sm:text-3xl font-bold tabular-nums"
+                className="text-2xl sm:text-3xl font-light tabular-nums"
                 style={{
                   color:
                     data.nextEventDays <= 3
@@ -1844,7 +1844,7 @@ export default function Overview({
           >
             <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
-                className="font-bold leading-none"
+                className="font-light leading-none"
                 style={{
                   fontSize: k.tamanho,
                   color: k.cor,
@@ -1926,7 +1926,7 @@ export default function Overview({
               className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
             >
               <p
-                className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
+                className="order-2 ml-auto font-light leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
                 style={{ fontSize: "clamp(18px, 1.9vw, 22px)" }}
               >
                 {k.v}
@@ -2023,7 +2023,7 @@ export default function Overview({
             <div className="grid grid-cols-2 gap-3 mb-3.5 sm:mb-5">
               <div>
                 <p
-                  className="text-[#4d6350] font-bold leading-none mb-1"
+                  className="text-[#4d6350] font-light leading-none mb-1"
                   style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.received)}
@@ -2032,7 +2032,7 @@ export default function Overview({
               </div>
               <div>
                 <p
-                  className="text-foreground/70 font-bold leading-none mb-1"
+                  className="text-foreground/70 font-light leading-none mb-1"
                   style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.outstanding)}

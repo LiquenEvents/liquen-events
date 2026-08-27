@@ -10,6 +10,7 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import Miniaturas from "./Miniaturas";
 import ValoresSuspeitos from "./ValoresSuspeitos";
+import ValorEnviado from "./ValorEnviado";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -621,6 +622,7 @@ export default function DefinicoesProposta() {
         conjunto, e não para um casamento.
       */}
       <ValoresSuspeitos />
+      <ValorEnviado />
     </div>
   );
 }
