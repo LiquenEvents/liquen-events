@@ -126,7 +126,34 @@ export function TabelaOuCartoes<T>({
   // aparecer e desaparecer num ecrã pequeno salta à vista.
   if (!montado || !desktop) {
     return (
-      <ul className="flex flex-col gap-2" aria-label={legenda}>
+      /**
+       * ── UMA LISTA, E NÃO UMA PILHA DE CAIXAS ────────────────────────────
+       *
+       * Cada linha era um cartão com moldura própria, canto próprio e fundo
+       * próprio, com 8 px de ar entre eles. Vinte pedidos eram vinte molduras
+       * — e vinte molduras não são uma lista, são vinte coisas separadas que
+       * por acaso estão em cima umas das outras.
+       *
+       * A moldura sobe para o GRUPO e sai de cada linha; o que separa passa a
+       * ser um fio. É exactamente o mesmo movimento que os três números do
+       * dinheiro da Visão Geral já tinham feito, com a razão escrita lá: «três
+       * caixas com ar entre elas gastam três vezes a mesma margem».
+       *
+       * ── O QUE NÃO SE PERDE ──────────────────────────────────────────────
+       *
+       * A linha inteira continua a ser um alvo de toque, e continua a
+       * responder: o `hover` e o `:active` passam a pintar a FAIXA em vez de
+       * acender uma moldura. Num telemóvel isso lê-se melhor do que um
+       * contorno de 1 px — a mão tapa metade do que está a tocar.
+       *
+       * O `p-3.5` em vez de `p-3`: sem moldura à volta, o respiro tem de vir
+       * do interior. E a densidade não piora, porque desaparecem os 8 px de ar
+       * entre cada duas linhas.
+       */
+      <ul
+        className="flex flex-col divide-y divide-foreground/[0.07] overflow-hidden rounded-xl border border-foreground/[0.08] bg-white"
+        aria-label={legenda}
+      >
         {ordenados.map((item) => (
           <li key={chaveDe(item)}>
             {semMoldura ? (
@@ -138,14 +165,12 @@ export function TabelaOuCartoes<T>({
                 // Sem `motion-safe:` até aqui, e nos 150 ms por omissão. A linha
                 // inteira é um alvo de toque no telemóvel — é dos sítios desta
                 // pasta onde o carregar mais precisava de resposta.
-                className={`alvo-toque group block w-full rounded-xl border border-foreground/[0.08] bg-white p-3 text-left hover:border-[#4d6350]/40 active:bg-[#4d6350]/[0.05] ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque group block w-full p-3.5 text-left hover:bg-[#4d6350]/[0.04] active:bg-[#4d6350]/[0.08] ${ESTADO} ${PRESSAO}`}
               >
                 {cartao(item)}
               </button>
             ) : (
-              <div className="group rounded-xl border border-foreground/[0.08] bg-white p-3">
-                {cartao(item)}
-              </div>
+              <div className="group p-3.5">{cartao(item)}</div>
             )}
           </li>
         ))}

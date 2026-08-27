@@ -4720,7 +4720,10 @@ export default function AdminClient({
                 A partir de `lg` o painel é sempre visível e o botão desaparece:
                 no computador há largura para tudo numa fila, e era assim que já
                 estava. */}
-            <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 sm:gap-3 mb-2.5 sm:mb-4 lg:mb-6">
+            <div
+              style={{ "--cena": 0 } as React.CSSProperties}
+              className="bo-cena flex flex-col lg:flex-row lg:items-center gap-2.5 sm:gap-3 mb-2.5 sm:mb-4 lg:mb-6"
+            >
               <div className="flex items-center gap-2 lg:flex-1 lg:max-w-md">
                 <div className="relative flex-1">
                   <svg
@@ -4952,7 +4955,10 @@ export default function AdminClient({
 
                 `py-1` não é enfeite: `overflow-x` recorta também na vertical, e
                 sem essa folga o anel de foco das pastilhas ficava cortado. */}
-            <div className="flex flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible gap-1.5 py-1 mb-3 sm:mb-5 lg:mb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              style={{ "--cena": 1 } as React.CSSProperties}
+              className="bo-cena flex flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible gap-1.5 py-1 mb-3 sm:mb-5 lg:mb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {!showArchived && (
                 <>
                   <button
@@ -5136,7 +5142,10 @@ export default function AdminClient({
               }`}
             >
               {/* List */}
-              <div className="flex min-w-0 flex-col gap-3">
+              <div
+                style={{ "--cena": 2 } as React.CSSProperties}
+                className="bo-cena flex min-w-0 flex-col gap-3"
+              >
                 {filtered.length === 0 && (
                   <div className="bo-card">
                     <EmptyState
