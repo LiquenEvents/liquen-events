@@ -194,7 +194,7 @@ jobs:
         # `@propostas` corre no seu próprio passo bloqueante, com config e
         # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
         # este servidor é o de produção e recusa escritas sem Supabase.
-        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria"
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -229,6 +229,26 @@ jobs:
       # continua a parecer bem com fotos três vezes maiores do que precisa. Foi
       # exactamente assim que ela chegou a 55 MB por travessia sem ninguém dar
       # por isso — e um passo que avisa e deixa passar é um passo que se ignora.
+      # BLOQUEANTE. O PESO DO BACK OFFICE, que até aqui não era medido por
+      # ninguém: os orçamentos do `lighthouserc.json` cobrem seis páginas e são
+      # todas do sítio público. O painel que ela abre todos os dias no telemóvel
+      # nunca teve teto nenhum.
+      #
+      # Mede BYTES e número de pedidos, e não milissegundos: o tempo desta
+      # máquina não diz nada sobre um 4G de quinta, mas os bytes que se mandam
+      # são os mesmos nos dois sítios. Um teto em tempo seria um vermelho que
+      # aparece quando o runner está ocupado — e um vermelho que não quer dizer
+      # nada é um vermelho que se aprende a ignorar.
+      #
+      # Bloqueante porque isto regride em silêncio: uma biblioteca nova entra
+      # com uma funcionalidade e ninguém volta a olhar para o número.
+      - name: Peso do back office (bloqueante)
+        run: npx playwright test --grep "@desempenho"
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
       - name: Desempenho da galeria (bloqueante)
         run: npx playwright test --grep "@galeria"
         env:
