@@ -101,6 +101,7 @@ import {
   type Coluna,
 } from "./ui";
 import { MoreMenu } from "./MoreMenu";
+import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import {
   Overview,
   Kanban,
@@ -2320,6 +2321,20 @@ export default function AdminClient({
       observador?.disconnect();
     };
   }, [selected, isDetailOverlay, drawerRef]);
+
+  /**
+   * ── AS VERSÕES LEVES DAS FOTOGRAFIAS FAZEM-SE ENQUANTO ELA TRABALHA ──────
+   *
+   * Uma linha aqui porque é aqui que o back office abre, e a lista de
+   * fotografias por converter só se limpa se alguém a limpar. O porquê inteiro
+   * — os 1099 KB de um original contra os 20 KB de uma miniatura, e as duas
+   * únicas portas que isto tinha antes (um botão e as sobras de um cron
+   * diário) — está em `varrer-derivadas.ts`.
+   *
+   * Não pede rede a ela: o trabalho pesado é do servidor, e o que sai daqui é
+   * um POST pequeno de cada vez.
+   */
+  useEffect(() => varrerDerivadasEmFundo(), []);
 
   // Lock background scroll while the detail drawer is open as a mobile overlay
   // (mirrors the nav-drawer lock above). The inline xl panel never locks.
