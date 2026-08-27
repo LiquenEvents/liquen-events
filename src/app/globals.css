@@ -967,6 +967,27 @@ body:has([data-cream-page]) [data-public-nav] {
   --color-moss: var(--color-moss-dark);
 }
 
+/* ── O MESMO ANEL, DOIS AFASTAMENTOS ──────────────────────────────────────
+   Da análise da loja da Apple: `--sk-focus-offset: 1px` nos controlos e
+   `--sk-focus-offset-container: 3px` nos contentores. Dois afastamentos, e a
+   razão é boa — um anel colado a um cartão grande LÊ-SE COMO BORDA, não como
+   foco. É o detalhe que separa «temos foco visível» de «temos um sistema de
+   foco».
+
+   Aqui o anel de base já tem dois píxeis de folga (a auréola da cor da
+   superfície, antes do musgo). Esta classe abre-a para quatro, e é para os
+   alvos que são CAIXAS e não controlos: uma linha inteira de uma lista, um
+   cartão de dinheiro com cem píxeis de altura. Num botão de 32 px, quatro
+   píxeis de folga seriam um halo à volta de nada; numa linha de 80, dois
+   píxeis colados à moldura são indistinguíveis da moldura.
+
+   Mesma cor, mesma espessura, mesma transição: o que muda é a distância. */
+.foco-largo:focus-visible {
+  box-shadow:
+    0 0 0 4px var(--color-surface),
+    0 0 0 6px rgba(76, 97, 80, 0.95);
+}
+
 /* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
    point — a heading moved into focus after a route change is not a control, and
    the ring above drew a hard box around it for every visitor. Needed as a real

@@ -1840,7 +1840,7 @@ export default function Overview({
                A partir de 640 tudo volta a `block`, e a ordem do DOM — número,
                rótulo, frase — é a que se vê. A ordem do DOM não muda em lado
                nenhum, portanto quem ouve a página ouve sempre o mesmo. */
-            className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            className={`foco-largo flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
             <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
