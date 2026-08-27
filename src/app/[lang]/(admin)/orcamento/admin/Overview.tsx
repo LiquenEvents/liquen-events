@@ -1801,7 +1801,15 @@ export default function Overview({
       <div
         role="group"
         aria-label="Dinheiro — ganho, à espera e recebido"
-        className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-[1.4fr_1fr_1fr] sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
+        /* A cascata entra no GRUPO e não em cada número. Medido no browser,
+           com dados verdadeiros, antes desta correcção: o `--cena` saía
+           `0, 2, 2, 2, 3` — o `2` três vezes, porque a classe tinha caído
+           DENTRO do `.map()` dos três valores. Os três cartões animavam-se
+           cada um por si e o bloco a que pertencem não se animava de todo.
+           Uma cascata de blocos que anima filhos não é uma cascata: é um
+           tremor. */
+        style={{ "--cena": 2 } as React.CSSProperties}
+        className="bo-cena flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-[1.4fr_1fr_1fr] sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
       >
         {[
           {
@@ -1841,10 +1849,7 @@ export default function Overview({
                nenhum, portanto quem ouve a página ouve sempre o mesmo. */
             className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
-            <div
-              style={{ "--cena": 2 } as React.CSSProperties}
-              className="bo-cena order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between"
-            >
+            <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
                 className="font-bold leading-none"
                 style={{
