@@ -286,7 +286,7 @@ export default function CriarAPartirDe({
         onKeyDown={teclas}
       >
         <div className="border-b border-[var(--bo-hairline-strong)] px-5 py-4">
-          <h2 id="cad-titulo" className="font-serif text-lg text-[var(--bo-text)]">
+          <h2 id="cad-titulo" className="font-display text-lg text-[var(--bo-text)]">
             Criar a partir de…
           </h2>
           <p className="mt-1 text-xs text-foreground/50">

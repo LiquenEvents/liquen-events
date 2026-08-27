@@ -186,7 +186,7 @@ function Capa({
           style={{ width: cq(52), height: cq(1.1), background: DOURADO }}
         />
         <p
-          className="mt-[3cqw] font-serif leading-tight"
+          className="mt-[3cqw] font-display leading-tight"
           style={{ fontSize: cq(40), color: CREME }}
         >
           {resumo.titulo || "—"}
@@ -194,7 +194,7 @@ function Capa({
         {resumo.linhas.map((l, i) => (
           <p
             key={i}
-            className={i === 0 ? "mt-[2.5cqw]" : "mt-[1.4cqw] font-serif italic"}
+            className={i === 0 ? "mt-[2.5cqw]" : "mt-[1.4cqw] font-display-italico"}
             style={{
               fontSize: cq(11),
               color: i === 0 ? CREME_APAGADO : "#8d8f88",
@@ -231,7 +231,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
         </p>
       )}
       <p
-        className="absolute truncate font-serif text-[var(--bo-text)]"
+        className="absolute truncate font-display text-[var(--bo-text)]"
         style={{
           left: pct(PAGINA_M, PAGINA_W),
           right: pct(PAGINA_M, PAGINA_W),
@@ -259,7 +259,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
            em pequenino — quem olhasse para a grelha via uma folha discreta em
            vez de um problema. */
         <p
-          className="absolute font-serif italic"
+          className="absolute font-display-italico"
           style={{
             left: pct(PAGINA_M, PAGINA_W),
             right: pct(PAGINA_M, PAGINA_W),
@@ -286,7 +286,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
               <p
                 key={i}
                 className={`truncate ${
-                  rubrica ? "font-serif text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-muted)]"
+                  rubrica ? "font-display text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-muted)]"
                 }`}
                 style={{
                   fontSize: cq(rubrica ? 11 : CORPO),
