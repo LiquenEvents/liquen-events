@@ -410,34 +410,37 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-tinta-10: rgba(13, 13, 13, 0.1);
   --bo-tinta-13: rgba(13, 13, 13, 0.13);
 
-  /* ── UMA CURVA, DUAS VELOCIDADES, UM DEGRAU ──────────────────────────────
-     Medido nos dois sites de referência: a Pixelmatters usa
-     `cubic-bezier(.4,0,.2,1)` em tudo; a Apple usa `cubic-bezier(0,0,.5,1)`,
-     contada 23 vezes numa página. São curvas diferentes com a MESMA
-     propriedade — nenhuma tem `ease-in`. Arrancam a fundo e travam no fim, que
-     é a curva de uma coisa que já vinha a caminho. Uma coisa que acelera
-     devagar parece estar a decidir se vem.
+  /* ── A ESCADA DE ENTRADA: DEGRAUS DE 20 ms, SEIS, E PÁRA ─────────────────
+     A Apple tem esta escada ESCRITA no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
+     0,26 / 0,28 / 0,30 s. Degraus de vinte milissegundos, seis, e pára. O
+     desfasamento existe para o olho ler ORDEM DE LEITURA, não para dar
+     espectáculo: ao sexto item essa informação já foi dada, e a partir daí o
+     atraso só acrescenta espera.
 
-     E duas velocidades, não uma escala: 0,1 s para COR (a Apple tem
-     `background-color 0.1s linear` quinze vezes) e 0,3 s para FORMA
-     (`transform 0.3s`, vinte e três vezes). A regra por trás é a de que
-     nenhuma resposta a um clique ou a um rato passa dos 300 ms nos dois sites
-     — acima disso deixa de parecer resposta e passa a parecer processamento.
+     ── E AS CURVAS E OS TEMPOS DA ANÁLISE? JÁ CÁ ESTAVAM ───────────────────
 
-     O terceiro tempo, 0,2 s, é o SINAL. Nos filtros da Pixelmatters o texto
-     acende aos 200 ms e a pílula chega aos 300: separar o «ouvi-te» do «e
-     agora mostro-te» é o que faz o clique parecer imediato e o movimento
-     parecer caro, em vez de obrigar a escolher entre os dois.
+     A análise pede «uma curva para o sítio inteiro, sem ease-in» e propõe a
+     `cubic-bezier(.4,0,.2,1)` da Pixelmatters. Escrevi-a aqui como um token
+     novo e estava errado: esta casa JÁ tem uma curva única — a
+     `--ease-out: cubic-bezier(0.16, 1, 0.3, 1)` do `:root`, que é também o
+     `--default-transition-timing-function` do `@theme`, ou seja, sai em todos
+     os ~322 utilitários `transition-*` sem ninguém a pedir. Cumpre o princípio
+     («arranca depressa, trava, zero ease-in») e cumpre-o com mais desaceleração
+     do que qualquer das duas referências.
 
-     O degrau de 20 ms é a escada de atrasos que a Apple tem ESCRITA no CSS —
-     0,20 / 0,22 / 0,24 / 0,26 / 0,28 / 0,30 s. Seis degraus, e pára. O
-     desfasamento serve para o olho ler ordem de leitura; ao sexto item essa
-     informação já foi dada, e continuar só acrescenta espera. */
-  --bo-curva: cubic-bezier(0.4, 0, 0.2, 1); /* tudo o que muda de estado */
-  --bo-curva-entra: cubic-bezier(0, 0, 0.5, 1); /* o que ENTRA: avisos, painéis */
-  --bo-t-cor: 0.1s; /* cor e opacidade */
-  --bo-t-sinal: 0.2s; /* «ouvi-te» — chega antes do movimento */
-  --bo-t-forma: 0.3s; /* posição, tamanho, abertura de painel */
+     E a curva que eu tinha acrescentado é, letra por letra, a que esta casa
+     RECUSOU por escrito: o comentário do `@theme` conta que ~300 transições
+     estavam nela por omissão e foram convergidas de propósito para a
+     assinatura, e o `ui/movimento.ts` diz «não se desfaz isso a partir daqui».
+     Acrescentar uma segunda curva era fazer ao movimento o que os quarenta e
+     sete cinzentos faziam à cor — que é o defeito que este trabalho todo veio
+     tirar.
+
+     Os TEMPOS, o mesmo: 0,1 s / 0,2 s / 0,3 s são a proposta da análise, e a
+     casa já tem três degraus escolhidos e medidos — 20 ms para o toque, 120 ms
+     para o estado, 250 ms para o que se move (`lib/motion/tokens.ts`,
+     `ui/movimento.ts`). Ficam esses. O que a análise acrescenta de novo, e que
+     aqui faltava mesmo, é o DEGRAU DE GRUPO com tecto. */
   --bo-degrau: 20ms; /* escada de entrada, no máximo seis */
   --bo-degraus-max: 5; /* o sexto degrau é o índice 5 */
 
@@ -1344,7 +1347,7 @@ body {
    contar até trinta punha a última a começar seis décimos de segundo depois
    da primeira — que é precisamente a sensação que isto existe para evitar. */
 .bo-cena {
-  animation: bo-cena 600ms var(--bo-curva-entra) backwards;
+  animation: bo-cena 600ms var(--ease-out) backwards;
   animation-delay: calc(min(var(--cena, 0), var(--bo-degraus-max)) * var(--bo-degrau));
 }
 @media (prefers-reduced-motion: reduce) {
