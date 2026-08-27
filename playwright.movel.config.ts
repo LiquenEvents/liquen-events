@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { ESTADO_ADMIN } from "./e2e/estado-admin";
 
 /**
  * A ERGONOMIA TÁCTIL DO BACK OFFICE — com o seu próprio servidor.
@@ -38,14 +39,21 @@ const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["**/admin-mobile.spec.ts"],
+  testMatch: ["**/admin-mobile.spec.ts", "**/sessao-admin.setup.ts"],
   // Em série: os passeios criam pedidos e mexem na mesma lista.
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : "list",
   use: { baseURL, trace: "on-first-retry" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "sessao", testMatch: /sessao-admin\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },
+      dependencies: ["sessao"],
+    },
+  ],
   webServer: {
     command: `npm run dev -- --port ${PORT}`,
     url: baseURL,

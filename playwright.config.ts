@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { ESTADO_ADMIN } from "./e2e/estado-admin";
 
 /**
  * End-to-end tests for the critical user journeys. Run with `npm run test:e2e`.
@@ -52,7 +53,18 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // Entra uma vez e guarda a sessão. A razão por extenso está no próprio
+    // ficheiro: o tecto de oito entradas por minuto é do produto e está certo,
+    // e uma suite que entra trinta vezes tranca-se sozinha à porta.
+    { name: "sessao", testMatch: /sessao-admin\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      testIgnore: ["**/*.setup.ts"],
+      use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },
+      dependencies: ["sessao"],
+    },
+  ],
   webServer: {
     command: process.env.CI ? "npm run start" : "npm run dev",
     url: baseURL,

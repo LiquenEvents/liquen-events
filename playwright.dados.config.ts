@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { ESTADO_ADMIN } from "./e2e/estado-admin";
 
 /**
  * OS PASSEIOS QUE PRECISAM DE UM PEDIDO NA LISTA — com o seu próprio servidor.
@@ -66,6 +67,13 @@ export default defineConfig({
   reporter: process.env.CI ? [["html", { open: "never" }], ["list"]] : "list",
   use: { baseURL, trace: "on-first-retry" },
   projects: [
+    // Entra uma vez; o resto da passagem herda a sessão. O porquê está no
+    // `e2e/sessao-admin.setup.ts`.
+    {
+      name: "sessao",
+      testMatch: ["**/sessao-admin.setup.ts"],
+      use: { ...devices["Desktop Chrome"] },
+    },
     // Paga a compilação das rotas pesadas uma vez, antes de tudo. A razão está
     // em `e2e/aquecer.setup.ts`; em duas palavras: `next dev` compila à
     // primeira visita, e um clique numa página ainda por hidratar não faz nada
@@ -73,7 +81,8 @@ export default defineConfig({
     {
       name: "aquecer",
       testMatch: ["**/aquecer.setup.ts"],
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },
+      dependencies: ["sessao"],
     },
     {
       name: "chromium",
@@ -86,7 +95,7 @@ export default defineConfig({
         "**/temas.spec.ts",
         "**/caca/a02-editor-stress.spec.ts",
       ],
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },
       dependencies: ["aquecer"],
     },
   ],

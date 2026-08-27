@@ -121,3 +121,6 @@ instagram-export/
 # em qualquer medição local. São o RESULTADO de uma medição, não código, e o
 # que interessa deles são os números escritos no commit que os motivou.
 .lighthouseci/
+
+# A sessão de administração que os passeios guardam para não voltarem a entrar.
+e2e/.auth/

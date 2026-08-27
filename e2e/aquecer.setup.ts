@@ -1,5 +1,5 @@
 import { test as setup, expect } from "@playwright/test";
-import { exigirLogin, garantirPedido } from "./semear-pedido";
+import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido";
 
 /**
  * AQUECER O SERVIDOR DE DESENVOLVIMENTO, UMA VEZ, ANTES DE TUDO.
@@ -30,18 +30,13 @@ import { exigirLogin, garantirPedido } from "./semear-pedido";
 setup("aquecer as rotas pesadas do back office", async ({ page }) => {
   setup.setTimeout(240_000);
 
-  await page.goto("/orcamento/admin");
-  await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
+  // Pelo ajudante partilhado e não pelo formulário à mão: com a sessão já
+  // guardada pelo `sessao-admin.setup.ts`, o painel abre directo e não há
+  // formulário nenhum para encher. Escrito à mão, este passo esperava por um
+  // «Painel de Gestão» que já não aparece — e gastava uma entrada a mais no
+  // contador de oito por minuto.
+  exigirLogin(await entrarNoBackOffice(page));
   const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
-  exigirLogin(
-    await nav
-      .waitFor({ state: "visible", timeout: 60_000 })
-      .then(() => true)
-      .catch(() => false),
-  );
 
   // O pedido de que todos os passeios precisam, criado uma só vez.
   const quoteId = await garantirPedido(page);

@@ -14,6 +14,7 @@ import {
   irParaDestinoMovel,
   NA_BARRA_DE_BAIXO,
 } from "./ergonomia-tactil.mjs";
+import { entrarNoBackOffice } from "./semear-pedido";
 
 /**
  * Mobile back-office smoke test (~390px phone, touch).
@@ -59,22 +60,11 @@ function collectErrors(page: Page) {
 }
 
 async function login(page: Page): Promise<boolean> {
-  await page.goto("/orcamento/admin");
-  await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  // O campo pelo `name`: o rótulo «Palavra-passe» é agora partilhado com o botão
-  // de mostrar/ocultar, e o botão de entrar diz por que caminho se entra (a
-  // passkey passou a ser o primeiro, com o botão principal).
-  await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
-  try {
-    await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
-      timeout: 8000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  // Pelo ajudante partilhado: com a sessão guardada pelo
+  // `sessao-admin.setup.ts` ele encontra o painel aberto e não gasta entrada
+  // nenhuma no tecto de oito por minuto. Sete passeios em fila entravam sete
+  // vezes em quarenta segundos, e o oitavo apanhava o 429.
+  return entrarNoBackOffice(page);
 }
 
 /**
@@ -179,6 +169,26 @@ async function garantirUmPedido(page: Page): Promise<void> {
  * `ViewSkeleton`) tem de ter saído, e o `<main>` tem de ter conteúdo próprio.
  */
 async function esperarPelaVista(page: Page, label: string) {
+  /**
+   * PRIMEIRO, ESPERAR QUE O PAINEL TENHA HIDRATADO.
+   *
+   * `body.admin-mode` entra num efeito do `AdminClient`, portanto é a marca de
+   * que o React chegou. Antes disso o que está no ecrã é HTML do servidor, e
+   * medir aí é medir a chegada do React em vez da interface: o `inert` da
+   * gaveta fechada depende de um `matchMedia` que ainda não correu, e o
+   * auditor acusava seis botões «focáveis fora do ecrã» que, um instante
+   * depois, deixam de o ser.
+   *
+   * Isto não é varrer nada para debaixo do tapete — o que se via ANTES de
+   * hidratar e se via a olho foi corrigido: as maiúsculas do back office
+   * deixaram de esperar pela classe e passaram a sair já certas do servidor
+   * (ver `globals.css`). O que fica a depender do JS é o que só o JS pode
+   * saber, e mede-se quando ele chega.
+   */
+  await expect(
+    page.locator("body.admin-mode"),
+    `"${label}": o painel ainda não hidratou (\`body.admin-mode\` por chegar).`,
+  ).toHaveCount(1);
   await expect(
     page.locator("[data-view-skeleton]"),
     `"${label}": o esqueleto ainda está no ecrã — a vista não montou, e medi-la agora ` +
@@ -211,6 +221,28 @@ async function esperarPelaVista(page: Page, label: string) {
  */
 async function expectErgonomiaTactil(page: Page, label: string) {
   await esperarPelaVista(page, label);
+  /**
+   * REPETE-SE ATÉ ASSENTAR, E A RAZÃO É UMA REGRA E NÃO UM TRUQUE.
+   *
+   * Um achado de ergonomia tem de ser ESTÁVEL para valer alguma coisa: um
+   * botão que está mal tapado durante um quadro e bem no seguinte não é um
+   * problema de toque — ninguém consegue lá tocar nesse quadro.
+   *
+   * O que motivou isto: o `inert` da gaveta fechada depende de um efeito com
+   * `matchMedia` que corre DEPOIS do efeito que põe `body.admin-mode`. Entre
+   * um e outro há uma fresta em que os botões da gaveta ainda não são inertes,
+   * e o auditor acusava seis de estarem «focáveis fora do ecrã». Um instante
+   * depois estavam todos certos.
+   *
+   * A alternativa era esperar um tempo fixo — que é como se escreve um teste
+   * que passa hoje e falha na máquina lenta de amanhã.
+   */
+  await expect(async () => {
+    await auditarUmaVez(page, label);
+  }).toPass({ timeout: 10_000 });
+}
+
+async function auditarUmaVez(page: Page, label: string) {
   const r = (await page.evaluate(AUDITOR)) as {
     examinados: number;
     pequenos: Parameters<typeof descreverAlvo>[0][];
