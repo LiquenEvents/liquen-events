@@ -103,6 +103,11 @@ import {
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import {
+  faltaADataDoEvento,
+  AVISO_SEM_DATA,
+  PORQUE_FALTA_A_DATA,
+} from "@/lib/orcamento/data-em-falta";
+import {
   Overview,
   Kanban,
   Clientes,
@@ -542,7 +547,20 @@ function COLUNAS_DE_PEDIDOS(ctx: {
                 ÚNICO ecrã onde ele chegava à frente de alguém. Em todo o resto
                 da aplicação — cartões, calendário, propostas, dossier — a data
                 está escrita em português. Ver `dataCurta`. */}
-            {dataCurta(q.date) || "—"}
+            {/* F-15 da auditoria: aqui estava só «—». Um travessão não é um
+                aviso — é um espaço em branco com um caracter dentro. Ver
+                `data-em-falta.ts` para a fronteira (só depois de a proposta
+                seguir). */}
+            {faltaADataDoEvento(q) ? (
+              <span
+                className="inline-flex items-center rounded-full bg-[#c98a2e]/12 px-2 py-0.5 text-[11px] font-medium text-[#8a6420]"
+                title={PORQUE_FALTA_A_DATA}
+              >
+                {AVISO_SEM_DATA}
+              </span>
+            ) : (
+              dataCurta(q.date) || "—"
+            )}
             {cd && cd.tone !== "past" && (
               <span
                 className={`ml-1.5 text-[10px] ${
@@ -827,6 +845,19 @@ const QuoteCard = memo(function QuoteCard({
             de outra maneira (fuso horário, visita impossível, tudo por
             escrito). Uma das ausências sozinha não bastava: datas por marcar há
             às dezenas em casamentos de Évora. */}
+        {/* F-15: no cartão a data em falta nem «—» tinha — a fila de factos
+            simplesmente não a mencionava, e um facto que não aparece lê-se
+            como um facto que está bem. */}
+        {faltaADataDoEvento(q) && (
+          <div className="mt-2.5">
+            <span
+              className="inline-flex items-center rounded-full bg-[#c98a2e]/12 px-2 py-0.5 text-[11px] font-medium text-[#8a6420]"
+              title={PORQUE_FALTA_A_DATA}
+            >
+              {AVISO_SEM_DATA}
+            </span>
+          </div>
+        )}
         {ctx.destination && (
           <div className="mt-2.5">
             <span
