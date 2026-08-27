@@ -3607,16 +3607,15 @@ export default function AdminClient({
 
   return (
     <>
-      {/* `-mt-24` CANCELA O `pt-24` DO `<main>` GLOBAL, NO PRIMEIRO DESENHO.
-          Isto era feito por CSS (`body.admin-mode main { padding-top: 0 }`), e
-          a classe `admin-mode` só entra num `useEffect` — ou seja, DEPOIS de o
-          browser já ter desenhado os 96 px de padding. O resultado era o back
-          office inteiro a saltar 96 px para cima assim que o React montava:
-          **0,128 de CLS**, medido, o maior salto de todos os ecrãs auditados, e
-          em todas as entradas.
-          Em `className` vai no HTML que o servidor manda, portanto não há
-          instante nenhum em que a página esteja na posição errada. */}
-      <div className="-mt-24 min-h-screen bg-surface flex">
+      {/* Houve aqui um `-mt-24` a cancelar o `pt-24` do `<main>` do cromado do
+          sítio — em `className` e não em CSS, porque a versão em CSS dependia
+          da classe `admin-mode`, que só entra num efeito, e o salto de 96 px à
+          montagem valia 0,128 de CLS medidos.
+          Saiu com o cromado: o back office no grupo `(admin)` já não tem
+          `pt-24` para cancelar, e o `<main>` que faltava está no layout do
+          grupo. Enquanto os dois se cruzaram, a raiz começava a `top: -96px` —
+          os primeiros 96 px do back office estavam fora do ecrã. */}
+      <div className="min-h-screen bg-surface flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         {/* Repor uma cópia troca os dados TODOS no servidor, e a lista que está
             aqui em memória não tem como saber o que mudou. É o único sítio onde

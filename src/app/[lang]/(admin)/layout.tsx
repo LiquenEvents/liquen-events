@@ -64,6 +64,35 @@
  * servidor, que o CSS lê com `body:has(...)` no primeiro pixel. A classe
  * `admin-mode` continua a existir e fica para o que depende mesmo de JS.
  */
+/**
+ * ── E O `<main>`, QUE VINHA DE CARONA NO CROMADO ───────────────────────────
+ *
+ * Isto era um `<div>`, e faltava-lhe uma coisa que ninguém tinha reparado que
+ * o back office nunca teve por si: o marco `<main>`.
+ *
+ * Ele vinha do `CromadoDoSitio` — `<main id="conteudo" className="flex-1
+ * pt-24">` —, e ao tirar o cromado daqui foi-se com ele. MEDIDO no browser,
+ * depois da mudança e antes desta correcção:
+ *
+ *     document.querySelector("main")            →  null
+ *     raiz do back office, topo no ecrã         →  −96 px
+ *
+ * Duas coisas de uma vez. Um leitor de ecrã deixou de ter para onde saltar; e
+ * os 96 px de cima do back office ficaram FORA do ecrã, porque cada raiz do
+ * back office trazia um `-mt-24` cujo único trabalho era cancelar o `pt-24`
+ * daquele `<main>`. Cancelado o cancelamento, sobrou a subtracção.
+ *
+ * Foi a suite de telemóvel que apanhou isto — `main li button` deixou de
+ * encontrar seja o que for — e é a razão de ela existir.
+ *
+ * Sem `pt-24`, como no `(privado)/layout.tsx` e no `s/layout.tsx`: aqui não há
+ * barra de navegação por cima, e a página começa onde a página começa. Os
+ * `-mt-24` das raízes saíram todos no mesmo movimento.
+ */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <div data-admin-mode>{children}</div>;
+  return (
+    <main id="conteudo" data-admin-mode className="flex-1">
+      {children}
+    </main>
+  );
 }

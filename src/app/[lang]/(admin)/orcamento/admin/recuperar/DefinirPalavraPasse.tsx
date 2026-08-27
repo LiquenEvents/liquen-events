@@ -67,7 +67,7 @@ export default function DefinirPalavraPasse({ token }: { token: string }) {
 
   return (
     <div
-      className="-mt-24 min-h-screen flex items-center justify-center px-4 py-12"
+      className="min-h-screen flex items-center justify-center px-4 py-12"
       style={{ background: "linear-gradient(180deg, #ffffff 0%, #f4f5f3 100%)" }}
     >
       <div className="w-full max-w-sm flex flex-col items-center gap-8">

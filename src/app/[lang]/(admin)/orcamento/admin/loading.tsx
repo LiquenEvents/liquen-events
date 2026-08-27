@@ -19,24 +19,21 @@ export default function AdminLoading() {
     // as outras — quem lá chegar sem JS vê o que há, não um esqueleto eterno.
     <div
       /**
-       * `-mt-24`: MEDIDO a 375×667. O `<main>` público tem `pt-24` (96 px) e
-       * o globals.css diz, por extenso, que o `padding-top: 0` da classe
-       * `admin-mode` saiu de lá para o `className` de CADA raiz do back
-       * office, porque a classe só entra num efeito e o salto valia 0,128 de
-       * CLS. Esta raiz — a PRIMEIRA que ela vê, antes de haver ecrã nenhum —
-       * ficou sem o `-mt-24`:
+       * ── AQUI HOUVE UM `-mt-24`, E O TRABALHO DELE ACABOU ─────────────────
        *
-       *                        cabeçalho do esqueleto   cabeçalho a sério
-       *   antes                      y = 96 px                y = 0
-       *   depois                     y = 0                    y = 0
+       * Cancelava o `pt-24` do `<main>` do `CromadoDoSitio`, e cancelava-o no
+       * `className` — servido pelo servidor — porque a versão em CSS dependia
+       * da classe `admin-mode`, que só entra num efeito: o back office saltava
+       * 96 px para cima ao montar, e isso valia 0,128 de CLS medidos.
        *
-       * Ou seja: o esqueleto desenhava-se 96 px mais abaixo do que a coisa
-       * que vinha a seguir, e ao chegar o back office (ou o ecrã de entrada,
-       * que também traz o seu `-mt-24`) tudo subia esses 96 px de uma vez. Era
-       * exactamente o salto que aquele comentário do globals.css descreve, no
-       * único sítio onde ainda faltava a cura.
+       * Ao sair para o grupo `(admin)`, o back office deixou de ter aquele
+       * cromado — e portanto deixou de ter o `pt-24` e o `<main>`. O `-mt-24`
+       * ficou a subtrair 96 px a coisa nenhuma: MEDIDO no browser, a raiz do
+       * back office começava a `top: -96px`, com os primeiros 96 px fora do
+       * ecrã. O `<main>` que faltava está agora no `(admin)/layout.tsx`, sem
+       * padding nenhum, e não há nada para cancelar.
        */
-      className="ecra-de-espera -mt-24 min-h-screen bg-surface flex"
+      className="ecra-de-espera min-h-screen bg-surface flex"
       role="status"
       aria-busy="true"
       aria-label="A carregar o back office"

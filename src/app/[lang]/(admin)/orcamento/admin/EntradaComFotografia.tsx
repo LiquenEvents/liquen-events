@@ -26,7 +26,7 @@ import {
  *       </div>
  *     </EntradaComFotografia>
  *
- * O `-mt-24`, o `min-h-screen`, a centragem e o gradiente do fundo vivem TODOS
+ * O `min-h-screen`, a centragem e o gradiente do fundo vivem TODOS
  * aqui dentro — o `AdminLogin` não os repete. Quem lá mexer não precisa de
  * saber mais do que isto; o resto deste cabeçalho é o PORQUÊ das escolhas, que
  * é o que não se consegue reconstituir a olhar para o código.
@@ -301,8 +301,6 @@ export function EntradaComFotografia({ children }: { children: ReactNode }) {
 
   return (
     <div
-      // `-mt-24`: ver a nota no AdminLogin. Cancela o `pt-24` do `<main>` global
-      // logo no primeiro desenho, em vez de esperar por um efeito.
       /**
        * 62/38 e não 50/50.
        *
@@ -316,7 +314,7 @@ export function EntradaComFotografia({ children }: { children: ReactNode }) {
        * cartão de 384 px mais o respiro lateral (`px-4`) sem o apertar num
        * portátil de 1280 px, onde 38% são 486 px.
        */
-      className="-mt-24 min-h-screen lg:grid lg:grid-cols-[62fr_38fr]"
+      className="min-h-screen lg:grid lg:grid-cols-[62fr_38fr]"
     >
       {/* ── O painel da fotografia ─────────────────────────────────────── */}
       {foto && (
