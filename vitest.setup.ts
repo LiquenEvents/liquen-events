@@ -36,6 +36,15 @@ if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
  */
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class {
+    // O construtor recebe a função, como o verdadeiro, mesmo não a usando. Sem
+    // ele, a análise estática desta casa resolvia `new ResizeObserver(medir)`
+    // do `ui/Segmented.tsx` para ESTE esboço — uma classe anónima sem
+    // construtor — e acusava «argumento a mais no construtor». Um alerta a
+    // apontar para código de produção, nascido de um esboço de teste, é pior do
+    // que não ter alerta nenhum: ensina a ignorá-los.
+    constructor(_aoMudar: ResizeObserverCallback) {
+      void _aoMudar;
+    }
     observe() {}
     unobserve() {}
     disconnect() {}
