@@ -1766,7 +1766,6 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
     // Passou para baixo do botão, em letra pequena, com a frase que diz para
     // que serve — mas continua lá, que era a razão de estar no cartão.
     expect(enviado().html).toContain("Proposta-Liquen-Events");
-    expect(enviado().html).toContain("É o mesmo documento que segue em anexo");
   });
 
   /**
@@ -1800,40 +1799,54 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
   });
 
   /**
-   * ── E OS DOIS BOTÕES DESTE EMAIL MEDEM O MESMO ────────────────────────────
+   * ── UM BOTÃO CHEIO, UM LINK — E OS DOIS CABEM NO POLEGAR ──────────────────
    *
-   * São dois — «Ver a proposta» e «Abrir a proposta» — e no corpo de recurso
-   * aparecem um debaixo do outro. Tinham 39 px e 37 px de altura, com letra de
-   * 13 px: sete píxeis abaixo dos 44 do alvo de toque da casa, num email que
-   * se abre quase sempre no telemóvel e onde um clique falhado é um casal a
-   * desistir de ler.
+   * O email tinha DOIS rectângulos verdes do mesmo tamanho, um por cima do
+   * outro: «Ver a proposta →» e «Abrir a proposta →». Fazem coisas diferentes e
+   * não havia como saber qual era qual. Duas coisas com o mesmo peso não são
+   * uma hierarquia.
    *
-   * Lê-se da FONTE e não do email enviado, de propósito: os dois botões não
-   * aparecem os dois em nenhum dos caminhos que este ficheiro consegue montar
-   * — o do modelo guardado leva só um. Um teste que só mede o que a fixture
-   * alcança deixava o outro por medir, que é como ele chegou aos 39.
+   * Ficou um botão cheio — a página onde o casal responde — e um link para o
+   * PDF, que é o outro caminho para o mesmo documento.
+   *
+   * O que este teste guarda é a MEDIDA, que é o defeito de origem deste bloco:
+   * o botão tinha 37 px e o irmão 39, num email que se abre quase sempre no
+   * telemóvel. Minimalismo não é encolher o que se toca.
+   *
+   * Lê-se da fonte e não do email enviado: os dois não aparecem juntos em
+   * nenhum caminho que a fixture consiga montar, e um teste que só mede o que a
+   * fixture alcança deixava um por medir — que é como ele chegou aos 39.
    */
-  it("e os dois botões do email são desenhados com a mesma medida", () => {
+  it("o botão e o link do email têm os 44 px de alvo", () => {
     const fonte = fs.readFileSync(
       path.join(process.cwd(), "src/app/api/orcamento/[id]/proposta-doc/route.ts"),
       "utf8",
     );
-    const desenhos = [
-      ...fonte.matchAll(/padding:(\d+)px \d+px;font-size:(\d+)px;line-height:(\d+)px/g),
-    ].map(([, pad, fs_, lh]) => ({
+    const alvos = [
+      ...fonte.matchAll(/padding:(\d+)px [^";]*;font-size:(\d+)px;line-height:(\d+)px/g),
+    ].map(([, pad, letra, lh]) => ({
       altura: Number(pad) * 2 + Number(lh),
-      letra: Number(fs_),
+      letra: Number(letra),
     }));
-    expect(desenhos.length, "não encontrei os dois botões na fonte da rota").toBe(2);
-    for (const d of desenhos) {
-      expect(d.altura, `um botão tem ${d.altura} px de altura`).toBeGreaterThanOrEqual(44);
-      expect(d.letra, `um botão tem letra de ${d.letra} px`).toBeGreaterThanOrEqual(16);
-    }
     expect(
-      new Set(desenhos.map((d) => `${d.altura}/${d.letra}`)).size,
-      `os dois botões do mesmo email não medem o mesmo: ${desenhos
-        .map((d) => `${d.altura}px/${d.letra}px`)
-        .join(" e ")} — leem-se como dois produtos`,
+      alvos.length,
+      "não encontrei o botão e o link do PDF na fonte da rota",
+    ).toBeGreaterThanOrEqual(2);
+    for (const a of alvos) {
+      expect(a.altura, `um alvo do email tem ${a.altura} px de altura`).toBeGreaterThanOrEqual(44);
+      expect(a.letra, `um alvo do email tem letra de ${a.letra} px`).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  it("e há UM só botão cheio — o segundo virou link", () => {
+    const fonte = fs.readFileSync(
+      path.join(process.cwd(), "src/app/api/orcamento/[id]/proposta-doc/route.ts"),
+      "utf8",
+    );
+    const cheios = [...fonte.matchAll(/background:#4c6350;border-radius/g)];
+    expect(
+      cheios.length,
+      "voltou a haver dois rectângulos verdes iguais no mesmo email — não se distinguem",
     ).toBe(1);
   });
 

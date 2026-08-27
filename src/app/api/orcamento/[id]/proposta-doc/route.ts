@@ -1185,44 +1185,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      */
     const linkDoPdf = enderecoDoPdfDaProposta(acceptUrl);
     /**
-     * ── O CARTÃO, REDESENHADO ────────────────────────────────────────────────
+     * ── DOIS BOTÕES IGUAIS NÃO SÃO DUAS ACÇÕES ───────────────────────────────
      *
-     * «Quero melhorar isto de forma absurda.» O que lá estava tinha quatro
-     * defeitos, e três deles medem-se:
+     * «Quero algo mais bonito e minimalista.» Desenhei o cartão sozinho e ficou
+     * bem; só ao desenhar o EMAIL INTEIRO é que se viu o problema — e não era o
+     * cartão.
      *
-     *  · O BOTÃO tinha 37 px de altura (11+13+11) e letra de 13 px. É o único
-     *    botão de um email que se abre quase sempre no telemóvel, e ficava
-     *    sete píxeis abaixo dos 44 do alvo de toque. Agora tem 48 (14+20+14) e
-     *    letra de 16 — e ocupa a largura toda, que num ecrã estreito é a
-     *    diferença entre acertar e tentar duas vezes.
-     *  · O NOME DO FICHEIRO era a coisa mais alta do cartão a seguir ao botão:
-     *    sessenta caracteres técnicos a 14 px. Serve para o casal reconhecer
-     *    que o anexo e o botão são o mesmo documento — e isso é uma NOTA, não
-     *    um título. Passou para baixo do botão, pequeno, com a frase que
-     *    explica para que serve. O título passa a dizer o que se ganha ao
-     *    carregar.
-     *  · DOIS RAIOS sem razão — 6 px no cartão, 4 px no botão. Um cartão e um
-     *    controlo, dois papéis, dois valores: 10 e 8. É a mesma regra dos
-     *    raios do back office.
-     *  · E o cartão era uma caixa branca com um risco bege, que num email
-     *    lê-se como bloco de sistema. Passa a assentar no creme da casa — o
-     *    mesmo `#f7f4ee` do sítio —, e lê-se como parte da carta.
+     * Eram dois rectângulos verdes do mesmo tamanho, um por cima do outro, a
+     * dizer «Ver a proposta →» e «Abrir a proposta →». Fazem coisas diferentes
+     * — o primeiro leva à página onde o casal responde, o segundo abre o PDF —
+     * e não havia como saber qual era qual sem ler as duas com atenção. Duas
+     * coisas com o mesmo peso não são uma hierarquia: são uma escolha que se
+     * empurra para quem lê.
      *
-     * Tudo em tabelas e estilos em linha, que é o que sobrevive ao Outlook: o
-     * botão é um `<a>` em bloco dentro de um `<td>` com fundo, e não um
-     * elemento com `flex`, que lá não existe.
+     * Um botão cheio, e um link. O botão é o que se quer que aconteça: ir à
+     * página, ler, responder. O PDF é o outro caminho para o mesmo documento —
+     * continua à vista, no corpo, acima da assinatura, que era toda a razão por
+     * que este bloco existe (antes só ia em anexo, e quem arquivasse a mensagem
+     * decidia milhares de euros a olhar para um total).
+     *
+     * ── E CONTINUA A CABER NO POLEGAR ───────────────────────────────────────
+     *
+     * O link é `inline-block` com 12 px em cima e em baixo: 44 px de alvo,
+     * contando a entrelinha de 20. Minimalismo não é encolher o que se toca —
+     * era esse o defeito de origem deste bloco, com um botão de 37 px.
+     *
+     * Em tabelas e estilos em linha, que é o que sobrevive ao Outlook.
      */
     const cartaoDoPdf = `
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:28px 0;border-collapse:collapse">
-          <tr><td style="background:#f7f4ee;border:1px solid #e6dfd2;border-radius:10px;padding:22px">
-            <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#8a8375">${esc(t.anexoEtiqueta)}</p>
-            <p style="margin:0 0 18px;font-size:17px;line-height:1.4;color:#2a2620">${esc(t.anexoTitulo)}</p>
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate">
-              <tr><td style="background:#4c6350;border-radius:8px">
-                <a href="${linkDoPdf}" style="display:block;padding:14px 26px;font-size:16px;line-height:20px;color:#f7f4ee;text-decoration:none;font-weight:600;white-space:nowrap">${esc(t.anexoBotao)}</a>
-              </td></tr>
-            </table>
-            <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#8a8375">${esc(t.anexoNota(nomeDoAnexo))}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:32px 0 0;border-collapse:collapse">
+          <tr><td style="border-top:1px solid #e6dfd2;padding-top:20px">
+            <a href="${linkDoPdf}" style="display:inline-block;padding:12px 0;font-size:16px;line-height:20px;color:#4c6350;text-decoration:underline;text-underline-offset:3px">${esc(t.anexoBotao)}</a>
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#8a8375">${esc(t.anexoEtiqueta)} · ${esc(nomeDoAnexo)}</p>
           </td></tr>
         </table>`;
     /** O mesmo, para quem lê o email em texto simples. */

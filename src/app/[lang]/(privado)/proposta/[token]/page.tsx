@@ -351,6 +351,34 @@ export default async function ProposalPage({
    * endereços e a página desenha o documento na mesma, sem a galeria — o casal
    * continua a ler a proposta e a poder abrir o PDF.
    */
+  /**
+   * ── AS DUAS LEITURAS QUE FALTAM NÃO DEPENDEM UMA DA OUTRA ──────────────────
+   *
+   * «Tem que ser ultra rápido abrir a proposta, tanto online como a do PDF.»
+   *
+   * Daqui para baixo faltavam duas idas ao servidor: as fotografias (assinar os
+   * endereços do Storage) e o PEDIDO (o que o casal já escolheu). Estavam em
+   * fila — a segunda só partia quando a primeira voltasse —, e nenhuma delas
+   * precisa do resultado da outra: as duas só precisam da proposta, que já foi
+   * lida acima.
+   *
+   * Em fila, a página espera a soma. Juntas, espera a maior das duas. Num
+   * telemóvel em 4G, onde o que custa é a ida e a volta e não o trabalho do
+   * outro lado, é uma volta inteira que desaparece de todas as aberturas.
+   *
+   * O `.catch` fica preso à promessa no instante em que ela nasce, e não no
+   * `await`: uma promessa que rebenta antes de alguém a esperar é uma rejeição
+   * sem dono, e essas derrubam o processo em vez de desenharem a página sem as
+   * marcas — que é o pior caso honesto e está escrito aqui em baixo.
+   */
+  const pedidoDasEscolhas =
+    (proposal.doc?.escolhas ?? []).length > 0 && (proposal.quoteId ?? "").trim()
+      ? getQuote(proposal.quoteId!.trim()).catch((e) => {
+          log.warn("proposta: não deu para ler as escolhas do casal", { erro: e });
+          return null;
+        })
+      : Promise.resolve(null);
+
   const fotos = proposal.doc ? await fotosDaProposta(proposal.doc) : [];
 
   /**
@@ -366,16 +394,9 @@ export default async function ProposalPage({
    * continuam a poder ser escolhidas e a escolha volta a seguir; o que não
    * acontece é a página inventar que não escolheram.
    */
-  let escolhido: Record<string, string> = {};
-  if ((proposal.doc?.escolhas ?? []).length > 0 && (proposal.quoteId ?? "").trim()) {
-    try {
-      const pedido = await getQuote(proposal.quoteId.trim());
-      for (const r of pedido?.escolhasDoCasal ?? []) escolhido[r.escolhaId] = r.opcaoId;
-    } catch (e) {
-      log.warn("proposta: não deu para ler as escolhas do casal", { erro: e });
-      escolhido = {};
-    }
-  }
+  const escolhido: Record<string, string> = {};
+  const pedidoDoCasal = await pedidoDasEscolhas;
+  for (const r of pedidoDoCasal?.escolhasDoCasal ?? []) escolhido[r.escolhaId] = r.opcaoId;
 
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
