@@ -398,48 +398,6 @@ function initialDoc(quote: Quote): StudioDoc {
   return base;
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O QUE VEIO DO PEDIDO, E AINDA NÃO FOI OLHADO
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O pré-preenchimento já existia: a proposta abre com os nomes do casal, o
- * tipo, a data por extenso, o local, os convidados e a cerimónia que o casal
- * escolheu no formulário. Poupa-lhe cinco campos e uma ida ao pedido.
- *
- * O que faltava era DIZÊ-LO. Um campo semeado é uma resposta de terceiros
- * dentro de um documento que sai com a assinatura dela: o casal escreveu
- * «Évora» no formulário e a proposta pode ter de dizer «Herdade da Malhadinha,
- * Albernoa». Sem marca nenhuma, um valor semeado lê-se como um valor escrito —
- * e um valor escrito não se relê.
- *
- * O mecanismo já existia inteiro e é o da CÓPIA: anel laranja, e tocar-lhe é a
- * confirmação (ver `realce`/`confirmado`). Estava só ligado a um dos dois
- * caminhos por onde entra texto de outra pessoa.
- *
- * ── SÓ O QUE TEM MESMO ALGUMA COISA ESCRITA ──────────────────────────────
- * Um campo que o pedido não sabia responder fica VAZIO (é a regra do
- * `initialDoc`: nunca inventa). Um anel laranja à volta de uma caixa em branco
- * não pede confirmação nenhuma — pede que se ignore o anel.
- *
- * ── E O VALOR NÃO ────────────────────────────────────────────────────────
- * O total também é semeado do pedido, e de propósito NÃO entra aqui: não é um
- * palpite a confirmar, é o mesmo número visto de dois sítios — escrever aqui
- * altera-o lá. Marcá-lo pedia confirmação de uma coisa que ela própria escreveu.
- */
-function camposVindosDoPedido(d: StudioDoc): CampoAMudar[] {
-  const escrito = (v: unknown) => typeof v === "string" && v.trim() !== "";
-  const marcar: CampoAMudar[] = [];
-  if (escrito(d.clientNames)) marcar.push("clientNames");
-  if (escrito(d.eventType)) marcar.push("eventType");
-  if (escrito(d.eventDate)) marcar.push("eventDate");
-  if (escrito(d.location)) marcar.push("location");
-  if (escrito(d.guests)) marcar.push("guests");
-  if (escrito(d.ceremony)) marcar.push("ceremony");
-  if (escrito(d.time)) marcar.push("time");
-  return marcar;
-}
-
 /** Passos do fluxo guiado do estúdio. */
 type Step = "conteudo" | "prever" | "enviar";
 /**
@@ -2078,11 +2036,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // existente (mesmo sem grupos) nunca é sobrescrito.
     if (!hadDraft) {
       setDoc((d) => seedDefaults(d, quote));
-      // E marca o que veio do pedido, pela mesma condição: um rascunho é
-      // trabalho DELA, e pedir-lhe que confirme o que ela própria escreveu é o
-      // caminho mais curto para o anel laranja deixar de querer dizer alguma
-      // coisa. Ver `camposVindosDoPedido`.
-      setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
+      // E NÃO marca nada. A razão está por extenso no `realce`, mais abaixo:
+      // marcar o que vem do pedido acendia seis anéis em TODAS as propostas, e
+      // um aviso que está sempre ligado deixa de ser um aviso.
+      setPorConfirmar(new Set());
     }
 
     // O VALOR é a excepção, e de propósito: vem SEMPRE do pedido, haja rascunho
@@ -4166,9 +4123,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
     });
     setDoc(seedDefaults(initialDoc(quote), quote));
-    // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz
-    // volta a estar por confirmar.
-    setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
+    // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz é o
+    // que ela acabou de pedir para ver. Nada a confirmar.
+    setPorConfirmar(new Set());
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
         ? textoDoTotal(quote.quotedPrice)
@@ -6457,6 +6414,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *
    * Laranja e não verde: é um AVISO de coisa por rever, não uma acção. O
    * `DESIGN-TOKENS.md` fixa esta regra para a página toda.
+   *
+   * ── E ACENDE-SE NUMA OCASIÃO SÓ ──────────────────────────────────────────
+   *
+   * Quando a proposta foi COPIADA DE OUTRA. É aí que os campos trazem mesmo o
+   * casal de outra pessoa, e é a única forma de a duplicação fazer mal em vez
+   * de bem: uma proposta enviada com o nome ou a data de outro casamento. Esse
+   * caso fica marcado, e tem passeio próprio a guardá-lo.
+   *
+   * Acendia-se TAMBÉM ao abrir qualquer proposta, para assinalar o que o casal
+   * tinha escrito no formulário do pedido. A intenção era boa e o resultado não
+   * era: seis anéis à volta de seis campos, em todas as propostas, sempre — e
+   * ela a ter de tocar num a um para os apagar. Palavras dela: «fica com essas
+   * coisas à volta amarelas e eu quero tirar isso».
+   *
+   * Um aviso que está sempre ligado não é um aviso; é decoração que ensina a
+   * não olhar. E o que ele marcava ali não era perigoso: os dados do formulário
+   * são deste casal, estão certos, e ela lê-os no ecrã de qualquer maneira. O
+   * perigo é o outro caso, e esse continua marcado.
    */
   const realce = (campo: CampoAMudar) =>
     porConfirmar.has(campo)
