@@ -99,6 +99,23 @@ describe("a entrada do que aparece por cima da página", () => {
     expect(sem).toEqual([]);
   });
 
+  it("a troca de vista usa o MESMO número e a MESMA curva", () => {
+    // A análise escreve «06 · trocas de secção SEM TRANSIÇÃO». Sobre esta casa
+    // está errada: havia transição e corria — MEDIDO, 0,4 s com
+    // `cubic-bezier(0.16, 1, 0.3, 1)`, a 3,39 px e 0,577 de opacidade aos
+    // 60 ms. O que estava desalinhado era o número: 400 ms hesita entre as
+    // duas bandas da regra 1 (200–320 para estados, 600–1500 para
+    // apresentações), e «se uma animação hesitar entre as duas, está no sítio
+    // errado».
+    const css = semComentarios(CSS);
+    expect(css).toMatch(
+      /\.view-in\s*\{[^}]*animation:\s*view-in 240ms cubic-bezier\(0, 0, 0\.2, 1\) backwards/,
+    );
+    // Os 8 px ficam: 32 px é para uma PÁGINA inteira, e aqui o cromado não sai
+    // do sítio — muda o conteúdo dentro dele.
+    expect(css).toMatch(/@keyframes view-in\s*\{[^}]*translateY\(8px\)/);
+  });
+
   it("o aviso desloca oito, que é a distância de um aviso", () => {
     // `translate-y-2` = 0.5rem = 8 px. Eram 12 (`translate-y-3`).
     const toast = semComentarios(readFileSync(RAIZ + "Toast.tsx", "utf8"));

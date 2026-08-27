@@ -1957,7 +1957,41 @@ body[data-menu-open] .whatsapp-fixed {
      transform afterwards. A persistent transform creates a containing block
      and would break the position:fixed detail drawer nested inside (it would
      anchor to the padded view wrapper instead of the viewport on mobile). */
-  animation: view-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+
+  /* ── 240 ms E A CURVA DE QUEM APRESENTA ──────────────────────────────────
+     Eram 0,4 s com `cubic-bezier(0.16, 1, 0.3, 1)`.
+
+     A análise de craft escreve, sobre esta casa, «06 · Estados em 200–320 ms —
+     estado actual: trocas de secção SEM TRANSIÇÃO». Sobre este ponto está
+     errada, e MEDIDO no browser ao trocar de Pedidos para Propostas:
+
+         animationName   view-in
+         duration        0.4s
+         transform       translateY(3.39px) aos 60 ms
+         opacity         0.577 aos 60 ms
+
+     Havia transição, corria, e via-se. O que estava desalinhado era o número.
+
+     Regra 1 da análise: há DUAS velocidades e só duas — 200 a 320 ms para
+     estados, 600 a 1500 ms para apresentações. «Se uma animação hesitar entre
+     as duas, está no sítio errado.» Os 400 ms hesitavam: longos de mais para
+     um estado, curtos de mais para uma apresentação.
+
+     Regra 2: a curva diz quem começou o movimento. Isto é o sistema a
+     apresentar um ecrã, portanto SÓ DESACELERA — a mesma
+     `cubic-bezier(0, 0, 0.2, 1)` da `.bo-entrada`. A anterior
+     (`0.16, 1, 0.3, 1`) é um travão muito mais violento: chega a 85% da
+     distância no primeiro quinto do tempo, o que a faz ler como um salto
+     seguido de uma espera.
+
+     240 ms, o mesmo número da `.bo-entrada`: dentro da banda dos estados, e um
+     só número para o back office inteiro em vez de dois parecidos.
+
+     Os 8 px ficam. A análise reserva 32 px para uma PÁGINA inteira a
+     apresentar-se; aqui o cromado não sai do sítio — muda o conteúdo dentro
+     dele —, e 8 px é a distância certa para dizer «isto é outro ecrã» sem o
+     atirar de longe. */
+  animation: view-in 240ms cubic-bezier(0, 0, 0.2, 1) backwards;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
