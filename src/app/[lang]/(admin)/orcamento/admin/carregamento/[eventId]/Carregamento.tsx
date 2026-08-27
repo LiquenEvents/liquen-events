@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { idUnico } from "@/lib/id-unico";
 import type { EventMaterialItem } from "@/lib/event-material-types";
 import { progresso } from "@/lib/event-material-types";
@@ -297,15 +297,68 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
   const estado = fecho ? fecho.valor : estadoNoServidor;
   const fechada = estado === "carregada" || estado === "devolvida";
   /** A hora do fecho, quando é este telemóvel que a sabe. */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * OS TÍTULOS DE SECÇÃO PARAM ONDE O CABEÇALHO ACABA — MEDIDO, NÃO ESCRITO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Aqui estava `sticky top-[132px]`. O 132 era o fundo do cabeçalho na
+   * geometria em que foi escrito: o `<main>` público punha 96 px de `pt-24` e
+   * cada raiz do back office cancelava-os com um `-mt-24`, e no meio dessa
+   * conta o cabeçalho acabava aos 187 — mas o título ainda nem tinha chegado
+   * ao ponto de colar, portanto o número nunca chegou a ser posto à prova.
+   *
+   * Ao tirar o `pt-24` e os `-mt-24` (o back office saiu do grupo do sítio e
+   * levou o `<main>` com ele), a página passou a começar no zero. MEDIDO a
+   * 390×844, num telemóvel:
+   *
+   *     cabeçalho      0 → 91 px
+   *     título         132 → 165 px      ← 41 px ABAIXO do cabeçalho
+   *     primeira linha 124 → 180 px      ← e o título por cima dela
+   *
+   * `document.elementFromPoint` no meio da linha devolvia o `<h2>`: a primeira
+   * linha de cada secção deixou de se poder TOCAR. Foram os dois passeios de
+   * telemóvel do carregamento que o apanharam — cento e vinte segundos a
+   * tentar clicar num botão tapado.
+   *
+   * Um número escrito à mão que descreve a altura de outra coisa fica errado no
+   * dia em que essa outra coisa muda, e não se queixa. Passa a ser medido, como
+   * já se faz para a barra de acção do estúdio e para a barra de baixo do back
+   * office: o cabeçalho diz a sua altura, e os títulos colam exactamente aí.
+   *
+   * O valor de reserva (5,75rem = 92 px) é a altura medida deste cabeçalho, e
+   * serve o primeiro desenho — antes de a medição correr — em vez de deixar os
+   * títulos a colar no zero, por baixo do contador.
+   */
+  const cabecalho = useRef<HTMLElement | null>(null);
+  const caixa = useRef<HTMLDivElement | null>(null);
+  const [alturaDoCabecalho, setAlturaDoCabecalho] = useState(92);
+  useEffect(() => {
+    const el = cabecalho.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const medir = () => setAlturaDoCabecalho(Math.ceil(el.getBoundingClientRect().height));
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, []);
+
   const horaDoFecho = fecho
     ? new Date(fecho.markedAt).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
     : "";
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-[640px] bg-white pb-28">
+    <div
+      ref={caixa}
+      className="mx-auto min-h-dvh w-full max-w-[640px] bg-white pb-28"
+      style={{ "--carregamento-cabecalho": `${alturaDoCabecalho}px` } as React.CSSProperties}
+    >
       {/* Cabeçalho fixo: o contador é a única coisa que se olha a meio do
           carregamento, por isso nunca sai do ecrã. */}
-      <header className="sticky top-0 z-10 border-b border-foreground/10 bg-white/95 px-4 py-3 backdrop-blur">
+      <header
+        ref={cabecalho}
+        className="sticky top-0 z-10 border-b border-foreground/10 bg-white/95 px-4 py-3 backdrop-blur"
+      >
         <p className="truncate text-sm text-foreground/70">{titulo}</p>
         <p className="text-2xl font-medium tabular-nums">
           {p.carregados} <span className="text-foreground/45">de {p.total}</span>{" "}
@@ -403,7 +456,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         <div role="group" aria-label="Material a carregar">
           {porCategoria.map(([categoria, linhas]) => (
             <section key={categoria}>
-              <h2 className="sticky top-[132px] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-foreground/55 uppercase backdrop-blur">
+              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-foreground/55 uppercase backdrop-blur">
                 {categoria}
               </h2>
               <ul>
