@@ -97,6 +97,15 @@ jobs:
           # by the deploy platform, not needed for a type-safe build.
           NEXT_TELEMETRY_DISABLED: "1"
 
+      # A proposta que o casal abre nunca teve tecto de peso, e não podia ter
+      # pela via do browser: para a medir é preciso uma proposta gravada, e o
+      # servidor de produção recusa escritas sem Supabase, de propósito. Este
+      # guião lê o manifesto que o próprio build escreve por rota — sem
+      # servidor, sem dados, sem rede. Corre AQUI porque é aqui que o `.next`
+      # que ele lê acaba de nascer.
+      - name: Peso das rotas (bloqueante)
+        run: node scripts/peso-das-rotas.mjs
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
