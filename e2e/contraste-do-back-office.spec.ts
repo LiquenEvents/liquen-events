@@ -115,6 +115,98 @@ async function prontos(page: import("@playwright/test").Page) {
   await page.evaluate(FORMULA);
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ABRIR UM DESTINO SEM NUNCA PENDURAR O PASSEIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A casa tem o `irPara` no `caca/harness.ts` e foi com ele que isto começou.
+ * Não serve AQUI, e a razão foi medida, com um cronómetro dentro do ciclo:
+ *
+ *     Visão Geral        916 ms   ✓
+ *     Pedidos          4 449 ms   inalcançável
+ *     Propostas      172 567 ms   inalcançável  ← levou o teste inteiro
+ *
+ * O `irPara` tenta oito vezes e, ao fim de cada tentativa falhada, clica em
+ * «Mais» — porque os destinos fora do núcleo vivem lá dentro. Chamado logo a
+ * seguir a um `goto`, a primeira tentativa falha só porque a página ainda não
+ * hidratou, e a gaveta abre sem ser precisa. A partir daí ela TAPA a barra
+ * lateral: na volta seguinte o botão já existe mas está coberto, e o
+ * `alvo.click()` do ajudante não leva tecto de tempo — fica à espera de ficar
+ * clicável até ao tecto do teste todo. Um passeio que espera 172 segundos não
+ * diz o que aconteceu; diz só que desistiu.
+ *
+ * Aqui TODOS os passos têm tecto, e a gaveta abre-se UMA vez e só se for
+ * precisa. O pior caso são poucos segundos e uma frase que diz qual foi o
+ * destino e porquê — que é o que se quer de uma rede.
+ *
+ * (Não se corrige o `irPara` a partir daqui: é partilhado por outros passeios,
+ * onde é chamado com a página já montada e nunca chega a abrir a gaveta à toa.
+ * Mexer-lhe é outro bloco, com os seus próprios passeios a confirmar.)
+ */
+async function abrirDestino(page: import("@playwright/test").Page, destino: string) {
+  const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
+  /**
+   * O nome traz o distintivo atrás — e traz um ESPAÇO ANTES DA VÍRGULA.
+   *
+   * MEDIDO, pela árvore de acessibilidade que o browser calcula:
+   *
+   *     button "Pedidos , 54 por responder"
+   *              ▲──────┘
+   *              o distintivo é um nó irmão, e o cálculo do nome mete um
+   *              espaço entre ele e o texto
+   *
+   * Escrevi `(?:,.*)?$` — a vírgula colada — e o localizador nunca resolveu.
+   * O passeio não ficava à espera do CLIQUE: ficava à espera de um botão que,
+   * para ele, não existia, e só dizia «Timeout» ao fim de três minutos.
+   *
+   * (O `comDistintivo` do `caca/harness.ts` monta o mesmo padrão colado. Ou o
+   * distintivo mudou de forma depois de ele ser escrito, ou os passeios que o
+   * usam nunca calharam de passar por um destino com trabalho à espera. Fica
+   * anotado; mexer-lhe é outro bloco, com os seus próprios passeios.)
+   */
+  const nome = new RegExp(`^${destino.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s*,.*)?$`);
+
+  // Que o painel MONTOU. Sem isto, tudo o que vem a seguir julga que o destino
+  // não existe, quando o que não existe ainda é a página.
+  await nav
+    .getByRole("button", { name: /^Visão Geral$/ })
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
+
+  const alvo = () => nav.getByRole("button", { name: nome }).first();
+
+  /**
+   * Quem decide é a CAIXA, não o `count()` nem o `isVisible()`.
+   *
+   * MEDIDO a 1280, com a gaveta fechada: os cinco destinos de fora do núcleo
+   * ESTÃO no DOM e medem 0×0 —
+   *
+   *     Visão Geral        x=12  w=231  h=41
+   *     Propostas Aceites  x=0   w=0    h=0
+   *
+   * — portanto `count()` devolve 1 para eles e `isVisible()` também mente. Quem
+   * perguntasse por qualquer um dos dois clicava num alvo de zero píxeis e
+   * ficava à espera dele até ao tecto.
+   */
+  const temCaixa = async () => {
+    const c = await alvo()
+      .boundingBox()
+      .catch(() => null);
+    return !!c && c.width > 0 && c.height > 0;
+  };
+
+  if (!(await temCaixa())) {
+    await nav
+      .getByRole("button", { name: /^Mais$/i })
+      .first()
+      .click({ timeout: 5_000 });
+    await expect(async () => expect(await temCaixa()).toBe(true)).toPass({ timeout: 10_000 });
+  }
+
+  await alvo().click({ timeout: 10_000 });
+}
+
 test.describe("o contraste do back office", () => {
   /**
    * ── A SONDA É O CASO PRINCIPAL, E A VARREDURA É A SECUNDÁRIA ────────────
@@ -176,20 +268,142 @@ test.describe("o contraste do back office", () => {
     expect(medidos["/45"], JSON.stringify(medidos)).toBeLessThan(medidos["/50"]);
   });
 
-  for (const destino of ["Visão Geral", "Pedidos"]) {
-    test(`nenhum texto de ${destino} chumba a norma`, async ({ page }) => {
-      await page.setViewportSize({ width: 1280, height: 900 });
-      exigirLogin(await entrarNoBackOffice(page));
-      await page.getByRole("button", { name: destino, exact: true }).first().click();
+  /**
+   * ── E A VARREDURA PASSA A DESCOBRIR OS DESTINOS SOZINHA ──────────────────
+   *
+   * Aqui estavam DOIS nomes escritos à mão — «Visão Geral» e «Pedidos» — num
+   * painel que tem onze destinos. MEDIDO no browser, a 390 px: a navegação
+   * lateral oferece Visão Geral, Pedidos, Fazer proposta, Propostas,
+   * Calendário, Tarefas, Propostas Aceites, Material, Temas, Estatísticas e
+   * Definições. Nove ficavam de fora, e a escada de tinta tocou em todos.
+   *
+   * Uma lista escrita à mão é uma rede que envelhece: o destino que alguém
+   * acrescentar amanhã nasce sem ninguém a olhar por ele, e ninguém se vai
+   * lembrar de o vir cá pôr. Por isso os destinos leem-se da PRÓPRIA navegação
+   * — o que estiver lá é varrido, e um destino novo é varrido no dia em que
+   * nasce.
+   *
+   * ── PORQUE É UM SÓ PASSEIO E NÃO ONZE ────────────────────────────────────
+   *
+   * O Playwright fixa os testes antes de abrir o browser, portanto não é
+   * possível gerar um por destino a partir de uma lista que só existe depois de
+   * a página montar. E há uma vantagem em juntar: uma passagem só diz o mapa
+   * inteiro de uma vez — «estes três destinos têm texto abaixo do mínimo» — em
+   * vez de parar no primeiro e esconder os outros dois.
+   *
+   * ── A MESMA RESSALVA DA SONDA, OUTRA VEZ ─────────────────────────────────
+   *
+   * Numa base vazia muitos destinos mostram estados vazios, e o que se quer
+   * medir nem chega a ser desenhado. Isto continua a ser a rede SECUNDÁRIA: a
+   * sonda aqui em cima é que mede a regra. Aqui garante-se que, onde há texto,
+   * ele está acima do mínimo — e é por isso que o número de destinos varridos
+   * também se afirma: uma varredura que não encontrou navegação nenhuma
+   * passaria vazia e diria que estava tudo bem.
+   */
+  test("nenhum texto chumba a norma, em destino nenhum do painel", async ({ page }) => {
+    /**
+     * O tecto da casa são 30 s, e este passeio faz ONZE vezes o trabalho de um:
+     * por destino são uma ida à raiz do painel, um clique, a espera pela classe
+     * `admin-mode`, os 300 ms de assentamento e uma varredura de toda a árvore
+     * de texto. MEDIDO: ~500 ms por destino nos que montam depressa.
+     *
+     * Não se corta trabalho para caber — cortar era voltar a varrer dois
+     * destinos. Levanta-se o tecto, e diz-se porquê.
+     */
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    exigirLogin(await entrarNoBackOffice(page));
+    await prontos(page);
+
+    const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
+
+    /**
+     * ── OS DESTINOS LEEM-SE DA PRÓPRIA NAVEGAÇÃO ─────────────────────────
+     *
+     * Primeiro os do núcleo; depois abre-se a gaveta «Mais», que é onde vivem
+     * os outros cinco, e lê-se outra vez. O «Mais» não é destino nenhum, e sai.
+     *
+     * O nome traz o distintivo atrás — MEDIDO: «Pedidos, 54 por responder54» —,
+     * por isso corta-se na primeira vírgula. É o mesmo nome que o `irPara`
+     * espera, e é ele que volta a acrescentar o distintivo ao procurar.
+     */
+    const nomesDe = async () =>
+      (await nav.getByRole("button").allTextContents())
+        .map((t) => t.trim().split(/[\n,]/)[0].trim())
+        .filter(Boolean);
+
+    const destinos = new Set(await nomesDe());
+    const mais = nav.getByRole("button", { name: /^Mais$/i }).first();
+    if ((await mais.count()) > 0) {
+      await mais.click({ timeout: 5_000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      for (const n of await nomesDe()) destinos.add(n);
+    }
+    destinos.delete("Mais");
+
+    expect(
+      destinos.size,
+      `a navegação deu ${destinos.size} destinos (${[...destinos].join(", ")}) — ` +
+        "uma varredura sem destinos passaria vazia e não é isso que se quer afirmar",
+    ).toBeGreaterThan(6);
+
+    const falhas: Record<string, unknown[]> = {};
+    const varridos: string[] = [];
+    const inalcancaveis: string[] = [];
+
+    /**
+     * ── E O ESTÚDIO FICA PARA O FIM ──────────────────────────────────────
+     *
+     * «Fazer proposta» abre o estúdio, e o estúdio TAPA a navegação: MEDIDO,
+     * todos os cliques a seguir a ele expiravam. Recarregar a página não
+     * resolvia — o painel volta a abrir onde ela estava, portanto a recarga
+     * caía outra vez dentro do estúdio.
+     *
+     * Como só há um destino assim, a ordem resolve-o sem truque nenhum: varre-
+     * se tudo o resto primeiro, e o estúdio no fim, quando já não há para onde
+     * ir a seguir. Sem recargas, o passeio ficou também três vezes mais rápido.
+     */
+    const TAPA_A_NAVEGACAO = ["Fazer proposta"];
+    const porOrdem = [
+      ...[...destinos].filter((d) => !TAPA_A_NAVEGACAO.includes(d)),
+      ...[...destinos].filter((d) => TAPA_A_NAVEGACAO.includes(d)),
+    ];
+
+    for (const destino of porOrdem) {
+      /**
+       * ── E VOLTA-SE SEMPRE À RAIZ ANTES DE CADA DESTINO ─────────────────
+       *
+       * A primeira versão clicava a partir de onde calhasse estar, e MEDIDO foi
+       * assim que partiu: «Fazer proposta» abre o estúdio, o estúdio tapa a
+       * navegação, e os quatro cliques seguintes expiravam aos 10 s cada um —
+       * o passeio inteiro pendurado sem dizer porquê.
+       */
+      const t0 = Date.now();
+      try {
+        await abrirDestino(page, destino);
+      } catch (erro) {
+        inalcancaveis.push(`${destino} (${Date.now() - t0} ms: ${String(erro).split("\n")[0]})`);
+        continue;
+      }
       await prontos(page);
+      varridos.push(destino);
 
       const fora = await page.evaluate(() =>
         (window as unknown as { __contraste: () => unknown[] }).__contraste(),
       );
-      expect(
-        fora,
-        `${destino}: ${fora.length} nós abaixo do mínimo — ${JSON.stringify(fora.slice(0, 8), null, 1)}`,
-      ).toEqual([]);
-    });
-  }
+      if (fora.length > 0) falhas[destino] = fora.slice(0, 6);
+    }
+
+    // Um destino a que não se chega é uma rede furada, não um destino limpo.
+    expect(
+      inalcancaveis,
+      `não cheguei a ${inalcancaveis.length} destinos: ${inalcancaveis.join(", ")}`,
+    ).toEqual([]);
+
+    expect(
+      falhas,
+      `texto abaixo do mínimo em ${Object.keys(falhas).length} de ${varridos.length} destinos ` +
+        `(${varridos.join(", ")}):\n${JSON.stringify(falhas, null, 1)}`,
+    ).toEqual({});
+  });
 });

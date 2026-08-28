@@ -7,7 +7,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -2137,7 +2137,8 @@ export default function Overview({
                         className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
                         style={{
                           background: `${metaFor(STATUS_META, q.status).color}18`,
-                          color: metaFor(STATUS_META, q.status).color,
+                          // A cor de ESCREVER, não a de preencher: medido 3,16:1 antes.
+                          color: corDeTexto(metaFor(STATUS_META, q.status).color),
                         }}
                       >
                         {metaFor(STATUS_META, q.status).label}

@@ -107,7 +107,7 @@ const CONDITION_LABEL: Record<Condition, string> = {
 const CONDITION_CHIP: Record<Condition, { bg: string; text: string }> = {
   novo: { bg: "#e7efe4", text: "#3a5c39" },
   bom: { bg: "#eef1e6", text: "#525a2f" },
-  usado: { bg: "#f6efe1", text: "#8a6d2f" },
+  usado: { bg: "#f6efe1", text: "#84692d" }, // 4,26:1 → 4,55:1 sobre #f6efe1
   danificado: { bg: "#f6e6df", text: "#8a2a22" },
 };
 
