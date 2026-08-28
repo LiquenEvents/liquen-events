@@ -172,3 +172,167 @@ describe("a fita de clientes", () => {
     expect(cala, "o movimento reduzido deixou de calar a fita").toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O FUNDO DA FITA — «transparente, dentro da imagem de fundo»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, com a fotografia dos dois sítios lado a lado, e depois:
+ * «coloca transparente dentro da imagem de fundo».
+ *
+ * ── E a banda JÁ ERA transparente ────────────────────────────────────────
+ *
+ * MEDIDO: o fundo dela era `rgba(0, 0, 0, 0)`. O branco que ela via era a
+ * PÁGINA por baixo. A fita ficava entre duas secções escuras de bordo a bordo,
+ * e o corpo branco aparecia no meio delas como uma tira clara a cortar tudo.
+ *
+ * Ou seja, o problema nunca foi o fundo da banda — foi ONDE ela estava. Passa
+ * a viver DENTRO do herói, por cima da fotografia e do véu que ele já tem, e
+ * aí a transparência faz o que ela queria: os logótipos assentam no mesmo
+ * escuro de tudo o resto.
+ *
+ * Duas coisas que isso obriga, e que estão presas aqui em baixo: os logótipos
+ * têm de ser CLAROS (pretos sobre uma fotografia escura não se veem), e as
+ * máscaras das pontas têm de sair (um degradê para uma cor sólida por cima de
+ * uma fotografia é uma mancha, não um desvanecer).
+ */
+describe("o fundo da fita", () => {
+  it("a banda não pinta fundo nenhum — o que se vê é a fotografia", () => {
+    const m = componente().match(/className="([^"]*relative[^"]*overflow-hidden[^"]*)"/);
+    expect(m, "não se encontrou a banda").not.toBeNull();
+    expect(m![1], "a banda voltou a pintar um fundo").not.toMatch(/\bbg-/);
+  });
+
+  it("as duas linhas que a fechavam numa caixa saíram", () => {
+    // `border-y` era o que a fazia ler-se como um bloco à parte, mesmo com o
+    // fundo da página por trás.
+    expect(componente(), "as linhas voltaram a fechar a banda").not.toMatch(/\bborder-y\b/);
+  });
+
+  it("os logótipos são CLAROS — pretos sobre a fotografia não se veem", () => {
+    /**
+     * O `brightness-0` sozinho pinta-os a preto: servia quando a banda estava
+     * sobre o branco da página. Sobre a fotografia, sem o `invert`, a fita fica
+     * vazia — e foi o que aconteceu numa das tentativas, visto no browser.
+     */
+    expect(componente(), "os logótipos voltaram a preto").toMatch(/brightness-0[^"]*\binvert\b/);
+  });
+
+  it("as máscaras das pontas saíram", () => {
+    // Desvaneciam para uma COR sólida. Por cima de uma fotografia isso é uma
+    // mancha; e o sítio que ela mostrou também não as tem.
+    expect(componente(), "as máscaras das pontas voltaram").not.toMatch(/from-surface|from-noite/);
+  });
+
+  it("o nome do cliente, quando o logótipo falha, lê-se sobre a fotografia", () => {
+    /**
+     * Com o `text-foreground/68` que lá estava — tinta escura —, um logótipo
+     * que falhasse deixava um nome invisível em cima de uma fotografia escura.
+     * Branco a 70% sobre o escuro do véu dá 9,30:1.
+     */
+    expect(componente(), "o nome de recurso voltou à tinta escura").toMatch(/text-white\/\d+/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E A FITA TEM DE VIVER DENTRO DO HERÓI — senão nada disto acima faz sentido
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É esta a metade estrutural da correcção. Uma banda transparente com logótipos
+ * BRANCOS colocada de volta entre duas secções, sobre o corpo branco da página,
+ * fica invisível — branco sobre branco. As duas coisas andam juntas.
+ */
+describe("onde a fita vive", () => {
+  const paginas = [
+    "src/app/[lang]/(site)/page.tsx",
+    "src/app/[lang]/(site)/clientes/page.tsx",
+  ] as const;
+
+  /** O `<section>` do herói: do primeiro `<section` ao `</section>` que o fecha. */
+  function heroi(caminho: string): string {
+    const fonte = readFileSync(join(RAIZ, caminho), "utf8");
+    const i = fonte.indexOf("<section");
+    expect(i, `${caminho}: não tem ` + "`<section`").toBeGreaterThan(-1);
+    const fim = fonte.indexOf("</section>", i);
+    expect(fim, `${caminho}: o herói não fecha`).toBeGreaterThan(i);
+    return fonte.slice(i, fim);
+  }
+
+  it("CONTROLO POSITIVO: os dois heróis foram mesmo lidos", () => {
+    // Sem isto, um caminho errado dava uma cadeia vazia e a regra a seguir
+    // passava por não encontrar nada — que é precisamente o defeito.
+    for (const p of paginas) {
+      expect(heroi(p).length, `${p}: herói vazio`).toBeGreaterThan(400);
+      expect(heroi(p), `${p}: o herói não tem fotografia`).toMatch(/HeroImage|SafeImage|Image/);
+    }
+  });
+
+  it("a fita é desenhada DENTRO do herói, nas duas páginas", () => {
+    for (const p of paginas) {
+      expect(
+        heroi(p),
+        `${p}: a fita saiu do herói — transparente e com logótipos brancos, ` +
+          "fora dali ela fica branco sobre branco",
+      ).toContain("<ClientMarquee />");
+    }
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ARMADILHA DO `@theme`: UM COMENTÁRIO `/**` APAGA A ENTRADA A SEGUIR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Custou-me meia hora e vale a pena ficar preso.
+ *
+ * Acrescentei o `--color-noite` ao `@theme` com um comentário de bloco no
+ * estilo do resto desta casa (`/**` … `*\/`). O CSS compilou sem um aviso, a
+ * página serviu-se, e o `bg-noite` simplesmente NÃO EXISTIA: nem o utilitário,
+ * nem a variável em `:root`. Os logótipos ficaram brancos sobre branco.
+ *
+ * MEDIDO no CSS servido: `me-12` e `w-max` — classes minhas do mesmo ficheiro —
+ * estavam lá, portanto o Tailwind tinha lido o componente. O que faltava era só
+ * a cor. Trocado o `/**` por um `/*` simples, apareceram os dois.
+ *
+ * Este ficheiro tem centenas de comentários `/**`. Sem esta rede, o próximo a
+ * acrescentar uma cor perde a mesma meia hora — e, pior, pode não dar pela
+ * falta se a cor não estiver à vista.
+ */
+describe("o bloco `@theme` do globals.css", () => {
+  /** O corpo do `@theme`, do `{` ao `}` que o fecha. */
+  const tema = () => {
+    const fonte = css();
+    const i = fonte.indexOf("@theme");
+    expect(i, "o bloco `@theme` desapareceu").toBeGreaterThan(-1);
+    const abre = fonte.indexOf("{", i);
+    let profundidade = 0;
+    for (let k = abre; k < fonte.length; k++) {
+      if (fonte[k] === "{") profundidade++;
+      else if (fonte[k] === "}" && --profundidade === 0) return fonte.slice(abre, k + 1);
+    }
+    throw new Error("o `@theme` não fecha");
+  };
+
+  it("CONTROLO POSITIVO: o bloco foi lido e tem cores lá dentro", () => {
+    // Sem isto, um `@theme` renomeado dava uma cadeia vazia e a regra seguinte
+    // passava por não encontrar nada.
+    expect(tema()).toContain("--color-");
+    expect(tema().length).toBeGreaterThan(200);
+  });
+
+  it("não leva comentários `/**` — eles apagam a entrada seguinte, em silêncio", () => {
+    expect(
+      tema(),
+      "um comentário `/**` dentro do `@theme` faz o Tailwind ignorar a declaração " +
+        "a seguir: nem o utilitário nem a variável chegam a existir, e não há aviso nenhum. " +
+        "Usa `/*` simples.",
+    ).not.toContain("/**");
+  });
+
+  it("o `--color-noite` está lá, e é o mesmo tom das fotografias", () => {
+    // Se desaparecer outra vez, a fita fica branca sobre branco.
+    expect(tema()).toMatch(/--color-noite:\s*#12160f/i);
+  });
+});

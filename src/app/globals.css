@@ -7,6 +7,11 @@
   --color-moss: #637a5f;
   --color-moss-light: #86997f;
   --color-moss-dark: #4c6150;
+  /* O verde-quase-preto por baixo das fotografias. Estava escrito à mão em
+     dois sítios (`.g-tile` e o `--cv-bg` dos painéis) e a fita dos clientes ia
+     ser o terceiro: é o mesmo tom nos três — o fundo neutro que impede um
+     flash branco enquanto uma fotografia escura carrega. */
+  --color-noite: #12160f;
   --color-gold: #d6ab3a;
   --color-gold-dark: #b88f28;
   /* Gold as TEXT on white/cream. gold (~2:1) and gold-dark (~3:1) fail WCAG AA
@@ -2786,7 +2791,7 @@ body:has([data-orcamento-mode]) .eyebrow {
      destes painéis, portanto o pior caso passa a ser a fotografia a aparecer
      sobre a sua própria sombra em vez de sobre um flash branco. Um painel de
      fundo claro sobrepõe com `[--cv-bg:…]`, como já faz com `--cv-h`. */
-  background-color: var(--cv-bg, #12160f);
+  background-color: var(--cv-bg, var(--color-noite));
 }
 
 /* ── O aviso de cookies de quem já respondeu ──
@@ -2987,7 +2992,7 @@ body:has(.barra-consentimento) footer {
 /* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {
-  background-color: #12160f;
+  background-color: var(--color-noite);
   /* Skip rendering off-screen tiles' contents (the <Image>) so a long gallery
      doesn't keep hundreds of decoded layers laid out — the fix for the measured
      scroll cost. Safe against the old "dark gap" regression BECAUSE the box

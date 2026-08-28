@@ -151,13 +151,13 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           className="absolute inset-0"
           style={{
             backgroundImage:
-              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92), rgba(8,8,8,0.25), transparent)",
+              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92) 0%, rgba(8,8,8,0.78) 22%, rgba(8,8,8,0.25) 55%, transparent 100%)",
           }}
         />
 
         {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
             photograph owns the first screen. Still the page's single <h1>. */}
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-8 lg:pb-12">
           <AnimateIn>
             <div className="max-w-md">
               <p className="text-white/70 text-[10px] tracking-[0.5em] uppercase mb-3 flex items-center gap-3">
@@ -173,10 +173,19 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
             </div>
           </AnimateIn>
         </div>
-      </section>
 
-      {/* ── MARQUEE ── */}
-      <ClientMarquee />
+        {/* ── A FITA DOS CLIENTES, DENTRO DA FOTOGRAFIA ──────────────────────
+            A mesma decisão da página inicial, e pela mesma razão: fora daqui a
+            fita ficava entre duas secções escuras e o corpo branco da página
+            aparecia no meio delas como uma tira clara. Aqui assenta na
+            fotografia do herói, que é o que ela pediu.
+
+            A folga em baixo é para não ficar por baixo dos flutuantes — ver a
+            nota igual na página inicial, com a medição. */}
+        <div className="relative z-10 w-full pb-20 lg:pb-24">
+          <ClientMarquee />
+        </div>
+      </section>
 
       {/* ── LEAD STATEMENT ── */}
       <section className="relative py-28 lg:py-36 overflow-hidden border-b border-foreground/8">
