@@ -101,7 +101,7 @@ function Lista({ itens }: { itens?: readonly string[] }) {
     <ul className="mt-4 space-y-2.5">
       {linhas.map((l, i) => (
         <li key={i} className="text-foreground/75 relative pl-5 text-[15px] leading-relaxed">
-          <span aria-hidden className="text-moss/60 absolute top-0 left-0">
+          <span aria-hidden className="text-moss-dark absolute top-0 left-0">
             ·
           </span>
           {l}
@@ -124,7 +124,7 @@ function Titulo({
   return (
     <header id={id} className="scroll-mt-6">
       {sobretitulo && (
-        <p className="text-foreground/60 mb-2 text-[10px] tracking-[0.4em] uppercase">
+        <p className="text-foreground/70 mb-2 text-[10px] tracking-[0.4em] uppercase">
           {sobretitulo}
         </p>
       )}
@@ -249,12 +249,12 @@ function SeccaoDobrada({
               seria HTML inválido e um nível a menos no índice da página. */}
           <span
             aria-hidden
-            className="text-moss/70 absolute top-[0.35em] left-0 text-[13px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+            className="text-moss-dark absolute top-[0.35em] left-0 text-[13px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
           >
             ▸
           </span>
           {sobretitulo && (
-            <span className="text-foreground/60 mb-2 block text-[10px] tracking-[0.4em] uppercase">
+            <span className="text-foreground/70 mb-2 block text-[10px] tracking-[0.4em] uppercase">
               {sobretitulo}
             </span>
           )}
@@ -269,7 +269,7 @@ function SeccaoDobrada({
            * por baixo, uma linha a dizer do que ele trata passa a ser ruído
            * entre o título e a primeira cláusula.
            */}
-          <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+          <span className="text-foreground/70 mt-1 block text-[13px] leading-relaxed group-open:hidden">
             {resumo}
           </span>
         </summary>
@@ -753,7 +753,7 @@ export default function Documento({
           <dl className="mt-7 grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
             {apresentacao.map(([chave, valor]) => (
               <div key={chave} className="border-foreground/8 border-t pt-3">
-                <dt className="text-foreground/60 text-[10px] tracking-[0.24em] uppercase">
+                <dt className="text-foreground/70 text-[10px] tracking-[0.24em] uppercase">
                   {t.campos[chave]}
                 </dt>
                 <dd className="text-foreground/85 mt-1 text-[15px] leading-relaxed">{valor}</dd>
@@ -764,7 +764,7 @@ export default function Documento({
 
         {indice.length > 1 && (
           <nav aria-label={p.nestaPagina} className="mt-10">
-            <p className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase">
+            <p className="text-foreground/70 text-[10px] tracking-[0.3em] uppercase">
               {p.nestaPagina}
             </p>
             <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
@@ -796,7 +796,7 @@ export default function Documento({
               <div key={g.id ?? i}>
                 <h3 className="text-foreground/85 flex items-baseline gap-3 text-[17px] font-medium">
                   {g.letter && (
-                    <span className="text-moss/70 text-xs tracking-[0.2em]">{g.letter}</span>
+                    <span className="text-moss-dark text-xs tracking-[0.2em]">{g.letter}</span>
                   )}
                   {g.title}
                 </h3>
@@ -898,7 +898,7 @@ export default function Documento({
                 >
                   <span className="text-foreground/85 text-[15px]">{r.item}</span>
                   {r.extra && (
-                    <span className="text-foreground/55 shrink-0 text-[11px] tracking-[0.14em] uppercase">
+                    <span className="text-foreground/70 shrink-0 text-[11px] tracking-[0.14em] uppercase">
                       {t.marcaExtra}
                     </span>
                   )}
@@ -926,7 +926,7 @@ export default function Documento({
           )}
 
           {quantosExtras > 0 && (
-            <p className="text-foreground/60 mt-3 text-[13px] leading-relaxed">
+            <p className="text-foreground/70 mt-3 text-[13px] leading-relaxed">
               {quantosExtras === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(quantosExtras)}
             </p>
           )}
@@ -1017,7 +1017,7 @@ export default function Documento({
                  * pontos lado a lado ou encolhem o número ou partem a linha.
                  */}
                 <div className="border-foreground/15 mt-5 border-t pt-5">
-                  <p className="text-foreground/60 text-[11px] tracking-[0.22em] uppercase">
+                  <p className="text-foreground/70 text-[11px] tracking-[0.22em] uppercase">
                     {t.totalAPagar}
                   </p>
                   <p
@@ -1097,14 +1097,14 @@ export default function Documento({
               <summary className="marker:content-none pointer-coarse:min-h-11 relative cursor-pointer list-none pl-5 [&::-webkit-details-marker]:hidden">
                 <span
                   aria-hidden
-                  className="text-moss/70 absolute top-[0.2em] left-0 text-[11px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                  className="text-moss-dark absolute top-[0.2em] left-0 text-[11px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
                 >
                   ▸
                 </span>
                 <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
                   {t.notasImportantes}
                 </h3>
-                <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+                <span className="text-foreground/70 mt-1 block text-[13px] leading-relaxed group-open:hidden">
                   {resumoDe("notasImportantes", fixos.notasImportantes ?? [])}
                 </span>
               </summary>
@@ -1194,7 +1194,7 @@ export default function Documento({
         >
           <Lista itens={fixos.faseamento} />
           {totais.aPagar > 0 && (
-            <p className="text-foreground/60 mt-4 text-[13px] leading-relaxed">
+            <p className="text-foreground/70 mt-4 text-[13px] leading-relaxed">
               {t.baseDoCalculo(eur(totais.aPagar))}
             </p>
           )}

@@ -548,7 +548,7 @@ export default async function ProposalPage({
               cara do produto para dar má impressão, e dava-a a toda a gente que
               recebe uma proposta do estúdio. */}
               {proposal.lineItems.length > 0 && (
-                <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
+                <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/70 text-[10px] tracking-[0.2em] uppercase">
                   <span className="flex-1">{t.tableDescricao}</span>
                   <span className="w-12 text-center">{t.tableQt}</span>
                   <span className="w-28 text-right">{t.tableValor}</span>
@@ -639,7 +639,7 @@ export default async function ProposalPage({
         )}
 
         {validLabel && (
-          <p className="text-foreground/68 text-xs mt-5 text-center">
+          <p className="text-foreground/70 text-xs mt-5 text-center">
             {t.validoAte} {validLabel}.
           </p>
         )}
@@ -658,7 +658,7 @@ export default async function ProposalPage({
             Só aparece a partir da versão 2: dizer «Versão 1» a quem abre uma
             proposta pela primeira vez é ruído. */}
         {(emitidaLabel || (!!doLink?.versao && doLink.versao > 1)) && (
-          <p className="text-foreground/60 text-[11px] mt-2 text-center">
+          <p className="text-foreground/70 text-[11px] mt-2 text-center">
             {[
               emitidaLabel ? `${t.emitidaEm} ${emitidaLabel}` : "",
               /* Só a partir da versão 2: dizer «Versão 1» a quem abre uma
@@ -722,7 +722,7 @@ export default async function ProposalPage({
           </p>
         </div>
 
-        <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
+        <p className="text-foreground/70 text-[11px] text-center mt-10 leading-relaxed">
           {t.footerNote}{" "}
           {/* Medido a 375 px: 140×14 px — um alvo de e-mail com 14 px de
               altura, mais pequeno do que a polpa de um dedo consegue acertar
