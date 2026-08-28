@@ -166,6 +166,7 @@ import { GET, POST } from "./route";
 import { sendMail } from "@/lib/mail";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { createProposal, updateProposal } from "@/lib/proposals-store";
+import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 
 /** Minimal studio doc — only `ref` + `clientNames` are validated by the route;
  *  the money fields under test are added per-case. */
@@ -1761,10 +1762,23 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
       params,
     });
     expect(enviado().html).toContain("https://liquen-events.com/api/proposta/tok/pdf");
-    expect(enviado().html).toContain("Abrir a proposta");
+    /**
+     * A FRASE do link vem dos textos e não daqui.
+     *
+     * Estava `toContain("Abrir a proposta")` — a frase exacta —, e caiu no dia
+     * em que ela deixou de ser verdade: a rota do PDF passou a DESCARREGAR, e o
+     * botão passou a dizer «Descarregar a proposta em PDF». Um teste que prende
+     * a redacção obriga a mexer-lhe sempre que alguém melhora uma palavra, e
+     * treina quem lá mexe a actualizar a expectativa sem pensar.
+     *
+     * O que este passeio existe para provar é que o CARTÃO vai no corpo escrito
+     * à mão — e disso a prova é o endereço do PDF, aqui em cima, que é o que o
+     * cartão tem de único. A frase é a que os textos disserem.
+     */
+    expect(enviado().html).toContain(textosDoEmailDaProposta("pt").anexoBotao);
     // E o nome do ficheiro, para o casal reconhecer que é o mesmo do anexo.
-    // Passou para baixo do botão, em letra pequena, com a frase que diz para
-    // que serve — mas continua lá, que era a razão de estar no cartão.
+    // Vive por baixo do link, em letra pequena e quieta — mas continua lá, que
+    // era a razão de estar no cartão.
     expect(enviado().html).toContain("Proposta-Liquen-Events");
   });
 
