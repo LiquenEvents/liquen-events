@@ -2872,6 +2872,41 @@ body:has(.barra-consentimento) footer {
   contain-intrinsic-size: auto 400px;
 }
 
+/* ── A GRELHA DA PROPOSTA SALTA O QUE ESTÁ FORA DO ECRÃ ──────────────────────
+   Palavras dela, sobre a proposta no telemóvel: «trava ao deslizar».
+
+   A galeria pública já resolveu isto (`.g-tile` aqui em cima) e a proposta
+   ficou de fora — e é a proposta que tem 46 fotografias numa página que o casal
+   percorre de cima a baixo. Cada célula fora do ecrã continuava a pagar estilo,
+   layout e uma camada descodificada em cada fotograma do deslize.
+
+   ── PORQUE É QUE AQUI É SEGURO, E ONDE NÃO É ──────────────────────────────
+
+   A regra desta casa é dura e foi paga: `content-visibility: auto` só é seguro
+   se o espaço RESERVADO for igual ao REAL, senão a página encolhe por baixo do
+   dedo — e no Safari do iPhone não há âncora de scroll que o disfarce.
+
+   Aqui a altura da célula NÃO vem do conteúdo saltado: vem do `aspect-ratio`
+   que cada foto declara a partir da forma guardada, e um `max-height` que
+   clampa aplica-se na mesma com ou sem conteúdo desenhado. É a mesma razão que
+   está escrita no `.g-tile`, e é por isso que esta classe só é posta pelo
+   `Inspiracao.tsx` QUANDO A FORMA É CONHECIDA.
+
+   Onde a forma se desconhece — fotografias anteriores às colunas de dimensão —
+   a célula não leva esta classe. Aí a altura vem mesmo da imagem, e reservar um
+   número inventado era escolher o defeito que se está a corrigir.
+
+   O fundo já lá está (o `bg-` moss a 12% no botão): uma célula com o conteúdo
+   saltado nunca pisca branco, que é a outra armadilha documentada no `.g-tile`.
+
+   `auto 320px` e não `auto`: `auto` sozinho é gramática INVÁLIDA — o parser
+   deita a declaração inteira fora e a rede não existe. Está escrito no
+   `.g-tile` e custou lá uma verificação no browser. */
+.foto-adiavel {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
    traço do check. Puro CSS (stroke-dashoffset), respeita reduced-motion. */
 @keyframes confirm-draw {

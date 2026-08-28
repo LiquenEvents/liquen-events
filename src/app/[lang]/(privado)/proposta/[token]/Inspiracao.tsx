@@ -703,7 +703,11 @@ function Celula({
         onClick={(e) => aoAmpliar(e.currentTarget)}
         disabled={!alvo || desistiu}
         aria-label={`${textos.ampliar}: ${rotulo}`}
-        className="group focus-visible:outline-moss relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-moss)_12%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
+        /* `foto-adiavel` SÓ com a forma conhecida — a razão está escrita na
+           classe, em `globals.css`: saltar o desenho de uma caixa cuja altura
+           venha do conteúdo faz a página encolher por baixo do dedo. Com
+           `aspectRatio` a altura é da CAIXA e não do conteúdo, e aí é seguro. */
+        className={`group focus-visible:outline-moss relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-moss)_12%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default${proporcao ? " foto-adiavel" : ""}`}
         style={
           proporcao || tecto
             ? {
