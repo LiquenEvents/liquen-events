@@ -4,7 +4,7 @@ import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { chaveDoPdf, PropostaIncompleta } from "@/lib/proposal-pdf-chave";
-import { urlDoPdfDaProposta } from "@/lib/proposal-pdf-guardado";
+import { pdfGuardadoEmFluxo } from "@/lib/pdf-do-armazenamento";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { respostaPdf } from "@/lib/pdf-resposta";
@@ -14,7 +14,13 @@ import { log } from "@/lib/logger";
 // pdf-lib + sharp need the Node runtime.
 export const runtime = "nodejs";
 // Cap a single render so a slow/large document can't tie up a worker forever.
-export const maxDuration = 20;
+/**
+ * 60 s, e não 20: desde que o ficheiro guardado é encaminhado por aqui em vez
+ * de reencaminhado, a função fica aberta enquanto o telemóvel recebe. Uma
+ * proposta anda pelos 0,5–4 MB, numa quinta com 4G fraco. Ver a nota igual na
+ * porta do email.
+ */
+export const maxDuration = 60;
 
 /**
  * Public-by-token proposal PDF for the client portal. Same trust model as the
@@ -105,27 +111,32 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     );
 
     /**
-     * ── SE ELE JÁ ESTÁ GUARDADO, NÃO PRECISA DE NOS ATRAVESSAR ────────────
+     * ── SE ELE JÁ ESTÁ GUARDADO, NÃO SE DESENHA: ENCAMINHA-SE ─────────────
      *
-     * O mesmo atalho que a porta do email já tinha (`api/proposta/[token]/pdf`)
-     * e que esta não tinha. Sem ele os bytes faziam duas viagens —
-     * armazenamento → esta função → o telemóvel — e numa proposta com quarenta
-     * e seis fotografias são megabytes a passar por um sítio que não precisa de
-     * os ver, com um arranque a frio pelo meio.
+     * O mesmo atalho que a porta do email tem, e as duas portas partilham o
+     * ficheiro (a chave é o conteúdo), portanto o que o envio guardou serve as
+     * duas. `null` = não está lá, e aí desenha-se como antes.
      *
-     * As duas portas partilham o ficheiro (a chave é o conteúdo), portanto o
-     * que o envio guardou serve as duas. `null` = não está lá, e aí desenha-se
-     * como antes.
+     * ── E AS DUAS DEIXARAM DE REENCAMINHAR, PELA MESMA RAZÃO ──────────────
+     *
+     * Isto respondia `302` para o endereço assinado do armazenamento, e a
+     * barra do browser passava a mostrar `<referência>.supabase.co`. A queixa
+     * dela foi sobre a porta do email — «este url super desconfiado» —, mas o
+     * defeito era das DUAS: corrigir só uma deixava o casal a aterrar no mesmo
+     * domínio estranho conforme a porta por onde entrasse.
+     *
+     * Ver `pdf-do-armazenamento.ts`: além do endereço passar a ser o dela, o
+     * caminho é mais curto do que era — o reencaminhamento não poupava arranque
+     * a frio nenhum e custava ao telemóvel uma ligação nova a um segundo
+     * domínio.
      */
-    const directo = await urlDoPdfDaProposta(proposal.id, chaveDoPdf(proposal.doc, idioma), nome);
-    if (directo) {
-      return NextResponse.redirect(directo, {
-        status: 302,
-        // O endereço expira em minutos: guardado por um cache partilhado seria
-        // um link morto servido a quem carregasse depois.
-        headers: { "Cache-Control": "private, no-store, must-revalidate" },
-      });
-    }
+    const guardado = await pdfGuardadoEmFluxo(
+      request,
+      proposal.id,
+      chaveDoPdf(proposal.doc, idioma),
+      nome,
+    );
+    if (guardado) return guardado;
 
     /**
      * ── O DESENHADOR SÓ ENTRA AQUI, E SÓ SE FOR PRECISO ────────────────────

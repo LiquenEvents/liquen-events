@@ -96,8 +96,9 @@ let bytesGuardados = 0;
  *
  *   · o PDF guardado no envio ficava com uma chave que mais ninguém calculava;
  *   · `lerPdfDaProposta` procurava pela outra e não encontrava nada;
- *   · `urlDoPdfDaProposta` — o atalho que manda o casal direito ao CDN e que
- *     existe precisamente para isto não demorar — nunca disparava;
+ *   · `pdfGuardadoEmFluxo` — o atalho que serve o ficheiro guardado sem o
+ *     redesenhar, e que existe precisamente para isto não demorar — nunca
+ *     disparava;
  *   · e cada abertura redesenhava o documento inteiro, oitenta fotografias
  *     pelo `sharp`, num processo a frio.
  *

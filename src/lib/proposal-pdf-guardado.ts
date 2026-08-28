@@ -162,56 +162,6 @@ export async function lerPdfDaProposta(proposalId: string, chave: string): Promi
   }
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O ENDEREÇO DO PDF, PARA ELE NÃO TER DE NOS ATRAVESSAR
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O `lerPdfDaProposta` traz os bytes para DENTRO da função e a rota reenvia-os
- * ao casal. São duas viagens do ficheiro inteiro — armazenamento → nós → eles —
- * quando os bytes já estavam num sítio que sabe servi-los melhor do que nós, e
- * mais perto de quem os pede. Numa proposta com quarenta e seis fotografias
- * isso são megabytes a passar por um sítio que não precisava de os ver.
- *
- * Com um endereço assinado, a rota responde com um reencaminhamento e o
- * ficheiro vai do CDN directo ao telemóvel.
- *
- * ── PORQUE É QUE A VALIDADE É CURTA ──────────────────────────────────────
- *
- * Porque este endereço não tem token nem sessão: quem o tiver, abre o PDF. Dez
- * minutos chegam para o descarregar (e para o retomar, se a rede falhar a
- * meio) e não sobrevivem a ser reencaminhados a alguém amanhã. O que guarda a
- * porta continua a ser o link do casal, que é quem emite este.
- *
- * `null` quer dizer «não está lá guardado» — o `createSignedUrl` recusa um
- * ficheiro que não existe, e é por isso que isto serve também de pergunta.
- * Quem chama desenha-o, como fazia antes.
- */
-const VALIDADE_DO_ENDERECO = 600;
-
-export async function urlDoPdfDaProposta(
-  proposalId: string,
-  chave: string,
-  nome: string,
-): Promise<string | null> {
-  if (!proposalId || !chave) return null;
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const { data, error } = await sb.storage
-      .from(BUCKET)
-      // `download` põe o nome no `Content-Disposition` do lado do
-      // armazenamento: sem ele, o ficheiro chegava com o nome da chave (um
-      // resumo de trinta e dois caracteres) em vez daquele com que seguiu no
-      // email — e o casal tem de reconhecer o que descarrega.
-      .createSignedUrl(caminho(proposalId, chave), VALIDADE_DO_ENDERECO, { download: nome });
-    if (error || !data?.signedUrl) return null;
-    return data.signedUrl;
-  } catch {
-    return null;
-  }
-}
-
 /** Só para os testes: esquece a tentativa de criar o bucket. */
 export function esquecerBucketDePdfs(): void {
   bucketPronto = null;
