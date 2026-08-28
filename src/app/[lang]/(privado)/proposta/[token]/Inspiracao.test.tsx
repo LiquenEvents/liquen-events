@@ -423,3 +423,62 @@ describe("as colunas da grelha", () => {
     expect(ordens).toEqual(posicoesNoHtml().map((n) => n - 1));
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TÍTULO NÃO FICA SOZINHO POR CIMA DO VAZIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A dona do negócio abriu a proposta a sério no telemóvel dela e mandou o que
+ * viu: um RECTÂNGULO CINZENTO, sem fotografia nenhuma, com «Saída dos noivos»
+ * escrito por cima.
+ *
+ * ── PORQUE É QUE A REDE QUE JÁ EXISTIA NÃO O APANHOU ──────────────────────
+ *
+ * O ficheiro já dizia a coisa certa, por extenso: «um título branco sobre nada
+ * nenhum é o defeito que isto existe para não ter». Mas essa guarda é o
+ * `respiro()`, que corre no servidor e pergunta se a fotografia TEM endereço.
+ * Tinha. O que falhou foi o endereço, já com a página desenhada — uma
+ * assinatura expirada, uma derivada por fabricar.
+ *
+ * Aí a célula desiste e devolve nada, e a faixa do título, que é IRMÃ dela e
+ * não filha, continua desenhada: o véu escuro sobre o papel branco dá o
+ * cinzento, e o nome por cima dele.
+ *
+ * Havia dois caminhos para o mesmo sítio e só um estava tapado.
+ */
+describe("quando a fotografia do momento falha depois de a página abrir", () => {
+  /** O título como faixa branca sobre a fotografia. */
+  const tituloSobreFoto = () =>
+    [...document.querySelectorAll("h3")].find((h) => h.className.includes("text-white"));
+  /** O mesmo título, a preto sobre o papel. */
+  const tituloSobrePapel = () =>
+    [...document.querySelectorAll("h3")].find((h) => h.className.includes("text-foreground/90"));
+
+  it("começa com o nome por cima da fotografia, como foi desenhado", () => {
+    desenhar();
+    expect(tituloSobreFoto()?.textContent).toBe("Cerimónia");
+    expect(tituloSobrePapel()).toBeUndefined();
+  });
+
+  it("e quando ela falha, o nome volta ao papel em vez de ficar sobre o vazio", async () => {
+    desenhar();
+    // A fotografia do momento — a primeira, a que abre a secção — rebenta.
+    // DUAS vezes: a célula tem plano B (miniatura → original) e só desiste
+    // depois de o segundo endereço também falhar.
+    const doMomento = () => document.querySelector("img:not([aria-hidden])") as HTMLImageElement;
+    expect(doMomento(), "não encontrei a fotografia do momento").toBeTruthy();
+    fireEvent.error(doMomento());
+    fireEvent.error(doMomento());
+
+    await waitFor(() => {
+      expect(tituloSobrePapel()?.textContent, "o nome tinha de voltar a preto sobre o papel").toBe(
+        "Cerimónia",
+      );
+    });
+    expect(
+      tituloSobreFoto(),
+      "ficou uma faixa de título branca por cima de coisa nenhuma — é este o defeito",
+    ).toBeUndefined();
+  });
+});

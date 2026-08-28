@@ -236,6 +236,170 @@ function destacada(board: BoardParaEcra): number | null {
  * regra desta página), e um respiro que desaparece deixa o título encostado ao
  * bloco anterior — o buraco exactamente onde se queria o ar.
  */
+/**
+ * O nome do momento SEM fotografia por baixo — a preto sobre o papel.
+ *
+ * Existia inline, no caminho «nenhuma das fotografias resolveu». Passa a ser
+ * partilhado porque há um SEGUNDO caminho para o mesmo sítio, e era ele que
+ * estava a falhar: ver `Respiro`.
+ */
+function TituloDoMomento({ titulo, subtitulo }: { titulo: string; subtitulo?: string }) {
+  return (
+    <>
+      <h3
+        className="text-foreground/90 text-balance"
+        style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 34px)" }}
+      >
+        {titulo}
+      </h3>
+      {subtitulo && (
+        <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">{subtitulo}</p>
+      )}
+    </>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O MOMENTO DE RESPIRAÇÃO — e o título que desiste com a fotografia
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era um bloco inline. Passa a componente por uma razão só, e ela é um
+ * defeito que a dona do negócio viu no telemóvel dela, na proposta a sério:
+ *
+ *     um rectângulo cinzento, sem fotografia nenhuma, com «Saída dos noivos»
+ *     escrito por cima
+ *
+ * ── PORQUE É QUE A REDE QUE JÁ EXISTIA NÃO O APANHOU ──────────────────────
+ *
+ * O ficheiro já dizia a coisa certa, e por extenso: «um título branco sobre
+ * nada nenhum é o defeito que isto existe para não ter». Só que essa guarda é
+ * o `respiro()`, que corre UMA vez, no servidor, e pergunta se a fotografia
+ * TEM endereço. Tinha.
+ *
+ * O que falhou foi o endereço, já depois de a página estar desenhada — uma
+ * assinatura expirada, uma derivada que não chegou a ser feita. Aí a célula
+ * desiste e devolve `null`, e a faixa do título, que é irmã dela e não filha,
+ * fica desenhada por cima do vazio: o véu escuro sobre o papel branco dá o
+ * cinzento, e o nome do momento por cima dele.
+ *
+ * Havia dois caminhos para o mesmo sítio e só um estava tapado. Aqui os dois
+ * convergem no `TituloDoMomento` — o nome volta a preto, sobre o papel, como
+ * já acontecia quando a fotografia faltava desde o início.
+ */
+function Respiro({
+  token,
+  foto,
+  ansiosa,
+  rotulo,
+  textos,
+  aoAmpliar,
+  aoDesistir,
+  titulo,
+  subtitulo,
+}: {
+  token: string;
+  foto?: FotoDaProposta;
+  ansiosa: boolean;
+  rotulo: string;
+  textos: TextosDaPagina;
+  aoAmpliar: (alvo: HTMLElement | null) => void;
+  aoDesistir: () => void;
+  titulo: string;
+  subtitulo?: string;
+}) {
+  /**
+   * ── CAÍDO ENQUANTO FOR O MESMO ENDEREÇO, E NÃO PARA SEMPRE ──────────────
+   *
+   * A primeira versão disto era um `caiu: boolean`, e a rede que já existia
+   * apanhou-a: quando as assinaturas morrem, esta página tem um botão que as
+   * VOLTA A PEDIR — e com um booleano o momento nunca regressava. O casal
+   * carregava em «recarregar» e ficava com o nome a preto e a fotografia por
+   * baixo dele para sempre.
+   *
+   * Guardar QUAL endereço falhou resolve-o sem efeito nenhum: assinaturas
+   * novas mudam o endereço, a comparação deixa de bater, e o momento volta.
+   * Um endereço novo é uma hipótese nova.
+   */
+  const [enderecoQueFalhou, setEnderecoQueFalhou] = useState<string | null>(null);
+  const endereco = foto?.miniatura ?? foto?.original ?? null;
+  const caiu = enderecoQueFalhou !== null && enderecoQueFalhou === endereco;
+
+  const desistir = useCallback(() => {
+    setEnderecoQueFalhou(endereco);
+    aoDesistir();
+  }, [aoDesistir, endereco]);
+
+  if (caiu) return <TituloDoMomento titulo={titulo} subtitulo={subtitulo} />;
+
+  return (
+    <div className="relative mb-9">
+      <Celula
+        token={token}
+        foto={foto}
+        /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
+                   milhares de pixéis de distância, e três fotografias
+                   grandes a carregar de uma vez são meio megabyte gasto
+                   antes de a primeira secção acabar de se desenhar. */
+        ansiosa={ansiosa}
+        /* Mais alta do que a capa (que ainda tem a página toda por
+                 baixo dela) e com tecto: uma foto ao alto a 1024 px de
+                 largura são 1500 px de altura, e isso não é um respiro, é um
+                 ecrã inteiro sem uma palavra. */
+        tecto="min(64vh, 560px)"
+        larguraNoEcra="(min-width: 1024px) 1024px, 100vw"
+        rotulo={rotulo}
+        textos={textos}
+        aoAmpliar={aoAmpliar}
+        aoDesistir={desistir}
+      />
+      {/*
+       * ── O NOME DO MOMENTO POR CIMA DA FOTOGRAFIA ──────────────
+       *
+       * Palavras dela: «as secções principais abrem com uma imagem a
+       * toda a largura e o nome do momento por cima». O título
+       * estava por baixo, e por baixo ele é uma legenda: lê-se
+       * depois da fotografia, e o que ela quer é que se leia COM ela.
+       *
+       * `pointer-events-none` porque a fotografia por baixo é
+       * clicável (amplia), e uma faixa de texto por cima roubava-lhe
+       * metade da área de toque sem dizer que o fazia.
+       *
+       * O véu escuro não é decoração: sem ele, um título branco
+       * sobre uma fotografia de mesa posta em luz alta desaparece.
+       * Começa em transparente a meio da altura para não escurecer a
+       * fotografia inteira — o que se quer é ler o texto, não pôr um
+       * filtro na foto dela.
+       */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-sm bg-gradient-to-t from-black/60 via-black/25 to-transparent"
+        style={{ height: "58%" }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-7">
+        <h3
+          className="text-balance text-white"
+          style={{
+            fontFamily: "var(--font-playfair)",
+            fontSize: "clamp(22px, 3.4vw, 34px)",
+            textShadow: "0 1px 12px rgba(0,0,0,0.35)",
+          }}
+        >
+          {titulo}
+        </h3>
+        {subtitulo && (
+          <p
+            className="mt-1.5 text-sm leading-relaxed text-white/85"
+            style={{ textShadow: "0 1px 10px rgba(0,0,0,0.35)" }}
+          >
+            {subtitulo}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function respiro(board: BoardParaEcra, fotos: Record<string, FotoDaProposta>): number | null {
   const resolve = (i: number) => {
     const f = fotos[board.fotos[i]];
@@ -374,70 +538,17 @@ export default function Inspiracao({
 
               Ver `respiro`, acima, para qual das fotografias é. */}
             {oRespiro !== null && (
-              <div className="relative mb-9">
-                <Celula
-                  token={token}
-                  foto={fotos[board.fotos[oRespiro]]}
-                  /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
-                     milhares de pixéis de distância, e três fotografias
-                     grandes a carregar de uma vez são meio megabyte gasto
-                     antes de a primeira secção acabar de se desenhar. */
-                  ansiosa={b === 0}
-                  /* Mais alta do que a capa (que ainda tem a página toda por
-                   baixo dela) e com tecto: uma foto ao alto a 1024 px de
-                   largura são 1500 px de altura, e isso não é um respiro, é um
-                   ecrã inteiro sem uma palavra. */
-                  tecto="min(64vh, 560px)"
-                  larguraNoEcra="(min-width: 1024px) 1024px, 100vw"
-                  rotulo={contar(textos.contagem, oRespiro + 1, board.fotos.length)}
-                  textos={textos}
-                  aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
-                  aoDesistir={marcarFalha}
-                />
-                {/*
-                 * ── O NOME DO MOMENTO POR CIMA DA FOTOGRAFIA ──────────────
-                 *
-                 * Palavras dela: «as secções principais abrem com uma imagem a
-                 * toda a largura e o nome do momento por cima». O título
-                 * estava por baixo, e por baixo ele é uma legenda: lê-se
-                 * depois da fotografia, e o que ela quer é que se leia COM ela.
-                 *
-                 * `pointer-events-none` porque a fotografia por baixo é
-                 * clicável (amplia), e uma faixa de texto por cima roubava-lhe
-                 * metade da área de toque sem dizer que o fazia.
-                 *
-                 * O véu escuro não é decoração: sem ele, um título branco
-                 * sobre uma fotografia de mesa posta em luz alta desaparece.
-                 * Começa em transparente a meio da altura para não escurecer a
-                 * fotografia inteira — o que se quer é ler o texto, não pôr um
-                 * filtro na foto dela.
-                 */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-sm bg-gradient-to-t from-black/60 via-black/25 to-transparent"
-                  style={{ height: "58%" }}
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-7">
-                  <h3
-                    className="text-balance text-white"
-                    style={{
-                      fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(22px, 3.4vw, 34px)",
-                      textShadow: "0 1px 12px rgba(0,0,0,0.35)",
-                    }}
-                  >
-                    {board.titulo}
-                  </h3>
-                  {board.subtitulo && (
-                    <p
-                      className="mt-1.5 text-sm leading-relaxed text-white/85"
-                      style={{ textShadow: "0 1px 10px rgba(0,0,0,0.35)" }}
-                    >
-                      {board.subtitulo}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <Respiro
+                token={token}
+                foto={fotos[board.fotos[oRespiro]]}
+                ansiosa={b === 0}
+                rotulo={contar(textos.contagem, oRespiro + 1, board.fotos.length)}
+                textos={textos}
+                aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
+                aoDesistir={marcarFalha}
+                titulo={board.titulo}
+                subtitulo={board.subtitulo}
+              />
             )}
             {/*
              * Sem respiro — a secção cujas fotografias nenhuma resolveu — o
@@ -446,22 +557,7 @@ export default function Inspiracao({
              * defeito que isto existe para não ter.
              */}
             {oRespiro === null && (
-              <>
-                <h3
-                  className="text-foreground/90 text-balance"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(22px, 3.4vw, 34px)",
-                  }}
-                >
-                  {board.titulo}
-                </h3>
-                {board.subtitulo && (
-                  <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">
-                    {board.subtitulo}
-                  </p>
-                )}
-              </>
+              <TituloDoMomento titulo={board.titulo} subtitulo={board.subtitulo} />
             )}
 
             {/* ── A GRELHA ─────────────────────────────────────────────────────
