@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -51,6 +51,26 @@ import { render } from "@testing-library/react";
  * do BACK OFFICE; a forma do token é do ficheiro ao lado, que já a mede.
  */
 const SEGMENTO_TOKEN = "token-de-teste";
+
+/**
+ * ── NADA FICA MONTADO QUANDO UM TESTE ACABA ──────────────────────────────
+ *
+ * Este projecto não corre o vitest com `globals`, portanto a limpeza
+ * automática da testing-library NÃO está ligada: o que se desenha fica
+ * montado até ao fim do ficheiro.
+ *
+ * Com o `GoogleTag` e o `Analytics` isso nunca deu nada — devolvem uma
+ * etiqueta ou uma cadeia vazia e não têm estado. O `ConsentBanner` tem dois
+ * `useEffect` e um `useState`, e aí o React deixa trabalho agendado no
+ * `scheduler`. Quando esse trabalho corre, o ambiente jsdom já foi desmontado
+ * e o que sai é `ReferenceError: window is not defined` — um erro NÃO
+ * APANHADO, que não reprova teste nenhum e reprova a corrida inteira.
+ *
+ * Foi assim que aconteceu: 9105 testes verdes e o CI vermelho, com cinco
+ * destes erros. Localmente não se via a correr só este ficheiro (acaba
+ * depressa de mais) — só na suite completa.
+ */
+afterEach(cleanup);
 
 /** Onde os analíticos NÃO podem existir. */
 const CALADOS = [
@@ -258,8 +278,9 @@ describe("ConsentBanner — a regra deixou de estar escrita à mão", () => {
 
   it("continua fora do back office", () => {
     pathname.value = "/pt/orcamento/admin";
-    const { container } = render(<ConsentBanner locale="pt" />);
+    const { container, unmount } = render(<ConsentBanner locale="pt" />);
     expect(container.innerHTML).toBe("");
+    unmount();
   });
 
   /**
@@ -296,8 +317,9 @@ describe("ConsentBanner — a regra deixou de estar escrita à mão", () => {
       `/portal/${SEGMENTO_TOKEN}`,
     ]) {
       pathname.value = p;
-      const { container } = render(<ConsentBanner locale="pt" />);
+      const { container, unmount } = render(<ConsentBanner locale="pt" />);
       expect(container.innerHTML, `o aviso de cookies desenhou em ${p}`).toBe("");
+      unmount();
     }
   });
 
@@ -306,8 +328,9 @@ describe("ConsentBanner — a regra deixou de estar escrita à mão", () => {
     // desenhasse em lado nenhum passava neste ficheiro inteiro.
     for (const p of MEDIDOS) {
       pathname.value = p;
-      const { container } = render(<ConsentBanner locale="pt" />);
+      const { container, unmount } = render(<ConsentBanner locale="pt" />);
       expect(container.innerHTML, `o aviso de cookies desapareceu de ${p}`).not.toBe("");
+      unmount();
     }
   });
 });
