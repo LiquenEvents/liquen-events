@@ -884,9 +884,65 @@ body:is(.admin-mode, :has([data-admin-mode])) .bo-text-faint {
    subir o corpo sem desapertar o espacejamento troca letra pequena por texto
    transbordado. */
 body:is(.admin-mode, :has([data-admin-mode]))
-  :is([class*="text-[7px]"], [class*="text-[8px]"], [class*="text-[9px]"]) {
+  :is(
+    [class*="text-[7px]"],
+    [class*="text-[8px]"],
+    [class*="text-[9px]"],
+    [class*="text-[10px]"],
+    [class*="text-[11px]"]
+  ) {
   font-size: var(--bo-fs-caption);
   letter-spacing: 0.01em;
+}
+
+/* ── E O 10 E O 11 ENTRARAM AQUI, A PEDIDO DELA ──────────────────────────────
+   Isto levantava TRÊS tamanhos (7 a 9) e parava aí de propósito: o 10 e o 11
+   eram «o registo denso do computador», e o comentário do chão do telemóvel
+   dizia, com razão, que alargar a fronteira mudava a densidade da tabela do
+   portátil «sem ninguém pedir».
+
+   PEDIU. Palavras dela, depois de eu lhe mostrar a medição: «arruma em todo o
+   back office». A premissa daquela frase era ninguém ter pedido; deixou de ser
+   verdade, e por isso a regra muda — e o teste que a guardava muda com ela, com
+   esta razão escrita, em vez de ser contornado.
+
+   O QUE A MEDIÇÃO MOSTROU, e é o que justifica o pedido: o back office tem 593
+   tamanhos de letra escritos à mão e ONZE usos da escala declarada.
+
+       text-[11px]  231      text-[12px]   24      text-[15px]   5
+       text-[10px]  223      text-[8px]    14      text-[17px]   2
+       text-[9px]    80      text-[13px]   13      text-[14px]   1
+
+   A escala existe — caption 12 · label 13 · body 15 · lead 17 · title 20 — e o
+   painel quase não assentava nela. É a mesma forma dos 47 cinzentos e das 15
+   grafias de espacejamento: uma decisão tomada 593 vezes por não haver onde a
+   ir buscar.
+
+   Com o 10 e o 11 aqui dentro, 454 dessas chamadas passam a assentar no degrau
+   mais baixo da casa, em vez de inventarem um número dois píxeis abaixo dele. */
+
+/* ── E A SOBRANCELHA VAI COM ELES, PELA MESMA RAZÃO ──────────────────────────
+   A `.bo-eyebrow` não é um utilitário do Tailwind: é uma classe própria fixada
+   em 11 px, e o chão de cima não lhe toca por não haver classe `text-[11px]`
+   nenhuma para apanhar.
+
+   MEDIDO depois de o 10 e o 11 entrarem no chão, a 1280, nas dez vistas: dos
+   360 nós que estavam abaixo do degrau sobraram VINTE E QUATRO, e eram todos
+   ela — «Próximos eventos», «Prioridade», «Prazo», «A fazer», «Valor já
+   ganho». Ou seja, os TÍTULOS das secções ficavam um píxel abaixo do chão
+   enquanto o texto que eles titulam assentava nele.
+
+   O chão do telemóvel já a levantava, e a razão está lá escrita: «é ela que
+   titula quase todas as secções do painel… num ecrã onde os títulos são o
+   mapa». Vale igual no computador.
+
+   `0.04em` e não os `0.14em` que ela declara: é a mesma geometria que o resto
+   deste ficheiro repete — subir o corpo sem desapertar o espacejamento troca
+   letra pequena por texto transbordado. É o mesmo valor que o chão do telemóvel
+   já escolheu para ela. */
+body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow {
+  font-size: var(--bo-fs-caption);
+  letter-spacing: 0.04em;
 }
 
 /* ── E PORQUE É QUE ISTO É `[class*=]` E NÃO A CLASSE ─────────────────────
