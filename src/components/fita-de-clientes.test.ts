@@ -175,74 +175,94 @@ describe("a fita de clientes", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O FUNDO DA FITA — «transparente, dentro da imagem de fundo»
+ * O FUNDO DA FITA — a banda clara, que é o que ela quer
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Palavras dela, com a fotografia dos dois sítios lado a lado, e depois:
- * «coloca transparente dentro da imagem de fundo».
+ * Esta parte do ficheiro já disse o contrário, e vale a pena ficar escrito.
  *
- * ── E a banda JÁ ERA transparente ────────────────────────────────────────
+ * Com a fotografia do sítio de que ela gosta ao lado da nossa, ela pediu:
+ * «coloca transparente dentro da imagem de fundo». MEDIDO, a banda JÁ era
+ * transparente (`rgba(0, 0, 0, 0)`) — o claro que ela via era o corpo da
+ * página por baixo, entre duas secções escuras de bordo a bordo. Levei a fita
+ * para dentro do herói, por cima da fotografia, com os logótipos claros.
  *
- * MEDIDO: o fundo dela era `rgba(0, 0, 0, 0)`. O branco que ela via era a
- * PÁGINA por baixo. A fita ficava entre duas secções escuras de bordo a bordo,
- * e o corpo branco aparecia no meio delas como uma tira clara a cortar tudo.
+ * ── E ela viu, e disse que não ───────────────────────────────────────────
  *
- * Ou seja, o problema nunca foi o fundo da banda — foi ONDE ela estava. Passa
- * a viver DENTRO do herói, por cima da fotografia e do véu que ele já tem, e
- * aí a transparência faz o que ela queria: os logótipos assentam no mesmo
- * escuro de tudo o resto.
+ * «epa nao gosto deixa com a fita preta como estava», e logo a seguir, a
+ * corrigir-se: «deixa com a fita branca».
  *
- * Duas coisas que isso obriga, e que estão presas aqui em baixo: os logótipos
- * têm de ser CLAROS (pretos sobre uma fotografia escura não se veem), e as
- * máscaras das pontas têm de sair (um degradê para uma cor sólida por cima de
- * uma fotografia é uma mancha, não um desvanecer).
+ * Portanto a fita volta a ser o que era: uma banda à parte, entre as secções,
+ * clara, com as suas duas linhas, os logótipos a preto e as máscaras nas
+ * pontas. Não é uma regressão — é a escolha dela, vista no telemóvel dela.
+ *
+ * As três coisas lá em cima (o ciclo que fecha, os 110 px/s, o botão fora do
+ * desenho) NÃO dependem disto e ficam: o que se desfez foi só onde a fita
+ * assenta e de que cor são os logótipos.
  */
 describe("o fundo da fita", () => {
-  it("a banda não pinta fundo nenhum — o que se vê é a fotografia", () => {
+  it("a banda fecha-se nas suas duas linhas", () => {
+    // `border-y` é o que a faz ler-se como um bloco à parte. Saiu quando a
+    // fita foi para dentro da fotografia; volta com ela.
+    expect(componente(), "as linhas que fecham a banda desapareceram").toMatch(/\bborder-y\b/);
+  });
+
+  it("a banda continua a não pintar fundo — o claro é a página", () => {
+    /**
+     * Vale a pena não confundir as duas coisas: ela quer a fita CLARA, e isso
+     * consegue-se com a banda transparente sobre o corpo claro da página, que
+     * é como sempre esteve. Pintar aqui um `bg-*` seria pintar por cima do
+     * tema em vez de o deixar decidir.
+     */
     const m = componente().match(/className="([^"]*relative[^"]*overflow-hidden[^"]*)"/);
     expect(m, "não se encontrou a banda").not.toBeNull();
-    expect(m![1], "a banda voltou a pintar um fundo").not.toMatch(/\bbg-/);
+    expect(m![1], "a banda passou a pintar um fundo próprio").not.toMatch(/\bbg-/);
   });
 
-  it("as duas linhas que a fechavam numa caixa saíram", () => {
-    // `border-y` era o que a fazia ler-se como um bloco à parte, mesmo com o
-    // fundo da página por trás.
-    expect(componente(), "as linhas voltaram a fechar a banda").not.toMatch(/\bborder-y\b/);
-  });
-
-  it("os logótipos são CLAROS — pretos sobre a fotografia não se veem", () => {
+  it("os logótipos são ESCUROS — é uma banda clara", () => {
     /**
-     * O `brightness-0` sozinho pinta-os a preto: servia quando a banda estava
-     * sobre o branco da página. Sobre a fotografia, sem o `invert`, a fita fica
-     * vazia — e foi o que aconteceu numa das tentativas, visto no browser.
+     * `brightness-0` pinta-os a preto. O `invert` a seguir tornava-os brancos,
+     * e foi o que entrou quando a fita vivia sobre a fotografia — sobre o
+     * claro da página isso é branco sobre branco, ou seja, uma fita vazia.
      */
-    expect(componente(), "os logótipos voltaram a preto").toMatch(/brightness-0[^"]*\binvert\b/);
+    expect(componente(), "não se encontrou o `brightness-0`").toMatch(/\bbrightness-0\b/);
+    expect(componente(), "os logótipos ficaram brancos sobre a banda clara").not.toMatch(
+      /brightness-0[^"]*\binvert\b/,
+    );
   });
 
-  it("as máscaras das pontas saíram", () => {
-    // Desvaneciam para uma COR sólida. Por cima de uma fotografia isso é uma
-    // mancha; e o sítio que ela mostrou também não as tem.
-    expect(componente(), "as máscaras das pontas voltaram").not.toMatch(/from-surface|from-noite/);
+  it("as máscaras das pontas estão lá", () => {
+    // Desvanecem os logótipos para o `surface` da página nas duas pontas, em
+    // vez de os cortar a direito. Sobre uma fotografia eram uma mancha; sobre
+    // a página clara são o que sempre foram.
+    const fonte = componente();
+    expect(fonte, "a máscara da esquerda saiu").toMatch(/from-surface[^"]*to-transparent/);
+    expect(
+      (fonte.match(/from-surface/g) ?? []).length,
+      "faltam máscaras — são duas, uma por ponta",
+    ).toBe(2);
   });
 
-  it("o nome do cliente, quando o logótipo falha, lê-se sobre a fotografia", () => {
+  it("o nome do cliente, quando o logótipo falha, lê-se na banda clara", () => {
     /**
-     * Com o `text-foreground/68` que lá estava — tinta escura —, um logótipo
-     * que falhasse deixava um nome invisível em cima de uma fotografia escura.
-     * Branco a 70% sobre o escuro do véu dá 9,30:1.
+     * Branco a 70% era o que se lia sobre a fotografia. Sobre a banda clara
+     * desaparece: o nome de recurso volta à tinta escura do tema.
      */
-    expect(componente(), "o nome de recurso voltou à tinta escura").toMatch(/text-white\/\d+/);
+    expect(componente(), "o nome de recurso ficou branco sobre claro").toMatch(
+      /text-foreground\/\d+/,
+    );
   });
 });
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * E A FITA TEM DE VIVER DENTRO DO HERÓI — senão nada disto acima faz sentido
+ * E A FITA VIVE FORA DO HERÓI — é a outra metade da mesma escolha dela
  * ════════════════════════════════════════════════════════════════════════════
  *
- * É esta a metade estrutural da correcção. Uma banda transparente com logótipos
- * BRANCOS colocada de volta entre duas secções, sobre o corpo branco da página,
- * fica invisível — branco sobre branco. As duas coisas andam juntas.
+ * As duas andam juntas, nos dois sentidos. Uma banda clara com logótipos
+ * pretos colocada por cima da fotografia do herói fica preto sobre escuro,
+ * tão invisível como o contrário. Se alguém voltar a levar a fita para dentro
+ * do herói, tem de mexer também nas cores — e é isso que estas duas regras,
+ * juntas, obrigam a notar.
  */
 describe("onde a fita vive", () => {
   const paginas = [
@@ -262,20 +282,29 @@ describe("onde a fita vive", () => {
 
   it("CONTROLO POSITIVO: os dois heróis foram mesmo lidos", () => {
     // Sem isto, um caminho errado dava uma cadeia vazia e a regra a seguir
-    // passava por não encontrar nada — que é precisamente o defeito.
+    // passava por não encontrar nada — que, aqui, é o defeito ao contrário:
+    // «não está no herói» é trivialmente verdade num ficheiro que não se leu.
     for (const p of paginas) {
       expect(heroi(p).length, `${p}: herói vazio`).toBeGreaterThan(400);
       expect(heroi(p), `${p}: o herói não tem fotografia`).toMatch(/HeroImage|SafeImage|Image/);
     }
   });
 
-  it("a fita é desenhada DENTRO do herói, nas duas páginas", () => {
+  it("CONTROLO POSITIVO: as duas páginas desenham mesmo a fita", () => {
+    for (const p of paginas) {
+      expect(readFileSync(join(RAIZ, p), "utf8"), `${p}: a fita desapareceu da página`).toContain(
+        "<ClientMarquee />",
+      );
+    }
+  });
+
+  it("a fita é desenhada FORA do herói, nas duas páginas", () => {
     for (const p of paginas) {
       expect(
         heroi(p),
-        `${p}: a fita saiu do herói — transparente e com logótipos brancos, ` +
-          "fora dali ela fica branco sobre branco",
-      ).toContain("<ClientMarquee />");
+        `${p}: a fita voltou para dentro do herói — clara e com logótipos ` +
+          "pretos, ali fica preto sobre escuro",
+      ).not.toContain("<ClientMarquee />");
     }
   });
 });
