@@ -322,19 +322,6 @@ export default async function ProposalPage({
   const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
 
   /**
-   * A frase de intenção, na língua da proposta.
-   *
-   * A caixa inglesa vazia cai para o português, como tudo o resto neste
-   * documento (ver `proposal-doc-bilingue.ts`): uma proposta inglesa com a
-   * abertura em branco era um buraco no sítio mais visível da página.
-   */
-  const intencao = (
-    (locale === "en" ? proposal.doc?.intencaoEn?.trim() : "") ||
-    proposal.doc?.intencao?.trim() ||
-    ""
-  ).trim();
-
-  /**
    * AS FOTOGRAFIAS, ASSINADAS AQUI E NÃO POR UM PEDIDO DO NAVEGADOR.
    *
    * A página é `force-dynamic`, portanto isto corre a cada visita e o HTML sai
@@ -483,33 +470,29 @@ export default async function ProposalPage({
           </h1>
           {/*
            * ══════════════════════════════════════════════════════════════
-           * A FRASE DELA, OU FRASE NENHUMA
+           * A ABERTURA É O NOME DELES, E MAIS NADA
            * ══════════════════════════════════════════════════════════════
            *
-           * Palavras dela: «quero retirar isto de "veja com calma". quero que
-           * apareça apenas o nome do noivo e da noiva».
+           * Duas frases já viveram aqui, e as duas saíram.
            *
-           * A frase da casa («Preparámos esta proposta com todo o cuidado…
-           * Vejam com calma») era verdadeira e era de toda a gente — e é isso
-           * que estava mal debaixo de dois nomes próprios. O que a abertura
-           * tem para dizer é de quem é a proposta; uma frase que serve para
-           * qualquer casal não acrescenta nada a isso e afasta o botão.
+           * A primeira era da casa: «Preparámos esta proposta com todo o
+           * cuidado… Vejam com calma.» Palavras dela na altura: «quero retirar
+           * isto de "veja com calma". quero que apareça apenas o nome do noivo
+           * e da noiva». Era verdadeira e era de toda a gente — e é isso que
+           * estava mal debaixo de dois nomes próprios.
            *
-           * Quando ela escreveu uma frase para AQUELE casamento, essa fica —
-           * é dela e é específica, que é precisamente o contrário do que saiu.
-           * Maior e na serifada do documento: não é uma nota de boas-vindas,
-           * é a tese da proposta.
+           * A segunda foi a que a substituiu: uma «frase de intenção» escrita
+           * por ela, proposta a proposta, sobre o que tinha imaginado para
+           * aquele casamento. Também saiu, e por decisão dela: mandou a
+           * fotografia do parágrafo e escreveu «nao quero estes textos na
+           * proposta». Perguntei-lhe se era aquele texto ou o campo; respondeu
+           * «não quero o campo, ponto final».
            *
-           * A da casa continua a existir no EMAIL (`proposta-doc/route.ts`),
-           * onde um corpo só com dois nomes não se lê como uma mensagem. */}
-          {intencao && (
-            <p
-              className="text-foreground/80 mx-auto mt-5 max-w-xl leading-relaxed text-balance"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(17px, 2.4vw, 21px)" }}
-            >
-              {intencao}
-            </p>
-          )}
+           * Fica o nome deles. O `h1` acima é a abertura inteira.
+           *
+           * A frase da casa continua a existir no EMAIL
+           * (`proposta-doc/route.ts`), onde um corpo só com dois nomes não se
+           * lê como uma mensagem. */}
         </header>
 
         {/* ── O DOCUMENTO INTEIRO, QUANDO ELE EXISTE ──────────────────────

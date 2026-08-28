@@ -193,8 +193,6 @@ export const NUNCA_NO_PDF: Readonly<Record<string, string>> = {
   headerTitle: "o título de cabeçalho não chega a ser desenhado pelo gerador.",
   traducoesFeitas:
     "o registo de contra que português cada tradução foi escrita é do estúdio: serve para marcar uma caixa inglesa como desactualizada, e não tem nada que dizer numa folha impressa.",
-  intencao:
-    "a frase de intenção estética é da página do casal: o PDF fica exactamente como estava, por decisão dela, e uma frase escrita para se ler por cima de uma fotografia grande não tem sítio numa folha que abre com uma capa.",
   escolhas:
     "as alternativas que o casal escolhe são de ecrã: vivem na página da proposta e nunca são impressas — uma folha A4 não oferece escolhas, e imprimir «opção A / opção B» no documento que o casal guarda só cria a dúvida de qual das duas ficou.",
 };
