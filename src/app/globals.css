@@ -2928,6 +2928,64 @@ body:has(.barra-consentimento) footer {
   contain-intrinsic-size: auto 400px;
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   A PROPOSTA CHEGA — as secções sobem ao entrar no ecrã
+   ════════════════════════════════════════════════════════════════════════════
+
+   «Quero que a web proposta seja algo incrivelmente bom, com animações.»
+
+   ── AS TRÊS REGRAS DA CASA, QUE SE HERDAM E NÃO SE REINVENTAM ─────────────
+
+   1. SUBIDA, NUNCA OPACIDADE. Está escrito duas vezes neste ficheiro, por dois
+      incidentes diferentes: um estado de repouso invisível faz da animação a
+      CONDIÇÃO de o conteúdo existir. Numa proposta que decide milhares de euros
+      isso é o pior defeito possível — a página em branco e ninguém a saber
+      porquê. Aqui a opacidade nunca desce abaixo de 1 no repouso.
+
+   2. SÓ `transform`. Trabalho de compositor: não bloqueia o dedo a deslizar,
+      que era exactamente a queixa dela («trava ao deslizar»).
+
+   3. `will-change` SÓ ENQUANTO CORRE. Aqui nem é preciso pedi-lo: uma animação
+      com linha de tempo de scroll já é composta, e um `will-change` no repouso
+      seria uma camada por secção a segurar memória de vídeo sem nada a animar.
+
+   ── E PORQUE É QUE ISTO NÃO LEVA UMA LINHA DE JAVASCRIPT ──────────────────
+
+   A galeria revela com um `IntersectionObserver`. Aqui não: `animation-timeline:
+   view()` é o browser a fazê-lo sozinho, fora do fio principal.
+
+   O `@supports` não é zelo — é a regra 1 outra vez, por outra porta. Onde a
+   linha de tempo não existir, NÃO se aplica repouso nenhum: a página fica
+   exactamente como está hoje, direita e legível, em vez de ficar com as
+   secções vinte píxeis fora do sítio à espera de uma animação que nunca vem.
+
+   ── A DISTÂNCIA, E PORQUE É PEQUENA ──────────────────────────────────────
+
+   14 px e não os 20 do masonry. Ali são mosaicos numa grelha, e o gesto lê-se
+   em conjunto; aqui são blocos de texto que alguém está a LER, e um texto que
+   sobe muito rouba a linha que a pessoa está a seguir. O movimento é para se
+   sentir, não para se ver.
+
+   `entry 0%` a `entry 60%`: acaba antes de a secção chegar ao meio do ecrã,
+   ou seja está sempre parada quando se lê. Nenhuma animação atrasa nada. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .prop-chega {
+      animation: prop-chega linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+  }
+}
+@keyframes prop-chega {
+  from {
+    transform: translateY(14px);
+  }
+  to {
+    transform: none;
+  }
+}
+
 /* ── A GRELHA DA PROPOSTA SALTA O QUE ESTÁ FORA DO ECRÃ ──────────────────────
    Palavras dela, sobre a proposta no telemóvel: «trava ao deslizar».
 

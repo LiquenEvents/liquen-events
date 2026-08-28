@@ -146,8 +146,23 @@ function Titulo({
  * voltar à esquerda), e as fotografias ficam com a largura toda, que é o que
  * esta página existe para lhes dar.
  */
+/**
+ * ── `prop-chega`: a secção sobe ao entrar no ecrã ─────────────────────────
+ *
+ * A regra vive no `globals.css`, com as três leis de movimento desta casa
+ * escritas por extenso. As duas que decidem esta linha:
+ *
+ *  · a opacidade NUNCA desce no repouso — se a animação não vier, a secção
+ *    está lá na mesma, direita e legível;
+ *  · não leva JavaScript nenhum — é o browser a segui-la fora do fio
+ *    principal, o que importa numa página onde ela se queixou de travar.
+ */
 function Seccao({ children, larga = false }: { children: React.ReactNode; larga?: boolean }) {
-  return <section className={`mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>{children}</section>;
+  return (
+    <section className={`prop-chega mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>
+      {children}
+    </section>
+  );
 }
 
 /**
