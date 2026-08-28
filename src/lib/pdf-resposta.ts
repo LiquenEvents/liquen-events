@@ -44,6 +44,34 @@ export interface OpcoesPdf {
   nome: string;
   /** Cabeçalhos extra (por exemplo `X-Fotos-Em-Falta`). */
   extra?: Record<string, string>;
+  /**
+   * Descarregar em vez de abrir no visualizador do browser?
+   *
+   * ── PORQUE É QUE ISTO PASSOU A SER UMA ESCOLHA ─────────────────────────
+   *
+   * Palavras dela sobre o botão do PDF no email: «isto não funciona. quero que
+   * vá direto ao pdf da proposta ultra rápido. que se faça download.»
+   *
+   * A causa era os DOIS caminhos da mesma rota não fazerem a mesma coisa:
+   *
+   *   · ficheiro JÁ guardado → reencaminha para o endereço assinado do
+   *     armazenamento, que leva `download` no pedido e portanto DESCARREGA;
+   *   · ficheiro por desenhar → passava por aqui, e aqui estava `inline`.
+   *
+   * Ou seja: a primeira vez que alguém abre uma proposta — ou a primeira vez
+   * depois de uma revisão, que muda a chave e obriga a desenhar de novo — o
+   * ficheiro abria dentro do Safari em vez de descarregar. Num iPhone com 4G
+   * fraco, um PDF de vários megabytes a abrir no visualizador é a diferença
+   * entre «descarregou» e «isto não funciona»: fica um ecrã branco a encher-se
+   * aos poucos, sem nada que diga que está a trabalhar.
+   *
+   * O mesmo botão tinha assim dois comportamentos conforme o dia. Agora tem um.
+   *
+   * Fica por omissão a `false` — `inline` — porque o contrato em PDF usa a
+   * mesma função e abre-se para ler, não para arquivar. Quem quer descarregar
+   * pede-o.
+   */
+  descarregar?: boolean;
 }
 
 /**
@@ -107,7 +135,7 @@ export function respostaPdf(
 
   const base: Record<string, string> = {
     "Content-Type": "application/pdf",
-    "Content-Disposition": `inline; filename="${opcoes.nome}"`,
+    "Content-Disposition": `${opcoes.descarregar ? "attachment" : "inline"}; filename="${opcoes.nome}"`,
     // Sem isto o cliente nunca chega a PEDIR um pedaço.
     "Accept-Ranges": "bytes",
     ETag: etag,

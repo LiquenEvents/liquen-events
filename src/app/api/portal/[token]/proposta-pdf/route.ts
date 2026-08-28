@@ -143,7 +143,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
     const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
-    return respostaPdf(request, pdf, { nome });
+    // `descarregar`: o caminho de cima (ficheiro guardado) já descarrega, pelo
+    // `download` do endereço assinado. Sem isto os dois caminhos da MESMA rota
+    // faziam coisas diferentes — ver `OpcoesPdf.descarregar`.
+    return respostaPdf(request, pdf, { nome, descarregar: true });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.
