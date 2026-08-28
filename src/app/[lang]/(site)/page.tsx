@@ -70,18 +70,26 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         />
         {/* Two hero veils merged into one layer (multiple backgrounds paint
             first-listed on top, so the former upper div is listed first): same
-            pixels, one paint/composite pass instead of two. */}
+            pixels, one paint/composite pass instead of two.
+
+            ── O DEGRAU DOS 22% É NOVO, E É PARA A FITA ─────────────────────
+            O véu segurava 0,92 só na aresta de baixo e caía logo para 0,25.
+            Chegava para a legenda, que vive colada ao fundo. A fita dos
+            clientes entrou por cima da fotografia e vive MAIS ACIMA — e nesta
+            página a fotografia é clara (flores em luz alta), portanto os
+            logótipos brancos desapareciam nela. Segurar 0,78 até aos 22%
+            cobre a faixa onde a fita assenta, sem escurecer a fotografia
+            inteira: o que muda é o quarto de baixo, que já era escuro. */}
         <div
           className="absolute inset-0"
           style={{
             backgroundImage:
-              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92), rgba(8,8,8,0.25), transparent)",
+              "linear-gradient(to right, rgba(0,0,0,0.3), transparent), linear-gradient(to top, rgba(8,8,8,0.92) 0%, rgba(8,8,8,0.78) 22%, rgba(8,8,8,0.25) 55%, transparent 100%)",
           }}
         />
-
         {/* Full-SpaceX hero caption: small and tucked at the bottom-left so the
             photograph owns the first screen. Still the page's single <h1>. */}
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-14 lg:pb-20">
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 lg:px-16 pb-8 lg:pb-12">
           <AnimateIn>
             <div className="max-w-2xl">
               {/* The site's emotional promise, in the SpaceX display lettering:
@@ -136,10 +144,30 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             </div>
           </AnimateIn>
         </div>
-      </section>
+        {/* ── A FITA DOS CLIENTES, DENTRO DA FOTOGRAFIA ──────────────────────
+            Palavras dela, a comparar com um sítio de que gosta: «coloca
+            transparente dentro da imagem de fundo».
 
-      {/* ── Clients marquee ── */}
-      <ClientMarquee />
+            Estava ENTRE esta secção e a seguinte — e as duas são escuras de
+            bordo a bordo, portanto o corpo branco da página aparecia no meio
+            delas como uma tira clara a cortar tudo. Aqui dentro, por cima da
+            fotografia e do véu que ela já tem, os logótipos assentam no mesmo
+            escuro de tudo o resto.
+
+            `z-10` para ficar por cima das camadas do herói (fotografia, WebGL,
+            véu), como a legenda. Sem `px-*`: a fita corre de bordo a bordo, e é
+            a borda que corta os logótipos que entram e saem.
+
+            A FOLGA EM BAIXO NÃO É ESTÉTICA: é para a fita não ficar POR BAIXO
+            dos flutuantes. MEDIDO num 390×844 sem o aviso de cookies — a pílula
+            de WhatsApp ocupa de 776 a 824, e com `pb-6` a fita acabava a 820,
+            ou seja, com um logótipo permanentemente meio tapado por um círculo
+            verde. Ver a mesma armadilha, escrita por extenso, em
+            `e2e/consentimento-geometria.spec.ts`. */}
+        <div className="relative z-10 w-full pb-20 lg:pb-24">
+          <ClientMarquee />
+        </div>
+      </section>
 
       {/* ── Serviços — capítulos SpaceX de ecrã inteiro ──
           Cada serviço é um painel full-bleed (100vw) de altura quase-total,

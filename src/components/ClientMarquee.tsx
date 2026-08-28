@@ -31,8 +31,8 @@ function Mark({
 
   if (failed || !logo) {
     return (
-      <div className="flex-shrink-0 flex items-center h-8 sm:h-10" {...hidden}>
-        <span className="text-foreground/68 text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase whitespace-nowrap">
+      <div className="me-12 flex h-8 flex-shrink-0 items-center sm:me-16 sm:h-10" {...hidden}>
+        <span className="text-white/70 text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase whitespace-nowrap">
           {name}
         </span>
       </div>
@@ -43,7 +43,10 @@ function Mark({
   const d = logoDimsFor(logo);
 
   return (
-    <div className="flex-shrink-0 flex items-center justify-center h-8 sm:h-10" {...hidden}>
+    <div
+      className="me-12 flex h-8 flex-shrink-0 items-center justify-center sm:me-16 sm:h-10"
+      {...hidden}
+    >
       <Image
         src={logo}
         alt={duplicate ? "" : name}
@@ -64,7 +67,7 @@ function Mark({
         // Slimmer strip on every breakpoint: cap the logo height (max-h) so the
         // whole band reads as a fine line — 22px on a phone, 34px from sm+ (was
         // uncapped, which let the band grow much taller on desktop).
-        className="w-auto max-h-[22px] sm:max-h-[34px] max-w-[120px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
+        className="w-auto max-h-[22px] sm:max-h-[34px] max-w-[120px] sm:max-w-[170px] object-contain opacity-80 brightness-0 invert transition-opacity duration-300"
         // O erro é ouvido pela `ref` e NÃO pelo `onError` do next/image.
         // Passar `onError` faz o next/image reatribuir `img.src = img.src` na
         // montagem (image-component.js:140) para ressuscitar um erro anterior à
@@ -78,13 +81,47 @@ function Mark({
   );
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A VELOCIDADE DA FITA, EM PÍXEIS POR SEGUNDO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O CSS levava um TEMPO fixo (`30s`), e um tempo fixo numa fita que muda de
+ * largura não é uma velocidade: é o que sobrar. MEDIDO na página inicial, com
+ * os 19 clientes de hoje — a fita mede 3844 px a 390 px de ecrã e 5053 a 1440,
+ * porque o intervalo entre logótipos é maior a partir de `sm`. A mesma
+ * animação, duas velocidades. E no dia em que ela juntasse seis clientes a
+ * fita alargava e passava a correr mais depressa, sem ninguém mexer em nada.
+ *
+ * ── PORQUE 110 E NÃO OUTRO NÚMERO ────────────────────────────────────────
+ *
+ * Ela mandou o site que quer imitar e disse que o nosso é lento. NÃO CONSEGUI
+ * medir o dele: o proxy desta máquina não deixa sair para lá, e um número
+ * inventado a dizer que é o deles seria pior do que não ter número nenhum.
+ *
+ * 110 px/s é quase o dobro do que a fita andava, e fica longe do ponto em que
+ * um wordmark deixa de se ler de relance. Está aqui, com nome, para ela poder
+ * pedir mais ou menos numa palavra.
+ */
+const PIXEIS_POR_SEGUNDO = 110;
+
 export default function ClientMarquee() {
   const { t } = useTranslations();
   const trackRef = useRef<HTMLDivElement>(null);
-  // Persistent user control (WCAG 2.2.2 Pause, Stop, Hide): the band scrolls for
-  // more than 5s, so a visitor must be able to stop it. Orthogonal to the
-  // off-screen IntersectionObserver pause below — user pause is applied via an
-  // inline animation-play-state, which wins over the observer's class either way.
+  /**
+   * O comando de parar, que continua a existir e deixou de se ver.
+   *
+   * Palavras dela: «o nosso tem até um botão para parar ou ligar e eu não
+   * quero isso». O botão desenhado saiu.
+   *
+   * O comando não saiu, e a razão não é teimosia: a WCAG 2.2.2 («Pause, Stop,
+   * Hide») é nível A e diz que um movimento que arranca sozinho e dura mais de
+   * cinco segundos tem de poder ser parado. Esta fita anda sempre.
+   *
+   * Fica um botão que NÃO OCUPA ESPAÇO NENHUM e não se vê — só aparece se
+   * alguém lhe chegar com o Tab, que é exactamente quem precisa dele. Quem
+   * navega com o rato ou com o dedo nunca o encontra, e é isso que ela pediu.
+   */
   const [userPaused, setUserPaused] = useState(false);
 
   // Shuffle the logo order once per visit so a DIFFERENT set of clients leads
@@ -102,6 +139,41 @@ export default function ClientMarquee() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrder(a);
   }, []);
+
+  /**
+   * A duração, a partir da largura REAL da fita.
+   *
+   * Metade do conteúdo é EXACTAMENTE uma cópia: o intervalo entre logótipos
+   * vive dentro de cada marca (uma margem) e não no contentor, portanto o
+   * conteúdo são duas cópias iguais, sem meio intervalo a sobrar. É a mesma
+   * razão que faz o `-50%` do `@keyframes` fechar o ciclo.
+   *
+   * `ResizeObserver` e não uma medição única: a fita muda de largura quando a
+   * janela cruza o `sm` (o intervalo passa de 48 para 64 px) e quando um
+   * logótipo falha e é substituído pelo nome do cliente.
+   */
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const medir = () => {
+      const copia = el.scrollWidth / 2;
+      if (copia <= 0) return;
+      /**
+       * Só se mudou, e não é zelo: mexer na `animation-duration` de uma
+       * animação a correr obriga o browser a recalcular onde ela vai, e um
+       * observador que dispare com frequência põe a fita a reajustar-se em vez
+       * de andar.
+       */
+      const anterior = parseFloat(el.style.getPropertyValue("--fita-duracao"));
+      const nova = copia / PIXEIS_POR_SEGUNDO;
+      if (Number.isFinite(anterior) && Math.abs(anterior - nova) < 0.05) return;
+      el.style.setProperty("--fita-duracao", `${nova}s`);
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [order]);
 
   // Pause the infinite scroll while the band is off-screen — no point
   // compositing a wide moving strip the user can't see (battery / GPU).
@@ -121,14 +193,28 @@ export default function ClientMarquee() {
   }, []);
 
   return (
-    <div className="relative py-3.5 sm:py-4 border-y border-foreground/8 overflow-hidden">
+    <div className="relative overflow-hidden py-3.5 sm:py-4">
       {/* sr-only heading so heading-navigation users find the client band. */}
       <h2 className="sr-only">{t.nav.clientes}</h2>
-      <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-16 sm:w-24 bg-gradient-to-l from-surface to-transparent z-10 pointer-events-none" />
+      {/* As máscaras das pontas saíram: desvaneciam os logótipos para BRANCO,
+          e esta banda passou a viver por cima da fotografia do herói. Um
+          degradê para uma cor sólida em cima de uma fotografia é uma mancha,
+          não um desvanecer — e o sítio que ela mostrou também não as tem: os
+          logótipos entram e saem cortados pela borda. */}
       <div
         ref={trackRef}
-        className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap"
+        /**
+         * `w-max` — a caixa cresce até ao conteúdo.
+         *
+         * É o que faz o `translateX(-50%)` do `@keyframes` significar «uma
+         * cópia». Sem isto a caixa media o que a janela media (a banda é
+         * `overflow-hidden`) e a fita saltava 1838 px em cada volta. E o
+         * intervalo entre logótipos saiu do `gap` do contentor para uma
+         * margem em cada marca, para que metade do conteúdo seja uma cópia
+         * exacta e não uma cópia mais meio intervalo. O porquê inteiro está
+         * no `globals.css`, ao pé do `@keyframes marquee`.
+         */
+        className="animate-marquee flex w-max items-center whitespace-nowrap"
         style={userPaused ? { animationPlayState: "paused" } : undefined}
       >
         {/*
@@ -153,37 +239,30 @@ export default function ClientMarquee() {
           />
         ))}
       </div>
-      {/* Pause/resume control. Hidden from the reduced-motion path — there the
-          band doesn't animate (globals.css), so there's nothing to pause. */}
-      {/* MEDIDO a 375 px com toque emulado: 28×28 px. É o único comando desta
-          banda e o que a WCAG 2.2.2 exige que exista para poder parar um
-          movimento automático — um comando de pausa que não se acerta com o
-          dedo é um comando que não existe.
-
-          O `alvo-toque` fica no BOTÃO e o círculo desenhado passa para um
-          `<span>` por dentro. Posto no próprio botão, o `min-width/height` de
-          44 px inchava a bolinha para 44 px numa banda de 60 px de altura — o
-          comando passava a ser a coisa maior de uma faixa que é para se ver de
-          relance. Assim o alvo tem 44 e o desenho continua a ter 28. */}
+      {/**
+       * ── O COMANDO QUE NÃO SE VÊ ────────────────────────────────────────
+       *
+       * Era um círculo com «❚❚» encostado ao canto da banda. Palavras dela:
+       * «o nosso tem até um botão para parar ou ligar e eu não quero isso».
+       *
+       * O DESENHO saiu; o comando ficou. A WCAG 2.2.2 é nível A e pede que um
+       * movimento que arranca sozinho e dura mais de cinco segundos possa ser
+       * parado — e esta fita anda sempre.
+       *
+       * `sr-only` até receber foco: não ocupa espaço, não se vê, e não há como
+       * lá chegar com o rato ou com o dedo. Quem navega por teclado dá com ele
+       * no Tab e ele aparece.
+       *
+       * `motion-reduce:hidden` fica: nessa via a fita não anda (globals.css),
+       * e um botão para parar o que já está parado é ruído.
+       */}
       <button
         type="button"
         onClick={() => setUserPaused((p) => !p)}
         aria-pressed={userPaused}
-        aria-label={userPaused ? t.common.retomarLogos : t.common.pausarLogos}
-        // `pointer-coarse:bottom-0` porque a caixa de 44 px cresce à volta do
-        // círculo: mantida em `bottom-1`, empurrava-o 8 px para dentro da
-        // banda. A zero, o círculo fica a 8 px do fundo em vez de 4 — e o
-        // botão inteiro fica DENTRO da banda (60 px de altura), que é o que
-        // importa: esta banda é `overflow-hidden`, e o que saísse dela era
-        // cortado, alvo incluído.
-        className="alvo-toque group motion-reduce:hidden absolute bottom-1 right-2 z-20 flex items-center justify-center pointer-coarse:right-0 pointer-coarse:bottom-0"
+        className="focus:border-foreground/30 focus:bg-surface focus:text-foreground sr-only focus:absolute focus:right-2 focus:bottom-1 focus:z-20 focus:rounded-full focus:border focus:px-3 focus:py-1.5 focus:text-xs focus:not-sr-only motion-reduce:hidden"
       >
-        <span
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-surface/80 text-foreground/60 backdrop-blur-sm transition-colors group-hover:border-foreground/30 group-hover:text-foreground/90"
-          aria-hidden
-        >
-          <span className="text-[11px] leading-none">{userPaused ? "▶" : "❚❚"}</span>
-        </span>
+        {userPaused ? t.common.retomarLogos : t.common.pausarLogos}
       </button>
     </div>
   );

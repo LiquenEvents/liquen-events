@@ -155,6 +155,26 @@ const temAlturaPorDentro = (el: Element) =>
   // `SVGAnimatedString`, e os ícones do rodapé são todos `<svg>`.
   Array.from(el.querySelectorAll("*")).some((f) => declaraAlturaDeToque(classesDe(f)));
 
+/**
+ * ── O QUE NÃO É UM ALVO DE TOQUE: o que não se pode tocar ────────────────
+ *
+ * O `sr-only` do Tailwind é `position:absolute` com 1×1 píxel e um `clip` que
+ * corta o resto. Um elemento assim não está no ecrã: não há dedo que lhe
+ * acerte, nem por sorte. Exigir-lhe 44 px é exigir uma medida a uma coisa que
+ * não tem tamanho — e, pior, obrigaria a escrever no código uma promessa
+ * («este alvo tem 44 px») que é falsa.
+ *
+ * Onde isto aparece: o comando de parar a fita de logótipos. Ela pediu que o
+ * botão desaparecesse do desenho; a WCAG 2.2.2 pede que exista um comando. Fica
+ * `sr-only` até receber foco — invisível para quem usa o dedo, presente para
+ * quem usa o Tab.
+ *
+ * A dispensa é ESTREITA de propósito: só o que declara `sr-only`. Quem quiser
+ * esconder um alvo a sério por aqui esconde-o de toda a gente, e isso é outro
+ * defeito — este ficheiro guarda o tamanho, não a existência.
+ */
+const ehSoParaLeitorDeEcra = (el: Element) => /(^|\s)sr-only(\s|$)/.test(classesDe(el));
+
 /** A regra, aplicada a uma árvore já no DOM. */
 function verificarArvore(raiz: ParentNode, ondeVem: string) {
   const alvos = Array.from(raiz.querySelectorAll("a[href], button, [role=button]"));
@@ -162,7 +182,7 @@ function verificarArvore(raiz: ParentNode, ondeVem: string) {
   // verdadeira sem verificar nada — foi assim que se perdeu o flutuante.
   expect(alvos.length, `${ondeVem} não desenhou nenhum elemento interactivo`).toBeGreaterThan(0);
   for (const el of alvos) {
-    if (ehPalavraNumaFrase(el) || temAlturaPorDentro(el)) continue;
+    if (ehPalavraNumaFrase(el) || temAlturaPorDentro(el) || ehSoParaLeitorDeEcra(el)) continue;
     expect(
       declaraAlturaDeToque(classesDe(el)),
       `${ondeVem}: sem alvo de 44 px — ${descrever(el)}`,
@@ -296,9 +316,25 @@ describe("o cromado que aparece em todas as páginas", () => {
 
   it("o comando de pausa do desfile de logótipos", () => {
     const { container } = montar(<ClientMarquee />);
-    // WCAG 2.2.2: um movimento automático tem de se poder parar. Um comando de
-    // pausa que não se acerta com o dedo é um comando que não existe.
+    /**
+     * O comando EXISTE — a WCAG 2.2.2 pede-o para um movimento que arranca
+     * sozinho e não pára. O que mudou é que deixou de se ver: ela pediu que o
+     * botão saísse do desenho, e ele passou a `sr-only` até receber foco.
+     *
+     * Por isso este passeio já não mede 44 px nele (ver `ehSoParaLeitorDeEcra`)
+     * e mede outra coisa: que ele continua lá, alcançável e com nome.
+     */
     verificarArvore(container, "ClientMarquee");
+    const comando = container.querySelector("button[aria-pressed]");
+    expect(comando, "o comando de parar a fita desapareceu").not.toBeNull();
+    expect(classesDe(comando!), "deixou de estar escondido").toMatch(/(^|\s)sr-only(\s|$)/);
+    expect(
+      classesDe(comando!),
+      "escondido e sem forma de aparecer: quem usa teclado deixa de o ver",
+    ).toMatch(/focus:not-sr-only/);
+    expect((comando!.textContent ?? "").trim().length, "o comando ficou sem nome").toBeGreaterThan(
+      3,
+    );
   });
 });
 

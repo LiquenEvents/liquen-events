@@ -7,6 +7,11 @@
   --color-moss: #637a5f;
   --color-moss-light: #86997f;
   --color-moss-dark: #4c6150;
+  /* O verde-quase-preto por baixo das fotografias. Estava escrito à mão em
+     dois sítios (`.g-tile` e o `--cv-bg` dos painéis) e a fita dos clientes ia
+     ser o terceiro: é o mesmo tom nos três — o fundo neutro que impede um
+     flash branco enquanto uma fotografia escura carrega. */
+  --color-noite: #12160f;
   --color-gold: #d6ab3a;
   --color-gold-dark: #b88f28;
   /* Gold as TEXT on white/cream. gold (~2:1) and gold-dark (~3:1) fail WCAG AA
@@ -1684,6 +1689,51 @@ body::before {
 }
 
 /* ── Keyframes ── */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FITA DOS CLIENTES — O CICLO TEM DE FECHAR, E SEM VARIÁVEL NENHUMA AQUI
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * ── O que estava errado ─────────────────────────────────────────────────
+ *
+ * Num `transform`, uma percentagem é da largura de CAIXA do próprio elemento —
+ * não do conteúdo. A fita é filha de uma banda `overflow-hidden`, portanto a
+ * caixa dela media o que a janela media e o conteúdo transbordava.
+ *
+ * MEDIDO na página inicial, a 1440 px:
+ *
+ *     caixa da fita (offsetWidth)     1440 px   → o `-50%` deslocava  720 px
+ *     conteúdo (scrollWidth)          5053 px
+ *     UMA cópia dos clientes          2558 px
+ *
+ * Andava 720 px e voltava ao princípio: um SALTO de 1838 px em cada volta,
+ * desde sempre. Não era uma fita lenta — era uma fita que dava um solavanco.
+ *
+ * ── A correcção é na CAIXA, e é por uma razão de desempenho ─────────────
+ *
+ * A primeira tentativa foi pôr aqui a largura medida de uma cópia
+ * (`translateX(calc(-1 * var(--fita-copia)))`). Fechava o ciclo e ESTRAGOU o
+ * resto: uma animação cujos fotogramas dependem de uma variável CSS não pode
+ * ser entregue ao compositor — o browser tem de a recalcular no fio principal
+ * a cada fotograma.
+ *
+ * MEDIDO com o relógio da própria animação contra o relógio da parede:
+ *
+ *     1440 px   3000 ms de animação em 3000 ms reais   (100%)
+ *      390 px   1900 ms de animação em 3000 ms reais    (63%)
+ *
+ * No telemóvel — que é onde ela vê o sítio — a fita passou a andar a dois
+ * terços do que dizia. Exactamente o contrário do que se queria.
+ *
+ * Por isso a percentagem FICA, e o que muda é a caixa: a fita passa a
+ * `width: max-content` (a caixa cresce até ao conteúdo) e o intervalo entre
+ * logótipos passa do `gap` do contentor para uma margem em cada marca. Com o
+ * intervalo DENTRO de cada marca, o conteúdo são duas cópias exactamente
+ * iguais, e `-50%` é uma cópia — ao milésimo, sem medir nada.
+ *
+ * A duração continua a vir de uma variável, e essa pode: o que impede o
+ * compositor são os VALORES dos fotogramas, não quanto tempo eles levam.
+ */
 @keyframes marquee {
   from {
     transform: translateX(0);
@@ -1793,12 +1843,50 @@ body::before {
   animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FITA DOS CLIENTES ANDA A UMA VELOCIDADE, NÃO NUM TEMPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estava `30s` — um TEMPO fixo. E um tempo fixo numa fita que muda de largura
+ * não é uma velocidade: é o que sobrar.
+ *
+ * MEDIDO no browser, na página inicial, com os 19 clientes de hoje:
+ *
+ *     390 px de ecrã   fita de 3844 px   →  64 px por segundo
+ *    1440 px de ecrã   fita de 5053 px   →  84 px por segundo
+ *
+ * A mesma animação, duas velocidades — porque o intervalo entre logótipos é
+ * maior a partir de `sm` e a fita fica mais larga. E há a segunda metade do
+ * problema, que é pior por ser silenciosa: no dia em que ela juntar seis
+ * clientes, a fita alarga e passa a correr MAIS DEPRESSA, sem ninguém mexer
+ * em nada.
+ *
+ * Agora a duração é calculada a partir da largura real (`--fita-duracao`, posta
+ * pelo `ClientMarquee` com um `ResizeObserver`): mesma velocidade em qualquer
+ * ecrã e com qualquer número de clientes. O `30s` fica como recurso para o
+ * instante entre o HTML chegar e a medição acontecer.
+ *
+ * ── O `:hover` SAIU ──────────────────────────────────────────────────────
+ *
+ * Parava a fita ao passar o rato por cima. Palavras dela, a comparar com o
+ * site que gosta: «o nosso tem até um botão para parar ou ligar e eu não quero
+ * isso». O mesmo vale para o rato — uma fita que pára porque o ponteiro lhe
+ * passou por cima lê-se como uma avaria, não como um comando.
+ *
+ * O que fica a poder pará-la: o `prefers-reduced-motion` (aqui em baixo, e aí
+ * ela não anda de todo) e o comando de teclado que vive no componente — sem
+ * desenho nenhum até alguém lhe chegar com o Tab.
+ */
 .animate-marquee {
-  animation: marquee 30s linear infinite;
+  animation: marquee var(--fita-duracao, 30s) linear infinite;
+  /* Só enquanto corre, que é a regra da casa: a classe `marquee-paused` é
+     posta quando a banda sai do ecrã, e aí devolve-se a memória. */
+  will-change: transform;
 }
-.animate-marquee:hover,
 .animate-marquee.marquee-paused {
   animation-play-state: paused;
+  will-change: auto;
 }
 
 /* ── Scroll indicator ── */
@@ -2703,7 +2791,7 @@ body:has([data-orcamento-mode]) .eyebrow {
      destes painéis, portanto o pior caso passa a ser a fotografia a aparecer
      sobre a sua própria sombra em vez de sobre um flash branco. Um painel de
      fundo claro sobrepõe com `[--cv-bg:…]`, como já faz com `--cv-h`. */
-  background-color: var(--cv-bg, #12160f);
+  background-color: var(--cv-bg, var(--color-noite));
 }
 
 /* ── O aviso de cookies de quem já respondeu ──
@@ -2904,7 +2992,7 @@ body:has(.barra-consentimento) footer {
 /* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {
-  background-color: #12160f;
+  background-color: var(--color-noite);
   /* Skip rendering off-screen tiles' contents (the <Image>) so a long gallery
      doesn't keep hundreds of decoded layers laid out — the fix for the measured
      scroll cost. Safe against the old "dark gap" regression BECAUSE the box
