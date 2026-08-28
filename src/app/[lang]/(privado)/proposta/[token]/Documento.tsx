@@ -93,6 +93,39 @@ import { textosDaPagina, fase, type SeccaoDobravel } from "./textos-da-pagina";
  * As DATAS já eram localizadas e continuam.
  */
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A OFERTA EM AVIF DE UMA FOTOGRAFIA GRANDE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio, média
+ * por fotografia:
+ *
+ *     lado    webp      avif     densidade num telemóvel de 390 pt
+ *      400   22,5 KB   17,2 KB    1,1x
+ *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe hoje
+ *
+ * Numa proposta de quarenta e seis fotografias são 5,8 MB em WebP contra
+ * 4,7 MB em AVIF: 19% menos, com os MESMOS pixéis. Não se mexe na resolução de
+ * propósito — a queixa de fotografias «desfocadas» veio de servir MENOS pixéis
+ * (a de 400 numa fatia que pedia 1030) e não se volta lá.
+ *
+ * ── `min-resolution: 2dppx`, e não «sempre» ─────────────────────────────
+ *
+ * A oferta só tem o candidato de 1200. Um `<source>` que casa DESLIGA o
+ * `srcset` do `<img>` — e num ecrã de densidade 1, onde o navegador escolheria
+ * a de 400 (22 KB), servir a de 1200 em AVIF (105 KB) seria cinco vezes pior.
+ * A partir de 2 pixéis por ponto a de 1200 JÁ ERA a escolhida, e aí a troca é
+ * estritamente melhor.
+ *
+ * `null` — nenhuma oferta — é o caso NORMAL de tudo o que foi carregado antes
+ * de o bucket existir. O `<img>` ao lado existe sempre.
+ */
+function OfertaAvif({ foto }: { foto?: { mediaAvif?: string } }) {
+  if (!foto?.mediaAvif) return null;
+  return <source type="image/avif" media="(min-resolution: 2dppx)" srcSet={foto.mediaAvif} />;
+}
+
 /** Um bloco de texto corrido — as notas, as condições, as observações. */
 function Lista({ itens }: { itens?: readonly string[] }) {
   const linhas = (itens ?? []).map((l) => l?.trim()).filter(Boolean);
@@ -744,55 +777,58 @@ export default function Documento({
               className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
             />
           )}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={capa.miniatura ?? capa.original}
-            {...(capa.miniatura
-              ? {
-                  /**
-                   * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
-                   *
-                   * A capa desenha-se com a largura toda do documento — até
-                   * 1024 px numa janela larga, e num iPhone ~390 pontos com
-                   * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
-                   * conta da galeria, no sítio onde ela se vê mais: a primeira
-                   * coisa que o casal olha ao abrir a proposta.
-                   *
-                   * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
-                   *
-                   * A derivada de 1200 px era servida SEMPRE pela nossa rota —
-                   * que abre o token, descarrega os bytes para dentro da função
-                   * e só então os reencaminha. Os mesmos bytes a atravessar-nos
-                   * a caminho de um sítio onde já estavam, com um arranque a
-                   * frio pelo meio. Assinada (`capa.media`), vem do CDN
-                   * directamente ao telemóvel.
-                   *
-                   * A rota fica para quando a derivada ainda não foi fabricada:
-                   * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
-                   * de todos os dias e passa a ser o de arranque.
-                   */
-                  srcSet: `${capa.miniatura} 400w, ${
-                    capa.media ??
-                    `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`
-                  } 1200w`,
-                  /* A capa ocupa a largura da página, com o tecto de 1024 px
+          <picture>
+            <OfertaAvif foto={capa} />
+            { }
+            <img
+              src={capa.miniatura ?? capa.original}
+              {...(capa.miniatura
+                ? {
+                    /**
+                     * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
+                     *
+                     * A capa desenha-se com a largura toda do documento — até
+                     * 1024 px numa janela larga, e num iPhone ~390 pontos com
+                     * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
+                     * conta da galeria, no sítio onde ela se vê mais: a primeira
+                     * coisa que o casal olha ao abrir a proposta.
+                     *
+                     * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
+                     *
+                     * A derivada de 1200 px era servida SEMPRE pela nossa rota —
+                     * que abre o token, descarrega os bytes para dentro da função
+                     * e só então os reencaminha. Os mesmos bytes a atravessar-nos
+                     * a caminho de um sítio onde já estavam, com um arranque a
+                     * frio pelo meio. Assinada (`capa.media`), vem do CDN
+                     * directamente ao telemóvel.
+                     *
+                     * A rota fica para quando a derivada ainda não foi fabricada:
+                     * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
+                     * de todos os dias e passa a ser o de arranque.
+                     */
+                    srcSet: `${capa.miniatura} 400w, ${
+                      capa.media ??
+                      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`
+                    } 1200w`,
+                    /* A capa ocupa a largura da página, com o tecto de 1024 px
                      do `max-w-5xl`. Sem isto o navegador assume `100vw` e num
                      ecrã grande pede a maior sem precisar. */
-                  sizes: "(min-width: 1024px) 1024px, 100vw",
-                }
-              : {})}
-            alt=""
-            /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
+                    sizes: "(min-width: 1024px) 1024px, 100vw",
+                  }
+                : {})}
+              alt=""
+              /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
                de busca, porque é ela o elemento de maior pintura da página. */
-            fetchPriority="high"
-            /* `sync` e não `async`: numa imagem que já foi buscada com
+              fetchPriority="high"
+              /* `sync` e não `async`: numa imagem que já foi buscada com
                prioridade alta, descodificar fora do fio principal só adiciona um
                fotograma de espera entre «os bytes chegaram» e «vê-se». Nas
                outras da página continua `async`, que aí é o certo — são muitas
                e nenhuma é a que se está a olhar. */
-            decoding="sync"
-            className="relative block h-full w-full object-cover"
-          />
+              decoding="sync"
+              className="relative block h-full w-full object-cover"
+            />
+          </picture>
         </div>
       )}
 
@@ -1270,12 +1306,14 @@ export default function Documento({
           cláusula de arbitragem. */}
       {fecho && (
         <div className="mt-20 overflow-hidden rounded-sm sm:mt-28">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={fecho.miniatura ?? fecho.original}
-            {...(fecho.miniatura
-              ? {
-                  /* A MESMA regra da capa, que esta tinha ficado sem: com a
+          <picture>
+            <OfertaAvif foto={fecho} />
+            { }
+            <img
+              src={fecho.miniatura ?? fecho.original}
+              {...(fecho.miniatura
+                ? {
+                    /* A MESMA regra da capa, que esta tinha ficado sem: com a
                      derivada assinada (`fecho.media`), os bytes vêm do CDN
                      directos ao telemóvel. A nossa rota abre o token,
                      descarrega os bytes para dentro da função e só então os
@@ -1283,26 +1321,27 @@ export default function Documento({
                      de um sítio onde já estavam, com um arranque a frio pelo
                      meio. Fica para quando a derivada ainda não existe: é ela
                      que a fabrica e guarda. */
-                  srcSet: `${fecho.miniatura} 400w, ${
-                    fecho.media ??
-                    `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)}`
-                  } 1200w`,
-                  sizes: "(min-width: 1024px) 1024px, 100vw",
-                }
-              : {})}
-            alt=""
-            /* Preguiçosa, ao contrário da capa: está no fim de uma página com
+                    srcSet: `${fecho.miniatura} 400w, ${
+                      fecho.media ??
+                      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)}`
+                    } 1200w`,
+                    sizes: "(min-width: 1024px) 1024px, 100vw",
+                  }
+                : {})}
+              alt=""
+              /* Preguiçosa, ao contrário da capa: está no fim de uma página com
                quarenta e seis fotografias, e quem lá chega já esperou o que
                tinha a esperar. */
-            loading="lazy"
-            decoding="async"
-            className="w-full object-cover"
-            style={{
-              aspectRatio:
-                fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",
-              maxHeight: "min(62vh, 560px)",
-            }}
-          />
+              loading="lazy"
+              decoding="async"
+              className="w-full object-cover"
+              style={{
+                aspectRatio:
+                  fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",
+                maxHeight: "min(62vh, 560px)",
+              }}
+            />
+          </picture>
         </div>
       )}
     </article>

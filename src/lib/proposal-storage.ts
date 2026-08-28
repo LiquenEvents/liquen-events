@@ -6,6 +6,7 @@ import { getSupabase } from "./supabase";
 import {
   THEME_BUCKET,
   THEME_MID_BUCKET,
+  THEME_AVIF_MID_BUCKET,
   THEME_SIGNED_TTL,
   THEME_THUMB_BUCKET,
   caminhoDoRefDeTema,
@@ -851,6 +852,23 @@ async function ensureThumbBucket(): Promise<boolean> {
  */
 export const PROPOSAL_MID_BUCKET = "proposal-medias";
 
+/**
+ * ── A MESMA, EM AVIF: UMA OFERTA, NÃO UMA SUBSTITUIÇÃO ────────────────────
+ *
+ * Bucket próprio pela mesma razão do `THEME_AVIF_BUCKET`, que lá está escrita
+ * por extenso: o `<picture>` propõe o AVIF primeiro e o navegador que não o
+ * souber ler pede o WebP, que está no bucket de sempre e existe SEMPRE. Quem
+ * ganha ganha; quem não ganha fica exactamente como estava.
+ *
+ * O caminho dentro do bucket é o mesmo, que é o que permite assinar os dois
+ * lados com a mesma lista.
+ *
+ * Estas são as fotografias que o casal descarrega — a página serve a de 1200
+ * em qualquer telemóvel. Numa proposta de quarenta e seis, ~28% de cada uma é
+ * a diferença entre uma página que se vê e uma que se espera.
+ */
+export const PROPOSAL_AVIF_MID_BUCKET = "proposal-avif-medias";
+
 let midBucketReady = false;
 
 /** Garante o bucket das derivadas intermédias. Mesma regra do das miniaturas:
@@ -1194,6 +1212,20 @@ export async function signProposalThumbs(paths: string[]): Promise<Map<string, s
  */
 export async function signProposalMids(paths: string[]): Promise<Map<string, string>> {
   return assinarRefs(paths, PROPOSAL_MID_BUCKET, THEME_MID_BUCKET, true);
+}
+
+/**
+ * As mesmas de 1200 px, na oferta em AVIF.
+ *
+ * `silencioso`, e desta vez a palavra pesa mais do que nas outras: uma
+ * derivada AVIF em falta é o caso NORMAL de tudo o que foi carregado antes
+ * destes buckets existirem. Não é um erro, não se regista, e não se fabrica à
+ * pressa dentro do pedido — quem não a tiver recebe o WebP de sempre, que é o
+ * que o `<picture>` garante. É por isso que estas derivadas são «leves» no
+ * lote: a página não depende delas para existir.
+ */
+export async function signProposalMidsAvif(paths: string[]): Promise<Map<string, string>> {
+  return assinarRefs(paths, PROPOSAL_AVIF_MID_BUCKET, THEME_AVIF_MID_BUCKET, true);
 }
 
 /**

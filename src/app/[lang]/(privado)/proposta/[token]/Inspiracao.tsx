@@ -798,6 +798,31 @@ function Celula({
    * que acabou de falhar.
    */
   const temSrcset = !!foto?.miniatura && alvo === foto.miniatura;
+  /**
+   * ── A OFERTA EM AVIF, E PORQUE É QUE ELA É CONDICIONADA ────────────────
+   *
+   * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio,
+   * média por fotografia:
+   *
+   *     lado    webp      avif     densidade num telemóvel de 390 pt
+   *      400   22,5 KB   17,2 KB    1,1x
+   *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe hoje
+   *
+   * Numa proposta de quarenta e seis fotografias são 5,8 MB em WebP contra
+   * 4,7 MB em AVIF: 19% menos, com os MESMOS pixéis.
+   *
+   * ── `min-resolution: 2dppx`, e não «sempre» ───────────────────────────
+   *
+   * A oferta em AVIF só tem o candidato de 1200 (não há AVIF de 400 do lado
+   * das propostas). Um `<source>` que casa DESLIGA o `srcset` do `<img>` — e
+   * num ecrã de densidade 1, onde o navegador escolheria a de 400 (22 KB),
+   * passar a servir a de 1200 em AVIF (105 KB) seria cinco vezes pior.
+   *
+   * A partir de 2 pixéis por ponto a fatia pede sempre 718 px ou mais, e
+   * portanto a de 1200 JÁ ERA a escolhida. Aí a troca é estritamente melhor,
+   * e é onde estão os telemóveis dela.
+   */
+  const ofertaAvif = temSrcset && foto?.mediaAvif ? foto.mediaAvif : null;
 
   // Avisar o pai NUM EFEITO, e não durante o desenho: mudar estado do pai a
   // meio do render de um filho é o aviso que o React dá («Cannot update a
@@ -868,8 +893,12 @@ function Celula({
             className="absolute inset-0 h-full w-full scale-105 object-cover blur-md"
           />
         )}
-        {
-          /* eslint-disable-next-line @next/next/no-img-element */
+        <picture>
+          {/* A proposta primeiro; o `<img>` a seguir é o que existe sempre. */}
+          {ofertaAvif && (
+            <source type="image/avif" media="(min-resolution: 2dppx)" srcSet={ofertaAvif} />
+          )}
+          { }
           <img
             key={alvo}
             src={alvo}
@@ -910,7 +939,7 @@ function Celula({
             onError={aoFalhar}
             className="relative block h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
           />
-        }
+        </picture>
       </button>
     </figure>
   );

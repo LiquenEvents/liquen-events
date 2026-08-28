@@ -48,6 +48,7 @@ vi.mock("@/lib/supabase", () => ({
 vi.mock("@/lib/proposal-storage", () => ({
   PROPOSAL_BUCKET: "proposal-assets",
   PROPOSAL_MID_BUCKET: "proposal-medias",
+  PROPOSAL_AVIF_MID_BUCKET: "proposal-avif-medias",
   PROPOSAL_THUMB_BUCKET: "proposal-thumbs",
   uploadProposalMid: vi.fn(),
   uploadProposalThumb: vi.fn(),

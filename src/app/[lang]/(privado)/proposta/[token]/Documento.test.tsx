@@ -255,8 +255,16 @@ describe("as fotografias", () => {
     // Sem isto, o texto por baixo salta quando a fotografia chega — e um salto
     // lê-se como lentidão mesmo quando não é.
     desenhar();
-    const caixa = capa().parentElement;
-    expect(caixa?.getAttribute("style")).toContain("aspect-ratio");
+    /**
+     * A caixa procura-se pela FORMA, e não por ser o pai da imagem.
+     *
+     * Era `capa().parentElement`, e caiu no dia em que a imagem passou a viver
+     * dentro de um `<picture>` (a oferta em AVIF). O que interessa provar é que
+     * a forma está reservada por uma CAIXA à volta — quantos elementos há pelo
+     * meio é assunto de quem desenha.
+     */
+    const caixa = capa().closest("[style*='aspect-ratio']");
+    expect(caixa, "nenhuma caixa à volta da capa reserva a forma").not.toBeNull();
   });
 
   it("e diz que largura ocupa — senão pede sempre a maior", () => {

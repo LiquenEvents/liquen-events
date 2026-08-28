@@ -587,3 +587,84 @@ describe("um mood board é uma parte do capítulo, não um capítulo", () => {
     );
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A OFERTA EM AVIF — «quero que as fotos sejam muito mais rápidas a carregar»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio, média
+ * por fotografia:
+ *
+ *     lado    webp      avif     densidade num telemóvel de 390 pt
+ *      400   22,5 KB   17,2 KB    1,1x
+ *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe
+ *
+ * Numa proposta de quarenta e seis: 5,8 MB em WebP contra 4,7 MB em AVIF.
+ *
+ * ── A ARMADILHA QUE O `media` EVITA, E QUE ESTE FICHEIRO GUARDA ──────────
+ *
+ * Um `<source>` que casa DESLIGA o `srcset` do `<img>`. Como a oferta só tem
+ * o candidato de 1200, num ecrã de densidade 1 — onde o navegador escolheria a
+ * de 400, que pesa 22 KB — servir a de 1200 em AVIF seria CINCO VEZES PIOR.
+ *
+ * O `media="(min-resolution: 2dppx)"` é o que garante que a oferta só existe
+ * onde a de 1200 já era a escolhida. Tirá-lo faz cair um teste aqui.
+ */
+describe("a oferta em AVIF das fotografias grandes", () => {
+  const COM_AVIF: Record<string, FotoDaProposta> = {
+    a: { ...FOTOS.a, media: "media/a", mediaAvif: "avif/a" },
+    b: FOTOS.b,
+    c: FOTOS.c,
+  };
+  const comAvif = () =>
+    render(<Inspiracao boards={[BOARD]} fotosIniciais={COM_AVIF} token="tk" textos={T} />);
+
+  it("CONTROLO POSITIVO: sem `mediaAvif` não se propõe nada, e a página desenha na mesma", () => {
+    // É o caso NORMAL de tudo o que foi carregado antes do bucket existir.
+    // Sem este controlo, um `<picture>` que nunca propusesse nada passava no
+    // teste de baixo por dizer o mesmo que uma implementação a funcionar.
+    desenhar();
+    expect(document.querySelectorAll("source")).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: /Ampliar/ }).length).toBeGreaterThan(0);
+  });
+
+  it("propõe o AVIF quando ele existe, e o `<img>` de sempre continua lá", () => {
+    comAvif();
+    const fonte = document.querySelector('source[type="image/avif"]');
+    expect(fonte, "não se propôs AVIF nenhum").not.toBeNull();
+    expect(fonte!.getAttribute("srcset")).toBe("avif/a");
+    // A oferta NÃO substitui: o `<img>` tem de continuar a ser servível.
+    const imagem = fonte!.parentElement!.querySelector("img");
+    expect(imagem?.getAttribute("src")).toBe("mini/a");
+  });
+
+  it("A OFERTA SÓ VALE A PARTIR DE 2 PIXÉIS POR PONTO", () => {
+    // Sem isto, um ecrã de densidade 1 passava de 22 KB (a de 400) para 105 KB
+    // (a de 1200 em AVIF) — cinco vezes pior, exactamente ao contrário do que
+    // isto existe para fazer.
+    comAvif();
+    const fonte = document.querySelector('source[type="image/avif"]');
+    expect(fonte!.getAttribute("media")).toBe("(min-resolution: 2dppx)");
+  });
+
+  it("sem `srcset` no `<img>` não há oferta — a cascata já caiu para o plano B", () => {
+    /**
+     * Depois de a cascata cair para o original, o que interessa é servir ALGUMA
+     * COISA. Uma oferta em AVIF nessa altura era deixar o navegador voltar a
+     * escolher por conta própria, quando a primeira escolha acabou de falhar.
+     */
+    const soOriginal: Record<string, FotoDaProposta> = {
+      a: { id: "a", original: "orig/a", mediaAvif: "avif/a" },
+    };
+    render(
+      <Inspiracao
+        boards={[{ ...BOARD, fotos: ["a"] }]}
+        fotosIniciais={soOriginal}
+        token="tk"
+        textos={T}
+      />,
+    );
+    expect(document.querySelectorAll('source[type="image/avif"]')).toHaveLength(0);
+  });
+});
