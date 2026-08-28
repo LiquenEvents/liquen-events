@@ -34,11 +34,38 @@ function bloco(): string {
   return fim === -1 ? resto : resto.slice(0, fim);
 }
 
+/**
+ * O mesmo bloco, SEM COMENTÁRIOS.
+ *
+ * Sem isto as afirmações pelo negativo — «não levanta o 10 nem o 11» — leem a
+ * prosa que está ao lado da regra, e essa prosa FALA do 10 e do 11 para
+ * explicar porque é que ficam de fora. O teste dava-se por satisfeito com um
+ * comentário em vez de olhar para a regra. Já me apanhou uma vez hoje, no
+ * `chao-com-prefixo.test.ts`.
+ */
+function regra(): string {
+  return bloco().replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 describe("o chão absoluto da letra", () => {
   it("levanta o 7, o 8 e o 9 ao degrau que a casa já tinha", () => {
-    const b = bloco();
+    const b = regra();
+    /**
+     * ── PELA SUBCADEIA, E NÃO PELA CLASSE NUA ──────────────────────────────
+     *
+     * Isto exigia `.text-\[9px\]` — a classe nua — e era essa a forma que a
+     * regra tinha. MEDIDO num browser, a 1280, com a Visão Geral montada: três
+     * rótulos («Pedidos ativos», «Por responder», «Próximos 7 dias») pediam
+     * `lg:text-[9px]` e saíam mesmo a 9 px, porque o Tailwind compila essa
+     * variante para `.lg\:text-\[9px\]` — outro nome de classe, dentro de uma
+     * media query — e a classe nua não lhe toca.
+     *
+     * A regra passou a `[class*="text-[9px]"]`, que apanha o nome onde quer que
+     * ele apareça. Este teste passa a exigir essa forma: é ela, e não a outra,
+     * que cumpre o que o bloco promete.
+     */
     for (const px of [7, 8, 9]) {
-      expect(b, `o ${px}px ficou de fora`).toContain(`.text-\\[${px}px\\]`);
+      expect(b, `o ${px}px ficou de fora`).toContain(`[class*="text-[${px}px]"]`);
     }
     // O degrau da casa, e não um número inventado ao lado dele.
     expect(b).toMatch(/font-size:\s*var\(--bo-fs-caption\)/);
@@ -51,9 +78,13 @@ describe("o chão absoluto da letra", () => {
    * guarda, e com razão.
    */
   it("e NÃO levanta o 10 nem o 11 — esses são a densidade do computador", () => {
-    const b = bloco();
-    expect(b).not.toContain(".text-\\[10px\\]");
-    expect(b).not.toContain(".text-\\[11px\\]");
+    // Pelo NÚMERO e não por uma grafia: escrito `.text-\[10px\]`, esta guarda
+    // ficava cega assim que a regra mudou de forma, e uma guarda cega passa a
+    // verde por não estar a olhar. Lê a regra sem comentários — a prosa ao lado
+    // fala do 10 e do 11 justamente para explicar que ficam de fora.
+    const b = regra();
+    expect(b, "o 10px entrou no chão absoluto").not.toMatch(/10px/);
+    expect(b, "o 11px entrou no chão absoluto").not.toMatch(/11px/);
   });
 
   it("não tem largura nenhuma — é um limite do olho, não do ecrã", () => {
