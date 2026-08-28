@@ -77,9 +77,6 @@ import { NUNCA_NO_PDF } from "./proposta-de-pdf/tipos";
  */
 const VISTO_NA_PAGINA = new Set([
   "headerTitle",
-  // A frase de intenção é a PRIMEIRA coisa que o casal lê. Trocá-la por baixo
-  // de quem já leu a proposta é trocar o que ele leu.
-  "intencao",
   // As alternativas do casal só existem na página, e é lá que se escolhe:
   // trocar uma opção depois do aceite é mudar o que foi aceite.
   "escolhas",

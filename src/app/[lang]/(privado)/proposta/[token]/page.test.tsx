@@ -343,6 +343,76 @@ describe("página pública da proposta — o cumprimento", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
+ * A ABERTURA É O NOME DELES — E AS PROPOSTAS ANTIGAS NÃO A ESTRAGAM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Aqui viveu uma «frase de intenção»: um parágrafo escrito no Estúdio, por
+ * proposta, que a página desenhava debaixo do nome do casal. Saiu por decisão
+ * dela — mandou a fotografia do parágrafo e escreveu «nao quero estes textos
+ * na proposta»; perguntei se era aquele texto ou o campo, e a resposta foi
+ * «não quero o campo, ponto final».
+ *
+ * ── PORQUE É QUE APAGAR O CÓDIGO NÃO CHEGA ────────────────────────────────
+ *
+ * O campo foi apagado do Estúdio e da página, mas o VALOR não desaparece de
+ * lado nenhum: vive dentro do `doc` (jsonb `proposals.doc`) de todas as
+ * propostas em que alguém o escreveu, e essas propostas continuam a abrir-se
+ * pelo link que o casal tem no email. Se um dia alguém voltar a passar o `doc`
+ * por um componente que desenhe o que não conhece, a frase volta — numa
+ * proposta que já foi enviada, por baixo de quem já a leu.
+ *
+ * É por isso que este teste dá à página uma proposta COM a frase guardada, e
+ * não uma sem ela: a ausência que interessa provar é a do desenho, não a do
+ * dado.
+ */
+describe("a frase de intenção não volta pelas propostas que já a têm guardada", () => {
+  const FRASE = "Pensámos o vosso dia em branco e verde, com a serenidade do Alentejo.";
+
+  it("uma proposta com a frase guardada abre sem a desenhar", async () => {
+    db.proposal = proposta({
+      clientName: "Ana Dias",
+      doc: { ref: "PO Decoração", intencao: FRASE, intencaoEn: "We imagined your day…" },
+    });
+    await abrir();
+    // CONTROLO POSITIVO: a página abriu mesmo, e é a da proposta.
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
+    expect(screen.queryByText(FRASE), "a frase de intenção foi desenhada").toBeNull();
+  });
+
+  it("e em inglês também não — nem a caixa inglesa, nem o recurso ao português", async () => {
+    // A regra antiga caía para o português quando a caixa inglesa estava
+    // vazia. Se alguém a repuser sem pensar, é por aqui que ela reaparece.
+    db.proposal = proposta({
+      clientName: "Ana Dias",
+      idioma: "en",
+      doc: { ref: "PO Decoração", intencao: FRASE, intencaoEn: "" },
+    });
+    await abrir("bom", "en");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Hello, Ana.");
+    expect(screen.queryByText(FRASE)).toBeNull();
+  });
+
+  it("a abertura tem UM título e mais nada por baixo dele", async () => {
+    /**
+     * O teste acima procura a frase que conhecemos. Este não conhece frase
+     * nenhuma: mede o que a abertura CONTÉM. Um campo novo de prosa que
+     * alguém acrescente amanhã ao cabeçalho — outro nome, outra frase —
+     * aparece aqui sem ninguém ter de se lembrar de o vir escrever.
+     */
+    db.proposal = proposta({
+      clientName: "Ana Dias",
+      doc: { ref: "PO Decoração", intencao: FRASE },
+    });
+    await abrir();
+    const titulo = screen.getByRole("heading", { level: 1 });
+    const cabecalho = titulo.closest("header");
+    expect(cabecalho, "o cumprimento devia viver num <header>").not.toBeNull();
+    expect(cabecalho!.textContent?.trim()).toBe("Olá, Ana.");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
  * NENHUMA IMAGEM DE PARTILHA — E O CONTROLO POSITIVO QUE PROVA QUE HERDAVA
  * ════════════════════════════════════════════════════════════════════════════
  *

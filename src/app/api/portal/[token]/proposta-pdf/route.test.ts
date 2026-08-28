@@ -17,7 +17,7 @@ const db = vi.hoisted(() => ({
   emFalta: 0,
   /** O endereço assinado do ficheiro já desenhado. `null` = não está guardado,
    *  que é o caso normal aqui; só o bloco do fim o liga. */
-  urlDirecto: null as string | null,
+  guardado: null as Response | null,
 }));
 
 vi.mock("@/lib/portal-token", () => ({
@@ -51,9 +51,14 @@ vi.mock("@/lib/proposal-doc-render", () => ({
   }),
 }));
 vi.mock("@/lib/proposal-pdf-guardado", () => ({
-  urlDoPdfDaProposta: vi.fn(async () => db.urlDirecto),
   guardarPdfDaProposta: vi.fn(async () => true),
   lerPdfDaProposta: vi.fn(async () => null),
+}));
+
+/** O ficheiro guardado, encaminhado em fluxo pelo NOSSO endereço. Os
+ *  cabeçalhos dele têm testes próprios em `pdf-do-armazenamento.test.ts`. */
+vi.mock("@/lib/pdf-do-armazenamento", () => ({
+  pdfGuardadoEmFluxo: vi.fn(async () => db.guardado),
 }));
 
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
@@ -77,7 +82,7 @@ beforeEach(() => {
   db.acceptedContractByQuote.clear();
   db.rendered = [];
   db.emFalta = 0;
-  db.urlDirecto = null;
+  db.guardado = null;
   db.quotes.set("q-1", { id: "q-1", name: "Cliente" });
   vi.clearAllMocks();
 });
@@ -297,27 +302,50 @@ describe("portal proposta-pdf — quando o ficheiro já está guardado", () => {
     db.newestByQuote.set("q-1", { id: "p-1", quoteId: "q-1", doc: { ref: "PO" } });
   });
 
-  it("reencaminha para o ficheiro em vez de o reenviar", async () => {
-    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
+  const guardadoFalso = () =>
+    new Response("%PDF-1.7 fingido", {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Cache-Control": "private, no-store, must-revalidate",
+      },
+    });
+
+  it("serve o ficheiro guardado sem o desenhar", async () => {
+    db.guardado = guardadoFalso();
 
     const res = await chamar();
 
-    expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("https://cdn.exemplo/pdf-assinado");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
     // E não se desenhou nada — era esse o custo que isto existe para não pagar.
     expect(db.rendered).toHaveLength(0);
   });
 
-  it("o reencaminhamento não fica guardado por cache nenhuma", async () => {
-    // O endereço assinado expira em minutos: guardá-lo servia um link morto a
-    // quem carregasse a seguir.
-    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
+  it("NUNCA reencaminha o casal para outro domínio", async () => {
+    /**
+     * A queixa dela foi sobre a porta do EMAIL — «este url super desconfiado»,
+     * com a barra do Safari a mostrar `<referência>.supabase.co`. O defeito era
+     * das duas portas, e corrigir só uma deixava o casal a aterrar no mesmo
+     * domínio estranho conforme a porta por onde entrasse. Este teste é o que
+     * impede esta metade de voltar atrás sozinha.
+     */
+    db.guardado = guardadoFalso();
+
+    const res = await chamar();
+
+    expect(res.status, "voltou a reencaminhar").toBeLessThan(300);
+    expect(res.headers.get("location"), "voltou a mandar o casal para outro domínio").toBeNull();
+  });
+
+  it("o documento de um cliente não fica em cache partilhada", async () => {
+    db.guardado = guardadoFalso();
     const res = await chamar();
     expect(res.headers.get("Cache-Control")).toMatch(/no-store/);
   });
 
   it("não estando guardado, desenha e serve como sempre", async () => {
-    db.urlDirecto = null;
+    db.guardado = null;
     const res = await chamar();
     expect(res.status).toBe(200);
     expect(db.rendered).toHaveLength(1);

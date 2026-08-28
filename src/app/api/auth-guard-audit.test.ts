@@ -241,6 +241,7 @@ vi.mock("@/lib/proposal-storage", () =>
       // aí só era lida DENTRO de uma função, e um mock em falta não se notava.
       // Agora é lida no topo do módulo, e a falta rebentava cinco rotas.
       PROPOSAL_MID_BUCKET: "proposal-medias",
+      PROPOSAL_AVIF_MID_BUCKET: "proposal-avif-medias",
     },
   ),
 );

@@ -40,6 +40,9 @@ vi.mock("@/lib/proposal-storage", () => ({
     H.assinados.push(...paths);
     return new Map(paths.map((p) => [p, `https://storage.example/d/${encodeURIComponent(p)}`]));
   },
+  // A oferta em AVIF: vazia, que é o caso normal de quem foi carregado antes
+  // de o bucket existir. O que este ficheiro guarda é o que É assinado.
+  signProposalMidsAvif: async () => new Map<string, string>(),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
   formasDeCaminhos: async () => new Map(),

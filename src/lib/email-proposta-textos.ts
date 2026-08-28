@@ -236,7 +236,7 @@ const PT: TextosDoEmailDaProposta = {
   verOnline: "Ver online:",
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "pt"),
   anexoEtiqueta: "Proposta em PDF",
-  anexoBotao: "Abrir a proposta →",
+  anexoBotao: "Descarregar a proposta em PDF →",
 };
 
 const EN: TextosDoEmailDaProposta = {
@@ -256,7 +256,7 @@ const EN: TextosDoEmailDaProposta = {
    */
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "en"),
   anexoEtiqueta: "Proposal PDF",
-  anexoBotao: "Open the proposal →",
+  anexoBotao: "Download the proposal (PDF) →",
 };
 
 /**

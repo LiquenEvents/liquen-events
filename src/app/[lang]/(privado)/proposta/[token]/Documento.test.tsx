@@ -13,6 +13,8 @@ import {
   type ProposalDoc,
 } from "@/lib/proposal-doc";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * O documento inteiro desenhado para ecrã. O que se prende aqui é o que o
@@ -253,8 +255,16 @@ describe("as fotografias", () => {
     // Sem isto, o texto por baixo salta quando a fotografia chega — e um salto
     // lê-se como lentidão mesmo quando não é.
     desenhar();
-    const caixa = capa().parentElement;
-    expect(caixa?.getAttribute("style")).toContain("aspect-ratio");
+    /**
+     * A caixa procura-se pela FORMA, e não por ser o pai da imagem.
+     *
+     * Era `capa().parentElement`, e caiu no dia em que a imagem passou a viver
+     * dentro de um `<picture>` (a oferta em AVIF). O que interessa provar é que
+     * a forma está reservada por uma CAIXA à volta — quantos elementos há pelo
+     * meio é assunto de quem desenha.
+     */
+    const caixa = capa().closest("[style*='aspect-ratio']");
+    expect(caixa, "nenhuma caixa à volta da capa reserva a forma").not.toBeNull();
   });
 
   it("e diz que largura ocupa — senão pede sempre a maior", () => {
@@ -929,5 +939,144 @@ describe("a página do casal e a folha dizem o mesmo número", () => {
     expect(screen.getByText(/de 800 a 1\.200 €/)).toBeTruthy();
     // Controlo positivo: os oito milhões que a leitura antiga inventava.
     expect(screen.queryByText(/8\.001\.200/)).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ESCALA DO DOCUMENTO — quatro degraus, e nenhum deles a fingir
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDA NUM BROWSER A SÉRIO, a 390×844, com uma proposta a sério:
+ *
+ *     26 px  Playfair    «2. Serviços»            ← o capítulo
+ *     17 px  Inter w500  «Cerimónia»              ← o momento
+ *     15 px  Inter w400  «Arco floral»            ← o que ele leva
+ *     14 px  Inter w400  «Em tons de branco…»     ← o que isso é
+ *
+ * O nome do momento era o ÚNICO título desta página em letra de texto — tudo
+ * o resto que titula é a serifada —, e por isso o salto de 26 para 17 não se
+ * lia como degrau, lia-se como o fim dos títulos. E o nome do serviço estava
+ * a UM PIXEL e a um tom de cinzento da sua própria descrição: num telemóvel
+ * ao sol, a lista do que o casal recebe era um bloco cinzento só.
+ *
+ * ── O QUE O JSDOM PODE E NÃO PODE DIZER, E PORQUE ESTÁ ESCRITO ───────────
+ *
+ * A primeira versão deste bloco perguntava ao `getComputedStyle` o tamanho e
+ * o peso, e passou a mentir-me: aqui não há folha de estilos do Tailwind
+ * nenhuma (o `font-medium` não chega a existir) e o `clamp()` não é
+ * resolvido — devolve a cadeia como está. Uma comparação de números sobre
+ * isso não compara nada.
+ *
+ * Portanto pergunta-se ao que EXISTE mesmo neste ambiente: as declarações
+ * escritas no elemento. A família e o `clamp` vivem num `style` em linha, e
+ * daí saem números a sério; o peso vive numa classe, e é a classe que se lê,
+ * dito por extenso em vez de disfarçado de medição.
+ *
+ * O que este bloco prende é a ORDEM dos degraus, não os números: quem quiser
+ * afinar um tamanho pode; quem esborratar a hierarquia não.
+ */
+describe("a escala do documento", () => {
+  /**
+   * ── O TAMANHO VEM DO CÓDIGO, E ESTÁ AQUI ESCRITO PORQUÊ ─────────────────
+   *
+   * PERGUNTEI AO JSDOM. Um `<h2 style={{ fontFamily: "var(--font-playfair)",
+   * fontSize: "clamp(26px, 4.2vw, 40px)" }}>` sai de lá com o atributo
+   * `style` a valer exactamente `"font-family: var(--font-playfair);"` — o
+   * `font-size` não está lá. O analisador de CSS do jsdom não conhece
+   * `clamp()` e deita a declaração fora em silêncio.
+   *
+   * Ou seja: neste ambiente o tamanho NÃO É OBSERVÁVEL, nem pelo
+   * `getComputedStyle` nem pelo atributo. Foi o controlo positivo que o
+   * apanhou — duas vezes, porque a minha primeira correcção também partia do
+   * princípio de que o atributo o guardava.
+   *
+   * Então lê-se do ficheiro. É a mesma decisão do `tons-do-documento.test.ts`:
+   * onde o desenho não se deixa medir, mede-se a declaração.
+   */
+  const clamps = () => {
+    const fonte = readFileSync(
+      join(process.cwd(), "src/app/[lang]/(privado)/proposta/[token]/Documento.tsx"),
+      "utf8",
+    );
+    const todos = [...fonte.matchAll(/fontSize:\s*"clamp\(\s*([\d.]+)px/g)].map((m) =>
+      Number(m[1]),
+    );
+    return todos;
+  };
+  /** A família, essa, sobrevive ao atributo — e é lida de lá. */
+  const familia = (el: HTMLElement) =>
+    ((el.getAttribute("style") ?? "").match(/font-family:\s*([^;]+)/)?.[1] ?? "").trim();
+
+  const capitulo = () => screen.getByRole("heading", { level: 2, name: /Serviços/ });
+  const momento = () => screen.getByRole("heading", { level: 3, name: /Decoração Cerimónia/ });
+
+  it("CONTROLO POSITIVO: os degraus estão desenhados, e os tamanhos foram lidos", () => {
+    // Sem isto, um selector errado ou uma expressão regular que deixasse de
+    // casar davam listas vazias e `undefined` — e o teste seguinte comparava
+    // nada com nada.
+    desenhar();
+    expect(screen.getByText("Arco floral")).toBeTruthy();
+    expect(screen.getByText("Com lisianthus")).toBeTruthy();
+    expect(capitulo()).toBeTruthy();
+    expect(momento()).toBeTruthy();
+    expect(clamps().length, "deixou de haver tamanhos em clamp no Documento.tsx").toBeGreaterThan(
+      1,
+    );
+  });
+
+  it("o nome do momento é da letra dos títulos, não da do texto", () => {
+    desenhar();
+    expect(familia(momento()), "o nome do momento saiu da letra dos títulos").toBe(
+      familia(capitulo()),
+    );
+    expect(familia(momento())).toContain("playfair");
+  });
+
+  it("o momento é MENOR do que o capítulo — é um degrau, não um empate", () => {
+    /**
+     * O `Documento.tsx` declara dois tamanhos em `clamp`: o do capítulo
+     * (`Titulo`) e o do momento (`Momento`), por esta ordem no ficheiro.
+     * O que se prende é a ORDEM entre eles, não os números — quem quiser
+     * afinar um tamanho pode; quem os empatar ou trocar não.
+     */
+    const [doCapitulo, doMomento] = clamps();
+    expect(doMomento, `momento ${doMomento} não é menor que capítulo ${doCapitulo}`).toBeLessThan(
+      doCapitulo,
+    );
+  });
+
+  it("o nome do serviço distingue-se da descrição por PESO, não por um pixel", () => {
+    /**
+     * A regra escrita ao contrário do que se corrigiu: NÃO se exige que o nome
+     * seja maior — não é, são 15 contra 14. Exige-se que seja mais pesado, que
+     * é de onde vem o degrau sem custar legibilidade à prosa dela.
+     *
+     * Lê-se a classe porque é isso que existe: ver o cabeçalho.
+     */
+    desenhar();
+    expect(screen.getByText("Arco floral").className).toMatch(/\bfont-medium\b/);
+    expect(
+      screen.getByText("Com lisianthus").className,
+      "a descrição ganhou peso — e aí o degrau desaparece outra vez",
+    ).not.toMatch(/\bfont-(medium|semibold|bold)\b/);
+  });
+
+  it("a descrição NÃO foi encolhida para arranjar o degrau", () => {
+    // O caminho fácil era descê-la um degrau. É prosa dela, escrita para ser
+    // lida: roubar-lhe tamanho para arrumar uma escala é pagar legibilidade
+    // com desenho. `text-sm` são os 14 px que ela já tinha.
+    desenhar();
+    expect(screen.getByText("Com lisianthus").className).toMatch(/\btext-sm\b/);
+  });
+
+  it("o mesmo degrau serve as fases do cronograma — é um só componente", () => {
+    // Estava escrito à mão nos dois sítios, com a linha de classes copiada.
+    desenhar({
+      serviceGroups: [],
+      cronograma: [{ title: "Montagem", items: ["Chegada às 8h"] }],
+    });
+    const fase = screen.getByRole("heading", { level: 3, name: "Montagem" });
+    expect(familia(fase)).toContain("playfair");
   });
 });

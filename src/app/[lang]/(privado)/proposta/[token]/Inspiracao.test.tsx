@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import { textosDaPagina } from "./textos-da-pagina";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * A LUPA — o gesto que existe para as fotografias deixarem de ser pequenas.
@@ -421,5 +423,248 @@ describe("as colunas da grelha", () => {
     // Cada fotografia leva a SUA posição, e não a da célula onde calhou.
     expect([...ordens].sort((x, y) => x - y)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(ordens).toEqual(posicoesNoHtml().map((n) => n - 1));
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TÍTULO NÃO FICA SOZINHO POR CIMA DO VAZIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A dona do negócio abriu a proposta a sério no telemóvel dela e mandou o que
+ * viu: um RECTÂNGULO CINZENTO, sem fotografia nenhuma, com «Saída dos noivos»
+ * escrito por cima.
+ *
+ * ── PORQUE É QUE A REDE QUE JÁ EXISTIA NÃO O APANHOU ──────────────────────
+ *
+ * O ficheiro já dizia a coisa certa, por extenso: «um título branco sobre nada
+ * nenhum é o defeito que isto existe para não ter». Mas essa guarda é o
+ * `respiro()`, que corre no servidor e pergunta se a fotografia TEM endereço.
+ * Tinha. O que falhou foi o endereço, já com a página desenhada — uma
+ * assinatura expirada, uma derivada por fabricar.
+ *
+ * Aí a célula desiste e devolve nada, e a faixa do título, que é IRMÃ dela e
+ * não filha, continua desenhada: o véu escuro sobre o papel branco dá o
+ * cinzento, e o nome por cima dele.
+ *
+ * Havia dois caminhos para o mesmo sítio e só um estava tapado.
+ */
+describe("quando a fotografia do momento falha depois de a página abrir", () => {
+  /** O título como faixa branca sobre a fotografia. */
+  const tituloSobreFoto = () =>
+    [...document.querySelectorAll("h3")].find((h) => h.className.includes("text-white"));
+  /** O mesmo título, a preto sobre o papel. */
+  const tituloSobrePapel = () =>
+    [...document.querySelectorAll("h3")].find((h) => h.className.includes("text-foreground/90"));
+
+  it("começa com o nome por cima da fotografia, como foi desenhado", () => {
+    desenhar();
+    expect(tituloSobreFoto()?.textContent).toBe("Cerimónia");
+    expect(tituloSobrePapel()).toBeUndefined();
+  });
+
+  it("e quando ela falha, o nome volta ao papel em vez de ficar sobre o vazio", async () => {
+    desenhar();
+    // A fotografia do momento — a primeira, a que abre a secção — rebenta.
+    // DUAS vezes: a célula tem plano B (miniatura → original) e só desiste
+    // depois de o segundo endereço também falhar.
+    const doMomento = () => document.querySelector("img:not([aria-hidden])") as HTMLImageElement;
+    expect(doMomento(), "não encontrei a fotografia do momento").toBeTruthy();
+    fireEvent.error(doMomento());
+    fireEvent.error(doMomento());
+
+    await waitFor(() => {
+      expect(tituloSobrePapel()?.textContent, "o nome tinha de voltar a preto sobre o papel").toBe(
+        "Cerimónia",
+      );
+    });
+    expect(
+      tituloSobreFoto(),
+      "ficou uma faixa de título branca por cima de coisa nenhuma — é este o defeito",
+    ).toBeUndefined();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O RITMO ENTRE MOOD BOARDS — «os buracos brancos», palavras dela
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO num 390×844, com oito boards de tamanhos diferentes. Duas coisas
+ * estavam erradas, e são diferentes uma da outra:
+ *
+ * 1. O intervalo entre dois boards era de 96 px, e o intervalo entre dois
+ *    CAPÍTULOS do documento — «Serviços» e «Orçamento Proposto» — é de 64.
+ *    Um board é uma parte DENTRO do capítulo «Inspiração»; separá-lo do
+ *    vizinho com vez e meia o que separa dois capítulos diz ao olho que ali
+ *    acabou coisa maior do que acabou.
+ *
+ * 2. Num board cuja ÚNICA fotografia é o respiro, o intervalo era 132 e não
+ *    96. Os 36 px a mais eram o `mb-9` do respiro a separá-lo de uma grelha
+ *    VAZIA. Um ritmo com um intervalo diferente dos outros não é um ritmo.
+ */
+describe("o ritmo entre mood boards", () => {
+  /** Um board de uma fotografia só: a do respiro. É o caso que media 132. */
+  const SO_O_RESPIRO: BoardParaEcra = { ...BOARD, chave: "so-um", fotos: ["a"] };
+
+  it("um board de uma só fotografia não desenha grelha nenhuma", () => {
+    desenhar(SO_O_RESPIRO);
+    // A grelha é o `flex` que segura as colunas. Sem fotografias fora do
+    // respiro não há nada para ela segurar — e uma caixa vazia com margem é
+    // exactamente o buraco que isto existe para não ter.
+    const botoes = screen.getAllByRole("button", { name: /Ampliar/ });
+    expect(botoes).toHaveLength(1);
+    const grelha = document.querySelector(".flex.flex-col.gap-4");
+    expect(grelha, "a grelha vazia continua a ser desenhada").toBeNull();
+  });
+
+  it("CONTROLO POSITIVO: com fotografias fora do respiro, a grelha existe", () => {
+    // Sem isto, um selector errado dava `null` nos dois casos e o teste acima
+    // passava sem provar nada.
+    desenhar();
+    expect(document.querySelector(".flex.flex-col.gap-4")).not.toBeNull();
+  });
+
+  it("o afastamento até à grelha é da GRELHA, não do respiro", () => {
+    // Estava no respiro (`mb-9`), e por isso sobrava quando não havia grelha.
+    desenhar();
+    const respiro = screen.getAllByRole("button", { name: /Ampliar/ })[0];
+    const caixaDoRespiro = respiro.closest("div");
+    expect(caixaDoRespiro?.className, "o respiro voltou a levar margem de baixo").not.toMatch(
+      /\bmb-\d/,
+    );
+    expect(document.querySelector(".flex.flex-col.gap-4")?.className).toMatch(/\bmt-9\b/);
+  });
+});
+
+/**
+ * A hierarquia, lida do CÓDIGO dos dois ficheiros.
+ *
+ * O teste acima mede uma árvore desenhada; este mede a REGRA, e é a que se
+ * desfaz sem ninguém dar por isso — basta alguém subir um número achando que
+ * «fica com mais ar». O intervalo entre duas partes de um capítulo não pode
+ * passar o intervalo entre dois capítulos.
+ */
+describe("um mood board é uma parte do capítulo, não um capítulo", () => {
+  const RAIZ = process.cwd();
+  const AQUI = "src/app/[lang]/(privado)/proposta/[token]";
+  const ler = (f: string) => readFileSync(join(RAIZ, `${AQUI}/${f}`), "utf8");
+  /**
+   * O degrau de `margin-top` da primeira `<section>` de um ficheiro.
+   *
+   * Lê a ETIQUETA DE ABERTURA inteira e não um `className="…"`: o
+   * `Documento.tsx` escreve o dele num template literal, e uma expressão
+   * regular à espera de aspas devolvia `null` — que se compara com tudo sem
+   * reclamar. Foi o controlo positivo aqui em baixo que o apanhou.
+   *
+   * O `(?<![\w:-])` exclui as variantes: sem ele, o `first:mt-6` da
+   * Inspiração passava por ser o afastamento normal.
+   */
+  const degrau = (fonte: string) => {
+    const i = fonte.indexOf("<section");
+    if (i < 0) return null;
+    const etiqueta = fonte.slice(i, fonte.indexOf(">", i));
+    const mt = etiqueta.match(/(?<![\w:-])mt-(\d+)\b/);
+    const sm = etiqueta.match(/\bsm:mt-(\d+)\b/);
+    return { mt: mt ? Number(mt[1]) : null, sm: sm ? Number(sm[1]) : null };
+  };
+
+  it("CONTROLO POSITIVO: os dois números foram mesmo lidos", () => {
+    // Uma leitura falhada devolve `null`, e `null` compara-se com tudo sem
+    // reclamar — era o silêncio que este controlo impede.
+    expect(degrau(ler("Documento.tsx"))).toEqual({ mt: 16, sm: 24 });
+    expect(degrau(ler("Inspiracao.tsx"))).toEqual({ mt: 12, sm: 16 });
+  });
+
+  it("o intervalo entre boards não passa o intervalo entre capítulos", () => {
+    const capitulo = degrau(ler("Documento.tsx"))!;
+    const board = degrau(ler("Inspiracao.tsx"))!;
+    expect(board.mt, `board ${board.mt} > capítulo ${capitulo.mt} no telemóvel`).toBeLessThan(
+      capitulo.mt!,
+    );
+    expect(board.sm, `board ${board.sm} > capítulo ${capitulo.sm} no ecrã largo`).toBeLessThan(
+      capitulo.sm!,
+    );
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A OFERTA EM AVIF — «quero que as fotos sejam muito mais rápidas a carregar»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio, média
+ * por fotografia:
+ *
+ *     lado    webp      avif     densidade num telemóvel de 390 pt
+ *      400   22,5 KB   17,2 KB    1,1x
+ *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe
+ *
+ * Numa proposta de quarenta e seis: 5,8 MB em WebP contra 4,7 MB em AVIF.
+ *
+ * ── A ARMADILHA QUE O `media` EVITA, E QUE ESTE FICHEIRO GUARDA ──────────
+ *
+ * Um `<source>` que casa DESLIGA o `srcset` do `<img>`. Como a oferta só tem
+ * o candidato de 1200, num ecrã de densidade 1 — onde o navegador escolheria a
+ * de 400, que pesa 22 KB — servir a de 1200 em AVIF seria CINCO VEZES PIOR.
+ *
+ * O `media="(min-resolution: 2dppx)"` é o que garante que a oferta só existe
+ * onde a de 1200 já era a escolhida. Tirá-lo faz cair um teste aqui.
+ */
+describe("a oferta em AVIF das fotografias grandes", () => {
+  const COM_AVIF: Record<string, FotoDaProposta> = {
+    a: { ...FOTOS.a, media: "media/a", mediaAvif: "avif/a" },
+    b: FOTOS.b,
+    c: FOTOS.c,
+  };
+  const comAvif = () =>
+    render(<Inspiracao boards={[BOARD]} fotosIniciais={COM_AVIF} token="tk" textos={T} />);
+
+  it("CONTROLO POSITIVO: sem `mediaAvif` não se propõe nada, e a página desenha na mesma", () => {
+    // É o caso NORMAL de tudo o que foi carregado antes do bucket existir.
+    // Sem este controlo, um `<picture>` que nunca propusesse nada passava no
+    // teste de baixo por dizer o mesmo que uma implementação a funcionar.
+    desenhar();
+    expect(document.querySelectorAll("source")).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: /Ampliar/ }).length).toBeGreaterThan(0);
+  });
+
+  it("propõe o AVIF quando ele existe, e o `<img>` de sempre continua lá", () => {
+    comAvif();
+    const fonte = document.querySelector('source[type="image/avif"]');
+    expect(fonte, "não se propôs AVIF nenhum").not.toBeNull();
+    expect(fonte!.getAttribute("srcset")).toBe("avif/a");
+    // A oferta NÃO substitui: o `<img>` tem de continuar a ser servível.
+    const imagem = fonte!.parentElement!.querySelector("img");
+    expect(imagem?.getAttribute("src")).toBe("mini/a");
+  });
+
+  it("A OFERTA SÓ VALE A PARTIR DE 2 PIXÉIS POR PONTO", () => {
+    // Sem isto, um ecrã de densidade 1 passava de 22 KB (a de 400) para 105 KB
+    // (a de 1200 em AVIF) — cinco vezes pior, exactamente ao contrário do que
+    // isto existe para fazer.
+    comAvif();
+    const fonte = document.querySelector('source[type="image/avif"]');
+    expect(fonte!.getAttribute("media")).toBe("(min-resolution: 2dppx)");
+  });
+
+  it("sem `srcset` no `<img>` não há oferta — a cascata já caiu para o plano B", () => {
+    /**
+     * Depois de a cascata cair para o original, o que interessa é servir ALGUMA
+     * COISA. Uma oferta em AVIF nessa altura era deixar o navegador voltar a
+     * escolher por conta própria, quando a primeira escolha acabou de falhar.
+     */
+    const soOriginal: Record<string, FotoDaProposta> = {
+      a: { id: "a", original: "orig/a", mediaAvif: "avif/a" },
+    };
+    render(
+      <Inspiracao
+        boards={[{ ...BOARD, fotos: ["a"] }]}
+        fotosIniciais={soOriginal}
+        token="tk"
+        textos={T}
+      />,
+    );
+    expect(document.querySelectorAll('source[type="image/avif"]')).toHaveLength(0);
   });
 });

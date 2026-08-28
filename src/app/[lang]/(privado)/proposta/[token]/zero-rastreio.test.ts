@@ -128,6 +128,7 @@ vi.mock("@/lib/proposal-storage", () => ({
   signProposalPaths: async (p: string[]) => new Map(p.map((x) => [x, `u/${x}`])),
   signProposalThumbs: async (p: string[]) => new Map(p.map((x) => [x, `m/${x}`])),
   signProposalMids: async (p: string[]) => new Map(p.map((x) => [x, `d/${x}`])),
+  signProposalMidsAvif: async () => new Map<string, string>(),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
   formasDeCaminhos: async () => new Map(),

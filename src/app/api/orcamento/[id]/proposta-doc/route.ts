@@ -1216,7 +1216,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:32px 0 0;border-collapse:collapse">
           <tr><td style="border-top:1px solid #e6dfd2;padding-top:20px">
             <a href="${linkDoPdf}" style="display:inline-block;padding:12px 0;font-size:16px;line-height:20px;color:#4c6350;text-decoration:underline;text-underline-offset:3px">${esc(t.anexoBotao)}</a>
-            <p style="margin:0;font-size:12px;line-height:1.5;color:#8a8375">${esc(t.anexoEtiqueta)} · ${esc(nomeDoAnexo)}</p>
+            <p style="margin:0;font-size:11px;line-height:1.5;color:#a49c8e;word-break:break-word">${esc(nomeDoAnexo)}</p>
           </td></tr>
         </table>`;
     /** O mesmo, para quem lê o email em texto simples. */

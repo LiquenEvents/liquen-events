@@ -12,9 +12,11 @@ const H = vi.hoisted(() => ({
   originais: new Map<string, string>(),
   miniaturas: new Map<string, string>(),
   medias: new Map<string, string>(),
+  mediasAvif: new Map<string, string>(),
   pedidosOriginais: [] as string[][],
   pedidosMiniaturas: [] as string[][],
   pedidosMedias: [] as string[][],
+  pedidosMediasAvif: [] as string[][],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +32,17 @@ vi.mock("@/lib/proposal-storage", () => ({
   signProposalMids: vi.fn(async (paths: string[]) => {
     H.pedidosMedias.push([...paths]);
     return new Map(paths.filter((p) => H.medias.has(p)).map((p) => [p, H.medias.get(p)!]));
+  }),
+  /**
+   * A oferta em AVIF da mesma de 1200 px.
+   *
+   * `H.mediasAvif` VAZIO por omissão, de propósito: é o caso normal de tudo o
+   * que foi carregado antes de o bucket existir, e o que se quer provar na
+   * maioria destes passeios é que a ausência não estraga nada.
+   */
+  signProposalMidsAvif: vi.fn(async (paths: string[]) => {
+    H.pedidosMediasAvif.push([...paths]);
+    return new Map(paths.filter((p) => H.mediasAvif.has(p)).map((p) => [p, H.mediasAvif.get(p)!]));
   }),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
@@ -54,6 +67,8 @@ beforeEach(() => {
   H.pedidosOriginais.length = 0;
   H.pedidosMiniaturas.length = 0;
   H.pedidosMedias.length = 0;
+  H.pedidosMediasAvif.length = 0;
+  H.mediasAvif.clear();
   H.originais.clear();
   H.miniaturas.clear();
   H.medias.clear();

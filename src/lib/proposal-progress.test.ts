@@ -336,8 +336,11 @@ describe("os bloqueios que impedem um erro de sair", () => {
   it("proposta em inglês com campos por traduzir não sai", () => {
     const semIngles = {
       ...COMPLETO,
-      intencao: "Uma frase escrita em português",
-      intencaoEn: "",
+      /* Um campo de PROSA dela qualquer serve: o que se prova é a regra, não
+         o campo. Era a «frase de intenção», que entretanto saiu da proposta a
+         pedido dela — e a regra não saiu com ela. */
+      budgetNote: "Uma frase escrita em português",
+      budgetNoteEn: "",
     } as unknown as ProposalDoc;
     expect(podeEnviar(semIngles, 3997.5, { idioma: "en" })).toBe(false);
   });
@@ -345,8 +348,11 @@ describe("os bloqueios que impedem um erro de sair", () => {
   it("e a mesma proposta em português sai sem problema nenhum", () => {
     const semIngles = {
       ...COMPLETO,
-      intencao: "Uma frase escrita em português",
-      intencaoEn: "",
+      /* Um campo de PROSA dela qualquer serve: o que se prova é a regra, não
+         o campo. Era a «frase de intenção», que entretanto saiu da proposta a
+         pedido dela — e a regra não saiu com ela. */
+      budgetNote: "Uma frase escrita em português",
+      budgetNoteEn: "",
     } as unknown as ProposalDoc;
     expect(podeEnviar(semIngles, 3997.5, { idioma: "pt" })).toBe(true);
   });

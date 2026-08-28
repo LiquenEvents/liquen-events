@@ -1,6 +1,11 @@
 import "server-only";
 import { isPendingImage, type ProposalDoc } from "./proposal-doc";
-import { signProposalMids, signProposalPaths, signProposalThumbs } from "./proposal-storage";
+import {
+  signProposalMids,
+  signProposalMidsAvif,
+  signProposalPaths,
+  signProposalThumbs,
+} from "./proposal-storage";
 import { ehRefDeTema, caminhoDoRefDeTema } from "./theme-ref";
 import { formasDeCaminhos, lqipsDeCaminhos } from "./biblioteca-fotos-store";
 
@@ -76,6 +81,19 @@ export interface FotoDaProposta {
    * passa a ser o de arranque.
    */
   media?: string;
+  /**
+   * A MESMA de 1200 px, em AVIF — uma OFERTA, não uma substituição.
+   *
+   * Quem desenha propõe-a primeiro num `<picture>`; o navegador que não a
+   * souber ler pede a `media`, que existe sempre. Ausente é o caso NORMAL de
+   * tudo o que foi carregado antes de este bucket existir, e não é erro
+   * nenhum: sem ela a página fica exactamente como estava.
+   *
+   * Os mesmos pixéis da `media`, em ~28% menos bytes — a medição está no
+   * `derivadas.ts`. Não se mexe na resolução de propósito: a queixa de
+   * fotografias «desfocadas» veio de servir MENOS pixéis, e não se volta lá.
+   */
+  mediaAvif?: string;
   /** O URL do ficheiro grande. É o que a lupa abre, e SÓ isso. */
   original?: string;
   /** Largura do ficheiro em pixels, quando se sabe (ver `formasDeCaminhos`). */
@@ -180,12 +198,15 @@ export async function fotosDaProposta(
   const caminhoReal = (ref: string) => (ehRefDeTema(ref) ? caminhoDoRefDeTema(ref) : ref);
   const caminhos = porAssinar.map(caminhoReal);
 
-  const [originais, miniaturas, medias, formas, lqips] = await Promise.all([
+  const [originais, miniaturas, medias, mediasAvif, formas, lqips] = await Promise.all([
     signProposalPaths(porAssinar),
     signProposalThumbs(porAssinar),
     // A de 1200 px assinada, quando já existe: é ela que a capa e a galeria
     // pedem num telemóvel, e era a única que fazia o desvio pela nossa função.
     signProposalMids(porAssinar),
+    // E a oferta em AVIF da mesma, quando existir. Vai no mesmo lote de
+    // assinaturas: uma ida a mais ao armazenamento por página, não por foto.
+    signProposalMidsAvif(porAssinar),
     formasDeCaminhos(caminhos),
     lqipsDeCaminhos(caminhos),
   ]);
@@ -200,6 +221,7 @@ export async function fotosDaProposta(
       id,
       ...(miniaturas.get(ref) ? { miniatura: miniaturas.get(ref) } : {}),
       ...(medias.get(ref) ? { media: medias.get(ref) } : {}),
+      ...(mediasAvif.get(ref) ? { mediaAvif: mediasAvif.get(ref) } : {}),
       ...(originais.get(ref) ? { original: originais.get(ref) } : {}),
       ...(forma ? { largura: forma.largura, altura: forma.altura } : {}),
       ...(lqip ? { lqip } : {}),

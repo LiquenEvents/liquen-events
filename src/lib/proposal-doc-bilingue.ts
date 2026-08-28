@@ -98,7 +98,6 @@ export function temVersaoInglesa(c: CampoDeTexto): boolean {
       return false;
     // ── A prosa dela ──────────────────────────────────────────────────────
     case "headerTitle":
-    case "intencao":
     case "servico":
     case "totalLabel":
     case "budgetNote":
@@ -129,8 +128,6 @@ export function lerEn(doc: Partial<ProposalDoc>, campo: CampoDeTexto): string | 
       return undefined;
     case "headerTitle":
       return doc.headerTitleEn;
-    case "intencao":
-      return doc.intencaoEn;
     case "servico":
       return doc.servicoEn;
     case "totalLabel":
@@ -203,8 +200,6 @@ function escreverInglesNoCampo<T extends Partial<ProposalDoc>>(
       return doc;
     case "headerTitle":
       return { ...doc, headerTitleEn: texto };
-    case "intencao":
-      return { ...doc, intencaoEn: texto };
     case "servico":
       return { ...doc, servicoEn: texto };
     case "totalLabel":
