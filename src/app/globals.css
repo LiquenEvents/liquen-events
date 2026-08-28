@@ -884,9 +884,65 @@ body:is(.admin-mode, :has([data-admin-mode])) .bo-text-faint {
    subir o corpo sem desapertar o espacejamento troca letra pequena por texto
    transbordado. */
 body:is(.admin-mode, :has([data-admin-mode]))
-  :is([class*="text-[7px]"], [class*="text-[8px]"], [class*="text-[9px]"]) {
+  :is(
+    [class*="text-[7px]"],
+    [class*="text-[8px]"],
+    [class*="text-[9px]"],
+    [class*="text-[10px]"],
+    [class*="text-[11px]"]
+  ) {
   font-size: var(--bo-fs-caption);
   letter-spacing: 0.01em;
+}
+
+/* ── E O 10 E O 11 ENTRARAM AQUI, A PEDIDO DELA ──────────────────────────────
+   Isto levantava TRÊS tamanhos (7 a 9) e parava aí de propósito: o 10 e o 11
+   eram «o registo denso do computador», e o comentário do chão do telemóvel
+   dizia, com razão, que alargar a fronteira mudava a densidade da tabela do
+   portátil «sem ninguém pedir».
+
+   PEDIU. Palavras dela, depois de eu lhe mostrar a medição: «arruma em todo o
+   back office». A premissa daquela frase era ninguém ter pedido; deixou de ser
+   verdade, e por isso a regra muda — e o teste que a guardava muda com ela, com
+   esta razão escrita, em vez de ser contornado.
+
+   O QUE A MEDIÇÃO MOSTROU, e é o que justifica o pedido: o back office tem 593
+   tamanhos de letra escritos à mão e ONZE usos da escala declarada.
+
+       text-[11px]  231      text-[12px]   24      text-[15px]   5
+       text-[10px]  223      text-[8px]    14      text-[17px]   2
+       text-[9px]    80      text-[13px]   13      text-[14px]   1
+
+   A escala existe — caption 12 · label 13 · body 15 · lead 17 · title 20 — e o
+   painel quase não assentava nela. É a mesma forma dos 47 cinzentos e das 15
+   grafias de espacejamento: uma decisão tomada 593 vezes por não haver onde a
+   ir buscar.
+
+   Com o 10 e o 11 aqui dentro, 454 dessas chamadas passam a assentar no degrau
+   mais baixo da casa, em vez de inventarem um número dois píxeis abaixo dele. */
+
+/* ── E A SOBRANCELHA VAI COM ELES, PELA MESMA RAZÃO ──────────────────────────
+   A `.bo-eyebrow` não é um utilitário do Tailwind: é uma classe própria fixada
+   em 11 px, e o chão de cima não lhe toca por não haver classe `text-[11px]`
+   nenhuma para apanhar.
+
+   MEDIDO depois de o 10 e o 11 entrarem no chão, a 1280, nas dez vistas: dos
+   360 nós que estavam abaixo do degrau sobraram VINTE E QUATRO, e eram todos
+   ela — «Próximos eventos», «Prioridade», «Prazo», «A fazer», «Valor já
+   ganho». Ou seja, os TÍTULOS das secções ficavam um píxel abaixo do chão
+   enquanto o texto que eles titulam assentava nele.
+
+   O chão do telemóvel já a levantava, e a razão está lá escrita: «é ela que
+   titula quase todas as secções do painel… num ecrã onde os títulos são o
+   mapa». Vale igual no computador.
+
+   `0.04em` e não os `0.14em` que ela declara: é a mesma geometria que o resto
+   deste ficheiro repete — subir o corpo sem desapertar o espacejamento troca
+   letra pequena por texto transbordado. É o mesmo valor que o chão do telemóvel
+   já escolheu para ela. */
+body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow {
+  font-size: var(--bo-fs-caption);
+  letter-spacing: 0.04em;
 }
 
 /* ── E PORQUE É QUE ISTO É `[class*=]` E NÃO A CLASSE ─────────────────────
@@ -2870,6 +2926,41 @@ body:has(.barra-consentimento) footer {
      `.g-tile` e NÃO têm `aspect-ratio`: dependem da altura fixa da grelha. No
      dia em que alguém lha tirasse, não havia rede nenhuma por baixo. */
   contain-intrinsic-size: auto 400px;
+}
+
+/* ── A GRELHA DA PROPOSTA SALTA O QUE ESTÁ FORA DO ECRÃ ──────────────────────
+   Palavras dela, sobre a proposta no telemóvel: «trava ao deslizar».
+
+   A galeria pública já resolveu isto (`.g-tile` aqui em cima) e a proposta
+   ficou de fora — e é a proposta que tem 46 fotografias numa página que o casal
+   percorre de cima a baixo. Cada célula fora do ecrã continuava a pagar estilo,
+   layout e uma camada descodificada em cada fotograma do deslize.
+
+   ── PORQUE É QUE AQUI É SEGURO, E ONDE NÃO É ──────────────────────────────
+
+   A regra desta casa é dura e foi paga: `content-visibility: auto` só é seguro
+   se o espaço RESERVADO for igual ao REAL, senão a página encolhe por baixo do
+   dedo — e no Safari do iPhone não há âncora de scroll que o disfarce.
+
+   Aqui a altura da célula NÃO vem do conteúdo saltado: vem do `aspect-ratio`
+   que cada foto declara a partir da forma guardada, e um `max-height` que
+   clampa aplica-se na mesma com ou sem conteúdo desenhado. É a mesma razão que
+   está escrita no `.g-tile`, e é por isso que esta classe só é posta pelo
+   `Inspiracao.tsx` QUANDO A FORMA É CONHECIDA.
+
+   Onde a forma se desconhece — fotografias anteriores às colunas de dimensão —
+   a célula não leva esta classe. Aí a altura vem mesmo da imagem, e reservar um
+   número inventado era escolher o defeito que se está a corrigir.
+
+   O fundo já lá está (o `bg-` moss a 12% no botão): uma célula com o conteúdo
+   saltado nunca pisca branco, que é a outra armadilha documentada no `.g-tile`.
+
+   `auto 320px` e não `auto`: `auto` sozinho é gramática INVÁLIDA — o parser
+   deita a declaração inteira fora e a rede não existe. Está escrito no
+   `.g-tile` e custou lá uma verificação no browser. */
+.foto-adiavel {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
 }
 
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o

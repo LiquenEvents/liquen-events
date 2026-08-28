@@ -64,7 +64,7 @@ describe("o chão absoluto da letra", () => {
      * ele apareça. Este teste passa a exigir essa forma: é ela, e não a outra,
      * que cumpre o que o bloco promete.
      */
-    for (const px of [7, 8, 9]) {
+    for (const px of [7, 8, 9, 10, 11]) {
       expect(b, `o ${px}px ficou de fora`).toContain(`[class*="text-[${px}px]"]`);
     }
     // O degrau da casa, e não um número inventado ao lado dele.
@@ -72,19 +72,28 @@ describe("o chão absoluto da letra", () => {
   });
 
   /**
-   * A régua ao contrário, e é a que impede isto de virar o outro bloco: o 10 e
-   * o 11 são o registo denso do computador. Levantá-los aqui mudava a densidade
-   * da tabela sem ninguém pedir — que é precisamente o que o `escala-movel`
-   * guarda, e com razão.
+   * ── ESTA RÉGUA MUDOU DE ALVO, E A RAZÃO FICA ESCRITA ────────────────────
+   *
+   * Guardava o contrário: que o 10 e o 11 NÃO entravam aqui, porque eram «o
+   * registo denso do computador» e levantá-los mudava a densidade da tabela do
+   * portátil «sem ninguém pedir».
+   *
+   * A premissa dessa frase era ninguém ter pedido. Deixou de ser verdade: com
+   * a medição à frente — 593 tamanhos escritos à mão contra onze usos da escala
+   * declarada —, a dona do negócio disse «arruma em todo o back office».
+   *
+   * Uma guarda cuja premissa caiu não se contorna nem se apaga: muda de alvo e
+   * diz porquê. O que ela agora guarda é o fim da escada — que o chão pára no
+   * 11 e não continua a subir sozinho pela escala acima, engolindo o `label`
+   * (13) e o `body` (15), que são degraus com trabalho a fazer e não erros.
    */
-  it("e NÃO levanta o 10 nem o 11 — esses são a densidade do computador", () => {
-    // Pelo NÚMERO e não por uma grafia: escrito `.text-\[10px\]`, esta guarda
-    // ficava cega assim que a regra mudou de forma, e uma guarda cega passa a
-    // verde por não estar a olhar. Lê a regra sem comentários — a prosa ao lado
-    // fala do 10 e do 11 justamente para explicar que ficam de fora.
+  it("e PÁRA no 11 — o 12 é o degrau, não mais um número a levantar", () => {
+    // Pelo NÚMERO e não por uma grafia: escrito `.text-\[13px\]`, esta guarda
+    // ficava cega assim que a regra mudasse de forma, e uma guarda cega passa a
+    // verde por não estar a olhar. Lê a regra sem comentários.
     const b = regra();
-    expect(b, "o 10px entrou no chão absoluto").not.toMatch(/10px/);
-    expect(b, "o 11px entrou no chão absoluto").not.toMatch(/11px/);
+    expect(b, "o 13px (o degrau `label`) foi engolido pelo chão").not.toMatch(/13px/);
+    expect(b, "o 15px (o degrau `body`) foi engolido pelo chão").not.toMatch(/15px/);
   });
 
   it("não tem largura nenhuma — é um limite do olho, não do ecrã", () => {
