@@ -11,6 +11,7 @@ import {
   type IdiomaDoModelo,
 } from "./email-templates-store";
 import { renderizarAssunto, renderizarCorpo, variaveisPorPreencher } from "./email-template-engine";
+import { semFimEmBranco } from "./email-fim-em-branco";
 import {
   fraseDoLocal,
   primeiroNome,
@@ -288,7 +289,16 @@ function prepararDialectoNovo(
     };
   }
 
-  const html = renderizarCorpo(corpo, vars);
+  /**
+   * ── O FIM EM BRANCO SAI AQUI ──────────────────────────────────────────
+   *
+   * O editor visual escreve um bloco por cada Enter, e as linhas que alguém
+   * carregou no fim do modelo «para dar um ar» vão para o email tal e qual.
+   * Não se veem: veem-se como um email mais comprido, com o clipe do anexo
+   * mais abaixo. Palavras dela: «muitas vezes ele esta super la para baixo no
+   * email». Ver `email-fim-em-branco.ts` — só o FIM, nunca o meio.
+   */
+  const html = semFimEmBranco(renderizarCorpo(corpo, vars));
   const texto = textoDoCorpo(html);
   if (texto.trim() === "") {
     return {
@@ -364,11 +374,14 @@ export function prepararModelo(
   }
 
   const rendido = renderTemplate({ ...modelo, subject: assunto, body: corpo }, vars);
+  // O mesmo fim arrumado do dialecto novo: os dois saem pela mesma porta e o
+  // modelo antigo é escrito no mesmo editor.
+  const corpoArrumado = semFimEmBranco(rendido.body);
   return {
     ok: true,
     assunto: rendido.subject,
-    html: rendido.body,
-    texto: textoDoCorpo(rendido.body),
+    html: corpoArrumado,
+    texto: textoDoCorpo(corpoArrumado),
   };
 }
 
