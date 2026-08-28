@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import { textosDaPagina } from "./textos-da-pagina";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * A LUPA — o gesto que existe para as fotografias deixarem de ser pequenas.
@@ -480,5 +482,108 @@ describe("quando a fotografia do momento falha depois de a página abrir", () =>
       tituloSobreFoto(),
       "ficou uma faixa de título branca por cima de coisa nenhuma — é este o defeito",
     ).toBeUndefined();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O RITMO ENTRE MOOD BOARDS — «os buracos brancos», palavras dela
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO num 390×844, com oito boards de tamanhos diferentes. Duas coisas
+ * estavam erradas, e são diferentes uma da outra:
+ *
+ * 1. O intervalo entre dois boards era de 96 px, e o intervalo entre dois
+ *    CAPÍTULOS do documento — «Serviços» e «Orçamento Proposto» — é de 64.
+ *    Um board é uma parte DENTRO do capítulo «Inspiração»; separá-lo do
+ *    vizinho com vez e meia o que separa dois capítulos diz ao olho que ali
+ *    acabou coisa maior do que acabou.
+ *
+ * 2. Num board cuja ÚNICA fotografia é o respiro, o intervalo era 132 e não
+ *    96. Os 36 px a mais eram o `mb-9` do respiro a separá-lo de uma grelha
+ *    VAZIA. Um ritmo com um intervalo diferente dos outros não é um ritmo.
+ */
+describe("o ritmo entre mood boards", () => {
+  /** Um board de uma fotografia só: a do respiro. É o caso que media 132. */
+  const SO_O_RESPIRO: BoardParaEcra = { ...BOARD, chave: "so-um", fotos: ["a"] };
+
+  it("um board de uma só fotografia não desenha grelha nenhuma", () => {
+    desenhar(SO_O_RESPIRO);
+    // A grelha é o `flex` que segura as colunas. Sem fotografias fora do
+    // respiro não há nada para ela segurar — e uma caixa vazia com margem é
+    // exactamente o buraco que isto existe para não ter.
+    const botoes = screen.getAllByRole("button", { name: /Ampliar/ });
+    expect(botoes).toHaveLength(1);
+    const grelha = document.querySelector(".flex.flex-col.gap-4");
+    expect(grelha, "a grelha vazia continua a ser desenhada").toBeNull();
+  });
+
+  it("CONTROLO POSITIVO: com fotografias fora do respiro, a grelha existe", () => {
+    // Sem isto, um selector errado dava `null` nos dois casos e o teste acima
+    // passava sem provar nada.
+    desenhar();
+    expect(document.querySelector(".flex.flex-col.gap-4")).not.toBeNull();
+  });
+
+  it("o afastamento até à grelha é da GRELHA, não do respiro", () => {
+    // Estava no respiro (`mb-9`), e por isso sobrava quando não havia grelha.
+    desenhar();
+    const respiro = screen.getAllByRole("button", { name: /Ampliar/ })[0];
+    const caixaDoRespiro = respiro.closest("div");
+    expect(caixaDoRespiro?.className, "o respiro voltou a levar margem de baixo").not.toMatch(
+      /\bmb-\d/,
+    );
+    expect(document.querySelector(".flex.flex-col.gap-4")?.className).toMatch(/\bmt-9\b/);
+  });
+});
+
+/**
+ * A hierarquia, lida do CÓDIGO dos dois ficheiros.
+ *
+ * O teste acima mede uma árvore desenhada; este mede a REGRA, e é a que se
+ * desfaz sem ninguém dar por isso — basta alguém subir um número achando que
+ * «fica com mais ar». O intervalo entre duas partes de um capítulo não pode
+ * passar o intervalo entre dois capítulos.
+ */
+describe("um mood board é uma parte do capítulo, não um capítulo", () => {
+  const RAIZ = process.cwd();
+  const AQUI = "src/app/[lang]/(privado)/proposta/[token]";
+  const ler = (f: string) => readFileSync(join(RAIZ, `${AQUI}/${f}`), "utf8");
+  /**
+   * O degrau de `margin-top` da primeira `<section>` de um ficheiro.
+   *
+   * Lê a ETIQUETA DE ABERTURA inteira e não um `className="…"`: o
+   * `Documento.tsx` escreve o dele num template literal, e uma expressão
+   * regular à espera de aspas devolvia `null` — que se compara com tudo sem
+   * reclamar. Foi o controlo positivo aqui em baixo que o apanhou.
+   *
+   * O `(?<![\w:-])` exclui as variantes: sem ele, o `first:mt-6` da
+   * Inspiração passava por ser o afastamento normal.
+   */
+  const degrau = (fonte: string) => {
+    const i = fonte.indexOf("<section");
+    if (i < 0) return null;
+    const etiqueta = fonte.slice(i, fonte.indexOf(">", i));
+    const mt = etiqueta.match(/(?<![\w:-])mt-(\d+)\b/);
+    const sm = etiqueta.match(/\bsm:mt-(\d+)\b/);
+    return { mt: mt ? Number(mt[1]) : null, sm: sm ? Number(sm[1]) : null };
+  };
+
+  it("CONTROLO POSITIVO: os dois números foram mesmo lidos", () => {
+    // Uma leitura falhada devolve `null`, e `null` compara-se com tudo sem
+    // reclamar — era o silêncio que este controlo impede.
+    expect(degrau(ler("Documento.tsx"))).toEqual({ mt: 16, sm: 24 });
+    expect(degrau(ler("Inspiracao.tsx"))).toEqual({ mt: 12, sm: 16 });
+  });
+
+  it("o intervalo entre boards não passa o intervalo entre capítulos", () => {
+    const capitulo = degrau(ler("Documento.tsx"))!;
+    const board = degrau(ler("Inspiracao.tsx"))!;
+    expect(board.mt, `board ${board.mt} > capítulo ${capitulo.mt} no telemóvel`).toBeLessThan(
+      capitulo.mt!,
+    );
+    expect(board.sm, `board ${board.sm} > capítulo ${capitulo.sm} no ecrã largo`).toBeLessThan(
+      capitulo.sm!,
+    );
   });
 });

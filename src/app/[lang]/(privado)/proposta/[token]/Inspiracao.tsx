@@ -333,7 +333,11 @@ function Respiro({
   if (caiu) return <TituloDoMomento titulo={titulo} subtitulo={subtitulo} />;
 
   return (
-    <div className="relative mb-9">
+    /* Sem `mb-9`: o afastamento até à grelha é do PAR, e vive agora na
+       grelha — que só é desenhada quando tem fotografias. Ver o comentário
+       lá em baixo: com ele aqui, um board de uma só fotografia levava 36 px
+       a separá-lo de uma grelha vazia. */
+    <div className="relative">
       <Celula
         token={token}
         foto={foto}
@@ -528,7 +532,30 @@ export default function Inspiracao({
           return f?.largura && f?.altura ? f.altura / f.largura : ALTURA_POR_OMISSAO;
         });
         return (
-          <section key={board.chave} className="mt-24 first:mt-6 sm:mt-36">
+          /**
+           * ── O AFASTAMENTO ENTRE MOOD BOARDS ─────────────────────────────
+           *
+           * Era `mt-24 sm:mt-36` — 96 px no telemóvel. Palavras dela: os
+           * «buracos brancos» entre os mood boards.
+           *
+           * MEDIDO num 390×844, com oito boards: o branco entre dois boards
+           * era de 96 px, e o branco entre dois CAPÍTULOS do documento — entre
+           * «Serviços» e «Orçamento Proposto», que são secções de topo — é de
+           * 64 px (`Documento.tsx`, `mt-16 sm:mt-24`).
+           *
+           * A hierarquia estava ao contrário. Um mood board não é um capítulo:
+           * é uma parte DENTRO do capítulo «Inspiração». Separá-lo do vizinho
+           * com uma vez e meia o intervalo que separa dois capítulos diz ao
+           * olho que ali acabou alguma coisa maior do que acabou — e é isso
+           * que se lê como buraco, e não como respiração.
+           *
+           * `mt-12 sm:mt-16` (48/64) põe-no um degrau ABAIXO do capítulo, que
+           * é onde ele vive. E não é pouco: cada board abre com uma fotografia
+           * a toda a largura com o nome do momento por cima — o separador mais
+           * forte desta página inteira não precisa de 96 px de branco a
+           * anunciá-lo.
+           */
+          <section key={board.chave} className="mt-12 first:mt-6 sm:mt-16">
             {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
               «Devia haver mais momentos assim, a separar secções: uma foto a
               toda a largura entre blocos.» Vem ANTES do título de propósito:
@@ -573,43 +600,60 @@ export default function Inspiracao({
               px davam o mesmo tamanho a que elas já saem na folha A4, e voltar
               a esse tamanho num ecrã era fazer o trabalho todo para não
               resolver nada. */}
-            <div className="mt-3 flex flex-col gap-4 sm:flex-row">
-              {arrumadas.map((coluna, c) => (
-                /*
-                 * ── UMA COLUNA, E NO TELEMÓVEL NENHUMA ──────────────────
-                 *
-                 * `contents` faz este `div` desaparecer da disposição e deixa
-                 * as fotografias serem filhas directas do `flex` de cima. É o
-                 * que permite ter as duas coisas: acima de `sm` são duas
-                 * colunas equilibradas, e abaixo é uma coluna só onde o
-                 * `order` de cada fotografia lhe devolve a ordem que ELA
-                 * arrumou no estúdio.
-                 *
-                 * O `order` não faz mal nenhum do lado de cima: dentro de cada
-                 * coluna os índices já são crescentes (o empacotamento nunca
-                 * recua), portanto ordená-los por ele é deixá-los como estão.
-                 */
-                <div
-                  key={c}
-                  className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4"
-                  style={{ minWidth: 0 }}
-                >
-                  {coluna.map(({ id, i }) => (
-                    <Celula
-                      key={id}
-                      token={token}
-                      foto={fotos[id]}
-                      ansiosa={i < FOTOS_ANSIOSAS}
-                      rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
-                      textos={textos}
-                      aoAmpliar={(alvo) => abrir(b, i, alvo)}
-                      aoDesistir={marcarFalha}
-                      ordem={i}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
+            {/**
+             * ── A GRELHA SÓ EXISTE QUANDO TEM FOTOGRAFIAS ───────────────
+             *
+             * MEDIDO: num board cuja ÚNICA fotografia é o respiro, o branco
+             * até ao board seguinte era de 132 px em vez dos 96 dos outros.
+             * Os 36 px a mais eram o `mb-9` do respiro — que existe para o
+             * separar da grelha — a separá-lo de uma grelha VAZIA.
+             *
+             * O afastamento é do PAR, não do respiro: passa para a grelha, e
+             * a grelha deixa de ser desenhada quando não tem nada dentro.
+             * Assim o intervalo entre boards é o mesmo em todos, que é o que
+             * faz um ritmo ser um ritmo.
+             */}
+            {naGrelha.length > 0 && (
+              <div
+                className={`flex flex-col gap-4 sm:flex-row ${oRespiro !== null ? "mt-9" : "mt-3"}`}
+              >
+                {arrumadas.map((coluna, c) => (
+                  /*
+                   * ── UMA COLUNA, E NO TELEMÓVEL NENHUMA ──────────────────
+                   *
+                   * `contents` faz este `div` desaparecer da disposição e deixa
+                   * as fotografias serem filhas directas do `flex` de cima. É o
+                   * que permite ter as duas coisas: acima de `sm` são duas
+                   * colunas equilibradas, e abaixo é uma coluna só onde o
+                   * `order` de cada fotografia lhe devolve a ordem que ELA
+                   * arrumou no estúdio.
+                   *
+                   * O `order` não faz mal nenhum do lado de cima: dentro de cada
+                   * coluna os índices já são crescentes (o empacotamento nunca
+                   * recua), portanto ordená-los por ele é deixá-los como estão.
+                   */
+                  <div
+                    key={c}
+                    className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4"
+                    style={{ minWidth: 0 }}
+                  >
+                    {coluna.map(({ id, i }) => (
+                      <Celula
+                        key={id}
+                        token={token}
+                        foto={fotos[id]}
+                        ansiosa={i < FOTOS_ANSIOSAS}
+                        rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
+                        textos={textos}
+                        aoAmpliar={(alvo) => abrir(b, i, alvo)}
+                        aoDesistir={marcarFalha}
+                        ordem={i}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/*
              * ── A PAUSA DE LEITURA ────────────────────────────────────────
