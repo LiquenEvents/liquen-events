@@ -32,7 +32,7 @@ function Mark({
   if (failed || !logo) {
     return (
       <div className="me-12 flex h-8 flex-shrink-0 items-center sm:me-16 sm:h-10" {...hidden}>
-        <span className="text-white/70 text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase whitespace-nowrap">
+        <span className="text-foreground/68 text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase whitespace-nowrap">
           {name}
         </span>
       </div>
@@ -67,7 +67,7 @@ function Mark({
         // Slimmer strip on every breakpoint: cap the logo height (max-h) so the
         // whole band reads as a fine line — 22px on a phone, 34px from sm+ (was
         // uncapped, which let the band grow much taller on desktop).
-        className="w-auto max-h-[22px] sm:max-h-[34px] max-w-[120px] sm:max-w-[170px] object-contain opacity-80 brightness-0 invert transition-opacity duration-300"
+        className="w-auto max-h-[22px] sm:max-h-[34px] max-w-[120px] sm:max-w-[170px] object-contain opacity-100 transition-opacity duration-300 brightness-0"
         // O erro é ouvido pela `ref` e NÃO pelo `onError` do next/image.
         // Passar `onError` faz o next/image reatribuir `img.src = img.src` na
         // montagem (image-component.js:140) para ressuscitar um erro anterior à
@@ -193,14 +193,11 @@ export default function ClientMarquee() {
   }, []);
 
   return (
-    <div className="relative overflow-hidden py-3.5 sm:py-4">
+    <div className="relative py-3.5 sm:py-4 border-y border-foreground/8 overflow-hidden">
       {/* sr-only heading so heading-navigation users find the client band. */}
       <h2 className="sr-only">{t.nav.clientes}</h2>
-      {/* As máscaras das pontas saíram: desvaneciam os logótipos para BRANCO,
-          e esta banda passou a viver por cima da fotografia do herói. Um
-          degradê para uma cor sólida em cima de uma fotografia é uma mancha,
-          não um desvanecer — e o sítio que ela mostrou também não as tem: os
-          logótipos entram e saem cortados pela borda. */}
+      <div className="absolute inset-y-0 left-0 w-16 sm:w-24 bg-gradient-to-r from-surface to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-y-0 right-0 w-16 sm:w-24 bg-gradient-to-l from-surface to-transparent z-10 pointer-events-none" />
       <div
         ref={trackRef}
         /**
