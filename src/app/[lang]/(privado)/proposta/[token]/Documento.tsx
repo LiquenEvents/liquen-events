@@ -147,6 +147,59 @@ function Titulo({
  * esta página existe para lhes dar.
  */
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DEGRAU DO MEIO — «Cerimónia», «Jantar», «Bar e copo de água»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO num 390×844, com uma proposta a sério. A escala desenhada desta
+ * página era esta:
+ *
+ *     26 px  Playfair   «2. Serviços»            ← o capítulo
+ *     17 px  Inter w500  «Cerimónia»             ← o momento
+ *     15 px  Inter w400  «Arco floral»           ← o que ele leva
+ *     14 px  Inter w400  «Em tons de branco…»    ← o que isso é
+ *
+ * Duas coisas estavam a esborratar-se aí.
+ *
+ * 1. O NOME DO MOMENTO ERA O ÚNICO TÍTULO EM LETRA DE TEXTO. Tudo o que
+ *    titula nesta página é a serifada — a capa, os capítulos, o nome de cada
+ *    mood board por cima da fotografia. Só este não era, e por isso o salto
+ *    de 26 para 17 não se lia como um degrau: lia-se como o fim dos títulos.
+ *    E «Cerimónia», «Jantar», «Bar» não são rótulos de lista — são os
+ *    momentos do dia dela, que é o que esta proposta vende.
+ *
+ * 2. O NOME DO SERVIÇO E A SUA DESCRIÇÃO ERAM QUASE A MESMA COISA: 15 px
+ *    contra 14, o mesmo peso, a mesma família. Um pixel e um tom de cinzento
+ *    a separar «Arco floral» de «Em tons de branco e verde, com eucalipto e
+ *    lisianthus» — num telemóvel ao sol, isso não é hierarquia nenhuma, e a
+ *    lista do que o casal recebe lia-se como um bloco cinzento só.
+ *
+ * ── O QUE NÃO SE FEZ, E PORQUÊ ───────────────────────────────────────────
+ *
+ * Não se encolheu a descrição para ganhar o degrau. Era o caminho fácil — 14
+ * para 13 dá logo dois pixéis de diferença — e é o errado: aquilo é prosa
+ * dela, escrita para ser lida, e roubar-lhe tamanho para arrumar uma escala
+ * é pagar legibilidade com desenho. O degrau vem do PESO e da força da tinta,
+ * que é onde ele não custa nada a quem lê.
+ *
+ * ── UM SÓ SÍTIO ──────────────────────────────────────────────────────────
+ *
+ * Este título estava escrito à mão em dois sítios — nos grupos de serviços e
+ * nas fases do cronograma — com a mesma linha de classes copiada. Passa a ser
+ * um componente: o dia em que alguém mudar o degrau do meio, muda-o uma vez.
+ */
+function Momento({ children }: { children: React.ReactNode }) {
+  return (
+    <h3
+      className="text-foreground/90 flex items-baseline gap-3 text-balance"
+      style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.6vw, 24px)" }}
+    >
+      {children}
+    </h3>
+  );
+}
+
+/**
  * ── `prop-chega`: a secção sobe ao entrar no ecrã ─────────────────────────
  *
  * A regra vive no `globals.css`, com as três leis de movimento desta casa
@@ -794,17 +847,17 @@ export default function Documento({
           <div className="mt-8 space-y-9">
             {(doc.serviceGroups ?? []).map((g, i) => (
               <div key={g.id ?? i}>
-                <h3 className="text-foreground/85 flex items-baseline gap-3 text-[17px] font-medium">
+                <Momento>
                   {g.letter && (
                     <span className="text-moss-dark text-xs tracking-[0.2em]">{g.letter}</span>
                   )}
                   {g.title}
-                </h3>
+                </Momento>
                 {(g.items ?? []).length > 0 && (
                   <ul className="mt-3 space-y-2.5">
                     {(g.items ?? []).map((it, j) => (
                       <li key={it.id ?? j} className="border-foreground/8 border-t pt-2.5">
-                        <span className="text-foreground/85 text-[15px]">{it.label}</span>
+                        <span className="text-foreground text-[15px] font-medium">{it.label}</span>
                         {it.desc?.trim() && (
                           <span className="text-foreground/65 block text-sm leading-relaxed">
                             {it.desc}
@@ -830,7 +883,7 @@ export default function Documento({
           <div className="mt-8 space-y-8">
             {(doc.cronograma ?? []).map((fase, i) => (
               <div key={i}>
-                <h3 className="text-foreground/85 text-[17px] font-medium">{fase.title}</h3>
+                <Momento>{fase.title}</Momento>
                 <Lista itens={fase.items} />
               </div>
             ))}
