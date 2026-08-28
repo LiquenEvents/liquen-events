@@ -680,12 +680,17 @@ body:is(.admin-mode, :has([data-admin-mode])) .font-display {
    marketing site keeps its editorial caps. Every admin screen now reads in
    calm sentence case with quiet spacing, like a modern product app (ChatGPT/
    Linear). Data fields keep their true case via the block below. */
-body:is(.admin-mode, :has([data-admin-mode])) .uppercase,
+body:is(.admin-mode, :has([data-admin-mode])) [class*="uppercase"],
 body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow,
 body:is(.admin-mode, :has([data-admin-mode])) .eyebrow {
   text-transform: none;
   letter-spacing: 0.005em;
 }
+/* `[class*="uppercase"]` e não `.uppercase`, pela mesma razão do chão da letra
+   lá em baixo: a classe nua não apanha `lg:uppercase`, e os mesmos três
+   rótulos da Visão Geral gritavam em maiúsculas no computador enquanto o resto
+   do painel estava em caixa de frase — não por alguém ter decidido isso, mas
+   por o prefixo os ter deixado passar por fora da decisão. */
 
 /* Keep real DATA in its true case — an email, a client's name mid-typing, a
    phone number or a reference id must never be transformed. (Now that the
@@ -878,10 +883,34 @@ body:is(.admin-mode, :has([data-admin-mode])) .bo-text-faint {
    O `letter-spacing` acompanha pela mesma geometria que está escrita acima:
    subir o corpo sem desapertar o espacejamento troca letra pequena por texto
    transbordado. */
-body:is(.admin-mode, :has([data-admin-mode])) :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
+body:is(.admin-mode, :has([data-admin-mode]))
+  :is([class*="text-[7px]"], [class*="text-[8px]"], [class*="text-[9px]"]) {
   font-size: var(--bo-fs-caption);
   letter-spacing: 0.01em;
 }
+
+/* ── E PORQUE É QUE ISTO É `[class*=]` E NÃO A CLASSE ─────────────────────
+   Estava `:is(.text-\[7px\], .text-\[8px\], .text-\[9px\])` — a classe
+   NUA. E uma classe nua não apanha as variantes: o Tailwind compila
+   `lg:text-[9px]` para `.lg\:text-\[9px\]`, que é outro nome, dentro de uma
+   media query. O chão passava-lhe ao lado.
+
+   MEDIDO num browser a sério, a 1280, com a Visão Geral montada — três
+   rótulos, os primeiros que ela vê ao abrir o painel:
+
+       «Pedidos ativos»     pedido a 15 px, desenhado a  9 px
+       «Por responder»      pedido a 15 px, desenhado a  9 px
+       «Próximos 7 dias»    pedido a 15 px, desenhado a  9 px
+
+   Nove píxeis é exactamente o tamanho que o comentário aqui em cima diz que
+   esta casa não manda para ecrã nenhum, «porque abaixo disso não é texto
+   denso: é texto que não se lê». A regra dizia-o e não o fazia.
+
+   `[class*="…"]` casa o nome da classe onde quer que ele apareça na lista —
+   com prefixo de largura (`lg:`), de contentor (`@min-[36rem]:`) ou sem
+   nenhum. A especificidade é a mesma de uma classe, portanto nada mais muda.
+   São só dois sítios hoje; o que se fecha é a FORMA do buraco, para o próximo
+   `lg:text-[9px]` já nascer coberto. */
 
 /* ── O CHÃO DA COR DO TEXTO, PELA MESMA RAZÃO DO CHÃO DA LETRA ────────────
    A casa tem três tokens de texto com o rácio medido e um teste a guardá-lo
