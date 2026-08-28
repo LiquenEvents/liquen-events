@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { isBackOfficeRoute } from "@/lib/safe-path";
+import { semAnaliticos } from "@/lib/safe-path";
 import Link from "next/link";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
 import { ALTURA_BARRA_FIXA_PX, ehRotaSocial } from "@/lib/meta/barra";
@@ -80,7 +80,36 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
   // enquanto os quatro analíticos ao lado não sabiam. Passou para
   // `safe-path.ts`, que diz de si próprio: uma só definição, para não haver
   // duas versões da verdade.
-  const isBackOffice = isBackOfficeRoute(pathname);
+  //
+  /**
+   * ── E TAMBÉM FORA DAS ROTAS COM TOKEN, QUE É O RESTO DA MESMA FRASE ─────
+   *
+   * Isto lia `isBackOfficeRoute` — METADE do `semAnaliticos`. A outra metade
+   * são as rotas com token: a proposta do casal e o portal. E nessas não é
+   * montado analítico nenhum — o Plausible, o Google tag, os Web Vitals e a
+   * captura de origem calam-se todos por `isTokenRoute`, que é a regra mais
+   * antiga deste projecto.
+   *
+   * Ou seja: esta barra estava a pedir a um casal consentimento para cookies
+   * que aquela página NUNCA PÕE.
+   *
+   * E não era só inútil, era caro. MEDIDO num 390×844, com a proposta a sério
+   * e a página rolada até ao fim: a barra desenha 116 px encostados ao chão, e
+   * debaixo dela ficavam as duas últimas linhas do documento — «Válida até …»
+   * e «Emitida a …». A página já estava no fundo; aquelas linhas eram
+   * inalcançáveis. Ela mandou a fotografia com o total tapado pelo aviso.
+   *
+   * O sítio público resolve a mesma geometria com uma reserva
+   * (`--reserva-consentimento`), consumida pelo rodapé, pelo herói e pelos dois
+   * botões flutuantes. O ramo privado não tem nenhum deles — foi desenhado sem
+   * cromado, de propósito (ver `(privado)/layout.tsx`) —, portanto não havia lá
+   * nada para consumir reserva nenhuma, e acrescentar-lha seria pagar espaço a
+   * um aviso que não tem ali nada para avisar.
+   *
+   * Quem abrir depois o sítio público vê a barra como sempre: a escolha vive no
+   * `localStorage` e ninguém a perde por a barra não aparecer aqui.
+   */
+  const foraDeSitio = semAnaliticos(pathname);
 
   useEffect(() => {
     // A lógica é a mesma de sempre, ao contrário: a barra já está desenhada, e
@@ -140,7 +169,7 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
     setShow(false);
   };
 
-  if (isBackOffice || !show) return null;
+  if (foraDeSitio || !show) return null;
   const t = COPY[locale === "en" ? "en" : "pt"];
 
   // Nas variantes sociais o banner SOBE a altura da barra fixa, em vez de se
