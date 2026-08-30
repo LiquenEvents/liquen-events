@@ -10,6 +10,7 @@ import { eur0 as eur } from "@/lib/money";
 import { corDeTexto, metaFor } from "./status-meta";
 import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
+import { useEntradaAoChegar } from "./ui/useEntradaAoChegar";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
@@ -1150,6 +1151,21 @@ export default function Overview({
   onVerArquivados,
 }: Props) {
   /**
+   * ── OS DOIS BLOCOS QUE ESPERAM POR SER VISTOS ────────────────────────────
+   *
+   * Os quatro blocos desta vista entram em cascata (`.bo-cena`). Os dois
+   * primeiros estão sempre no ecrã; estes dois estão abaixo da dobra num
+   * telemóvel, e faziam a sua entrada enquanto ninguém olhava — quando ela lá
+   * chegava a rolar, já estava tudo parado.
+   *
+   * Passam a esperar pela chegada. A animação é a mesma; muda o instante. Ver
+   * o `useEntradaAoChegar` para as três redes que garantem que o bloco aparece
+   * mesmo que o gatilho falhe.
+   */
+  const chegadaDosNumeros = useEntradaAoChegar<HTMLDivElement>();
+  const chegadaDaEspera = useEntradaAoChegar<HTMLDivElement>();
+
+  /**
    * ── O QUE AQUI DENTRO AINDA LÊ O RELÓGIO, E PORQUE É QUE FICA ─────────────
    *
    * Este cálculo também usa a hora (o «hoje» dos eventos, os «14d parado», os
@@ -1809,6 +1825,7 @@ export default function Overview({
            cada um por si e o bloco a que pertencem não se animava de todo.
            Uma cascata de blocos que anima filhos não é uma cascata: é um
            tremor. */
+        ref={chegadaDosNumeros}
         style={{ "--cena": 2 } as React.CSSProperties}
         className="bo-cena flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-[1.4fr_1fr_1fr] sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
       >
@@ -1889,7 +1906,7 @@ export default function Overview({
         ))}
       </div>
 
-      <div style={{ "--cena": 3 } as React.CSSProperties} className="bo-cena">
+      <div ref={chegadaDaEspera} style={{ "--cena": 3 } as React.CSSProperties} className="bo-cena">
         <AEsperaDeResposta
           linhas={data.semResposta}
           pendurado={data.pendurado}
