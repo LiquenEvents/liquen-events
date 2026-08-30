@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import {
   CHECK_CHUNK,
@@ -460,7 +460,15 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await openFolder(/Terracotta/);
 
     // Eliminar (o servidor ainda não respondeu) e criar outro tema entretanto.
+    //
+    // Eliminar deixou de ser um clique: passa pela pergunta da casa, com a
+    // lista do que se perde lá dentro. O que este caso mede — um tema criado
+    // enquanto um DELETE falhado ia a caminho — não muda.
     fireEvent.click(screen.getByRole("button", { name: "Eliminar tema" }));
+    const caixa = await screen.findByRole("dialog");
+    await act(async () => {
+      fireEvent.click(within(caixa).getByRole("button", { name: "Eliminar o tema" }));
+    });
     fireEvent.click(screen.getByRole("button", { name: "Novo tema" }));
     const field = screen.getByLabelText(/Nome do tema/);
     fireEvent.change(field, { target: { value: "Itália" } });

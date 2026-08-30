@@ -28,6 +28,7 @@ import {
   EmptyState,
   Field,
   MenuDeAccoes,
+  PerguntaDestrutiva,
   Toolbar,
   type AccaoDeItem,
 } from "./ui";
@@ -645,6 +646,9 @@ export default function Temas() {
   const [newNotes, setNewNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+
+  /** O tema à espera de resposta à pergunta de o eliminar. */
+  const [aEliminar, setAEliminar] = useState<ThemeSummary | null>(null);
   const [search, setSearch] = useState("");
   // Guardada entre sessões: quem trabalha com a biblioteca todos os dias escolhe
   // uma vez e não quer voltar a escolher. Começa em "compacto" porque com seis
@@ -1011,21 +1015,6 @@ export default function Temas() {
   }
 
   async function removeTheme(t: ThemeSummary) {
-    // Quantas fotos se perdem pode ser desconhecido (pasta ilegível) ou apenas
-    // um mínimo (contagem truncada) — a frase tem de continuar a fazer sentido.
-    const photos =
-      t.imageCount === null
-        ? " e as fotos que tiver lá dentro"
-        : t.imageCount > 0
-          ? ` e as suas ${t.imageCount}${t.truncated ? "+" : ""} fotos`
-          : "";
-    if (
-      !window.confirm(
-        `Eliminar o tema "${t.name}"${photos}? ` +
-          "As propostas já feitas com estas fotos não são afetadas. Esta ação não pode ser anulada.",
-      )
-    )
-      return;
     setThemes((prev) => prev.filter((x) => x.id !== t.id));
     if (openId === t.id) setOpenId(null);
     // O cartão sai da lista já e volta se o servidor recusar — e é isso que a
@@ -1175,40 +1164,83 @@ export default function Temas() {
   // um ecrã irmão da lista, não um separador dentro dela.
   if (revendo) return <BibliotecaRevisao onBack={() => setRevendo(false)} />;
 
+  /**
+   * ── A PERGUNTA DE ELIMINAR UM TEMA ────────────────────────────────────
+   *
+   * Escrita uma vez e posta nos DOIS ramos do desenho: eliminar chega-se tanto
+   * da lista como de dentro da pasta aberta, e esse ramo devolve outro
+   * componente. Sem isto, a pergunta pedida lá dentro não tinha onde aparecer.
+   *
+   * O que se perde vai numa LISTA e não espremido no meio de uma frase — é
+   * para isso que a `oQueSePerde` existe. A contagem de fotos pode ser
+   * desconhecida (pasta ilegível) ou um mínimo (contagem truncada), e as três
+   * versões têm de fazer sentido.
+   */
+  const perguntaDeEliminar = (
+    <PerguntaDestrutiva
+      aberto={!!aEliminar}
+      onFechar={() => setAEliminar(null)}
+      titulo={`Eliminar o tema «${aEliminar?.name ?? ""}»?`}
+      oQueSePerde={
+        aEliminar
+          ? [
+              aEliminar.imageCount === null
+                ? "As fotografias que estiverem lá dentro"
+                : aEliminar.imageCount > 0
+                  ? `${aEliminar.imageCount}${aEliminar.truncated ? "+" : ""} ${
+                      aEliminar.imageCount === 1 ? "fotografia" : "fotografias"
+                    }`
+                  : "A pasta, que está vazia",
+            ]
+          : []
+      }
+      aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
+      rotuloConfirmar="Eliminar o tema"
+      onConfirmar={() => {
+        const t = aEliminar;
+        setAEliminar(null);
+        if (t) void removeTheme(t);
+      }}
+    />
+  );
+
   if (open) {
     return (
-      <ThemeFolder
-        key={open.id}
-        theme={open}
-        // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
-        // o cartão do destino tem de somar as fotos que lá chegaram, senão a
-        // contagem só se corrige no próximo carregamento da página.
-        themes={themes}
-        onCopiedTo={(destId, added) =>
-          setThemes((prev) =>
-            prev.map((t) =>
-              t.id === destId && t.imageCount !== null
-                ? { ...t, imageCount: t.imageCount + added }
-                : t,
-            ),
-          )
-        }
-        onBack={() => setOpenId(null)}
-        onFolderState={(s) => syncCard(open.id, s)}
-        onRename={(name) =>
-          setThemes((prev) =>
-            prev
-              .map((t) => (t.id === open.id ? { ...t, name } : t))
-              .sort((a, b) => a.name.localeCompare(b.name, "pt")),
-          )
-        }
-        onCover={(coverPath, coverUrl) =>
-          setThemes((prev) =>
-            prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
-          )
-        }
-        onDelete={() => removeTheme(open)}
-      />
+      <>
+        <ThemeFolder
+          key={open.id}
+          theme={open}
+          // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
+          // o cartão do destino tem de somar as fotos que lá chegaram, senão a
+          // contagem só se corrige no próximo carregamento da página.
+          themes={themes}
+          onCopiedTo={(destId, added) =>
+            setThemes((prev) =>
+              prev.map((t) =>
+                t.id === destId && t.imageCount !== null
+                  ? { ...t, imageCount: t.imageCount + added }
+                  : t,
+              ),
+            )
+          }
+          onBack={() => setOpenId(null)}
+          onFolderState={(s) => syncCard(open.id, s)}
+          onRename={(name) =>
+            setThemes((prev) =>
+              prev
+                .map((t) => (t.id === open.id ? { ...t, name } : t))
+                .sort((a, b) => a.name.localeCompare(b.name, "pt")),
+            )
+          }
+          onCover={(coverPath, coverUrl) =>
+            setThemes((prev) =>
+              prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
+            )
+          }
+          onDelete={() => setAEliminar(open)}
+        />
+        {perguntaDeEliminar}
+      </>
     );
   }
 
@@ -1740,6 +1772,7 @@ export default function Temas() {
           ))}
         </div>
       )}
+      {perguntaDeEliminar}
     </div>
   );
 }
