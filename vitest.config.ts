@@ -14,6 +14,13 @@ export default defineConfig({
       "server-only": fileURLToPath(
         new URL("./node_modules/next/dist/compiled/server-only/empty.js", import.meta.url),
       ),
+      // `next/font/google` é o mesmo caso, e apareceu no dia em que um layout
+      // passou a carregar uma letra: as funções (`Inter`, `Geist`, …) só
+      // existem depois de o compilador do Next as substituir. Num teste que
+      // monta esse layout, a chamada rebenta com «Geist is not a function» —
+      // um erro que não tem nada que ver com o que o teste mede. O duplo tem a
+      // forma do verdadeiro; ver a nota no ficheiro.
+      "next/font/google": fileURLToPath(new URL("./test/next-font-google.ts", import.meta.url)),
     },
   },
   test: {
@@ -33,7 +40,16 @@ export default defineConfig({
      * espera por passagem antes de alguém perceber porquê (ver
      * `caca/harness.rotulos.test.ts`).
      */
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "e2e/**/*.test.ts"],
+    /**
+     * ── E O `test/`, QUE É ONDE VIVEM OS DUPLOS ───────────────────────────
+     *
+     * O `test/next-font-google.ts` substitui um marcador de compilação, e tem
+     * uma lista de famílias escrita à mão que se desactualiza sozinha. O aviso
+     * que a guarda vive ao lado dele; sem esta linha, esse aviso nunca corria
+     * — um teste que não corre é pior do que um teste que não existe, porque
+     * dá a impressão de que alguém está a tomar conta.
+     */
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "e2e/**/*.test.ts", "test/**/*.test.ts"],
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts"],
