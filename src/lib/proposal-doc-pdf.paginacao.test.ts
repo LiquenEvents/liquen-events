@@ -567,7 +567,6 @@ describe("a folha do orçamento é uma coluna", () => {
         { label: "Serviço de coordenação", valueText: "950,50 € + IVA" },
         { label: "Deslocação da Equipa Líquen", valueText: "250,00 €" },
       ],
-      mostrarTotalAPagar: true,
     };
     const escritas = corpo(await desenhar(propostaDeOrcamento(comExtras)));
     const total = onde(escritas, "Total a pagar");
