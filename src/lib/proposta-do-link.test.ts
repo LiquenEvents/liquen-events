@@ -18,10 +18,15 @@ const dados = vi.hoisted(() => ({
   rebentaAoListar: false,
   /** Código curto → proposta, a gaveta do lado do servidor. */
   curtas: new Map<string, string>(),
+  /** Quando foi emitido o endereço que está a ser usado, em ms. */
+  emitidoEm: undefined as number | undefined,
+  /** Quando foram cortados os links do pedido, em ms (null = nunca). */
+  cortadoEm: null as number | null,
 }));
 
 vi.mock("@/lib/proposal-token", () => ({
-  readProposalToken: (t: string | null | undefined) => (t === "bom" ? { proposalId: "p1" } : null),
+  readProposalToken: (t: string | null | undefined) =>
+    t === "bom" ? { proposalId: "p1", emitidoEm: dados.emitidoEm } : null,
 }));
 vi.mock("@/lib/proposals-store", () => ({
   getProposal: async (id: string) => dados.porId.get(id) ?? null,
@@ -44,9 +49,23 @@ vi.mock("@/lib/proposta-link-curto", async (original) => {
     ...real,
     lerLigacaoCurta: async (codigo: string) => {
       const propostaId = dados.curtas.get(codigo);
-      return propostaId ? { propostaId } : null;
+      return propostaId
+        ? { propostaId, criadaEm: new Date(dados.emitidoEm ?? 0).toISOString() }
+        : null;
     },
   };
+});
+
+/**
+ * O corte: a gaveta é falsa, a REGRA é a verdadeira.
+ *
+ * Duplicar o `aindaAbre` aqui seria deixar de o testar — e é ele que decide se
+ * um link morre. O que se finge é só a leitura do carimbo, que é o que precisa
+ * de base de dados.
+ */
+vi.mock("@/lib/links-cortados", async (original) => {
+  const real = await original<typeof import("@/lib/links-cortados")>();
+  return { ...real, linksCortadosEm: async () => dados.cortadoEm };
 });
 
 const { propostaDoLink } = await import("./proposta-do-link");
@@ -77,6 +96,8 @@ beforeEach(() => {
   dados.porId.clear();
   dados.contrato = null;
   dados.rebentaAoListar = false;
+  dados.emitidoEm = undefined;
+  dados.cortadoEm = null;
 });
 
 describe("propostaDoLink", () => {
@@ -462,5 +483,128 @@ describe("o endereço curto abre a mesma proposta que o token", () => {
     expect(await propostaDoLink("mau")).toBe(null);
     expect(await propostaDoLink("")).toBe(null);
     expect(await propostaDoLink(undefined)).toBe(null);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CORTAR UM LINK TEM DE FECHAR AS DUAS PORTAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `proposta-link-curto.ts` escreveu isto quando nasceu, e é o teste inteiro:
+ *
+ *   «enquanto o token assinado continuar a abrir a mesma proposta, cortar o
+ *    código curto não fecha porta nenhuma — quem tem o email antigo entra à
+ *    mesma. Cortar a sério é uma decisão sobre as DUAS portas ao mesmo tempo.»
+ *
+ * Por isso cada regra daqui corre nas duas: o código curto E o token assinado.
+ * Uma que passasse só numa seria precisamente o corte que não corta.
+ */
+describe("os links cortados", () => {
+  const CORTE = Date.parse("2026-03-10T12:00:00.000Z");
+  const ANTES = CORTE - 60_000;
+  const DEPOIS = CORTE + 60_000;
+
+  /** As duas portas para a mesma sala, para as regras correrem nas duas. */
+  const portas: Array<[string, () => string]> = [
+    ["o token assinado", () => "bom"],
+    [
+      "o código curto",
+      () => {
+        dados.curtas.set("abcdefghjkmnpqrs", "p1");
+        return "abcdefghjkmnpqrs";
+      },
+    ],
+  ];
+
+  for (const [nome, endereco] of portas) {
+    describe(nome, () => {
+      it("abre normalmente quando nunca houve corte", async () => {
+        por(proposta({ id: "p1" }));
+        dados.emitidoEm = ANTES;
+        dados.cortadoEm = null;
+        expect((await propostaDoLink(endereco()))?.proposta.id).toBe("p1");
+      });
+
+      it("DEIXA de abrir quando foi emitido antes do corte", async () => {
+        por(proposta({ id: "p1" }));
+        dados.emitidoEm = ANTES;
+        dados.cortadoEm = CORTE;
+        expect(
+          await propostaDoLink(endereco()),
+          "o link cortado continua a abrir — o corte não corta",
+        ).toBeNull();
+      });
+
+      it("um endereço cunhado DEPOIS do corte nasce vivo", async () => {
+        /**
+         * É esta a razão de o corte ser um carimbo e não um interruptor: ela
+         * corta, corrige o preço, reenvia — e o email novo tem de funcionar
+         * sem ninguém se lembrar de voltar a ligar coisa nenhuma. Um endereço
+         * morto no reenvio seria o pior desfecho do gesto mais importante da
+         * casa.
+         */
+        por(proposta({ id: "p1" }));
+        dados.emitidoEm = DEPOIS;
+        dados.cortadoEm = CORTE;
+        expect((await propostaDoLink(endereco()))?.proposta.id).toBe("p1");
+      });
+    });
+  }
+
+  it("o corte é por PEDIDO: não se escapa pela revisão seguinte", async () => {
+    /**
+     * Nesta casa uma revisão é uma proposta NOVA, e este ficheiro salta da
+     * proposta do token para a irmã mais recente do mesmo pedido. Um corte por
+     * proposta deixaria as irmãs abertas — e o próprio salto trataria de as ir
+     * buscar. É o defeito mais fácil de introduzir aqui, e o mais silencioso.
+     */
+    por(
+      proposta({ id: "p1", quoteId: "q1", createdAt: "2026-01-01T10:00:00.000Z" }),
+      proposta({ id: "p2", quoteId: "q1", createdAt: "2026-02-01T10:00:00.000Z" }),
+    );
+    dados.emitidoEm = ANTES;
+    dados.cortadoEm = null;
+    // Sem corte, o link salta mesmo para a revisão — é o comportamento de sempre.
+    expect((await propostaDoLink("bom"))?.proposta.id).toBe("p2");
+
+    dados.cortadoEm = CORTE;
+    expect(
+      await propostaDoLink("bom"),
+      "cortou-se o pedido e o link ainda chega à revisão seguinte",
+    ).toBeNull();
+  });
+
+  it("um link de idade desconhecida morre com o corte", async () => {
+    /**
+     * `emitidoEm` indefinido é um token tão antigo que nem se lhe consegue
+     * deduzir a idade. Depois de alguém mandar cortar, é exactamente o que se
+     * quis cortar — e na dúvida fecha-se, que é o lado seguro deste botão.
+     */
+    por(proposta({ id: "p1" }));
+    dados.emitidoEm = undefined;
+    dados.cortadoEm = CORTE;
+    expect(await propostaDoLink("bom")).toBeNull();
+  });
+
+  it("sem corte, um link de idade desconhecida continua a abrir", async () => {
+    // O contrário do de cima, e é o que garante que isto não parte os links
+    // antigos de toda a gente por causa de uma dedução que falhou.
+    por(proposta({ id: "p1" }));
+    dados.emitidoEm = undefined;
+    dados.cortadoEm = null;
+    expect((await propostaDoLink("bom"))?.proposta.id).toBe("p1");
+  });
+
+  it("uma proposta sem pedido não pode ser cortada — e continua a abrir", async () => {
+    /**
+     * `quote_id` é `on delete set null`, portanto uma proposta órfã é um estado
+     * real. Não há pedido a que o carimbo pertença, e inventar um seria cortar
+     * links por engano.
+     */
+    por(proposta({ id: "p1", quoteId: "" }));
+    dados.emitidoEm = ANTES;
+    dados.cortadoEm = CORTE;
+    expect((await propostaDoLink("bom"))?.proposta.id).toBe("p1");
   });
 });

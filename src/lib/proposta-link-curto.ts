@@ -207,14 +207,19 @@ export async function criarLigacaoCurta(
  * do casal mostra a mesma frase para um link inválido e para um que expirou, e
  * dizer qual é dos dois só ajudaria quem estivesse a adivinhar códigos.
  */
-export async function lerLigacaoCurta(codigo: string): Promise<{ propostaId: string } | null> {
+export async function lerLigacaoCurta(
+  codigo: string,
+): Promise<{ propostaId: string; criadaEm: string } | null> {
   if (!pareceCodigoCurto(codigo)) return null;
   try {
     const g = await getState<LigacaoCurta>(chave(codigo));
     if (!g?.propostaId) return null;
     if (g.revogadaEm) return null;
     if (g.expiraEm && Date.parse(g.expiraEm) < Date.now()) return null;
-    return { propostaId: g.propostaId };
+    // `criadaEm` sai daqui porque o corte de links precisa de saber a idade
+    // deste endereço: morre o que foi emitido ANTES do corte, e esta é a única
+    // fonte dessa data para a porta do código curto.
+    return { propostaId: g.propostaId, criadaEm: g.criadaEm };
   } catch (e) {
     // Uma leitura que falha NÃO é um link inválido. Mas também não há como
     // abrir a proposta sem ela, portanto o desfecho é o mesmo — o que muda é

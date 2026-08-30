@@ -519,6 +519,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/[id]/tempo-activo/route", methods: ["GET", "POST"] },
   // O histórico devolve o que se cobrou em cada ronda de negociação, e com
   // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
+  // Cortar os links já enviados de um pedido. É a rota que fecha uma porta do
+  // lado do casal, e o GET diz se e quando já foi cortada — as duas coisas são
+  // do back office e nenhuma pode ser feita, nem lida, por quem tem só o link.
+  { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
   // A memória de preços atravessa TODAS as propostas já enviadas: o que se
   // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa

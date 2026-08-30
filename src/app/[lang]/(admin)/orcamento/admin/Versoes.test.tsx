@@ -36,6 +36,12 @@ const V2: VersaoEnviada = {
 /** O documento da última enviada, que a rota devolve com `?doc=`. */
 const ULTIMO = doc({ totalAmount: 9500, budgetItems: ["Flores"], budgetAmounts: [1800] });
 
+/** O corte que a rota `/links` devolve, e o que ela faz quando se corta. */
+let corteGuardado: { cortadoEm: string; por?: string } | null = null;
+let oCorteFalha = false;
+/** Tudo o que saiu — é onde se lê se o corte foi mesmo pedido ao servidor. */
+let pedidos: Array<{ url: string; metodo: string }> = [];
+
 function montar(
   versoes: VersaoEnviada[],
   noEcra: ProposalDoc,
@@ -44,8 +50,28 @@ function montar(
 ) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: { method?: string }) => {
       const u = String(url);
+      const metodo = init?.method ?? "GET";
+      pedidos.push({ url: u, metodo });
+      if (u.includes("/links")) {
+        if (metodo === "POST") {
+          if (oCorteFalha) {
+            return {
+              ok: false,
+              status: 503,
+              json: async () => ({
+                ok: false,
+                cortado: false,
+                erro: "Não consegui cortar: o armazenamento recusou a escrita, e os links continuam a abrir.",
+              }),
+            };
+          }
+          corteGuardado = { cortadoEm: "2026-03-10T12:00:00.000Z", por: "Ana" };
+          return { ok: true, status: 200, json: async () => ({ ok: true, corte: corteGuardado }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true, corte: corteGuardado }) };
+      }
       if (u.includes("?doc=")) {
         const id = u.split("?doc=")[1];
         if (!versoes.some((v) => v.id === id)) {
@@ -71,6 +97,9 @@ function montar(
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  corteGuardado = null;
+  oCorteFalha = false;
+  pedidos = [];
 });
 
 describe("quando não há envios", () => {
@@ -246,5 +275,110 @@ describe("repor", () => {
     // A resposta atrasada não pode voltar a escrever no estúdio.
     expect(onRestaurar).toHaveBeenCalledTimes(1);
     expect(onRestaurar).toHaveBeenLastCalledWith(DOC_V1);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CORTAR OS LINKS JÁ ENVIADOS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A alavanca vive aqui porque é aqui que está a lista do que já seguiu para o
+ * casal — a pergunta «e se eu quiser fechar aquele link?» nasce a olhar para
+ * essa lista.
+ *
+ * O que estes testes prendem é sobretudo o que o botão NÃO pode fazer: não
+ * pode aparecer antes de haver envios, não pode cortar sem perguntar com o que
+ * se perde à vista, e — a mais importante — não pode dizer que cortou quando
+ * não cortou.
+ */
+describe("cortar os links já enviados", () => {
+  it("não aparece antes de haver envios", async () => {
+    montar([], doc({}));
+    // Cortar links que não existem é uma pergunta sem sentido, e um botão
+    // perigoso a mais num ecrã que ainda não tem nada para proteger.
+    await waitFor(() => expect(screen.queryByText(/Cortar os links/i)).toBeNull());
+  });
+
+  it("aparece quando já seguiu alguma coisa", async () => {
+    montar([V1], doc({}));
+    expect(await screen.findByRole("button", { name: /Cortar os links enviados/i })).toBeTruthy();
+  });
+
+  it("pergunta primeiro, com o que se perde escrito", async () => {
+    montar([V1], doc({}));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Cortar os links enviados/i }));
+
+    // A pergunta nomeia o que acontece — não é um «tens a certeza?».
+    expect(await screen.findByText(/Cortar os links desta proposta\?/i)).toBeTruthy();
+    expect(document.body.textContent).toMatch(/deixam de abrir/i);
+    expect(document.body.textContent).toMatch(/link inválido/i);
+    // E diz como voltar a dar acesso, que é a pergunta seguinte de quem lê.
+    expect(document.body.textContent).toMatch(/envia a proposta/i);
+  });
+
+  it("não corta nada enquanto não se confirmar", async () => {
+    montar([V1], doc({}));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Cortar os links enviados/i }));
+    await screen.findByText(/Cortar os links desta proposta\?/i);
+    expect(
+      pedidos.some((p) => p.url.includes("/links") && p.metodo === "POST"),
+      "abrir a pergunta já cortou os links",
+    ).toBe(false);
+  });
+
+  it("confirmado, corta e passa a dizer quando e por quem", async () => {
+    montar([V1], doc({}));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Cortar os links enviados/i }));
+    await user.click(await screen.findByRole("button", { name: /^Cortar os links$/i }));
+
+    await waitFor(() =>
+      expect(pedidos.some((p) => p.url.includes("/links") && p.metodo === "POST")).toBe(true),
+    );
+    const texto = await screen.findByText(/foram cortados a/i);
+    expect(texto.textContent).toMatch(/por Ana/);
+    // E diz o que fazer a seguir, que é o que evita o telefonema.
+    expect(texto.textContent).toMatch(/próximo envio cunha um endereço novo/i);
+  });
+
+  it("QUANDO NÃO CONSEGUE CORTAR, di-lo — e não finge que cortou", async () => {
+    /**
+     * É a regra mais importante deste ecrã. Dizer «cortado» a quem carregou no
+     * botão, com o carimbo por gravar, é mandá-la seguir a vida a pensar que
+     * fechou uma porta que continua aberta. A frase do servidor é a que diz
+     * que os links CONTINUAM a abrir, e é essa que tem de chegar ao ecrã.
+     */
+    oCorteFalha = true;
+    montar([V1], doc({}));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Cortar os links enviados/i }));
+    await user.click(await screen.findByRole("button", { name: /^Cortar os links$/i }));
+
+    expect(await screen.findByText(/continuam a abrir/i)).toBeTruthy();
+    expect(screen.queryByText(/foram cortados a/i), "disse que cortou sem ter cortado").toBeNull();
+    // E o botão continua lá, para se poder tentar outra vez.
+    expect(screen.getByRole("button", { name: /Cortar os links enviados/i })).toBeTruthy();
+  });
+
+  it("já cortado, não oferece cortar outra vez", async () => {
+    corteGuardado = { cortadoEm: "2026-03-10T12:00:00.000Z", por: "Ana" };
+    montar([V1], doc({}));
+    expect(await screen.findByText(/foram cortados a/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Cortar os links enviados/i })).toBeNull();
+  });
+
+  it("NÃO há botão de voltar a abrir", async () => {
+    /**
+     * É uma decisão, e não um esquecimento: reabrir devolveria a vida ao
+     * endereço que já anda por aí, que é precisamente o que se quis fechar. A
+     * maneira de dar acesso outra vez é enviar — que cunha um endereço novo.
+     */
+    corteGuardado = { cortadoEm: "2026-03-10T12:00:00.000Z" };
+    montar([V1], doc({}));
+    await screen.findByText(/foram cortados a/i);
+    expect(screen.queryByRole("button", { name: /reabrir|voltar a abrir|activar/i })).toBeNull();
   });
 });
