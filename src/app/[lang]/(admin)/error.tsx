@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { log } from "@/lib/logger";
 import { Button } from "./orcamento/admin/ui";
+import { relatarErro } from "./orcamento/admin/relatar-erro";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -51,16 +52,17 @@ import { Button } from "./orcamento/admin/ui";
  * atrás de um «detalhes técnicos», porque quem o lê é a equipa, não um
  * visitante a quem se queira poupar o susto.
  *
- * ── O QUE ESTE ECRÃ AINDA NÃO FAZ ─────────────────────────────────────────
+ * ── E O ERRO CHEGA A QUEM O POSSA LER ─────────────────────────────────────
  *
- * Não faz chegar o erro a lado nenhum. O `log.error` daqui morre na consola do
- * telemóvel: o transporte para fora está preso a uma variável de ambiente sem
- * `NEXT_PUBLIC_`, portanto é `undefined` no browser. Ou seja: hoje, um erro no
- * iPhone dela só se sabe se ela o contar.
+ * Este bloco do cabeçalho dizia, quando o ecrã nasceu, que isso ainda NÃO
+ * acontecia: o `log.error` daqui morre na consola do telemóvel, porque o
+ * transporte para fora está preso a uma variável sem `NEXT_PUBLIC_`. «Hoje, um
+ * erro no iPhone dela só se sabe se ela o contar.»
  *
- * Isso é uma correcção com outro tamanho — mexe no transporte e no que se pode
- * ou não mandar para fora sem levar dados de casais atrás — e vai num bloco
- * próprio. Fica dito aqui para não se pensar que já está resolvido.
+ * Já não é assim. O `relatarErro` manda-o para `api/admin/erro-do-cliente`,
+ * que o escreve pelo mesmo `log.error` do servidor — e portanto pela mesma
+ * redacção do RGPD, que apaga emails, telefones e tokens antes de qualquer
+ * coisa sair. Sem serviço externo, sem dependência nova, sem variável nova.
  */
 export default function ErroDoBackOffice({
   error,
@@ -73,6 +75,19 @@ export default function ErroDoBackOffice({
 
   useEffect(() => {
     log.error("ecrã do back office parou", error);
+    /**
+     * ── E AGORA O ERRO CHEGA A ALGUÉM QUE O POSSA LER ────────────────────
+     *
+     * O `log.error` acima morre na consola do telemóvel: o transporte para
+     * fora está preso a uma variável sem `NEXT_PUBLIC_`. Era a lacuna que
+     * ficou escrita no cabeçalho deste ficheiro quando ele nasceu — «hoje, um
+     * erro no iPhone dela só se sabe se ela o contar».
+     *
+     * O `relatarErro` manda-o para uma rota nossa, que o escreve no registo da
+     * casa passando pela redacção do RGPD que já existe. Não espera, não
+     * lança, e não leva o estado da página atrás.
+     */
+    relatarErro(error, error.digest);
   }, [error]);
 
   /** A marca que liga este ecrã ao registo do servidor. */
@@ -103,9 +118,9 @@ export default function ErroDoBackOffice({
         </p>
 
         <p className="text-[var(--bo-text-muted)] mb-6 text-sm leading-relaxed">
-          Tenta desenhar outra vez. Se voltar a acontecer, recarrega. E se tinhas coisas por
-          gravar, o <strong className="font-medium">Guardar tudo</strong> na barra de cima diz quais
-          são, pelo nome.
+          Tenta desenhar outra vez. Se voltar a acontecer, recarrega. E se tinhas coisas por gravar,
+          o <strong className="font-medium">Guardar tudo</strong> na barra de cima diz quais são,
+          pelo nome.
         </p>
 
         <div className="flex flex-wrap gap-2">

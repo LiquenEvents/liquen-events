@@ -525,6 +525,9 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // Quem trabalha aqui. Saber os nomes da equipa de uma empresa não é
   // informação pública — um endereço aberto a listá-los é meio caminho para
   // tentar entrar com um deles.
+  // O relato de um erro do browser. Escreve no registo da casa — uma rota
+  // aberta a fazê-lo é um megafone para quem a encontrar.
+  { path: "./admin/erro-do-cliente/route", methods: ["POST"] },
   { path: "./admin/equipa/route", methods: ["GET"] },
   { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
