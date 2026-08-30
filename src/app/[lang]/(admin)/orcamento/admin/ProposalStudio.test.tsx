@@ -497,6 +497,118 @@ const renderStudio = () =>
  * Estes testes prendem as duas metades: que a barra aparece e diz de quem e de
  * quando, e que o botão vai à GAVETA CERTA e traz o documento de volta.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A NOTA QUE PERTENCE A UMA SECÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo `notasPorSeccao` existia há muito, e bem tratado em três sítios: o
+ * tipo no documento, o guarda do gerador do PDF («as notas por secção nunca são
+ * desenhadas», com teste próprio em `notas-internas-ficam-em-casa.test.ts`) e a
+ * limpeza ao copiar para outro pedido.
+ *
+ * Três sítios a cuidar de uma coisa que NINGUÉM ESCREVIA: não havia caixa
+ * nenhuma no estúdio. Era uma funcionalidade inteira, acabada e protegida, sem
+ * porta de entrada.
+ *
+ * O `notasInternas` que já existia é sobre o negócio inteiro («recusaram em
+ * 2025 por preço») e vive na primeira secção. Estas são outra escala — «as
+ * capas são as duas do mesmo ângulo», «esta linha é a que dá a margem toda» —
+ * e o ponto é estarem onde a dúvida nasce.
+ */
+describe("notas presas a cada secção", () => {
+  const seccoes = [
+    "Nota sobre as capas",
+    "Nota sobre os serviços",
+    "Nota sobre os mood boards",
+    "Nota sobre o orçamento",
+    "Nota sobre o total",
+  ];
+
+  it("cada secção do trabalho tem a sua caixa", async () => {
+    renderStudio();
+    for (const titulo of seccoes) {
+      expect(
+        await screen.findByLabelText(new RegExp(titulo, "i")),
+        `falta a caixa de «${titulo}»`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("a secção do Evento NÃO ganha uma segunda caixa", async () => {
+    /**
+     * Ali já vive a nota do negócio inteiro. Duas caixas amarelas na mesma
+     * secção, uma por baixo da outra, seriam duas gavetas para a mesma coisa —
+     * e quem escrevesse na de baixo perdia a nota que a proposta seguinte
+     * herda.
+     */
+    renderStudio();
+    await screen.findByLabelText(/Notas internas/i);
+    expect(screen.queryByLabelText(/Nota sobre o evento/i)).toBeNull();
+  });
+
+  it("o que se escreve fica guardado na chave daquela secção", async () => {
+    renderStudio();
+    const user = userEvent.setup();
+    const caixa = await screen.findByLabelText(/Nota sobre o orçamento/i);
+    await user.type(caixa, "A margem toda está na linha das flores.");
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    const gravado = corpos("proposta-rascunho").at(-1) ?? "";
+    expect(gravado).toContain("notasPorSeccao");
+    expect(gravado).toContain("A margem toda está na linha das flores.");
+    // E na chave certa — uma nota do orçamento guardada como sendo das capas
+    // aparecia na secção errada seis meses depois.
+    expect(JSON.parse(gravado).doc.notasPorSeccao.orcamento).toContain("margem toda");
+  });
+
+  it("apagar a nota TIRA a chave, em vez de deixar um vazio", async () => {
+    /**
+     * Seis caixas que gravassem `""` punham seis chaves sem conteúdo em todos
+     * os documentos — e faziam a comparação de versões e o resgate acusarem
+     * diferenças que não existem. Um documento sem notas tem de ficar
+     * exactamente como era antes de isto existir.
+     */
+    renderStudio();
+    const user = userEvent.setup();
+    const caixa = await screen.findByLabelText(/Nota sobre as capas/i);
+    await user.type(caixa, "trocar a segunda");
+    await waitFor(
+      () => expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("trocar a segunda"),
+      {
+        timeout: 4000,
+      },
+    );
+    pedidos = [];
+    await user.clear(caixa);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    const depois = JSON.parse(corpos("proposta-rascunho").at(-1)!).doc;
+    expect(depois.notasPorSeccao, "ficou uma gaveta vazia no documento").toBeUndefined();
+  });
+
+  it("uma nota só com espaços não entra no documento", async () => {
+    /**
+     * Escrever espaços não provoca gravação nenhuma — e isso é a resposta
+     * certa, não uma falha: o documento não mudou, portanto não há o que
+     * gravar. A regra que interessa é a outra, e é esta: espaços em branco
+     * nunca podem chegar ao documento como se fossem uma nota.
+     */
+    renderStudio();
+    const user = userEvent.setup();
+    const caixa = await screen.findByLabelText(/Nota sobre o total/i);
+    await user.type(caixa, "   ");
+    // Tempo de sobra para uma gravação automática, se ela chegasse a existir.
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(
+      corpos("proposta-rascunho").some((c) => c.includes("notasPorSeccao")),
+      "espaços em branco entraram no documento como se fossem uma nota",
+    ).toBe(false);
+  });
+});
+
 describe("o trabalho que uma gravação esmagou", () => {
   /** Uma gravação que sobrepôs alguém, tal como o servidor a responde. */
   function gravacaoQueSobrepos(opcoes: { resgate?: string; quem?: string } = {}) {
@@ -7115,10 +7227,27 @@ describe("o email do passo 3 viaja com o envio", () => {
  */
 describe("as notas internas vivem no estúdio", () => {
   it("o campo está montado e diz que não sai na proposta", () => {
+    /**
+     * O `getByText` desta garantia era único quando havia UMA caixa. Desde que
+     * cada secção passou a ter a sua, a mesma frase aparece seis vezes — e
+     * deve mesmo: é ela a garantia, e uma caixa amarela sem ela ao lado de
+     * campos que SAEM na proposta é precisamente a confusão que este
+     * componente existe para evitar.
+     *
+     * Por isso a regra passa a dizer DE QUAL fala: a frase tem de estar no
+     * rótulo do campo, que é onde um leitor de ecrã a vai buscar.
+     */
     seedDraft(0);
     renderStudio();
-    expect(screen.getByLabelText(/Notas internas/)).toBeTruthy();
-    expect(screen.getByText(/só para ti, nunca sai na proposta/)).toBeTruthy();
+    const campo = screen.getByLabelText(/Notas internas/);
+    expect(campo).toBeTruthy();
+    expect(
+      campo.getAttribute("aria-label") ??
+        document.querySelector(`label[for="${campo.id}"]`)?.textContent ??
+        "",
+    ).toMatch(/só para ti, nunca sai na proposta/);
+    // E continua a haver uma por cada caixa, e não uma solitária.
+    expect(screen.getAllByText(/só para ti, nunca sai na proposta/).length).toBeGreaterThan(1);
   });
 
   it("o que se escreve na nota entra no rascunho gravado", async () => {

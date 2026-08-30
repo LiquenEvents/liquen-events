@@ -4340,6 +4340,51 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *     para a mesma gaveta. Ou seja, o resgate protege nos dois sentidos sem
    *     ninguém ter escrito código para isso.
    */
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A NOTA QUE PERTENCE A UMA SECÇÃO, E NÃO AO NEGÓCIO INTEIRO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O campo `notasPorSeccao` existia há muito: tipado no documento, protegido
+   * no gerador do PDF («as notas por secção nunca são desenhadas»), e limpo na
+   * cópia para outro pedido — três sítios a tratar bem de uma coisa que
+   * NINGUÉM ESCREVIA. Não havia caixa nenhuma no estúdio.
+   *
+   * O `notasInternas` que já existe é sobre o negócio: «recusaram em 2025 por
+   * preço». Estas são outra coisa e vivem noutra escala: «as capas são as duas
+   * do mesmo ângulo, trocar a segunda», «o cronograma tem de bater com a hora
+   * do padre», «esta linha é a que dá a margem toda». Escritas ao lado do
+   * campo geral, perdiam-se num parágrafo; escritas na secção, estão onde a
+   * dúvida nasce.
+   *
+   * ── E O DOCUMENTO NÃO PODE ENCHER-SE DE VAZIOS ─────────────────────────
+   *
+   * Uma caixa vazia por secção que gravasse `""` punha seis chaves em todos os
+   * documentos, todas sem conteúdo, e ainda por cima faziam o `resgate` e as
+   * comparações de versões acusarem diferenças que não existem. Apagar a
+   * entrada quando a nota fica vazia é o que mantém o documento igual ao que
+   * era antes desta funcionalidade existir — e é isso que o teste prende.
+   */
+  function notaDaSeccao(chave: string, titulo: string) {
+    const notas = doc.notasPorSeccao ?? {};
+    return (
+      <NotasInternas
+        compacta
+        titulo={titulo}
+        valor={notas[chave] ?? ""}
+        placeholder="Só para a equipa. Nunca sai na proposta."
+        onChange={(v) => {
+          const seguintes = { ...notas };
+          if (v.trim()) seguintes[chave] = v;
+          else delete seguintes[chave];
+          patch({
+            notasPorSeccao: Object.keys(seguintes).length > 0 ? seguintes : undefined,
+          });
+        }}
+      />
+    );
+  }
+
   async function reporSobreposto() {
     if (!sobreposto || aRepor) return;
     setARepor(true);
@@ -7565,7 +7610,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section title="Imagens de capa (2)" id="capas">
+          <Section
+            title="Imagens de capa (2)"
+            id="capas"
+            rodape={notaDaSeccao("capas", "Nota sobre as capas")}
+          >
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -7681,7 +7730,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos">
+          <Section
+            title="Serviços"
+            id="servicos"
+            rodape={notaDaSeccao("servicos", "Nota sobre os serviços")}
+          >
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -7701,7 +7754,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
+            <Section
+              title="Mood boards"
+              id="moodboards"
+              nota={contagemDosBoards}
+              rodape={notaDaSeccao("moodboards", "Nota sobre os mood boards")}
+            >
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -8723,7 +8781,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section title="Cronograma de Organização" id="cronograma">
+            <Section
+              title="Cronograma de Organização"
+              id="cronograma"
+              rodape={notaDaSeccao("cronograma", "Nota sobre o cronograma")}
+            >
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -8796,7 +8858,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section title="Orçamento Proposto" id="orcamento">
+          <Section
+            title="Orçamento Proposto"
+            id="orcamento"
+            rodape={notaDaSeccao("orcamento", "Nota sobre o orçamento")}
+          >
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -9644,7 +9710,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section title="Total, IVA e validade" id="total">
+          <Section
+            title="Total, IVA e validade"
+            id="total"
+            rodape={notaDaSeccao("total", "Nota sobre o total")}
+          >
             <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
               {/**
                * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
@@ -11746,12 +11816,27 @@ function Section({
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
   accao,
+  /**
+   * O que fica no FUNDO da secção, depois do conteúdo — hoje, a nota interna
+   * daquela secção.
+   *
+   * ── PORQUE É UMA RANHURA DA SECÇÃO E NÃO MAIS UM FILHO ──────────────────
+   *
+   * Podia ser escrito como último filho em cada uma das seis. Seria a mesma
+   * coisa até ao dia em que uma delas ficasse com a nota no meio do conteúdo
+   * — e uma nota interna que aparece onde calha, ao pé de campos que SAEM na
+   * proposta, é exactamente o que o papel amarelo do `NotasInternas` existe
+   * para evitar. A ranhura garante que está sempre no mesmo sítio, por baixo
+   * de tudo, e que se dobra com a secção como o resto.
+   */
+  rodape,
 }: {
   title: string;
   children: React.ReactNode;
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
+  rodape?: React.ReactNode;
 }) {
   const [fechada, setFechada] = useState(false);
 
@@ -11814,6 +11899,7 @@ function Section({
           no formulário, e fechá-la não pode apagar o que lá está escrito. */}
       <div id={corpoId} hidden={fechada}>
         {children}
+        {rodape}
       </div>
     </Card>
   );
