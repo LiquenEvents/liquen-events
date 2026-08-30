@@ -252,6 +252,10 @@ let rascunhoDoEmail: Record<string, unknown> | null = {
 };
 /** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
 let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
+/** O que está na GAVETA DO RESGATE (`?variante=sobreposto`). É de propósito
+ *  uma variável à parte de `rascunhoServidor`: o defeito que isto prende era
+ *  precisamente as duas serem lidas como se fossem a mesma. */
+let rascunhoSobreposto: { doc: unknown; updatedAt: string } | null = null;
 /**
  * Um portão para segurar a LEITURA do rascunho.
  *
@@ -340,9 +344,14 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     // que decide se o estúdio pode reenviar o que tem preso no navegador.
     if (metodo === "GET") {
       if (portaoDoRascunho) await portaoDoRascunho;
-      return leituraDoRascunhoFalha
-        ? reply({ ok: false })
-        : reply({ json: { ok: true, draft: rascunhoServidor } });
+      if (leituraDoRascunhoFalha) return reply({ ok: false });
+      // A gaveta do resgate é OUTRA gaveta. Devolver aqui o rascunho do
+      // estúdio é exactamente o que o servidor fazia antes de a porta existir,
+      // e um duplo que não distinga as duas não testa porta nenhuma.
+      const querResgate = /[?&]variante=/.test(url);
+      return reply({
+        json: { ok: true, draft: querResgate ? rascunhoSobreposto : rascunhoServidor },
+      });
     }
     if (metodo === "PUT") return gravacaoDoRascunho();
     return reply({ ok: false });
@@ -388,6 +397,7 @@ beforeEach(() => {
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   rascunhoServidor = null;
+  rascunhoSobreposto = null;
   portaoDoRascunho = null;
   abrirPortaoDoRascunho = null;
   gravacaoDoRascunho = () =>
@@ -463,6 +473,203 @@ const renderStudio = () =>
  * não viu o que ia perder, e a resposta certa é quase sempre "sim" — por isso
  * carrega-se sem ler. A anulação pergunta DEPOIS, com o estrago à vista.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TRABALHO ESMAGADO TEM DE TER PORTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O cenário, que já aconteceu: a Ana abre o estúdio de manhã e deixa o
+ * separador aberto. A Catarina abre a MESMA proposta à tarde noutro
+ * computador, compõe dois mood boards e escreve os textos. A Ana volta ao
+ * portátil e escreve um carácter. Oitocentos milissegundos depois, o documento
+ * das nove da manhã é gravado por cima do das quatro da tarde.
+ *
+ * O servidor sempre fez a parte difícil: guarda a versão que ia desaparecer
+ * numa gaveta irmã e devolve o nome dela em `resgate`. A regra da casa — «se
+ * falhar, não perder trabalho» — estava cumprida onde importa.
+ *
+ * O que faltava era tudo o resto. O estúdio lia `overwrote` e `previousBy`,
+ * ignorava o `resgate`, e dizia «Ficou a tua versão.» — a frase que faz quem a
+ * lê concluir, com toda a razão, que as duas horas da outra pessoa acabaram.
+ * E mesmo que soubesse, não havia como lá chegar: a lista de gavetas que a
+ * leitura aceitava não tinha esta lá dentro.
+ *
+ * Estes testes prendem as duas metades: que a barra aparece e diz de quem e de
+ * quando, e que o botão vai à GAVETA CERTA e traz o documento de volta.
+ */
+describe("o trabalho que uma gravação esmagou", () => {
+  /** Uma gravação que sobrepôs alguém, tal como o servidor a responde. */
+  function gravacaoQueSobrepos(opcoes: { resgate?: string; quem?: string } = {}) {
+    const { resgate = "q1--sobreposto", quem = "Catarina" } = opcoes;
+    gravacaoDoRascunho = () =>
+      reply({
+        json: {
+          ok: true,
+          guardado: true,
+          updatedAt: new Date().toISOString(),
+          overwrote: true,
+          previousBy: quem,
+          ...(resgate ? { resgate, resgateEm: "2026-07-28T15:30:00.000Z" } : {}),
+        },
+      });
+  }
+
+  /** Um rascunho com conteúdo, para haver onde escrever. */
+  function semear() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Igreja" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      }),
+    );
+  }
+
+  /** Escreve alguma coisa, para a gravação automática disparar. */
+  async function mexerNoDocumento(user: ReturnType<typeof userEvent.setup>) {
+    const campo = await screen.findByDisplayValue("Decoração Floral");
+    await user.type(campo, "!");
+  }
+
+  it("a barra aparece, e diz de quem era e de quando", async () => {
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+
+    const barra = await screen.findByText(
+      /A versão de Catarina ficou guardada/i,
+      {},
+      {
+        timeout: 4000,
+      },
+    );
+    expect(barra).toBeTruthy();
+    // A hora importa: é o que dá a noção do que está em jogo antes de decidir.
+    expect(document.body.textContent).toMatch(/às \d/);
+  });
+
+  it("o aviso deixa de dizer que ficou só a tua versão, e ponto", async () => {
+    /**
+     * A frase antiga era verdadeira e mesmo assim a pior possível: fechava a
+     * porta. Quem a lia não tinha razão nenhuma para procurar mais.
+     */
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+    expect(document.body.textContent).toMatch(/a outra está guardada/i);
+  });
+
+  it("REPOR vai à GAVETA DO RESGATE, e não ao rascunho do estúdio", async () => {
+    /**
+     * É esta a regra que prende a porta. Antes, um pedido com `?variante=`
+     * caía no rascunho do estúdio — ou seja, «repor» devolvia exactamente o
+     * documento que estava no ecrã, e o trabalho da outra pessoa continuava
+     * inalcançável.
+     */
+    rascunhoServidor = {
+      doc: { ref: "o que está no ecrã" },
+      updatedAt: "2026-07-28T16:00:00.000Z",
+    };
+    rascunhoSobreposto = {
+      doc: {
+        template: "decoracao",
+        ref: "AS DUAS HORAS DA CATARINA",
+        serviceGroups: [{ letter: "a)", title: "Cerimónia ao pôr do sol", items: [] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      },
+      updatedAt: "2026-07-28T15:30:00.000Z",
+    };
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+    await user.click(screen.getByRole("button", { name: /Repor essa versão/i }));
+
+    // Foi à gaveta certa.
+    await waitFor(() =>
+      expect(
+        pedidos.some((p) => p.url.includes("proposta-rascunho") && p.url.includes("variante=")),
+        "o «repor» não pediu a variante: foi buscar o rascunho do estúdio",
+      ).toBe(true),
+    );
+    // E o documento voltou mesmo.
+    expect(await screen.findByDisplayValue("Cerimónia ao pôr do sol")).toBeTruthy();
+  });
+
+  it("repor pode ser anulado — é um gesto que substitui o documento", async () => {
+    rascunhoSobreposto = {
+      doc: {
+        template: "decoracao",
+        ref: "a versão da Catarina",
+        serviceGroups: [{ letter: "a)", title: "Cerimónia ao pôr do sol", items: [] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      },
+      updatedAt: "2026-07-28T15:30:00.000Z",
+    };
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+    await user.click(screen.getByRole("button", { name: /Repor essa versão/i }));
+    await screen.findByDisplayValue("Cerimónia ao pôr do sol");
+    // A mesma rede dos outros gestos que deitam fora o que estava no ecrã.
+    expect(await screen.findByText(/Pode anular durante/i)).toBeTruthy();
+  });
+
+  it("dispensar tira o lembrete e não vai ao servidor — nada se apaga", async () => {
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+
+    pedidos = [];
+    await user.click(screen.getByRole("button", { name: /Dispensar o aviso/i }));
+    expect(screen.queryByText(/ficou guardada/i)).toBeNull();
+    expect(
+      pedidos.some((p) => p.init?.method === "DELETE"),
+      "dispensar o lembrete apagou alguma coisa no servidor",
+    ).toBe(false);
+  });
+
+  it("sem gaveta, não promete o que não pode cumprir", async () => {
+    /**
+     * O servidor pode não conseguir guardar a cópia (e regista-o). Nesse caso
+     * a frase antiga é a honesta, e não pode aparecer barra nenhuma a oferecer
+     * um resgate que não existe.
+     */
+    gravacaoQueSobrepos({ resgate: undefined });
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    expect(screen.queryByRole("button", { name: /Repor essa versão/i })).toBeNull();
+  });
+});
+
 describe("limpar o rascunho pode ser anulado", () => {
   function seedComConteudo() {
     localStorage.setItem(
