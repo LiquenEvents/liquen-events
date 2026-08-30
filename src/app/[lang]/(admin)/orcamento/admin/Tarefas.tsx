@@ -5,7 +5,15 @@ import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
-import { Button, Card, EmptyState, Field, MenuDeAccoes, type AccaoDeItem } from "./ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  MenuDeAccoes,
+  PerguntaDestrutiva,
+  type AccaoDeItem,
+} from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { corDeTexto, metaFor } from "./status-meta";
@@ -291,6 +299,19 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
 
+  /**
+   * ── A PERGUNTA DE ELIMINAR ────────────────────────────────────────────
+   *
+   * O que estava aqui era `confirm('Eliminar a tarefa "X"?')`. A caixa do
+   * browser não cabe num ecrã de 375 px, aparece no TOPO — longe do polegar,
+   * e longe da linha em que ela acabou de tocar —, diz «OK» em vez de dizer o
+   * que vai fazer, e bloqueia o fio principal enquanto está aberta.
+   *
+   * Guarda-se a tarefa e não só o `id`: o título tem de aparecer na pergunta,
+   * e a linha pode desaparecer da lista entre a pergunta e a resposta.
+   */
+  const [aEliminar, setAEliminar] = useState<Task | null>(null);
+
   // new-task form
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("normal");
@@ -514,8 +535,6 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   const remove = useCallback(
     async (id: string) => {
       const t = tasksRef.current.find((x) => x.id === id);
-      // Only confirm when there's real content to lose (skip trivial empties).
-      if (t && !confirm(`Eliminar a tarefa "${t.title}"?`)) return;
       // Guardamos a tarefa e o sítio dela, não a lista: se a eliminação for
       // recusada devolve-se ESTA linha ao lugar sem mexer no que outras
       // gravações tenham feito entretanto (ver a nota em `toggle`).
@@ -537,6 +556,30 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       }
     },
     [setTasks, gravar],
+  );
+
+  /**
+   * Perguntar primeiro, e só depois eliminar.
+   *
+   * A pergunta fica aqui e não dentro do `remove` de propósito: o `remove` é o
+   * que AGE — tira a linha, chama o servidor, repõe-na se for recusado — e
+   * misturar as duas coisas fazia com que qualquer sítio que quisesse eliminar
+   * sem perguntar (uma acção em lote, um desfazer) tivesse de contornar a
+   * caixa em vez de simplesmente não a abrir.
+   *
+   * Sem a tarefa não há nada para nomear na pergunta, e uma pergunta que não
+   * diz o que se perde não vale o toque: nesse caso elimina-se e pronto.
+   */
+  const pedirParaEliminar = useCallback(
+    (id: string) => {
+      const t = tasksRef.current.find((x) => x.id === id);
+      if (!t) {
+        void remove(id);
+        return;
+      }
+      setAEliminar(t);
+    },
+    [remove],
   );
 
   // Uma passagem só: as pessoas, e quantas tarefas por fazer tem cada uma. Antes
@@ -685,7 +728,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         overdue={!!t.dueDate && !t.done && t.dueDate < todayStr}
         onToggle={toggle}
         onEdit={startEditTask}
-        onRemove={remove}
+        onRemove={pedirParaEliminar}
       />
     );
   }
@@ -922,6 +965,25 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
           )}
         </>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar, onde o dedo já está), diálogo centrado no computador, e o
+          verbo repetido no botão em vez de «OK». */}
+      <PerguntaDestrutiva
+        aberto={!!aEliminar}
+        onFechar={() => setAEliminar(null)}
+        titulo={`Eliminar a tarefa «${aEliminar?.title ?? ""}»?`}
+        rotuloConfirmar="Eliminar"
+        // Fecha PRIMEIRO e só depois age: a lista é optimista — a linha sai
+        // logo e volta se o servidor recusar — e uma caixa aberta por cima
+        // atrasaria um gesto que hoje é instantâneo.
+        onConfirmar={() => {
+          const t = aEliminar;
+          setAEliminar(null);
+          if (t) void remove(t.id);
+        }}
+      />
     </div>
   );
 }

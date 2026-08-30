@@ -5,7 +5,7 @@ import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/ty
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
-import { Button, Card, EmptyState, Field } from "./ui";
+import { Button, Card, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -260,6 +260,15 @@ export default function Calendario({ quotes, onOpen }: Props) {
     refresh: recarregar,
   } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
   const [modalDate, setModalDate] = useState<string | null>(null);
+
+  /**
+   * A marcação à espera de resposta à pergunta de a remover.
+   *
+   * Guarda-se o título e não só o `id`, porque é o título que aparece na
+   * pergunta: numa grelha de mês, os alvos são de 9 px e a marcação em que ela
+   * tocou não é óbvia depois de a caixa abrir.
+   */
+  const [aRemover, setARemover] = useState<{ id: string; title: string } | null>(null);
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -332,9 +341,19 @@ export default function Calendario({ quotes, onOpen }: Props) {
     return true;
   }
 
+  /**
+   * Perguntar primeiro, e é aqui que a pergunta faz mais falta: o alvo de
+   * remoção é a própria marcação na grelha, com 9 px de altura, e um toque a
+   * mais numa lista apertada apaga o que estava lá.
+   *
+   * A pergunta fica fora do `deleteEvent` de propósito: esse é o que age, e
+   * quem quiser um dia remover sem perguntar não tem de contornar uma caixa.
+   */
+  function pedirParaRemover(id: string, title: string) {
+    setARemover({ id, title });
+  }
+
   async function deleteEvent(id: string, title: string) {
-    // Single-click delete is a footgun on a tiny target — confirm first.
-    if (!window.confirm(`Remover "${title}" do calendário?`)) return;
     // Optimistic remove, but put THIS event back if the server rejects the
     // delete — otherwise it silently reappears on the next reload and the team
     // never learns it failed.
@@ -796,7 +815,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         key={ev.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteEvent(ev.id, ev.title);
+                          pedirParaRemover(ev.id, ev.title);
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
@@ -922,7 +941,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       </span>
                     </span>
                     <button
-                      onClick={() => deleteEvent(ev.id, ev.title)}
+                      onClick={() => pedirParaRemover(ev.id, ev.title)}
                       aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                       className="text-foreground/35 hover:text-[#8a2a22] text-[9px] tracking-[0.15em] uppercase shrink-0 motion-safe:transition-colors"
                     >
@@ -1040,6 +1059,23 @@ export default function Calendario({ quotes, onOpen }: Props) {
           onCreate={createEvent}
         />
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
+          Folha inferior no telemóvel — ao pé do polegar, e não no topo do ecrã
+          a que o dedo teria de subir — e o verbo no botão em vez de «OK». */}
+      <PerguntaDestrutiva
+        aberto={!!aRemover}
+        onFechar={() => setARemover(null)}
+        titulo={`Remover «${aRemover?.title ?? ""}» do calendário?`}
+        rotuloConfirmar="Remover"
+        // Fecha primeiro e só depois age: a grelha é optimista — a marcação sai
+        // logo e volta se o servidor recusar.
+        onConfirmar={() => {
+          const m = aRemover;
+          setARemover(null);
+          if (m) void deleteEvent(m.id, m.title);
+        }}
+      />
     </>
   );
 }

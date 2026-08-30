@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
@@ -123,8 +123,15 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     await user.click(screen.getByRole("button", { name: "Guardar" }));
 
     // … e, à espera dela, a tarefa B é eliminada com sucesso.
+    //
+    // Eliminar deixou de ser um clique: passa pela pergunta da casa
+    // (`ui/PerguntaDestrutiva`), em vez do `confirm()` do browser que não cabe
+    // num ecrã de 375 px. O que este teste mede — a corrida entre a gravação
+    // lenta de A e a eliminação de B — não muda; muda o caminho até lá.
     const linhaB = screen.getByText("Ligar à florista").closest("div.group")!;
     await user.click(linhaB.querySelector('[aria-label="Eliminar"]') as HTMLElement);
+    const caixa = await screen.findByRole("dialog");
+    await user.click(within(caixa).getByRole("button", { name: /^Eliminar$/ }));
     await waitFor(() => expect(screen.queryByText("Ligar à florista")).not.toBeInTheDocument());
 
     recusarGravacaoDeA();
