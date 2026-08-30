@@ -2169,6 +2169,15 @@ function ThemeFolder({
   /** Onde ela cairia se a largasse agora — é o que desenha o espaço aberto. */
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  /**
+   * As fotografias à espera de resposta à pergunta de as remover.
+   *
+   * Um estado só para os dois caminhos — a foto solta e o lote seleccionado —,
+   * com o `emBloco` a dizer qual deles age. Dois estados separados seriam duas
+   * janelas a poderem abrir ao mesmo tempo.
+   */
+  const [aRemover, setARemover] = useState<{ alvos: ThemeImage[]; emBloco: boolean } | null>(null);
   /** A ação em bloco que está a decorrer (transferir ou remover), com a
    *  contagem verdadeira. `null` = nada a acontecer. */
   const [emBloco, setEmBloco] = useState<AccaoEmBloco | null>(null);
@@ -3204,21 +3213,25 @@ function ThemeFolder({
     });
   }
 
-  async function removeOne(im: ThemeImage) {
-    if (!window.confirm("Remover esta foto do tema? Esta ação não pode ser anulada.")) return;
-    await removeImages([im]);
+  /** Perguntar por uma foto solta. Quem age é o `removeImages`. */
+  function pedirParaRemoverUma(im: ThemeImage) {
+    setARemover({ alvos: [im], emBloco: false });
   }
 
-  async function removeSelected() {
+  /**
+   * Perguntar pelo lote seleccionado.
+   *
+   * Sem selecção não há pergunta nenhuma: perguntar «remover 0 fotografias?»
+   * seria pedir uma decisão sobre nada.
+   */
+  function pedirParaRemoverAsSeleccionadas() {
     const targets = images.filter((i) => selected.has(i.path));
     if (targets.length === 0) return;
-    if (
-      !window.confirm(
-        `Remover ${plural(targets.length, "foto", "fotos")} de "${theme.name}"? ` +
-          "As propostas já feitas com estas fotos não são afetadas. Esta ação não pode ser anulada.",
-      )
-    )
-      return;
+    setARemover({ alvos: targets, emBloco: true });
+  }
+
+  async function removeSelected(targets: ThemeImage[]) {
+    if (targets.length === 0) return;
     setBulkBusy(true);
     // A remoção é otimista: a grelha e a seleção esvaziam-se já, e a barra de
     // ações desaparece com elas. O cartão fica no lugar dela, no mesmo sítio
@@ -3770,7 +3783,12 @@ function ThemeFolder({
                 <Button size="sm" variant="secondary" onClick={clearSelection}>
                   Limpar seleção
                 </Button>
-                <Button size="sm" variant="danger" loading={bulkBusy} onClick={removeSelected}>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  loading={bulkBusy}
+                  onClick={pedirParaRemoverAsSeleccionadas}
+                >
                   Remover
                 </Button>
               </div>
@@ -4060,7 +4078,7 @@ function ThemeFolder({
                     </button>
                     <button
                       type="button"
-                      onClick={() => removeOne(im)}
+                      onClick={() => pedirParaRemoverUma(im)}
                       aria-label={`Remover foto ${i + 1} de ${images.length}`}
                       // Num ecrã tátil não há "passar o rato": aí o × está sempre
                       // visível, senão a foto não se conseguia remover de todo.
@@ -4095,6 +4113,35 @@ function ThemeFolder({
           </>
         )}
       </div>
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          Uma janela para os dois caminhos — a foto solta e o lote. Folha
+          inferior no telemóvel, ao pé do polegar; o verbo no botão. */}
+      <PerguntaDestrutiva
+        aberto={!!aRemover}
+        onFechar={() => setARemover(null)}
+        titulo={
+          !aRemover
+            ? ""
+            : aRemover.alvos.length === 1
+              ? "Remover esta fotografia do tema?"
+              : `Remover ${plural(aRemover.alvos.length, "fotografia", "fotografias")} de «${theme.name}»?`
+        }
+        aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
+        rotuloConfirmar={
+          aRemover && aRemover.alvos.length > 1 ? "Remover as fotografias" : "Remover a fotografia"
+        }
+        // Fecha primeiro e só depois age: a grelha é optimista, e no lote a
+        // barra de progresso toma o lugar da selecção — uma caixa por cima
+        // taparia precisamente o que diz que ainda há pedidos a caminho.
+        onConfirmar={() => {
+          const pedido = aRemover;
+          setARemover(null);
+          if (!pedido) return;
+          if (pedido.emBloco) void removeSelected(pedido.alvos);
+          else void removeImages(pedido.alvos);
+        }}
+      />
     </div>
   );
 }

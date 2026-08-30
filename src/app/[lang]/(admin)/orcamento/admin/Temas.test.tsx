@@ -9,6 +9,24 @@ import {
   THEME_PAGE_SIZE,
 } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
+
+/**
+ * Responde «sim» à pergunta da casa depois de um gesto de remover.
+ *
+ * Remover fotos deixou de passar pelo `confirm()` do browser — que não cabe num
+ * ecrã de 375 px e aparece longe do dedo. O que estes testes medem (a grelha
+ * optimista, a reposição do que o servidor recusa, a barra de progresso do
+ * lote) não muda; muda o caminho até lá.
+ */
+async function confirmarRemocao() {
+  const caixa = await screen.findByRole("dialog");
+  await act(async () => {
+    fireEvent.click(
+      within(caixa).getByRole("button", { name: /^Remover (a fotografia|as fotografias)$/ }),
+    );
+  });
+}
+
 import Temas, {
   COLUNAS,
   GRELHA_DE_FOTOS,
@@ -407,6 +425,7 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 1" }));
     });
+    await confirmarRemocao();
     // Do servidor não fica nada; o que está no ecrã é a foto que ela acabou de
     // largar, mostrada a partir do ficheiro que está no computador.
     expect(photos().filter((s) => !s?.startsWith("blob:"))).toEqual([]);
@@ -433,6 +452,7 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 1" }));
     });
+    await confirmarRemocao();
 
     // A foto nova chega primeiro; só depois se sabe que a remoção falhou.
     await release("POST /api/temas/t1/imagens");
@@ -1496,8 +1516,17 @@ describe("Biblioteca de Temas — seleção e ações em bloco", () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover" }));
     });
 
-    // Uma pergunta para as quatro — não quatro perguntas.
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    // UMA pergunta para as quatro — não quatro perguntas —, e a pergunta diz
+    // quantas são. O `confirm()` do browser deixou de ser usado: a caixa é a
+    // da casa, e é ela que se conta agora.
+    const caixa = await screen.findByRole("dialog");
+    expect(within(caixa).getByText(/4 fotografias/)).toBeTruthy();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(
+      confirmSpy,
+      "voltou o `confirm()` do browser ao gesto de remover em bloco",
+    ).not.toHaveBeenCalled();
+    await confirmarRemocao();
     expect(callsTo("DELETE /api/temas/t1/imagens")).toBe(4);
     expect(photos()).toEqual([photo(5).url]);
   });
@@ -1521,6 +1550,7 @@ describe("Biblioteca de Temas — seleção e ações em bloco", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover" }));
     });
+    await confirmarRemocao();
 
     // A que falhou volta — e volta ao seu lugar na ordem, não ao fim.
     expect(photos()).toHaveLength(4);
@@ -1615,6 +1645,7 @@ describe("Biblioteca de Temas — seleção e ações em bloco", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover" }));
     });
+    await confirmarRemocao();
 
     expect(screen.queryByText("4 fotos selecionadas")).not.toBeInTheDocument();
     expect(screen.getByText("A remover as fotos…")).toBeInTheDocument();
@@ -2711,6 +2742,7 @@ describe("a pasta de um tema diz o que mudou", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 2" }));
     });
+    await confirmarRemocao();
 
     // O buraco na grelha aparece no instante do clique, muito antes de o
     // servidor responder: é a frase que diz que a remoção PEGOU.

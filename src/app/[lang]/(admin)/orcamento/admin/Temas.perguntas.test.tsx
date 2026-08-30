@@ -24,16 +24,22 @@ import { readFileSync } from "node:fs";
  * guarda: que a pergunta é a da casa e não a do browser, e que a lista do que
  * se perde não voltou a ser uma frase espremida.
  *
+ * ── AS FOTOGRAFIAS, QUE VIERAM A SEGUIR ───────────────────────────────────
+ *
+ * Remover UMA foto e remover as SELECCIONADAS partilham uma janela só, com o
+ * `emBloco` a dizer qual dos dois caminhos age. Dois estados separados seriam
+ * duas janelas a poderem abrir ao mesmo tempo.
+ *
+ * A do lote fecha ANTES de agir por uma razão que se vê: no lote, a barra de
+ * progresso toma o lugar da selecção, e uma caixa por cima taparia exactamente
+ * o que diz que ainda há pedidos a caminho do servidor.
+ *
  * ── O QUE FICA POR CONVERTER NESTE ECRÃ ───────────────────────────────────
  *
- * Três caixas, e cada uma pela sua razão:
- *
- *   · remover UMA foto e remover as fotos SELECCIONADAS vivem no componente da
- *     pasta aberta, que é outro ficheiro de trabalho e outro bloco.
- *   · sair com fotos ainda a subir NÃO é um apagar: é uma guarda de navegação
- *     síncrona, da mesma família das três do `AdminClient`. A pergunta tem de
- *     acontecer antes de a vista se ir embora, e isso pede um desenho próprio —
- *     não uma substituição.
+ * Uma só: sair com fotos ainda a subir. NÃO é um apagar — é uma guarda de
+ * navegação síncrona, da mesma família das três do `AdminClient`. A pergunta
+ * tem de acontecer antes de a vista se ir embora, e isso pede um desenho
+ * próprio, não uma substituição.
  */
 
 const FONTE = readFileSync("src/app/[lang]/(admin)/orcamento/admin/Temas.tsx", "utf8");
@@ -84,6 +90,35 @@ describe("a pergunta de eliminar um tema", () => {
     expect(codigo, "o caso da pasta ilegível perdeu-se").toContain("imageCount === null");
     expect(codigo, "o caso da contagem truncada perdeu-se").toContain("truncated");
     expect(codigo, "o caso da pasta vazia perdeu-se").toMatch(/vazia/i);
+  });
+
+  it("as fotografias também deixaram de abrir a caixa do browser", () => {
+    const codigo = semComentarios(FONTE);
+    // As duas funções que agem não podem voltar a perguntar por dentro.
+    for (const nome of ["async function removeSelected(", "async function removeImages("]) {
+      const i = codigo.indexOf(nome);
+      expect(i, `${nome} desapareceu`).toBeGreaterThan(-1);
+      expect(
+        codigo.slice(i, codigo.indexOf("\n  }", i)),
+        `voltou o \`confirm()\` a ${nome}`,
+      ).not.toMatch(/\bconfirm\(/);
+    }
+    // E o gesto de remover uma foto solta passa a pedir, não a agir.
+    expect(codigo, "o clique numa foto voltou a remover directo").toContain(
+      "onClick={() => pedirParaRemoverUma(im)}",
+    );
+  });
+
+  it("as duas remoções de fotografias partilham UMA janela", () => {
+    // Dois estados separados seriam duas janelas a poderem abrir ao mesmo
+    // tempo — e num telemóvel isso é uma folha por cima de outra.
+    const codigo = semComentarios(FONTE);
+    expect(codigo, "o estado partilhado das fotografias desapareceu").toContain(
+      "alvos: ThemeImage[]; emBloco: boolean",
+    );
+    expect(codigo.split("<PerguntaDestrutiva").length - 1, "há mais janelas do que as duas").toBe(
+      2,
+    );
   });
 
   it("a pergunta aparece nos DOIS ramos do desenho", () => {
