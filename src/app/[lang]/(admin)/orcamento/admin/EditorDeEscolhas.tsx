@@ -242,7 +242,7 @@ export default function EditorDeEscolhas({
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h4
           className="text-[var(--bo-text)] text-[17px]"
-          style={{ fontFamily: "var(--font-playfair)" }}
+          style={{ fontFamily: "var(--font-display)" }}
         >
           À escolha do casal <span className="text-foreground/40 text-[12px]">(opcional)</span>
         </h4>

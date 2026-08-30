@@ -1459,7 +1459,7 @@ export default function Overview({
           </p>
           <h2
             className="text-foreground font-bold"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
+            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
           >
             {greeting}, {userName}.
           </h2>
@@ -1489,7 +1489,7 @@ export default function Overview({
             </span>
             <h3
               className="text-[var(--bo-text)] font-bold text-base sm:text-xl mb-2"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              style={{ fontFamily: "var(--font-display)" }}
             >
               {tudoArquivado ? "Está tudo arquivado." : "Ainda sem pedidos por aqui."}
             </h3>
@@ -1597,7 +1597,7 @@ export default function Overview({
           </p>
           <h2
             className="text-foreground font-bold"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
+            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
           >
             {greeting}, {userName}.
           </h2>
@@ -1672,7 +1672,7 @@ export default function Overview({
               </p>
               <h3
                 className="text-[var(--bo-text)] font-bold text-lg leading-tight truncate"
-                style={{ fontFamily: "var(--font-playfair)" }}
+                style={{ fontFamily: "var(--font-display)" }}
               >
                 {data.nextEvent.name}
               </h3>

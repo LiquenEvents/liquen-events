@@ -107,6 +107,12 @@ export default function FolhaDaProposta({
 
   return (
     <div
+      /* Isto é a folha que o casal recebe, e não interface do back office: o
+         marcador devolve-lhe a letra do documento verdadeiro (ver a regra
+         `[data-folha-do-cliente]` no `globals.css`). Sem ele, a prévia mudava
+         de letra quando o back office mudou, e ela passava a conferir uma
+         folha que não é a que sai. */
+      data-folha-do-cliente=""
       className={`relative w-full overflow-hidden rounded-md border ${
         daCapa ? "border-transparent" : "border-[var(--bo-hairline-strong)] bg-white"
       }`}
