@@ -1458,8 +1458,12 @@ export default function Overview({
             {dateLabel}
           </p>
           <h2
-            className="text-foreground font-bold"
-            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
+            className="text-foreground font-normal"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(26px, 3.5vw, 40px)",
+              letterSpacing: "var(--bo-tracking-display)",
+            }}
           >
             {greeting}, {userName}.
           </h2>
@@ -1488,7 +1492,7 @@ export default function Overview({
               </svg>
             </span>
             <h3
-              className="text-[var(--bo-text)] font-bold text-base sm:text-xl mb-2"
+              className="text-[var(--bo-text)] font-medium text-base sm:text-xl mb-2"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {tudoArquivado ? "Está tudo arquivado." : "Ainda sem pedidos por aqui."}
@@ -1596,8 +1600,12 @@ export default function Overview({
             {dateLabel}
           </p>
           <h2
-            className="text-foreground font-bold"
-            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
+            className="text-foreground font-normal"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "clamp(26px, 3.5vw, 40px)",
+              letterSpacing: "var(--bo-tracking-display)",
+            }}
           >
             {greeting}, {userName}.
           </h2>
@@ -1671,7 +1679,7 @@ export default function Overview({
                     : `Próximo evento · faltam ${data.nextEventDays} dias`}
               </p>
               <h3
-                className="text-[var(--bo-text)] font-bold text-lg leading-tight truncate"
+                className="text-[var(--bo-text)] font-medium text-lg leading-tight truncate"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {data.nextEvent.name}

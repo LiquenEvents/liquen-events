@@ -4297,9 +4297,10 @@ export default function AdminClient({
                     o nome da vista está sempre também na barra de baixo ou na
                     gaveta de onde se veio. */}
                 <h1
-                  className="text-[var(--bo-text)] font-bold leading-none truncate motion-safe:transition-[font-size] duration-200"
+                  className="text-[var(--bo-text)] font-medium leading-none truncate motion-safe:transition-[font-size] duration-200"
                   style={{
                     fontFamily: "var(--font-display)",
+                    letterSpacing: "var(--bo-tracking-display)",
                     // A meio de uma lista o título é o que menos falta faz —
                     // por isso é ele que encolhe primeiro.
                     fontSize: desceu ? "clamp(16px, 2.6vw, 30px)" : "clamp(19px, 2.6vw, 30px)",

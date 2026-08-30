@@ -571,7 +571,28 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      enquanto o `text-xs` — A MESMA MEDIDA — saía com 16. Ver a regra do chão,
      mais abaixo, para a conta inteira. */
   --bo-lh-caption: 1.35;
+  /* ── TRÊS APERTOS, E O NÚMERO CRESCE COM O TAMANHO ──────────────────────
+     A letra do painel é a que ela escolheu, e o que ela apontou nela foi isto:
+     «o traço estilístico mais marcante é o tracking negativo agressivo nos
+     títulos combinado com peso regular em vez de bold».
+
+     O `em` já acompanha o tamanho — 3% de 40 px são 1,2 px e de 15 px são
+     0,45 — mas não chega: o que a vista quer é que o aperto cresça MAIS
+     depressa do que a letra. Um título de 40 px aguenta 4,5% e ganha com isso;
+     o mesmo valor num rótulo de 12 px cola as letras umas às outras e é a
+     legibilidade que paga.
+
+     Daí três degraus, e não um:
+
+       TRABALHO  -0,011em  o texto corrido da interface, como já era
+       TÍTULO    -0,03em   um cabeçalho de secção, um nome de casal
+       DISPLAY   -0,045em  o título grande de uma vista, e só esse
+
+     Quem escrever um número à mão fica de fora da próxima decisão — é a mesma
+     razão de os cinzentos terem passado a cinco degraus com o número no nome. */
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
+  --bo-tracking-titulo: -0.03em;
+  --bo-tracking-display: -0.045em;
 
   /* ── UMA LETRA SÓ NO BACK OFFICE, E A SERIFA GUARDADA PARA O CLIENTE ───
      Aqui esteve, em tempos, uma redefinição da letra de display para a sans do
@@ -722,10 +743,11 @@ body:is(.admin-mode, :has([data-admin-mode])) [data-folha-do-cliente] {
   }
 }
 
-/* Display / working headings: tighter tracking for the calm modern-sans look. */
+/* O aperto de um título de trabalho. O degrau de cima, o do display, pede-se
+   onde o título é mesmo grande — ver `--bo-tracking-display`. */
 body:is(.admin-mode, :has([data-admin-mode])) :is(h1, h2, h3, h4),
 body:is(.admin-mode, :has([data-admin-mode])) .font-display {
-  letter-spacing: -0.02em;
+  letter-spacing: var(--bo-tracking-titulo);
 }
 
 /* ── ChatGPT-calm typography ──────────────────────────────────────────────
