@@ -249,7 +249,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   desceu. */}
               {!desceu && <p className="bo-eyebrow mb-1.5">Dossier do Evento</p>}
               <h1
-                className="font-display text-[var(--bo-text)] font-bold leading-tight truncate min-w-0"
+                className="font-display text-[var(--bo-text)] font-medium leading-tight truncate min-w-0"
                 style={{ fontSize: "clamp(22px, 2.6vw, 32px)" }}
               >
                 {quote.name}

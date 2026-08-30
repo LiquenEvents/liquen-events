@@ -126,19 +126,41 @@ describe("as sombras do back office", () => {
     }
   });
 
-  it("assenta os cartões brancos num chão que não é branco", () => {
-    // Sem isto, tirar as sombras era apagar a separação: branco sobre branco
-    // com um fio de 8% de opacidade. É o mecanismo da Apple (#F5F5F7 →
-    // #FFFFFF), e é o que torna a ausência de sombra legível.
-    for (const ecra of [
-      "src/app/[lang]/(admin)/orcamento/admin/AdminClient.tsx",
-      "src/app/[lang]/(admin)/orcamento/admin/loading.tsx",
-      "src/app/[lang]/(admin)/orcamento/admin/evento/[id]/DossierClient.tsx",
-    ]) {
-      const fonte = readFileSync(ecra, "utf8");
-      expect(fonte, `${ecra}: o chão da página voltou a branco`).toContain(
-        "min-h-screen bg-[var(--bo-surface-sunken)]",
-      );
-    }
+  /**
+   * ── O QUE MUDOU AQUI, E PORQUÊ ──────────────────────────────────────────
+   *
+   * Este caso exigia que o chão da página NÃO fosse branco, e a razão era boa:
+   * sem sombra no conteúdo, o que fazia um cartão ler-se como estando por cima
+   * era a área branca sobre o cinzento (#F7F7F8 → #FFFFFF, o mecanismo da
+   * Apple) MAIS o fio da moldura.
+   *
+   * Ela pediu o chão branco — «eu quero branco» —, e isso tira uma das duas
+   * metades. A decisão não foi ignorar este teste: foi dar à metade que ficou
+   * o peso das duas. O fio subiu um degrau (8% → 10%) e a moldura de um cartão
+   * passou a pedir o degrau forte.
+   *
+   * Por isso o que se guarda deixou de ser a cor do chão e passou a ser a
+   * COMPENSAÇÃO. Se alguém puser o fio outra vez fraco, volta-se ao problema
+   * que este caso sempre teve medo: branco sobre branco sem nada a separar.
+   */
+  it("com o chão branco, é o fio que separa — e por isso não pode ser fraco", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+
+    // O fio de omissão, que serve molduras e separadores.
+    const fio = css.match(/--bo-hairline:\s*var\(--bo-tinta-(\d+)\)/);
+    expect(fio, "`--bo-hairline` deixou de vir da escala da tinta").not.toBeNull();
+    expect(
+      Number(fio?.[1]),
+      "o fio do back office voltou a ser fraco, e com o chão branco é a única coisa que separa",
+    ).toBeGreaterThanOrEqual(10);
+
+    // A moldura de um cartão: o degrau forte, porque é uma fronteira e não um
+    // separador.
+    const inicio = css.indexOf(".bo-card {");
+    expect(inicio, "`.bo-card` desapareceu").toBeGreaterThan(-1);
+    const bloco = css.slice(inicio, css.indexOf("}", inicio));
+    expect(bloco, "a moldura do cartão deixou de pedir o degrau forte").toContain(
+      "--bo-hairline-strong",
+    );
   });
 });

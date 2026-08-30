@@ -3689,7 +3689,7 @@ export default function AdminClient({
           `pt-24` para cancelar, e o `<main>` que faltava está no layout do
           grupo. Enquanto os dois se cruzaram, a raiz começava a `top: -96px` —
           os primeiros 96 px do back office estavam fora do ecrã. */}
-      <div className="min-h-screen bg-[var(--bo-surface-sunken)] flex">
+      <div className="min-h-screen bg-[var(--bo-chao)] flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         {/* Repor uma cópia troca os dados TODOS no servidor, e a lista que está
             aqui em memória não tem como saber o que mudou. É o único sítio onde
@@ -3774,7 +3774,7 @@ export default function AdminClient({
         <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
           <aside
             inert={navEhGaveta && !navOpen}
-            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
+            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
               navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
             } ${
               /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
@@ -4221,7 +4221,27 @@ export default function AdminClient({
               A partir daqui fica a faixa com os botões, que é o que serve para
               alguma coisa a meio de uma lista. No computador não encolhe nada:
               lá o espaço não é o problema. */}
-          <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
+          {/* ── O FIO DO CABEÇALHO SÓ APARECE QUANDO HÁ COISA POR CIMA ──────
+              Da análise do site que ela mandou: lá o cabeçalho começa sem
+              moldura e ganha-a ao rolar. A razão é boa e aqui é ainda melhor,
+              porque o chão do painel passou a branco: no topo, um cabeçalho
+              branco com um risco por baixo desenha uma linha a separar o nada.
+              O fio passa a dizer uma coisa — «há conteúdo escondido acima» — em
+              vez de estar sempre lá.
+
+              O `border-b` FICA sempre; o que muda é a cor. Ligar e desligar a
+              moldura mudava a altura do cabeçalho em 1 px a cada rolagem, e um
+              salto de um pixel numa lista é pior do que um risco a mais.
+
+              O gatilho é o `desceu` que já existe para o cabeçalho encolher —
+              com a histerese dele (desce aos 24, volta aos 8), que evita o
+              tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
+              novo. */}
+          <header
+            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors duration-150 ${
+              desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
+            }`}
+          >
             <div
               className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5 motion-safe:transition-[padding] duration-200 ${
                 desceu ? "py-1.5" : "py-2.5"
@@ -4297,9 +4317,10 @@ export default function AdminClient({
                     o nome da vista está sempre também na barra de baixo ou na
                     gaveta de onde se veio. */}
                 <h1
-                  className="text-[var(--bo-text)] font-bold leading-none truncate motion-safe:transition-[font-size] duration-200"
+                  className="text-[var(--bo-text)] font-medium leading-none truncate motion-safe:transition-[font-size] duration-200"
                   style={{
-                    fontFamily: "var(--font-playfair)",
+                    fontFamily: "var(--font-display)",
+                    letterSpacing: "var(--bo-tracking-display)",
                     // A meio de uma lista o título é o que menos falta faz —
                     // por isso é ele que encolhe primeiro.
                     fontSize: desceu ? "clamp(16px, 2.6vw, 30px)" : "clamp(19px, 2.6vw, 30px)",

@@ -71,11 +71,32 @@ describe("a escada da tinta do back office", () => {
   });
 
   it("e os dois nomes de papel são apelidos de degraus, não valores à parte", () => {
-    // `--bo-hairline` e `--bo-hairline-strong` estão em centenas de chamadas e
-    // dizem o que a coisa É. Ficam — mas apontados à escada, senão são dois
-    // valores a viver por sua conta outra vez.
-    expect(CSS).toContain("--bo-hairline: var(--bo-tinta-8)");
-    expect(CSS).toContain("--bo-hairline-strong: var(--bo-tinta-13)");
+    /**
+     * `--bo-hairline` e `--bo-hairline-strong` estão em centenas de chamadas e
+     * dizem o que a coisa É. Ficam — mas apontados à ESCADA, senão são dois
+     * valores a viver por sua conta outra vez.
+     *
+     * ── PORQUE É QUE ISTO DEIXOU DE FIXAR O NÚMERO DO DEGRAU ──────────────
+     *
+     * Estava escrito `--bo-hairline: var(--bo-tinta-8)`, com o oito lá dentro.
+     * O que este caso quer dizer é «vem da escada»; o degrau EM QUE ele está é
+     * uma decisão de desenho, e mudou quando o chão do painel passou a branco:
+     * sem o cinzento por baixo, o fio ficou sozinho a separar as coisas e subiu
+     * para os 10%. Um teste que fixa o número obriga a passar por aqui para
+     * afinar um tom, e isso ensina a mudar testes em vez de os ler.
+     *
+     * Quem guarda o «não pode ser fraco» é o `sombras-do-back-office.test.ts`,
+     * que é onde essa razão vive: foi por causa do fio que as sombras do
+     * conteúdo puderam sair todas.
+     */
+    for (const apelido of ["--bo-hairline", "--bo-hairline-strong"]) {
+      const m = CSS.match(new RegExp(`${apelido}:\\s*var\\(--bo-tinta-(\\d+)\\)`));
+      expect(m, `\`${apelido}\` deixou de ser um apelido de um degrau da escada`).not.toBeNull();
+      expect(
+        ESCADA[`--bo-tinta-${m?.[1]}` as keyof typeof ESCADA],
+        `\`${apelido}\` aponta para \`--bo-tinta-${m?.[1]}\`, que não é um degrau da escada`,
+      ).toBeDefined();
+    }
     expect(CSS).toContain("--bo-text: var(--bo-tinta-82)");
     expect(CSS).toContain("--bo-text-muted: var(--bo-tinta-64)");
     expect(CSS).toContain("--bo-text-faint: var(--bo-tinta-58)");
