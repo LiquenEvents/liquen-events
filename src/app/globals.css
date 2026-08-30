@@ -395,6 +395,28 @@ body:is(.admin-mode, :has([data-admin-mode])) {
 
      ── Neutral surfaces (low-contrast but AA) ── */
   --bo-surface: #ffffff; /* card / panel face */
+
+  /* ── O CHÃO DO PAINEL, QUE PASSA A SER BRANCO ───────────────────────────
+     Pedido dela, a olhar para a referência: «eu quero branco».
+
+     O chão era o mesmo cinzento dos encaixes — `--bo-surface-sunken` —, e um
+     cartão distinguia-se do que estava por baixo por ser branco sobre esse
+     cinzento. Com o chão branco, quem separa as coisas passa a ser o FIO. É a
+     mesma decisão da referência e da maqueta: uma folha, e riscos quase
+     invisíveis a arrumá-la, em vez de caixas cinzentas encaixadas umas nas
+     outras.
+
+     ── PORQUE É QUE ISTO É UM TOKEN NOVO E NÃO O CINZENTO A MUDAR DE VALOR ──
+
+     Porque o cinzento continua a fazer falta ONDE É ENCAIXE: o `<code>` do
+     ecrã de erro, o painel afundado do estúdio, as riscas de uma lista. Pôr o
+     `--bo-surface-sunken` a branco resolvia o chão e apagava esses ao mesmo
+     tempo — um encaixe branco dentro de um cartão branco não é um encaixe.
+
+     São duas ideias diferentes que por acaso tinham o mesmo valor. Separá-las
+     é o que permite mudar uma sem mexer na outra. */
+  --bo-chao: #ffffff;
+
   --bo-surface-sunken: #f7f7f8; /* insets, list stripes — neutral ChatGPT grey */
   --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
   --bo-tint-accent: rgba(76, 99, 80, 0.1); /* soft moss call-out fill */
@@ -2618,8 +2640,9 @@ body[data-menu-open] .whatsapp-fixed {
   border: 1px solid var(--bo-hairline, rgba(42, 38, 32, 0.08));
   /* Roomier corners (rounded-2xl) — the calm container the redesign leans on. */
   border-radius: var(--bo-radius-lg, 1rem);
-  /* Sem sombra: o branco sobre o cinzento da página mais o fio da moldura já
-     dizem que isto está em cima. Ver os dois tokens de sombra lá em cima. */
+  /* Sem sombra, e agora sem cinzento por baixo: o chão do painel é branco, e
+     quem diz onde um cartão começa e acaba é o FIO da moldura. Ver os dois
+     tokens de sombra lá em cima, e o `--bo-chao`. */
 }
 /* A LARGURA POR OMISSÃO DE UM CAMPO, E SÓ ELA, VIVE NUMA CAMADA.
    ─────────────────────────────────────────────────────────────────────────
