@@ -4221,7 +4221,27 @@ export default function AdminClient({
               A partir daqui fica a faixa com os botões, que é o que serve para
               alguma coisa a meio de uma lista. No computador não encolhe nada:
               lá o espaço não é o problema. */}
-          <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
+          {/* ── O FIO DO CABEÇALHO SÓ APARECE QUANDO HÁ COISA POR CIMA ──────
+              Da análise do site que ela mandou: lá o cabeçalho começa sem
+              moldura e ganha-a ao rolar. A razão é boa e aqui é ainda melhor,
+              porque o chão do painel passou a branco: no topo, um cabeçalho
+              branco com um risco por baixo desenha uma linha a separar o nada.
+              O fio passa a dizer uma coisa — «há conteúdo escondido acima» — em
+              vez de estar sempre lá.
+
+              O `border-b` FICA sempre; o que muda é a cor. Ligar e desligar a
+              moldura mudava a altura do cabeçalho em 1 px a cada rolagem, e um
+              salto de um pixel numa lista é pior do que um risco a mais.
+
+              O gatilho é o `desceu` que já existe para o cabeçalho encolher —
+              com a histerese dele (desce aos 24, volta aos 8), que evita o
+              tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
+              novo. */}
+          <header
+            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors duration-150 ${
+              desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
+            }`}
+          >
             <div
               className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5 motion-safe:transition-[padding] duration-200 ${
                 desceu ? "py-1.5" : "py-2.5"
