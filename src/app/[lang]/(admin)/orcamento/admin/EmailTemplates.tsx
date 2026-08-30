@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
-import { Button } from "./ui";
+import { Button, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import EmailTemplatesBilingue from "./EmailTemplatesBilingue";
@@ -234,6 +234,25 @@ function EditorClassico() {
   const [doc, setDoc] = useState<RichDoc>(emptyRichDoc);
   const [htmlBody, setHtmlBody] = useState("");
   const [mode, setMode] = useState<Mode>("visual");
+
+  /**
+   * ── AS TRÊS PERGUNTAS DESTE EDITOR, NUMA JANELA SÓ ─────────────────────
+   *
+   * Nenhuma destas é um «apagar», e todas as três são destrutivas na mesma:
+   * o que se perde é TRABALHO. Trocar de modelo com o rascunho por gravar,
+   * descartar o que está por publicar, e voltar ao editor visual a partir de
+   * HTML escrito à mão — nas três, quem responde «sim» perde o que escreveu.
+   *
+   * Uma janela e um estado, com a acção lá dentro: três estados seriam três
+   * folhas a poderem abrir ao mesmo tempo, e é o mesmo desenho que o
+   * `Inventario` já usa.
+   */
+  const [aPerguntar, setAPerguntar] = useState<{
+    titulo: string;
+    aviso?: string;
+    rotulo: string;
+    fazer: () => void;
+  } | null>(null);
   const [baselineBody, setBaselineBody] = useState("");
 
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -485,10 +504,14 @@ function EditorClassico() {
     // precisamente isso que se perdia.
     guardarRascunhoAgora();
     if (dirty && rascunhoFalhou.current) {
-      const ok = window.confirm(
-        "Este computador não deixa guardar o rascunho, e as alterações que fez a este modelo ainda não foram guardadas. Se mudar de modelo agora, perde-as. Continuar?",
-      );
-      if (!ok) return;
+      setAPerguntar({
+        titulo: "Mudar de modelo e perder o que escreveu?",
+        aviso:
+          "Este aparelho não está a deixar guardar o rascunho, e as alterações a este modelo ainda não foram publicadas.",
+        rotulo: "Mudar de modelo",
+        fazer: () => selectInto(t),
+      });
+      return;
     }
     selectInto(t);
   }
@@ -497,10 +520,16 @@ function EditorClassico() {
    *  que diz o que faz, não como efeito colateral de clicar noutro modelo. */
   function descartarRascunho() {
     if (!selected) return;
-    const ok = window.confirm(
-      "Descartar as alterações por publicar e voltar ao modelo que está guardado no servidor?",
-    );
-    if (!ok) return;
+    setAPerguntar({
+      titulo: "Descartar as alterações por publicar?",
+      aviso: "O modelo volta ao que está guardado no servidor.",
+      rotulo: "Descartar",
+      fazer: descartarRascunhoMesmo,
+    });
+  }
+
+  function descartarRascunhoMesmo() {
+    if (!selected) return;
     apagarRascunho(selected.key);
     rascunhoFalhou.current = false;
     setRascunhoEm(null);
@@ -576,13 +605,17 @@ function EditorClassico() {
       activeFieldRef.current = "visual";
       return;
     }
-    const ok = window.confirm(
-      "Este HTML foi escrito à mão. Ao voltar ao editor visual, a formatação avançada é convertida em texto simples e pode perder-se. Continuar?",
-    );
-    if (!ok) return;
-    setDoc(docFromPlainText(htmlToPlainText(htmlBody)));
-    setMode("visual");
-    activeFieldRef.current = "visual";
+    setAPerguntar({
+      titulo: "Voltar ao editor visual?",
+      aviso:
+        "Este HTML foi escrito à mão. Ao voltar, a formatação avançada é convertida em texto simples e pode perder-se.",
+      rotulo: "Voltar ao visual",
+      fazer: () => {
+        setDoc(docFromPlainText(htmlToPlainText(htmlBody)));
+        setMode("visual");
+        activeFieldRef.current = "visual";
+      },
+    });
   }
 
   /**
@@ -936,6 +969,25 @@ function EditorClassico() {
           Seleciona um modelo para editar.
         </div>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
+          As três perguntas deste editor cabem aqui: cada uma traz o seu título,
+          o seu aviso e o que fazer se a resposta for sim. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha primeiro e só depois age, como nos outros ecrãs: o que vem a
+        // seguir é uma troca de vista, e uma caixa aberta por cima dela ficaria
+        // pendurada sobre um ecrã que já mudou.
+        onConfirmar={() => {
+          const pedido = aPerguntar;
+          setAPerguntar(null);
+          pedido?.fazer();
+        }}
+      />
     </div>
   );
 }
