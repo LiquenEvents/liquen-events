@@ -47,7 +47,33 @@ const MAX_DRAFT_BYTES = 512 * 1024;
  * (letras, dígitos, `-` e `_`), portanto estas gavetas vão na cópia de
  * segurança e voltam na reposição pelo mesmo caminho das outras.
  */
-const VARIANTES_DE_RASCUNHO = new Set(["orcamento-linhas"]);
+/**
+ * ── E A GAVETA DO RESGATE, QUE ESTAVA ESCRITA E ERA INALCANÇÁVEL ──────────
+ *
+ * O `PUT` guarda, desde sempre, a versão que ia ser esmagada numa chave irmã
+ * `<chave>--sobreposto`, e devolve o nome dela em `resgate`. Isso cumpria
+ * metade da regra da casa — «se falhar, não perder trabalho»: o trabalho da
+ * outra pessoa ficava mesmo guardado.
+ *
+ * A outra metade não existia. Esta lista é fechada de propósito (ver acima), e
+ * `sobreposto` NÃO estava nela: um `GET ?variante=sobreposto` caía no `else` e
+ * devolvia o rascunho do estúdio — ou seja, a gaveta estava cheia e não havia
+ * porta. O trabalho estava guardado num sítio que nenhuma parte do produto
+ * conseguia abrir.
+ *
+ * As duas entradas, e não uma: a chave de resgate é construída sobre a chave
+ * JÁ escolhida, portanto a ferramenta antiga das linhas gera
+ * `<pedido>--orcamento-linhas--sobreposto`. Deixar essa de fora repetia o
+ * defeito na outra metade do estúdio.
+ *
+ * A lista continua fechada — é ela que impede quem chame a rota de escolher a
+ * chave que quiser dentro do espaço de nomes do `app_state`.
+ */
+const VARIANTES_DE_RASCUNHO = new Set([
+  "orcamento-linhas",
+  "sobreposto",
+  "orcamento-linhas--sobreposto",
+]);
 
 function idDoRascunho(request: NextRequest, id: string): string {
   let variante: string | null = null;

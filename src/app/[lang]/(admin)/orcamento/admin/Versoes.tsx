@@ -7,6 +7,7 @@ import { dinheiroDaProposta } from "@/lib/proposal-budget";
 import { paragrafoDoQueMudou } from "@/lib/email-proposta-textos";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { Button } from "./ui/Button";
+import { PerguntaDestrutiva } from "./ui/PerguntaDestrutiva";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -107,6 +108,20 @@ export default function Versoes({
   const [aberta, setAberta] = useState<string | null>(null);
   /** O documento da última enviada, para comparar com o que está no ecrã. */
   const [ultimoDoc, setUltimoDoc] = useState<ProposalDoc | null>(null);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O CORTE DOS LINKS JÁ ENVIADOS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Vive aqui e não nas definições porque é aqui que está a lista do que já
+   * seguiu para o casal. A pergunta que este botão responde — «e se eu quiser
+   * fechar aquele link?» — nasce a olhar para essa lista.
+   */
+  const [corte, setCorte] = useState<{ cortadoEm: string; por?: string } | null>(null);
+  const [aPerguntar, setAPerguntar] = useState(false);
+  const [aCortar, setACortar] = useState(false);
+  /** A falha do corte é dita por extenso, e não com a frase vaga do painel. */
+  const [erroDoCorte, setErroDoCorte] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -115,6 +130,30 @@ export default function Versoes({
       const data = (await res.json()) as { versoes?: VersaoEnviada[] };
       setVersoes(data.versoes ?? []);
       setErro(false);
+      /**
+       * O corte vem no mesmo carregamento, e não num efeito próprio.
+       *
+       * As duas coisas mostram-se juntas — a lista do que seguiu, e se aqueles
+       * endereços ainda abrem —, portanto pedem-se juntas. Um segundo efeito
+       * só para isto acrescentaria mais uma gravação de estado dentro de um
+       * `useEffect`, que é o aviso que esta página já tem uma vez e não precisa
+       * de ter duas.
+       *
+       * À PARTE do `try` de cima na prática, porque uma falha aqui não pode
+       * levar a lista de versões atrás: quem não conseguiu perguntar pelo corte
+       * fica sem saber do corte, e a lista continua a aparecer. O painel não
+       * afirma nada sobre links cortados quando não conseguiu perguntar —
+       * dizer que estão abertos seria a mentira que este ecrã não pode contar.
+       */
+      try {
+        const r = await fetch(`/api/orcamento/${quoteId}/links`, { cache: "no-store" });
+        if (r.ok) {
+          const c = (await r.json()) as { corte?: { cortadoEm: string; por?: string } | null };
+          setCorte(c.corte ?? null);
+        }
+      } catch {
+        /* sem rede: o painel não afirma nada sobre o corte */
+      }
     } catch {
       setErro(true);
       setVersoes([]);
@@ -124,6 +163,46 @@ export default function Versoes({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  async function cortarOsLinks() {
+    if (aCortar) return;
+    setACortar(true);
+    setErroDoCorte(null);
+    try {
+      const res = await fetch(`/api/orcamento/${quoteId}/links`, { method: "POST" });
+      const data = (await res.json().catch(() => null)) as {
+        corte?: { cortadoEm: string; por?: string };
+        erro?: string;
+      } | null;
+      if (!res.ok || !data?.corte) {
+        /**
+         * A caixa FECHA-SE, e o erro fica no painel.
+         *
+         * Deixá-la aberta parece mais atencioso e é o contrário: a frase da
+         * falha é escrita no painel, ou seja ATRÁS da caixa, e quem carregou
+         * ficava a olhar para uma pergunta sem resposta. Fechada, a pessoa vê
+         * a frase — que diz que os links continuam a abrir — e o botão logo
+         * por baixo, para tentar outra vez. Foi um teste que apanhou isto.
+         */
+        setAPerguntar(false);
+        // A frase do servidor quando ela existe: é ela que diz que os links
+        // CONTINUAM a abrir, e essa é a parte que importa.
+        setErroDoCorte(
+          data?.erro ??
+            (res.status === 401
+              ? "A sessão expirou. Entra outra vez — os links continuam como estavam."
+              : "Não consegui cortar agora, e os links continuam a abrir. Tenta daqui a pouco."),
+        );
+        return;
+      }
+      setCorte(data.corte);
+      setAPerguntar(false);
+    } catch {
+      setErroDoCorte("Não consegui cortar agora, e os links continuam a abrir. Sem ligação?");
+    } finally {
+      setACortar(false);
+    }
+  }
 
   const ultima = versoes?.[0];
   const ultimaId = ultima?.id;
@@ -339,6 +418,65 @@ export default function Versoes({
       <p className="mt-3 text-[11px] leading-relaxed text-foreground/45">
         Repor escreve a versão antiga no rascunho — não envia nada ao cliente.
       </p>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          CORTAR OS LINKS JÁ ENVIADOS
+          ══════════════════════════════════════════════════════════════════
+
+          Só aparece quando já houve envios: cortar links que não existem é
+          uma pergunta sem sentido, e um botão perigoso a mais num ecrã que
+          ainda não tem nada para proteger.
+
+          Não há botão de «voltar a abrir», e é uma decisão: quem cortou fê-lo
+          porque um endereço chegou a mãos erradas, e reabrir devolveria a vida
+          a ESSE endereço, que ninguém sabe onde anda. A maneira de dar acesso
+          outra vez é a de sempre — enviar, que cunha um endereço novo. */}
+      {/* Sem condição de «há envios»: este bloco só chega aqui depois do
+          `versoes.length === 0` lá em cima devolver nada. Uma verificação que
+          nunca corre não é defesa em profundidade, é ruído — e a verificação
+          ao contrário provou-o: tirei-a e não caiu teste nenhum. */}
+      <div className="mt-4 border-t border-[var(--bo-hairline-strong)] pt-3">
+        {corte ? (
+          <p className="text-[11px] leading-relaxed text-[var(--bo-text-muted)]">
+            Os links enviados foram cortados a {quando(corte.cortadoEm)}
+            {corte.por ? ` por ${corte.por}` : ""}. Quem tiver o endereço antigo já não abre a
+            proposta. O próximo envio cunha um endereço novo, que funciona.
+          </p>
+        ) : (
+          <>
+            <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">
+              Se o link foi para as mãos erradas, ou o preço saiu errado, podes fechar os endereços
+              já enviados.
+            </p>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setErroDoCorte(null);
+                setAPerguntar(true);
+              }}
+              className="alvo-toque text-[11px]"
+            >
+              Cortar os links enviados
+            </Button>
+          </>
+        )}
+        {erroDoCorte && (
+          <p className="mt-2 text-xs leading-relaxed text-[#8a2a22]">{erroDoCorte}</p>
+        )}
+      </div>
+
+      <PerguntaDestrutiva
+        aberto={aPerguntar}
+        onFechar={() => setAPerguntar(false)}
+        titulo="Cortar os links desta proposta?"
+        oQueSePerde={[
+          "Todos os endereços já enviados deixam de abrir — o do email e o que tenha sido reencaminhado.",
+          "O casal, se voltar ao link antigo, vê a página de link inválido.",
+        ]}
+        aviso="Não pode ser anulado. Para lhes dar acesso outra vez, envia a proposta — isso cunha um endereço novo."
+        rotuloConfirmar={aCortar ? "A cortar…" : "Cortar os links"}
+        onConfirmar={cortarOsLinks}
+      />
       {erro && <p className="mt-2 text-xs text-[#8a2a22]">Alguma coisa falhou. Tenta outra vez.</p>}
     </section>
   );

@@ -282,6 +282,41 @@ function sharedHash(): string | null {
  * Nesse modo, a alavanca para pôr alguém fora é o `SESSION_VERSION` mais a
  * remoção do dispositivo na lista.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS NOMES DA EQUIPA — e SÓ os nomes
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O sistema sabe exactamente quem trabalha aqui, e nunca o perguntava a
+ * ninguém: o responsável de uma tarefa era um campo de texto livre, e a lista
+ * de pessoas do filtro nascia do que estivesse escrito nas tarefas. «Ana»,
+ * «ana» e «Ana R.» eram três colaboradoras diferentes — e uma tarefa atribuída
+ * a uma delas não aparecia no filtro das outras duas.
+ *
+ * ── O QUE ESTA FUNÇÃO NÃO PODE DEVOLVER, NUNCA ──────────────────────────
+ *
+ * O `ADMIN_USERS` traz `passwordHash` em cada conta, e traz `email`. Isto sai
+ * para o browser. Por isso devolve uma lista de CADEIAS — não os objectos com
+ * um campo escolhido, não uma projecção: cadeias. Um `map` que se esqueça de
+ * um campo é um acidente a uma linha de distância; uma lista de nomes não tem
+ * como transportar um hash.
+ *
+ * Devolve `[]` quando não há contas configuradas (a instalação com palavra-
+ * passe partilhada). Aí não há equipa a listar, e quem lê isto tem de tratar o
+ * vazio como «não sei quem são» — não como «não há ninguém».
+ */
+export function nomesDaEquipa(): string[] {
+  const users = configuredUsers();
+  if (!users) return [];
+  const nomes = users
+    .map((u) => String(u.name ?? "").trim())
+    .filter((n) => n.length > 0)
+    .map((n) => n.slice(0, 40));
+  // Sem repetidos e por ordem, para a lista ser sempre a mesma: uma ordem que
+  // muda entre carregamentos faz o olho procurar duas vezes.
+  return [...new Set(nomes)].sort((a, b) => a.localeCompare(b, "pt"));
+}
+
 export function contaExiste(name: string): boolean {
   const users = configuredUsers();
   if (!users) return true;

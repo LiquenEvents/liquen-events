@@ -2447,7 +2447,8 @@ export async function renderProposalDocPdfWithReport(
      * poder ser lido como preço final quando não é.
      *
      * ── PORQUE É QUE «TOTAL A PAGAR» DEIXOU DE SER OPCIONAL ────────────────
-     * Esteve desligado por omissão (ver `mostrarTotalAPagar`), com o argumento
+     * Esteve desligado por omissão, atrás de um interruptor no documento, com o
+     * argumento
      * de que a folha feita à mão fecha em «Valor Total» e não tem bloco de
      * soma. O argumento caiu com esta proposta: a folha feita à mão também não
      * tinha o sinal em euros, e sem o «Total a pagar» impresso o casal não tem

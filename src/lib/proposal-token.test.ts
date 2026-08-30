@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import { createProposalToken, readProposalToken } from "./proposal-token";
+import { createProposalToken, readProposalToken, TTL_MS } from "./proposal-token";
 import { DEFAULT_VALID_DAYS } from "./proposal-doc";
 import { createSession } from "./admin-auth";
 
@@ -34,7 +34,7 @@ function forge(payload: unknown, secret = process.env.SESSION_SECRET!): string {
 describe("proposal-token — signed accept links", () => {
   it("round-trips a valid token", () => {
     const token = createProposalToken("prop-123");
-    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+    expect(readProposalToken(token)?.proposalId).toBe("prop-123");
   });
 
   it("rejects a tampered payload kept alongside the original signature", () => {
@@ -58,7 +58,7 @@ describe("proposal-token — signed accept links", () => {
     // `body.sig` is genuinely valid; appending `.junk` must NOT be silently
     // dropped (the old 2-target split-destructure accepted `body.sig.junk`).
     const token = createProposalToken("prop-123");
-    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+    expect(readProposalToken(token)?.proposalId).toBe("prop-123");
     expect(readProposalToken(`${token}.junk`)).toBeNull();
     expect(readProposalToken(`${token}.a.b.c`)).toBeNull();
   });
@@ -99,13 +99,13 @@ describe("proposal-token — signed accept links", () => {
 
     // O último dia da validade por omissão: o link tem de abrir.
     vi.setSystemTime(envio.getTime() + DEFAULT_VALID_DAYS * 864e5);
-    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+    expect(readProposalToken(token)?.proposalId).toBe("prop-123");
 
     // E ainda depois disso, para o casal encontrar a frase honesta («esta
     // proposta expirou») em vez de um link partido — e para o estúdio poder
     // esticar a validade sem ter de reenviar o email.
     vi.setSystemTime(envio.getTime() + (DEFAULT_VALID_DAYS + 7) * 864e5);
-    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+    expect(readProposalToken(token)?.proposalId).toBe("prop-123");
   });
 
   it("rejects a validly-signed token that carries no proposal id", () => {
@@ -124,8 +124,8 @@ describe("proposal-token — signed accept links", () => {
     const a = createProposalToken("prop-A");
     const b = createProposalToken("prop-B");
     expect(a).not.toEqual(b);
-    expect(readProposalToken(a)).toEqual({ proposalId: "prop-A" });
-    expect(readProposalToken(b)).toEqual({ proposalId: "prop-B" });
+    expect(readProposalToken(a)?.proposalId).toBe("prop-A");
+    expect(readProposalToken(b)?.proposalId).toBe("prop-B");
   });
 
   it("rejects a validly-signed token whose body is not valid JSON", () => {
@@ -152,9 +152,49 @@ describe("proposal-token — signed accept links", () => {
   // Backward compatibility: accept links minted before the typ claim existed
   // (payload had only { pid, exp }) must keep validating until they expire.
   it("still accepts a legacy token that carries no type claim", () => {
-    expect(readProposalToken(forge({ pid: "prop-legacy", exp: Date.now() + 1e9 }))).toEqual({
-      proposalId: "prop-legacy",
-    });
+    expect(
+      readProposalToken(forge({ pid: "prop-legacy", exp: Date.now() + 1e9 }))?.proposalId,
+    ).toBe("prop-legacy");
+  });
+
+  /**
+   * ── A HORA DE EMISSÃO, QUE É O QUE PERMITE CORTAR UM LINK ────────────────
+   *
+   * O corte de links é um carimbo de tempo no pedido, e a regra é «morre o que
+   * foi emitido ANTES do corte». Sem saber a idade de cada endereço, ou o corte
+   * não apanha os já enviados (não fecha nada) ou mata também o que ela cunhar
+   * a seguir — e aí ela reenviaria a proposta para um link morto.
+   */
+  it("um token novo diz quando foi emitido", () => {
+    const antes = Date.now();
+    const lido = readProposalToken(createProposalToken("prop-123"));
+    const depois = Date.now();
+    expect(lido).not.toBeNull();
+    const emitido = lido!.emitidoEm;
+    expect(emitido).toBeGreaterThanOrEqual(antes);
+    expect(emitido).toBeLessThanOrEqual(depois);
+  });
+
+  it("um token ANTIGO, sem `iat`, tem a emissão deduzida do prazo", () => {
+    /**
+     * Os links já em caixas de correio não trazem `iat` e não podem passar a
+     * ser incortáveis por isso. O `exp` é `emissão + TTL_MS`, portanto a
+     * emissão deduz-se ao milissegundo enquanto o prazo for o mesmo.
+     */
+    const emitido = Date.now() - 5 * 24 * 60 * 60 * 1000;
+    const lido = readProposalToken(forge({ typ: "proposal", pid: "p", exp: emitido + TTL_MS }));
+    expect(lido?.emitidoEm).toBe(emitido);
+  });
+
+  it("um `iat` que não seja número não vira NaN — cai na dedução", () => {
+    // Um payload estranho não passa pela assinatura vinda de fora, mas a
+    // comparação do corte nunca pode responder ao calhas por causa de um `NaN`.
+    const emitido = Date.now() - 1000;
+    const lido = readProposalToken(
+      forge({ typ: "proposal", pid: "p", iat: "ontem", exp: emitido + TTL_MS }),
+    );
+    expect(Number.isFinite(lido?.emitidoEm)).toBe(true);
+    expect(lido?.emitidoEm).toBe(emitido);
   });
 });
 

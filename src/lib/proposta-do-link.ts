@@ -4,6 +4,7 @@ import { getProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { readProposalToken } from "@/lib/proposal-token";
 import { lerLigacaoCurta, pareceCodigoCurto } from "@/lib/proposta-link-curto";
+import { aindaAbre, linksCortadosEm } from "@/lib/links-cortados";
 import { estadoDaVersao, seloDoConteudo, type EstadoDaVersao } from "@/lib/proposta-versao";
 import { log } from "@/lib/logger";
 
@@ -105,11 +106,46 @@ export async function propostaDoLink(
    * e falha de imediato para tudo o que seja um token.
    */
   const codigo = pareceCodigoCurto(token) ? await lerLigacaoCurta(String(token)) : null;
-  const propostaId = codigo?.propostaId ?? readProposalToken(token)?.proposalId;
+  const doTokenAssinado = codigo ? null : readProposalToken(token);
+  const propostaId = codigo?.propostaId ?? doTokenAssinado?.proposalId;
   if (!propostaId) return null;
+
+  /**
+   * Quando é que ESTE endereço foi emitido — a data de criação do código curto,
+   * ou o `iat` do token (deduzido do `exp` nos tokens anteriores a esse campo).
+   * É com isto que o corte de links decide, e é a única coisa que as duas
+   * portas precisam de trazer em comum.
+   */
+  const emitidoEm = codigo ? Date.parse(codigo.criadaEm) : doTokenAssinado?.emitidoEm;
 
   const doToken = await getProposal(propostaId);
   if (!doToken) return null;
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O CORTE DE LINKS FECHA-SE AQUI, E TEM DE SER AQUI
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `proposta-link-curto.ts` avisou, quando nasceu, que cortar só o código
+   * curto «não fecha porta nenhuma — quem tem o email antigo entra à mesma»:
+   * o token assinado abre a mesma sala e não faz pergunta nenhuma a ninguém.
+   *
+   * Este ficheiro é o sítio onde as duas portas se juntam, e é a única razão
+   * pela qual o corte se pode escrever uma vez em vez de duas. Fica ANTES de
+   * tudo o resto — antes do salto para a versão mais recente, antes do aceite,
+   * antes dos selos —, porque um link cortado não tem que dar trabalho nenhum
+   * ao servidor nem revelar que a proposta existe.
+   *
+   * É por PEDIDO, e não por proposta: uma revisão nesta casa é uma proposta
+   * nova, e o salto mais abaixo leva o casal da proposta do token para a irmã
+   * mais recente. Cortar por proposta deixaria as irmãs abertas e o próprio
+   * salto trataria de as ir buscar — um corte que não corta.
+   *
+   * O `quoteId` vazio é um estado real (`quote_id` é `on delete set null`) e aí
+   * não há corte possível: não há pedido a que o carimbo pertença.
+   */
+  const pedido = (doToken.quoteId ?? "").trim();
+  if (pedido && !aindaAbre(emitidoEm, await linksCortadosEm(pedido))) return null;
 
   let proposta = doToken;
   let seguiu = false;

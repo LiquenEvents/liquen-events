@@ -1044,6 +1044,26 @@ export type ResultadoDaGravacao =
       overwrote?: boolean;
       previousBy?: string;
       /**
+       * A gaveta onde ficou o trabalho que esta gravação esmagou.
+       *
+       * ── PORQUE É QUE ISTO ESTAVA A SER DEITADO FORA ─────────────────────
+       *
+       * O servidor guarda, desde sempre, a versão que ia desaparecer numa
+       * chave irmã, e devolve o nome dela aqui. O estúdio lia o `overwrote` e
+       * o `previousBy` — e ignorava estes dois. Resultado: o aviso dizia «ficou
+       * a tua versão» e mais nada, portanto quem o lia concluía, com toda a
+       * razão, que as duas horas da outra pessoa tinham acabado.
+       *
+       * Não tinham. Estavam guardadas num sítio que nenhuma parte do produto
+       * conseguia abrir — a lista de gavetas que a leitura aceita não tinha
+       * esta lá dentro. Metade da regra da casa («se falhar, não perder
+       * trabalho») cumprida, e a metade que se vê por cumprir.
+       */
+      resgate?: string;
+      /** Quando é que essa versão tinha sido gravada — é a hora que dá à
+       *  pessoa a noção do que está em jogo antes de decidir. */
+      resgateEm?: string;
+      /**
        * O sítio onde ficou sobrevive a um deploy?
        *
        * ── PORQUE É QUE ISTO NÃO PODE FICAR DE FORA ────────────────────────
@@ -1115,6 +1135,8 @@ export async function gravarRascunhoNoServidor(
           updatedAt: typeof dados?.updatedAt === "string" ? dados.updatedAt : undefined,
           overwrote: Boolean(dados?.overwrote),
           previousBy: typeof dados?.previousBy === "string" ? dados.previousBy : undefined,
+          resgate: typeof dados?.resgate === "string" ? dados.resgate : undefined,
+          resgateEm: typeof dados?.resgateEm === "string" ? dados.resgateEm : undefined,
           duradouro: typeof dados?.duradouro === "boolean" ? dados.duradouro : undefined,
           aviso: typeof dados?.aviso === "string" ? dados.aviso : undefined,
         };
@@ -1952,6 +1974,35 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const serverStamp = useRef<string | null>(null);
   /** Já avisámos desta gravação cruzada? (uma vez chega; não a cada gravação) */
   const warnedOverwrite = useRef(false);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O TRABALHO QUE ESTA SESSÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O aviso da gravação cruzada é um `toast`, e um `toast` desaparece. Para
+   * dizer «ficou a tua versão» isso chega — é uma notícia, não uma tarefa.
+   *
+   * Isto é outra coisa: é trabalho de outra pessoa à espera de uma decisão.
+   * Uma notícia que se apaga sozinha ao fim de uns segundos não serve para
+   * uma decisão que a pessoa pode querer tomar dez minutos depois, quando
+   * perceber o que aconteceu. Por isso o `toast` continua a dar a notícia, e
+   * isto fica no ecrã até alguém resolver — repondo ou dispensando.
+   *
+   * Fica só em memória, de propósito: não é um estado do documento, é uma
+   * coisa desta sessão. Se ela fechar o separador sem decidir, o trabalho
+   * continua guardado no servidor e o próximo aviso de sobreposição volta a
+   * apontar para lá. O que se perde é o lembrete, não o trabalho.
+   */
+  const [sobreposto, setSobreposto] = useState<{
+    /** A gaveta, tal como o servidor a nomeou. */
+    chave: string;
+    /** Quem tinha escrito aquilo, quando se sabe. */
+    quem?: string;
+    /** Quando é que tinha sido gravado. */
+    quando?: string;
+  } | null>(null);
+  /** A repor: a leitura da gaveta demora, e o botão tem de o dizer. */
+  const [aRepor, setARepor] = useState(false);
   /**
    * ══════════════════════════════════════════════════════════════════════════
    * O QUE SEGUIU PARA O CLIENTE, E O QUE ESTE APARELHO TEM
@@ -2984,12 +3035,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // trabalho de outra pessoa em silêncio, não.
         if (r.overwrote && !warnedOverwrite.current) {
           warnedOverwrite.current = true;
+          /**
+           * ── A FRASE MUDOU, E A MUDANÇA É O PONTO ─────────────────────────
+           *
+           * Dizia «Ficou a tua versão.» e acabava ali. É verdade, e mesmo
+           * assim era a pior coisa a dizer: quem lê aquilo conclui que o
+           * trabalho da outra pessoa acabou. Não acabou — o servidor guarda-o
+           * sempre —, mas ninguém tinha como saber, e sobretudo ninguém tinha
+           * como lá chegar.
+           *
+           * Quando há gaveta (`r.resgate`), a frase deixa de fechar a porta e
+           * manda-a olhar para a barra, que é onde a decisão vive. Quando não
+           * há — o servidor não conseguiu guardar a cópia, e regista-o —, a
+           * frase antiga é a honesta e fica.
+           */
+          const quem = r.previousBy ? `por ${r.previousBy}` : "noutro sítio";
           toast(
-            r.previousBy
-              ? `Este rascunho tinha sido alterado por ${r.previousBy} noutro sítio. Ficou a tua versão.`
-              : "Este rascunho tinha sido alterado noutro sítio. Ficou a tua versão.",
+            r.resgate
+              ? `Este rascunho tinha sido alterado ${quem}. Ficou a tua versão, e a outra está guardada — vê em cima.`
+              : `Este rascunho tinha sido alterado ${quem}. Ficou a tua versão.`,
             "info",
           );
+        }
+        // A barra, ao contrário do aviso, actualiza-se a cada sobreposição: a
+        // gaveta tem UMA ranhura e guarda sempre a última, portanto apontar
+        // para uma anterior seria apontar para o sítio errado.
+        if (r.overwrote && r.resgate) {
+          setSobreposto({ chave: r.resgate, quem: r.previousBy, quando: r.resgateEm });
         }
         return r;
       })();
@@ -4241,6 +4313,122 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       orcamento > 0 ? `${orcamento} ${orcamento === 1 ? "linha" : "linhas"} de orçamento` : null,
     ].filter((x): x is string => x !== null);
     return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * REPOR O TRABALHO QUE ESTA SESSÃO ESMAGOU
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A gaveta já existia e já estava cheia; o que faltava era isto e a porta do
+   * lado do servidor. Aqui vai-se buscar o documento pelo nome que a própria
+   * gravação devolveu.
+   *
+   * ── E REPOR NÃO É UM SENTIDO ÚNICO ────────────────────────────────────────
+   *
+   * Repor é, por definição, escrever por cima do que está no ecrã — ou seja, o
+   * mesmo gesto que criou este problema. Duas coisas impedem que seja uma
+   * troca de um estrago por outro:
+   *
+   *  1. O «desfazer» de dez segundos desta casa (`limpo`), que já existe para
+   *     os outros gestos que substituem o documento — o próprio código diz que
+   *     nasceu também para «repor uma versão antiga». Fica com o motivo
+   *     escrito, para a barra poder dizer o que aconteceu.
+   *
+   *  2. E a gravação seguinte volta a passar pelo mesmo mecanismo do servidor:
+   *     o documento que está agora no ecrã passa a ser ELE o sobreposto, e vai
+   *     para a mesma gaveta. Ou seja, o resgate protege nos dois sentidos sem
+   *     ninguém ter escrito código para isso.
+   */
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A NOTA QUE PERTENCE A UMA SECÇÃO, E NÃO AO NEGÓCIO INTEIRO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O campo `notasPorSeccao` existia há muito: tipado no documento, protegido
+   * no gerador do PDF («as notas por secção nunca são desenhadas»), e limpo na
+   * cópia para outro pedido — três sítios a tratar bem de uma coisa que
+   * NINGUÉM ESCREVIA. Não havia caixa nenhuma no estúdio.
+   *
+   * O `notasInternas` que já existe é sobre o negócio: «recusaram em 2025 por
+   * preço». Estas são outra coisa e vivem noutra escala: «as capas são as duas
+   * do mesmo ângulo, trocar a segunda», «o cronograma tem de bater com a hora
+   * do padre», «esta linha é a que dá a margem toda». Escritas ao lado do
+   * campo geral, perdiam-se num parágrafo; escritas na secção, estão onde a
+   * dúvida nasce.
+   *
+   * ── E O DOCUMENTO NÃO PODE ENCHER-SE DE VAZIOS ─────────────────────────
+   *
+   * Uma caixa vazia por secção que gravasse `""` punha seis chaves em todos os
+   * documentos, todas sem conteúdo, e ainda por cima faziam o `resgate` e as
+   * comparações de versões acusarem diferenças que não existem. Apagar a
+   * entrada quando a nota fica vazia é o que mantém o documento igual ao que
+   * era antes desta funcionalidade existir — e é isso que o teste prende.
+   */
+  function notaDaSeccao(chave: string, titulo: string) {
+    const notas = doc.notasPorSeccao ?? {};
+    return (
+      <NotasInternas
+        compacta
+        titulo={titulo}
+        valor={notas[chave] ?? ""}
+        placeholder="Só para a equipa. Nunca sai na proposta."
+        onChange={(v) => {
+          const seguintes = { ...notas };
+          if (v.trim()) seguintes[chave] = v;
+          else delete seguintes[chave];
+          patch({
+            notasPorSeccao: Object.keys(seguintes).length > 0 ? seguintes : undefined,
+          });
+        }}
+      />
+    );
+  }
+
+  async function reporSobreposto() {
+    if (!sobreposto || aRepor) return;
+    setARepor(true);
+    try {
+      // A rota recebe a VARIANTE, não a chave inteira: a chave é
+      // `<pedido>--<variante>`, e é o servidor que a volta a montar.
+      const variante = sobreposto.chave.startsWith(`${quote.id}--`)
+        ? sobreposto.chave.slice(`${quote.id}--`.length)
+        : null;
+      if (!variante) {
+        toast("Não reconheço o sítio onde essa versão ficou guardada.", "error");
+        return;
+      }
+      const res = await fetch(
+        `/api/orcamento/${quote.id}/proposta-rascunho?variante=${encodeURIComponent(variante)}`,
+      );
+      const dados = await res.json().catch(() => null);
+      const recuperado = dados?.draft?.doc;
+      if (!res.ok || recuperado == null) {
+        // Dizer o que aconteceu e o que fazer, e NÃO limpar a barra: se não se
+        // conseguiu abrir agora, a gaveta continua lá e vale a pena insistir.
+        toast(
+          res.status === 401
+            ? "A sessão expirou. Entra outra vez e essa versão continua guardada."
+            : "Não consegui abrir essa versão agora. Ela continua guardada — tenta daqui a pouco.",
+          "error",
+        );
+        return;
+      }
+      setLimpo({
+        doc,
+        total: totalInput,
+        segundos: 10,
+        motivo: sobreposto.quem
+          ? `Reposta a versão de ${sobreposto.quem}.`
+          : "Reposta a versão que tinha sido substituída.",
+      });
+      setDoc(recuperado as StudioDoc);
+      setSobreposto(null);
+    } catch {
+      toast("Não consegui abrir essa versão agora. Ela continua guardada.", "error");
+    } finally {
+      setARepor(false);
+    }
   }
 
   function clearDraft() {
@@ -7088,6 +7276,47 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             em `ProposalBuilder.tsx:973-1009`; aqui é a mesma conta noutra
             caixa. */}
         <div className="@container min-w-0 flex-1">
+          {/* ══════════════════════════════════════════════════════════════
+              O TRABALHO QUE ESTA GRAVAÇÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
+              ══════════════════════════════════════════════════════════════
+
+              Isto não é um aviso: é uma decisão por tomar sobre trabalho de
+              outra pessoa. Por isso não é um `toast` — fica aqui até alguém
+              resolver.
+
+              `aria-live="polite"` e não `assertive`: aparece depois de uma
+              gravação automática, num momento em que ela está a escrever, e
+              interromper um leitor de ecrã a meio de uma frase para dar uma
+              notícia que não é urgente seria trocar o mal maior pelo menor.
+
+              As duas saídas estão à vista e nenhuma esconde a outra: repor, ou
+              dispensar. Dispensar não apaga nada no servidor — só tira o
+              lembrete —, e é isso que o botão diz pelo nome. */}
+          {sobreposto && (
+            <div
+              className="border-[var(--bo-hairline-strong)] bg-[var(--bo-surface-sunken)] mb-4 rounded-xl border p-3"
+              aria-live="polite"
+            >
+              <p className="text-[var(--bo-text)] mb-1 text-sm font-medium">
+                {sobreposto.quem
+                  ? `A versão de ${sobreposto.quem} ficou guardada.`
+                  : "A versão que estava aqui ficou guardada."}
+              </p>
+              <p className="text-[var(--bo-text-muted)] mb-3 text-xs leading-relaxed">
+                Gravaste por cima de trabalho que tinha sido feito noutro sítio
+                {sobreposto.quando ? ` às ${quandoGravado(sobreposto.quando)}` : ""}. Ficou a tua
+                versão, e a outra não se perdeu.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" loading={aRepor} onClick={reporSobreposto}>
+                  Repor essa versão
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSobreposto(null)}>
+                  Dispensar o aviso
+                </Button>
+              </div>
+            </div>
+          )}
           {/* Template selector */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <Segmented
@@ -7381,7 +7610,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section title="Imagens de capa (2)" id="capas">
+          <Section
+            title="Imagens de capa (2)"
+            id="capas"
+            rodape={notaDaSeccao("capas", "Nota sobre as capas")}
+          >
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -7497,7 +7730,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos">
+          <Section
+            title="Serviços"
+            id="servicos"
+            rodape={notaDaSeccao("servicos", "Nota sobre os serviços")}
+          >
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -7517,7 +7754,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
+            <Section
+              title="Mood boards"
+              id="moodboards"
+              nota={contagemDosBoards}
+              rodape={notaDaSeccao("moodboards", "Nota sobre os mood boards")}
+            >
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -8539,7 +8781,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section title="Cronograma de Organização" id="cronograma">
+            <Section
+              title="Cronograma de Organização"
+              id="cronograma"
+              rodape={notaDaSeccao("cronograma", "Nota sobre o cronograma")}
+            >
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -8612,7 +8858,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section title="Orçamento Proposto" id="orcamento">
+          <Section
+            title="Orçamento Proposto"
+            id="orcamento"
+            rodape={notaDaSeccao("orcamento", "Nota sobre o orçamento")}
+          >
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -9460,7 +9710,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section title="Total, IVA e validade" id="total">
+          <Section
+            title="Total, IVA e validade"
+            id="total"
+            rodape={notaDaSeccao("total", "Nota sobre o total")}
+          >
             <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
               {/**
                * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
@@ -11562,12 +11816,27 @@ function Section({
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
   accao,
+  /**
+   * O que fica no FUNDO da secção, depois do conteúdo — hoje, a nota interna
+   * daquela secção.
+   *
+   * ── PORQUE É UMA RANHURA DA SECÇÃO E NÃO MAIS UM FILHO ──────────────────
+   *
+   * Podia ser escrito como último filho em cada uma das seis. Seria a mesma
+   * coisa até ao dia em que uma delas ficasse com a nota no meio do conteúdo
+   * — e uma nota interna que aparece onde calha, ao pé de campos que SAEM na
+   * proposta, é exactamente o que o papel amarelo do `NotasInternas` existe
+   * para evitar. A ranhura garante que está sempre no mesmo sítio, por baixo
+   * de tudo, e que se dobra com a secção como o resto.
+   */
+  rodape,
 }: {
   title: string;
   children: React.ReactNode;
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
+  rodape?: React.ReactNode;
 }) {
   const [fechada, setFechada] = useState(false);
 
@@ -11630,6 +11899,7 @@ function Section({
           no formulário, e fechá-la não pode apagar o que lá está escrito. */}
       <div id={corpoId} hidden={fechada}>
         {children}
+        {rodape}
       </div>
     </Card>
   );

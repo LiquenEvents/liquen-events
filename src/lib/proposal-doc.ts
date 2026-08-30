@@ -719,28 +719,29 @@ export interface ProposalDoc {
   budgetExtrasSomam?: boolean;
 
   /**
-   * Desenhar a linha «Total a pagar» a fechar o orçamento.
+   * ── NÃO HÁ INTERRUPTOR DO «TOTAL A PAGAR», E É DE PROPÓSITO ──────────────
    *
-   * DESLIGADA POR OMISSÃO. Esteve ligada, com o argumento de que a soma dos
-   * adicionais — cada um com o seu próprio IVA — não é trivial e não se deve
-   * pedir de cabeça a quem lê. O argumento continua de pé; o que ele não pesou
-   * foi a folha de referência.
+   * Havia aqui um `mostrarTotalAPagar?: boolean`, com um comentário a dizer
+   * que a linha estava «desligada por omissão» e que «continua a poder
+   * ligar-se». Saiu, porque as duas coisas tinham deixado de ser verdade:
    *
-   * A proposta feita à mão fecha o quadro em «Valor Total», com a coordenação e
-   * a deslocação por baixo, e mais nada. Ela abriu uma proposta gerada, viu um
-   * bloco «Total a pagar» em corpo 22 que a folha dela não tem, e disse que não
-   * estava igual. Num documento que ela envia há anos, um número grande a mais é
-   * um número que ninguém lhe pediu.
+   *  · NADA em código o lia. O gerador do PDF deixou de o consultar quando o
+   *    argumento a favor de o ter caiu — está escrito lá, com o caso à frente:
+   *    sem essa linha impressa, o casal não tinha como ligar os 2.950,79 € de
+   *    uma página aos 3.025,80 € da outra, e a soma que ninguém escreve é a
+   *    soma que o casal faz de cabeça, e faz mal.
    *
-   * Continua a poder ligar-se — é uma linha por proposta, e nas propostas com
-   * muitos adicionais é ela que responde ao «então quanto é ao todo?». Só deixou
-   * de ser o que sai sem ninguém escolher.
+   *  · E depois ela pediu o contrário do que este campo permitia: «quero
+   *    sempre que nas propostas apareça assim na parte do orçamento». Hoje a
+   *    escada — TOTAL, IVA, Total a pagar — sai sempre, com adicionais ou sem
+   *    eles, e há testes a prendê-lo em `proposal-doc-pdf.dinheiro.test.ts`.
    *
-   * Nota: só governa o total de FECHO, o que soma os adicionais. Uma proposta
-   * sem adicionais nenhuns continua a fechar no total de sempre, com o rótulo
-   * escrito no estúdio — que é a linha «Valor Total» da folha antiga.
+   * Ou seja: um campo morto cuja documentação prometia uma escolha que já não
+   * existia — e que descrevia como estado actual precisamente aquilo que ela
+   * mandou mudar. Uma análise a este código leu esse comentário e concluiu, com
+   * toda a lógica, que faltava construir o interruptor. Construí-lo teria
+   * desfeito um pedido dela.
    */
-  mostrarTotalAPagar?: boolean;
   // Organização template: per-item estimated values.
   budgetRows?: BudgetRow[];
   totalEstimatedText?: string; // "[Valor Total]" / "12.500,00 €"

@@ -252,6 +252,10 @@ let rascunhoDoEmail: Record<string, unknown> | null = {
 };
 /** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
 let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
+/** O que está na GAVETA DO RESGATE (`?variante=sobreposto`). É de propósito
+ *  uma variável à parte de `rascunhoServidor`: o defeito que isto prende era
+ *  precisamente as duas serem lidas como se fossem a mesma. */
+let rascunhoSobreposto: { doc: unknown; updatedAt: string } | null = null;
 /**
  * Um portão para segurar a LEITURA do rascunho.
  *
@@ -340,9 +344,14 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     // que decide se o estúdio pode reenviar o que tem preso no navegador.
     if (metodo === "GET") {
       if (portaoDoRascunho) await portaoDoRascunho;
-      return leituraDoRascunhoFalha
-        ? reply({ ok: false })
-        : reply({ json: { ok: true, draft: rascunhoServidor } });
+      if (leituraDoRascunhoFalha) return reply({ ok: false });
+      // A gaveta do resgate é OUTRA gaveta. Devolver aqui o rascunho do
+      // estúdio é exactamente o que o servidor fazia antes de a porta existir,
+      // e um duplo que não distinga as duas não testa porta nenhuma.
+      const querResgate = /[?&]variante=/.test(url);
+      return reply({
+        json: { ok: true, draft: querResgate ? rascunhoSobreposto : rascunhoServidor },
+      });
     }
     if (metodo === "PUT") return gravacaoDoRascunho();
     return reply({ ok: false });
@@ -388,6 +397,7 @@ beforeEach(() => {
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   rascunhoServidor = null;
+  rascunhoSobreposto = null;
   portaoDoRascunho = null;
   abrirPortaoDoRascunho = null;
   gravacaoDoRascunho = () =>
@@ -463,6 +473,315 @@ const renderStudio = () =>
  * não viu o que ia perder, e a resposta certa é quase sempre "sim" — por isso
  * carrega-se sem ler. A anulação pergunta DEPOIS, com o estrago à vista.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TRABALHO ESMAGADO TEM DE TER PORTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O cenário, que já aconteceu: a Ana abre o estúdio de manhã e deixa o
+ * separador aberto. A Catarina abre a MESMA proposta à tarde noutro
+ * computador, compõe dois mood boards e escreve os textos. A Ana volta ao
+ * portátil e escreve um carácter. Oitocentos milissegundos depois, o documento
+ * das nove da manhã é gravado por cima do das quatro da tarde.
+ *
+ * O servidor sempre fez a parte difícil: guarda a versão que ia desaparecer
+ * numa gaveta irmã e devolve o nome dela em `resgate`. A regra da casa — «se
+ * falhar, não perder trabalho» — estava cumprida onde importa.
+ *
+ * O que faltava era tudo o resto. O estúdio lia `overwrote` e `previousBy`,
+ * ignorava o `resgate`, e dizia «Ficou a tua versão.» — a frase que faz quem a
+ * lê concluir, com toda a razão, que as duas horas da outra pessoa acabaram.
+ * E mesmo que soubesse, não havia como lá chegar: a lista de gavetas que a
+ * leitura aceitava não tinha esta lá dentro.
+ *
+ * Estes testes prendem as duas metades: que a barra aparece e diz de quem e de
+ * quando, e que o botão vai à GAVETA CERTA e traz o documento de volta.
+ */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A NOTA QUE PERTENCE A UMA SECÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo `notasPorSeccao` existia há muito, e bem tratado em três sítios: o
+ * tipo no documento, o guarda do gerador do PDF («as notas por secção nunca são
+ * desenhadas», com teste próprio em `notas-internas-ficam-em-casa.test.ts`) e a
+ * limpeza ao copiar para outro pedido.
+ *
+ * Três sítios a cuidar de uma coisa que NINGUÉM ESCREVIA: não havia caixa
+ * nenhuma no estúdio. Era uma funcionalidade inteira, acabada e protegida, sem
+ * porta de entrada.
+ *
+ * O `notasInternas` que já existia é sobre o negócio inteiro («recusaram em
+ * 2025 por preço») e vive na primeira secção. Estas são outra escala — «as
+ * capas são as duas do mesmo ângulo», «esta linha é a que dá a margem toda» —
+ * e o ponto é estarem onde a dúvida nasce.
+ */
+describe("notas presas a cada secção", () => {
+  const seccoes = [
+    "Nota sobre as capas",
+    "Nota sobre os serviços",
+    "Nota sobre os mood boards",
+    "Nota sobre o orçamento",
+    "Nota sobre o total",
+  ];
+
+  it("cada secção do trabalho tem a sua caixa", async () => {
+    renderStudio();
+    for (const titulo of seccoes) {
+      expect(
+        await screen.findByLabelText(new RegExp(titulo, "i")),
+        `falta a caixa de «${titulo}»`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("a secção do Evento NÃO ganha uma segunda caixa", async () => {
+    /**
+     * Ali já vive a nota do negócio inteiro. Duas caixas amarelas na mesma
+     * secção, uma por baixo da outra, seriam duas gavetas para a mesma coisa —
+     * e quem escrevesse na de baixo perdia a nota que a proposta seguinte
+     * herda.
+     */
+    renderStudio();
+    await screen.findByLabelText(/Notas internas/i);
+    expect(screen.queryByLabelText(/Nota sobre o evento/i)).toBeNull();
+  });
+
+  it("o que se escreve fica guardado na chave daquela secção", async () => {
+    renderStudio();
+    const user = userEvent.setup();
+    const caixa = await screen.findByLabelText(/Nota sobre o orçamento/i);
+    await user.type(caixa, "A margem toda está na linha das flores.");
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    const gravado = corpos("proposta-rascunho").at(-1) ?? "";
+    expect(gravado).toContain("notasPorSeccao");
+    expect(gravado).toContain("A margem toda está na linha das flores.");
+    // E na chave certa — uma nota do orçamento guardada como sendo das capas
+    // aparecia na secção errada seis meses depois.
+    expect(JSON.parse(gravado).doc.notasPorSeccao.orcamento).toContain("margem toda");
+  });
+
+  it("apagar a nota TIRA a chave, em vez de deixar um vazio", async () => {
+    /**
+     * Seis caixas que gravassem `""` punham seis chaves sem conteúdo em todos
+     * os documentos — e faziam a comparação de versões e o resgate acusarem
+     * diferenças que não existem. Um documento sem notas tem de ficar
+     * exactamente como era antes de isto existir.
+     */
+    renderStudio();
+    const user = userEvent.setup();
+    const caixa = await screen.findByLabelText(/Nota sobre as capas/i);
+    await user.type(caixa, "trocar a segunda");
+    await waitFor(
+      () => expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("trocar a segunda"),
+      {
+        timeout: 4000,
+      },
+    );
+    pedidos = [];
+    await user.clear(caixa);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    const depois = JSON.parse(corpos("proposta-rascunho").at(-1)!).doc;
+    expect(depois.notasPorSeccao, "ficou uma gaveta vazia no documento").toBeUndefined();
+  });
+
+  it("uma nota só com espaços não entra no documento", async () => {
+    /**
+     * Escrever espaços não provoca gravação nenhuma — e isso é a resposta
+     * certa, não uma falha: o documento não mudou, portanto não há o que
+     * gravar. A regra que interessa é a outra, e é esta: espaços em branco
+     * nunca podem chegar ao documento como se fossem uma nota.
+     */
+    renderStudio();
+    const user = userEvent.setup();
+    const caixa = await screen.findByLabelText(/Nota sobre o total/i);
+    await user.type(caixa, "   ");
+    // Tempo de sobra para uma gravação automática, se ela chegasse a existir.
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(
+      corpos("proposta-rascunho").some((c) => c.includes("notasPorSeccao")),
+      "espaços em branco entraram no documento como se fossem uma nota",
+    ).toBe(false);
+  });
+});
+
+describe("o trabalho que uma gravação esmagou", () => {
+  /** Uma gravação que sobrepôs alguém, tal como o servidor a responde. */
+  function gravacaoQueSobrepos(opcoes: { resgate?: string; quem?: string } = {}) {
+    const { resgate = "q1--sobreposto", quem = "Catarina" } = opcoes;
+    gravacaoDoRascunho = () =>
+      reply({
+        json: {
+          ok: true,
+          guardado: true,
+          updatedAt: new Date().toISOString(),
+          overwrote: true,
+          previousBy: quem,
+          ...(resgate ? { resgate, resgateEm: "2026-07-28T15:30:00.000Z" } : {}),
+        },
+      });
+  }
+
+  /** Um rascunho com conteúdo, para haver onde escrever. */
+  function semear() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Igreja" }] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      }),
+    );
+  }
+
+  /** Escreve alguma coisa, para a gravação automática disparar. */
+  async function mexerNoDocumento(user: ReturnType<typeof userEvent.setup>) {
+    const campo = await screen.findByDisplayValue("Decoração Floral");
+    await user.type(campo, "!");
+  }
+
+  it("a barra aparece, e diz de quem era e de quando", async () => {
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+
+    const barra = await screen.findByText(
+      /A versão de Catarina ficou guardada/i,
+      {},
+      {
+        timeout: 4000,
+      },
+    );
+    expect(barra).toBeTruthy();
+    // A hora importa: é o que dá a noção do que está em jogo antes de decidir.
+    expect(document.body.textContent).toMatch(/às \d/);
+  });
+
+  it("o aviso deixa de dizer que ficou só a tua versão, e ponto", async () => {
+    /**
+     * A frase antiga era verdadeira e mesmo assim a pior possível: fechava a
+     * porta. Quem a lia não tinha razão nenhuma para procurar mais.
+     */
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+    expect(document.body.textContent).toMatch(/a outra está guardada/i);
+  });
+
+  it("REPOR vai à GAVETA DO RESGATE, e não ao rascunho do estúdio", async () => {
+    /**
+     * É esta a regra que prende a porta. Antes, um pedido com `?variante=`
+     * caía no rascunho do estúdio — ou seja, «repor» devolvia exactamente o
+     * documento que estava no ecrã, e o trabalho da outra pessoa continuava
+     * inalcançável.
+     */
+    rascunhoServidor = {
+      doc: { ref: "o que está no ecrã" },
+      updatedAt: "2026-07-28T16:00:00.000Z",
+    };
+    rascunhoSobreposto = {
+      doc: {
+        template: "decoracao",
+        ref: "AS DUAS HORAS DA CATARINA",
+        serviceGroups: [{ letter: "a)", title: "Cerimónia ao pôr do sol", items: [] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      },
+      updatedAt: "2026-07-28T15:30:00.000Z",
+    };
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+    await user.click(screen.getByRole("button", { name: /Repor essa versão/i }));
+
+    // Foi à gaveta certa.
+    await waitFor(() =>
+      expect(
+        pedidos.some((p) => p.url.includes("proposta-rascunho") && p.url.includes("variante=")),
+        "o «repor» não pediu a variante: foi buscar o rascunho do estúdio",
+      ).toBe(true),
+    );
+    // E o documento voltou mesmo.
+    expect(await screen.findByDisplayValue("Cerimónia ao pôr do sol")).toBeTruthy();
+  });
+
+  it("repor pode ser anulado — é um gesto que substitui o documento", async () => {
+    rascunhoSobreposto = {
+      doc: {
+        template: "decoracao",
+        ref: "a versão da Catarina",
+        serviceGroups: [{ letter: "a)", title: "Cerimónia ao pôr do sol", items: [] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      },
+      updatedAt: "2026-07-28T15:30:00.000Z",
+    };
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+    await user.click(screen.getByRole("button", { name: /Repor essa versão/i }));
+    await screen.findByDisplayValue("Cerimónia ao pôr do sol");
+    // A mesma rede dos outros gestos que deitam fora o que estava no ecrã.
+    expect(await screen.findByText(/Pode anular durante/i)).toBeTruthy();
+  });
+
+  it("dispensar tira o lembrete e não vai ao servidor — nada se apaga", async () => {
+    gravacaoQueSobrepos();
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await screen.findByText(/A versão de Catarina ficou guardada/i, {}, { timeout: 4000 });
+
+    pedidos = [];
+    await user.click(screen.getByRole("button", { name: /Dispensar o aviso/i }));
+    expect(screen.queryByText(/ficou guardada/i)).toBeNull();
+    expect(
+      pedidos.some((p) => p.init?.method === "DELETE"),
+      "dispensar o lembrete apagou alguma coisa no servidor",
+    ).toBe(false);
+  });
+
+  it("sem gaveta, não promete o que não pode cumprir", async () => {
+    /**
+     * O servidor pode não conseguir guardar a cópia (e regista-o). Nesse caso
+     * a frase antiga é a honesta, e não pode aparecer barra nenhuma a oferecer
+     * um resgate que não existe.
+     */
+    gravacaoQueSobrepos({ resgate: undefined });
+    semear();
+    renderStudio();
+    const user = userEvent.setup();
+    await mexerNoDocumento(user);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 4000,
+    });
+    expect(screen.queryByRole("button", { name: /Repor essa versão/i })).toBeNull();
+  });
+});
+
 describe("limpar o rascunho pode ser anulado", () => {
   function seedComConteudo() {
     localStorage.setItem(
@@ -6908,10 +7227,27 @@ describe("o email do passo 3 viaja com o envio", () => {
  */
 describe("as notas internas vivem no estúdio", () => {
   it("o campo está montado e diz que não sai na proposta", () => {
+    /**
+     * O `getByText` desta garantia era único quando havia UMA caixa. Desde que
+     * cada secção passou a ter a sua, a mesma frase aparece seis vezes — e
+     * deve mesmo: é ela a garantia, e uma caixa amarela sem ela ao lado de
+     * campos que SAEM na proposta é precisamente a confusão que este
+     * componente existe para evitar.
+     *
+     * Por isso a regra passa a dizer DE QUAL fala: a frase tem de estar no
+     * rótulo do campo, que é onde um leitor de ecrã a vai buscar.
+     */
     seedDraft(0);
     renderStudio();
-    expect(screen.getByLabelText(/Notas internas/)).toBeTruthy();
-    expect(screen.getByText(/só para ti, nunca sai na proposta/)).toBeTruthy();
+    const campo = screen.getByLabelText(/Notas internas/);
+    expect(campo).toBeTruthy();
+    expect(
+      campo.getAttribute("aria-label") ??
+        document.querySelector(`label[for="${campo.id}"]`)?.textContent ??
+        "",
+    ).toMatch(/só para ti, nunca sai na proposta/);
+    // E continua a haver uma por cada caixa, e não uma solitária.
+    expect(screen.getAllByText(/só para ti, nunca sai na proposta/).length).toBeGreaterThan(1);
   });
 
   it("o que se escreve na nota entra no rascunho gravado", async () => {

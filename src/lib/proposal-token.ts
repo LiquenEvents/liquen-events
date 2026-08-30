@@ -100,13 +100,38 @@ function sign(body: string): string {
 
 /** Mint a tamper-proof link token for a proposal. */
 export function createProposalToken(proposalId: string): string {
-  const payload = { typ: "proposal", pid: proposalId, exp: Date.now() + TTL_MS };
+  /**
+   * ── O `iat` É NOVO, E É O QUE PERMITE CORTAR UM LINK ─────────────────────
+   *
+   * Cortar links tem de saber QUANDO cada um foi emitido: o corte é um
+   * carimbo de tempo no pedido, e um link só morre se for anterior a ele.
+   * Sem isso, ou o corte não apanha os links já enviados (não fecha nada) ou
+   * mata também o endereço que ela cunhar a seguir (fecha demais, e ela
+   * reenviaria a proposta para um link morto).
+   *
+   * Os tokens já emitidos não trazem `iat` — e não precisam: o `exp` é
+   * `emissão + TTL_MS`, portanto a emissão deduz-se ao milissegundo enquanto
+   * o prazo for o mesmo. O `iat` explícito existe para que deixe de depender
+   * disso: se um dia o prazo mudar, os tokens novos continuam a saber a sua
+   * própria idade e só os antigos ficam pela dedução.
+   */
+  const agora = Date.now();
+  const payload = { typ: "proposal", pid: proposalId, iat: agora, exp: agora + TTL_MS };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
 }
 
-/** Validate a token; returns the proposal id or null if invalid/expired/tampered. */
-export function readProposalToken(token: string | undefined | null): { proposalId: string } | null {
+/**
+ * Validate a token; returns the proposal id or null if invalid/expired/tampered.
+ *
+ * `emitidoEm` é a hora em que o token foi cunhado, em milissegundos. Vem do
+ * `iat` quando ele existe e, nos tokens anteriores a esse campo, deduz-se de
+ * `exp - TTL_MS` — exacto enquanto o prazo for o mesmo. É com ele que o corte
+ * de links distingue um endereço já enviado de um cunhado depois do corte.
+ */
+export function readProposalToken(
+  token: string | undefined | null,
+): { proposalId: string; emitidoEm: number } | null {
   if (!token) return null;
   // A canonical token is exactly `body.sig` (a base64url signature never contains
   // a "."). Reject any trailing junk (`body.sig.x`) rather than silently dropping
@@ -130,7 +155,12 @@ export function readProposalToken(token: string | undefined | null): { proposalI
     if (payload.typ !== undefined && payload.typ !== "proposal") return null;
     if (typeof payload.exp !== "number" || Date.now() > payload.exp) return null;
     if (typeof payload.pid !== "string" || !payload.pid) return null;
-    return { proposalId: payload.pid };
+    // Ver a nota no `createProposalToken`: `iat` quando existe, dedução quando
+    // não. Nunca se aceita um `iat` que não seja número — um token adulterado
+    // não passa pela assinatura, mas um payload estranho não pode virar `NaN`
+    // e fazer a comparação do corte responder ao calhas.
+    const emitidoEm = typeof payload.iat === "number" ? payload.iat : payload.exp - TTL_MS;
+    return { proposalId: payload.pid, emitidoEm };
   } catch {
     return null;
   }
