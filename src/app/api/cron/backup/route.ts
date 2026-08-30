@@ -6,6 +6,8 @@ import { isAuthed } from "@/lib/admin-auth";
 import { sendMail, MAIL_TO } from "@/lib/mail";
 import { construirManifesto, type ManifestoDeFotografias } from "@/lib/manifesto-de-fotografias";
 import { registarCopiaEnviada } from "@/lib/copia-de-seguranca-marcador";
+import { correrRetencao } from "@/lib/retencao";
+import { listQuotes } from "@/lib/quotes-store";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -216,6 +218,42 @@ export async function GET(request: NextRequest) {
      */
     await registarCopiaEnviada({ bytes: comprimido.byteLength, parcial, modo: "automatica" });
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * E SÓ AGORA A RETENÇÃO DOS 12 MESES
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * A política de privacidade publicada promete que «pedidos que não deem
+     * origem a contrato são eliminados no prazo máximo de 12 meses após o
+     * último contacto». Não havia nada a fazê-lo: dois trabalhos automáticos,
+     * e nenhum apagava seja o que for.
+     *
+     * ── PORQUE É QUE VIVE AQUI DENTRO ───────────────────────────────────
+     *
+     * Não é para poupar um ficheiro. É a ORDEM: a cópia já foi enviada quando
+     * isto corre, portanto **nada é apagado sem estar dentro da cópia desse
+     * mesmo dia**. Um trabalho à parte podia correr antes, ou num dia em que a
+     * cópia falhasse, e aí um apagamento correcto passava a ser uma perda.
+     *
+     * E há a razão prática: esta casa já teve um deploy RECUSADO por assumir
+     * um plano de alojamento que não tinha (ver `agendamento.contrato.test.ts`
+     * — «assumi mal, e só o deploy é que mo disse»). Um terceiro agendamento é
+     * uma aposta nesse mesmo plano; esta linha não é.
+     *
+     * ── E NUNCA PODE DEITAR A CÓPIA ABAIXO ──────────────────────────────
+     *
+     * A cópia de segurança é a razão de ser deste trabalho e já foi feita. Se
+     * a retenção falhar, isso regista-se e a resposta continua a dizer que a
+     * cópia seguiu — porque seguiu. Trocar uma cópia bem-sucedida por um 500
+     * por causa da limpeza seria vender o essencial pelo acessório.
+     */
+    let retencao: Awaited<ReturnType<typeof correrRetencao>> | null = null;
+    try {
+      retencao = await correrRetencao(await listQuotes());
+    } catch (e) {
+      log.error("cron backup: a retenção falhou (a cópia seguiu na mesma)", e, { dia });
+    }
+
     log.info("cron backup enviado", {
       dia,
       bytes: comprimido.byteLength,
@@ -236,6 +274,7 @@ export async function GET(request: NextRequest) {
             completo: fotos.manifesto.completo,
           }
         : null,
+      retencao,
     });
   } catch (err) {
     log.error("cron backup falhou", err);
