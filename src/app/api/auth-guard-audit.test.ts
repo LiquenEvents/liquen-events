@@ -522,6 +522,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // Cortar os links já enviados de um pedido. É a rota que fecha uma porta do
   // lado do casal, e o GET diz se e quando já foi cortada — as duas coisas são
   // do back office e nenhuma pode ser feita, nem lida, por quem tem só o link.
+  // Quem trabalha aqui. Saber os nomes da equipa de uma empresa não é
+  // informação pública — um endereço aberto a listá-los é meio caminho para
+  // tentar entrar com um deles.
+  { path: "./admin/equipa/route", methods: ["GET"] },
   { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
   // A memória de preços atravessa TODAS as propostas já enviadas: o que se

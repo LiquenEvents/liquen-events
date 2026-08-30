@@ -300,6 +300,54 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   );
   const [area, setArea] = useState("");
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A EQUIPA É UMA LISTA DE PESSOAS, NÃO UMA CAIXA DE TEXTO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O responsável era escrito à mão. «Ana», «ana» e «Ana R.» eram três
+   * colaboradoras diferentes para o produto — e uma tarefa atribuída a uma
+   * delas não aparecia no filtro das outras duas. O sistema sabe exactamente
+   * quem trabalha aqui (as contas estão configuradas) e nunca o perguntava.
+   *
+   * VAZIO NÃO É «NÃO HÁ NINGUÉM». É «não sei quem são»: a instalação com
+   * palavra-passe partilhada não tem contas nomeadas, e aí o campo tem de
+   * continuar a aceitar um nome escrito à mão. Uma lista vazia que fechasse o
+   * campo tirava a funcionalidade a quem ainda não migrou.
+   *
+   * Pelo `useCachedList` e não por um efeito próprio: é o gancho que esta
+   * página já usa para as tarefas, trata da cache e da revalidação, e evita
+   * mais uma gravação de estado escrita dentro de um `useEffect` — que é um
+   * aviso que este ficheiro não tem nenhum e não vai passar a ter.
+   */
+  const { data: respostaDaEquipa } = useCachedList<{ nomes?: string[] }>(
+    "equipa",
+    "/api/admin/equipa",
+  );
+  const equipa = useMemo(
+    () => (Array.isArray(respostaDaEquipa?.nomes) ? respostaDaEquipa.nomes : []),
+    [respostaDaEquipa],
+  );
+
+  /**
+   * As opções do campo de responsável.
+   *
+   * A equipa configurada MAIS o que já estiver escrito naquela tarefa. A
+   * segunda metade é a que evita o estrago: há tarefas antigas atribuídas a
+   * nomes que não são conta nenhuma («Ana R.», «o fornecedor»), e uma lista
+   * fechada apagava-as em silêncio no primeiro `select` que se tocasse. Uma
+   * migração que perde dados não é uma migração.
+   */
+  const opcoesDeResponsavel = useCallback(
+    (actual: string): string[] => {
+      const nomes = [...equipa];
+      const escrito = (actual ?? "").trim();
+      if (escrito && !nomes.includes(escrito)) nomes.push(escrito);
+      return nomes;
+    },
+    [equipa],
+  );
+
   // filter
   const [who, setWho] = useState<string>("Todos");
 
@@ -496,6 +544,22 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   const { people, openByPerson } = useMemo(() => {
     const counts = new Map<string, number>();
     const seen: string[] = [];
+    /**
+     * A EQUIPA ENTRA PRIMEIRO, mesmo quem não tem tarefa nenhuma.
+     *
+     * Esta lista nascia só do que estivesse ESCRITO nas tarefas — ou seja, uma
+     * colaboradora sem nada atribuído não existia no filtro, e não havia como
+     * perguntar «o que é que a Ana tem?» e receber «nada». A ausência de
+     * resposta e a resposta «nada» são coisas diferentes.
+     *
+     * Os nomes escritos à mão que não são conta nenhuma continuam a aparecer, a
+     * seguir: são as tarefas antigas, e desaparecerem do filtro seria
+     * escondê-las.
+     */
+    for (const nome of equipa) {
+      counts.set(nome, 0);
+      seen.push(nome);
+    }
     for (const t of tasks) {
       if (!t.assignee) continue;
       if (!counts.has(t.assignee)) {
@@ -505,7 +569,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       if (!t.done) counts.set(t.assignee, counts.get(t.assignee)! + 1);
     }
     return { people: ["Todos", ...seen], openByPerson: counts };
-  }, [tasks]);
+  }, [tasks, equipa]);
 
   // Filtrar e ordenar acontecia em CADA render — inclusive a cada tecla escrita
   // no campo "Nova tarefa", que é estado deste componente. Só depende da lista
@@ -562,12 +626,32 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, dueDate: e.target.value })}
                 className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1"
               />
-              <input
-                value={editTaskFields.assignee}
-                onChange={(e) => setEditTaskFields({ ...editTaskFields, assignee: e.target.value })}
-                placeholder="Responsável"
-                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
-              />
+              {equipa.length > 0 ? (
+                <select
+                  aria-label="Responsável"
+                  value={editTaskFields.assignee}
+                  onChange={(e) =>
+                    setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
+                  }
+                  className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
+                >
+                  <option value="">Sem responsável</option>
+                  {opcoesDeResponsavel(editTaskFields.assignee).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={editTaskFields.assignee}
+                  onChange={(e) =>
+                    setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
+                  }
+                  placeholder="Responsável"
+                  className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
+                />
+              )}
               <select
                 value={editTaskFields.area}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, area: e.target.value })}
@@ -677,14 +761,33 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
             Detalhes (opcional)
           </summary>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field
-              label="Responsável"
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-              // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
-              // exemplo acaba por sair daqui para sítios onde não devia estar.
-              placeholder="Ex.: quem fica responsável"
-            />
+            {equipa.length > 0 ? (
+              <Field
+                as="select"
+                label="Responsável"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+              >
+                <option value="">Sem responsável</option>
+                {opcoesDeResponsavel(assignee).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </Field>
+            ) : (
+              /* Sem contas nomeadas configuradas não há equipa a listar, e o
+                 campo continua a ser o de sempre. Ver a nota no `equipa`: uma
+                 lista vazia é «não sei quem são», não «não há ninguém». */
+              <Field
+                label="Responsável"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
+                // exemplo acaba por sair daqui para sítios onde não devia estar.
+                placeholder="Ex.: quem fica responsável"
+              />
+            )}
             <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
               <option value="">Sem área</option>
               {AREAS.map((a) => (
