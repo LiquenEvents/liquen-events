@@ -502,7 +502,22 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-degraus-max: 5; /* o sexto degrau é o índice 5 */
 
   /* ── Hairline borders & control boundaries (neutral, ChatGPT-quiet) ── */
-  --bo-hairline: var(--bo-tinta-8); /* card / divider hairline */
+  /* ── O FIO SOBE UM DEGRAU PORQUE FICOU SOZINHO ──────────────────────────
+     Enquanto o chão do painel era cinzento, um cartão distinguia-se por DUAS
+     coisas ao mesmo tempo: a área branca sobre o cinzento (o mecanismo da
+     Apple, #F5F5F7 → #FFFFFF) e o fio da moldura. Foi por isso que as sombras
+     do conteúdo puderam sair todas — estão contadas uma a uma no
+     `sombras-do-back-office.test.ts`.
+
+     Com o chão branco, a metade da área desapareceu e o fio ficou sozinho a
+     fazer o trabalho das duas. Um fio de 8% sobre branco vê-se, mas vê-se
+     pouco — e este ecrã é lido de relance, num telemóvel, muitas vezes ao sol.
+
+     Sobe um degrau na escala que a casa já tem: 8% → 10%. Um degrau e não
+     dois, porque estes 158 fios não são todos molduras — a maioria são
+     SEPARADORES dentro de um cartão, e um separador que grita é ruído. A
+     moldura, essa, passa a pedir o degrau forte, na `.bo-card` mais abaixo. */
+  --bo-hairline: var(--bo-tinta-10); /* card / divider hairline */
   --bo-hairline-strong: var(--bo-tinta-13); /* clearer separator */
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
   --bo-control-border: rgba(13, 13, 13, 0.55);
@@ -2637,7 +2652,10 @@ body[data-menu-open] .whatsapp-fixed {
    call-outs. These classes keep that language consistent across every view. */
 .bo-card {
   background: var(--bo-surface, #ffffff);
-  border: 1px solid var(--bo-hairline, rgba(42, 38, 32, 0.08));
+  /* O degrau FORTE, e não o de omissão: com o chão branco, isto é a única
+     coisa que diz onde o cartão começa e acaba. Um separador dentro dele
+     continua a ser o fio normal. */
+  border: 1px solid var(--bo-hairline-strong, rgba(42, 38, 32, 0.13));
   /* Roomier corners (rounded-2xl) — the calm container the redesign leans on. */
   border-radius: var(--bo-radius-lg, 1rem);
   /* Sem sombra, e agora sem cinzento por baixo: o chão do painel é branco, e
