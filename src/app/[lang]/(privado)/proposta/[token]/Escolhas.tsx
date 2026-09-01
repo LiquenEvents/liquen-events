@@ -67,11 +67,26 @@ function FotoDaOpcao({ foto, alt }: { foto?: FotoDaProposta; alt: string }) {
   if (!foto || !alvo || desistiu) return null;
   return (
     <span
-      className="block overflow-hidden rounded-md bg-foreground/[0.04]"
+      className="relative block overflow-hidden rounded-md bg-foreground/[0.04]"
       style={{
         aspectRatio: foto.largura && foto.altura ? `${foto.largura}/${foto.altura}` : "4/3",
       }}
     >
+      {/* O BORRÃO, QUE ESTAVA CALCULADO E A SER DEITADO FORA.
+          O `lqip` vem no HTML, em poucas centenas de bytes, e já é servido em
+          todas as fotos (ver `proposta-fotos.ts`). Aqui não era pintado: as
+          fotografias das opções são preguiçosas, e o que o casal via enquanto
+          elas não chegavam era uma fila de rectângulos cinzentos ao lado das
+          escolhas — no ecrã onde ele decide. */}
+      {foto.lqip && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={foto.lqip}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
+        />
+      )}
       {/* `<img>` e não `next/image`: estes URLs são assinados e de vida curta,
           e o optimizador do Next guardaria em cache uma assinatura que expira.
           É a mesma decisão da galeria — ver `Inspiracao.tsx`. */}
@@ -82,7 +97,8 @@ function FotoDaOpcao({ foto, alt }: { foto?: FotoDaProposta; alt: string }) {
         loading="lazy"
         decoding="async"
         onError={aoFalhar}
-        className="h-full w-full object-cover"
+        /* `relative`: o borrão está em `absolute` por baixo. */
+        className="relative h-full w-full object-cover"
       />
     </span>
   );

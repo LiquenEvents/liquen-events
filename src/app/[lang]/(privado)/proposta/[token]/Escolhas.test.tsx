@@ -234,3 +234,60 @@ describe("as duas línguas", () => {
     expect(await screen.findByText(/We have got it/i)).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ECRÃ ONDE ELES DECIDEM NÃO NASCE COM RECTÂNGULOS CINZENTOS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «quero mesmo tudo super rápido».
+ *
+ * O `lqip` é um borrão de poucas centenas de bytes que JÁ VEM no HTML — é
+ * calculado no envio e servido em todas as fotografias (ver `proposta-fotos`).
+ * A capa e a grelha pintavam-no; as fotografias das opções, não. E estas são
+ * preguiçosas, portanto o que o casal via ao chegar às escolhas era uma fila
+ * de caixas cinzentas ao lado das perguntas — no ecrã onde se decide.
+ *
+ * Estava calculado, servido, e deitado fora à chegada.
+ */
+describe("as fotografias das opções não nascem em branco", () => {
+  /** A chave é a POSIÇÃO (`e{i}o{j}`) e não o id da opção — ver `proposta-fotos`. */
+  const COM_FOTO = {
+    e0o0: {
+      id: "f1",
+      miniatura: "mini/o1",
+      lqip: "data:image/jpeg;base64,BORRAO",
+      largura: 4,
+      altura: 3,
+    },
+  };
+
+  it("há um borrão por baixo desde o primeiro fotograma", () => {
+    desenhar({ fotos: COM_FOTO });
+    const borrao = document.querySelector('img[aria-hidden="true"]');
+    expect(borrao?.getAttribute("src")).toBe("data:image/jpeg;base64,BORRAO");
+  });
+
+  it("e é decoração: quem ouve a página não encontra a fotografia duas vezes", () => {
+    desenhar({ fotos: COM_FOTO });
+    const borrao = document.querySelector('img[aria-hidden="true"]');
+    expect(borrao?.getAttribute("alt")).toBe("");
+  });
+
+  it("a fotografia a sério fica POR CIMA do borrão", () => {
+    // O borrão está em `absolute`; sem uma posição na de cima, a fotografia
+    // verdadeira ficava por baixo dele e o casal via a proposta desfocada.
+    desenhar({ fotos: COM_FOTO });
+    const verdadeira = [...document.querySelectorAll("img")].find(
+      (i) => i.getAttribute("aria-hidden") !== "true",
+    );
+    expect(verdadeira?.className).toContain("relative");
+  });
+
+  it("sem borrão gravado, não se inventa caixa nenhuma", () => {
+    // As propostas anteriores ao `lqip` não têm nenhum. Uma caixa vazia
+    // marcada como decoração seria ruído no HTML e mais nada.
+    desenhar({ fotos: { e0o0: { id: "f1", miniatura: "mini/o1" } } });
+    expect(document.querySelector('img[aria-hidden="true"]')).toBeNull();
+  });
+});

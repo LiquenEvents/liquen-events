@@ -110,20 +110,43 @@ import { textosDaPagina, fase, type SeccaoDobravel } from "./textos-da-pagina";
  * propósito — a queixa de fotografias «desfocadas» veio de servir MENOS pixéis
  * (a de 400 numa fatia que pedia 1030) e não se volta lá.
  *
- * ── `min-resolution: 2dppx`, e não «sempre» ─────────────────────────────
+ * ── `min-resolution: 1.5dppx`, e não «sempre» ─────────────────────────
  *
- * A oferta só tem o candidato de 1200. Um `<source>` que casa DESLIGA o
- * `srcset` do `<img>` — e num ecrã de densidade 1, onde o navegador escolheria
- * a de 400 (22 KB), servir a de 1200 em AVIF (105 KB) seria cinco vezes pior.
- * A partir de 2 pixéis por ponto a de 1200 JÁ ERA a escolhida, e aí a troca é
- * estritamente melhor.
+ * A oferta em AVIF só tem o candidato de 1200 (não há AVIF de 400 do lado
+ * das propostas). Um `<source>` que casa DESLIGA o `srcset` do `<img>` — e
+ * num ecrã de densidade 1, onde o navegador escolheria a de 400 (22 KB),
+ * passar a servir a de 1200 em AVIF (105 KB) seria cinco vezes pior.
+ *
+ * A pergunta é então: a partir de que densidade é que a de 1200 JÁ ERA a
+ * escolhida? O navegador escolhe a de 1200 quando a fatia pede mais de 400
+ * pixéis, portanto a fronteira é `400 ÷ largura-da-fatia-em-pontos`. Com as
+ * fatias que esta casa serve:
+ *
+ *     ecrã     fatia (pontos)   fronteira
+ *      320 pt      294 (92vw)     1,36 dppx
+ *      360 pt      331 (92vw)     1,21 dppx
+ *      390 pt      359 (92vw)     1,11 dppx
+ *      640 pt      294 (46vw)     1,36 dppx
+ *     1024 pt     1024            0,39 dppx
+ *
+ * A pior de todas é 1,36. Um portão a 1,5 fica acima de todas elas: onde
+ * ele casa, a de 1200 já era a escolhida, e a troca é estritamente melhor.
+ *
+ * ── E PORQUE É QUE DESCEU DE 2 PARA 1,5 ──────────────────────────────────
+ *
+ * Porque a 2 ficava de fora uma densidade inteira de gente: um portátil
+ * Windows a 150% de escala reporta exactamente 1,5. Não é um caso de
+ * laboratório — é como se vê uma proposta num escritório. E a conta acima
+ * mostra que a 1,5 não há ecrã nenhum onde a troca piore alguma coisa.
+ *
+ * Guardado pelo `portao-do-avif.test.ts`, com esta aritmética lá dentro.
  *
  * `null` — nenhuma oferta — é o caso NORMAL de tudo o que foi carregado antes
  * de o bucket existir. O `<img>` ao lado existe sempre.
  */
 function OfertaAvif({ foto }: { foto?: { mediaAvif?: string } }) {
   if (!foto?.mediaAvif) return null;
-  return <source type="image/avif" media="(min-resolution: 2dppx)" srcSet={foto.mediaAvif} />;
+  return <source type="image/avif" media="(min-resolution: 1.5dppx)" srcSet={foto.mediaAvif} />;
 }
 
 /** Um bloco de texto corrido — as notas, as condições, as observações. */
@@ -779,7 +802,7 @@ export default function Documento({
           )}
           <picture>
             <OfertaAvif foto={capa} />
-            { }
+            {}
             <img
               src={capa.miniatura ?? capa.original}
               {...(capa.miniatura
@@ -1305,10 +1328,26 @@ export default function Documento({
           que ela faz é acabar a proposta com o trabalho dela em vez de uma
           cláusula de arbitragem. */}
       {fecho && (
-        <div className="mt-20 overflow-hidden rounded-sm sm:mt-28">
+        <div className="relative mt-20 overflow-hidden rounded-sm sm:mt-28">
+          {/* O MESMO BORRÃO DA CAPA, que esta tinha ficado sem.
+              O `lqip` são poucas centenas de bytes que já vêm no HTML: está
+              pintado antes de qualquer ida à rede. Aqui a fotografia é
+              preguiçosa de propósito (está no fim de uma página com quarenta e
+              seis), e uma imagem preguiçosa sem borrão é um rectângulo vazio a
+              ocupar meio ecrã no momento em que o casal chega ao fim da
+              proposta — a última coisa que vê. */}
+          {fecho.lqip && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={fecho.lqip}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
+            />
+          )}
           <picture>
             <OfertaAvif foto={fecho} />
-            { }
+            {}
             <img
               src={fecho.miniatura ?? fecho.original}
               {...(fecho.miniatura
@@ -1334,7 +1373,9 @@ export default function Documento({
                tinha a esperar. */
               loading="lazy"
               decoding="async"
-              className="w-full object-cover"
+              /* `relative`: o borrão está em `absolute` por baixo, e sem isto a
+                 fotografia a sério ficava ATRÁS dele. */
+              className="relative w-full object-cover"
               style={{
                 aspectRatio:
                   fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",

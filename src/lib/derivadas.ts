@@ -1,6 +1,7 @@
 import "server-only";
 import { opcoesDeCarregamento } from "./cache-das-fotos";
-import sharp, { type Sharp } from "sharp";
+import type { Sharp } from "sharp";
+import { oSharp } from "./sharp-adiado";
 import { getSupabase } from "@/lib/supabase";
 import {
   PROPOSAL_BUCKET,
@@ -837,7 +838,7 @@ async function gerarAsDeUmaFoto(
       try {
         // Um `sharp` novo por derivada, sobre os MESMOS bytes: um pipeline não
         // se reaproveita depois de `toBuffer`. O que não se repete é a viagem.
-        const derivada = sharp(bytes)
+        const derivada = (await oSharp())(bytes)
           // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
           // foto de telemóvel deitada sai com os lados trocados face ao
           // original — e a miniatura ficava com outra proporção do que a grelha
@@ -961,7 +962,9 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     // Os MESMOS números do lote e do navegador (`image-worker.ts`): uma
     // miniatura fabricada aqui tem de ser indistinguível de uma fabricada lá,
     // ou a mesma foto muda de aspecto conforme o caminho por onde veio.
-    const derivada = await sharp(bytes)
+    const derivada = await (
+      await oSharp()
+    )(bytes)
       .rotate()
       .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: MINIATURA.qualidade - FORMATO.desconto })
@@ -1046,7 +1049,9 @@ export async function derivadaMediaAPedido(
       return { bytes: null, motivo: semResposta ? "storage-sem-resposta" : "original-em-falta" };
     }
     const bytes = Buffer.from(await data.arrayBuffer());
-    const derivada = await sharp(bytes)
+    const derivada = await (
+      await oSharp()
+    )(bytes)
       .rotate()
       // `withoutEnlargement`: uma fotografia que já seja mais pequena do que
       // 1200 sai como está. Esticá-la aqui seria fabricar pixéis que não

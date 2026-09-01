@@ -188,6 +188,56 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * E O QUE NÃO VAI: OS OUTROS `sharp`, QUE NUNCA CORREM AQUI
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela sobre a proposta que chega ao casal: «quero mesmo tudo super
+   * rápido».
+   *
+   * O `sharp` traz um pacote por plataforma, e o rastreador não sabe qual é a
+   * que vai correr — pode levá-los todos. MEDIDO neste repositório:
+   *
+   *   @img/sharp-libvips-linuxmusl-x64   18 MB
+   *   @img/sharp-wasm32                 8,7 MB
+   *   @img/sharp-linuxmusl-x64          324 KB
+   *   ────────────────────────────────────────
+   *                                      27 MB
+   *
+   * Vinte e sete megabytes por FUNÇÃO. Um pacote maior é um arranque a frio
+   * mais longo — é o ficheiro a ser descomprimido antes de a primeira linha
+   * correr —, e o arranque a frio é exactamente o que o casal paga ao carregar
+   * num link do email três dias depois do envio.
+   *
+   * ── PORQUE É QUE SE PODE MESMO DEITAR FORA ────────────────────────────────
+   *
+   * `linuxmusl` é para Alpine; `wasm32` é o recurso para quando não há binário
+   * nativo nenhum. O alvo aqui é Linux x64 com glibc, e essa decisão não é
+   * nova: as duas linhas de cima, no `outputFileTracingIncludes`, já nomeiam
+   * `linux-x64` e só esse — foram escritas em resposta a uma avaria REAL em
+   * produção (`Could not load the "sharp" module`), e desde então é o único
+   * par que se garante. Isto é a outra metade da mesma decisão, dita em voz
+   * alta em vez de ficar por dizer.
+   *
+   * ── E O CUIDADO QUE ISTO EXIGE ───────────────────────────────────────────
+   *
+   * As exclusões correm DEPOIS das inclusões. Uma exclusão escrita larga de
+   * mais engolia o `sharp-linux-x64` que a linha de cima acabou de garantir, e
+   * o resultado seria a mesma função a rebentar inteira antes de chegar ao
+   * código da rota — a avaria que já custou a lista dos temas dela. Repare-se
+   * que `sharp-linux-x64` e `sharp-linuxmusl-x64` são nomes diferentes e
+   * nenhum é prefixo do outro: é isso que faz estes padrões não se tocarem, e
+   * é isso que o `tracing-do-sharp.test.ts` verifica a cada corrida.
+   */
+  outputFileTracingExcludes: {
+    "/**": [
+      "./node_modules/@img/sharp-wasm32/**/*",
+      "./node_modules/@img/sharp-linuxmusl-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
+    ],
+  },
+
   experimental: {
     // React <ViewTransition> (View Transitions API): página-a-página com
     // deslize direcional e morph thumbnail→lightbox na galeria. Browsers sem

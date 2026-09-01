@@ -110,6 +110,52 @@ describe("a grelha", () => {
       "lazy",
     ]);
   });
+
+  it("e o segundo mood board já não tem pressa nenhuma", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════
+     * O DEFEITO QUE UM BOARD SÓ NUNCA PODIA MOSTRAR
+     * ════════════════════════════════════════════════════════════════════
+     *
+     * O caso de cima desenha UM board. Com um board só, contar a posição
+     * dentro do board e contar no documento dá exactamente o mesmo — e por
+     * isso ele passava com a conta certa e com a conta errada.
+     *
+     * E a conta estava errada: o contador reiniciava em cada board. Numa
+     * proposta de três boards saíam ONZE fotografias com pressa, das quais
+     * UMA está no ecrã. Com os pesos que o `Inspiracao.tsx` tem medidos
+     * (105,3 KB a 1200 px em AVIF), são 1 158 KB antes de a página servir
+     * para alguma coisa — 6,2 s num 4G de 1,5 Mbps —, e a capa que o casal
+     * está a ver fica em fila atrás de dez fotografias a quinze mil píxeis
+     * de distância.
+     *
+     * Este caso desenha DOIS boards, que é o mínimo para a diferença
+     * existir. Se alguém voltar a contar por board, as fotografias do
+     * segundo voltam a nascer `eager` e isto fica vermelho.
+     */
+    const b1: BoardParaEcra = { ...BOARD, chave: "b1", fotos: ["a", "b", "c", "a"] };
+    const b2: BoardParaEcra = { ...BOARD, chave: "b2", titulo: "Jantar", fotos: ["b", "c", "a"] };
+    render(<Inspiracao boards={[b1, b2]} fotosIniciais={FOTOS} token="tk" textos={T} />);
+
+    const modos = [...document.querySelectorAll("button[aria-label]")].map((b) =>
+      b.querySelector("img:last-of-type")?.getAttribute("loading"),
+    );
+    // Quatro no total do documento, e não quatro por board.
+    expect(
+      modos.filter((m) => m === "eager").length,
+      "voltou a contar por board: o casal descarrega fotografias que estão a metros de distância",
+    ).toBe(4);
+    // E as do segundo board — todas elas — esperam pela vez delas.
+    const doSegundo = [...document.querySelectorAll("section")]
+      .slice(1)
+      .flatMap((sec) => [...sec.querySelectorAll("button[aria-label] img:last-of-type")])
+      .map((i) => i.getAttribute("loading"));
+    expect(doSegundo.length, "o segundo board não foi desenhado").toBeGreaterThan(0);
+    expect(
+      doSegundo.every((m) => m === "lazy"),
+      "o segundo board ainda tem pressa",
+    ).toBe(true);
+  });
 });
 
 describe("a lupa", () => {
@@ -219,13 +265,27 @@ describe("a grelha oferece dois tamanhos", () => {
     expect(img.getAttribute("sizes")).toBe("(min-width: 640px) 46vw, 92vw");
   });
 
-  it("depois de a primeira escolha falhar, o `srcset` SAI", () => {
+  it("depois de a primeira escolha falhar, o `srcset` SAI — e cai no degrau do meio", () => {
     // Senão o navegador voltava a escolher o candidato que acabou de falhar.
     desenhar();
     const img = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     fireEvent.error(img());
     expect(img().getAttribute("srcset")).toBeNull();
-    // E o `src` é o plano B, que é o que continua a mostrar alguma coisa.
+    /**
+     * ── O PLANO B DEIXOU DE SER O ORIGINAL ────────────────────────────────
+     *
+     * Era `miniatura → original`, e o original numa caixa de 350 px são
+     * 2 600 KB: 13,9 s num 4G de 1,5 Mbps, contra 0,56 s da derivada de
+     * 1200 px. O degrau do meio existia e estava a ser saltado.
+     *
+     * Aqui a fotografia de teste não tem `media` assinada, portanto a
+     * derivada é a rota que a fabrica — que é exactamente o que deve
+     * acontecer nas fotografias anteriores ao bucket, ou seja nas propostas
+     * antigas que estão nas caixas de correio dos casais.
+     */
+    expect(img().getAttribute("src")).toBe("/api/proposta/tk/foto/a");
+    // E só se ESTA também falhar é que se paga o ficheiro inteiro.
+    fireEvent.error(img());
     expect(img().getAttribute("src")).toBe("orig/a");
   });
 });
@@ -244,8 +304,19 @@ describe("quando as assinaturas morrem", () => {
   it("aparece quando uma célula desiste", () => {
     desenhar();
     const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
-    // A miniatura falha, cai para o original, o original falha: desistiu.
+    /**
+     * TRÊS degraus, e não dois.
+     *
+     * A grelha deixou de cair da miniatura directamente para o original — o
+     * ficheiro inteiro numa caixa de 350 px eram 13,9 s num 4G. Passa pela
+     * derivada de 1200 px pelo caminho, portanto uma célula só desiste depois
+     * de as TRÊS falharem: miniatura → 1200 px → original.
+     *
+     * Um teste que dispare dois erros não mede quem desistiu: mede quem ainda
+     * está a tentar.
+     */
     fireEvent.error(img);
+    fireEvent.error(screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!);
     fireEvent.error(screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!);
     expect(screen.getByRole("button", { name: T.recarregarFotos })).toBeTruthy();
   });
@@ -268,6 +339,7 @@ describe("quando as assinaturas morrem", () => {
     const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     fireEvent.error(cel());
     fireEvent.error(cel());
+    fireEvent.error(cel());
     expect(screen.getAllByRole("button", { name: /Ampliar/ }).length).toBe(antes - 1);
     expect(screen.queryByText(T.fotoFalhou)).toBeNull();
     expect(screen.queryByRole("button", { name: T.tentarDeNovo })).toBeNull();
@@ -284,6 +356,7 @@ describe("quando as assinaturas morrem", () => {
     desenhar();
     // Provocar a falha, que é o que faz o botão existir.
     const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    fireEvent.error(cel());
     fireEvent.error(cel());
     fireEvent.error(cel());
     fireEvent.click(screen.getByRole("button", { name: T.recarregarFotos }));
@@ -472,6 +545,7 @@ describe("quando a fotografia do momento falha depois de a página abrir", () =>
     expect(doMomento(), "não encontrei a fotografia do momento").toBeTruthy();
     fireEvent.error(doMomento());
     fireEvent.error(doMomento());
+    fireEvent.error(doMomento());
 
     await waitFor(() => {
       expect(tituloSobrePapel()?.textContent, "o nome tinha de voltar a preto sobre o papel").toBe(
@@ -639,13 +713,38 @@ describe("a oferta em AVIF das fotografias grandes", () => {
     expect(imagem?.getAttribute("src")).toBe("mini/a");
   });
 
-  it("A OFERTA SÓ VALE A PARTIR DE 2 PIXÉIS POR PONTO", () => {
-    // Sem isto, um ecrã de densidade 1 passava de 22 KB (a de 400) para 105 KB
-    // (a de 1200 em AVIF) — cinco vezes pior, exactamente ao contrário do que
-    // isto existe para fazer.
+  /**
+   * A OFERTA NÃO VALE EM TODO O LADO — E O NÚMERO MUDOU, DE PROPÓSITO.
+   *
+   * Este caso guardava `2dppx`. O portão desceu para `1,5`, e vale a pena
+   * dizer porquê em vez de trocar o número em silêncio.
+   *
+   * A razão do portão nunca foi o «2»: é a FRONTEIRA a partir da qual o
+   * navegador já escolhia a de 1200 sozinho. Abaixo dela ele escolheria a de
+   * 400 (22 KB) e nós passaríamos a impor-lhe a de 1200 em AVIF (105 KB) —
+   * cinco vezes pior, exactamente ao contrário do que isto existe para fazer.
+   * Refeita a conta com as fatias que esta casa serve, essa fronteira é
+   * 1,36 dppx (a pior é a grelha a 92vw num ecrã de 320 pontos). O 2 era
+   * prudente de mais: deixava de fora um portátil Windows a 150% de escala,
+   * que reporta exactamente 1,5 — que é como se vê uma proposta num
+   * escritório.
+   *
+   * O número em si passou a ser guardado onde a conta vive, e não aqui:
+   * `portao-do-avif.test.ts` REFAZ a fronteira a partir das `sizes` do código
+   * e reprova se o portão ficar abaixo dela. Um número pregado não sabe porque
+   * é que está certo — no dia em que alguém alargar uma fatia, a fronteira
+   * mexe-se e só a conta dá por isso.
+   *
+   * O que fica aqui é o que este ficheiro é responsável por guardar: que a
+   * oferta TEM um portão, e que ele não casa num ecrã de densidade 1.
+   */
+  it("A OFERTA NÃO VALE NUM ECRÃ DE DENSIDADE 1", () => {
     comAvif();
     const fonte = document.querySelector('source[type="image/avif"]');
-    expect(fonte!.getAttribute("media")).toBe("(min-resolution: 2dppx)");
+    const media = fonte!.getAttribute("media") ?? "";
+    const dppx = Number(media.match(/min-resolution:\s*([\d.]+)dppx/)?.[1]);
+    expect(media, "a oferta em AVIF deixou de ter portão nenhum").toMatch(/min-resolution/);
+    expect(dppx, "o portão passou a casar num ecrã de densidade 1").toBeGreaterThan(1);
   });
 
   it("sem `srcset` no `<img>` não há oferta — a cascata já caiu para o plano B", () => {

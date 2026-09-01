@@ -1,7 +1,7 @@
 import "server-only";
+import { oSharp } from "./sharp-adiado";
 import { opcoesDeCarregamento } from "./cache-das-fotos";
 import { randomUUID } from "node:crypto";
-import sharp from "sharp";
 import { getSupabase } from "./supabase";
 import {
   THEME_BUCKET,
@@ -336,7 +336,18 @@ export async function inspectStoredImage(
 async function avaliarCabecalho(head: Buffer | null): Promise<{ ok: boolean; reason: string }> {
   if (!head || head.byteLength === 0) return { ok: false, reason: "ilegivel" };
   try {
-    const meta = await sharp(head).metadata();
+    /**
+     * O `sharp` só se carrega aqui — este é o único sítio deste ficheiro que
+     * dele precisa, e corre no back office (a confirmação de um carregamento),
+     * nunca no caminho do casal. A razão por extenso, e o defeito que uma
+     * corrida de oito `import()` soltos causou, estão no `sharp-adiado.ts`.
+     *
+     * Uma falha do módulo cai no `catch` de baixo e responde
+     * «formato-invalido» em vez de derrubar a função inteira — que é
+     * exactamente a avaria que já mordeu esta casa em produção e está escrita
+     * por extenso no `next.config`.
+     */
+    const meta = await (await oSharp())(head).metadata();
     const pixels = (meta.width ?? 0) * (meta.height ?? 0);
     if (!pixels) return { ok: false, reason: "sem-dimensoes" };
     if (pixels > MAX_IMAGE_PIXELS) return { ok: false, reason: "dimensoes-excessivas" };
