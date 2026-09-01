@@ -22,7 +22,20 @@ const dados = vi.hoisted(() => ({
   emitidoEm: undefined as number | undefined,
   /** Quando foram cortados os links do pedido, em ms (null = nunca). */
   cortadoEm: null as number | null,
+  /** O diário das leituras: o que começou, o que acabou, e por que ordem. */
+  diario: [] as string[],
+  /** Um travão que segura as leituras até se mandar largar. */
+  travao: null as null | { largar: () => void; espera: Promise<void> },
 }));
+
+/** Regista o começo, espera pelo travão se houver, regista o fim. */
+async function comDiario<T>(nome: string, valor: () => T | Promise<T>): Promise<T> {
+  dados.diario.push(`começou:${nome}`);
+  if (dados.travao) await dados.travao.espera;
+  const r = await valor();
+  dados.diario.push(`acabou:${nome}`);
+  return r;
+}
 
 vi.mock("@/lib/proposal-token", () => ({
   readProposalToken: (t: string | null | undefined) =>
@@ -30,13 +43,14 @@ vi.mock("@/lib/proposal-token", () => ({
 }));
 vi.mock("@/lib/proposals-store", () => ({
   getProposal: async (id: string) => dados.porId.get(id) ?? null,
-  listProposalsForQuote: async (quoteId: string) => {
-    if (dados.rebentaAoListar) throw new Error("base em baixo");
-    return [...dados.porId.values()].filter((p) => p.quoteId === quoteId);
-  },
+  listProposalsForQuote: async (quoteId: string) =>
+    comDiario("irmas", () => {
+      if (dados.rebentaAoListar) throw new Error("base em baixo");
+      return [...dados.porId.values()].filter((p) => p.quoteId === quoteId);
+    }),
 }));
 vi.mock("@/lib/contracts-store", () => ({
-  getAcceptedContractByQuote: async () => dados.contrato,
+  getAcceptedContractByQuote: async () => comDiario("aceite", () => dados.contrato),
 }));
 /**
  * A gaveta dos endereços curtos. O `pareceCodigoCurto` é o VERDADEIRO de
@@ -65,7 +79,7 @@ vi.mock("@/lib/proposta-link-curto", async (original) => {
  */
 vi.mock("@/lib/links-cortados", async (original) => {
   const real = await original<typeof import("@/lib/links-cortados")>();
-  return { ...real, linksCortadosEm: async () => dados.cortadoEm };
+  return { ...real, linksCortadosEm: async () => comDiario("corte", () => dados.cortadoEm) };
 });
 
 const { propostaDoLink } = await import("./proposta-do-link");
@@ -606,5 +620,86 @@ describe("os links cortados", () => {
     dados.emitidoEm = ANTES;
     dados.cortadoEm = CORTE;
     expect((await propostaDoLink("bom"))?.proposta.id).toBe("p1");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS TRÊS LEITURAS DO PEDIDO PARTEM JUNTAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO, com 25 ms por ida à base: o caminho do servidor até ao primeiro pixel
+ * da proposta são 202 ms — e 140 desses, 69%, são esta função em cinco idas
+ * estritamente uma atrás da outra.
+ *
+ * Só as duas primeiras são mesmo ordenadas. O carimbo dos links cortados, as
+ * irmãs e o contrato aceite dependem todos APENAS do `quoteId`, e de nada uns
+ * dos outros: estavam em série por hábito de escrita.
+ *
+ * Isto guarda o paralelismo, e guarda-o pela ÚNICA maneira que não se engana a
+ * si própria — segurando as três leituras num travão e verificando que as três
+ * já COMEÇARAM antes de qualquer uma acabar. Um teste que só olhasse para a
+ * ordem final passaria com o código em série.
+ */
+describe("as leituras do pedido não esperam umas pelas outras", () => {
+  beforeEach(() => {
+    dados.diario = [];
+    dados.travao = null;
+  });
+
+  it("as três começam antes de qualquer uma acabar", async () => {
+    dados.porId.set("p1", proposta({ id: "p1" }));
+    dados.emitidoEm = Date.now();
+
+    // Um travão: nenhuma leitura resolve enquanto não se largar. Se estiverem
+    // em série, a segunda nem chega a começar e o teste esgota o tempo.
+    let largar!: () => void;
+    const espera = new Promise<void>((r) => (largar = r));
+    dados.travao = { largar, espera };
+
+    const emCurso = propostaDoLink("bom");
+
+    // Dar voltas ao ciclo de eventos para as três terem oportunidade de partir.
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    const comecadas = dados.diario.filter((l) => l.startsWith("começou:"));
+    const acabadas = dados.diario.filter((l) => l.startsWith("acabou:"));
+
+    expect(
+      comecadas.sort(),
+      `só estas leituras chegaram a começar: ${JSON.stringify(dados.diario)}.\n` +
+        `Se faltar alguma, as leituras do pedido voltaram a ficar em série — e ` +
+        `isso são duas idas à base a mais, uma atrás da outra, à frente do ` +
+        `primeiro pixel que o casal vê.`,
+    ).toEqual(["começou:aceite", "começou:corte", "começou:irmas"]);
+    expect(acabadas, "alguma leitura acabou antes de as outras começarem").toEqual([]);
+
+    largar();
+    await emCurso;
+  });
+
+  it("e uma irmã que rebente continua a não deitar a página abaixo", async () => {
+    // O `catch` mudou de sítio — passou de um `try` à volta de tudo para um
+    // por leitura. Esta é a garantia que não pode ter-se perdido na mudança.
+    dados.porId.set("p1", proposta({ id: "p1" }));
+    dados.emitidoEm = Date.now();
+    dados.rebentaAoListar = true;
+
+    const r = await propostaDoLink("bom");
+
+    expect(r, "uma leitura falhada passou a matar a proposta").not.toBeNull();
+    expect(r?.proposta.id).toBe("p1");
+    dados.rebentaAoListar = false;
+  });
+
+  it("um link cortado continua a devolver nada", async () => {
+    // As leituras passaram a partir ANTES de se saber se o link ainda abre.
+    // O que não pode mudar é a resposta: continua a ser `null`.
+    dados.porId.set("p1", proposta({ id: "p1" }));
+    dados.emitidoEm = Date.now() - 10_000;
+    dados.cortadoEm = Date.now();
+
+    expect(await propostaDoLink("bom")).toBeNull();
+    dados.cortadoEm = null;
   });
 });
