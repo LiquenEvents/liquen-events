@@ -713,13 +713,38 @@ describe("a oferta em AVIF das fotografias grandes", () => {
     expect(imagem?.getAttribute("src")).toBe("mini/a");
   });
 
-  it("A OFERTA SÓ VALE A PARTIR DE 2 PIXÉIS POR PONTO", () => {
-    // Sem isto, um ecrã de densidade 1 passava de 22 KB (a de 400) para 105 KB
-    // (a de 1200 em AVIF) — cinco vezes pior, exactamente ao contrário do que
-    // isto existe para fazer.
+  /**
+   * A OFERTA NÃO VALE EM TODO O LADO — E O NÚMERO MUDOU, DE PROPÓSITO.
+   *
+   * Este caso guardava `2dppx`. O portão desceu para `1,5`, e vale a pena
+   * dizer porquê em vez de trocar o número em silêncio.
+   *
+   * A razão do portão nunca foi o «2»: é a FRONTEIRA a partir da qual o
+   * navegador já escolhia a de 1200 sozinho. Abaixo dela ele escolheria a de
+   * 400 (22 KB) e nós passaríamos a impor-lhe a de 1200 em AVIF (105 KB) —
+   * cinco vezes pior, exactamente ao contrário do que isto existe para fazer.
+   * Refeita a conta com as fatias que esta casa serve, essa fronteira é
+   * 1,36 dppx (a pior é a grelha a 92vw num ecrã de 320 pontos). O 2 era
+   * prudente de mais: deixava de fora um portátil Windows a 150% de escala,
+   * que reporta exactamente 1,5 — que é como se vê uma proposta num
+   * escritório.
+   *
+   * O número em si passou a ser guardado onde a conta vive, e não aqui:
+   * `portao-do-avif.test.ts` REFAZ a fronteira a partir das `sizes` do código
+   * e reprova se o portão ficar abaixo dela. Um número pregado não sabe porque
+   * é que está certo — no dia em que alguém alargar uma fatia, a fronteira
+   * mexe-se e só a conta dá por isso.
+   *
+   * O que fica aqui é o que este ficheiro é responsável por guardar: que a
+   * oferta TEM um portão, e que ele não casa num ecrã de densidade 1.
+   */
+  it("A OFERTA NÃO VALE NUM ECRÃ DE DENSIDADE 1", () => {
     comAvif();
     const fonte = document.querySelector('source[type="image/avif"]');
-    expect(fonte!.getAttribute("media")).toBe("(min-resolution: 2dppx)");
+    const media = fonte!.getAttribute("media") ?? "";
+    const dppx = Number(media.match(/min-resolution:\s*([\d.]+)dppx/)?.[1]);
+    expect(media, "a oferta em AVIF deixou de ter portão nenhum").toMatch(/min-resolution/);
+    expect(dppx, "o portão passou a casar num ecrã de densidade 1").toBeGreaterThan(1);
   });
 
   it("sem `srcset` no `<img>` não há oferta — a cascata já caiu para o plano B", () => {
