@@ -779,7 +779,7 @@ export default function Documento({
           )}
           <picture>
             <OfertaAvif foto={capa} />
-            { }
+            {}
             <img
               src={capa.miniatura ?? capa.original}
               {...(capa.miniatura
@@ -1305,10 +1305,26 @@ export default function Documento({
           que ela faz é acabar a proposta com o trabalho dela em vez de uma
           cláusula de arbitragem. */}
       {fecho && (
-        <div className="mt-20 overflow-hidden rounded-sm sm:mt-28">
+        <div className="relative mt-20 overflow-hidden rounded-sm sm:mt-28">
+          {/* O MESMO BORRÃO DA CAPA, que esta tinha ficado sem.
+              O `lqip` são poucas centenas de bytes que já vêm no HTML: está
+              pintado antes de qualquer ida à rede. Aqui a fotografia é
+              preguiçosa de propósito (está no fim de uma página com quarenta e
+              seis), e uma imagem preguiçosa sem borrão é um rectângulo vazio a
+              ocupar meio ecrã no momento em que o casal chega ao fim da
+              proposta — a última coisa que vê. */}
+          {fecho.lqip && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={fecho.lqip}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
+            />
+          )}
           <picture>
             <OfertaAvif foto={fecho} />
-            { }
+            {}
             <img
               src={fecho.miniatura ?? fecho.original}
               {...(fecho.miniatura
@@ -1334,7 +1350,9 @@ export default function Documento({
                tinha a esperar. */
               loading="lazy"
               decoding="async"
-              className="w-full object-cover"
+              /* `relative`: o borrão está em `absolute` por baixo, e sem isto a
+                 fotografia a sério ficava ATRÁS dele. */
+              className="relative w-full object-cover"
               style={{
                 aspectRatio:
                   fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",

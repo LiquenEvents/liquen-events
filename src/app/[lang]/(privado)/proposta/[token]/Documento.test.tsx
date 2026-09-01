@@ -808,6 +808,49 @@ describe("o fecho", () => {
   });
 
   /**
+   * ── E O FECHO TAMBÉM NÃO NASCE EM BRANCO ──────────────────────────────
+   *
+   * A capa já tinha o borrão; o fecho tinha ficado sem. E é a fotografia onde
+   * mais se nota: é PREGUIÇOSA de propósito, e ocupa meio ecrã. O que o casal
+   * via ao chegar ao fim da proposta era um rectângulo vazio do tamanho de uma
+   * fotografia — a última coisa que a proposta lhe mostra.
+   *
+   * O `lqip` são poucas centenas de bytes que já vêm no HTML: está lá pintado
+   * antes de qualquer ida à rede, e é calculado no envio para TODAS as fotos
+   * (ver `proposta-fotos`). Estava calculado, servido, e deitado fora.
+   */
+  it("o fecho tem o borrão por baixo, como a capa", () => {
+    comCapas(
+      [DUAS_CAPAS[0], { ...DUAS_CAPAS[1], lqip: "data:image/jpeg;base64,FECHO" }],
+      ["ped/capa0.jpg", "ped/capa1.jpg"],
+    );
+    const borroes = Array.from(document.querySelectorAll('img[aria-hidden="true"]'));
+    expect(
+      borroes.map((b) => b.getAttribute("src")),
+      "o fecho voltou a nascer como um rectângulo vazio",
+    ).toContain("data:image/jpeg;base64,FECHO");
+  });
+
+  it("e a fotografia do fecho fica POR CIMA do borrão", () => {
+    // O borrão está em `absolute`; sem uma posição na de cima, a última
+    // fotografia da proposta ficava por baixo dele — desfocada para sempre.
+    comCapas(
+      [DUAS_CAPAS[0], { ...DUAS_CAPAS[1], lqip: "data:image/jpeg;base64,FECHO" }],
+      ["ped/capa0.jpg", "ped/capa1.jpg"],
+    );
+    const imagens = Array.from(document.querySelectorAll("img"));
+    const ultima = imagens[imagens.length - 1];
+    expect(ultima.getAttribute("src")).toBe("mini/capa1");
+    expect(ultima.className).toContain("relative");
+  });
+
+  it("sem borrão gravado, não se inventa caixa nenhuma", () => {
+    // As propostas anteriores ao `lqip` não têm nenhum.
+    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
+    expect(document.querySelectorAll('img[aria-hidden="true"]')).toHaveLength(0);
+  });
+
+  /**
    * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
    */
   it("com uma capa só, não se repete a de abertura no fim", () => {
