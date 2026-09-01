@@ -16,6 +16,8 @@ const dados = vi.hoisted(() => ({
   porId: new Map<string, Proposal>(),
   contrato: null as Contract | null,
   rebentaAoListar: false,
+  /** Rebenta ANTES de devolver promessa — o caso que o `.catch()` não apanha. */
+  rebentaJa: false,
   /** Código curto → proposta, a gaveta do lado do servidor. */
   curtas: new Map<string, string>(),
   /** Quando foi emitido o endereço que está a ser usado, em ms. */
@@ -43,11 +45,18 @@ vi.mock("@/lib/proposal-token", () => ({
 }));
 vi.mock("@/lib/proposals-store", () => ({
   getProposal: async (id: string) => dados.porId.get(id) ?? null,
-  listProposalsForQuote: async (quoteId: string) =>
-    comDiario("irmas", () => {
+  /**
+   * NÃO é `async` de propósito: uma função `async` transforma qualquer
+   * rebentamento numa rejeição, e é precisamente o caso contrário que se quer
+   * poder encenar aqui — o rebentamento IMEDIATO, antes de haver promessa.
+   */
+  listProposalsForQuote: (quoteId: string) => {
+    if (dados.rebentaJa) throw new Error("export em falta");
+    return comDiario("irmas", () => {
       if (dados.rebentaAoListar) throw new Error("base em baixo");
       return [...dados.porId.values()].filter((p) => p.quoteId === quoteId);
-    }),
+    });
+  },
 }));
 vi.mock("@/lib/contracts-store", () => ({
   getAcceptedContractByQuote: async () => comDiario("aceite", () => dados.contrato),
@@ -690,6 +699,31 @@ describe("as leituras do pedido não esperam umas pelas outras", () => {
     expect(r, "uma leitura falhada passou a matar a proposta").not.toBeNull();
     expect(r?.proposta.id).toBe("p1");
     dados.rebentaAoListar = false;
+  });
+
+  it("uma leitura que rebenta ANTES de devolver promessa também não mata a página", async () => {
+    /**
+     * O defeito que esta linha guarda foi mesmo cometido, e escapou à minha
+     * própria verificação.
+     *
+     * Um `.catch()` só apanha promessas REJEITADAS. Uma função que rebente de
+     * imediato não deixa promessa nenhuma a que o agarrar — o erro sobe e mata
+     * a página. Com as leituras dentro do `try`, os dois casos estavam
+     * cobertos; ao movê-las para fora com um `.catch()` solto, metade da
+     * protecção desapareceu sem se ver.
+     *
+     * Foi um teste de OUTRO assunto — o dinheiro nas páginas do cliente — que
+     * o apanhou, por acaso. Isto passa a apanhá-lo de propósito.
+     */
+    dados.porId.set("p1", proposta({ id: "p1" }));
+    dados.emitidoEm = Date.now();
+    dados.rebentaJa = true;
+
+    const r = await propostaDoLink("bom");
+
+    expect(r, "um rebentamento imediato voltou a matar a página").not.toBeNull();
+    expect(r?.proposta.id).toBe("p1");
+    dados.rebentaJa = false;
   });
 
   it("um link cortado continua a devolver nada", async () => {

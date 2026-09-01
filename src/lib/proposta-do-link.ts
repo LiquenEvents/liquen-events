@@ -177,19 +177,36 @@ export async function propostaDoLink(
    *
    * Cada uma leva o seu `catch`: uma irmã que falhe a ler não pode levar a
    * página atrás, que é o que o `try` mais abaixo sempre garantiu.
+   *
+   * ── E PORQUE É QUE CADA UMA VAI DENTRO DE UMA FUNÇÃO ─────────────────────
+   *
+   * Porque um `.catch()` só apanha promessas REJEITADAS. Uma função que
+   * rebente de imediato — antes sequer de devolver uma promessa — não deixa
+   * promessa nenhuma a que agarrar o `.catch()`: o erro sobe e mata a página.
+   *
+   * Não é hipótese de manual. Foi assim que isto se partiu: com as leituras
+   * dentro do `try` de baixo, um `listProposalsForQuote` em falta era apanhado
+   * e a página servia na mesma; movidas para aqui com um `.catch()` solto,
+   * passou a rebentar. Um teste que já cá estava apanhou-o.
+   *
+   * A função `async` à volta converte o rebentamento imediato numa rejeição, e
+   * aí o `.catch()` volta a valer para os dois casos — que é o que o `try`
+   * fazia e não se podia perder.
    */
-  const pCorte = pedido ? linksCortadosEm(pedido) : Promise.resolve(null);
+  const semRebentar = <T>(nome: string, ler: () => Promise<T>): Promise<T | null> =>
+    (async () => ler())().catch((e) => {
+      log.warn(`proposta-do-link: não deu para ler ${nome}`, { proposta: doToken.id, erro: e });
+      return null;
+    });
+
+  const pCorte = pedido
+    ? semRebentar("o corte dos links", () => linksCortadosEm(pedido))
+    : Promise.resolve(null);
   const pIrmas = pedido
-    ? listProposalsForQuote(pedido).catch((e) => {
-        log.warn("proposta-do-link: não deu para ler as irmãs", { proposta: doToken.id, erro: e });
-        return null;
-      })
+    ? semRebentar("as irmãs", () => listProposalsForQuote(pedido))
     : Promise.resolve(null);
   const pAceite = pedido
-    ? getAcceptedContractByQuote(pedido).catch((e) => {
-        log.warn("proposta-do-link: não deu para ler o aceite", { proposta: doToken.id, erro: e });
-        return null;
-      })
+    ? semRebentar("o aceite", () => getAcceptedContractByQuote(pedido))
     : Promise.resolve(null);
 
   if (pedido && !aindaAbre(emitidoEm, await pCorte)) return null;
