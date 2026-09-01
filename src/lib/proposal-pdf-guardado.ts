@@ -162,6 +162,39 @@ export async function lerPdfDaProposta(proposalId: string, chave: string): Promi
   }
 }
 
+/**
+ * O PDF já está guardado, sem o trazer para dentro da função?
+ *
+ * `lerPdfDaProposta` desce o ficheiro inteiro — dois, três, às vezes dez
+ * megabytes. Para SERVIR isso é o trabalho; para PERGUNTAR «já existe?» é
+ * desperdício, e é a pergunta que o aquecimento nocturno faz uma vez por
+ * proposta. Uma listagem de um item devolve o nome e mais nada.
+ *
+ * `search` é um prefixo, não uma igualdade: pede-se um item e confirma-se o
+ * nome à letra, senão uma chave que comece pela outra dava um falso «existe» —
+ * e um falso «existe» é o pior dos dois erros, porque deixa a proposta por
+ * aquecer e ninguém fica a saber.
+ *
+ * `false` quer dizer «não sei se está lá» tanto como «não está»: as duas
+ * respostas levam ao mesmo sítio (desenhar), e distingui-las aqui só daria a
+ * quem chama uma decisão que não tem de tomar.
+ */
+export async function existePdfDaProposta(proposalId: string, chave: string): Promise<boolean> {
+  if (!proposalId || !chave) return false;
+  const sb = getSupabase();
+  if (!sb) return false;
+  const alvo = `${chave}.pdf`;
+  try {
+    const { data, error } = await sb.storage
+      .from(BUCKET)
+      .list(proposalId.replace(/[^a-zA-Z0-9_-]/g, ""), { search: alvo, limit: 1 });
+    if (error || !data) return false;
+    return data.some((f) => f.name === alvo);
+  } catch {
+    return false;
+  }
+}
+
 /** Só para os testes: esquece a tentativa de criar o bucket. */
 export function esquecerBucketDePdfs(): void {
   bucketPronto = null;

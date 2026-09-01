@@ -1,0 +1,277 @@
+import "server-only";
+import { listAllProposals } from "@/lib/proposals-store";
+import { idiomaDaProposta } from "@/lib/proposta-idioma";
+import { chaveDoPdf } from "@/lib/proposal-pdf-chave";
+import { existePdfDaProposta } from "@/lib/proposal-pdf-guardado";
+import { getState, setState } from "@/lib/app-state";
+import { log } from "@/lib/logger";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS PROPOSTAS QUE ELA JÁ ENVIOU TAMBÉM TÊM DE ABRIR DEPRESSA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A pergunta dela, à letra: «mesmo nas propostas em que já enviamos (…) se
+ * esta coisa de melhorar a rapidez em que se carrega no botão e aquilo abre
+ * logo, se também vai acontecer nestas propostas que já enviamos».
+ *
+ * Para quase tudo a resposta é sim sem se fazer nada: o ecrã de espera, a
+ * contagem das fotos e o `sharp` adiado são código do servidor e atributos de
+ * HTML, e valem no próximo carregamento de qualquer proposta. O PDF é a
+ * excepção, e é a que mais custa.
+ *
+ * ── PORQUE É QUE O PDF É DIFERENTE ────────────────────────────────────────
+ *
+ * A rota do PDF já não desenha nada no caminho normal: procura o ficheiro
+ * guardado e serve-o em fluxo. Só que o ficheiro é guardado NO ENVIO — e há
+ * duas famílias de propostas que não o têm:
+ *
+ *   • as que foram enviadas antes de isso existir;
+ *   • as que o perderam quando a chave mudou, a 26/08. A chave é o `sha256` do
+ *     conteúdo, e uma alteração no cálculo deixou órfão tudo o que já lá
+ *     estava: os ficheiros continuam no armazenamento e nunca mais são
+ *     encontrados. Ver o `proposal-pdf-chave.test.ts`, que passou a pregá-la.
+ *
+ * Para essas, o primeiro casal a carregar no botão paga o desenho inteiro —
+ * oitenta fotografias reencodadas — atrás de um link que não diz nada enquanto
+ * trabalha. É exactamente a queixa dela, e é a única parte que não se resolve
+ * sozinha: alguém tem de desenhar o ficheiro uma vez.
+ *
+ * Este trabalho desenha-o de noite, para que ninguém o pague de dia.
+ *
+ * ── PORQUE É QUE ISTO NÃO É UM AGENDAMENTO NOVO ───────────────────────────
+ *
+ * Porque esta casa já teve um deploy RECUSADO por assumir um plano de
+ * alojamento que não tinha — está escrito no `agendamento.contrato.test.ts`,
+ * com as palavras «assumi mal, e só o deploy é que mo disse». Um terceiro
+ * agendamento é uma aposta nesse mesmo plano. Isto viaja dentro da cópia de
+ * segurança que já corre às quatro da manhã, e não custa entrada nenhuma.
+ *
+ * ── E PORQUE É QUE TEM RELÓGIO E TECTO ────────────────────────────────────
+ *
+ * Porque a cópia de segurança é a razão de ser daquele trabalho e já foi
+ * feita quando isto corre. Um desenho pode demorar dez segundos; oitenta
+ * propostas por aquecer esgotavam a função e a cópia ficava sem o registo
+ * final. Portanto: um orçamento de tempo, um tecto de propostas, e uma de
+ * cada vez — nunca em paralelo, que num contentor pequeno é o que faz o
+ * `sharp` bater no tecto de memória.
+ *
+ * O que sobra para amanhã sobra. São propostas antigas; aquecer seis por noite
+ * é uma decisão sobre quantas noites demora, não sobre se funciona.
+ */
+
+/** O tempo que este trabalho pode gastar, quando chega ao fim de tudo o resto. */
+export const ORCAMENTO_MS = 45_000;
+
+/**
+ * Abaixo disto nem se começa.
+ *
+ * Um desenho a meio que é cortado pelo tecto da função não deixa ficheiro
+ * nenhum e gastou o tempo à mesma. Mais vale não abrir o próximo.
+ */
+export const CHAO_MS = 8_000;
+
+/** Quantas propostas por noite. */
+export const TECTO_POR_NOITE = 6;
+
+/** Onde fica a memória das que falharam. */
+export const CHAVE_DO_ESTADO = "aquecimento-pdf:estado";
+
+/** Uma proposta que falhou não se volta a tentar antes disto. */
+export const ESPERA_APOS_FALHA_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** E ao fim de três tentativas deixa de se tentar. */
+export const TENTATIVAS_ATE_DESISTIR = 3;
+
+type Falhada = { emFalta: number; tentadaEm: string; tentativas: number };
+export type EstadoDoAquecimento = { falhadas: Record<string, Falhada> };
+
+export type ResumoDoAquecimento = {
+  vistas: number;
+  jaTinham: number;
+  aquecidas: number;
+  incompletas: number;
+  falhadas: number;
+  adiadas: number;
+  semTempo: boolean;
+};
+
+/**
+ * Desenha e guarda os PDF que faltam, dentro do tempo que sobrar.
+ *
+ * Nunca lança: isto corre depois de a cópia de segurança ter seguido, e uma
+ * falha aqui não pode transformar uma cópia bem-sucedida num 500. O resumo é
+ * para os registos, não para decidir nada.
+ */
+export async function aquecerPdfsEmFalta(
+  /** Quanto tempo já foi gasto pelo trabalho que corre antes deste. */
+  decorridoMs: number,
+): Promise<ResumoDoAquecimento> {
+  const resumo: ResumoDoAquecimento = {
+    vistas: 0,
+    jaTinham: 0,
+    aquecidas: 0,
+    incompletas: 0,
+    falhadas: 0,
+    adiadas: 0,
+    semTempo: false,
+  };
+  const limite = Date.now() + Math.max(0, ORCAMENTO_MS - decorridoMs);
+  if (limite - Date.now() < CHAO_MS) {
+    resumo.semTempo = true;
+    return resumo;
+  }
+
+  let estado: EstadoDoAquecimento;
+  let propostas: Awaited<ReturnType<typeof listAllProposals>>;
+  try {
+    estado = (await getState<EstadoDoAquecimento>(CHAVE_DO_ESTADO)) ?? { falhadas: {} };
+    if (!estado.falhadas) estado.falhadas = {};
+    propostas = await listAllProposals();
+  } catch (e) {
+    log.warn("aquecimento-pdf: não se conseguiu ler o que há a fazer", { erro: String(e) });
+    return resumo;
+  }
+
+  /**
+   * As que já seguiram para um casal, das mais recentes para as mais antigas.
+   *
+   * A ordem não é arrumação: é quem tem mais probabilidade de ser aberta
+   * amanhã. Uma proposta enviada ontem ainda está na caixa de correio de
+   * alguém; uma de há dois anos já não se abre.
+   *
+   * Sem `doc` não há o que desenhar — são as propostas de linhas, criadas em
+   * `/api/propostas`, que nunca tiveram documento.
+   */
+  const candidatas = propostas
+    .filter((p) => p.doc && p.sentAt)
+    .sort((a, b) => +new Date(b.sentAt ?? 0) - +new Date(a.sentAt ?? 0));
+
+  const agora = Date.now();
+  let mudouOEstado = false;
+
+  for (const proposta of candidatas) {
+    if (resumo.aquecidas >= TECTO_POR_NOITE) break;
+    if (limite - Date.now() < CHAO_MS) {
+      resumo.semTempo = true;
+      break;
+    }
+
+    /**
+     * Uma que já desistiu não custa nem sequer uma pergunta.
+     *
+     * Ao fim de três tentativas, a causa não é passageira. O caso comum é uma
+     * fotografia que não está no armazenamento, e essa não se resolve sozinha:
+     * resolve-se no estúdio — e quando ela lá mexer, o documento muda, a chave
+     * muda, e isto volta a ser uma proposta por aquecer como outra qualquer.
+     */
+    const falha = estado.falhadas[proposta.id];
+    if (falha && falha.tentativas >= TENTATIVAS_ATE_DESISTIR) continue;
+
+    resumo.vistas++;
+    const idioma = idiomaDaProposta(proposta);
+    const chave = chaveDoPdf(proposta.doc!, idioma);
+
+    /**
+     * ── A PERGUNTA VEM ANTES DA ESPERA, E DE PROPÓSITO ────────────────────
+     *
+     * Perguntar «já existe?» é uma listagem de um item: não traz o ficheiro,
+     * e é barata ao ponto de não valer a pena poupá-la. Desenhar é que é caro.
+     *
+     * Fazê-la ANTES da espera das falhas resolve um caso que este sistema
+     * acabou de ter: uma proposta marcada como falhada cujo PDF, entretanto,
+     * passou a existir — porque um casal abriu o link e a rota o desenhou e
+     * guardou. Com a pergunta depois da espera, ela ficava marcada mais sete
+     * dias por uma falha que já não existia.
+     */
+    if (await existePdfDaProposta(proposta.id, chave)) {
+      resumo.jaTinham++;
+      if (falha) {
+        delete estado.falhadas[proposta.id];
+        mudouOEstado = true;
+      }
+      continue;
+    }
+
+    // Não existe, e falhou há pouco: fica para a semana que vem. Repetir hoje
+    // o desenho que rebentou ontem é gastar o orçamento das outras.
+    if (falha && agora - +new Date(falha.tentadaEm) < ESPERA_APOS_FALHA_MS) {
+      resumo.adiadas++;
+      continue;
+    }
+
+    try {
+      /**
+       * O desenhador entra só aqui, e por `import()`.
+       *
+       * O `proposal-pdf-cache` traz o `pdf-lib` atrás, e este módulo é
+       * importado pela rota da cópia de segurança — que na esmagadora maioria
+       * das noites não tem nada para aquecer. É a mesma razão do
+       * `sharp-adiado.ts`, e o `pdf/route.ts` já o faz pelo mesmo motivo.
+       */
+      const { pdfDaPropostaEmCache } = await import("@/lib/proposal-pdf-cache");
+      /**
+       * `servirIncompleto = false`, e é a decisão que mais importa aqui.
+       *
+       * Com `true`, uma proposta a que falte uma fotografia desenha-se com o
+       * buraco e — pior — seria este trabalho a fixá-la no armazenamento, onde
+       * fica a ser servida a um casal para sempre, mesmo depois de ela repor a
+       * foto. A rota do casal serve incompleto de propósito, porque aí a
+       * alternativa é um botão que não faz nada; aqui a alternativa é não
+       * guardar, e não guardar é melhor.
+       */
+      const pdf = await pdfDaPropostaEmCache(proposta.doc!, idioma, false, proposta.id);
+      resumo.aquecidas++;
+      log.info("aquecimento-pdf: proposta aquecida", {
+        id: proposta.id,
+        bytes: pdf.byteLength,
+        idioma,
+      });
+      if (falha) {
+        delete estado.falhadas[proposta.id];
+        mudouOEstado = true;
+      }
+    } catch (e) {
+      const emFalta = (e as { emFalta?: number })?.emFalta ?? 0;
+      if (emFalta > 0) resumo.incompletas++;
+      else resumo.falhadas++;
+      estado.falhadas[proposta.id] = {
+        emFalta,
+        tentadaEm: new Date().toISOString(),
+        tentativas: (falha?.tentativas ?? 0) + 1,
+      };
+      mudouOEstado = true;
+      log.warn("aquecimento-pdf: proposta não aqueceu", {
+        id: proposta.id,
+        emFalta,
+        erro: String(e),
+      });
+    }
+  }
+
+  /**
+   * A memória por processo vai fora no fim.
+   *
+   * O `pdfDaPropostaEmCache` guarda cada ficheiro desenhado num mapa que vive
+   * enquanto o processo viver. Seis PDF de vários megabytes cada, num
+   * contentor de função, num processo cujo trabalho ACABOU: é memória retida
+   * para nada, e o próximo pedido que caia neste contentor herda-a. O que
+   * interessa ficou no armazenamento, que é onde a rota do casal o vai buscar.
+   */
+  if (resumo.aquecidas > 0) {
+    const { esvaziarCachePdf } = await import("@/lib/proposal-pdf-cache");
+    esvaziarCachePdf();
+  }
+
+  if (mudouOEstado) {
+    try {
+      await setState(CHAVE_DO_ESTADO, estado);
+    } catch (e) {
+      // Perder a memória das falhas custa uma tentativa repetida amanhã, não
+      // um erro. Não vale derrubar nada por isto.
+      log.warn("aquecimento-pdf: a memória das falhas não ficou gravada", { erro: String(e) });
+    }
+  }
+
+  return resumo;
+}
