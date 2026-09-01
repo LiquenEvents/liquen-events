@@ -239,8 +239,29 @@ export default async function RootLayout({
    * 200 a 400 ms em que não acontece nada.
    *
    * `preconnect` faz esse aperto de mão enquanto o HTML ainda está a ser lido.
-   * `crossOrigin` porque é o que um `<img>` de outra origem usa — sem ele o
-   * navegador abre uma segunda ligação e o aviso não serve para nada.
+   *
+   * ── E PORQUE É QUE SÃO DOIS, E NÃO UM ────────────────────────────────────
+   *
+   * Aqui estava um `preconnect` só, com `crossOrigin`, e o comentário dizia:
+   * «`crossOrigin` porque é o que um `<img>` de outra origem usa — sem ele o
+   * navegador abre uma segunda ligação». Está ao contrário, e o resultado era
+   * exactamente a avaria que essa frase julgava estar a evitar.
+   *
+   * Um `<img src="…">` SEM atributo `crossorigin` — que é o caso de todas as
+   * fotografias desta casa — é um pedido NÃO-CORS, e vive num conjunto de
+   * ligações diferente do anónimo. Um `<link rel="preconnect" crossorigin>`
+   * abre precisamente o anónimo. Ou seja: aquecia-se uma ligação que as
+   * fotografias não usam, e a primeira fotografia abria a sua do zero — os
+   * mesmos 200 a 400 ms que isto existe para poupar, pagos na mesma.
+   *
+   * Os dois são precisos e não se substituem:
+   *   • SEM `crossOrigin` — é o que as FOTOGRAFIAS usam. É este que interessa
+   *     à página do casal.
+   *   • COM `crossOrigin` — é o que um `fetch` de outra origem usa, e é o que
+   *     o service worker do sítio público faz (`public/sw.js`, `mode: "cors"`).
+   *
+   * Dois `preconnect` para a mesma origem não são um desperdício: são dois
+   * conjuntos de ligações diferentes, e cada um serve pedidos diferentes.
    */
   let storageOrigin = "";
   try {
@@ -369,6 +390,9 @@ export default async function RootLayout({
         />
         {/* O aperto de mão com o Storage começa aqui, e não quando o primeiro
             `<img>` aparecer. Ver `storageOrigin`. */}
+        {/* Sem `crossOrigin`: é este que as fotografias usam. Ver `storageOrigin`. */}
+        {storageOrigin && <link rel="preconnect" href={storageOrigin} />}
+        {/* Com `crossOrigin`: é este que serve o `fetch` do service worker. */}
         {storageOrigin && <link rel="preconnect" href={storageOrigin} crossOrigin="" />}
         {storageOrigin && <link rel="dns-prefetch" href={storageOrigin} />}
       </head>

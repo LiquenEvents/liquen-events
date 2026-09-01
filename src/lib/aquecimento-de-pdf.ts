@@ -5,6 +5,7 @@ import { chaveDoPdf } from "@/lib/proposal-pdf-chave";
 import { existePdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { getState, setState } from "@/lib/app-state";
 import { log } from "@/lib/logger";
+import type { ProposalDoc } from "@/lib/proposal-doc";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -68,11 +69,39 @@ export const ORCAMENTO_MS = 45_000;
  *
  * Um desenho a meio que é cortado pelo tecto da função não deixa ficheiro
  * nenhum e gastou o tempo à mesma. Mais vale não abrir o próximo.
+ *
+ * ── PORQUE É QUE SUBIU DE 8 s PARA 15 s ───────────────────────────────────
+ *
+ * Porque 8 s não chegava, e a conta mostra-o. O repositório tem o custo de um
+ * desenho MEDIDO em oito execuções reais (ver `custo-do-pdf.ts`): uma proposta
+ * de 46 fotografias são 9 a 13 segundos, e uma de 80 chega aos 20.
+ *
+ * Com o chão a 8 s, o pior caso era este: o último desenho ARRANCA com 8 s de
+ * orçamento (aos 37 s dos 45) e demora 20 — acaba aos 57 s, e a gravação da
+ * memória das falhas vem DEPOIS disso, numa função que morre aos 60. Ou seja,
+ * a cópia de segurança já tinha seguido e o trabalho era dado como falhado por
+ * causa do aquecimento, que é precisamente o que este ficheiro promete que
+ * nunca acontece.
+ *
+ * A 15 s o pior caso honesto passa a caber. É por isso que o remédio para a
+ * lentidão NÃO é subir o orçamento: subir o orçamento aproxima o desastre.
+ * Quem trata da lentidão é a varredura, que corre noutra função e noutra hora.
  */
-export const CHAO_MS = 8_000;
+export const CHAO_MS = 15_000;
 
-/** Quantas propostas por noite. */
+/** Quantas propostas por noite, no aquecimento que viaja com a cópia. */
 export const TECTO_POR_NOITE = 6;
+
+/**
+ * E quantas por chamada, quando é ela a mandar aquecer do back office.
+ *
+ * Mais alto porque essa chamada tem a função INTEIRA para si: não vem atrás de
+ * uma cópia de segurança que já gastou metade do relógio.
+ */
+export const TECTO_POR_CHAMADA = 8;
+
+/** O orçamento de uma chamada avulsa: a função inteira menos a margem. */
+export const ORCAMENTO_AVULSO_MS = 50_000;
 
 /** Onde fica a memória das que falharam. */
 export const CHAVE_DO_ESTADO = "aquecimento-pdf:estado";
@@ -84,7 +113,29 @@ export const ESPERA_APOS_FALHA_MS = 7 * 24 * 60 * 60 * 1000;
 export const TENTATIVAS_ATE_DESISTIR = 3;
 
 type Falhada = { emFalta: number; tentadaEm: string; tentativas: number };
-export type EstadoDoAquecimento = { falhadas: Record<string, Falhada> };
+
+/**
+ * O que se sabe do aquecimento, entre execuções.
+ *
+ * `falhadas` — as que rebentaram, com a espera e o contador de tentativas.
+ *
+ * `feitas` — id da proposta → chave do documento que se confirmou guardada.
+ * É uma memória de «isto já está quente», e existe por uma razão que só se vê
+ * quando a fila encolhe: a lista é percorrida da mais recente para a mais
+ * antiga, e as mais recentes são exactamente as que JÁ têm o PDF (foi guardado
+ * no envio). Sem esta memória, todas as noites se paga uma ida ao armazenamento
+ * por cada proposta já quente ANTES de chegar à primeira fria — com oitenta
+ * propostas são uns oito segundos de uma janela de trinta, gastos a aprender o
+ * que já se sabia. E piora à medida que a fila drena.
+ *
+ * A correcção é segura por construção: a chave é o `sha256` do CONTEÚDO. Uma
+ * proposta revista dá outra chave, não bate com a memória, e volta a ser
+ * verificada e desenhada como se fosse nova.
+ */
+export type EstadoDoAquecimento = {
+  falhadas: Record<string, Falhada>;
+  feitas?: Record<string, string>;
+};
 
 export type ResumoDoAquecimento = {
   vistas: number;
@@ -94,6 +145,36 @@ export type ResumoDoAquecimento = {
   falhadas: number;
   adiadas: number;
   semTempo: boolean;
+  /**
+   * Quantas ficaram por aquecer — as candidatas que este lote não chegou a
+   * confirmar quentes. É o que diz a quem chama se vale a pena pedir outro
+   * lote, e é o que a varredura do back office lê para saber quando parar.
+   */
+  restantes: number;
+};
+
+/** As opções existem para a MESMA função servir a noite e o botão dela. */
+export type OpcoesDoAquecimento = {
+  /** Quanto tempo há para gastar. Por omissão, o da noite. */
+  orcamentoMs?: number;
+  /** Quantas propostas, no máximo. Por omissão, o tecto da noite. */
+  tecto?: number;
+  /**
+   * As propostas já lidas, quando quem chama as tem à mão.
+   *
+   * A cópia de segurança já lista as propostas todas para as meter no ficheiro
+   * (`buildBackupPayload`); sem isto, o aquecimento lia a MESMA tabela outra
+   * vez, com o `doc` inteiro em jsonb, dentro da mesma invocação.
+   */
+  propostas?: PropostaParaAquecer[];
+};
+
+/** O que o aquecimento precisa de saber de uma proposta. */
+export type PropostaParaAquecer = {
+  id: string;
+  doc?: ProposalDoc;
+  sentAt?: string | null;
+  idioma?: unknown;
 };
 
 /**
@@ -106,7 +187,10 @@ export type ResumoDoAquecimento = {
 export async function aquecerPdfsEmFalta(
   /** Quanto tempo já foi gasto pelo trabalho que corre antes deste. */
   decorridoMs: number,
+  opcoes: OpcoesDoAquecimento = {},
 ): Promise<ResumoDoAquecimento> {
+  const orcamento = opcoes.orcamentoMs ?? ORCAMENTO_MS;
+  const tecto = opcoes.tecto ?? TECTO_POR_NOITE;
   const resumo: ResumoDoAquecimento = {
     vistas: 0,
     jaTinham: 0,
@@ -115,19 +199,22 @@ export async function aquecerPdfsEmFalta(
     falhadas: 0,
     adiadas: 0,
     semTempo: false,
+    restantes: 0,
   };
-  const limite = Date.now() + Math.max(0, ORCAMENTO_MS - decorridoMs);
+  const limite = Date.now() + Math.max(0, orcamento - decorridoMs);
   if (limite - Date.now() < CHAO_MS) {
     resumo.semTempo = true;
     return resumo;
   }
 
   let estado: EstadoDoAquecimento;
-  let propostas: Awaited<ReturnType<typeof listAllProposals>>;
+  let propostas: PropostaParaAquecer[];
   try {
     estado = (await getState<EstadoDoAquecimento>(CHAVE_DO_ESTADO)) ?? { falhadas: {} };
     if (!estado.falhadas) estado.falhadas = {};
-    propostas = await listAllProposals();
+    if (!estado.feitas) estado.feitas = {};
+    // As propostas já lidas por quem chama, quando as tem — ver `OpcoesDoAquecimento`.
+    propostas = opcoes.propostas ?? (await listAllProposals());
   } catch (e) {
     log.warn("aquecimento-pdf: não se conseguiu ler o que há a fazer", { erro: String(e) });
     return resumo;
@@ -149,9 +236,11 @@ export async function aquecerPdfsEmFalta(
 
   const agora = Date.now();
   let mudouOEstado = false;
+  /** As que já desistiram: não contam para o que falta, porque nunca serão feitas. */
+  let desistidas = 0;
 
   for (const proposta of candidatas) {
-    if (resumo.aquecidas >= TECTO_POR_NOITE) break;
+    if (resumo.aquecidas >= tecto) break;
     if (limite - Date.now() < CHAO_MS) {
       resumo.semTempo = true;
       break;
@@ -166,7 +255,10 @@ export async function aquecerPdfsEmFalta(
      * muda, e isto volta a ser uma proposta por aquecer como outra qualquer.
      */
     const falha = estado.falhadas[proposta.id];
-    if (falha && falha.tentativas >= TENTATIVAS_ATE_DESISTIR) continue;
+    if (falha && falha.tentativas >= TENTATIVAS_ATE_DESISTIR) {
+      desistidas++;
+      continue;
+    }
 
     resumo.vistas++;
     const idioma = idiomaDaProposta(proposta);
@@ -184,8 +276,23 @@ export async function aquecerPdfsEmFalta(
      * guardou. Com a pergunta depois da espera, ela ficava marcada mais sete
      * dias por uma falha que já não existia.
      */
+    /**
+     * A memória primeiro, o armazenamento depois.
+     *
+     * `feitas[id] === chave` quer dizer que já se CONFIRMOU este documento
+     * guardado. A chave é o `sha256` do conteúdo: se o documento mudou, a
+     * chave muda, não bate, e cai na verificação a sério. Não há como esta
+     * memória servir uma proposta revista.
+     */
+    if ((estado.feitas ?? {})[proposta.id] === chave) {
+      resumo.jaTinham++;
+      continue;
+    }
+
     if (await existePdfDaProposta(proposta.id, chave)) {
       resumo.jaTinham++;
+      (estado.feitas ??= {})[proposta.id] = chave;
+      mudouOEstado = true;
       if (falha) {
         delete estado.falhadas[proposta.id];
         mudouOEstado = true;
@@ -262,6 +369,18 @@ export async function aquecerPdfsEmFalta(
     const { esvaziarCachePdf } = await import("@/lib/proposal-pdf-cache");
     esvaziarCachePdf();
   }
+
+  /**
+   * O que falta, que é o que diz a quem chama se vale a pena pedir outro lote.
+   *
+   * Não conta as que desistiram — essas nunca serão feitas por esta via, e
+   * mostrá-las como «por aquecer» punha um número que nunca chegava a zero e
+   * uma varredura que nunca parava.
+   */
+  resumo.restantes = Math.max(
+    0,
+    candidatas.length - resumo.jaTinham - resumo.aquecidas - desistidas,
+  );
 
   if (mudouOEstado) {
     try {

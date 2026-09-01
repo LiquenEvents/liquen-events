@@ -145,7 +145,71 @@ export async function propostaDoLink(
    * não há corte possível: não há pedido a que o carimbo pertença.
    */
   const pedido = (doToken.quoteId ?? "").trim();
-  if (pedido && !aindaAbre(emitidoEm, await linksCortadosEm(pedido))) return null;
+
+  /**
+   * ── AS TRÊS LEITURAS DO PEDIDO PARTEM JUNTAS ─────────────────────────────
+   *
+   * MEDIDO, com 25 ms por ida à base: o caminho do servidor até ao primeiro
+   * pixel são 202 ms, e 140 desses — 69% — são esta função, em CINCO idas
+   * estritamente uma atrás da outra.
+   *
+   * Só as duas primeiras são mesmo ordenadas: é preciso ler o link curto para
+   * saber que proposta é, e ler a proposta para saber de que pedido é. Daí para
+   * a frente, o carimbo dos links cortados, as irmãs e o contrato aceite
+   * dependem todos APENAS do `quoteId` — e de nada uns dos outros. Estavam em
+   * série por hábito de escrita, não por dependência.
+   *
+   * Cinco idas passam a três. Aos 25 ms medidos são ~55 ms; se as funções e a
+   * base estiverem em continentes diferentes — o que ninguém confirmou ainda —
+   * cada ida custa 90 a 120 ms e isto vale perto de um quarto de segundo.
+   *
+   * ── O QUE ISTO CUSTA, DITO POR EXTENSO ───────────────────────────────────
+   *
+   * Um link CORTADO passa a fazer duas leituras que antes não fazia. O
+   * cabeçalho aqui em cima diz que um link cortado «não tem que dar trabalho
+   * nenhum ao servidor», e isso deixa de ser inteiramente verdade.
+   *
+   * A troca é deliberada: um link cortado é a excepção rara, e um link vivo é
+   * todas as vezes. Pagar duas leituras à toa no caso raro para poupar uma ida
+   * inteira no caso comum é a troca certa. O que NÃO muda é o que interessa da
+   * regra: continua a devolver-se `null`, e continua a não se revelar nada a
+   * quem está do outro lado — as leituras são `SELECT` sem efeito nenhum.
+   *
+   * Cada uma leva o seu `catch`: uma irmã que falhe a ler não pode levar a
+   * página atrás, que é o que o `try` mais abaixo sempre garantiu.
+   *
+   * ── E PORQUE É QUE CADA UMA VAI DENTRO DE UMA FUNÇÃO ─────────────────────
+   *
+   * Porque um `.catch()` só apanha promessas REJEITADAS. Uma função que
+   * rebente de imediato — antes sequer de devolver uma promessa — não deixa
+   * promessa nenhuma a que agarrar o `.catch()`: o erro sobe e mata a página.
+   *
+   * Não é hipótese de manual. Foi assim que isto se partiu: com as leituras
+   * dentro do `try` de baixo, um `listProposalsForQuote` em falta era apanhado
+   * e a página servia na mesma; movidas para aqui com um `.catch()` solto,
+   * passou a rebentar. Um teste que já cá estava apanhou-o.
+   *
+   * A função `async` à volta converte o rebentamento imediato numa rejeição, e
+   * aí o `.catch()` volta a valer para os dois casos — que é o que o `try`
+   * fazia e não se podia perder.
+   */
+  const semRebentar = <T>(nome: string, ler: () => Promise<T>): Promise<T | null> =>
+    (async () => ler())().catch((e) => {
+      log.warn(`proposta-do-link: não deu para ler ${nome}`, { proposta: doToken.id, erro: e });
+      return null;
+    });
+
+  const pCorte = pedido
+    ? semRebentar("o corte dos links", () => linksCortadosEm(pedido))
+    : Promise.resolve(null);
+  const pIrmas = pedido
+    ? semRebentar("as irmãs", () => listProposalsForQuote(pedido))
+    : Promise.resolve(null);
+  const pAceite = pedido
+    ? semRebentar("o aceite", () => getAcceptedContractByQuote(pedido))
+    : Promise.resolve(null);
+
+  if (pedido && !aindaAbre(emitidoEm, await pCorte)) return null;
 
   let proposta = doToken;
   let seguiu = false;
@@ -168,7 +232,7 @@ export async function propostaDoLink(
         mesmoCliente(p.clientEmail, doToken.clientEmail) &&
         p.status !== "rascunho";
 
-      const irmas = (await listProposalsForQuote(quoteId)).filter(podeMostrar);
+      const irmas = ((await pIrmas) ?? []).filter(podeMostrar);
       maisRecente =
         [doToken, ...irmas.filter((p) => p.id !== doToken.id)]
           .filter(
@@ -176,7 +240,7 @@ export async function propostaDoLink(
           )
           .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0] ?? null;
 
-      const aceite = await getAcceptedContractByQuote(quoteId);
+      const aceite = await pAceite;
       if (aceite?.proposalId) {
         // «O que foi aceite fica congelado.» A proposta aceite manda, mesmo
         // que haja uma revisão mais recente por aí.

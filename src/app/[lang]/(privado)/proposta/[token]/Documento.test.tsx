@@ -272,14 +272,61 @@ describe("as fotografias", () => {
     expect(capa().getAttribute("sizes")).toBe("(min-width: 1024px) 1024px, 100vw");
   });
 
-  it("uma capa sem miniatura fica com o original e sem `srcset` a mentir", () => {
-    // Sem miniatura não há candidato de 400 px: um `srcset` com uma medida só
-    // dizia ao navegador que o original tem 1200, e ele tem 2200.
+  /**
+   * ── ESTE CASO GUARDAVA O CONTRÁRIO, E A RAZÃO MUDOU DE SÍTIO ──────────────
+   *
+   * Guardava «uma capa sem miniatura fica com o original e sem `srcset` a
+   * mentir», e a razão escrita era boa: «um `srcset` com uma medida só dizia ao
+   * navegador que o original tem 1200, e ele tem 2200». O defeito a evitar era
+   * MENTIR sobre a largura do original.
+   *
+   * Só que a conclusão de então — servir o original — tinha um custo que não
+   * estava contado. Sem miniatura, a capa era o ficheiro tal como saiu da
+   * máquina: 2,6 MB, sem alternativa nenhuma, com `fetchPriority="high"` e
+   * `decoding="sync"`. E quem não tem miniatura são precisamente as propostas
+   * ANTIGAS, anteriores ao bucket das miniaturas — as que estão nas caixas de
+   * correio de casais que podem voltar a abrir o link.
+   *
+   * O que mudou não foi a regra, foi haver um terceiro degrau que a cumpre: a
+   * derivada de 1200 px, que TEM mesmo 1200. O original deixa de aparecer na
+   * oferta, portanto não há largura nenhuma por onde mentir — e a de 400 só
+   * entra quando existe.
+   */
+  it("uma capa sem miniatura serve a derivada de 1200, e não o original", () => {
     render(
       <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", original: "orig/capa" }]} token="tk" />,
     );
-    expect(capa().getAttribute("src")).toBe("orig/capa");
-    expect(capa().getAttribute("srcset")).toBeNull();
+    expect(capa().getAttribute("src"), "a capa voltou a servir o original inteiro").not.toBe(
+      "orig/capa",
+    );
+    // Sem `media` assinada, o degrau do meio é a nossa rota — é ela que fabrica
+    // a derivada, guarda e serve.
+    expect(capa().getAttribute("src")).toBe("/api/proposta/tk/foto/c0");
+  });
+
+  it("e o `srcset` da capa nunca anuncia uma largura que não é verdade", () => {
+    // A razão do caso antigo, mantida: o que está no `srcset` como `1200w` tem
+    // de ter mesmo 1200. O original tem 2200 e por isso nunca lá entra.
+    render(
+      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", original: "orig/capa" }]} token="tk" />,
+    );
+    const srcset = capa().getAttribute("srcset") ?? "";
+    expect(srcset, "o original entrou na oferta com uma largura inventada").not.toContain(
+      "orig/capa",
+    );
+    expect(srcset).toBe("/api/proposta/tk/foto/c0 1200w");
+  });
+
+  it("com miniatura, a oferta tem os dois degraus", () => {
+    render(
+      <Documento
+        doc={DOC}
+        idioma="pt"
+        fotos={[{ id: "c0", miniatura: "mini/capa", media: "https://cdn/capa-1200" }]}
+        token="tk"
+      />,
+    );
+    expect(capa().getAttribute("srcset")).toBe("mini/capa 400w, https://cdn/capa-1200 1200w");
   });
 
   it("a grelha pede a MINIATURA, nunca o original", () => {

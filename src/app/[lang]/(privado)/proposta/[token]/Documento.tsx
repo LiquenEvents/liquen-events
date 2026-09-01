@@ -487,6 +487,30 @@ export default function Documento({
     .map((_, i) => porId.get(`c${i}`))
     .find((f) => f?.miniatura || f?.original);
 
+  /**
+   * ── O DEGRAU DO MEIO DA CAPA, QUE FALTAVA ─────────────────────────────────
+   *
+   * A capa tinha uma cascata de dois degraus: a miniatura de 400 e, se ela
+   * faltasse, o ORIGINAL. E o original é o ficheiro tal como saiu da máquina —
+   * 2,6 MB numa proposta típica.
+   *
+   * Quem não tem miniatura são precisamente as propostas ANTIGAS, anteriores ao
+   * bucket das miniaturas — as que estão nas caixas de correio de casais que
+   * podem voltar a abrir o link. Nessas, a capa era servida assim: o original
+   * inteiro, sem `srcSet` nenhum (o bloco todo era condicional à miniatura),
+   * com `fetchPriority="high"` e `decoding="sync"`. Megabytes, com prioridade
+   * máxima, descodificados no fio principal, como primeira coisa à vista.
+   *
+   * O degrau do meio existe e a grelha já o usava: a derivada de 1200 px, do
+   * CDN quando já está assinada, e da nossa rota quando ainda não existe — que
+   * é quem a fabrica. O original deixa de aparecer aqui: continua alcançável,
+   * mas pela rota, que o converte antes de o servir.
+   */
+  const capaMedia = capa
+    ? (capa.media ??
+      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`)
+    : "";
+
   // ── A APRESENTAÇÃO ────────────────────────────────────────────────────────
   // Os mesmos campos, pela mesma ordem, com a mesma regra do papel: um rótulo
   // seguido de nada não é «um campo por preencher», é um erro impresso numa
@@ -804,41 +828,40 @@ export default function Documento({
             <OfertaAvif foto={capa} />
             {}
             <img
-              src={capa.miniatura ?? capa.original}
-              {...(capa.miniatura
-                ? {
-                    /**
-                     * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
-                     *
-                     * A capa desenha-se com a largura toda do documento — até
-                     * 1024 px numa janela larga, e num iPhone ~390 pontos com
-                     * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
-                     * conta da galeria, no sítio onde ela se vê mais: a primeira
-                     * coisa que o casal olha ao abrir a proposta.
-                     *
-                     * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
-                     *
-                     * A derivada de 1200 px era servida SEMPRE pela nossa rota —
-                     * que abre o token, descarrega os bytes para dentro da função
-                     * e só então os reencaminha. Os mesmos bytes a atravessar-nos
-                     * a caminho de um sítio onde já estavam, com um arranque a
-                     * frio pelo meio. Assinada (`capa.media`), vem do CDN
-                     * directamente ao telemóvel.
-                     *
-                     * A rota fica para quando a derivada ainda não foi fabricada:
-                     * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
-                     * de todos os dias e passa a ser o de arranque.
-                     */
-                    srcSet: `${capa.miniatura} 400w, ${
-                      capa.media ??
-                      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`
-                    } 1200w`,
-                    /* A capa ocupa a largura da página, com o tecto de 1024 px
-                     do `max-w-5xl`. Sem isto o navegador assume `100vw` e num
-                     ecrã grande pede a maior sem precisar. */
-                    sizes: "(min-width: 1024px) 1024px, 100vw",
-                  }
-                : {})}
+              src={capa.miniatura ?? capaMedia}
+              /**
+               * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
+               *
+               * A capa desenha-se com a largura toda do documento — até
+               * 1024 px numa janela larga, e num iPhone ~390 pontos com
+               * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
+               * conta da galeria, no sítio onde ela se vê mais: a primeira
+               * coisa que o casal olha ao abrir a proposta.
+               *
+               * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
+               *
+               * A derivada de 1200 px era servida SEMPRE pela nossa rota —
+               * que abre o token, descarrega os bytes para dentro da função
+               * e só então os reencaminha. Os mesmos bytes a atravessar-nos
+               * a caminho de um sítio onde já estavam, com um arranque a
+               * frio pelo meio. Assinada (`capa.media`), vem do CDN
+               * directamente ao telemóvel.
+               *
+               * A rota fica para quando a derivada ainda não foi fabricada:
+               * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
+               * de todos os dias e passa a ser o de arranque.
+               *
+               * A de 400 só entra na oferta quando existe. O que NÃO pode
+               * faltar é a de 1200: sem ela, um documento sem miniatura ficava
+               * sem candidato nenhum e servia o original inteiro.
+               */
+              srcSet={[capa.miniatura ? `${capa.miniatura} 400w` : null, `${capaMedia} 1200w`]
+                .filter(Boolean)
+                .join(", ")}
+              /* A capa ocupa a largura da página, com o tecto de 1024 px do
+               `max-w-5xl`. Sem isto o navegador assume `100vw` e num ecrã
+               grande pede a maior sem precisar. */
+              sizes="(min-width: 1024px) 1024px, 100vw"
               alt=""
               /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
                de busca, porque é ela o elemento de maior pintura da página. */

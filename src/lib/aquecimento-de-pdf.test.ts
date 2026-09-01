@@ -86,6 +86,8 @@ vi.mock("@/lib/proposal-pdf-chave", () => ({
   chaveDoPdf: (doc: { v?: string }, idioma: string) => `k-${doc?.v ?? "x"}-${idioma}`,
 }));
 
+import { readFileSync } from "node:fs";
+import { TECTO_DA_ROTA_MS } from "./custo-do-pdf";
 import {
   aquecerPdfsEmFalta,
   CHAO_MS,
@@ -326,13 +328,49 @@ describe("o que fica para trás quando acaba", () => {
     expect(est.esvaziou, "os PDF desenhados ficaram retidos na memória").toBe(1);
   });
 
-  it("uma noite sem nada a fazer não escreve nada", async () => {
+  it("a primeira noite ANOTA o que aprendeu; a segunda já não escreve nada", async () => {
+    /**
+     * Isto guardava «uma noite sem nada a fazer não escreve nada», e deixou de
+     * ser verdade de propósito.
+     *
+     * A lista é percorrida da mais recente para a mais antiga, e as mais
+     * recentes são precisamente as que JÁ têm o PDF — foi guardado no envio.
+     * Sem memória, todas as noites se pagava uma ida ao armazenamento por cada
+     * proposta já quente ANTES de chegar à primeira fria. Com oitenta
+     * propostas isso são segundos de uma janela de trinta, gastos a aprender o
+     * que já se sabia — e piora à medida que a fila drena.
+     *
+     * Portanto a primeira noite escreve: anota o que confirmou. A partir daí,
+     * uma noite sem nada a fazer volta a não escrever nada, que era o que este
+     * caso guardava e continua a guardar — na segunda metade.
+     */
     est.propostas = [proposta("p1")];
     est.existentes.add("p1/k-p1-pt");
-    await aquecerPdfsEmFalta(0);
+    const primeira = await aquecerPdfsEmFalta(0);
 
-    expect(est.gravado, "escreveu estado numa noite em que nada mudou").toBe(null);
-    expect(est.esvaziou).toBe(0);
+    expect(primeira.jaTinham).toBe(1);
+    expect((est.gravado as EstadoDoAquecimento)?.feitas?.["p1"]).toBe("k-p1-pt");
+    expect(est.esvaziou, "não desenhou nada, não há memória para largar").toBe(0);
+
+    // A segunda noite, já com a memória: nem ao armazenamento vai.
+    est.estado = est.gravado;
+    est.gravado = null;
+    const segunda = await aquecerPdfsEmFalta(0);
+
+    expect(segunda.jaTinham).toBe(1);
+    expect(est.gravado, "voltou a escrever numa noite em que nada mudou").toBe(null);
+  });
+
+  it("e a memória não serve uma proposta que foi revista", async () => {
+    // A chave é o `sha256` do conteúdo. Documento revisto, chave diferente, a
+    // memória não bate — e vai verificar e desenhar como se fosse nova. Sem
+    // isto, uma proposta corrigida ficava para sempre com o PDF antigo.
+    est.propostas = [proposta("p1")];
+    est.estado = { falhadas: {}, feitas: { p1: "k-VELHA-pt" } };
+    const r = await aquecerPdfsEmFalta(0);
+
+    expect(r.jaTinham).toBe(0);
+    expect(est.desenhadas.map((d) => d.id)).toEqual(["p1"]);
   });
 
   it("uma base que não responde não leva a cópia de segurança abaixo", async () => {
@@ -353,5 +391,65 @@ describe("o que fica para trás quando acaba", () => {
     // Se alguém lhe mudar o nome, a memória das falhas começa do zero em
     // silêncio e as propostas partidas voltam a comer o orçamento todo.
     expect(CHAVE_DO_ESTADO).toBe("aquecimento-pdf:estado");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CHÃO TEM DE CABER O PIOR DESENHO — SENÃO A CÓPIA É DADA COMO FALHADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Este ficheiro promete, por extenso, que o aquecimento nunca pode derrubar a
+ * cópia de segurança. Havia uma maneira de o partir que nenhum teste via.
+ *
+ * O último desenho da noite pode ARRANCAR com o chão de orçamento e nada mais.
+ * Se o chão for menor do que o pior desenho, esse desenho acaba DEPOIS do tecto
+ * da função — e a gravação da memória das falhas, que vem a seguir, nunca
+ * chega a correr. Resultado: a cópia de segurança já tinha seguido, e o
+ * trabalho é dado como falhado por causa do aquecimento. Exactamente o que não
+ * pode acontecer.
+ *
+ * A conta usa números MEDIDOS, não escolhidos: `TECTO_DA_ROTA_MS` é o custo de
+ * uma proposta pesada em `custo-do-pdf.ts`, derivado de oito execuções reais.
+ *
+ * É também a razão de o remédio para a lentidão NÃO ser subir o orçamento:
+ * subir o orçamento aproxima o fim da janela do tecto da função. Quem trata da
+ * lentidão é a varredura, noutra função e noutra hora.
+ */
+describe("o chão do orçamento cabe o pior desenho", () => {
+  /** O tecto da função da cópia de segurança, lido do próprio ficheiro. */
+  function tectoDaFuncaoMs(): number {
+    const fonte = readFileSync("src/app/api/cron/backup/route.ts", "utf8");
+    const m = fonte.match(/export const maxDuration = (\d+)/);
+    if (!m) throw new Error("o `maxDuration` da cópia de segurança desapareceu");
+    return Number(m[1]) * 1000;
+  }
+
+  /** Depois do último desenho ainda há a gravação da memória das falhas. */
+  const MARGEM_PARA_GRAVAR_MS = 5_000;
+
+  it("o último desenho da noite acaba antes de a função morrer", () => {
+    const tecto = tectoDaFuncaoMs();
+    // O mais tarde que um desenho pode arrancar, e quando acabaria no pior caso.
+    const arranqueMaisTarde = ORCAMENTO_MS - CHAO_MS;
+    const fimNoPiorCaso = arranqueMaisTarde + TECTO_DA_ROTA_MS;
+
+    expect(
+      fimNoPiorCaso,
+      `um desenho que arranque ao segundo ${arranqueMaisTarde / 1000} e demore ` +
+        `${TECTO_DA_ROTA_MS / 1000}s acaba ao ${fimNoPiorCaso / 1000} — e a função morre ao ` +
+        `${tecto / 1000}, com ${MARGEM_PARA_GRAVAR_MS / 1000}s reservados para gravar a ` +
+        `memória das falhas.\n\nSuba o CHAO_MS, não o ORCAMENTO_MS: subir o orçamento ` +
+        `aproxima o desastre em vez de o afastar.`,
+    ).toBeLessThanOrEqual(tecto - MARGEM_PARA_GRAVAR_MS);
+  });
+
+  it("e o chão é mesmo respeitado — não é uma constante decorativa", () => {
+    // O controlo positivo: sem isto, o caso de cima passa por o chão poder ser
+    // enorme e nunca ninguém o consultar.
+    const fonte = readFileSync("src/lib/aquecimento-de-pdf.ts", "utf8");
+    expect(fonte, "o chão deixou de travar o arranque de um desenho").toMatch(
+      /limite - Date\.now\(\) < CHAO_MS/,
+    );
   });
 });
