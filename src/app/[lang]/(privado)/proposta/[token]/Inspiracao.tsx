@@ -505,9 +505,42 @@ export default function Inspiracao({
   const boardAberto = aberta ? boards[aberta.board] : null;
   const fotoAberta = boardAberto ? fotos[boardAberto.fotos[aberta!.i]] : undefined;
 
+  /**
+   * ── QUANTAS FOTOGRAFIAS VÊM ANTES DE CADA BOARD ────────────────────────
+   *
+   * O `FOTOS_ANSIOSAS` diz «quantas fotos entram antes de o navegador deixar
+   * de carregar à frente» — uma frase sobre o DOCUMENTO. Só que a conta era
+   * feita com o índice dentro de cada board, e portanto recomeçava do zero em
+   * cada um.
+   *
+   * MEDIDO numa proposta de três boards e 46 fotografias, com os pesos que
+   * este ficheiro já tem escritos (105,3 KB a 1200 px em AVIF): saíam ONZE
+   * pedidos com pressa — a capa, o respiro do primeiro board e três células
+   * por board. Dessas onze, UMA está no ecrã; as outras dez estão entre mil e
+   * quinhentos e quinze mil píxeis abaixo.
+   *
+   * Num 4G de 1,5 Mbps são 1 158 KB antes de a página servir para alguma
+   * coisa — 6,2 s —, e o pior nem é o total: é a capa, que é a única que o
+   * casal está a ver, ficar em fila atrás de dez fotografias que ele não
+   * alcança sem rolar meio minuto.
+   *
+   * Com a conta no documento ficam quatro, que é o que o número sempre disse.
+   * O número não muda; muda o sítio onde se conta.
+   */
+  const fotosAntesDoBoard: number[] = [];
+  {
+    let contadas = 0;
+    for (const board of boards) {
+      fotosAntesDoBoard.push(contadas);
+      contadas += board.fotos.length;
+    }
+  }
+
   return (
     <>
       {boards.map((board, b) => {
+        /** A posição desta fotografia no documento inteiro, e não no board. */
+        const noDocumento = (i: number) => (fotosAntesDoBoard[b] ?? 0) + i;
         const oRespiro = respiro(board, fotos);
         /**
          * ── QUANTAS COLUNAS TEM ESTA SECÇÃO ────────────────────────────────
@@ -568,7 +601,7 @@ export default function Inspiracao({
               <Respiro
                 token={token}
                 foto={fotos[board.fotos[oRespiro]]}
-                ansiosa={b === 0}
+                ansiosa={noDocumento(oRespiro) < FOTOS_ANSIOSAS}
                 rotulo={contar(textos.contagem, oRespiro + 1, board.fotos.length)}
                 textos={textos}
                 aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
@@ -642,7 +675,7 @@ export default function Inspiracao({
                         key={id}
                         token={token}
                         foto={fotos[id]}
-                        ansiosa={i < FOTOS_ANSIOSAS}
+                        ansiosa={noDocumento(i) < FOTOS_ANSIOSAS}
                         rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
                         textos={textos}
                         aoAmpliar={(alvo) => abrir(b, i, alvo)}
@@ -763,20 +796,6 @@ function Celula({
   /** Esta célula esgotou as tentativas. Ver `houveFalha`, acima. */
   aoDesistir: () => void;
 }) {
-  // A grelha pede a MINIATURA. O original é o plano B — e é plano B, não
-  // primeira escolha: as fotografias anteriores ao bucket das miniaturas não
-  // têm nenhuma, e essas pagam o ficheiro inteiro porque não há alternativa.
-  // Sem `tentarDeNovo`: a célula que desiste desaparece, e quem a faz voltar é
-  // o botão do pé da galeria (`recarregar`), que reassina o documento inteiro.
-  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(
-    foto?.miniatura ?? foto?.original,
-    foto?.original,
-  );
-  // Sem medida guardada, vale a forma que a repartição por colunas assumiu —
-  // ver `PROPORCAO_POR_OMISSAO`. Deixá-la em branco era o que punha uma coluna
-  // a acabar antes da outra.
-  const proporcao =
-    foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : PROPORCAO_POR_OMISSAO;
   /**
    * A derivada intermédia desta fotografia.
    *
@@ -790,6 +809,42 @@ function Celula({
     ? (foto.media ??
       `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
     : "";
+
+  /**
+   * ── A GRELHA DEIXA DE CAIR NO ORIGINAL ─────────────────────────────────
+   *
+   * A cascata era `miniatura ?? original` com o original como plano B. Numa
+   * fotografia SEM miniatura — o caso das anteriores ao bucket, que são
+   * precisamente as das propostas antigas que estão nas caixas de correio —
+   * isso punha o ficheiro inteiro dentro de uma caixa de 350 px.
+   *
+   * O degrau do meio existia e estava a ser saltado: a derivada de 1200 px
+   * está calculada aqui em cima e existe SEMPRE, porque quando ainda não foi
+   * fabricada cai na rota que a fabrica.
+   *
+   * A conta, com os pesos medidos neste ficheiro e um 4G de 1,5 Mbps:
+   *
+   *     original   2 600 KB ÷ 187,5 KB/s = 13,9 s
+   *     1200 px      105 KB ÷ 187,5 KB/s =  0,56 s
+   *
+   * Treze segundos por fotografia, numa página que é feita de fotografias. O
+   * próprio `useFotoComPlanoB` foi escrito por causa deste defeito e tem a
+   * medição no cabeçalho — aceita uma lista desde então, e esta página era a
+   * única que continuava a passar-lhe uma cadeia só.
+   *
+   * O original fica onde deve estar: em último, para quando nem a derivada
+   * responde. Sem `tentarDeNovo` — a célula que desiste desaparece, e quem a
+   * faz voltar é o botão do pé da galeria, que reassina o documento inteiro.
+   */
+  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(foto?.miniatura ?? media, [
+    media,
+    foto?.original,
+  ]);
+  // Sem medida guardada, vale a forma que a repartição por colunas assumiu —
+  // ver `PROPORCAO_POR_OMISSAO`. Deixá-la em branco era o que punha uma coluna
+  // a acabar antes da outra.
+  const proporcao =
+    foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : PROPORCAO_POR_OMISSAO;
   /**
    * O `srcset` só vale enquanto a primeira escolha está de pé.
    *
@@ -898,7 +953,7 @@ function Celula({
           {ofertaAvif && (
             <source type="image/avif" media="(min-resolution: 2dppx)" srcSet={ofertaAvif} />
           )}
-          { }
+          {}
           <img
             key={alvo}
             src={alvo}
