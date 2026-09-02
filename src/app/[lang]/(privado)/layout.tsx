@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { normalizeLocale } from "@/lib/i18n";
+import { CortinaDaProposta } from "./CortinaDaProposta";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -71,11 +73,32 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LayoutPrivado({ children }: { children: React.ReactNode }) {
+export default async function LayoutPrivado({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
+
   // Sem `<main>` com o `pt-24` do sítio: aqui não há barra de navegação por
   // cima, e a página começa onde a página começa.
   return (
     <main id="conteudo" className="flex-1">
+      {/*
+        A CORTINA VEM DAQUI, E NÃO DO `loading.tsx`, POR UMA RAZÃO SÓ: a
+        língua. O `loading.tsx` não recebe parâmetros — está nos documentos do
+        Next à letra, e é por isso que ele não tem uma única frase escrita. Um
+        layout recebe, e o lema tem de chegar na língua do casal.
+
+        E chega ANTES do resto: o layout é das primeiras coisas que o servidor
+        entrega, portanto a cortina está no ecrã enquanto a proposta ainda vem
+        a caminho — que é o trabalho dela. O esqueleto do `loading.tsx` fica
+        por baixo, e continua a ser ele a nomear a espera para quem ouve o
+        ecrã e para quem pediu menos movimento.
+      */}
+      <CortinaDaProposta locale={normalizeLocale(lang)} />
       {children}
     </main>
   );
