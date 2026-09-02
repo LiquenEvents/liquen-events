@@ -138,14 +138,164 @@ describe("o PDF guardado, servido por nós", () => {
     );
   });
 
-  it("o documento de um cliente não fica em cache partilhada", async () => {
+  /**
+   * ── ESTE CASO GUARDAVA O `no-store`, E ERA ELE O DEFEITO ──────────────────
+   *
+   * Guardava «private» E «no-store» juntos, como se fossem a mesma promessa.
+   * São coisas diferentes: `private` diz «não guardes numa cache PARTILHADA», e
+   * é a regra certa; `no-store` diz «não guardes de todo, nem no telemóvel de
+   * quem pediu» — e era isso que fazia o segundo clique, o «abrir outra vez» e
+   * uma transferência retomada pagarem 0,5 a 4 MB de novo, num 4G.
+   *
+   * A outra metade desta mesma rota — o caminho do desenho — sempre disse
+   * `private, max-age=300, must-revalidate`. As duas metades diziam coisas
+   * contrárias sobre o mesmo ficheiro.
+   *
+   * Fica a regra que interessa (nunca `public`, porque o testemunho vai no
+   * endereço) e a proibição do que estava errado.
+   */
+  it("fica no telemóvel de quem pediu, e em cache partilhada nenhuma", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(corpoDeTeste(), { status: 200 })),
     );
     const r = await pdfGuardadoEmFluxo(pedido(), "p1", "abc", "P.pdf");
-    expect(r!.headers.get("cache-control")).toContain("private");
-    expect(r!.headers.get("cache-control")).toContain("no-store");
+    const cc = r!.headers.get("cache-control") ?? "";
+
+    expect(cc, "o endereço leva o testemunho: nunca `public`").toContain("private");
+    expect(cc, "o endereço leva o testemunho: nunca `public`").not.toContain("public");
+    expect(
+      cc,
+      "voltou o `no-store`: o navegador fica proibido de guardar o ficheiro e cada " +
+        "reabertura volta a pagar os megabytes todos",
+    ).not.toContain("no-store");
+    expect(cc).toContain("max-age=300");
+    expect(cc, "sem isto, um telemóvel sem rede serve uma versão vencida").toContain(
+      "must-revalidate",
+    );
+    /**
+     * E NUNCA `immutable`. Os bytes deste endereço mudam de propósito: uma
+     * revisão muda a chave, e o mesmo link salta para a versão mais recente.
+     * Com `immutable`, um casal que descarregou a v1 e volta a carregar depois
+     * de ela corrigir o preço recebia a v1 sem sequer perguntar.
+     */
+    expect(cc, "o `immutable` congela uma proposta revista no telemóvel do casal").not.toContain(
+      "immutable",
+    );
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * REABRIR NÃO CUSTA UMA IDA AO BALDE NEM UM BYTE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «uma pessoa estar ali à espera diz que aquilo não funciona
+   * e funciona, só que demora tempo, só que não pode demorar».
+   *
+   * O caso mais comum de todos é o casal abrir a proposta, fechar, e voltar a
+   * abrir para a mostrar a alguém. Isso pagava tudo outra vez.
+   */
+  it("quem já tem esta versão recebe 304, sem se ir ao armazenamento", async () => {
+    const rede = vi.fn(async () => new Response(corpoDeTeste(), { status: 200 }));
+    vi.stubGlobal("fetch", rede);
+    const req = new Request("https://liquen.test/pdf", {
+      headers: { "if-none-match": '"abc"' },
+    });
+
+    const r = await pdfGuardadoEmFluxo(req, "p1", "abc", "P.pdf");
+
+    expect(r!.status).toBe(304);
+    expect(r!.headers.get("etag")).toBe('"abc"');
+    expect(rede, "foi ao armazenamento para responder «já tens»").not.toHaveBeenCalled();
+  });
+
+  it("o ETag é a chave do DOCUMENTO, e não o do balde", async () => {
+    /**
+     * Sem isto, nada do que está acima chega a acontecer em produção.
+     *
+     * O balde manda o MD5 do objecto. Se for esse que sai daqui, o navegador
+     * volta com `If-None-Match: "<md5>"` — que nunca é igual à nossa chave — e
+     * a reabertura nunca pode ser barata. A chave é o `sha256` do documento.
+     */
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(corpoDeTeste(), { status: 200, headers: { etag: '"md5-do-balde"' } }),
+      ),
+    );
+    const r = await pdfGuardadoEmFluxo(pedido(), "p1", "abc", "P.pdf");
+    expect(r!.headers.get("etag")).toBe('"abc"');
+  });
+
+  it("um `If-None-Match` de outra versão recebe o ficheiro novo", async () => {
+    // A prova de que uma proposta revista continua a ser entregue.
+    const rede = vi.fn(async () => new Response(corpoDeTeste(), { status: 200 }));
+    vi.stubGlobal("fetch", rede);
+    const req = new Request("https://liquen.test/pdf", {
+      headers: { "if-none-match": '"chave-velha"' },
+    });
+
+    const r = await pdfGuardadoEmFluxo(req, "p1", "abc", "P.pdf");
+
+    expect(r!.status).toBe(200);
+    expect(rede).toHaveBeenCalled();
+  });
+
+  it("com `Range` não se atalha para 304 — quem retoma quer o pedaço", async () => {
+    const rede = vi.fn(async () => new Response(corpoDeTeste(), { status: 206 }));
+    vi.stubGlobal("fetch", rede);
+    const req = new Request("https://liquen.test/pdf", {
+      headers: { "if-none-match": '"abc"', range: "bytes=0-15" },
+    });
+
+    const r = await pdfGuardadoEmFluxo(req, "p1", "abc", "P.pdf");
+
+    expect(r!.status).toBe(206);
+    expect(rede).toHaveBeenCalled();
+  });
+
+  it("um `If-Range` de outra versão anula o pedaço, em vez de costurar duas versões", async () => {
+    /**
+     * Uma transferência retomada manda o validador que tinha mais o `Range`. Se
+     * a proposta foi revista entretanto, servir o pedaço é colar bytes da v2 a
+     * bytes da v1 — e o que o casal abre é um PDF corrompido. A regra é
+     * ignorar o `Range` e mandar o ficheiro inteiro.
+     */
+    // Tipado com os argumentos porque é o SEGUNDO que interessa: as opções.
+    const rede = vi.fn(
+      async (_url: string, _opcoes?: RequestInit) => new Response(corpoDeTeste(), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", rede);
+    const req = new Request("https://liquen.test/pdf", {
+      headers: { "if-range": '"chave-velha"', range: "bytes=0-15" },
+    });
+
+    await pdfGuardadoEmFluxo(req, "p1", "abc", "P.pdf");
+
+    const opcoes = rede.mock.calls[0]?.[1] as { headers?: Record<string, string> } | undefined;
+    expect(
+      opcoes?.headers?.Range,
+      "o pedaço foi reencaminhado apesar de o validador não bater",
+    ).toBeUndefined();
+  });
+
+  it("um 304 do armazenamento nunca vira um desenho", async () => {
+    /**
+     * A armadilha, fechada antes de existir. Hoje não se reencaminha nenhum
+     * cabeçalho condicional, portanto o balde nunca responde 304. No dia em que
+     * alguém o reencaminhar — e parece uma optimização óbvia — um 304 caía no
+     * `!ok`, devolvia `null`, e a rota desenhava o documento inteiro em
+     * silêncio: o pedido mais barato passava a ser o mais caro.
+     */
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 304 })),
+    );
+    const r = await pdfGuardadoEmFluxo(pedido(), "p1", "abc", "P.pdf");
+
+    expect(r, "um 304 do balde devolveu `null` e mandou desenhar").not.toBeNull();
+    expect(r!.status).toBe(304);
   });
 
   it("404 é o caso normal da primeira vez: devolve `null` para se desenhar", async () => {
