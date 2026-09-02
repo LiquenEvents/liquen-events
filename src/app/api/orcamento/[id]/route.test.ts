@@ -122,21 +122,6 @@ vi.mock("@/lib/contracts-store", () => ({
   createContractIfAbsent: contratos.criar,
   newContractId: () => "contrato-novo",
 }));
-/**
- * O apagamento a sério vive em `apagar-pedido.ts` e tem os seus próprios
- * testes — as propostas que vão atrás, as fotografias, o contrato que manda
- * parar. Aqui o que se testa é o que a ROTA faz com o resultado: que código
- * HTTP devolve, e o que diz. Um duplo mantém as duas perguntas separadas.
- */
-const apagamento = vi.hoisted(() => ({
-  correr: vi.fn(async () => ({
-    apagado: true as boolean,
-    motivo: undefined as string | undefined,
-    contou: { propostas: 2, fotos: 3, rascunhos: 1 },
-    falhou: [] as string[],
-  })),
-}));
-vi.mock("@/lib/apagar-pedido", () => ({ apagarPedidoSemContrato: apagamento.correr }));
 
 import { GET, PATCH, DELETE, POST } from "./route";
 import { corpoDaMarcacao, corpoDoMotivo } from "@/lib/orcamento/desfecho";
@@ -349,67 +334,15 @@ describe("DELETE /api/orcamento/[id]", () => {
   it("requires authentication", async () => {
     const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
     expect(res.status).toBe(401);
-    expect(apagamento.correr).not.toHaveBeenCalled();
+    expect(store.remove).not.toHaveBeenCalled();
   });
 
-  it("apaga o pedido E o que é dele, e diz o que levou", async () => {
-    /**
-     * Isto respondia `{ ok: true }` seco depois de tirar só a LINHA do pedido.
-     * As propostas ficavam — com o nome do casal, o email e o documento
-     * inteiro — porque a chave estrangeira é `on delete set null`.
-     *
-     * A contagem na resposta não é enfeite: um apagamento silencioso é
-     * indistinguível de um que não aconteceu, e era esse o defeito.
-     */
+  it("hard-deletes the quote for an authenticated admin", async () => {
     authed.ok = true;
     const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(body.contou).toEqual({ propostas: 2, fotos: 3, rascunhos: 1 });
-    expect(apagamento.correr).toHaveBeenCalledWith("LIQ-1");
-  });
-
-  it("um pedido COM contrato responde 409 e não apaga nada", async () => {
-    /**
-     * Contratos e facturas são registos fiscais e conservam-se anos — e a
-     * própria política de privacidade fala de pedidos que NÃO deram origem a
-     * contrato. A frase tem de dizer porquê, senão parece uma avaria.
-     */
-    authed.ok = true;
-    apagamento.correr.mockResolvedValueOnce({
-      apagado: false,
-      motivo: "tem-contrato",
-      contou: { propostas: 0, fotos: 0, rascunhos: 0 },
-      falhou: [],
-    });
-    const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toMatch(/registo fiscal/i);
-  });
-
-  it("um pedido que não existe responde 404", async () => {
-    authed.ok = true;
-    apagamento.correr.mockResolvedValueOnce({
-      apagado: false,
-      motivo: "nao-existe",
-      contou: { propostas: 0, fotos: 0, rascunhos: 0 },
-      falhou: [],
-    });
-    expect((await DELETE(req("DELETE"), ctx("LIQ-1"))).status).toBe(404);
-  });
-
-  it("quando não conseguiu apagar, NÃO diz que apagou — e diz o que ficou", async () => {
-    authed.ok = true;
-    apagamento.correr.mockResolvedValueOnce({
-      apagado: false,
-      motivo: undefined,
-      contou: { propostas: 1, fotos: 0, rascunhos: 0 },
-      falhou: ["a fotografia q1/b.jpg continua no armazenamento"],
-    });
-    const res = await DELETE(req("DELETE"), ctx("LIQ-1"));
-    expect(res.status).toBe(500);
-    expect((await res.json()).falhou.join(" ")).toContain("q1/b.jpg");
+    expect(await res.json()).toEqual({ ok: true });
+    expect(store.remove).toHaveBeenCalledWith("LIQ-1");
   });
 });
 

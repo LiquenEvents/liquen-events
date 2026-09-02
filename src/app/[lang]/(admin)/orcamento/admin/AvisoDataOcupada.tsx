@@ -86,13 +86,13 @@ export default function AvisoDataOcupada({
         <div className="min-w-0 flex-1">
           <h3
             id="aviso-data-titulo"
-            className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--bo-tinta-72)]"
+            className="text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/70"
           >
             {choques.length === 1
               ? "Já há um evento nesta data"
               : `Já há ${choques.length} eventos à volta desta data`}
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">{motivo}</p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground/55">{motivo}</p>
 
           <ul className="mt-3 flex flex-col gap-2.5">
             {choques.map((c) => {
@@ -123,7 +123,7 @@ export default function AvisoDataOcupada({
                */
               const linha = (
                 <span>
-                  <span className="font-medium text-[var(--bo-text)]">{c.outro.name}</span>
+                  <span className="font-medium text-foreground/85">{c.outro.name}</span>
                   <span className="text-foreground/45">
                     {" · "}
                     {PROXIMIDADE[c.proximidade]}
@@ -166,7 +166,7 @@ export default function AvisoDataOcupada({
                         {/* Sempre "≈": a distância vem de coordenadas do centro
                             da localidade e de um factor de estrada, nunca de um
                             itinerário. Ver src/lib/geo/portugal.ts. */}
-                        <span className="text-[var(--bo-tinta-72)]">≈ {c.km} km daqui</span>
+                        <span className="text-foreground/70">≈ {c.km} km daqui</span>
                         {c.aproximado && " (região, não morada)"}
                       </>
                     ) : (

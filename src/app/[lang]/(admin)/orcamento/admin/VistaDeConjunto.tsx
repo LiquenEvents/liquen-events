@@ -111,7 +111,7 @@ export default function VistaDeConjunto({
           <button
             type="button"
             onClick={onFechar}
-            className="alvo-toque text-[11px] font-medium text-[var(--bo-text-muted)] transition-colors hover:text-[var(--bo-text)]"
+            className="alvo-toque text-[11px] font-medium text-foreground/55 transition-colors hover:text-foreground/80"
           >
             Fechar
           </button>
@@ -180,7 +180,7 @@ export default function VistaDeConjunto({
                 </div>
               </button>
               <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="min-w-0 text-[11px] leading-tight text-[var(--bo-text-muted)]">
+                <p className="min-w-0 text-[11px] leading-tight text-foreground/60">
                   {/* «Página 4 de 7», sempre à vista: é assim que se fala de uma
                       folha ao telefone com um casal, e era o que faltava para
                       um problema visto aqui se conseguir nomear. */}

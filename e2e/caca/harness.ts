@@ -322,34 +322,9 @@ export async function entrar(page: Page): Promise<boolean> {
  * A tolerância pára na vírgula, e isso importa: `/^Propostas$/` continua a NÃO
  * casar com «Propostas Aceites», que é um destino diferente.
  */
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O NOME DO DESTINO TRAZ O DISTINTIVO ATRÁS — E UM ESPAÇO ANTES DA VÍRGULA
- * ════════════════════════════════════════════════════════════════════════════
- *
- * `/^Pedidos$/` deixa de casar assim que há trabalho à espera, porque o nome
- * acessível do botão passa a incluir a contagem. Isto acrescenta-lhe essa
- * cauda — e continua a NÃO casar «Propostas Aceites» com `/^Propostas$/`, que
- * é a metade que não se pode perder.
- *
- * ── O ESPAÇO, QUE FALTAVA ────────────────────────────────────────────────
- *
- * Isto montava `(?:,.*)?$` — a vírgula colada ao nome. MEDIDO, pela árvore de
- * acessibilidade que o browser calcula, a 1280 e com 54 pedidos por responder:
- *
- *     button "Pedidos , 54 por responder"
- *              ▲──────┘
- *              o distintivo é um nó IRMÃO, e o cálculo do nome mete um espaço
- *              entre ele e o texto
- *
- * Com a vírgula colada o localizador nunca resolve. E o que isso parece, de
- * fora, não é «não encontrei»: o Playwright fica à espera do localizador até ao
- * tecto do teste e depois diz «Timeout» — três minutos a olhar para um passeio
- * pendurado por causa de um espaço.
- */
-export function comDistintivo(rotulo: RegExp): RegExp {
+function comDistintivo(rotulo: RegExp): RegExp {
   if (!rotulo.source.endsWith("$")) return rotulo;
-  return new RegExp(`${rotulo.source.slice(0, -1)}(?:\\s*,.*)?$`, rotulo.flags);
+  return new RegExp(`${rotulo.source.slice(0, -1)}(?:,.*)?$`, rotulo.flags);
 }
 
 export async function irPara(page: Page, rotuloPedido: RegExp) {
@@ -400,27 +375,9 @@ export async function irPara(page: Page, rotuloPedido: RegExp) {
         })
         .catch(() => false);
       if (dentro) {
-        /**
-         * COM TECTO, e não sem ele.
-         *
-         * Estava `alvo.click()` seco, e um clique sem tecto herda o do teste
-         * inteiro. Basta o botão ficar coberto — a gaveta que este mesmo ciclo
-         * abre uma linha abaixo tapa a barra lateral — para o passeio ficar
-         * três minutos à espera de um alvo que nunca fica clicável, e depois
-         * dizer só «Timeout» sem dizer de quê.
-         *
-         * Com tecto, uma tentativa falhada é apenas isso: volta ao ciclo, que
-         * fecha e reabre a gaveta e tenta outra vez. Se nem às oito conseguir,
-         * a mensagem lá em baixo diz o destino e a largura.
-         */
-        const clicou = await alvo
-          .click({ timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false);
-        if (clicou) {
-          if (largura < 1024) await page.waitForTimeout(350);
-          return;
-        }
+        await alvo.click();
+        if (largura < 1024) await page.waitForTimeout(350);
+        return;
       }
     }
 

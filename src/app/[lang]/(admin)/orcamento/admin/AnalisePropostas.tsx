@@ -71,7 +71,7 @@ function extrasDe(propostas: PropostaLeve[]): AnaliseDeExtras | null {
 function Numero({ valor, rotulo, nota }: { valor: string; rotulo: string; nota?: string }) {
   return (
     <div className="rounded-2xl border border-[var(--bo-hairline)] p-4">
-      <p className="text-2xl font-light text-[var(--bo-text)]">{valor}</p>
+      <p className="text-2xl font-light text-foreground/85">{valor}</p>
       <p className="mt-1 text-[11px] tracking-[0.08em] uppercase text-foreground/45">{rotulo}</p>
       {nota && <p className="mt-1 text-[11px] leading-relaxed text-foreground/40">{nota}</p>}
     </div>
@@ -202,7 +202,7 @@ export default function AnalisePropostas() {
           <ul className="flex flex-col gap-2">
             {a.motivos.map((m) => (
               <li key={m.chave} className="flex items-center gap-3">
-                <span className="w-40 shrink-0 text-xs text-[var(--bo-tinta-72)]">
+                <span className="w-40 shrink-0 text-xs text-foreground/70">
                   {NOME_DO_MOTIVO[m.chave]}
                 </span>
                 <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--bo-tinta-6)]">
@@ -211,7 +211,7 @@ export default function AnalisePropostas() {
                     style={{ width: `${Math.max(2, m.pct)}%` }}
                   />
                 </span>
-                <span className="w-24 shrink-0 text-right text-xs text-[var(--bo-text-muted)]">
+                <span className="w-24 shrink-0 text-right text-xs text-foreground/55">
                   {`${m.n} · ${m.pct}%`}
                 </span>
               </li>
@@ -235,7 +235,7 @@ export default function AnalisePropostas() {
           >
             Os extras vendem-se?
           </h3>
-          <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">
+          <p className="text-sm leading-relaxed text-foreground/70">
             {extras.taxa === null
               ? `${extras.comExtras} ${extras.comExtras === 1 ? "proposta ganha tinha" : "propostas ganhas tinham"} extras, e nenhuma tem a versão registada.`
               : `Das ${extras.levaramExtras + extras.ficaramNaBase} registadas, ${extras.levaramExtras} ${extras.levaramExtras === 1 ? "levou" : "levaram"} os extras — ${extras.taxa}%.`}

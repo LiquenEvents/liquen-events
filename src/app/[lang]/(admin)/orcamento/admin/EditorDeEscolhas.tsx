@@ -83,9 +83,9 @@ export interface FotoDisponivel {
 }
 
 const CAIXA =
-  "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-[#4d6350] focus:outline-none";
+  "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-foreground/85 placeholder:text-foreground/30 focus:border-[#4d6350] focus:outline-none";
 const BOTAO_MAGRO =
-  "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)]";
+  "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] text-foreground/60 transition-colors hover:bg-[var(--bo-tinta-6)]";
 
 export default function EditorDeEscolhas({
   escolhas,
@@ -241,8 +241,8 @@ export default function EditorDeEscolhas({
     <div className="mt-8 rounded-xl border border-[var(--color-moss)]/25 bg-[color-mix(in_srgb,var(--color-moss)_5%,transparent)] p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h4
-          className="text-[var(--bo-text)] text-[17px]"
-          style={{ fontFamily: "var(--font-display)" }}
+          className="text-foreground/85 text-[17px]"
+          style={{ fontFamily: "var(--font-playfair)" }}
         >
           À escolha do casal <span className="text-foreground/40 text-[12px]">(opcional)</span>
         </h4>
@@ -250,9 +250,9 @@ export default function EditorDeEscolhas({
           + Alternativa
         </button>
       </div>
-      <p className="mt-2 text-[13px] leading-relaxed text-[var(--bo-text-muted)]">
+      <p className="mt-2 text-[13px] leading-relaxed text-foreground/60">
         Duas paletas para a cerimónia, dois estilos de corredor:{" "}
-        <strong className="font-medium text-[var(--bo-tinta-72)]">
+        <strong className="font-medium text-foreground/75">
           deixa o casal decidir sem ser preciso outra reunião
         </strong>
         . Aparecem na página deles — não no PDF — e a resposta volta para a ficha do evento.
@@ -271,7 +271,7 @@ export default function EditorDeEscolhas({
           quer que ela estivesse a ouvir a seguir. */}
       {anulavel && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
-          <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-[var(--bo-tinta-72)]">
+          <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-foreground/70">
             {anulavel.frase} Pode anular durante {anulavel.segundos}s.
           </span>
           <button
@@ -342,7 +342,7 @@ export default function EditorDeEscolhas({
                     // À VISTA no telemóvel — é a regra desta casa desde o «×»
                     // das fotos: um botão que apaga não pode ser invisível e
                     // continuar a apanhar o dedo.
-                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-muted)] transition-colors hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8"
+                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-foreground/55 transition-colors hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8"
                     onClick={() => pedirParaApagarEscolha(i)}
                   >
                     ×
@@ -365,7 +365,7 @@ export default function EditorDeEscolhas({
                     aria-label="Confirmar apagar a alternativa"
                     className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
                   >
-                    <span className="min-w-[12rem] flex-1 text-[12px] leading-relaxed text-[var(--bo-text)]">
+                    <span className="min-w-[12rem] flex-1 text-[12px] leading-relaxed text-foreground/80">
                       {perguntaSobre(escolha, i)}
                     </span>
                     {/* Cancelar é o primeiro e não escreve NADA: nem apaga, nem

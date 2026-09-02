@@ -4,8 +4,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import { textosDaPagina } from "./textos-da-pagina";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 /**
  * A LUPA — o gesto que existe para as fotografias deixarem de ser pequenas.
@@ -16,9 +14,9 @@ import { join } from "node:path";
 const T = textosDaPagina("pt");
 
 const FOTOS: Record<string, FotoDaProposta> = {
-  a: { id: "a", marca: "ma", miniatura: "mini/a", original: "orig/a", largura: 1200, altura: 800 },
-  b: { id: "b", marca: "mb", miniatura: "mini/b", original: "orig/b" },
-  c: { id: "c", marca: "mc", miniatura: "mini/c", original: "orig/c" },
+  a: { id: "a", miniatura: "mini/a", original: "orig/a", largura: 1200, altura: 800 },
+  b: { id: "b", miniatura: "mini/b", original: "orig/b" },
+  c: { id: "c", miniatura: "mini/c", original: "orig/c" },
 };
 
 const BOARD: BoardParaEcra = {
@@ -84,7 +82,7 @@ describe("a grelha", () => {
     expect(semForma.style.aspectRatio).toBe("3 / 2");
   });
 
-  it("NENHUMA entra ansiosa — nenhuma delas está à vista", () => {
+  it("só as primeiras entram ansiosas — 46 de uma vez é a conta que isto evita", () => {
     /*
      * Contadas pela POSIÇÃO DELA e não pela ordem no HTML.
      *
@@ -101,143 +99,18 @@ describe("a grelha", () => {
         return { n: Number(n), modo: b.querySelector("img:last-of-type")?.getAttribute("loading") };
       })
       .sort((x, y) => x.n - y.n);
-    expect(
-      porPosicao.map((x) => x.modo),
-      "uma fotografia de board voltou a entrar com pressa — e nenhuma está à vista:\n" +
-        "a ordem é capa → apresentação → índice → serviços → cronograma → inspiração,\n" +
-        "portanto a primeira da grelha está milhares de píxeis abaixo da dobra e o que\n" +
-        "ela faz é disputar a ligação com a CAPA, que é o que o casal está a ver.",
-    ).toEqual(["lazy", "lazy", "lazy", "lazy", "lazy", "lazy"]);
-  });
-
-  it("a máquina de contar por DOCUMENTO continua lá, para o dia em que o número subir", () => {
-    /**
-     * A outra metade da garantia, e existe porque o caso a seguir a perdeu.
-     *
-     * Com `FOTOS_ANSIOSAS = 0`, contar por board e contar por documento dão o
-     * mesmo resultado — zero — portanto nenhum teste de comportamento
-     * consegue distinguir as duas contas. A conta certa deixou de estar a ser
-     * exercitada, e o que não é exercitado apodrece.
-     *
-     * Isto guarda-a estruturalmente: o índice que decide quem entra com pressa
-     * tem de ser o do DOCUMENTO (a soma das fotografias dos boards anteriores),
-     * e não o índice dentro do board. Se alguém voltar a subir o número — o que
-     * é legítimo, se um dia a inspiração subir na ordem das secções — encontra a
-     * contagem correcta em vez do defeito que já cá esteve: onze fotografias com
-     * pressa numa proposta de três boards, das quais uma se via.
-     */
-    const fonte = readFileSync("src/app/[lang]/(privado)/proposta/[token]/Inspiracao.tsx", "utf8");
-    expect(
-      fonte,
-      "desapareceu a soma das fotografias dos boards anteriores — a contagem por " +
-        "documento foi substituída por uma contagem por board",
-    ).toMatch(/fotosAntesDoBoard\[b\]/);
-    expect(fonte, "a decisão de entrar com pressa deixou de usar o índice no documento").toMatch(
-      /noDocumento\([^)]*\)\s*<\s*FOTOS_ANSIOSAS/,
-    );
-  });
-
-  it("e o segundo mood board já não tem pressa nenhuma", () => {
-    /**
-     * ════════════════════════════════════════════════════════════════════
-     * O DEFEITO QUE UM BOARD SÓ NUNCA PODIA MOSTRAR
-     * ════════════════════════════════════════════════════════════════════
-     *
-     * O caso de cima desenha UM board. Com um board só, contar a posição
-     * dentro do board e contar no documento dá exactamente o mesmo — e por
-     * isso ele passava com a conta certa e com a conta errada.
-     *
-     * E a conta estava errada: o contador reiniciava em cada board. Numa
-     * proposta de três boards saíam ONZE fotografias com pressa, das quais
-     * UMA está no ecrã. Com os pesos que o `Inspiracao.tsx` tem medidos
-     * (105,3 KB a 1200 px em AVIF), são 1 158 KB antes de a página servir
-     * para alguma coisa — 6,2 s num 4G de 1,5 Mbps —, e a capa que o casal
-     * está a ver fica em fila atrás de dez fotografias a quinze mil píxeis
-     * de distância.
-     *
-     * Este caso desenha DOIS boards, que é o mínimo para a diferença
-     * existir.
-     *
-     * ── E DEPOIS O NÚMERO FOI A ZERO ──────────────────────────────────
-     *
-     * O 4 corrigiu a CONTAGEM mas manteve a premissa de que as primeiras
-     * fotografias da grelha se vêem cedo. Não se vêem: a ordem é capa →
-     * apresentação → índice → serviços → cronograma → inspiração, e num
-     * telemóvel a primeira de board está milhares de píxeis abaixo. As
-     * quatro não estavam à vista — estavam a disputar a ligação com a capa.
-     *
-     * ── O QUE ESTE CASO DEIXOU DE CONSEGUIR PROVAR ────────────────────
-     *
-     * Com zero, contar por board e contar por documento dão o MESMO
-     * resultado. Portanto este caso já não distingue as duas contas, e
-     * dizer que distingue seria mentira.
-     *
-     * O que ele continua a fazer, e é o que interessa hoje, é reprovar se
-     * VOLTAR a haver fotografias com pressa — seja por que conta for. E o
-     * caso a seguir guarda a outra metade: que a máquina de contar por
-     * documento continua lá, para o dia em que alguém queira voltar a
-     * subir o número e precise dela correcta.
-     */
-    const b1: BoardParaEcra = { ...BOARD, chave: "b1", fotos: ["a", "b", "c", "a"] };
-    const b2: BoardParaEcra = { ...BOARD, chave: "b2", titulo: "Jantar", fotos: ["b", "c", "a"] };
-    render(<Inspiracao boards={[b1, b2]} fotosIniciais={FOTOS} token="tk" textos={T} />);
-
-    const modos = [...document.querySelectorAll("button[aria-label]")].map((b) =>
-      b.querySelector("img:last-of-type")?.getAttribute("loading"),
-    );
-    expect(
-      modos.filter((m) => m === "eager").length,
-      "voltou a haver fotografias de board com pressa, em dois boards",
-    ).toBe(0);
-    // E as do segundo board — todas elas — esperam pela vez delas.
-    const doSegundo = [...document.querySelectorAll("section")]
-      .slice(1)
-      .flatMap((sec) => [...sec.querySelectorAll("button[aria-label] img:last-of-type")])
-      .map((i) => i.getAttribute("loading"));
-    expect(doSegundo.length, "o segundo board não foi desenhado").toBeGreaterThan(0);
-    expect(
-      doSegundo.every((m) => m === "lazy"),
-      "o segundo board ainda tem pressa",
-    ).toBe(true);
+    expect(porPosicao.map((x) => x.modo)).toEqual([
+      "eager",
+      "eager",
+      "eager",
+      "eager",
+      "lazy",
+      "lazy",
+    ]);
   });
 });
 
 describe("a lupa", () => {
-  it("sai da secção e vai para o corpo do documento — senão não tapa o ecrã", () => {
-    /**
-     * ── O DEFEITO, MEDIDO ─────────────────────────────────────────────────
-     *
-     * Um elemento `position: fixed` é medido pelo ECRÃ — excepto se algum
-     * antepassado tiver um `transform`, e aí passa a ser medido por esse
-     * antepassado. A secção da Inspiração leva `prop-chega`, que a faz subir
-     * ao entrar. Essa animação ACABA em `transform: none`, mas corre com
-     * preenchimento `both` sobre uma linha de tempo de scroll — e o valor
-     * calculado no fim é `translateY(0)`, que não é `none`. Um `transform` a
-     * zero continua a ser um `transform`.
-     *
-     * Reproduzido num Chromium a 390×780 com a mesma regra de CSS: com uma
-     * fotografia à vista e o dedo em cima dela, o diálogo media de 270 a
-     * 3202 px num ecrã de 0 a 780 — o tamanho da SECÇÃO. Não tapava o ecrã.
-     * Um casal que carregasse numa fotografia via meio ecrã preto com a
-     * fotografia fora dele.
-     *
-     * O portal resolve-o pela raiz: a lupa passa a ser filha do `<body>`, onde
-     * não há antepassado nenhum com `transform`. É o que a galeria pública
-     * desta casa já faz. A partir daqui, qualquer animação nova numa secção da
-     * proposta é inofensiva para ela — que é o ponto, porque vêm aí mais.
-     */
-    const { container } = desenhar();
-    abrirPrimeira();
-    const d = lupa();
-    expect(d, "a lupa não abriu").not.toBeNull();
-    expect(
-      container.contains(d),
-      "a lupa voltou para dentro da árvore da secção — um `transform` num " +
-        "antepassado volta a fazê-la deixar de tapar o ecrã",
-    ).toBe(false);
-    expect(d?.parentElement, "a lupa tem de ser filha do corpo do documento").toBe(document.body);
-  });
-
   it("abre no ORIGINAL — é o único sítio onde os pixéis todos valem os bytes", () => {
     desenhar();
     expect(lupa()).toBeNull();
@@ -333,7 +206,7 @@ describe("a grelha oferece dois tamanhos", () => {
     const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     const candidatos = (img.getAttribute("srcset") ?? "").split(",").map((c) => c.trim());
     const daRota = candidatos.find((c) => c.startsWith("/api/"));
-    expect(daRota).toBe("/api/proposta/tk/foto/a?v=ma 1200w");
+    expect(daRota).toBe("/api/proposta/tk/foto/a 1200w");
   });
 
   it("diz que largura a fotografia OCUPA — senão o navegador pede sempre a maior", () => {
@@ -344,27 +217,13 @@ describe("a grelha oferece dois tamanhos", () => {
     expect(img.getAttribute("sizes")).toBe("(min-width: 640px) 46vw, 92vw");
   });
 
-  it("depois de a primeira escolha falhar, o `srcset` SAI — e cai no degrau do meio", () => {
+  it("depois de a primeira escolha falhar, o `srcset` SAI", () => {
     // Senão o navegador voltava a escolher o candidato que acabou de falhar.
     desenhar();
     const img = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     fireEvent.error(img());
     expect(img().getAttribute("srcset")).toBeNull();
-    /**
-     * ── O PLANO B DEIXOU DE SER O ORIGINAL ────────────────────────────────
-     *
-     * Era `miniatura → original`, e o original numa caixa de 350 px são
-     * 2 600 KB: 13,9 s num 4G de 1,5 Mbps, contra 0,56 s da derivada de
-     * 1200 px. O degrau do meio existia e estava a ser saltado.
-     *
-     * Aqui a fotografia de teste não tem `media` assinada, portanto a
-     * derivada é a rota que a fabrica — que é exactamente o que deve
-     * acontecer nas fotografias anteriores ao bucket, ou seja nas propostas
-     * antigas que estão nas caixas de correio dos casais.
-     */
-    expect(img().getAttribute("src")).toBe("/api/proposta/tk/foto/a?v=ma");
-    // E só se ESTA também falhar é que se paga o ficheiro inteiro.
-    fireEvent.error(img());
+    // E o `src` é o plano B, que é o que continua a mostrar alguma coisa.
     expect(img().getAttribute("src")).toBe("orig/a");
   });
 });
@@ -383,19 +242,8 @@ describe("quando as assinaturas morrem", () => {
   it("aparece quando uma célula desiste", () => {
     desenhar();
     const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
-    /**
-     * TRÊS degraus, e não dois.
-     *
-     * A grelha deixou de cair da miniatura directamente para o original — o
-     * ficheiro inteiro numa caixa de 350 px eram 13,9 s num 4G. Passa pela
-     * derivada de 1200 px pelo caminho, portanto uma célula só desiste depois
-     * de as TRÊS falharem: miniatura → 1200 px → original.
-     *
-     * Um teste que dispare dois erros não mede quem desistiu: mede quem ainda
-     * está a tentar.
-     */
+    // A miniatura falha, cai para o original, o original falha: desistiu.
     fireEvent.error(img);
-    fireEvent.error(screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!);
     fireEvent.error(screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!);
     expect(screen.getByRole("button", { name: T.recarregarFotos })).toBeTruthy();
   });
@@ -418,7 +266,6 @@ describe("quando as assinaturas morrem", () => {
     const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     fireEvent.error(cel());
     fireEvent.error(cel());
-    fireEvent.error(cel());
     expect(screen.getAllByRole("button", { name: /Ampliar/ }).length).toBe(antes - 1);
     expect(screen.queryByText(T.fotoFalhou)).toBeNull();
     expect(screen.queryByRole("button", { name: T.tentarDeNovo })).toBeNull();
@@ -435,7 +282,6 @@ describe("quando as assinaturas morrem", () => {
     desenhar();
     // Provocar a falha, que é o que faz o botão existir.
     const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
-    fireEvent.error(cel());
     fireEvent.error(cel());
     fireEvent.error(cel());
     fireEvent.click(screen.getByRole("button", { name: T.recarregarFotos }));
@@ -575,274 +421,5 @@ describe("as colunas da grelha", () => {
     // Cada fotografia leva a SUA posição, e não a da célula onde calhou.
     expect([...ordens].sort((x, y) => x - y)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(ordens).toEqual(posicoesNoHtml().map((n) => n - 1));
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O TÍTULO NÃO FICA SOZINHO POR CIMA DO VAZIO
- * ════════════════════════════════════════════════════════════════════════════
- *
- * A dona do negócio abriu a proposta a sério no telemóvel dela e mandou o que
- * viu: um RECTÂNGULO CINZENTO, sem fotografia nenhuma, com «Saída dos noivos»
- * escrito por cima.
- *
- * ── PORQUE É QUE A REDE QUE JÁ EXISTIA NÃO O APANHOU ──────────────────────
- *
- * O ficheiro já dizia a coisa certa, por extenso: «um título branco sobre nada
- * nenhum é o defeito que isto existe para não ter». Mas essa guarda é o
- * `respiro()`, que corre no servidor e pergunta se a fotografia TEM endereço.
- * Tinha. O que falhou foi o endereço, já com a página desenhada — uma
- * assinatura expirada, uma derivada por fabricar.
- *
- * Aí a célula desiste e devolve nada, e a faixa do título, que é IRMÃ dela e
- * não filha, continua desenhada: o véu escuro sobre o papel branco dá o
- * cinzento, e o nome por cima dele.
- *
- * Havia dois caminhos para o mesmo sítio e só um estava tapado.
- */
-describe("quando a fotografia do momento falha depois de a página abrir", () => {
-  /** O título como faixa branca sobre a fotografia. */
-  const tituloSobreFoto = () =>
-    [...document.querySelectorAll("h3")].find((h) => h.className.includes("text-white"));
-  /** O mesmo título, a preto sobre o papel. */
-  const tituloSobrePapel = () =>
-    [...document.querySelectorAll("h3")].find((h) => h.className.includes("text-foreground/90"));
-
-  it("começa com o nome por cima da fotografia, como foi desenhado", () => {
-    desenhar();
-    expect(tituloSobreFoto()?.textContent).toBe("Cerimónia");
-    expect(tituloSobrePapel()).toBeUndefined();
-  });
-
-  it("e quando ela falha, o nome volta ao papel em vez de ficar sobre o vazio", async () => {
-    desenhar();
-    // A fotografia do momento — a primeira, a que abre a secção — rebenta.
-    // DUAS vezes: a célula tem plano B (miniatura → original) e só desiste
-    // depois de o segundo endereço também falhar.
-    const doMomento = () => document.querySelector("img:not([aria-hidden])") as HTMLImageElement;
-    expect(doMomento(), "não encontrei a fotografia do momento").toBeTruthy();
-    fireEvent.error(doMomento());
-    fireEvent.error(doMomento());
-    fireEvent.error(doMomento());
-
-    await waitFor(() => {
-      expect(tituloSobrePapel()?.textContent, "o nome tinha de voltar a preto sobre o papel").toBe(
-        "Cerimónia",
-      );
-    });
-    expect(
-      tituloSobreFoto(),
-      "ficou uma faixa de título branca por cima de coisa nenhuma — é este o defeito",
-    ).toBeUndefined();
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O RITMO ENTRE MOOD BOARDS — «os buracos brancos», palavras dela
- * ════════════════════════════════════════════════════════════════════════════
- *
- * MEDIDO num 390×844, com oito boards de tamanhos diferentes. Duas coisas
- * estavam erradas, e são diferentes uma da outra:
- *
- * 1. O intervalo entre dois boards era de 96 px, e o intervalo entre dois
- *    CAPÍTULOS do documento — «Serviços» e «Orçamento Proposto» — é de 64.
- *    Um board é uma parte DENTRO do capítulo «Inspiração»; separá-lo do
- *    vizinho com vez e meia o que separa dois capítulos diz ao olho que ali
- *    acabou coisa maior do que acabou.
- *
- * 2. Num board cuja ÚNICA fotografia é o respiro, o intervalo era 132 e não
- *    96. Os 36 px a mais eram o `mb-9` do respiro a separá-lo de uma grelha
- *    VAZIA. Um ritmo com um intervalo diferente dos outros não é um ritmo.
- */
-describe("o ritmo entre mood boards", () => {
-  /** Um board de uma fotografia só: a do respiro. É o caso que media 132. */
-  const SO_O_RESPIRO: BoardParaEcra = { ...BOARD, chave: "so-um", fotos: ["a"] };
-
-  it("um board de uma só fotografia não desenha grelha nenhuma", () => {
-    desenhar(SO_O_RESPIRO);
-    // A grelha é o `flex` que segura as colunas. Sem fotografias fora do
-    // respiro não há nada para ela segurar — e uma caixa vazia com margem é
-    // exactamente o buraco que isto existe para não ter.
-    const botoes = screen.getAllByRole("button", { name: /Ampliar/ });
-    expect(botoes).toHaveLength(1);
-    const grelha = document.querySelector(".flex.flex-col.gap-4");
-    expect(grelha, "a grelha vazia continua a ser desenhada").toBeNull();
-  });
-
-  it("CONTROLO POSITIVO: com fotografias fora do respiro, a grelha existe", () => {
-    // Sem isto, um selector errado dava `null` nos dois casos e o teste acima
-    // passava sem provar nada.
-    desenhar();
-    expect(document.querySelector(".flex.flex-col.gap-4")).not.toBeNull();
-  });
-
-  it("o afastamento até à grelha é da GRELHA, não do respiro", () => {
-    // Estava no respiro (`mb-9`), e por isso sobrava quando não havia grelha.
-    desenhar();
-    const respiro = screen.getAllByRole("button", { name: /Ampliar/ })[0];
-    const caixaDoRespiro = respiro.closest("div");
-    expect(caixaDoRespiro?.className, "o respiro voltou a levar margem de baixo").not.toMatch(
-      /\bmb-\d/,
-    );
-    expect(document.querySelector(".flex.flex-col.gap-4")?.className).toMatch(/\bmt-9\b/);
-  });
-});
-
-/**
- * A hierarquia, lida do CÓDIGO dos dois ficheiros.
- *
- * O teste acima mede uma árvore desenhada; este mede a REGRA, e é a que se
- * desfaz sem ninguém dar por isso — basta alguém subir um número achando que
- * «fica com mais ar». O intervalo entre duas partes de um capítulo não pode
- * passar o intervalo entre dois capítulos.
- */
-describe("um mood board é uma parte do capítulo, não um capítulo", () => {
-  const RAIZ = process.cwd();
-  const AQUI = "src/app/[lang]/(privado)/proposta/[token]";
-  const ler = (f: string) => readFileSync(join(RAIZ, `${AQUI}/${f}`), "utf8");
-  /**
-   * O degrau de `margin-top` da primeira `<section>` de um ficheiro.
-   *
-   * Lê a ETIQUETA DE ABERTURA inteira e não um `className="…"`: o
-   * `Documento.tsx` escreve o dele num template literal, e uma expressão
-   * regular à espera de aspas devolvia `null` — que se compara com tudo sem
-   * reclamar. Foi o controlo positivo aqui em baixo que o apanhou.
-   *
-   * O `(?<![\w:-])` exclui as variantes: sem ele, o `first:mt-6` da
-   * Inspiração passava por ser o afastamento normal.
-   */
-  const degrau = (fonte: string) => {
-    const i = fonte.indexOf("<section");
-    if (i < 0) return null;
-    const etiqueta = fonte.slice(i, fonte.indexOf(">", i));
-    const mt = etiqueta.match(/(?<![\w:-])mt-(\d+)\b/);
-    const sm = etiqueta.match(/\bsm:mt-(\d+)\b/);
-    return { mt: mt ? Number(mt[1]) : null, sm: sm ? Number(sm[1]) : null };
-  };
-
-  it("CONTROLO POSITIVO: os dois números foram mesmo lidos", () => {
-    // Uma leitura falhada devolve `null`, e `null` compara-se com tudo sem
-    // reclamar — era o silêncio que este controlo impede.
-    expect(degrau(ler("Documento.tsx"))).toEqual({ mt: 16, sm: 24 });
-    expect(degrau(ler("Inspiracao.tsx"))).toEqual({ mt: 12, sm: 16 });
-  });
-
-  it("o intervalo entre boards não passa o intervalo entre capítulos", () => {
-    const capitulo = degrau(ler("Documento.tsx"))!;
-    const board = degrau(ler("Inspiracao.tsx"))!;
-    expect(board.mt, `board ${board.mt} > capítulo ${capitulo.mt} no telemóvel`).toBeLessThan(
-      capitulo.mt!,
-    );
-    expect(board.sm, `board ${board.sm} > capítulo ${capitulo.sm} no ecrã largo`).toBeLessThan(
-      capitulo.sm!,
-    );
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A OFERTA EM AVIF — «quero que as fotos sejam muito mais rápidas a carregar»
- * ════════════════════════════════════════════════════════════════════════════
- *
- * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio, média
- * por fotografia:
- *
- *     lado    webp      avif     densidade num telemóvel de 390 pt
- *      400   22,5 KB   17,2 KB    1,1x
- *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe
- *
- * Numa proposta de quarenta e seis: 5,8 MB em WebP contra 4,7 MB em AVIF.
- *
- * ── A ARMADILHA QUE O `media` EVITA, E QUE ESTE FICHEIRO GUARDA ──────────
- *
- * Um `<source>` que casa DESLIGA o `srcset` do `<img>`. Como a oferta só tem
- * o candidato de 1200, num ecrã de densidade 1 — onde o navegador escolheria a
- * de 400, que pesa 22 KB — servir a de 1200 em AVIF seria CINCO VEZES PIOR.
- *
- * O `media="(min-resolution: 2dppx)"` é o que garante que a oferta só existe
- * onde a de 1200 já era a escolhida. Tirá-lo faz cair um teste aqui.
- */
-describe("a oferta em AVIF das fotografias grandes", () => {
-  const COM_AVIF: Record<string, FotoDaProposta> = {
-    a: { ...FOTOS.a, media: "media/a", mediaAvif: "avif/a" },
-    b: FOTOS.b,
-    c: FOTOS.c,
-  };
-  const comAvif = () =>
-    render(<Inspiracao boards={[BOARD]} fotosIniciais={COM_AVIF} token="tk" textos={T} />);
-
-  it("CONTROLO POSITIVO: sem `mediaAvif` não se propõe nada, e a página desenha na mesma", () => {
-    // É o caso NORMAL de tudo o que foi carregado antes do bucket existir.
-    // Sem este controlo, um `<picture>` que nunca propusesse nada passava no
-    // teste de baixo por dizer o mesmo que uma implementação a funcionar.
-    desenhar();
-    expect(document.querySelectorAll("source")).toHaveLength(0);
-    expect(screen.getAllByRole("button", { name: /Ampliar/ }).length).toBeGreaterThan(0);
-  });
-
-  it("propõe o AVIF quando ele existe, e o `<img>` de sempre continua lá", () => {
-    comAvif();
-    const fonte = document.querySelector('source[type="image/avif"]');
-    expect(fonte, "não se propôs AVIF nenhum").not.toBeNull();
-    expect(fonte!.getAttribute("srcset")).toBe("avif/a");
-    // A oferta NÃO substitui: o `<img>` tem de continuar a ser servível.
-    const imagem = fonte!.parentElement!.querySelector("img");
-    expect(imagem?.getAttribute("src")).toBe("mini/a");
-  });
-
-  /**
-   * A OFERTA NÃO VALE EM TODO O LADO — E O NÚMERO MUDOU, DE PROPÓSITO.
-   *
-   * Este caso guardava `2dppx`. O portão desceu para `1,5`, e vale a pena
-   * dizer porquê em vez de trocar o número em silêncio.
-   *
-   * A razão do portão nunca foi o «2»: é a FRONTEIRA a partir da qual o
-   * navegador já escolhia a de 1200 sozinho. Abaixo dela ele escolheria a de
-   * 400 (22 KB) e nós passaríamos a impor-lhe a de 1200 em AVIF (105 KB) —
-   * cinco vezes pior, exactamente ao contrário do que isto existe para fazer.
-   * Refeita a conta com as fatias que esta casa serve, essa fronteira é
-   * 1,36 dppx (a pior é a grelha a 92vw num ecrã de 320 pontos). O 2 era
-   * prudente de mais: deixava de fora um portátil Windows a 150% de escala,
-   * que reporta exactamente 1,5 — que é como se vê uma proposta num
-   * escritório.
-   *
-   * O número em si passou a ser guardado onde a conta vive, e não aqui:
-   * `portao-do-avif.test.ts` REFAZ a fronteira a partir das `sizes` do código
-   * e reprova se o portão ficar abaixo dela. Um número pregado não sabe porque
-   * é que está certo — no dia em que alguém alargar uma fatia, a fronteira
-   * mexe-se e só a conta dá por isso.
-   *
-   * O que fica aqui é o que este ficheiro é responsável por guardar: que a
-   * oferta TEM um portão, e que ele não casa num ecrã de densidade 1.
-   */
-  it("A OFERTA NÃO VALE NUM ECRÃ DE DENSIDADE 1", () => {
-    comAvif();
-    const fonte = document.querySelector('source[type="image/avif"]');
-    const media = fonte!.getAttribute("media") ?? "";
-    const dppx = Number(media.match(/min-resolution:\s*([\d.]+)dppx/)?.[1]);
-    expect(media, "a oferta em AVIF deixou de ter portão nenhum").toMatch(/min-resolution/);
-    expect(dppx, "o portão passou a casar num ecrã de densidade 1").toBeGreaterThan(1);
-  });
-
-  it("sem `srcset` no `<img>` não há oferta — a cascata já caiu para o plano B", () => {
-    /**
-     * Depois de a cascata cair para o original, o que interessa é servir ALGUMA
-     * COISA. Uma oferta em AVIF nessa altura era deixar o navegador voltar a
-     * escolher por conta própria, quando a primeira escolha acabou de falhar.
-     */
-    const soOriginal: Record<string, FotoDaProposta> = {
-      a: { id: "a", marca: "ma", original: "orig/a", mediaAvif: "avif/a" },
-    };
-    render(
-      <Inspiracao
-        boards={[{ ...BOARD, fotos: ["a"] }]}
-        fotosIniciais={soOriginal}
-        token="tk"
-        textos={T}
-      />,
-    );
-    expect(document.querySelectorAll('source[type="image/avif"]')).toHaveLength(0);
   });
 });

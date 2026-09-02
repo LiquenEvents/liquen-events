@@ -165,10 +165,7 @@ export function TabelaOuCartoes<T>({
                 // Sem `motion-safe:` até aqui, e nos 150 ms por omissão. A linha
                 // inteira é um alvo de toque no telemóvel — é dos sítios desta
                 // pasta onde o carregar mais precisava de resposta.
-                /* `foco-largo`: esta linha é uma CAIXA de 80 px, não um botão. O anel
-                   de base, colado a ela, lê-se como moldura da linha; com quatro
-                   píxeis de folga lê-se como foco. Ver a nota no `globals.css`. */
-                className={`alvo-toque foco-largo group block w-full p-3.5 text-left hover:bg-[#4d6350]/[0.04] active:bg-[#4d6350]/[0.08] ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque group block w-full p-3.5 text-left hover:bg-[#4d6350]/[0.04] active:bg-[#4d6350]/[0.08] ${ESTADO} ${PRESSAO}`}
               >
                 {cartao(item)}
               </button>
@@ -251,7 +248,7 @@ export function TabelaOuCartoes<T>({
                           : { chave: c.chave, ascendente: true },
                       )
                     }
-                    className="inline-flex items-center gap-1 hover:text-[var(--bo-tinta-72)]"
+                    className="inline-flex items-center gap-1 hover:text-foreground/70"
                   >
                     {c.cabecalho}
                     <span aria-hidden className="text-[9px]">

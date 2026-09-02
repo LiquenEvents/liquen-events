@@ -44,17 +44,15 @@ const RAIZES = [
   "src/app/[lang]/(admin)/orcamento/admin/recuperar/DefinirPalavraPasse.tsx",
 ];
 
-/** O `lang` da rota, que este layout passou a receber por causa da cortina. */
-const PARAMS = Promise.resolve({ lang: "pt" });
-
 describe("o marco do conteúdo do back office", () => {
   afterEach(cleanup);
 
-  it("embrulha o back office num <main>, e não num <div>", async () => {
-    // O layout passou a ser um componente de servidor `async` (recebe o
-    // `lang`, para a cortina saber a língua). Chama-se e desenha-se o que ele
-    // devolve — o `render` não sabe esperar por um componente assíncrono.
-    render(await AdminLayout({ children: <p>o back office</p>, params: PARAMS }));
+  it("embrulha o back office num <main>, e não num <div>", () => {
+    render(
+      <AdminLayout>
+        <p>o back office</p>
+      </AdminLayout>,
+    );
     const marco = screen.getByRole("main");
     expect(marco.tagName).toBe("MAIN");
     expect(marco).toHaveAttribute("id", "conteudo");
@@ -63,11 +61,12 @@ describe("o marco do conteúdo do back office", () => {
     expect(marco).toHaveAttribute("data-admin-mode");
   });
 
-  it("não traz o `pt-24` do cromado do sítio — aqui não há barra por cima", async () => {
-    // O layout passou a ser um componente de servidor `async` (recebe o
-    // `lang`, para a cortina saber a língua). Chama-se e desenha-se o que ele
-    // devolve — o `render` não sabe esperar por um componente assíncrono.
-    render(await AdminLayout({ children: <p>o back office</p>, params: PARAMS }));
+  it("não traz o `pt-24` do cromado do sítio — aqui não há barra por cima", () => {
+    render(
+      <AdminLayout>
+        <p>o back office</p>
+      </AdminLayout>,
+    );
     expect(screen.getByRole("main").className).not.toMatch(/\bpt-24\b/);
   });
 

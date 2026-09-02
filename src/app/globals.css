@@ -7,11 +7,6 @@
   --color-moss: #637a5f;
   --color-moss-light: #86997f;
   --color-moss-dark: #4c6150;
-  /* O verde-quase-preto por baixo das fotografias. Estava escrito à mão em
-     dois sítios (`.g-tile` e o `--cv-bg` dos painéis) e a fita dos clientes ia
-     ser o terceiro: é o mesmo tom nos três — o fundo neutro que impede um
-     flash branco enquanto uma fotografia escura carrega. */
-  --color-noite: #12160f;
   --color-gold: #d6ab3a;
   --color-gold-dark: #b88f28;
   /* Gold as TEXT on white/cream. gold (~2:1) and gold-dark (~3:1) fail WCAG AA
@@ -196,30 +191,6 @@
      transições da casa são de estado (cor, contorno, sombra) e não têm entrada
      nem saída. Esta pede-se onde há mesmo uma coisa a desaparecer. */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
-  /* ── QUANTO TEMPO A CORTINA TAPA A PÁGINA ────────────────────────────────
-     O mesmo número que o `Cortina.tsx` escreve no elemento (`MINIMO`), aqui em
-     forma de token para o CSS o poder usar. Quem manda continua a ser o
-     componente; isto é a cópia que o CSS lê, e há um caso em
-     `Cortina.test.tsx` que reprova se os dois se separarem.
-
-     Serve para uma coisa só, mas importante: o que estiver por baixo da
-     cortina não deve gastar a sua animação enquanto ninguém a pode ver. */
-  /* ── O PANO SEGURA E SOBE NUMA SÓ ANIMAÇÃO ────────────────────────────
-     Palavras dela, a apontar para o ficheiro que mandou: «é isto —
-     `0%, 88% { translateY(0) }` fica parado dois segundos, e sobe nos últimos
-     270 ms».
-
-     São dois números porque há duas coisas a acontecer: o pano dura
-     `--cortina-total`, e começa a subir aos 88% disso. O que estiver por baixo
-     e quiser entrar com ele (o zoom da capa, a folha da proposta) espera por
-     `--cortina-sobe` — que é o mesmo instante, escrito uma vez.
-
-     A saída é CSS puro, e é isso que a torna melhor do que a que cá estava. O
-     argumento é dela e está escrito no ficheiro que mandou: «um preloader que
-     precise de JavaScript para sair é um ecrã preto permanente no dia em que o
-     script falhar — e esse dia chega sempre». */
-  --cortina-total: 2250ms;
-  --cortina-sobe: 1980ms; /* 88% de 2250 */
 }
 
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
@@ -376,39 +347,9 @@ body:is(.admin-mode, :has([data-admin-mode])) {
        --bo-text        11,63:1  informação forte (valores, emails, ids, datas)
        --bo-text-muted   5,91:1  informação secundária — passa AA a texto normal
        --bo-text-faint    4,77:1 micro-rótulos — agora também passa AA */
-  /* ── E A ESCADA DA TINTA CONTINUA AQUI, PARA O TEXTO ─────────────────────
-     Os degraus dos riscos e dos fundos estão mais abaixo (3, 6, 8, 10, 13). Os
-     do texto são estes quatro — e são QUATRO, e não os seis da análise, por
-     uma razão que não é gosto:
-
-     O fundo do back office é BRANCO. A escala de dez opacidades da Pixelmatters
-     funciona porque o site deles é escuro; aqui, 48% de preto sobre branco dá
-     ~3,5:1 e CHUMBA a norma (WCAG 1.4.3 pede 4,5:1 para texto normal). O
-     degrau `--ink-48` da proposta não pode carregar letra nenhuma nesta casa, e
-     o `--ink-32` muito menos.
-
-     A norma é o tecto, e é ela que decide onde a escada acaba. Medido sobre
-     branco, achatado:
-
-         tinta-82   11,63:1   títulos, valores, texto forte
-         tinta-72    8,03:1   corpo
-         tinta-64    5,91:1   apoio, metadados, datas
-         tinta-58    4,77:1   micro-rótulos — o ÚLTIMO degrau que passa
-
-     Abaixo de 58 não há degrau nenhum, porque abaixo de 58 não há texto que
-     passe. Quem precisar de mais claro está a desenhar um ícone ou um traço, e
-     esses têm a sua própria escada.
-
-     Os três nomes de PAPEL ficam, como apelidos: estão em centenas de sítios,
-     dizem o que a coisa é, e têm o contraste medido escrito ao lado. */
-  --bo-tinta-82: rgba(13, 13, 13, 0.82);
-  --bo-tinta-72: rgba(13, 13, 13, 0.72);
-  --bo-tinta-64: rgba(13, 13, 13, 0.64);
-  --bo-tinta-58: rgba(13, 13, 13, 0.58);
-
-  --bo-text: var(--bo-tinta-82);
-  --bo-text-muted: var(--bo-tinta-64);
-  --bo-text-faint: var(--bo-tinta-58);
+  --bo-text: rgba(13, 13, 13, 0.82);
+  --bo-text-muted: rgba(13, 13, 13, 0.64);
+  --bo-text-faint: rgba(13, 13, 13, 0.58);
 
   /* ── ChatGPT-app design system (back office only) ──────────────────────────
      One calm, modern surface language shared by every admin screen. Scoped to
@@ -419,28 +360,6 @@ body:is(.admin-mode, :has([data-admin-mode])) {
 
      ── Neutral surfaces (low-contrast but AA) ── */
   --bo-surface: #ffffff; /* card / panel face */
-
-  /* ── O CHÃO DO PAINEL, QUE PASSA A SER BRANCO ───────────────────────────
-     Pedido dela, a olhar para a referência: «eu quero branco».
-
-     O chão era o mesmo cinzento dos encaixes — `--bo-surface-sunken` —, e um
-     cartão distinguia-se do que estava por baixo por ser branco sobre esse
-     cinzento. Com o chão branco, quem separa as coisas passa a ser o FIO. É a
-     mesma decisão da referência e da maqueta: uma folha, e riscos quase
-     invisíveis a arrumá-la, em vez de caixas cinzentas encaixadas umas nas
-     outras.
-
-     ── PORQUE É QUE ISTO É UM TOKEN NOVO E NÃO O CINZENTO A MUDAR DE VALOR ──
-
-     Porque o cinzento continua a fazer falta ONDE É ENCAIXE: o `<code>` do
-     ecrã de erro, o painel afundado do estúdio, as riscas de uma lista. Pôr o
-     `--bo-surface-sunken` a branco resolvia o chão e apagava esses ao mesmo
-     tempo — um encaixe branco dentro de um cartão branco não é um encaixe.
-
-     São duas ideias diferentes que por acaso tinham o mesmo valor. Separá-las
-     é o que permite mudar uma sem mexer na outra. */
-  --bo-chao: #ffffff;
-
   --bo-surface-sunken: #f7f7f8; /* insets, list stripes — neutral ChatGPT grey */
   --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
   --bo-tint-accent: rgba(76, 99, 80, 0.1); /* soft moss call-out fill */
@@ -491,57 +410,8 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-tinta-10: rgba(13, 13, 13, 0.1);
   --bo-tinta-13: rgba(13, 13, 13, 0.13);
 
-  /* ── A ESCADA DE ENTRADA: DEGRAUS DE 20 ms, SEIS, E PÁRA ─────────────────
-     A Apple tem esta escada ESCRITA no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
-     0,26 / 0,28 / 0,30 s. Degraus de vinte milissegundos, seis, e pára. O
-     desfasamento existe para o olho ler ORDEM DE LEITURA, não para dar
-     espectáculo: ao sexto item essa informação já foi dada, e a partir daí o
-     atraso só acrescenta espera.
-
-     ── E AS CURVAS E OS TEMPOS DA ANÁLISE? JÁ CÁ ESTAVAM ───────────────────
-
-     A análise pede «uma curva para o sítio inteiro, sem ease-in» e propõe a
-     `cubic-bezier(.4,0,.2,1)` da Pixelmatters. Escrevi-a aqui como um token
-     novo e estava errado: esta casa JÁ tem uma curva única — a
-     `--ease-out: cubic-bezier(0.16, 1, 0.3, 1)` do `:root`, que é também o
-     `--default-transition-timing-function` do `@theme`, ou seja, sai em todos
-     os ~322 utilitários `transition-*` sem ninguém a pedir. Cumpre o princípio
-     («arranca depressa, trava, zero ease-in») e cumpre-o com mais desaceleração
-     do que qualquer das duas referências.
-
-     E a curva que eu tinha acrescentado é, letra por letra, a que esta casa
-     RECUSOU por escrito: o comentário do `@theme` conta que ~300 transições
-     estavam nela por omissão e foram convergidas de propósito para a
-     assinatura, e o `ui/movimento.ts` diz «não se desfaz isso a partir daqui».
-     Acrescentar uma segunda curva era fazer ao movimento o que os quarenta e
-     sete cinzentos faziam à cor — que é o defeito que este trabalho todo veio
-     tirar.
-
-     Os TEMPOS, o mesmo: 0,1 s / 0,2 s / 0,3 s são a proposta da análise, e a
-     casa já tem três degraus escolhidos e medidos — 20 ms para o toque, 120 ms
-     para o estado, 250 ms para o que se move (`lib/motion/tokens.ts`,
-     `ui/movimento.ts`). Ficam esses. O que a análise acrescenta de novo, e que
-     aqui faltava mesmo, é o DEGRAU DE GRUPO com tecto. */
-  --bo-degrau: 20ms; /* escada de entrada, no máximo seis */
-  --bo-degraus-max: 5; /* o sexto degrau é o índice 5 */
-
   /* ── Hairline borders & control boundaries (neutral, ChatGPT-quiet) ── */
-  /* ── O FIO SOBE UM DEGRAU PORQUE FICOU SOZINHO ──────────────────────────
-     Enquanto o chão do painel era cinzento, um cartão distinguia-se por DUAS
-     coisas ao mesmo tempo: a área branca sobre o cinzento (o mecanismo da
-     Apple, #F5F5F7 → #FFFFFF) e o fio da moldura. Foi por isso que as sombras
-     do conteúdo puderam sair todas — estão contadas uma a uma no
-     `sombras-do-back-office.test.ts`.
-
-     Com o chão branco, a metade da área desapareceu e o fio ficou sozinho a
-     fazer o trabalho das duas. Um fio de 8% sobre branco vê-se, mas vê-se
-     pouco — e este ecrã é lido de relance, num telemóvel, muitas vezes ao sol.
-
-     Sobe um degrau na escala que a casa já tem: 8% → 10%. Um degrau e não
-     dois, porque estes 158 fios não são todos molduras — a maioria são
-     SEPARADORES dentro de um cartão, e um separador que grita é ruído. A
-     moldura, essa, passa a pedir o degrau forte, na `.bo-card` mais abaixo. */
-  --bo-hairline: var(--bo-tinta-10); /* card / divider hairline */
+  --bo-hairline: var(--bo-tinta-8); /* card / divider hairline */
   --bo-hairline-strong: var(--bo-tinta-13); /* clearer separator */
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
   --bo-control-border: rgba(13, 13, 13, 0.55);
@@ -632,69 +502,37 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      enquanto o `text-xs` — A MESMA MEDIDA — saía com 16. Ver a regra do chão,
      mais abaixo, para a conta inteira. */
   --bo-lh-caption: 1.35;
-  /* ── TRÊS APERTOS, E O NÚMERO CRESCE COM O TAMANHO ──────────────────────
-     A letra do painel é a que ela escolheu, e o que ela apontou nela foi isto:
-     «o traço estilístico mais marcante é o tracking negativo agressivo nos
-     títulos combinado com peso regular em vez de bold».
-
-     O `em` já acompanha o tamanho — 3% de 40 px são 1,2 px e de 15 px são
-     0,45 — mas não chega: o que a vista quer é que o aperto cresça MAIS
-     depressa do que a letra. Um título de 40 px aguenta 4,5% e ganha com isso;
-     o mesmo valor num rótulo de 12 px cola as letras umas às outras e é a
-     legibilidade que paga.
-
-     Daí três degraus, e não um:
-
-       TRABALHO  -0,011em  o texto corrido da interface, como já era
-       TÍTULO    -0,03em   um cabeçalho de secção, um nome de casal
-       DISPLAY   -0,045em  o título grande de uma vista, e só esse
-
-     Quem escrever um número à mão fica de fora da próxima decisão — é a mesma
-     razão de os cinzentos terem passado a cinco degraus com o número no nome. */
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
-  --bo-tracking-titulo: -0.03em;
-  --bo-tracking-display: -0.045em;
 
-  /* ── UMA LETRA SÓ NO BACK OFFICE, E A SERIFA GUARDADA PARA O CLIENTE ───
-     Aqui esteve, em tempos, uma redefinição da letra de display para a sans do
-     trabalho. Foi tirada quando ela disse «o back office está com a mesma
-     estrutura, não me diz nada»: os títulos passaram a Playfair, como no sítio
-     público.
+  /* ── A LETRA DA CASA VOLTA AOS TÍTULOS ────────────────────────────────
+     Aqui estavam três linhas a redefinir `--font-playfair` para o Inter DENTRO
+     do back office, com a justificação de dar um ar «calm ChatGPT-app»: uma só
+     sans humanista para o texto de trabalho E para os títulos.
 
-     Ela voltou a olhar, agora com uma referência à frente, e disse o contrário
-     sem ambiguidade: «não quero estes títulos com este tipo de letra», «quero
-     este tipo de letra no back office todo». Foi ver qual era e trouxe o nome:
-     Geist, a letra da Vercel, com tracking negativo forte nos títulos e peso
-     normal em vez de negrito. É uma instrução, não uma hipótese.
+     A intenção era boa e o efeito foi outro. Palavras dela, a olhar para o
+     deploy verdadeiro: «o back office está com a mesma estrutura, não me diz
+     nada». Uma das razões é esta linha. Os 38 sítios que pedem a letra de
+     display — os títulos de página, o nome do casal, os números do dinheiro —
+     pediam-na e recebiam Inter. O back office ficou calmo e ficou sem cara
+     nenhuma: exactamente a mesma letra do resto da interface, do rótulo de
+     11 px ao número de 48.
 
-     O que muda: o back office passa a ter UMA letra, do rótulo de 12 px ao
-     número grande. Os ~29 sítios que pedem `font-display` mudam sem se lhes
-     tocar, porque no Tailwind v4 o utilitário compila para
-     `var(--font-display)` — o mesmo mecanismo com que o bloco dos raios
-     colapsou nove valores em dois. O que faz um título ser um título passa a
-     ser o TAMANHO, o PESO e o APERTO, e não uma segunda família.
+     O site público sempre teve o Playfair nos títulos. A ferramenta com que ela
+     trabalha o dia inteiro é da mesma casa, e não havia razão para ser a única
+     página da Líquen sem a letra da Líquen.
 
-     ── ONDE A SERIFA FICA, E PORQUÊ NÃO É UMA EXCEPÇÃO DECORATIVA ──────────
-     A proposta que chega ao casal é desenhada em Playfair — está escrita assim
-     no `Documento.tsx` e no `Inspiracao.tsx`, que vivem em `(privado)` e nunca
-     passam por aqui. A `FolhaDaProposta` do back office é a PRÉ-VISUALIZAÇÃO
-     dessa folha: se a prévia mudasse de letra, ela passava a conferir uma
-     folha que não é a que sai. É o defeito que o `letra-da-previa.test.ts` já
-     apanhou uma vez, com as palavras dela por trás: «uma pré-visualização
-     parcial dá falsa confiança».
+     ── O QUE ISTO **NÃO** FAZ ──────────────────────────────────────────────
+     O texto de trabalho continua todo em Inter — a `font-family` da raiz, aqui
+     mesmo por baixo, não se toca. O Playfair volta SÓ onde alguém pediu
+     `font-display` ou escreveu `var(--font-playfair)`, e esses 38 sítios são
+     todos títulos e números grandes. Foram contados um a um: o mais pequeno
+     está a 16 px, e o único que estava abaixo disso (uma descrição de 14 px na
+     Biblioteca de Temas) deixou de ser display, porque era prosa e não título.
 
-     Por isso a excepção não vive numa lista de ficheiros: vive num marcador no
-     que É folha do cliente — `[data-folha-do-cliente]`, mais abaixo —, e o
-     token volta ao Playfair dentro dessa árvore. Uma folha nova que nasça
-     amanhã herda a regra por estar marcada, e não por alguém se ter lembrado.
-
-     O texto de trabalho não se toca na sua NATUREZA: continua uma sans de
-     interface. Qual delas é que é, decide-se na regra a seguir a este bloco.
-
-     Esta linha aqui é a REDE: se a letra escolhida não chegar, o back office
-     fica com uma letra só à mesma — a que já cá estava — em vez de metade dos
-     títulos em serifa. */
-  --font-display: var(--font-inter);
+     O Playfair tem altura-de-x baixa: a 14 px lê-se como um Inter de 12,5, e o
+     chão da casa são 12. É por isso que a fronteira é 16 e está guardada por
+     teste (`letra-da-casa.test.ts`) — sem ela, o primeiro `font-display` numa
+     legenda pequena reabre o problema sem ninguém dar por isso. */
 
   /* Clean humanist sans for all working admin text; system-ui stack behind it so
      there is never a network dependency. */
@@ -713,46 +551,6 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      modern feel of a product app (ChatGPT/Linear) — NOT the shouty uppercase
      mission-control look this interface used to force on every element. */
   letter-spacing: var(--bo-tracking-tight);
-}
-
-/* ── O GEIST, E PORQUE É QUE ESTA REGRA NÃO ESTÁ NO `body` ────────────────
-   A letra é carregada pelo `layout.tsx` do grupo `(admin)`, e o `next/font`
-   põe a variável no elemento que leva a classe — o `<main data-admin-mode>`.
-   Uma variável não sobe: escrita no `<main>`, não existe no `<body>`, e uma
-   regra no `body` a pedir `var(--font-geist)` não pintava nada.
-
-   Por isso a regra mora no mesmo elemento que a variável. Tudo o que o back
-   office desenha vive lá dentro — foi verificado que não há um único
-   `createPortal` no painel, ou seja, não há diálogo nenhum a sair da árvore
-   para o `body` e a ficar de fora disto.
-
-   E se a letra não chegar (rede cortada a meio do carregamento), esta
-   declaração fica inválida e a `font-family` do bloco de cima é a que vale.
-   Não há estado em que metade do painel fique numa letra e metade noutra. */
-[data-admin-mode] {
-  --font-display: var(--font-geist);
-  font-family:
-    var(--font-geist),
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
-}
-
-/* ── A FOLHA DO CLIENTE MANTÉM A LETRA DO CLIENTE ──────────────────────────
-   A prévia da proposta tem de ser a folha que sai, e a folha que sai é em
-   Playfair. Este marcador põe-se na raiz do que é folha do casal — hoje a
-   `FolhaDaProposta` — e devolve o token à serifa dentro dessa árvore, sem
-   tocar em mais nada do back office.
-
-   É uma linha e não uma lista de ficheiros de propósito: uma prévia nova
-   herda isto por estar marcada como folha do cliente. */
-body:is(.admin-mode, :has([data-admin-mode])) [data-folha-do-cliente] {
-  --font-display: var(--font-playfair);
 }
 
 /* ── A ESCALA DO ESPAÇO DO BACK OFFICE ─────────────────────────────────────
@@ -804,11 +602,10 @@ body:is(.admin-mode, :has([data-admin-mode])) [data-folha-do-cliente] {
   }
 }
 
-/* O aperto de um título de trabalho. O degrau de cima, o do display, pede-se
-   onde o título é mesmo grande — ver `--bo-tracking-display`. */
+/* Display / working headings: tighter tracking for the calm modern-sans look. */
 body:is(.admin-mode, :has([data-admin-mode])) :is(h1, h2, h3, h4),
 body:is(.admin-mode, :has([data-admin-mode])) .font-display {
-  letter-spacing: var(--bo-tracking-titulo);
+  letter-spacing: -0.02em;
 }
 
 /* ── ChatGPT-calm typography ──────────────────────────────────────────────
@@ -819,17 +616,12 @@ body:is(.admin-mode, :has([data-admin-mode])) .font-display {
    marketing site keeps its editorial caps. Every admin screen now reads in
    calm sentence case with quiet spacing, like a modern product app (ChatGPT/
    Linear). Data fields keep their true case via the block below. */
-body:is(.admin-mode, :has([data-admin-mode])) [class*="uppercase"],
+body:is(.admin-mode, :has([data-admin-mode])) .uppercase,
 body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow,
 body:is(.admin-mode, :has([data-admin-mode])) .eyebrow {
   text-transform: none;
   letter-spacing: 0.005em;
 }
-/* `[class*="uppercase"]` e não `.uppercase`, pela mesma razão do chão da letra
-   lá em baixo: a classe nua não apanha `lg:uppercase`, e os mesmos três
-   rótulos da Visão Geral gritavam em maiúsculas no computador enquanto o resto
-   do painel estava em caixa de frase — não por alguém ter decidido isso, mas
-   por o prefixo os ter deixado passar por fora da decisão. */
 
 /* Keep real DATA in its true case — an email, a client's name mid-typing, a
    phone number or a reference id must never be transformed. (Now that the
@@ -1022,90 +814,10 @@ body:is(.admin-mode, :has([data-admin-mode])) .bo-text-faint {
    O `letter-spacing` acompanha pela mesma geometria que está escrita acima:
    subir o corpo sem desapertar o espacejamento troca letra pequena por texto
    transbordado. */
-body:is(.admin-mode, :has([data-admin-mode]))
-  :is(
-    [class*="text-[7px]"],
-    [class*="text-[8px]"],
-    [class*="text-[9px]"],
-    [class*="text-[10px]"],
-    [class*="text-[11px]"]
-  ) {
+body:is(.admin-mode, :has([data-admin-mode])) :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
   font-size: var(--bo-fs-caption);
   letter-spacing: 0.01em;
 }
-
-/* ── E O 10 E O 11 ENTRARAM AQUI, A PEDIDO DELA ──────────────────────────────
-   Isto levantava TRÊS tamanhos (7 a 9) e parava aí de propósito: o 10 e o 11
-   eram «o registo denso do computador», e o comentário do chão do telemóvel
-   dizia, com razão, que alargar a fronteira mudava a densidade da tabela do
-   portátil «sem ninguém pedir».
-
-   PEDIU. Palavras dela, depois de eu lhe mostrar a medição: «arruma em todo o
-   back office». A premissa daquela frase era ninguém ter pedido; deixou de ser
-   verdade, e por isso a regra muda — e o teste que a guardava muda com ela, com
-   esta razão escrita, em vez de ser contornado.
-
-   O QUE A MEDIÇÃO MOSTROU, e é o que justifica o pedido: o back office tem 593
-   tamanhos de letra escritos à mão e ONZE usos da escala declarada.
-
-       text-[11px]  231      text-[12px]   24      text-[15px]   5
-       text-[10px]  223      text-[8px]    14      text-[17px]   2
-       text-[9px]    80      text-[13px]   13      text-[14px]   1
-
-   A escala existe — caption 12 · label 13 · body 15 · lead 17 · title 20 — e o
-   painel quase não assentava nela. É a mesma forma dos 47 cinzentos e das 15
-   grafias de espacejamento: uma decisão tomada 593 vezes por não haver onde a
-   ir buscar.
-
-   Com o 10 e o 11 aqui dentro, 454 dessas chamadas passam a assentar no degrau
-   mais baixo da casa, em vez de inventarem um número dois píxeis abaixo dele. */
-
-/* ── E A SOBRANCELHA VAI COM ELES, PELA MESMA RAZÃO ──────────────────────────
-   A `.bo-eyebrow` não é um utilitário do Tailwind: é uma classe própria fixada
-   em 11 px, e o chão de cima não lhe toca por não haver classe `text-[11px]`
-   nenhuma para apanhar.
-
-   MEDIDO depois de o 10 e o 11 entrarem no chão, a 1280, nas dez vistas: dos
-   360 nós que estavam abaixo do degrau sobraram VINTE E QUATRO, e eram todos
-   ela — «Próximos eventos», «Prioridade», «Prazo», «A fazer», «Valor já
-   ganho». Ou seja, os TÍTULOS das secções ficavam um píxel abaixo do chão
-   enquanto o texto que eles titulam assentava nele.
-
-   O chão do telemóvel já a levantava, e a razão está lá escrita: «é ela que
-   titula quase todas as secções do painel… num ecrã onde os títulos são o
-   mapa». Vale igual no computador.
-
-   `0.04em` e não os `0.14em` que ela declara: é a mesma geometria que o resto
-   deste ficheiro repete — subir o corpo sem desapertar o espacejamento troca
-   letra pequena por texto transbordado. É o mesmo valor que o chão do telemóvel
-   já escolheu para ela. */
-body:is(.admin-mode, :has([data-admin-mode])) .bo-eyebrow {
-  font-size: var(--bo-fs-caption);
-  letter-spacing: 0.04em;
-}
-
-/* ── E PORQUE É QUE ISTO É `[class*=]` E NÃO A CLASSE ─────────────────────
-   Estava `:is(.text-\[7px\], .text-\[8px\], .text-\[9px\])` — a classe
-   NUA. E uma classe nua não apanha as variantes: o Tailwind compila
-   `lg:text-[9px]` para `.lg\:text-\[9px\]`, que é outro nome, dentro de uma
-   media query. O chão passava-lhe ao lado.
-
-   MEDIDO num browser a sério, a 1280, com a Visão Geral montada — três
-   rótulos, os primeiros que ela vê ao abrir o painel:
-
-       «Pedidos ativos»     pedido a 15 px, desenhado a  9 px
-       «Por responder»      pedido a 15 px, desenhado a  9 px
-       «Próximos 7 dias»    pedido a 15 px, desenhado a  9 px
-
-   Nove píxeis é exactamente o tamanho que o comentário aqui em cima diz que
-   esta casa não manda para ecrã nenhum, «porque abaixo disso não é texto
-   denso: é texto que não se lê». A regra dizia-o e não o fazia.
-
-   `[class*="…"]` casa o nome da classe onde quer que ele apareça na lista —
-   com prefixo de largura (`lg:`), de contentor (`@min-[36rem]:`) ou sem
-   nenhum. A especificidade é a mesma de uma classe, portanto nada mais muda.
-   São só dois sítios hoje; o que se fecha é a FORMA do buraco, para o próximo
-   `lg:text-[9px]` já nascer coberto. */
 
 /* ── O CHÃO DA COR DO TEXTO, PELA MESMA RAZÃO DO CHÃO DA LETRA ────────────
    A casa tem três tokens de texto com o rácio medido e um teste a guardá-lo
@@ -1219,27 +931,6 @@ body:is(.admin-mode, :has([data-admin-mode])) :is(.text-foreground\/50, .text-fo
    every white page keeps the navbar exactly as it was. */
 body:has([data-cream-page]) [data-public-nav] {
   --color-moss: var(--color-moss-dark);
-}
-
-/* ── O MESMO ANEL, DOIS AFASTAMENTOS ──────────────────────────────────────
-   Da análise da loja da Apple: `--sk-focus-offset: 1px` nos controlos e
-   `--sk-focus-offset-container: 3px` nos contentores. Dois afastamentos, e a
-   razão é boa — um anel colado a um cartão grande LÊ-SE COMO BORDA, não como
-   foco. É o detalhe que separa «temos foco visível» de «temos um sistema de
-   foco».
-
-   Aqui o anel de base já tem dois píxeis de folga (a auréola da cor da
-   superfície, antes do musgo). Esta classe abre-a para quatro, e é para os
-   alvos que são CAIXAS e não controlos: uma linha inteira de uma lista, um
-   cartão de dinheiro com cem píxeis de altura. Num botão de 32 px, quatro
-   píxeis de folga seriam um halo à volta de nada; numa linha de 80, dois
-   píxeis colados à moldura são indistinguíveis da moldura.
-
-   Mesma cor, mesma espessura, mesma transição: o que muda é a distância. */
-.foco-largo:focus-visible {
-  box-shadow:
-    0 0 0 4px var(--color-surface),
-    0 0 0 6px rgba(76, 97, 80, 0.95);
 }
 
 /* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
@@ -1607,23 +1298,9 @@ body {
     transform: none;
   }
 }
-/* ── A ESCADA PÁRA AO SEXTO DEGRAU ────────────────────────────────────────
-   Era `--cena × 70ms`, sem tecto: quatro blocos já valiam 280 ms de espera
-   antes de o último começar, e a lista não tinha limite nenhum.
-
-   A Apple tem esta escada escrita no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
-   0,26 / 0,28 / 0,30 s — degraus de vinte milissegundos, seis, e pára. O
-   desfasamento existe para o olho ler ORDEM DE LEITURA, não para dar
-   espectáculo: ao sexto item essa informação já foi dada, e a partir daí o
-   atraso só acrescenta espera. Seis blocos a entrar em 120 ms lê-se como
-   rapidez; vinte em 400 ms lê-se como lentidão.
-
-   O `min()` é o tecto. Sem ele, uma lista de trinta linhas com `--cena` a
-   contar até trinta punha a última a começar seis décimos de segundo depois
-   da primeira — que é precisamente a sensação que isto existe para evitar. */
 .bo-cena {
-  animation: bo-cena 600ms var(--ease-out) backwards;
-  animation-delay: calc(min(var(--cena, 0), var(--bo-degraus-max)) * var(--bo-degrau));
+  animation: bo-cena 600ms cubic-bezier(0, 0, 0.2, 1) backwards;
+  animation-delay: calc(var(--cena, 0) * 70ms);
 }
 @media (prefers-reduced-motion: reduce) {
   .bo-cena {
@@ -1823,51 +1500,6 @@ body::before {
 }
 
 /* ── Keyframes ── */
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A FITA DOS CLIENTES — O CICLO TEM DE FECHAR, E SEM VARIÁVEL NENHUMA AQUI
- * ════════════════════════════════════════════════════════════════════════════
- *
- * ── O que estava errado ─────────────────────────────────────────────────
- *
- * Num `transform`, uma percentagem é da largura de CAIXA do próprio elemento —
- * não do conteúdo. A fita é filha de uma banda `overflow-hidden`, portanto a
- * caixa dela media o que a janela media e o conteúdo transbordava.
- *
- * MEDIDO na página inicial, a 1440 px:
- *
- *     caixa da fita (offsetWidth)     1440 px   → o `-50%` deslocava  720 px
- *     conteúdo (scrollWidth)          5053 px
- *     UMA cópia dos clientes          2558 px
- *
- * Andava 720 px e voltava ao princípio: um SALTO de 1838 px em cada volta,
- * desde sempre. Não era uma fita lenta — era uma fita que dava um solavanco.
- *
- * ── A correcção é na CAIXA, e é por uma razão de desempenho ─────────────
- *
- * A primeira tentativa foi pôr aqui a largura medida de uma cópia
- * (`translateX(calc(-1 * var(--fita-copia)))`). Fechava o ciclo e ESTRAGOU o
- * resto: uma animação cujos fotogramas dependem de uma variável CSS não pode
- * ser entregue ao compositor — o browser tem de a recalcular no fio principal
- * a cada fotograma.
- *
- * MEDIDO com o relógio da própria animação contra o relógio da parede:
- *
- *     1440 px   3000 ms de animação em 3000 ms reais   (100%)
- *      390 px   1900 ms de animação em 3000 ms reais    (63%)
- *
- * No telemóvel — que é onde ela vê o sítio — a fita passou a andar a dois
- * terços do que dizia. Exactamente o contrário do que se queria.
- *
- * Por isso a percentagem FICA, e o que muda é a caixa: a fita passa a
- * `width: max-content` (a caixa cresce até ao conteúdo) e o intervalo entre
- * logótipos passa do `gap` do contentor para uma margem em cada marca. Com o
- * intervalo DENTRO de cada marca, o conteúdo são duas cópias exactamente
- * iguais, e `-50%` é uma cópia — ao milésimo, sem medir nada.
- *
- * A duração continua a vir de uma variável, e essa pode: o que impede o
- * compositor são os VALORES dos fotogramas, não quanto tempo eles levam.
- */
 @keyframes marquee {
   from {
     transform: translateX(0);
@@ -1977,50 +1609,12 @@ body::before {
   animation: fade-up 1s cubic-bezier(0.16, 1, 0.3, 1) 560ms both;
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A FITA DOS CLIENTES ANDA A UMA VELOCIDADE, NÃO NUM TEMPO
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Estava `30s` — um TEMPO fixo. E um tempo fixo numa fita que muda de largura
- * não é uma velocidade: é o que sobrar.
- *
- * MEDIDO no browser, na página inicial, com os 19 clientes de hoje:
- *
- *     390 px de ecrã   fita de 3844 px   →  64 px por segundo
- *    1440 px de ecrã   fita de 5053 px   →  84 px por segundo
- *
- * A mesma animação, duas velocidades — porque o intervalo entre logótipos é
- * maior a partir de `sm` e a fita fica mais larga. E há a segunda metade do
- * problema, que é pior por ser silenciosa: no dia em que ela juntar seis
- * clientes, a fita alarga e passa a correr MAIS DEPRESSA, sem ninguém mexer
- * em nada.
- *
- * Agora a duração é calculada a partir da largura real (`--fita-duracao`, posta
- * pelo `ClientMarquee` com um `ResizeObserver`): mesma velocidade em qualquer
- * ecrã e com qualquer número de clientes. O `30s` fica como recurso para o
- * instante entre o HTML chegar e a medição acontecer.
- *
- * ── O `:hover` SAIU ──────────────────────────────────────────────────────
- *
- * Parava a fita ao passar o rato por cima. Palavras dela, a comparar com o
- * site que gosta: «o nosso tem até um botão para parar ou ligar e eu não quero
- * isso». O mesmo vale para o rato — uma fita que pára porque o ponteiro lhe
- * passou por cima lê-se como uma avaria, não como um comando.
- *
- * O que fica a poder pará-la: o `prefers-reduced-motion` (aqui em baixo, e aí
- * ela não anda de todo) e o comando de teclado que vive no componente — sem
- * desenho nenhum até alguém lhe chegar com o Tab.
- */
 .animate-marquee {
-  animation: marquee var(--fita-duracao, 30s) linear infinite;
-  /* Só enquanto corre, que é a regra da casa: a classe `marquee-paused` é
-     posta quando a banda sai do ecrã, e aí devolve-se a memória. */
-  will-change: transform;
+  animation: marquee 30s linear infinite;
 }
+.animate-marquee:hover,
 .animate-marquee.marquee-paused {
   animation-play-state: paused;
-  will-change: auto;
 }
 
 /* ── Scroll indicator ── */
@@ -2369,34 +1963,9 @@ body[data-menu-open] .whatsapp-fixed {
 .hero-settle {
   transform: scale(1.06);
 }
-/* ── E PORQUE É QUE ELE ESPERA PELA CORTINA ───────────────────────────────
-   Porque, sem esperar, corria inteiro POR BAIXO DELA. A conta é embaraçosa de
-   tão certa: o zoom dura 2,2 s e arranca no primeiro fotograma; a cortina tapa
-   a página durante 2,2 s. Ou seja, o gesto acabava exactamente no instante em
-   que passava a haver alguém para o ver. Ninguém que entrou no sítio, desde
-   que a cortina existe, alguma vez viu esta fotografia abrir.
-
-   É o mesmo defeito que o esqueleto a pulsar por trás de uma cortina opaca —
-   uma animação a correr para ninguém, e a gastar bateria a fazê-lo.
-
-   ── PORQUE É QUE É UM ATRASO E NÃO UM GANCHO NA CORTINA ─────────────────
-   O gancho existiu, e a proposta usava-o (`html[data-cortina="a-sair"]`).
-   Nenhuma das duas o usa hoje, e a razão é a mesma: o dia
-   em que o JavaScript não corre — bloqueado, falhado, uma rede que engoliu o
-   ficheiro. Nesse dia o atributo nunca aparece: com um gancho, a fotografia
-   ficava presa no primeiro fotograma da animação, 8% mais fechada, PARA
-   SEMPRE. Trocar uma animação perdida por uma fotografia permanentemente
-   errada é mau negócio.
-
-   Com um atraso, o pior que acontece é o zoom arrancar aos 2,2 s enquanto a
-   rede de segurança do CSS só levanta a cortina aos 4 — vê-se metade em vez de
-   se ver tudo, e nada fica errado.
-
-   O `backwards` é o que segura a fotografia no enquadramento inicial durante a
-   espera, sem salto quando ela arranca. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-navigated]) .hero-settle {
-    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) var(--cortina-sobe) backwards;
+    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }
 
@@ -2701,15 +2270,11 @@ body[data-menu-open] .whatsapp-fixed {
    call-outs. These classes keep that language consistent across every view. */
 .bo-card {
   background: var(--bo-surface, #ffffff);
-  /* O degrau FORTE, e não o de omissão: com o chão branco, isto é a única
-     coisa que diz onde o cartão começa e acaba. Um separador dentro dele
-     continua a ser o fio normal. */
-  border: 1px solid var(--bo-hairline-strong, rgba(42, 38, 32, 0.13));
+  border: 1px solid var(--bo-hairline, rgba(42, 38, 32, 0.08));
   /* Roomier corners (rounded-2xl) — the calm container the redesign leans on. */
   border-radius: var(--bo-radius-lg, 1rem);
-  /* Sem sombra, e agora sem cinzento por baixo: o chão do painel é branco, e
-     quem diz onde um cartão começa e acaba é o FIO da moldura. Ver os dois
-     tokens de sombra lá em cima, e o `--bo-chao`. */
+  /* Sem sombra: o branco sobre o cinzento da página mais o fio da moldura já
+     dizem que isto está em cima. Ver os dois tokens de sombra lá em cima. */
 }
 /* A LARGURA POR OMISSÃO DE UM CAMPO, E SÓ ELA, VIVE NUMA CAMADA.
    ─────────────────────────────────────────────────────────────────────────
@@ -2954,7 +2519,7 @@ body:has([data-orcamento-mode]) .eyebrow {
      destes painéis, portanto o pior caso passa a ser a fotografia a aparecer
      sobre a sua própria sombra em vez de sobre um flash branco. Um painel de
      fundo claro sobrepõe com `[--cv-bg:…]`, como já faz com `--cv-h`. */
-  background-color: var(--cv-bg, var(--color-noite));
+  background-color: var(--cv-bg, #12160f);
 }
 
 /* ── O aviso de cookies de quem já respondeu ──
@@ -3155,7 +2720,7 @@ body:has(.barra-consentimento) footer {
 /* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {
-  background-color: var(--color-noite);
+  background-color: #12160f;
   /* Skip rendering off-screen tiles' contents (the <Image>) so a long gallery
      doesn't keep hundreds of decoded layers laid out — the fix for the measured
      scroll cost. Safe against the old "dark gap" regression BECAUSE the box
@@ -3177,99 +2742,6 @@ body:has(.barra-consentimento) footer {
      `.g-tile` e NÃO têm `aspect-ratio`: dependem da altura fixa da grelha. No
      dia em que alguém lha tirasse, não havia rede nenhuma por baixo. */
   contain-intrinsic-size: auto 400px;
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
-   A PROPOSTA CHEGA — as secções sobem ao entrar no ecrã
-   ════════════════════════════════════════════════════════════════════════════
-
-   «Quero que a web proposta seja algo incrivelmente bom, com animações.»
-
-   ── AS TRÊS REGRAS DA CASA, QUE SE HERDAM E NÃO SE REINVENTAM ─────────────
-
-   1. SUBIDA, NUNCA OPACIDADE. Está escrito duas vezes neste ficheiro, por dois
-      incidentes diferentes: um estado de repouso invisível faz da animação a
-      CONDIÇÃO de o conteúdo existir. Numa proposta que decide milhares de euros
-      isso é o pior defeito possível — a página em branco e ninguém a saber
-      porquê. Aqui a opacidade nunca desce abaixo de 1 no repouso.
-
-   2. SÓ `transform`. Trabalho de compositor: não bloqueia o dedo a deslizar,
-      que era exactamente a queixa dela («trava ao deslizar»).
-
-   3. `will-change` SÓ ENQUANTO CORRE. Aqui nem é preciso pedi-lo: uma animação
-      com linha de tempo de scroll já é composta, e um `will-change` no repouso
-      seria uma camada por secção a segurar memória de vídeo sem nada a animar.
-
-   ── E PORQUE É QUE ISTO NÃO LEVA UMA LINHA DE JAVASCRIPT ──────────────────
-
-   A galeria revela com um `IntersectionObserver`. Aqui não: `animation-timeline:
-   view()` é o browser a fazê-lo sozinho, fora do fio principal.
-
-   O `@supports` não é zelo — é a regra 1 outra vez, por outra porta. Onde a
-   linha de tempo não existir, NÃO se aplica repouso nenhum: a página fica
-   exactamente como está hoje, direita e legível, em vez de ficar com as
-   secções vinte píxeis fora do sítio à espera de uma animação que nunca vem.
-
-   ── A DISTÂNCIA, E PORQUE É PEQUENA ──────────────────────────────────────
-
-   14 px e não os 20 do masonry. Ali são mosaicos numa grelha, e o gesto lê-se
-   em conjunto; aqui são blocos de texto que alguém está a LER, e um texto que
-   sobe muito rouba a linha que a pessoa está a seguir. O movimento é para se
-   sentir, não para se ver.
-
-   `entry 0%` a `entry 60%`: acaba antes de a secção chegar ao meio do ecrã,
-   ou seja está sempre parada quando se lê. Nenhuma animação atrasa nada. */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .prop-chega {
-      animation: prop-chega linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 60%;
-    }
-  }
-}
-@keyframes prop-chega {
-  from {
-    transform: translateY(14px);
-  }
-  to {
-    transform: none;
-  }
-}
-
-/* ── A GRELHA DA PROPOSTA SALTA O QUE ESTÁ FORA DO ECRÃ ──────────────────────
-   Palavras dela, sobre a proposta no telemóvel: «trava ao deslizar».
-
-   A galeria pública já resolveu isto (`.g-tile` aqui em cima) e a proposta
-   ficou de fora — e é a proposta que tem 46 fotografias numa página que o casal
-   percorre de cima a baixo. Cada célula fora do ecrã continuava a pagar estilo,
-   layout e uma camada descodificada em cada fotograma do deslize.
-
-   ── PORQUE É QUE AQUI É SEGURO, E ONDE NÃO É ──────────────────────────────
-
-   A regra desta casa é dura e foi paga: `content-visibility: auto` só é seguro
-   se o espaço RESERVADO for igual ao REAL, senão a página encolhe por baixo do
-   dedo — e no Safari do iPhone não há âncora de scroll que o disfarce.
-
-   Aqui a altura da célula NÃO vem do conteúdo saltado: vem do `aspect-ratio`
-   que cada foto declara a partir da forma guardada, e um `max-height` que
-   clampa aplica-se na mesma com ou sem conteúdo desenhado. É a mesma razão que
-   está escrita no `.g-tile`, e é por isso que esta classe só é posta pelo
-   `Inspiracao.tsx` QUANDO A FORMA É CONHECIDA.
-
-   Onde a forma se desconhece — fotografias anteriores às colunas de dimensão —
-   a célula não leva esta classe. Aí a altura vem mesmo da imagem, e reservar um
-   número inventado era escolher o defeito que se está a corrigir.
-
-   O fundo já lá está (o `bg-` moss a 12% no botão): uma célula com o conteúdo
-   saltado nunca pisca branco, que é a outra armadilha documentada no `.g-tile`.
-
-   `auto 320px` e não `auto`: `auto` sozinho é gramática INVÁLIDA — o parser
-   deita a declaração inteira fora e a rede não existe. Está escrito no
-   `.g-tile` e custou lá uma verificação no browser. */
-.foto-adiavel {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
 }
 
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
@@ -3672,404 +3144,5 @@ body:has(.barra-consentimento) footer {
   }
   details > summary span[aria-hidden] {
     display: none !important;
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   A CORTINA DA PROPOSTA
-   ══════════════════════════════════════════════════════════════════════════
-
-   O porquê inteiro está no `CortinaDaProposta.tsx` — incluindo porque é que
-   ela DEIXOU de ser invisível numa ligação rápida, e a que custo. Em duas
-   linhas: ela abriu a proposta no telemóvel, não viu animação nenhuma, e
-   escolheu vê-la sempre.
-
-   O que interessa saber ao ler o CSS: a cortina já nasce visível (opacidade
-   1), e quem manda no tempo dela é o `MIN` do guião — não este ficheiro. O
-   `4s` da subida aqui em baixo é só a saída que não precisa de JavaScript.
-
-   Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
-
-/* ══════════════════════════════════════════════════════════════════════════
-   OS GRUPOS DE PALAVRAS — E O TRUQUE NÃO É O ATRASO
-   ══════════════════════════════════════════════════════════════════════════
-
-   Palavras dela, no ficheiro que mandou: «cada grupo parte de mais longe e sai
-   para mais longe do que o anterior: 10px, 20px, 30px. Os atrasos são quase
-   nada — se fosse o atraso a fazer o trabalho, lia-se como três palavras em
-   fila indiana. É o DESENCONTRO DAS DISTÂNCIAS que dá a leitura em camadas: as
-   três percorrem o mesmo tempo a velocidades diferentes, e o olho lê isso como
-   profundidade.»
-
-   ── E A PARAGEM É QUE FAZ DISTO UMA FRASE ────────────────────────────────
-
-   Entra a subir, PÁRA de 35% a 65% para se ler, e sai a subir. Sem a paragem
-   isto era um efeito; com ela é uma frase.
-
-   ── O QUE ISTO SUBSTITUI, E PORQUÊ ───────────────────────────────────────
-
-   Estavam as letras a entrar uma a uma, alternadas, recortadas pela linha.
-   Fi-las a pedido dela — «uma cai e a outra entra» — e ela viu-as. Depois
-   mandou este ficheiro e disse «é isto». É outra coisa, e é a dela: as letras
-   saem, os grupos entram.
-
-   Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
-@keyframes cortina-grupo {
-  0% {
-    opacity: 0;
-    transform: translateY(var(--dy, 10px));
-  }
-  35%,
-  65% {
-    opacity: 1;
-    transform: none;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(calc(var(--dy, 10px) * -1));
-  }
-}
-
-/* O PANO. Uma animação só: fica parado 88% do tempo e sobe nos últimos 12%.
-   É de propósito que não são duas animações nem um temporizador — assim ele
-   sai sozinho, sem JavaScript nenhum. */
-@keyframes cortina-segurar {
-  0%,
-  88% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-100%);
-  }
-}
-
-.cortina {
-  position: fixed;
-  inset: 0;
-  /* Acima da barra dos cookies (`z-[70]`) e do aviso de navegação (80).
-     A fotografia mostrou o rodapé de consentimento a espreitar por baixo do
-     lema, que parece uma página partida a meio e não uma a caminho. */
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  /* ── UMA SÓ COR, EM TODA A CASA ─────────────────────────────────────────
-     Palavras dela: «quero esse verde mais claro, que nós temos, que é o mesmo
-     verde do site online». É o `moss-dark`: o verde do menu e da barra do
-     sítio. O creme sobre este verde dá ~5,9:1 — folgado para as WCAG. */
-  background: var(--color-moss-dark);
-  opacity: 1;
-  /* Dela, e vale a pena: no instante em que o pano já está a subir mas ainda
-     está no documento, não pode engolir um toque do que está por baixo. */
-  pointer-events: none;
-  /* ── A SAÍDA, SEM UMA LINHA DE JAVASCRIPT ───────────────────────────────
-     Fica parado 88% do tempo e sobe nos últimos 12%. Uma animação só, e não
-     duas nem um temporizador: assim o pano sai sozinho. Se o guião não correr
-     — bloqueado, falhado, desligado — o casal não fica preso atrás dele.
-
-     A curva é a do menu e da cortina do ficheiro dela, e não a das entradas de
-     conteúdo: acelera e trava nas duas pontas, e é isso que faz um pano
-     parecer um pano e não uma camada a deslizar. */
-  animation: cortina-segurar var(--cortina-total) cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
-  /* ── A CAMADA VEM ANTES DO MOVIMENTO ────────────────────────────────────
-     Sem isto, o WebKit só promove a cortina a camada própria no instante em
-     que ela COMEÇA a subir — e criar uma camada do ecrã inteiro no mesmo
-     fotograma em que o movimento arranca é um solavanco. */
-  will-change: transform;
-  /* O que acontece dentro da cortina não pode obrigar a página por baixo a
-     recalcular — e é a página por baixo que está a montar-se neste momento. */
-  contain: layout paint;
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   O MOTE
-   ══════════════════════════════════════════════════════════════════════════
-
-   ── A LETRA É DO SISTEMA, E ISSO NÃO É UMA CEDÊNCIA ──────────────────────
-
-   Era a Playfair, a serifada da marca, para o casal encontrar a mesma casa no
-   rodapé do sítio e no PDF. Ela pediu esta, do ficheiro que mandou.
-
-   E traz um ganho que a serifada nunca podia dar: uma letra do sistema não se
-   descarrega. A Playfair chegava lá pelos 300–900 ms — DENTRO do tempo em que
-   as palavras se mexem — e quando chegava a frase re-media-se e repintava-se a
-   meio do movimento. Havia uma máquina inteira só para tapar isso (o
-   `fontes-por-assentar`, que punha Georgia à espera). Deixa de ser precisa:
-   não há nada por que esperar. */
-.cortina__lema {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0 0.35em;
-  text-align: center;
-  margin: 0;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  color: var(--color-cream);
-}
-
-/* A quebra no sítio certo. O lema tem uma vírgula, e é aí que a frase respira
-   — deixá-lo quebrar onde calhasse punha «eternizamos» pendurado no fim da
-   primeira linha em metade dos telemóveis. Um item de largura inteira e altura
-   zero força a mudança de linha sem ocupar espaço nenhum. */
-.cortina__quebra {
-  flex-basis: 100%;
-  height: 0;
-}
-
-.cortina__grupo {
-  font-size: clamp(1.5rem, 5vw, 2.2rem);
-  /* Nasce invisível e é a animação que o traz. Sem `forwards` ele voltava ao
-     estado inicial no fim — invisível, no meio do pano ainda a subir. */
-  opacity: 0;
-  animation: cortina-grupo 2000ms cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
-}
-
-/* ── ESCONDER DE VEZ, SEM SAIR DO DOCUMENTO ──────────────────────────────
-   A cortina é desenhada pelo React e o guião corre ANTES da hidratação.
-   Removê-la deixava o React a hidratar um `<main>` a que faltava um filho:
-   erro #418, e o React a reconstruir a subárvore — ou seja, a pôr a cortina DE
-   VOLTA, já sem ninguém para a tirar. MEDIDO num Chromium com o JavaScript a
-   chegar 2,5 s depois: ficava no ecrã até aos ~7 s. Esconder pela CLASSE
-   resolve-o pela raiz. */
-.cortina--fora {
-  display: none !important;
-  /* A camada já não serve para nada: largá-la devolve a memória. */
-  will-change: auto;
-}
-
-/* ── A CORTINA À ESPERA DA SUA VEZ ───────────────────────────────────────
-   Serve dois casos, e nos dois o que é preciso é a animação NÃO andar:
-
-   1. Um documento PRÉ-RENDERIZADO. O navegador desenha a página seguinte em
-      segredo quando o dedo se aproxima de uma ligação, e esse documento corre
-      os guiões todos. Sem esta trava, o pano fazia a sua animação inteira numa
-      página que ninguém está a ver, e chegava ao ecrã já gasto.
-
-   2. VOLTAR PELA CACHE DO HISTÓRICO. Aí tem de recomeçar do princípio, e uma
-      animação de CSS só recomeça se for interrompida: pôr a classe, forçar o
-      cálculo, tirar a classe. */
-.cortina--parada,
-.cortina--parada .cortina__grupo {
-  animation: none !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cortina {
-    display: none;
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   O AVISO DE QUE UMA PÁGINA ESTÁ A DEMORAR
-   ══════════════════════════════════════════════════════════════════════════
-
-   O porquê está no `AvisoDeCarregamento.tsx`. A regra desta peça é a OPOSTA
-   da cortina, e é a diferença que importa ao ler isto: a cortina tem um
-   mínimo e vê-se sempre, porque é marca; isto é INFORMAÇÃO, e informação que
-   não é precisa é ruído. Nasce invisível e só aparece se a navegação demorar
-   mais de 400 ms — a receita que os próprios documentos do Next recomendam.
-
-   Só `transform` e `opacity`. */
-
-@keyframes aviso-a-aparecer {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* A respiração do logótipo, tal como no exemplo dela: `from{opacity:.9;
-   transform:scale(.9)} to{opacity:1;transform:scale(1)}`, em alternado. */
-@keyframes aviso-logo-a-respirar {
-  from {
-    opacity: 0.9;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.a-caminho {
-  position: fixed;
-  inset: 0;
-  /* Acima da barra dos cookies, que é `z-[70]`.
-     MEDIDO numa fotografia: com os dois no mesmo nível, ganhava a barra —
-     desenhada depois — e o aviso saía com um rodapé de consentimento por
-     cima, que parece uma página partida a meio e não uma a caminho. */
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  /* O creme da casa, e NÃO o verde-quase-preto da cortina.
-     A cortina cobre a chegada a uma proposta e pode ser escura — é um
-     momento. Isto acontece ENTRE duas páginas claras do sítio, e um flash
-     preto pelo meio lê-se como uma avaria, não como um cuidado. */
-  background: var(--color-cream);
-  opacity: 0;
-  animation: aviso-a-aparecer 0.25s ease 0.4s forwards;
-}
-
-.a-caminho__logo {
-  /* Os 56 px do exemplo dela eram para um SÍMBOLO. Este logótipo traz as nove
-     letras de «LÍQUEN EVENTS» ao lado do emblema — a essa largura, medido numa
-     fotografia a 390 px, as letras não se liam. 150 px é a mesma medida do
-     ecrã de espera da proposta (`loading.tsx`), e é onde o nome se lê. */
-  width: 150px;
-  max-width: 45vw;
-  height: auto;
-  animation: aviso-logo-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
-}
-
-/* ── AQUI O MOVIMENTO REDUZIDO NÃO APAGA A PEÇA ───────────────────────────
-   A cortina desaparece por completo para quem pediu menos movimento, porque
-   é decoração. Esta não pode: é o que diz que algo está a acontecer, e a
-   regra dela é que isso nunca falta. Fica o logótipo quieto, sem respirar e
-   sem aparição — e continua a só surgir se a página demorar mesmo. */
-@media (prefers-reduced-motion: reduce) {
-  .a-caminho {
-    animation: none;
-    opacity: 1;
-    transition-delay: 0.4s;
-  }
-  .a-caminho__logo {
-    animation: none;
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   O MOVIMENTO DA PROPOSTA
-   ══════════════════════════════════════════════════════════════════════════
-
-   Palavras dela: «quero que haja uma animação entre o eternizamos memórias e
-   o PDF, e animações pelo PDF todo, nas fotos, nos textos — quero que aquilo
-   fique espetacularmente bom».
-
-   ── O QUE JÁ CÁ ESTAVA, E PORQUE É QUE NÃO CHEGAVA ───────────────────────
-
-   O `prop-chega`, aqui em cima, com as três regras da casa escritas por
-   extenso. Duas coisas o travavam:
-
-     1. Estava aplicado a UM elemento — a moldura de uma secção. Tudo o resto
-        do documento (a capa, a apresentação, as condições, a fotografia de
-        fecho, os mood boards por dentro, as escolhas, o total) chegava
-        parado.
-
-     2. Depende do `animation-timeline: view()`, que é recente. Num telemóvel
-        com um Safari mais antigo, `@supports` falha e NÃO HÁ MOVIMENTO
-        NENHUM — não uma versão mais pobre: nenhuma. É bem possível que fosse
-        isso que ela estava a ver quando pediu isto.
-
-   ── PORQUE É QUE ESTE MECANISMO É OUTRO ──────────────────────────────────
-
-   Este funciona em todo o lado, e não pede nada ao browser além de um
-   `IntersectionObserver` — que a casa já usa em quatro sítios, com um
-   ajudante partilhado (`lib/motion/observeInView.ts`).
-
-   ── E PORQUE É QUE NUNCA PODE DEIXAR UMA PROPOSTA EM BRANCO ──────────────
-
-   Esta é a regra que manda em tudo o resto. O estado escondido NÃO EXISTE no
-   CSS até o guião o pôr, elemento a elemento — é o padrão `cl-armed` que esta
-   casa já usa nos logótipos dos clientes. Sem JavaScript, com um erro no
-   guião, com o `IntersectionObserver` em falta: nenhum elemento leva
-   `por-subir`, nenhum sai do sítio, e o casal lê a proposta inteira.
-
-   E NUNCA se mexe na opacidade. Só `transform`. Um `opacity: 0` à espera de
-   JavaScript é a maneira de servir a um casal um documento em branco de vinte
-   mil euros — está escrito duas vezes neste ficheiro, das duas vezes em que
-   aconteceu.
-
-   ── A ESCADA DAS DISTÂNCIAS ──────────────────────────────────────────────
-
-   A distância diz a importância, e é sempre pequena. A escala da casa já
-   existia: menu 4px, aviso 8px, bloco 12px, secção 14px, página 32px.
-
-       bloco dentro de uma secção .....  8px
-       fotografia ..................... 12px
-       secção ......................... 14px
-       o TOTAL A PAGAR ................ 20px   ← o único acima de 14
-*/
-
-/* A ARMAÇÃO É INSTANTÂNEA; SÓ A LARGADA É QUE ANIMA.
-   Tinha a transição nas duas, e um Chromium mostrou o que isso faz: ao ser
-   armado, o elemento TRANSITA de zero para o seu degrau — ou seja, desliza
-   para BAIXO à frente de quem olha, e só depois sobe. Duas viagens onde só
-   podia haver uma. Com a transição apenas no `.subiu`, o degrau é posto sem
-   um fotograma de movimento e o que se vê é só a subida. */
-[data-sobe].por-subir {
-  transform: translateY(var(--sobe, 12px));
-}
-/* ── A ESCADA, QUE ESTEVE DESCRITA AQUI EM CIMA SEM EXISTIR ──────────────
-   O texto acima descrevia quatro degraus; o CSS tinha um. O `--sobe` nunca
-   chegou a ser declarado em lado nenhum, portanto TUDO subia os 12 px do
-   valor de recurso — incluindo o total a pagar, que o próprio texto dizia ser
-   o único acima de 14.
-
-   Perdeu-se numa correcção: os degraus estavam escritos em linha no TSX, e o
-   teste do portão do AVIF apanhou-os por engano (uma cadeia como «8px» tem a
-   forma de uma fatia de `sizes`). Tirei-os de lá e não os voltei a pôr aqui.
-
-   Vivem aqui, e não no TSX, exactamente por isso: o que o documento diz é o
-   PAPEL de cada peça (`bloco`, `foto`, `seccao`, `total`), e a distância que
-   cada papel merece é uma decisão de desenho, que é deste ficheiro. */
-[data-sobe="bloco"].por-subir {
-  transform: translateY(8px);
-}
-[data-sobe="foto"].por-subir {
-  transform: translateY(12px);
-}
-[data-sobe="seccao"].por-subir {
-  transform: translateY(14px);
-}
-[data-sobe="total"].por-subir {
-  transform: translateY(20px);
-}
-[data-sobe].por-subir.subiu {
-  transform: none;
-  transition: transform 620ms var(--ease-out);
-}
-
-/* ── A ENTRADA DO DOCUMENTO, COLADA À SAÍDA DA CORTINA ────────────────────
-   A cortina sobe e o documento vem por baixo dela, um pouco atrasado, para o
-   olho ler UM gesto e não dois. O atributo é posto pelo guião da cortina no
-   instante exacto em que ela começa a subir.
-
-   `backwards` e nunca `forwards`: acaba em `transform: none`, sem deixar um
-   bloco de contenção — a lição está escrita no `.view-in`, e o visualizador
-   de fotografias desta página é `position: fixed` lá dentro. */
-/* ── DEIXOU DE SER UM GANCHO E PASSOU A SER UM ATRASO ────────────────────
-   Estava agarrada a `html[data-cortina="a-sair"]`, um atributo que o guião
-   punha no instante em que decidia levantar a cortina. O guião deixou de
-   decidir isso: quem manda no tempo do pano passou a ser o CSS, numa animação
-   só (ver `cortina-segurar`). O atributo já não aparece, e uma regra pendurada
-   nele nunca mais correria — a folha da proposta entrava parada.
-
-   Passa a esperar pelo mesmo instante que o zoom da capa do sítio espera,
-   escrito uma vez: `--cortina-sobe`. E ganha a propriedade que o comentário do
-   `hero-settle` já explica — num dia em que o JavaScript não corra, isto
-   continua a acontecer, porque nunca dependeu dele. */
-@media (prefers-reduced-motion: no-preference) {
-  .prop-folha {
-    animation: prop-entrada 520ms var(--ease-out) var(--cortina-sobe) backwards;
-  }
-}
-
-@keyframes prop-entrada {
-  from {
-    transform: translateY(18px);
-  }
-  to {
-    transform: none;
   }
 }

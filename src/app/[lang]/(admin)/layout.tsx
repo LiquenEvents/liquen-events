@@ -1,55 +1,3 @@
-import { Geist } from "next/font/google";
-import { normalizeLocale } from "@/lib/i18n";
-import { Cortina } from "@/components/Cortina";
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A LETRA DO BACK OFFICE CARREGA-SE AQUI, E SÓ AQUI
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Ela escolheu o Geist — a letra da Vercel — a olhar para um produto que a usa,
- * e disse o que queria dela: «este tipo de letra no back office todo». Vem do
- * `next/font/google`, ou seja, é servida desta casa como as outras três: sem
- * dependência nova, sem ida ao Google no browser dela, e sem terceiros a saber
- * que ela abriu o painel.
- *
- * ── PORQUE É QUE O `import` ESTÁ NESTE FICHEIRO E NÃO NA RAIZ ─────────────
- *
- * As outras três famílias são importadas no `layout.tsx` da raiz, que embrulha
- * o sítio inteiro — e o que lá é importado é pré-carregado em TODAS as páginas.
- * Uma letra que só o back office usa, carregada na raiz, seria um ficheiro a
- * mais em cada visita de um casal ao sítio público, no telemóvel, sem nunca
- * chegar a pintar um pixel.
- *
- * Importada aqui, o Next só a pré-carrega nas rotas que passam por este
- * layout. O sítio público não paga nada por uma decisão que é do painel.
- *
- * Variável, sem `weight`: um ficheiro só que já traz os pesos todos. Pinar
- * pesos discretos daria um ficheiro POR PESO — a lição está escrita por
- * extenso no `layout.tsx` da raiz.
- *
- * `display: "swap"` e `adjustFontFallback`, pelo mesmo motivo das outras: o
- * texto aparece já, na letra do sistema, e a troca quase não mexe na linha. Num
- * 4G de quinta, ver a lista de pedidos em Helvetica meio segundo antes é melhor
- * do que ver um rectângulo branco.
- */
-const geist = Geist({
-  variable: "--font-geist",
-  subsets: ["latin"],
-  display: "swap",
-  adjustFontFallback: true,
-  fallback: [
-    "ui-sans-serif",
-    "system-ui",
-    "-apple-system",
-    "Segoe UI",
-    "Roboto",
-    "Helvetica Neue",
-    "Arial",
-    "sans-serif",
-  ],
-});
-
 /**
  * ════════════════════════════════════════════════════════════════════════════
  * O BACK OFFICE NÃO É UMA PÁGINA DO SÍTIO — E AGORA A ESTRUTURA DI-LO
@@ -141,34 +89,9 @@ const geist = Geist({
  * barra de navegação por cima, e a página começa onde a página começa. Os
  * `-mt-24` das raízes saíram todos no mesmo movimento.
  */
-export default async function AdminLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ lang: string }>;
-}) {
-  const { lang } = await params;
-
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main id="conteudo" data-admin-mode className={`flex-1 ${geist.variable}`}>
-      {/*
-        A MESMA CORTINA DA PROPOSTA, À ENTRADA DO BACK OFFICE.
-
-        Palavras dela: «este que aparece quando carregamos no ver proposta,
-        aquela parte inicial de animação — eu quero que faças isso quando nós
-        entramos também no back office».
-
-        É o mesmo componente e o mesmo lema, de propósito: o estúdio abre o
-        dia com a mesma frase com que o casal abre a proposta.
-
-        Com UMA diferença, e é a `chaveDeSessao`. Um casal abre a proposta uma
-        vez; ela abre e recarrega isto dezenas de vezes por dia, e um segundo
-        de cortina a cada recarga deixava de ser marca e passava a ser um
-        imposto sobre o trabalho dela. Assim vê-se uma vez por separador — à
-        ENTRADA, que é o que ela pediu — e não outra vez a cada F5.
-      */}
-      <Cortina locale={normalizeLocale(lang)} chaveDeSessao="cortina:back-office" />
+    <main id="conteudo" data-admin-mode className="flex-1">
       {children}
     </main>
   );

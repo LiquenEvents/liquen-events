@@ -89,10 +89,7 @@ describe("criar e ler", () => {
   it("o que se guarda é o que se lê", async () => {
     const codigo = await criarLigacaoCurta("prop-1", "ped-1", AMANHA());
     expect(codigo).not.toBeNull();
-    expect((await lerLigacaoCurta(codigo!))?.propostaId).toBe("prop-1");
-    // A data de criação sai daqui porque o corte de links precisa da idade
-    // deste endereço — morre o que foi emitido antes do corte.
-    expect(Date.parse((await lerLigacaoCurta(codigo!))!.criadaEm)).toBeGreaterThan(0);
+    expect(await lerLigacaoCurta(codigo!)).toEqual({ propostaId: "prop-1" });
   });
 
   it("um código que ninguém emitiu não abre nada", async () => {
@@ -131,7 +128,7 @@ describe("o endereço que vai no email", () => {
     expect(url.startsWith(`${SITE.url}/proposta/`)).toBe(true);
     const cauda = url.slice(`${SITE.url}/proposta/`.length);
     expect(pareceCodigoCurto(cauda)).toBe(true);
-    expect((await lerLigacaoCurta(cauda))?.propostaId).toBe("prop-1");
+    expect(await lerLigacaoCurta(cauda)).toEqual({ propostaId: "prop-1" });
   });
 
   /**

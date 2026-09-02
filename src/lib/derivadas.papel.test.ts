@@ -53,7 +53,6 @@ import {
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
   THEME_AVIF_BUCKET,
-  THEME_AVIF_MID_BUCKET,
   THEME_AVIF_MICRO_BUCKET,
   THEME_MID_BUCKET,
 } from "./theme-ref";
@@ -120,17 +119,13 @@ describe("a contagem separa a avaria do ganho", () => {
     const c = await contarDerivadasEmFalta();
 
     expect(c.fotos).toBe(3);
-    // Três fotos × SEIS derivadas de tema = dezoito em falta ao todo. Eram
-    // cinco até a de 1200 px em AVIF existir.
-    expect(c.emFalta).toBe(18);
+    // Três fotos × cinco derivadas de tema = quinze em falta ao todo…
+    expect(c.emFalta).toBe(15);
     // …das quais NOVE são essenciais — a miniatura de 400, o micro de 96 e a
     // de 1200 px, que é a que a página do casal mostra e que durante muito
     // tempo não era fabricada por lote nenhum.
     expect(c.emFaltaEssenciais).toBe(9);
-    // E NOVE são o ganho por cobrar: os mesmos três tamanhos em AVIF. Que este
-    // número suba sem o de cima subir é a prova de que uma família nova entrou
-    // como ganho e não como avaria.
-    expect(c.emFaltaLeves).toBe(9);
+    expect(c.emFaltaLeves).toBe(6);
     // Mas as FOTOGRAFIAS mal são três, e não seis: é este o número que se diz
     // em voz alta, e o que a versão anterior não sabia dizer.
     expect(c.fotosSemMiniatura).toBe(3);
@@ -147,14 +142,9 @@ describe("a contagem separa a avaria do ganho", () => {
 
     expect(c.fotosSemMiniatura).toBe(0);
     expect(c.emFaltaEssenciais).toBe(0);
-    // O ganho continua por cobrar, e é dito — SEM ser dado como avaria. Que o
-    // `emFaltaEssenciais` acima continue em zero é o que aqui interessa: a de
-    // 1200 em AVIF entrou como `leve`, e uma família nova não pode transformar
-    // uma biblioteca sã numa biblioteca avariada.
+    // O ganho continua por cobrar, e é dito — sem ser dado como avaria.
     expect(c.fotosSemVersaoLeve).toBe(2);
-    // Seis e não quatro: três alvos leves por fotografia (400, micro e 1200
-    // em AVIF), duas fotografias.
-    expect(c.emFaltaLeves).toBe(6);
+    expect(c.emFaltaLeves).toBe(4);
   });
 
   it("uma pasta sem nada em falta não gera linha nenhuma", async () => {
@@ -164,7 +154,6 @@ describe("a contagem separa a avaria do ganho", () => {
       THEME_MICRO_BUCKET,
       THEME_AVIF_BUCKET,
       THEME_AVIF_MICRO_BUCKET,
-      THEME_AVIF_MID_BUCKET,
       THEME_MID_BUCKET,
     ]) {
       st.conteudo[b] = new Set(["tema-a/f0.jpg"]);

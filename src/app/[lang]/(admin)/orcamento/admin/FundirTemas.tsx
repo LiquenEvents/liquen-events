@@ -275,7 +275,7 @@ export default function FundirTemas({
           {progress && (
             <div>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm text-[var(--bo-text)]">
+                <p className="text-sm text-foreground/80">
                   A juntar <strong className="font-medium">{progress.done}</strong>
                   {progress.total > 0 ? ` de ${plural(progress.total, "foto", "fotos")}` : " fotos"}
                   …
@@ -300,7 +300,7 @@ export default function FundirTemas({
 
           {error && !running && (
             <div className="rounded-lg border border-[#8a2a22]/20 bg-[#f6e6df]/40 px-3 py-2">
-              <p className="text-sm text-[var(--bo-text)]">{error}</p>
+              <p className="text-sm text-foreground/80">{error}</p>
               <p className="bo-text-muted mt-0.5 text-xs">
                 O que já passou está em “{dest?.name ?? "…"}”; o resto continua aqui. Podes tentar
                 outra vez.
@@ -342,7 +342,7 @@ export default function FundirTemas({
           placeholder="Procurar tema…"
           aria-label="Procurar tema de destino"
           disabled={running}
-          className="bo-input mb-3 px-3 py-2 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+          className="bo-input mb-3 px-3 py-2 text-sm text-foreground/80 placeholder-foreground/30"
         />
       )}
       {others.length === 0 ? (
@@ -384,7 +384,7 @@ export default function FundirTemas({
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-[var(--bo-text)]">{t.name}</span>
+                  <span className="block truncate text-sm text-foreground/85">{t.name}</span>
                   <span className="bo-text-muted block text-xs">{countLabel(t)}</span>
                 </span>
               </button>

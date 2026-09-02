@@ -190,14 +190,14 @@ export default function PreviaDaPagina({
           {TXT.sobretitulo.texto}
         </p>
         <p
-          className="absolute truncate font-display-italico text-[var(--bo-text)]"
+          className="absolute truncate font-serif italic text-foreground/85"
           style={estiloDaLinha(TXT.titulo)}
         >
           {titulo?.trim() || "sem título"}
         </p>
         {subtitulo?.trim() && (
           <p
-            className="absolute truncate font-display-italico text-foreground/50"
+            className="absolute truncate font-serif italic text-foreground/50"
             style={estiloDaLinha(TXT.subtitulo)}
           >
             {subtitulo}
@@ -222,7 +222,7 @@ export default function PreviaDaPagina({
 
         {legenda?.trim() && (
           <p
-            className="absolute overflow-hidden font-display-italico text-foreground/50"
+            className="absolute overflow-hidden font-serif italic text-foreground/50"
             style={{
               // A ÚLTIMA linha sai sempre à mesma altura — a `folga` acima da
               // margem — e as anteriores empilham-se para cima, tal como o

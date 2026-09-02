@@ -157,7 +157,7 @@ export function CuradoriaDeFotos({
     const incluidas = historico.filter((d) => d.incluida);
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-5 py-8 text-center">
-        <p className="font-display text-lg text-[var(--bo-text)]">
+        <p className="font-display text-lg text-foreground/85">
           {incluidas.length === 0
             ? "Passaste por todas e não escolheste nenhuma."
             : `Escolheste ${incluidas.length} ${incluidas.length === 1 ? "foto" : "fotos"}.`}

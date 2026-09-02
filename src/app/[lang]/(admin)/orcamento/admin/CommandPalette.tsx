@@ -197,7 +197,7 @@ export default function CommandPalette({
             aria-controls={listaId}
             aria-autocomplete="list"
             aria-activedescendant={results.length > 0 ? idDaOpcao(active) : undefined}
-            className="flex-1 bg-transparent text-[15px] text-[var(--bo-text)] placeholder-foreground/35 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] text-foreground/90 placeholder-foreground/35 focus:outline-none"
           />
           {/* FECHAR: uma tecla em quem tem teclado, um botão em quem não tem.
               Aqui só havia a etiqueta "ESC". Num telemóvel isso é uma
@@ -300,7 +300,7 @@ export default function CommandPalette({
                       </span>
                       <span
                         className={`min-w-0 flex-1 truncate text-sm ${
-                          isActive ? "font-medium text-[#4d6350]" : "text-[var(--bo-tinta-72)]"
+                          isActive ? "font-medium text-[#4d6350]" : "text-foreground/75"
                         }`}
                       >
                         {c.label}
@@ -329,22 +329,13 @@ export default function CommandPalette({
             para ver os resultados. */}
         <div className="pointer-coarse:hidden flex items-center gap-4 border-t border-[var(--bo-hairline)] px-4 py-2.5 text-[11px] text-foreground/45">
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
-              ↑↓
-            </kbd>{" "}
-            navegar
+            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">↑↓</kbd> navegar
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
-              ↵
-            </kbd>{" "}
-            abrir
+            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">↵</kbd> abrir
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
-              esc
-            </kbd>{" "}
-            fechar
+            <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">esc</kbd> fechar
           </span>
         </div>
       </div>

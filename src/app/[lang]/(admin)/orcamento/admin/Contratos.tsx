@@ -259,7 +259,7 @@ export default function Contratos() {
   return (
     <div>
       {/* One calm line saying what this screen is for */}
-      <p className="mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+      <p className="mb-6 text-sm leading-relaxed text-foreground/55">
         Cada contrato é a prova de que o cliente aceitou a proposta. Aparecem aqui automaticamente,
         com a data e o nome de quem aceitou.
       </p>
@@ -287,7 +287,7 @@ export default function Contratos() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Procurar por cliente ou referência…"
               aria-label="Procurar contratos"
-              className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+              className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
             />
           </div>
         }
@@ -416,7 +416,7 @@ export default function Contratos() {
             {emTabela && aberto && (
               <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-medium text-[var(--bo-text)]">
+                  <p className="truncate text-sm font-medium text-foreground/80">
                     {aberto.clientName || "—"}
                   </p>
                   <Button size="sm" variant="ghost" onClick={() => setExpanded(null)}>
@@ -441,17 +441,17 @@ function ContractDetails({ c }: { c: Contract }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mb-4">
         <div>
           <p className="bo-eyebrow text-foreground/40 mb-1">Proposta</p>
-          <p className="text-[var(--bo-text-muted)] font-mono text-[11px] break-all">
+          <p className="text-foreground/60 font-mono text-[11px] break-all">
             {c.proposalId || "—"}
           </p>
         </div>
         <div>
           <p className="bo-eyebrow text-foreground/40 mb-1">Criado em</p>
-          <p className="text-[var(--bo-text-muted)]">{fmtDateTime(c.createdAt)}</p>
+          <p className="text-foreground/60">{fmtDateTime(c.createdAt)}</p>
         </div>
         <div>
           <p className="bo-eyebrow text-foreground/40 mb-1">Versão dos termos</p>
-          <p className="text-[var(--bo-text-muted)]">Versão {c.termsVersion}</p>
+          <p className="text-foreground/60">Versão {c.termsVersion}</p>
         </div>
         {/* IP é dado de auditoria — discreto, não em destaque. */}
         <div>
@@ -463,7 +463,7 @@ function ContractDetails({ c }: { c: Contract }) {
       </div>
       <p className="bo-eyebrow text-foreground/40 mb-2">Termos aceites (cópia guardada)</p>
       <div className="max-h-72 overflow-y-auto rounded-lg border border-[var(--bo-hairline-strong)] bg-white p-4">
-        <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-[var(--bo-text-muted)]">
+        <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-foreground/60">
           {c.termsSnapshot || "Sem cópia dos termos guardada."}
         </pre>
       </div>
@@ -485,7 +485,7 @@ function PdfDoContrato({ id }: { id: string }) {
       href={`/api/contratos/${id}/pdf`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/80"
       title="Descarregar contrato em PDF"
     >
       PDF
@@ -520,7 +520,7 @@ function CartaoDeContrato({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-medium text-[var(--bo-text)]" title={c.clientName}>
+          <p className="truncate font-medium text-foreground/80" title={c.clientName}>
             {c.clientName || "—"}
           </p>
           {c.clientEmail && (
@@ -583,7 +583,7 @@ function colunasDeContratos({
       ordenar: (a, b) => (a.clientName || "").localeCompare(b.clientName || "", "pt"),
       celula: (c) => (
         <span className="block">
-          <span className="block max-w-[200px] truncate font-medium text-[var(--bo-text)]">
+          <span className="block max-w-[200px] truncate font-medium text-foreground/80">
             {c.clientName || "—"}
           </span>
           {c.clientEmail && (
@@ -624,7 +624,7 @@ function colunasDeContratos({
       cabecalho: "Aceite por",
       celula: (c) => (
         <span
-          className="block max-w-[160px] truncate text-[var(--bo-text-muted)]"
+          className="block max-w-[160px] truncate text-foreground/65"
           title={c.acceptedName ?? undefined}
         >
           {c.acceptedName || "—"}

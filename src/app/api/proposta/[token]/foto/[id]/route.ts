@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { propostaDoLink } from "@/lib/proposta-do-link";
-import { inventarioDeFotos, marcaDaRef } from "@/lib/proposta-fotos";
+import { inventarioDeFotos } from "@/lib/proposta-fotos";
 import { derivadaMediaAPedido } from "@/lib/derivadas";
 import { fetchProposalImageBytes } from "@/lib/proposal-storage";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
@@ -80,27 +80,6 @@ export async function GET(
     const finais = bytes ?? (await fetchProposalImageBytes(entrada.ref));
     if (!finais) return new NextResponse(null, { status: 404 });
 
-    /**
-     * ── O ENDEREÇO DIZ QUAL FOTOGRAFIA É, OU NÃO PROMETE UM DIA ───────────
-     *
-     * O `id` é POSICIONAL (`b0f2` é «a terceira do primeiro mood board») e o
-     * mesmo link salta para a revisão mais recente (o `maisRecente`, em
-     * `proposta-do-link.ts`). Portanto o mesmo endereço, amanhã, pode ser
-     * outra fotografia — e guardá-lo um dia no telemóvel do casal mostrava-lhe
-     * a antiga depois de ela rever o board.
-     *
-     * Quem desenha põe agora a `marca` no endereço (ver `endereco-da-foto.ts`).
-     * Se ela bate certo com a fotografia que este documento tem AGORA neste
-     * lugar, o endereço identifica-a de facto, e o dia de cache é honesto: uma
-     * fotografia revista é um endereço novo, que o navegador não tem.
-     *
-     * Se não vier, ou não bater, não se sabe de que fotografia o endereço
-     * falava — cinco minutos, que é o que se pode prometer sem mentir. A
-     * fotografia sai à mesma: um endereço sem marca continua a funcionar.
-     */
-    const marcaPedida = new URL(request.url).searchParams.get("v");
-    const identifica = marcaPedida !== null && marcaPedida === marcaDaRef(entrada.ref);
-
     return new NextResponse(new Uint8Array(finais), {
       headers: {
         // As derivadas saem em WebP desde a Fase 1 da biblioteca (ver `FORMATO`
@@ -115,16 +94,11 @@ export async function GET(
          * proxy de uma empresa) não a pode guardar para servir a quem pedir o
          * mesmo caminho — é a mesma regra da página e do PDF.
          *
-         * E NUNCA `immutable`, mesmo com a marca certa: os bytes deste
-         * endereço mudam uma vez, e de propósito. À primeira visita a derivada
-         * ainda não existe e serve-se o ORIGINAL; ela é fabricada e guardada
-         * nessa mesma volta, e a partir daí o mesmo endereço serve o WebP, que
-         * é dez vezes mais leve. `immutable` prendia o casal ao ficheiro
-         * pesado — a promessa que dava jeito era exactamente a errada.
+         * `immutable` porque o conteúdo de um `id` dentro de um documento não
+         * muda: se ela trocar a fotografia, muda o DOCUMENTO, e a versão nova
+         * é outra proposta. O navegador do casal guarda-a e não volta a pedir.
          */
-        "Cache-Control": identifica
-          ? "private, max-age=86400, must-revalidate"
-          : "private, max-age=300, must-revalidate",
+        "Cache-Control": "private, max-age=86400, immutable",
       },
     });
   } catch (err) {

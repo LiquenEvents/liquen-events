@@ -258,7 +258,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                       type="button"
                       onClick={() => void guardarMotivo(m)}
                       disabled={motivoAGravar !== null}
-                      className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30`}
+                      className={`${botao} border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-foreground/30`}
                     >
                       {motivoAGravar === m ? "A guardar…" : NOME_DO_MOTIVO[m]}
                     </button>
@@ -270,7 +270,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                   maxLength={300}
                   onChange={(e) => setNotaMotivo(e.target.value)}
                   placeholder="Detalhe opcional…"
-                  className="bo-input px-2.5 py-2 text-sm text-[var(--bo-text)]"
+                  className="bo-input px-2.5 py-2 text-sm text-foreground/80"
                 />
               </div>
             ))}
@@ -296,7 +296,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                   if (e.key === "Escape") setFase({ tipo: "pergunta" });
                 }}
                 placeholder="Ex.: 4.600"
-                className="bo-input px-2.5 py-2 text-sm text-[var(--bo-text)]"
+                className="bo-input px-2.5 py-2 text-sm text-foreground/80"
               />
             </label>
             <button
@@ -318,7 +318,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                 setAviso(null);
                 setFase({ tipo: "pergunta" });
               }}
-              className={`${botao} border-transparent text-foreground/45 hover:text-[var(--bo-tinta-72)]`}
+              className={`${botao} border-transparent text-foreground/45 hover:text-foreground/70`}
             >
               Cancelar
             </button>
@@ -333,9 +333,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`text-[var(--bo-text-muted)] ${compacto ? "text-[11px]" : "text-sm"} mr-1`}
-          >
+          <span className={`text-foreground/55 ${compacto ? "text-[11px]" : "text-sm"} mr-1`}>
             Já responderam?
           </span>
           <button
@@ -353,7 +351,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
             type="button"
             disabled={fase.tipo === "a-gravar"}
             onClick={() => void marcar("perdido")}
-            className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/35 hover:text-[var(--bo-text)]`}
+            className={`${botao} border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-foreground/35 hover:text-foreground/80`}
           >
             Perdido
           </button>

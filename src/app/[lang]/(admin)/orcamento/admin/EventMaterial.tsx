@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import type { EventMaterial, EventMaterialItem } from "@/lib/event-material-types";
-import { quandoGravado } from "@/lib/quando-gravado";
 import { progresso } from "@/lib/event-material-types";
 import { useToast } from "./Toast";
 import { Button, PerguntaDestrutiva, SectionCard } from "./ui";
@@ -226,34 +225,6 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
   const { itens } = dados;
   const p = useMemo(() => progresso(itens), [itens]);
 
-  /**
-   * ══════════════════════════════════════════════════════════════════════════
-   * QUEM FECHOU A CARRINHA, E A QUE HORAS
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * O `loadedBy` é gravado desde sempre: quem marca um item fica com o nome ao
-   * lado da marca, viaja para a base de dados, entra na cópia de segurança —
-   * e NÃO ERA LIDO EM LADO NENHUM. O selo do escritório dizia «Carrinha
-   * carregada» e mais nada.
-   *
-   * É a diferença entre um registo e um reconhecimento. Alguém encheu aquela
-   * carrinha às seis e doze da manhã, e o produto sabia — só não dizia.
-   *
-   * O ÚLTIMO a ser marcado é quem fechou: a carrinha fica pronta quando a
-   * última coisa entra. Se várias pessoas carregaram, é o nome de quem rematou
-   * — e é esse que responde à pergunta «já saiu?».
-   */
-  const fechou = useMemo(() => {
-    let ultimo: { quando: string; quem?: string } | null = null;
-    for (const i of itens) {
-      if (!i.loadedAt) continue;
-      if (!ultimo || i.loadedAt > ultimo.quando) {
-        ultimo = { quando: i.loadedAt, quem: i.loadedBy };
-      }
-    }
-    return ultimo;
-  }, [itens]);
-
   const porCategoria = useMemo(() => {
     const mapa = new Map<string, EventMaterialItem[]>();
     for (const i of itens) {
@@ -334,18 +305,11 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
             checklist era uma coluna morta. */}
         {dados.evento?.status === "carregada" && (
           <span className="rounded-full bg-[#4d6350]/12 px-2 py-0.5 text-[11px] font-medium text-[#4d6350]">
-            {/* O nome e a hora quando se sabem — e o selo de sempre quando não.
-                Um carregamento antigo, de antes de isto ser gravado, não pode
-                passar a dizer «carregada por undefined». */}
-            {fechou?.quem
-              ? `Carrinha carregada por ${fechou.quem}, às ${quandoGravado(fechou.quando)}`
-              : fechou
-                ? `Carrinha carregada às ${quandoGravado(fechou.quando)}`
-                : "Carrinha carregada"}
+            Carrinha carregada
           </span>
         )}
         {dados.evento?.status === "devolvida" && (
-          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-text-muted)]">
+          <span className="rounded-full bg-[var(--bo-tinta-6)] px-2 py-0.5 text-[11px] font-medium text-foreground/60">
             Material devolvido
           </span>
         )}
@@ -365,7 +329,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
         <div className="mt-4 space-y-4">
           {porCategoria.map(([categoria, linhas]) => (
             <div key={categoria}>
-              <p className="mb-1.5 text-[11px] tracking-[0.14em] text-[var(--bo-text-muted)] uppercase">
+              <p className="mb-1.5 text-[11px] tracking-[0.14em] text-foreground/55 uppercase">
                 {categoria}
               </p>
               <ul className="divide-y divide-[var(--bo-hairline)]">

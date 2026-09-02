@@ -12,25 +12,13 @@ const H = vi.hoisted(() => ({
   originais: new Map<string, string>(),
   miniaturas: new Map<string, string>(),
   medias: new Map<string, string>(),
-  mediasAvif: new Map<string, string>(),
   pedidosOriginais: [] as string[][],
   pedidosMiniaturas: [] as string[][],
   pedidosMedias: [] as string[][],
-  pedidosMediasAvif: [] as string[][],
-  guardados: new Map<string, Record<string, string>>(),
-  gravados: new Map<string, Record<string, string>>(),
 }));
 
 vi.mock("server-only", () => ({}));
-/**
- * O módulo das ASSINATURAS, e não o `proposal-storage`.
- *
- * Mudaram de casa para o `sharp` sair do grafo da página que o casal abre — o
- * porquê está no `proposal-assinaturas.ts`. Se este caminho voltar a ser o
- * antigo, o `proposta-fotos` deixa de estar simulado e passa a assinar contra
- * o Supabase a sério: os casos abaixo ficariam verdes por não medirem nada.
- */
-vi.mock("@/lib/proposal-assinaturas", () => ({
+vi.mock("@/lib/proposal-storage", () => ({
   signProposalPaths: vi.fn(async (paths: string[]) => {
     H.pedidosOriginais.push([...paths]);
     return new Map(paths.filter((p) => H.originais.has(p)).map((p) => [p, H.originais.get(p)!]));
@@ -42,30 +30,6 @@ vi.mock("@/lib/proposal-assinaturas", () => ({
   signProposalMids: vi.fn(async (paths: string[]) => {
     H.pedidosMedias.push([...paths]);
     return new Map(paths.filter((p) => H.medias.has(p)).map((p) => [p, H.medias.get(p)!]));
-  }),
-  /**
-   * A oferta em AVIF da mesma de 1200 px.
-   *
-   * `H.mediasAvif` VAZIO por omissão, de propósito: é o caso normal de tudo o
-   * que foi carregado antes de o bucket existir, e o que se quer provar na
-   * maioria destes passeios é que a ausência não estraga nada.
-   */
-  signProposalMidsAvif: vi.fn(async (paths: string[]) => {
-    H.pedidosMediasAvif.push([...paths]);
-    return new Map(paths.filter((p) => H.mediasAvif.has(p)).map((p) => [p, H.mediasAvif.get(p)!]));
-  }),
-}));
-/**
- * O armazém dos endereços guardados, encenado.
- *
- * `guardados` é o que a base já tinha; `gravados` é o que esta execução lá pôs.
- * É com estes dois que se prova a coisa toda: que a segunda visita não assina
- * nada, e que o que se assinou na primeira ficou lá.
- */
-vi.mock("@/lib/urls-assinados", () => ({
-  urlsGuardados: vi.fn(async () => H.guardados),
-  guardarUrls: vi.fn(async (novos: Map<string, Record<string, string>>) => {
-    H.gravados = novos;
   }),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
@@ -90,8 +54,6 @@ beforeEach(() => {
   H.pedidosOriginais.length = 0;
   H.pedidosMiniaturas.length = 0;
   H.pedidosMedias.length = 0;
-  H.pedidosMediasAvif.length = 0;
-  H.mediasAvif.clear();
   H.originais.clear();
   H.miniaturas.clear();
   H.medias.clear();
@@ -242,123 +204,5 @@ describe("a forma da fotografia, quando se sabe", () => {
     expect(fotos.find((f) => f.id === "b0f0")).toMatchObject({ largura: 1600, altura: 900 });
     // E quem não tem linha na tabela não inventa forma nenhuma.
     expect(fotos.find((f) => f.id === "c0")?.largura).toBeUndefined();
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * REABRIR A PROPOSTA NÃO VOLTA A DESCARREGAR AS FOTOGRAFIAS TODAS
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Palavras dela: «caso as pessoas vão ver as propostas outra vez no email, mas
- * já esteja muito mais rápido».
- *
- * Isto assinava tudo a cada visita, e o Supabase devolve um token novo de cada
- * vez — portanto o endereço mudava sempre. A chave da cache do navegador inclui
- * o endereço inteiro: para o telemóvel, o mesmo ficheiro com outro endereço é
- * OUTRA fotografia. As fotografias estão gravadas com validade de um ano, e
- * esse ano nunca valia nada.
- *
- * Numa proposta de 46 fotografias isso são 6,6 a 9,2 MB descarregados outra
- * vez, sempre. É a explicação inteira do «reabrir é tão lento como abrir».
- */
-describe("os endereços das fotografias não mudam a cada visita", () => {
-  beforeEach(() => {
-    H.guardados = new Map();
-    H.gravados = new Map();
-  });
-
-  it("O QUE ISTO EXISTE PARA FAZER: a segunda visita não assina nada", async () => {
-    // Primeira visita: assina-se tudo, e o que se assinou fica guardado.
-    const primeira = await fotosDaProposta(DOC);
-    expect(H.gravados.size, "a primeira visita não guardou nada").toBeGreaterThan(0);
-
-    // A base passa a ter o que a primeira visita lá pôs.
-    H.guardados = H.gravados;
-    H.pedidosOriginais = [];
-    H.pedidosMiniaturas = [];
-    H.pedidosMedias = [];
-    H.pedidosMediasAvif = [];
-
-    const segunda = await fotosDaProposta(DOC);
-
-    /**
-     * ── O QUE SE PEDE NA SEGUNDA VISITA, E PORQUÊ ──────────────────────────
-     *
-     * A primeira versão deste caso exigia ZERO assinaturas, e estava errada —
-     * era o teste, não o código.
-     *
-     * Uma fotografia que não TEM ficheiro num balde (a `sem-miniatura`, aqui de
-     * propósito) nunca recebe endereço nenhum para essa família, portanto não há
-     * nada a guardar e volta a ser perguntada. E está certo que volte: é assim
-     * que a derivada é apanhada no dia em que passar a existir.
-     *
-     * O que se ganha é o que interessa: as que JÁ têm endereço guardado saem da
-     * pergunta. E como as assinaturas vão em lote, o custo de uma fotografia em
-     * falta é uma ida ao armazenamento — não quarenta e seis.
-     */
-    const caminhoDe = (ref: string) => ref.replace(/^tema:/, "");
-    for (const [familia, pedidos] of [
-      ["original", H.pedidosOriginais],
-      ["miniatura", H.pedidosMiniaturas],
-      ["media", H.pedidosMedias],
-      ["mediaAvif", H.pedidosMediasAvif],
-    ] as const) {
-      const jaTinham = pedidos.flat().filter((ref) => H.guardados.get(caminhoDe(ref))?.[familia]);
-      expect(
-        jaTinham,
-        `voltou a assinar «${familia}» de fotografias que JÁ tinham endereço guardado — ` +
-          "o telemóvel vai descarregar tudo outra vez",
-      ).toEqual([]);
-    }
-
-    // E os endereços são OS MESMOS, que é o que faz a cache do telemóvel valer.
-    expect(
-      segunda.map((f) => f.miniatura),
-      "os endereços mudaram entre visitas: para o navegador são fotografias novas",
-    ).toEqual(primeira.map((f) => f.miniatura));
-    expect(segunda.map((f) => f.media)).toEqual(primeira.map((f) => f.media));
-  });
-
-  it("uma família em falta assina-se sozinha, sem arrastar as outras", async () => {
-    // O caso de uma fotografia que ganhou derivada AVIF depois de já ter sido
-    // assinada: assina-se só essa família, e não tudo de novo.
-    await fotosDaProposta(DOC);
-    const semAvif = new Map(
-      [...H.gravados].map(([c, fam]) => {
-        const resto = { ...fam };
-        delete resto.mediaAvif;
-        return [c, resto] as const;
-      }),
-    );
-    H.guardados = new Map(semAvif);
-    H.pedidosOriginais = [];
-    H.pedidosMiniaturas = [];
-    H.pedidosMediasAvif = [];
-
-    await fotosDaProposta(DOC);
-
-    // A `sem-miniatura` está sempre em falta e volta sempre — ver o caso acima.
-    const jaTinha = (pedidos: string[][], familia: string) =>
-      pedidos.flat().filter((ref) => H.guardados.get(ref.replace(/^tema:/, ""))?.[familia]);
-    expect(jaTinha(H.pedidosOriginais, "original"), "reassinou originais que já tinha").toEqual([]);
-    expect(jaTinha(H.pedidosMiniaturas, "miniatura"), "reassinou miniaturas que já tinha").toEqual(
-      [],
-    );
-    expect(H.pedidosMediasAvif.flat().length, "não foi assinar a família em falta").toBeGreaterThan(
-      0,
-    );
-  });
-
-  it("sem nada guardado, comporta-se exactamente como antes", async () => {
-    // A rede por baixo: uma base sem a coluna, ou uma leitura que falhe,
-    // devolvem um mapa vazio — e aí assina-se tudo, como sempre se fez.
-    H.guardados = new Map();
-    const fotos = await fotosDaProposta(DOC);
-
-    expect(H.pedidosMiniaturas.flat().length).toBeGreaterThan(0);
-    expect(fotos.find((f) => f.id === "c0")?.miniatura).toBe(
-      "https://storage.example/mini:ped-42/capa.jpg?token=X",
-    );
   });
 });

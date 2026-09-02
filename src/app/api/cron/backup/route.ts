@@ -6,10 +6,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { sendMail, MAIL_TO } from "@/lib/mail";
 import { construirManifesto, type ManifestoDeFotografias } from "@/lib/manifesto-de-fotografias";
 import { registarCopiaEnviada } from "@/lib/copia-de-seguranca-marcador";
-import { correrRetencao } from "@/lib/retencao";
-import { listQuotes } from "@/lib/quotes-store";
 import { log } from "@/lib/logger";
-import type { aquecerPdfsEmFalta } from "@/lib/aquecimento-de-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,11 +110,6 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
-
-  // O relógio desta função, para o aquecimento dos PDF lá em baixo saber
-  // quanto tempo lhe sobra. `maxDuration` é 60 s e a cópia é o que não pode
-  // faltar; ver a nota no fim.
-  const arrancou = Date.now();
 
   try {
     const payload = await buildBackupPayload();
@@ -224,76 +216,6 @@ export async function GET(request: NextRequest) {
      */
     await registarCopiaEnviada({ bytes: comprimido.byteLength, parcial, modo: "automatica" });
 
-    /**
-     * ══════════════════════════════════════════════════════════════════════
-     * E SÓ AGORA A RETENÇÃO DOS 12 MESES
-     * ══════════════════════════════════════════════════════════════════════
-     *
-     * A política de privacidade publicada promete que «pedidos que não deem
-     * origem a contrato são eliminados no prazo máximo de 12 meses após o
-     * último contacto». Não havia nada a fazê-lo: dois trabalhos automáticos,
-     * e nenhum apagava seja o que for.
-     *
-     * ── PORQUE É QUE VIVE AQUI DENTRO ───────────────────────────────────
-     *
-     * Não é para poupar um ficheiro. É a ORDEM: a cópia já foi enviada quando
-     * isto corre, portanto **nada é apagado sem estar dentro da cópia desse
-     * mesmo dia**. Um trabalho à parte podia correr antes, ou num dia em que a
-     * cópia falhasse, e aí um apagamento correcto passava a ser uma perda.
-     *
-     * E há a razão prática: esta casa já teve um deploy RECUSADO por assumir
-     * um plano de alojamento que não tinha (ver `agendamento.contrato.test.ts`
-     * — «assumi mal, e só o deploy é que mo disse»). Um terceiro agendamento é
-     * uma aposta nesse mesmo plano; esta linha não é.
-     *
-     * ── E NUNCA PODE DEITAR A CÓPIA ABAIXO ──────────────────────────────
-     *
-     * A cópia de segurança é a razão de ser deste trabalho e já foi feita. Se
-     * a retenção falhar, isso regista-se e a resposta continua a dizer que a
-     * cópia seguiu — porque seguiu. Trocar uma cópia bem-sucedida por um 500
-     * por causa da limpeza seria vender o essencial pelo acessório.
-     */
-    let retencao: Awaited<ReturnType<typeof correrRetencao>> | null = null;
-    try {
-      retencao = await correrRetencao(await listQuotes());
-    } catch (e) {
-      log.error("cron backup: a retenção falhou (a cópia seguiu na mesma)", e, { dia });
-    }
-
-    /**
-     * ══════════════════════════════════════════════════════════════════════
-     * E, COM O TEMPO QUE SOBRAR, OS PDF DAS PROPOSTAS JÁ ENVIADAS
-     * ══════════════════════════════════════════════════════════════════════
-     *
-     * A pergunta dela: «mesmo nas propostas em que já enviamos (…) se também
-     * vai acontecer nestas propostas que já enviamos». Para tudo o resto a
-     * resposta é sim sem se fazer nada. O PDF é a excepção — o ficheiro é
-     * guardado no ENVIO, portanto as propostas anteriores a isso, e as que
-     * ficaram órfãs quando a chave mudou a 26/08, não têm nenhum. O primeiro
-     * casal a carregar no botão paga o desenho inteiro.
-     *
-     * Aqui desenha-se de noite o que falta, para ninguém o pagar de dia. A
-     * razão de viver dentro deste trabalho, e não num agendamento novo, está
-     * no `aquecimento-de-pdf.ts`: um terceiro agendamento é uma aposta no
-     * plano de alojamento, e esta casa já teve um deploy recusado por isso.
-     *
-     * ── E NUNCA PODE DEITAR A CÓPIA ABAIXO ──────────────────────────────
-     *
-     * Mesma regra da retenção, e pela mesma razão: a cópia já seguiu quando
-     * isto corre. Se o aquecimento falhar, regista-se e a resposta continua a
-     * dizer que a cópia seguiu — porque seguiu. O `aquecerPdfsEmFalta` já não
-     * lança; o `try` é o cinto por cima dos suspensórios, e o `import()`
-     * mantém o desenhador fora do arranque das noites em que não há nada a
-     * fazer.
-     */
-    let aquecimento: Awaited<ReturnType<typeof aquecerPdfsEmFalta>> | null = null;
-    try {
-      const { aquecerPdfsEmFalta } = await import("@/lib/aquecimento-de-pdf");
-      aquecimento = await aquecerPdfsEmFalta(Date.now() - arrancou);
-    } catch (e) {
-      log.error("cron backup: o aquecimento dos PDF falhou (a cópia seguiu na mesma)", e, { dia });
-    }
-
     log.info("cron backup enviado", {
       dia,
       bytes: comprimido.byteLength,
@@ -314,8 +236,6 @@ export async function GET(request: NextRequest) {
             completo: fotos.manifesto.completo,
           }
         : null,
-      retencao,
-      aquecimento,
     });
   } catch (err) {
     log.error("cron backup falhou", err);

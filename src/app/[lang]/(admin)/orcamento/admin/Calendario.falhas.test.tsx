@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
@@ -89,26 +89,15 @@ function montar() {
   return screen.findByLabelText(/Remover Reunião: Prova de bolo/);
 }
 
-/**
- * Remover uma marcação deixou de ser um clique: passa pela pergunta da casa,
- * em vez do `confirm()` do browser — que num alvo de 9 px é onde a pergunta
- * mais falta faz. O que estes testes medem não muda; muda o caminho até lá.
- */
-async function removerMesmo(user: ReturnType<typeof userEvent.setup>, alvo: HTMLElement) {
-  await user.click(alvo);
-  const caixa = await screen.findByRole("dialog");
-  await user.click(within(caixa).getByRole("button", { name: /^Remover$/ }));
-}
-
 describe("Calendário — uma remoção que o servidor recusa", () => {
   it("a marcação que foi mesmo apagada não regressa ao calendário", async () => {
     const user = userEvent.setup();
     const prova = await montar();
 
     // A remoção lenta da prova parte primeiro…
-    await removerMesmo(user, prova);
+    await user.click(prova);
     // … e, à espera dela, o ensaio é removido com sucesso.
-    await removerMesmo(user, screen.getByLabelText(/Remover Evento: Ensaio geral/));
+    await user.click(screen.getByLabelText(/Remover Evento: Ensaio geral/));
     await waitFor(() => expect(screen.queryByLabelText(/Ensaio geral/)).not.toBeInTheDocument());
 
     // Só agora o servidor recusa a primeira.
@@ -125,7 +114,7 @@ describe("Calendário — uma remoção que o servidor recusa", () => {
     const user = userEvent.setup();
     const prova = await montar();
 
-    await removerMesmo(user, prova);
+    await user.click(prova);
     recusarAProva();
 
     const aviso = await screen.findByText(/não está a aceitar gravações/);

@@ -150,7 +150,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
           }
         }}
         placeholder="Adicionar etiqueta e Enter…"
-        className="bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22"
+        className="bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22"
         list={`tag-suggestions-${quote.id}`}
       />
       {open.length > 0 && (
@@ -159,7 +159,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
             <button
               key={s}
               onClick={() => add(s)}
-              className="px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] transition-colors"
+              className="px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-foreground/70 transition-colors"
             >
               + {s}
             </button>

@@ -319,30 +319,20 @@ export default async function ProposalPage({
     String(proposal.clientName ?? "")
       .trim()
       .split(/\s+/)[0] ?? "";
+  const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
 
   /**
-   * ── E CUMPRIMENTAM-SE OS DOIS, NÃO UM ────────────────────────────────────
+   * A frase de intenção, na língua da proposta.
    *
-   * Palavras dela: «em vez de dizer Olá x diga o nome dos dois noivos».
-   *
-   * Isto dizia `Olá, {primeira palavra do nome do cliente}` — e o nome do
-   * cliente é o de QUEM PEDIU o orçamento. Numa proposta de casamento há duas
-   * pessoas, e cumprimentar só uma delas, em Playfair a 52 px, na primeira
-   * linha que o casal lê, é dizer-lhes que o documento é para um deles.
-   *
-   * `doc.clientNames` é o campo que ela própria escreve no estúdio e que o
-   * documento já mostra como «NOIVOS» mais abaixo — «Lola e João», na forma que
-   * ela escolheu. Usar esse texto é usar a autoria dela em vez de inventar uma
-   * junção a partir de dois campos.
-   *
-   * A cascata mantém as guardas que já existiam, e pela mesma razão: sem os
-   * dois nomes cai-se no primeiro nome de quem pediu, e sem nome nenhum
-   * cumprimenta-se na mesma — «Olá.» — que é uma frase inteira e não denuncia
-   * que falta ali um campo.
+   * A caixa inglesa vazia cai para o português, como tudo o resto neste
+   * documento (ver `proposal-doc-bilingue.ts`): uma proposta inglesa com a
+   * abertura em branco era um buraco no sítio mais visível da página.
    */
-  const nomesDoCasal = String(proposal.doc?.clientNames ?? "").trim();
-  const aQuemSeFala = nomesDoCasal || primeiroNome;
-  const saudacao = aQuemSeFala ? `${t.greeting}, ${aQuemSeFala}.` : `${t.greeting}.`;
+  const intencao = (
+    (locale === "en" ? proposal.doc?.intencaoEn?.trim() : "") ||
+    proposal.doc?.intencao?.trim() ||
+    ""
+  ).trim();
 
   /**
    * AS FOTOGRAFIAS, ASSINADAS AQUI E NÃO POR UM PEDIDO DO NAVEGADOR.
@@ -361,34 +351,6 @@ export default async function ProposalPage({
    * endereços e a página desenha o documento na mesma, sem a galeria — o casal
    * continua a ler a proposta e a poder abrir o PDF.
    */
-  /**
-   * ── AS DUAS LEITURAS QUE FALTAM NÃO DEPENDEM UMA DA OUTRA ──────────────────
-   *
-   * «Tem que ser ultra rápido abrir a proposta, tanto online como a do PDF.»
-   *
-   * Daqui para baixo faltavam duas idas ao servidor: as fotografias (assinar os
-   * endereços do Storage) e o PEDIDO (o que o casal já escolheu). Estavam em
-   * fila — a segunda só partia quando a primeira voltasse —, e nenhuma delas
-   * precisa do resultado da outra: as duas só precisam da proposta, que já foi
-   * lida acima.
-   *
-   * Em fila, a página espera a soma. Juntas, espera a maior das duas. Num
-   * telemóvel em 4G, onde o que custa é a ida e a volta e não o trabalho do
-   * outro lado, é uma volta inteira que desaparece de todas as aberturas.
-   *
-   * O `.catch` fica preso à promessa no instante em que ela nasce, e não no
-   * `await`: uma promessa que rebenta antes de alguém a esperar é uma rejeição
-   * sem dono, e essas derrubam o processo em vez de desenharem a página sem as
-   * marcas — que é o pior caso honesto e está escrito aqui em baixo.
-   */
-  const pedidoDasEscolhas =
-    (proposal.doc?.escolhas ?? []).length > 0 && (proposal.quoteId ?? "").trim()
-      ? getQuote(proposal.quoteId!.trim()).catch((e) => {
-          log.warn("proposta: não deu para ler as escolhas do casal", { erro: e });
-          return null;
-        })
-      : Promise.resolve(null);
-
   const fotos = proposal.doc ? await fotosDaProposta(proposal.doc) : [];
 
   /**
@@ -404,9 +366,16 @@ export default async function ProposalPage({
    * continuam a poder ser escolhidas e a escolha volta a seguir; o que não
    * acontece é a página inventar que não escolheram.
    */
-  const escolhido: Record<string, string> = {};
-  const pedidoDoCasal = await pedidoDasEscolhas;
-  for (const r of pedidoDoCasal?.escolhasDoCasal ?? []) escolhido[r.escolhaId] = r.opcaoId;
+  let escolhido: Record<string, string> = {};
+  if ((proposal.doc?.escolhas ?? []).length > 0 && (proposal.quoteId ?? "").trim()) {
+    try {
+      const pedido = await getQuote(proposal.quoteId.trim());
+      for (const r of pedido?.escolhasDoCasal ?? []) escolhido[r.escolhaId] = r.opcaoId;
+    } catch (e) {
+      log.warn("proposta: não deu para ler as escolhas do casal", { erro: e });
+      escolhido = {};
+    }
+  }
 
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
@@ -472,7 +441,7 @@ export default async function ProposalPage({
           `Documento` prende a prosa a `max-w-2xl` por dentro — cada coisa com
           a largura que lhe serve, em vez de uma só para as duas. Sem
           documento, a página fica exactamente como estava. */}
-      <div className={`prop-folha w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
+      <div className={`w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
         {/*
          * ── O QUE ESTAVA AQUI E SAIU ────────────────────────────────────
          *
@@ -493,29 +462,33 @@ export default async function ProposalPage({
           </h1>
           {/*
            * ══════════════════════════════════════════════════════════════
-           * A ABERTURA É O NOME DELES, E MAIS NADA
+           * A FRASE DELA, OU FRASE NENHUMA
            * ══════════════════════════════════════════════════════════════
            *
-           * Duas frases já viveram aqui, e as duas saíram.
+           * Palavras dela: «quero retirar isto de "veja com calma". quero que
+           * apareça apenas o nome do noivo e da noiva».
            *
-           * A primeira era da casa: «Preparámos esta proposta com todo o
-           * cuidado… Vejam com calma.» Palavras dela na altura: «quero retirar
-           * isto de "veja com calma". quero que apareça apenas o nome do noivo
-           * e da noiva». Era verdadeira e era de toda a gente — e é isso que
-           * estava mal debaixo de dois nomes próprios.
+           * A frase da casa («Preparámos esta proposta com todo o cuidado…
+           * Vejam com calma») era verdadeira e era de toda a gente — e é isso
+           * que estava mal debaixo de dois nomes próprios. O que a abertura
+           * tem para dizer é de quem é a proposta; uma frase que serve para
+           * qualquer casal não acrescenta nada a isso e afasta o botão.
            *
-           * A segunda foi a que a substituiu: uma «frase de intenção» escrita
-           * por ela, proposta a proposta, sobre o que tinha imaginado para
-           * aquele casamento. Também saiu, e por decisão dela: mandou a
-           * fotografia do parágrafo e escreveu «nao quero estes textos na
-           * proposta». Perguntei-lhe se era aquele texto ou o campo; respondeu
-           * «não quero o campo, ponto final».
+           * Quando ela escreveu uma frase para AQUELE casamento, essa fica —
+           * é dela e é específica, que é precisamente o contrário do que saiu.
+           * Maior e na serifada do documento: não é uma nota de boas-vindas,
+           * é a tese da proposta.
            *
-           * Fica o nome deles. O `h1` acima é a abertura inteira.
-           *
-           * A frase da casa continua a existir no EMAIL
-           * (`proposta-doc/route.ts`), onde um corpo só com dois nomes não se
-           * lê como uma mensagem. */}
+           * A da casa continua a existir no EMAIL (`proposta-doc/route.ts`),
+           * onde um corpo só com dois nomes não se lê como uma mensagem. */}
+          {intencao && (
+            <p
+              className="text-foreground/80 mx-auto mt-5 max-w-xl leading-relaxed text-balance"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(17px, 2.4vw, 21px)" }}
+            >
+              {intencao}
+            </p>
+          )}
         </header>
 
         {/* ── O DOCUMENTO INTEIRO, QUANDO ELE EXISTE ──────────────────────
@@ -554,7 +527,7 @@ export default async function ProposalPage({
               cara do produto para dar má impressão, e dava-a a toda a gente que
               recebe uma proposta do estúdio. */}
               {proposal.lineItems.length > 0 && (
-                <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/70 text-[10px] tracking-[0.2em] uppercase">
+                <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
                   <span className="flex-1">{t.tableDescricao}</span>
                   <span className="w-12 text-center">{t.tableQt}</span>
                   <span className="w-28 text-right">{t.tableValor}</span>
@@ -645,7 +618,7 @@ export default async function ProposalPage({
         )}
 
         {validLabel && (
-          <p className="text-foreground/70 text-xs mt-5 text-center">
+          <p className="text-foreground/68 text-xs mt-5 text-center">
             {t.validoAte} {validLabel}.
           </p>
         )}
@@ -664,7 +637,7 @@ export default async function ProposalPage({
             Só aparece a partir da versão 2: dizer «Versão 1» a quem abre uma
             proposta pela primeira vez é ruído. */}
         {(emitidaLabel || (!!doLink?.versao && doLink.versao > 1)) && (
-          <p className="text-foreground/70 text-[11px] mt-2 text-center">
+          <p className="text-foreground/60 text-[11px] mt-2 text-center">
             {[
               emitidaLabel ? `${t.emitidaEm} ${emitidaLabel}` : "",
               /* Só a partir da versão 2: dizer «Versão 1» a quem abre uma
@@ -728,7 +701,7 @@ export default async function ProposalPage({
           </p>
         </div>
 
-        <p className="text-foreground/70 text-[11px] text-center mt-10 leading-relaxed">
+        <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
           {t.footerNote}{" "}
           {/* Medido a 375 px: 140×14 px — um alvo de e-mail com 14 px de
               altura, mais pequeno do que a polpa de um dedo consegue acertar

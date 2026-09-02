@@ -445,7 +445,7 @@ export default function EventTasks({ quote, userName }: Props) {
               <div className="min-w-0 flex-1">
                 <p
                   className={`text-sm leading-snug ${
-                    task.done ? "text-foreground/40 line-through" : "text-[var(--bo-text)]"
+                    task.done ? "text-foreground/40 line-through" : "text-foreground/80"
                   }`}
                 >
                   {task.title}
@@ -493,7 +493,7 @@ export default function EventTasks({ quote, userName }: Props) {
                   aparecia, media 13×13 px contra os 44 da casa. */}
               <button
                 onClick={() => perguntarSeElimina(task)}
-                className="alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                className="alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                 aria-label="Remover tarefa"
               >
                 <svg

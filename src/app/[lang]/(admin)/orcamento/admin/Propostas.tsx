@@ -5,7 +5,7 @@ import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { MenuDeAccoes, TabelaOuCartoes, type AccaoDeItem } from "./ui";
-import { Button, Card, EmptyState, PerguntaDestrutiva, Segmented } from "./ui";
+import { Button, Card, EmptyState, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { metaFor } from "./status-meta";
@@ -214,15 +214,6 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
   const deferredFilter = useDeferredValue(filter);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
-  /**
-   * A proposta à espera de resposta à pergunta de a apagar.
-   *
-   * Guarda-se o `id` e o nome do cliente: é o nome que vai na pergunta, e numa
-   * lista de dezenas de propostas é a única coisa que diz em qual linha ela
-   * tocou.
-   */
-  const [aApagar, setAApagar] = useState<{ id: string; nome: string } | null>(null);
-
   // Índice id→pedido: evita um varrimento linear de todos os pedidos por cada
   // linha da lista (e dentro de `updateStatus`).
   const quotesById = useMemo(() => {
@@ -350,6 +341,12 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       const snapshot = latest.current.proposals;
       const p = snapshot.find((x) => x.id === id);
       const name = p?.clientName ?? "esta proposta";
+      if (
+        typeof window !== "undefined" &&
+        !window.confirm(`Apagar a proposta de ${name}?\n\nEsta ação não pode ser anulada.`)
+      ) {
+        return;
+      }
       setActionBusy(id);
       setProposals((prev) => prev.filter((x) => x.id !== id));
       const oQue = `apagar a proposta de «${name}»`;
@@ -478,7 +475,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
           </svg>
         </div>
         <div>
-          <p className="text-[var(--bo-text)] text-sm font-medium">
+          <p className="text-foreground/90 text-sm font-medium">
             Não foi possível carregar as propostas
           </p>
           <p className="text-foreground/50 text-xs mt-1">
@@ -526,7 +523,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       rotulo: "Apagar",
       destrutiva: true,
       desativada: actionBusy === p.id,
-      onAccao: () => setAApagar({ id: p.id, nome: p.clientName }),
+      onAccao: () => deleteProposal(p.id),
     });
     return lista;
   };
@@ -536,7 +533,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       {/* One calm line saying what this screen is for */}
       <p
         style={{ "--cena": 0 } as React.CSSProperties}
-        className="bo-cena text-sm leading-relaxed text-[var(--bo-text-muted)]"
+        className="bo-cena text-sm leading-relaxed text-foreground/55"
       >
         Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites.
       </p>
@@ -617,7 +614,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
             ].map((k) => (
               <Card key={k.l} padding="sm" className="flex flex-col gap-1.5">
                 <p
-                  className="font-light leading-none tabular-nums text-[var(--bo-text)]"
+                  className="font-light leading-none tabular-nums text-foreground/90"
                   style={{ fontSize: "clamp(19px, 2vw, 22px)" }}
                 >
                   {k.v}
@@ -770,7 +767,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                     const lugar = lugares.get(p.id);
                     return (
                       <span className="block">
-                        <span className="block text-[var(--bo-text)]">
+                        <span className="block text-foreground/90">
                           <span className="truncate align-middle">{p.clientName}</span>
                           {lugar && <LugarDoCliente lugar={lugar} />}
                         </span>
@@ -812,7 +809,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                   alinharADireita: true,
                   ordenar: (a, b) => a.total - b.total,
                   celula: (p) => (
-                    <span className="font-semibold tabular-nums text-[var(--bo-text)]">
+                    <span className="font-semibold tabular-nums text-foreground/90">
                       {eur(p.total)}
                     </span>
                   ),
@@ -837,7 +834,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 // legibilidade das que decidem.
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--bo-text)]">
+                    <p className="text-sm font-medium text-foreground/90">
                       <span className="truncate align-middle">{p.clientName}</span>
                       {lugares.get(p.id) && <LugarDoCliente lugar={lugares.get(p.id)!} />}
                     </p>
@@ -847,7 +844,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <span className="text-sm font-semibold tabular-nums text-[var(--bo-text)]">
+                    <span className="text-sm font-semibold tabular-nums text-foreground/90">
                       {eur(p.total)}
                     </span>
                     <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />
@@ -858,24 +855,6 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
           </div>
         )}
       </Card>
-
-      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
-          Folha inferior no telemóvel, ao pé do polegar; diálogo centrado no
-          computador; e o verbo repetido no botão em vez de «OK». */}
-      <PerguntaDestrutiva
-        aberto={!!aApagar}
-        onFechar={() => setAApagar(null)}
-        titulo={`Apagar a proposta de ${aApagar?.nome ?? ""}?`}
-        aviso="Esta acção não pode ser anulada."
-        rotuloConfirmar="Apagar a proposta"
-        // Fecha primeiro e só depois age: a lista é optimista — a linha sai
-        // logo e volta se o servidor recusar, com a frase a dizer de quem era.
-        onConfirmar={() => {
-          const alvo = aApagar;
-          setAApagar(null);
-          if (alvo) void deleteProposal(alvo.id);
-        }}
-      />
     </div>
   );
 }

@@ -40,9 +40,6 @@ const st = vi.hoisted(() => ({
     readme: "…",
   },
   manifestoRebenta: false,
-  /** O aquecimento dos PDF: o que devolveu, e se rebentou. */
-  aquecimentos: [] as number[],
-  aquecimentoRebenta: false,
   enviados: [] as { subject: string; anexos: string[] }[],
   carimbos: [] as unknown[],
 }));
@@ -61,21 +58,6 @@ vi.mock("@/lib/manifesto-de-fotografias", () => ({
 vi.mock("@/lib/copia-de-seguranca-marcador", () => ({
   registarCopiaEnviada: vi.fn(async (info: unknown) => {
     st.carimbos.push(info);
-  }),
-}));
-vi.mock("@/lib/aquecimento-de-pdf", () => ({
-  aquecerPdfsEmFalta: vi.fn(async (decorrido: number) => {
-    if (st.aquecimentoRebenta) throw new Error("a base não responde");
-    st.aquecimentos.push(decorrido);
-    return {
-      vistas: 2,
-      jaTinham: 1,
-      aquecidas: 1,
-      incompletas: 0,
-      falhadas: 0,
-      adiadas: 0,
-      semTempo: false,
-    };
   }),
 }));
 vi.mock("@/lib/mail", () => ({
@@ -108,8 +90,6 @@ beforeEach(() => {
   };
   st.enviados = [];
   st.carimbos = [];
-  st.aquecimentos = [];
-  st.aquecimentoRebenta = false;
   vi.stubEnv("CRON_SECRET", "segredo");
   vi.clearAllMocks();
 });
@@ -174,55 +154,5 @@ describe("o carimbo de «esta cópia chegou»", () => {
     expect(res.status).toBe(401);
     expect(st.carimbos).toHaveLength(0);
     expect(st.enviados).toHaveLength(0);
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * E, COM O TEMPO QUE SOBRAR, OS PDF DAS PROPOSTAS JÁ ENVIADAS
- * ════════════════════════════════════════════════════════════════════════════
- *
- * A pergunta dela: «mesmo nas propostas em que já enviamos (…) se também vai
- * acontecer nestas propostas que já enviamos». O aquecimento vive aqui dentro
- * porque um terceiro agendamento é uma aposta no plano de alojamento — a
- * mesma que já custou um deploy recusado a esta casa.
- *
- * Vive aqui dentro, mas é o hóspede: a cópia de segurança é a razão de ser
- * deste trabalho, e nada do que se lhe acrescente pode deitá-la abaixo.
- */
-describe("o aquecimento dos PDF viaja com a cópia", () => {
-  it("corre depois de a cópia ter seguido, e diz-lhe quanto tempo já se gastou", async () => {
-    st.authed = true;
-    const res = await GET(req());
-
-    expect(res.status).toBe(200);
-    expect(st.enviados, "correu sem a cópia ter seguido").toHaveLength(1);
-    expect(st.aquecimentos, "o aquecimento não chegou a correr").toHaveLength(1);
-    // O que ele recebe é o relógio da função, não um número inventado: sem
-    // isto ele não sabe quanto tempo lhe sobra e come o tecto da função.
-    expect(st.aquecimentos[0]).toBeGreaterThanOrEqual(0);
-    expect(await res.json()).toMatchObject({ aquecimento: { aquecidas: 1 } });
-  });
-
-  it("um aquecimento que rebenta NÃO impede a cópia de seguir", async () => {
-    // A mesma regra do manifesto e da retenção, e pela mesma razão: a cópia já
-    // seguiu quando isto corre. Trocar uma cópia bem-sucedida por um 500 por
-    // causa do aquecimento seria vender o essencial pelo acessório.
-    st.authed = true;
-    st.aquecimentoRebenta = true;
-    const res = await GET(req());
-
-    expect(res.status).toBe(200);
-    expect(st.enviados, "a cópia não seguiu por causa do aquecimento").toHaveLength(1);
-    expect(st.carimbos, "a cópia deixou de ficar carimbada").toHaveLength(1);
-    expect(await res.json()).toMatchObject({ ok: true, aquecimento: null });
-  });
-
-  it("um pedido recusado não aquece nada", async () => {
-    st.authed = false;
-    const res = await GET(req("Bearer errado"));
-
-    expect(res.status).toBe(401);
-    expect(st.aquecimentos).toEqual([]);
   });
 });

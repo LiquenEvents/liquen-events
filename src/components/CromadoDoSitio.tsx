@@ -3,8 +3,6 @@ import Footer from "@/components/Footer";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
-import { AvisoDeCarregamento } from "@/components/AvisoDeCarregamento";
-import { Cortina } from "@/components/Cortina";
 import SpeculationRules from "@/components/SpeculationRules";
 import PageTransition from "@/components/PageTransition";
 import HeroWarm from "@/components/HeroWarm";
@@ -78,9 +76,9 @@ export default function CromadoDoSitio({
   locale: Locale;
   skipLabel: string;
 }) {
-  // O `locale` desce para o rodapé e para o aviso de carregamento. Fica na
-  // assinatura para quem monta o cromado ter de o fornecer, em vez de cada um
-  // deles o ir buscar por sua conta a um contexto que pode não existir.
+  // `locale` não é lido aqui — o rodapé recebe-o, e é o único que precisa. Fica
+  // na assinatura para quem monta o cromado ter de o fornecer, em vez de o
+  // rodapé o ir buscar por sua conta a um contexto que pode não existir.
   return (
     <SmoothScroll>
       <SpeculationRules />
@@ -92,39 +90,7 @@ export default function CromadoDoSitio({
       >
         {skipLabel}
       </a>
-      {/*
-        O ARRANQUE DO SÍTIO, COM O LOGÓTIPO A RESPIRAR.
-
-        Palavras dela, com o segundo exemplo: «é isto que eu quero quando
-        carrega, mas para a Líquen com a animação».
-
-        É a MESMA peça da proposta e do back office, com a MESMA frase. Cheguei
-        a pô-la aqui com o logótipo a respirar; ela viu e disse o que queria:
-        «no site online não quero aquilo do logo — quero a frase a dizer
-        eternizamos memórias, organizamos eventos, com o mesmo cor de fundo do
-        site, aquele a verde clarinho».
-
-        Muda só o fundo: o verde do menu e da barra, em vez do verde-quase-preto
-        da proposta. No sítio a cortina não abre um documento — abre a casa, e a
-        casa tem uma cor.
-      */}
-      <Cortina locale={locale} />
       <ScrollProgress />
-      {/*
-        O aviso de que uma página está a demorar. Palavras dela: «caso demore
-        tempo, quero que coloques aquela animação de está a carregar e metemos
-        o logo».
-
-        Vive AQUI, e num sítio só, porque é do sítio inteiro: os `<Link>` estão
-        espalhados por vinte e dois ficheiros, e o `useLinkStatus` do Next só
-        funciona dentro de um deles. Vinte e duas cópias seriam vinte e duas
-        hipóteses de ficar esquecido no próximo link que alguém escrever.
-
-        Não custa nada quando não é preciso: nasce invisível e só começa a
-        aparecer aos 400 ms — uma navegação normal monta isto, não pinta um
-        pixel, e desmonta.
-      */}
-      <AvisoDeCarregamento locale={locale} />
       <StickyCTA />
       <Navbar />
       {/* tabIndex=-1 so the skip link actually MOVES keyboard focus into

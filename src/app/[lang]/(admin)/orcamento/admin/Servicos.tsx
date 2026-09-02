@@ -158,7 +158,7 @@ export default function Servicos() {
       <Card padding="md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-[var(--bo-tinta-72)]">
+            <p className="text-sm text-foreground/70">
               {servicos.filter((s) => !s.arquivado).length} serviços na biblioteca
             </p>
             {semIngles > 0 && (
@@ -175,7 +175,7 @@ export default function Servicos() {
                 era o rótulo que estava baixo — não a caixa. `alvo-toque` no
                 `label`, como nas listas base do Material, cresce o alvo sem
                 mexer no quadrado desenhado. */}
-            <label className="alvo-toque !justify-start flex items-center gap-2 text-[11px] text-[var(--bo-text-muted)]">
+            <label className="alvo-toque !justify-start flex items-center gap-2 text-[11px] text-foreground/55">
               <input
                 type="checkbox"
                 checked={mostrarArquivados}
@@ -228,9 +228,9 @@ export default function Servicos() {
                 ) : (
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--bo-text)]">{s.nome}</p>
+                      <p className="text-sm font-medium text-foreground/85">{s.nome}</p>
                       {s.descricao && (
-                        <p className="mt-0.5 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                        <p className="mt-0.5 text-xs leading-relaxed text-foreground/55">
                           {s.descricao}
                         </p>
                       )}

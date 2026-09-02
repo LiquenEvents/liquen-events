@@ -314,7 +314,7 @@ export default function Miniaturas() {
           que custa; a segunda é uma optimização e diz que não parte nada. Ter
           as duas debaixo do mesmo «em falta» era o que tornava o painel
           ilegível. */}
-      <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+      <p className="mt-1.5 text-xs leading-relaxed text-foreground/60">
         Uma fotografia <strong className="font-medium">sem miniatura</strong> é descarregada inteira
         — dois a três MB — para desenhar um quadrado de 150 px. É isso que faz a biblioteca demorar
         num telemóvel.
@@ -380,7 +380,7 @@ export default function Miniaturas() {
       {contagem && !aGerar && (
         <div className="mt-4 space-y-1.5 text-xs">
           {contagem.emFalta === 0 ? (
-            <p className="text-[var(--bo-tinta-72)]">
+            <p className="text-foreground/70">
               Nada em falta — as {contagem.fotos} fotografias têm todas miniatura e versão leve.{" "}
               <span className="text-foreground/50">
                 Se as grelhas continuarem lentas, a causa é outra.
@@ -389,25 +389,25 @@ export default function Miniaturas() {
           ) : (
             <>
               {semMiniatura > 0 ? (
-                <p className="text-[var(--bo-text)]">
+                <p className="text-foreground/80">
                   <strong>{fotografias(semMiniatura)}</strong> ainda são descarregadas inteiras, em{" "}
                   {contagem.fotos}.
                 </p>
               ) : (
-                <p className="text-[var(--bo-tinta-72)]">
+                <p className="text-foreground/70">
                   Nenhuma fotografia está a servir o original — as miniaturas estão todas feitas.
                 </p>
               )}
               {semLeve > 0 && (
-                <p className="text-[var(--bo-text-muted)]">
+                <p className="text-foreground/55">
                   {fotografias(semLeve)} ainda sem versão leve. Não parte nada; é peso a mais.
                 </p>
               )}
               {comProblema.length > 0 && (
-                <ul className="mt-2 space-y-0.5 text-[var(--bo-text-muted)]">
+                <ul className="mt-2 space-y-0.5 text-foreground/55">
                   {visiveis.map((l) => (
                     <li key={`${l.origem}/${l.pasta}`} className="truncate">
-                      <span className="text-[var(--bo-tinta-72)]">{l.nome}</span>
+                      <span className="text-foreground/75">{l.nome}</span>
                       {!l.daBiblioteca && <span className="text-foreground/40"> · pedido</span>}
                       {" — "}
                       {l.semMiniatura > 0
@@ -423,7 +423,7 @@ export default function Miniaturas() {
                 <button
                   type="button"
                   onClick={() => setTudoAVista((v) => !v)}
-                  className="alvo-toque text-[11px] text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2 hover:text-foreground"
+                  className="alvo-toque text-[11px] text-foreground/60 underline decoration-dotted underline-offset-2 hover:text-foreground"
                 >
                   {tudoAVista
                     ? "Mostrar menos"
@@ -448,7 +448,7 @@ export default function Miniaturas() {
           <p className="font-medium">
             {falhadas.length === 1 ? "Uma não deu:" : `${falhadas.length} não deram:`}
           </p>
-          <ul className="mt-1 space-y-0.5 text-[var(--bo-text-muted)]">
+          <ul className="mt-1 space-y-0.5 text-foreground/55">
             {falhadas.slice(0, 8).map((f) => (
               <li key={f}>{f}</li>
             ))}

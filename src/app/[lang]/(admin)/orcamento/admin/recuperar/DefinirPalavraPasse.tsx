@@ -83,14 +83,14 @@ export default function DefinirPalavraPasse({ token }: { token: string }) {
         <Card padding="lg" className="w-full">
           <div className="mb-6 text-center">
             <p className="bo-eyebrow mb-2">Área Restrita</p>
-            <h1 className="font-display text-2xl leading-tight text-[var(--bo-text)]">
+            <h1 className="font-display text-2xl leading-tight text-foreground/90">
               Palavra-passe nova
             </h1>
           </div>
 
           {pronto ? (
             <div className="flex flex-col gap-4">
-              <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">
+              <p className="text-sm leading-relaxed text-foreground/70">
                 Pronto. A palavra-passe nova já está a valer — usa-a na página de entrada.
               </p>
               <Button
@@ -103,7 +103,7 @@ export default function DefinirPalavraPasse({ token }: { token: string }) {
               </Button>
             </div>
           ) : !token ? (
-            <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">
+            <p className="text-sm leading-relaxed text-foreground/70">
               Esta página só funciona a partir da ligação que te chega por email. Pede uma nova na
               página de entrada.
             </p>

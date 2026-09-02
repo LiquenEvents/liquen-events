@@ -263,6 +263,7 @@ async function propostaDeCasamento(over: Partial<ProposalDoc> = {}): Promise<Pro
     totalText: "1.500,00 € + IVA",
     totalAmount: 1500,
     totalVatMode: "acrescer",
+    mostrarTotalAPagar: true,
     validUntil: DIA_DE_VALIDADE,
     ...over,
   } as Parameters<typeof withProposalDefaults>[0]);

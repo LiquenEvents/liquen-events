@@ -132,7 +132,7 @@ export default function MedidorDeTransbordo() {
                 </span>{" "}
                 · {c.tag} · {c.posicao} · largura {c.largura}
                 <br />
-                <span className="text-[var(--bo-text-muted)]">{c.onde}</span>
+                <span className="text-foreground/60">{c.onde}</span>
                 {c.texto && <br />}
                 {c.texto && <span className="text-foreground/50">«{c.texto}»</span>}
               </li>

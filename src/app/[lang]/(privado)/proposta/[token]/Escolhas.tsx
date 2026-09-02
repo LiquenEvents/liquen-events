@@ -1,6 +1,5 @@
 "use client";
 
-import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useState } from "react";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
@@ -63,48 +62,16 @@ type Estado = "quieto" | "a-enviar" | "seguiu" | "falhou";
 
 /** A fotografia de uma opção. Sem fotografia não desenha caixa nenhuma: uma
  *  moldura cinzenta ao lado de um rótulo lê-se como uma foto que não carregou. */
-function FotoDaOpcao({ foto, alt, token }: { foto?: FotoDaProposta; alt: string; token: string }) {
-  /**
-   * ── O DEGRAU DO MEIO, QUE AQUI FALTAVA ───────────────────────────────────
-   *
-   * A cascata era `miniatura → original`, sem nada pelo meio. E o original é o
-   * ficheiro tal como saiu da máquina: 2,6 MB numa proposta típica, dentro de
-   * uma caixa pequena, ao lado de uma pergunta.
-   *
-   * Basta a miniatura de 400 px falhar — uma assinatura caducada, um ficheiro
-   * que ainda não tem derivada — para o telemóvel do casal descarregar
-   * megabytes para desenhar um quadrado. É exactamente o defeito que a grelha
-   * já corrigiu (ver `Inspiracao.tsx`); as escolhas ficaram para trás.
-   *
-   * O degrau do meio é a derivada de 1200 px: do CDN quando já está assinada, e
-   * da nossa rota quando ainda não existe — que é quem a fabrica. O original
-   * continua a ser a última rede, mas deixa de ser a PRIMEIRA alternativa.
-   */
-  const media = foto ? (foto.media ?? enderecoDaRotaDaFoto(token, foto)) : "";
-  const { alvo, aoFalhar, desistiu } = useFotoComPlanoB(foto?.miniatura, [media, foto?.original]);
+function FotoDaOpcao({ foto, alt }: { foto?: FotoDaProposta; alt: string }) {
+  const { alvo, aoFalhar, desistiu } = useFotoComPlanoB(foto?.miniatura, foto?.original);
   if (!foto || !alvo || desistiu) return null;
   return (
     <span
-      className="relative block overflow-hidden rounded-md bg-foreground/[0.04]"
+      className="block overflow-hidden rounded-md bg-foreground/[0.04]"
       style={{
         aspectRatio: foto.largura && foto.altura ? `${foto.largura}/${foto.altura}` : "4/3",
       }}
     >
-      {/* O BORRÃO, QUE ESTAVA CALCULADO E A SER DEITADO FORA.
-          O `lqip` vem no HTML, em poucas centenas de bytes, e já é servido em
-          todas as fotos (ver `proposta-fotos.ts`). Aqui não era pintado: as
-          fotografias das opções são preguiçosas, e o que o casal via enquanto
-          elas não chegavam era uma fila de rectângulos cinzentos ao lado das
-          escolhas — no ecrã onde ele decide. */}
-      {foto.lqip && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={foto.lqip}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
-        />
-      )}
       {/* `<img>` e não `next/image`: estes URLs são assinados e de vida curta,
           e o optimizador do Next guardaria em cache uma assinatura que expira.
           É a mesma decisão da galeria — ver `Inspiracao.tsx`. */}
@@ -115,8 +82,7 @@ function FotoDaOpcao({ foto, alt, token }: { foto?: FotoDaProposta; alt: string;
         loading="lazy"
         decoding="async"
         onError={aoFalhar}
-        /* `relative`: o borrão está em `absolute` por baixo. */
-        className="relative h-full w-full object-cover"
+        className="h-full w-full object-cover"
       />
     </span>
   );
@@ -202,7 +168,7 @@ export default function Escolhas({ escolhas, escolhido, fotos, token, textos, em
                         : "border-foreground/12 hover:border-moss/50 hover:bg-moss/4"
                     }`}
                   >
-                    <FotoDaOpcao foto={fotos[`e${i}o${j}`]} alt={rotulo} token={token} />
+                    <FotoDaOpcao foto={fotos[`e${i}o${j}`]} alt={rotulo} />
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="text-foreground/85 text-sm font-medium">{rotulo}</span>
                       {escolhida && (

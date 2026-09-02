@@ -126,7 +126,7 @@ const KanbanCard = memo(function KanbanCard({
       <div className="flex items-start gap-2">
         <span className="mt-1 w-1 h-8 rounded-full shrink-0" style={{ background: colColor }} />
         <div className="min-w-0 flex-1">
-          <p className="text-[var(--bo-text)] text-sm font-semibold truncate">{q.name}</p>
+          <p className="text-foreground/78 text-sm font-semibold truncate">{q.name}</p>
           <p className="text-foreground/45 text-[11px] truncate mt-0.5">
             {eventTypeLabel(q)} · {q.guests} convidados
           </p>
@@ -501,7 +501,7 @@ export default function Kanban({
         ].map((k) => (
           <Card key={k.l} padding="sm" className="p-4 sm:p-5">
             <p
-              className="font-light leading-none mb-2 text-[var(--bo-text)] tabular-nums"
+              className="font-light leading-none mb-2 text-foreground/85 tabular-nums"
               style={{ fontSize: "clamp(20px, 2vw, 28px)" }}
             >
               {k.v}
@@ -611,7 +611,7 @@ export default function Kanban({
               <div className="flex items-center justify-between px-4 py-3.5">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
-                  <span className="text-[var(--bo-text-muted)] text-[11px] tracking-[0.1em] uppercase font-medium">
+                  <span className="text-foreground/60 text-[11px] tracking-[0.1em] uppercase font-medium">
                     {col.label}
                   </span>
                 </div>
@@ -677,7 +677,7 @@ export default function Kanban({
                   <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase">
                     Total (com IVA)
                   </span>
-                  <span className="text-[var(--bo-text-muted)] text-[11px] font-semibold tabular-nums">
+                  <span className="text-foreground/55 text-[11px] font-semibold tabular-nums">
                     {eur(value)}
                   </span>
                 </div>

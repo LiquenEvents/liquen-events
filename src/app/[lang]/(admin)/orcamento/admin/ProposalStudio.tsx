@@ -27,6 +27,7 @@ import {
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
+  MAX_INTENCAO,
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -49,12 +50,7 @@ import {
 } from "@/lib/tempo-activo";
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
-import {
-  guestRangeLabel,
-  ceremonyTypeLabel,
-  spaceTypeLabel,
-  eventTypeName,
-} from "@/lib/orcamento/data";
+import { guestRangeLabel, ceremonyTypeLabel, eventTypeName } from "@/lib/orcamento/data";
 import { log } from "@/lib/logger";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
@@ -283,7 +279,7 @@ function esperaDaCopiaDeFotos(fotos: number): number {
   return 900 + 1_500 * lotes;
 }
 
-const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-[var(--bo-text)]";
+const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-foreground/85";
 const ADD_BTN =
   "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors inline-flex items-center";
 const REMOVE_BTN =
@@ -372,35 +368,7 @@ function initialDoc(quote: Quote): StudioDoc {
     clientNames: nomesDoCasal(quote) || (quote.name ?? ""),
     eventType: eventTypeLabel(quote),
     eventDate: formatEventDate(quote.date),
-    /**
-     * ── O LOCAL LEVA O ESPAÇO ATRÁS ──────────────────────────────────────────
-     *
-     * «Quero que o sistema coloque logo isto no back office, nos espaços a
-     * fazer a proposta.» Fui contar o que o pedido responde contra o que a
-     * proposta recebia: das sete respostas, SEIS já chegavam sozinhas — o
-     * casal, a data, os convidados, o local, a cerimónia, e os pontos de
-     * decoração, que viram as linhas do orçamento.
-     *
-     * Faltava o ESPAÇO. O casal responde «Exterior», «Interior» ou «Interior e
-     * exterior», e essa resposta morria no pedido: quem escrevia a proposta
-     * tinha de voltar lá para se lembrar se era ao ar livre.
-     *
-     * Vai junto ao local, com um ponto a separar — «Setúbal Alentejo ·
-     * Exterior» — e não num campo novo. Uma linha a mais no documento do casal
-     * é uma decisão sobre o papel que sai; um local mais completo é a mesma
-     * linha a dizer mais. E o casal, ao ler, vê que percebemos o que respondeu.
-     *
-     * Como tudo o resto aqui, é uma SEMENTE: o campo continua editável, e o
-     * local da proposta acaba quase sempre mais preciso do que o do pedido
-     * («Herdade da Malhadinha» em vez de «Alentejo»). Quando ela o reescrever,
-     * reescreve a linha inteira, que é o que já fazia.
-     *
-     * Sem espaço respondido, fica só o local — nunca um ponto pendurado no fim.
-     */
-    location: [quote.location ?? "", spaceTypeLabel(quote.spaceType)]
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .join(" · "),
+    location: quote.location ?? "",
     // Sem número exacto, vale a ordem de grandeza que o casal deu ("100 a 150").
     // Escrever "0 pax" era pior do que não escrever nada.
     guests: quote.guests ? `${quote.guests} pax` : guestRangeLabel(quote.guestsRange),
@@ -428,6 +396,48 @@ function initialDoc(quote: Quote): StudioDoc {
   };
   base.ref = buildRef(base);
   return base;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE VEIO DO PEDIDO, E AINDA NÃO FOI OLHADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O pré-preenchimento já existia: a proposta abre com os nomes do casal, o
+ * tipo, a data por extenso, o local, os convidados e a cerimónia que o casal
+ * escolheu no formulário. Poupa-lhe cinco campos e uma ida ao pedido.
+ *
+ * O que faltava era DIZÊ-LO. Um campo semeado é uma resposta de terceiros
+ * dentro de um documento que sai com a assinatura dela: o casal escreveu
+ * «Évora» no formulário e a proposta pode ter de dizer «Herdade da Malhadinha,
+ * Albernoa». Sem marca nenhuma, um valor semeado lê-se como um valor escrito —
+ * e um valor escrito não se relê.
+ *
+ * O mecanismo já existia inteiro e é o da CÓPIA: anel laranja, e tocar-lhe é a
+ * confirmação (ver `realce`/`confirmado`). Estava só ligado a um dos dois
+ * caminhos por onde entra texto de outra pessoa.
+ *
+ * ── SÓ O QUE TEM MESMO ALGUMA COISA ESCRITA ──────────────────────────────
+ * Um campo que o pedido não sabia responder fica VAZIO (é a regra do
+ * `initialDoc`: nunca inventa). Um anel laranja à volta de uma caixa em branco
+ * não pede confirmação nenhuma — pede que se ignore o anel.
+ *
+ * ── E O VALOR NÃO ────────────────────────────────────────────────────────
+ * O total também é semeado do pedido, e de propósito NÃO entra aqui: não é um
+ * palpite a confirmar, é o mesmo número visto de dois sítios — escrever aqui
+ * altera-o lá. Marcá-lo pedia confirmação de uma coisa que ela própria escreveu.
+ */
+function camposVindosDoPedido(d: StudioDoc): CampoAMudar[] {
+  const escrito = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  const marcar: CampoAMudar[] = [];
+  if (escrito(d.clientNames)) marcar.push("clientNames");
+  if (escrito(d.eventType)) marcar.push("eventType");
+  if (escrito(d.eventDate)) marcar.push("eventDate");
+  if (escrito(d.location)) marcar.push("location");
+  if (escrito(d.guests)) marcar.push("guests");
+  if (escrito(d.ceremony)) marcar.push("ceremony");
+  if (escrito(d.time)) marcar.push("time");
+  return marcar;
 }
 
 /** Passos do fluxo guiado do estúdio. */
@@ -1044,26 +1054,6 @@ export type ResultadoDaGravacao =
       overwrote?: boolean;
       previousBy?: string;
       /**
-       * A gaveta onde ficou o trabalho que esta gravação esmagou.
-       *
-       * ── PORQUE É QUE ISTO ESTAVA A SER DEITADO FORA ─────────────────────
-       *
-       * O servidor guarda, desde sempre, a versão que ia desaparecer numa
-       * chave irmã, e devolve o nome dela aqui. O estúdio lia o `overwrote` e
-       * o `previousBy` — e ignorava estes dois. Resultado: o aviso dizia «ficou
-       * a tua versão» e mais nada, portanto quem o lia concluía, com toda a
-       * razão, que as duas horas da outra pessoa tinham acabado.
-       *
-       * Não tinham. Estavam guardadas num sítio que nenhuma parte do produto
-       * conseguia abrir — a lista de gavetas que a leitura aceita não tinha
-       * esta lá dentro. Metade da regra da casa («se falhar, não perder
-       * trabalho») cumprida, e a metade que se vê por cumprir.
-       */
-      resgate?: string;
-      /** Quando é que essa versão tinha sido gravada — é a hora que dá à
-       *  pessoa a noção do que está em jogo antes de decidir. */
-      resgateEm?: string;
-      /**
        * O sítio onde ficou sobrevive a um deploy?
        *
        * ── PORQUE É QUE ISTO NÃO PODE FICAR DE FORA ────────────────────────
@@ -1135,8 +1125,6 @@ export async function gravarRascunhoNoServidor(
           updatedAt: typeof dados?.updatedAt === "string" ? dados.updatedAt : undefined,
           overwrote: Boolean(dados?.overwrote),
           previousBy: typeof dados?.previousBy === "string" ? dados.previousBy : undefined,
-          resgate: typeof dados?.resgate === "string" ? dados.resgate : undefined,
-          resgateEm: typeof dados?.resgateEm === "string" ? dados.resgateEm : undefined,
           duradouro: typeof dados?.duradouro === "boolean" ? dados.duradouro : undefined,
           aviso: typeof dados?.aviso === "string" ? dados.aviso : undefined,
         };
@@ -1155,96 +1143,6 @@ export async function gravarRascunhoNoServidor(
     }
   }
   return { estado: "so-local", porque };
-}
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O PREÇO QUE FICAVA SÓ NO ESTÚDIO
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Isto era um `fetch` seco com um `catch` vazio, e o comentário dizia «a
- * gravação seguinte volta a tentar». NÃO HÁ GRAVAÇÃO SEGUINTE: esta chamada só
- * parte quando alguém MEXE no valor. Se a rede piscar na única vez que ela
- * escreve o preço, ninguém volta a tentar nada.
- *
- * O que se via, e está na auditoria da casa (2.3): o Estúdio e o PDF a dizerem
- * 9.500 €, e o cartão do pedido, a margem, as Estatísticas e as facturas a
- * dizerem 8.000 €. Sem aviso nenhum, porque o `catch` estava vazio. É a queixa
- * dela — «o valor enviado para o cliente tem de ser o valor que fica na
- * proposta» — com a causa por baixo.
- *
- * Duas coisas mudam, e são as mesmas do rascunho aqui em cima, de propósito:
- *
- *  · REPETIR. Uma gravação que morre porque a ligação caiu não pode morrer à
- *    primeira. Mesmas tentativas, mesma pausa crescente, mesmo tecto por
- *    tentativa.
- *  · DIZER. Quando nem à terceira chega, o ecrã passa a saber e a mostrar — com
- *    os dois valores à vista e um botão para tentar outra vez.
- *
- * O que NÃO se repete é o mesmo que ali: um 4xx é o pedido que está errado
- * (sessão caída, sobretudo), e repeti-lo dá exactamente a mesma resposta. Aí
- * `valeTentarDeNovo` vem `false` e o ecrã não oferece um botão que não pode
- * funcionar — é a regra que o `AvisoDeFalha` já segue.
- *
- * Nunca lança: quem chama está no meio da escrita de uma proposta.
- */
-export type ResultadoDoPreco =
-  | {
-      estado: "gravado";
-      /**
-       * O pedido actualizado, para propagar ao resto do ecrã. Falta quando o
-       * servidor respondeu 200 com um corpo que não se leu — gravou na mesma,
-       * e é isso que decide o estado; o que não há é número novo para
-       * espalhar.
-       */
-      quote?: Quote;
-    }
-  | { estado: "falhou"; porque?: string; valeTentarDeNovo: boolean };
-
-export async function mandarPrecoAoPedido(
-  quoteId: string,
-  base: number | null,
-): Promise<ResultadoDoPreco> {
-  let porque: string | undefined;
-  let valeTentarDeNovo = true;
-  for (let tentativa = 1; tentativa <= GRAVACAO_TENTATIVAS; tentativa++) {
-    try {
-      const res = await fetchComTecto(
-        `/api/orcamento/${quoteId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          // `null` e não `undefined`: apagar o preço tem de chegar ao servidor,
-          // e `undefined` desaparece no JSON (o merge parcial mantinha o valor
-          // antigo). É a mesma razão que está escrita na Gestão do pedido.
-          body: JSON.stringify({ quotedPrice: base }),
-        },
-        GRAVACAO_TECTO_MS,
-      );
-      if (res.ok) {
-        // Um 200 com corpo ilegível é um 200: o servidor gravou. Insistir aqui
-        // punha um alarme vermelho por cima de trabalho que está são — e ela
-        // deixava de acreditar no alarme quando ele for verdade.
-        const atualizado = (await res.json().catch(() => null)) as Quote | null;
-        return atualizado ? { estado: "gravado", quote: atualizado } : { estado: "gravado" };
-      } else {
-        const dados = await res.json().catch(() => null);
-        porque = typeof dados?.error === "string" ? dados.error : undefined;
-        if (res.status < 500) {
-          valeTentarDeNovo = false;
-          break;
-        }
-      }
-    } catch {
-      // Rede em baixo, ou o tecto de tempo. É exactamente o caso que a
-      // repetição existe para apanhar.
-      porque = undefined;
-    }
-    if (tentativa < GRAVACAO_TENTATIVAS) {
-      await new Promise((r) => setTimeout(r, GRAVACAO_PAUSA_MS * tentativa));
-    }
-  }
-  return { estado: "falhou", porque, valeTentarDeNovo };
 }
 
 interface Props {
@@ -1360,16 +1258,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * o servidor manda, com o nome das variáveis que resolvem.
    */
   const [naoDuraAoDeploy, setNaoDuraAoDeploy] = useState<{ aviso?: string } | null>(null);
-  /**
-   * O preço da proposta que não chegou ao pedido — ver `mandarPrecoAoPedido`.
-   * `null` é o normal: ou nunca falhou, ou a última tentativa passou.
-   */
-  const [precoPorChegar, setPrecoPorChegar] = useState<{
-    base: number | null;
-    porque?: string;
-    valeTentarDeNovo: boolean;
-  } | null>(null);
-  const [precoAGravar, setPrecoAGravar] = useState(false);
   /** O mesmo contrato do `avisouSoLocal`: o indicador di-lo sempre, o aviso
    *  grande uma vez. */
   const avisouNaoDura = useRef(false);
@@ -1976,35 +1864,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const warnedOverwrite = useRef(false);
   /**
    * ══════════════════════════════════════════════════════════════════════════
-   * O TRABALHO QUE ESTA SESSÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * O aviso da gravação cruzada é um `toast`, e um `toast` desaparece. Para
-   * dizer «ficou a tua versão» isso chega — é uma notícia, não uma tarefa.
-   *
-   * Isto é outra coisa: é trabalho de outra pessoa à espera de uma decisão.
-   * Uma notícia que se apaga sozinha ao fim de uns segundos não serve para
-   * uma decisão que a pessoa pode querer tomar dez minutos depois, quando
-   * perceber o que aconteceu. Por isso o `toast` continua a dar a notícia, e
-   * isto fica no ecrã até alguém resolver — repondo ou dispensando.
-   *
-   * Fica só em memória, de propósito: não é um estado do documento, é uma
-   * coisa desta sessão. Se ela fechar o separador sem decidir, o trabalho
-   * continua guardado no servidor e o próximo aviso de sobreposição volta a
-   * apontar para lá. O que se perde é o lembrete, não o trabalho.
-   */
-  const [sobreposto, setSobreposto] = useState<{
-    /** A gaveta, tal como o servidor a nomeou. */
-    chave: string;
-    /** Quem tinha escrito aquilo, quando se sabe. */
-    quem?: string;
-    /** Quando é que tinha sido gravado. */
-    quando?: string;
-  } | null>(null);
-  /** A repor: a leitura da gaveta demora, e o botão tem de o dizer. */
-  const [aRepor, setARepor] = useState(false);
-  /**
-   * ══════════════════════════════════════════════════════════════════════════
    * O QUE SEGUIU PARA O CLIENTE, E O QUE ESTE APARELHO TEM
    * ══════════════════════════════════════════════════════════════════════════
    *
@@ -2219,10 +2078,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // existente (mesmo sem grupos) nunca é sobrescrito.
     if (!hadDraft) {
       setDoc((d) => seedDefaults(d, quote));
-      // E NÃO marca nada. A razão está por extenso no `realce`, mais abaixo:
-      // marcar o que vem do pedido acendia seis anéis em TODAS as propostas, e
-      // um aviso que está sempre ligado deixa de ser um aviso.
-      setPorConfirmar(new Set());
+      // E marca o que veio do pedido, pela mesma condição: um rascunho é
+      // trabalho DELA, e pedir-lhe que confirme o que ela própria escreveu é o
+      // caminho mais curto para o anel laranja deixar de querer dizer alguma
+      // coisa. Ver `camposVindosDoPedido`.
+      setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
     }
 
     // O VALOR é a excepção, e de propósito: vem SEMPRE do pedido, haja rascunho
@@ -3035,33 +2895,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // trabalho de outra pessoa em silêncio, não.
         if (r.overwrote && !warnedOverwrite.current) {
           warnedOverwrite.current = true;
-          /**
-           * ── A FRASE MUDOU, E A MUDANÇA É O PONTO ─────────────────────────
-           *
-           * Dizia «Ficou a tua versão.» e acabava ali. É verdade, e mesmo
-           * assim era a pior coisa a dizer: quem lê aquilo conclui que o
-           * trabalho da outra pessoa acabou. Não acabou — o servidor guarda-o
-           * sempre —, mas ninguém tinha como saber, e sobretudo ninguém tinha
-           * como lá chegar.
-           *
-           * Quando há gaveta (`r.resgate`), a frase deixa de fechar a porta e
-           * manda-a olhar para a barra, que é onde a decisão vive. Quando não
-           * há — o servidor não conseguiu guardar a cópia, e regista-o —, a
-           * frase antiga é a honesta e fica.
-           */
-          const quem = r.previousBy ? `por ${r.previousBy}` : "noutro sítio";
           toast(
-            r.resgate
-              ? `Este rascunho tinha sido alterado ${quem}. Ficou a tua versão, e a outra está guardada — vê em cima.`
-              : `Este rascunho tinha sido alterado ${quem}. Ficou a tua versão.`,
+            r.previousBy
+              ? `Este rascunho tinha sido alterado por ${r.previousBy} noutro sítio. Ficou a tua versão.`
+              : "Este rascunho tinha sido alterado noutro sítio. Ficou a tua versão.",
             "info",
           );
-        }
-        // A barra, ao contrário do aviso, actualiza-se a cada sobreposição: a
-        // gaveta tem UMA ranhura e guarda sempre a última, portanto apontar
-        // para uma anterior seria apontar para o sítio errado.
-        if (r.overwrote && r.resgate) {
-          setSobreposto({ chave: r.resgate, quem: r.previousBy, quando: r.resgateEm });
         }
         return r;
       })();
@@ -3414,45 +3253,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         : baseDoEcraParaOPedido(escrito, opcoes?.doc ?? doc);
     precoEnviado.current = base;
     if (gravarPreco.current) clearTimeout(gravarPreco.current);
-    gravarPreco.current = setTimeout(() => {
-      void tentarGravarOPreco(base ?? null);
-    }, 600);
-  }
-
-  /**
-   * A ida ao servidor, separada do travão das teclas — porque o botão «Tentar
-   * de novo» precisa de a chamar sem esperar 600 ms por nada.
-   */
-  async function tentarGravarOPreco(base: number | null) {
-    setPrecoAGravar(true);
-    try {
-      const r = await mandarPrecoAoPedido(quote.id, base);
-      if (r.estado === "gravado") {
-        setPrecoPorChegar(null);
-        // `quote` pode faltar num 200 de corpo ilegível — ver `ResultadoDoPreco`.
-        if (r.quote) onQuoteUpdated?.(r.quote);
-        return;
+    gravarPreco.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/orcamento/${quote.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          // `null` e não `undefined`: apagar o preço tem de chegar ao servidor,
+          // e `undefined` desaparece no JSON (o merge parcial mantinha o
+          // valor antigo). É a mesma razão que está escrita na Gestão do pedido.
+          body: JSON.stringify({ quotedPrice: base ?? null }),
+        });
+        if (!res.ok) throw new Error("falhou");
+        const atualizado: Quote = await res.json();
+        onQuoteUpdated?.(atualizado);
+      } catch {
+        // Não interrompe a escrita da proposta: o valor fica no ecrã e no
+        // rascunho, e a gravação seguinte volta a tentar. Avisar a cada tecla
+        // seria pior do que o problema.
       }
-      /**
-       * ── E AQUI DEIXA DE SE CALAR ──────────────────────────────────────
-       *
-       * O comentário antigo dizia que avisar a cada tecla seria pior do que o
-       * problema — e tinha razão. Só que a alternativa que escolheu foi não
-       * avisar de todo, e o preço ficava a divergir em silêncio.
-       *
-       * O aviso não é por tecla: é UM estado, que fica enquanto o pedido tiver
-       * um valor diferente do da proposta, e desaparece sozinho assim que uma
-       * gravação passe. Enquanto ele estiver de pé, o ecrã mostra os dois
-       * números e um botão — que é o que ela precisa de ver para decidir.
-       */
-      setPrecoPorChegar({
-        base,
-        porque: r.porque,
-        valeTentarDeNovo: r.valeTentarDeNovo,
-      });
-    } finally {
-      setPrecoAGravar(false);
-    }
+    }, 600);
   }
 
   function onTotalInput(raw: string) {
@@ -4178,7 +3997,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         aria-label={rotulo}
         className="mb-2 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
       >
-        <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-[var(--bo-text)]">
+        <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-foreground/80">
           {aRemover.pergunta}
         </span>
         {/* Cancelar primeiro, e não escreve NADA: nem apaga, nem toca no
@@ -4315,122 +4134,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
   }
 
-  /**
-   * ══════════════════════════════════════════════════════════════════════════
-   * REPOR O TRABALHO QUE ESTA SESSÃO ESMAGOU
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * A gaveta já existia e já estava cheia; o que faltava era isto e a porta do
-   * lado do servidor. Aqui vai-se buscar o documento pelo nome que a própria
-   * gravação devolveu.
-   *
-   * ── E REPOR NÃO É UM SENTIDO ÚNICO ────────────────────────────────────────
-   *
-   * Repor é, por definição, escrever por cima do que está no ecrã — ou seja, o
-   * mesmo gesto que criou este problema. Duas coisas impedem que seja uma
-   * troca de um estrago por outro:
-   *
-   *  1. O «desfazer» de dez segundos desta casa (`limpo`), que já existe para
-   *     os outros gestos que substituem o documento — o próprio código diz que
-   *     nasceu também para «repor uma versão antiga». Fica com o motivo
-   *     escrito, para a barra poder dizer o que aconteceu.
-   *
-   *  2. E a gravação seguinte volta a passar pelo mesmo mecanismo do servidor:
-   *     o documento que está agora no ecrã passa a ser ELE o sobreposto, e vai
-   *     para a mesma gaveta. Ou seja, o resgate protege nos dois sentidos sem
-   *     ninguém ter escrito código para isso.
-   */
-  /**
-   * ══════════════════════════════════════════════════════════════════════════
-   * A NOTA QUE PERTENCE A UMA SECÇÃO, E NÃO AO NEGÓCIO INTEIRO
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * O campo `notasPorSeccao` existia há muito: tipado no documento, protegido
-   * no gerador do PDF («as notas por secção nunca são desenhadas»), e limpo na
-   * cópia para outro pedido — três sítios a tratar bem de uma coisa que
-   * NINGUÉM ESCREVIA. Não havia caixa nenhuma no estúdio.
-   *
-   * O `notasInternas` que já existe é sobre o negócio: «recusaram em 2025 por
-   * preço». Estas são outra coisa e vivem noutra escala: «as capas são as duas
-   * do mesmo ângulo, trocar a segunda», «o cronograma tem de bater com a hora
-   * do padre», «esta linha é a que dá a margem toda». Escritas ao lado do
-   * campo geral, perdiam-se num parágrafo; escritas na secção, estão onde a
-   * dúvida nasce.
-   *
-   * ── E O DOCUMENTO NÃO PODE ENCHER-SE DE VAZIOS ─────────────────────────
-   *
-   * Uma caixa vazia por secção que gravasse `""` punha seis chaves em todos os
-   * documentos, todas sem conteúdo, e ainda por cima faziam o `resgate` e as
-   * comparações de versões acusarem diferenças que não existem. Apagar a
-   * entrada quando a nota fica vazia é o que mantém o documento igual ao que
-   * era antes desta funcionalidade existir — e é isso que o teste prende.
-   */
-  function notaDaSeccao(chave: string, titulo: string) {
-    const notas = doc.notasPorSeccao ?? {};
-    return (
-      <NotasInternas
-        compacta
-        titulo={titulo}
-        valor={notas[chave] ?? ""}
-        placeholder="Só para a equipa. Nunca sai na proposta."
-        onChange={(v) => {
-          const seguintes = { ...notas };
-          if (v.trim()) seguintes[chave] = v;
-          else delete seguintes[chave];
-          patch({
-            notasPorSeccao: Object.keys(seguintes).length > 0 ? seguintes : undefined,
-          });
-        }}
-      />
-    );
-  }
-
-  async function reporSobreposto() {
-    if (!sobreposto || aRepor) return;
-    setARepor(true);
-    try {
-      // A rota recebe a VARIANTE, não a chave inteira: a chave é
-      // `<pedido>--<variante>`, e é o servidor que a volta a montar.
-      const variante = sobreposto.chave.startsWith(`${quote.id}--`)
-        ? sobreposto.chave.slice(`${quote.id}--`.length)
-        : null;
-      if (!variante) {
-        toast("Não reconheço o sítio onde essa versão ficou guardada.", "error");
-        return;
-      }
-      const res = await fetch(
-        `/api/orcamento/${quote.id}/proposta-rascunho?variante=${encodeURIComponent(variante)}`,
-      );
-      const dados = await res.json().catch(() => null);
-      const recuperado = dados?.draft?.doc;
-      if (!res.ok || recuperado == null) {
-        // Dizer o que aconteceu e o que fazer, e NÃO limpar a barra: se não se
-        // conseguiu abrir agora, a gaveta continua lá e vale a pena insistir.
-        toast(
-          res.status === 401
-            ? "A sessão expirou. Entra outra vez e essa versão continua guardada."
-            : "Não consegui abrir essa versão agora. Ela continua guardada — tenta daqui a pouco.",
-          "error",
-        );
-        return;
-      }
-      setLimpo({
-        doc,
-        total: totalInput,
-        segundos: 10,
-        motivo: sobreposto.quem
-          ? `Reposta a versão de ${sobreposto.quem}.`
-          : "Reposta a versão que tinha sido substituída.",
-      });
-      setDoc(recuperado as StudioDoc);
-      setSobreposto(null);
-    } catch {
-      toast("Não consegui abrir essa versão agora. Ela continua guardada.", "error");
-    } finally {
-      setARepor(false);
-    }
-  }
-
   function clearDraft() {
     /*
      * ── CONTINUA SEM CAIXA DE CONFIRMAÇÃO, E DE PROPÓSITO ─────────────────
@@ -4463,9 +4166,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
     });
     setDoc(seedDefaults(initialDoc(quote), quote));
-    // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz é o
-    // que ela acabou de pedir para ver. Nada a confirmar.
-    setPorConfirmar(new Set());
+    // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz
+    // volta a estar por confirmar.
+    setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
         ? textoDoTotal(quote.quotedPrice)
@@ -6754,24 +6457,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *
    * Laranja e não verde: é um AVISO de coisa por rever, não uma acção. O
    * `DESIGN-TOKENS.md` fixa esta regra para a página toda.
-   *
-   * ── E ACENDE-SE NUMA OCASIÃO SÓ ──────────────────────────────────────────
-   *
-   * Quando a proposta foi COPIADA DE OUTRA. É aí que os campos trazem mesmo o
-   * casal de outra pessoa, e é a única forma de a duplicação fazer mal em vez
-   * de bem: uma proposta enviada com o nome ou a data de outro casamento. Esse
-   * caso fica marcado, e tem passeio próprio a guardá-lo.
-   *
-   * Acendia-se TAMBÉM ao abrir qualquer proposta, para assinalar o que o casal
-   * tinha escrito no formulário do pedido. A intenção era boa e o resultado não
-   * era: seis anéis à volta de seis campos, em todas as propostas, sempre — e
-   * ela a ter de tocar num a um para os apagar. Palavras dela: «fica com essas
-   * coisas à volta amarelas e eu quero tirar isso».
-   *
-   * Um aviso que está sempre ligado não é um aviso; é decoração que ensina a
-   * não olhar. E o que ele marcava ali não era perigoso: os dados do formulário
-   * são deste casal, estão certos, e ela lê-os no ecrã de qualquer maneira. O
-   * perigo é o outro caso, e esse continua marcado.
    */
   const realce = (campo: CampoAMudar) =>
     porConfirmar.has(campo)
@@ -7064,7 +6749,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           aria-label="O valor não é o que seguiu para o cliente"
           className="mb-4 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
         >
-          <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+          <p className="text-xs leading-relaxed text-foreground/70">
             Esta proposta já seguiu para o cliente{" "}
             {dataDoEnvioPorExtenso(divergenciaDoEnviado.enviadaEm)}, e o valor que está neste ecrã
             NÃO é o que ele recebeu. Escolhe qual dos dois fica — nada muda até escolheres.
@@ -7073,13 +6758,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <dl className="flex flex-col gap-2 @min-[30rem]:flex-row @min-[30rem]:gap-4">
               <div className="min-w-0 grow">
                 <dt className="text-[11px] text-foreground/45">O que o cliente recebeu</dt>
-                <dd className="text-sm font-semibold text-[var(--bo-text)]">
+                <dd className="text-sm font-semibold text-foreground/85">
                   {eur(divergenciaDoEnviado.aPagarEnviado)}
                 </dd>
               </div>
               <div className="min-w-0 grow">
                 <dt className="text-[11px] text-foreground/45">O que está neste aparelho</dt>
-                <dd className="text-sm font-semibold text-[var(--bo-text)]">
+                <dd className="text-sm font-semibold text-foreground/85">
                   {eur(divergenciaDoEnviado.aPagarAqui)}
                 </dd>
               </div>
@@ -7107,7 +6792,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               </button>
               <button
                 type="button"
-                className="alvo-toque text-xs text-[var(--bo-text-muted)] underline-offset-2 hover:underline"
+                className="alvo-toque text-xs text-foreground/55 underline-offset-2 hover:underline"
                 onClick={manterOsValoresDesteAparelho}
               >
                 Manter os deste aparelho
@@ -7123,7 +6808,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
       {limpo && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
-          <span className="text-xs text-[var(--bo-tinta-72)]">
+          <span className="text-xs text-foreground/70">
             {limpo.motivo} Pode anular durante {limpo.segundos}s.
           </span>
           <button
@@ -7154,7 +6839,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           aria-label="Confirmar alteração ao valor"
           className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
         >
-          <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-[var(--bo-text)]">
+          <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-foreground/80">
             {confirmacaoDeDinheiro.pergunta}
           </span>
           <Button variant="ghost" size="sm" onClick={() => setConfirmacaoDeDinheiro(null)}>
@@ -7276,47 +6961,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             em `ProposalBuilder.tsx:973-1009`; aqui é a mesma conta noutra
             caixa. */}
         <div className="@container min-w-0 flex-1">
-          {/* ══════════════════════════════════════════════════════════════
-              O TRABALHO QUE ESTA GRAVAÇÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
-              ══════════════════════════════════════════════════════════════
-
-              Isto não é um aviso: é uma decisão por tomar sobre trabalho de
-              outra pessoa. Por isso não é um `toast` — fica aqui até alguém
-              resolver.
-
-              `aria-live="polite"` e não `assertive`: aparece depois de uma
-              gravação automática, num momento em que ela está a escrever, e
-              interromper um leitor de ecrã a meio de uma frase para dar uma
-              notícia que não é urgente seria trocar o mal maior pelo menor.
-
-              As duas saídas estão à vista e nenhuma esconde a outra: repor, ou
-              dispensar. Dispensar não apaga nada no servidor — só tira o
-              lembrete —, e é isso que o botão diz pelo nome. */}
-          {sobreposto && (
-            <div
-              className="border-[var(--bo-hairline-strong)] bg-[var(--bo-surface-sunken)] mb-4 rounded-xl border p-3"
-              aria-live="polite"
-            >
-              <p className="text-[var(--bo-text)] mb-1 text-sm font-medium">
-                {sobreposto.quem
-                  ? `A versão de ${sobreposto.quem} ficou guardada.`
-                  : "A versão que estava aqui ficou guardada."}
-              </p>
-              <p className="text-[var(--bo-text-muted)] mb-3 text-xs leading-relaxed">
-                Gravaste por cima de trabalho que tinha sido feito noutro sítio
-                {sobreposto.quando ? ` às ${quandoGravado(sobreposto.quando)}` : ""}. Ficou a tua
-                versão, e a outra não se perdeu.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" loading={aRepor} onClick={reporSobreposto}>
-                  Repor essa versão
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setSobreposto(null)}>
-                  Dispensar o aviso
-                </Button>
-              </div>
-            </div>
-          )}
           {/* Template selector */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <Segmented
@@ -7349,7 +6993,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 bilingue
                   ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
-                  : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
+                  : "border-[var(--bo-hairline-strong)] text-foreground/60 hover:border-foreground/30 hover:text-foreground/80"
               }`}
               title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
             >
@@ -7412,7 +7056,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   type="button"
                   disabled={!traducaoLigada}
                   onClick={() => void traduzirTudo()}
-                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <span aria-hidden="true">⇄</span>
                   Traduzir para inglês
@@ -7589,6 +7233,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               />
             </div>
 
+            {/*
+             * ══════════════════════════════════════════════════════════════
+             * A FRASE DE INTENÇÃO
+             * ══════════════════════════════════════════════════════════════
+             *
+             * «Pensámos o vosso dia em branco e azul, com a serenidade do
+             * Redondo em setembro.» É a primeira coisa que o casal lê na
+             * página, e é a única coisa da proposta que não é um dado.
+             *
+             * ── SEM TEXTO POR OMISSÃO, E ISSO É A DECISÃO ────────────────
+             * Palavras dela: «uma frase genérica é pior do que nenhuma». Uma
+             * frase da casa aqui seria lida como escrita para aquele casal, e
+             * no dia em que dois casais a comparassem seria pior do que nunca
+             * ter existido. Por isso não há sugestão, não há exemplo
+             * pré-preenchido, e o campo vazio não acende aviso nenhum: uma
+             * proposta sem frase é uma proposta legítima.
+             *
+             * O exemplo está no `hint`, onde se lê e não se copia.
+             */}
+            <div className="mt-4">
+              <Field
+                as="textarea"
+                rows={3}
+                label="Frase de intenção (só na página do casal)"
+                value={doc.intencao ?? ""}
+                maxLength={MAX_INTENCAO}
+                onChange={(e) => patch({ intencao: e.target.value.slice(0, MAX_INTENCAO) })}
+                data-campo="intencao"
+                hint={`abre a página, por cima do nome deles. Três linhas sobre o que imaginou para este casamento, escritas de raiz para eles. Ex.: «Pensámos o vosso dia em branco e azul, com a serenidade do Redondo em setembro.» ${(doc.intencao ?? "").length}/${MAX_INTENCAO}`}
+              />
+            </div>
+
             {/* ── O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE ────────────────
                 «Quer ficar por baixo dos 8.000 €.» «Quem decide é a mãe.»
                 Frases que hoje vivem na cabeça de quem escreveu a proposta e
@@ -7610,11 +7286,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section
-            title="Imagens de capa (2)"
-            id="capas"
-            rodape={notaDaSeccao("capas", "Nota sobre as capas")}
-          >
+          <Section title="Imagens de capa (2)" id="capas">
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -7730,11 +7402,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section
-            title="Serviços"
-            id="servicos"
-            rodape={notaDaSeccao("servicos", "Nota sobre os serviços")}
-          >
+          <Section title="Serviços" id="servicos">
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -7754,13 +7422,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section
-              title="Mood boards"
-              id="moodboards"
-              nota={contagemDosBoards}
-              rodape={notaDaSeccao("moodboards", "Nota sobre os mood boards")}
-            >
-              <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
+              <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
               <AvisoDeOrdem
@@ -7963,7 +7626,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     type="button"
                                     {...pega}
                                     aria-label={`Arrastar o mood board ${pos + 1}`}
-                                    className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:cursor-grabbing"
+                                    className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70 active:cursor-grabbing"
                                   >
                                     <span aria-hidden="true">⠿</span>
                                   </button>
@@ -7981,12 +7644,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         ? `Abrir o mood board ${pos + 1}`
                                         : `Fechar o mood board ${pos + 1}`
                                     }
-                                    className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                    className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
                                   >
                                     <span aria-hidden="true">{dobrado ? "▸" : "▾"}</span>
                                   </button>
                                   <input
-                                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                                     value={b.title}
                                     onChange={(e) => updateBoard(bi, { title: e.target.value })}
                                     // A pega do aviso de ortografia: é por ela
@@ -8008,7 +7671,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     "Título do mood board",
                                     {
                                       className:
-                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75",
                                       readOnly: fechado,
                                       placeholder: "Ceremony Decoration",
                                     },
@@ -8021,7 +7684,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             decidir. Sem campo, ou se perdia a segunda frase ou
                             se enfiava tudo num título com parênteses. */}
                                   <input
-                                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                                     value={b.subtitulo ?? ""}
                                     onChange={(e) => updateBoard(bi, { subtitulo: e.target.value })}
                                     data-campo={`boardSubtitulo:${bi}`}
@@ -8034,7 +7697,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     "Subtítulo do mood board",
                                     {
                                       className:
-                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75",
                                       readOnly: fechado,
                                     },
                                   )}
@@ -8062,7 +7725,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs transition-colors ${
                                       fechado
                                         ? "bg-[#4d6350]/15 text-[#4d6350]"
-                                        : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                        : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
                                     }`}
                                   >
                                     <span aria-hidden="true">{fechado ? "🔒" : "🔓"}</span>
@@ -8082,7 +7745,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       aria-label={`Arrumar por cor as fotografias do mood board ${pos + 1}`}
                                       title="Arrumar as fotografias por cor"
                                       disabled={fechado}
-                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:opacity-40"
+                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70 disabled:opacity-40"
                                     >
                                       <span aria-hidden="true">◑</span>
                                     </button>
@@ -8091,7 +7754,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     type="button"
                                     onClick={() => duplicarBoard(bi)}
                                     aria-label={`Duplicar o mood board ${pos + 1}`}
-                                    className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                    className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-foreground/70"
                                   >
                                     <span aria-hidden="true">⧉</span>
                                   </button>
@@ -8241,7 +7904,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         .sort((x, y) => x - y)
                                         .map((i) => `${i + 1}.ª`);
                                       return (
-                                        <p className="mb-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                                        <p className="mb-2 text-xs leading-relaxed text-foreground/55">
                                           <span aria-hidden="true">◐ </span>
                                           {fora.length === 1
                                             ? `A ${quais[0]} fotografia destoa da paleta desta página.`
@@ -8431,7 +8094,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                        * fazer melhor de graça.
                                        */
                                       <details className="group mt-1">
-                                        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+                                        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
                                           <span
                                             aria-hidden
                                             className="text-[10px] text-foreground/35 motion-safe:transition-transform group-open:rotate-90"
@@ -8439,7 +8102,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             ▸
                                           </span>
                                           Disposição:{" "}
-                                          <strong className="font-medium text-[var(--bo-tinta-72)]">
+                                          <strong className="font-medium text-foreground/75">
                                             {NOME_DO_LAYOUT[layoutDoBoard]}
                                           </strong>
                                           <span className="text-foreground/35">
@@ -8539,7 +8202,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           sem ela, para uma proposta já enviada sair como
                           sempre saiu. */}
                                     <div className="mt-2 flex items-center gap-1.5">
-                                      <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                                      <label className="flex items-start gap-2 text-xs leading-relaxed text-foreground/65">
                                         <input
                                           type="checkbox"
                                           className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
@@ -8695,7 +8358,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                      * uma em vez de a adivinhar.
                      */}
                     {doc.moodBoards.length > 1 && (
-                      <label className="flex items-center gap-2 text-xs text-[var(--bo-text-muted)]">
+                      <label className="flex items-center gap-2 text-xs text-foreground/65">
                         <input
                           type="checkbox"
                           className="h-4 w-4 shrink-0 accent-[#4d6350]"
@@ -8781,11 +8444,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section
-              title="Cronograma de Organização"
-              id="cronograma"
-              rodape={notaDaSeccao("cronograma", "Nota sobre o cronograma")}
-            >
+            <Section title="Cronograma de Organização" id="cronograma">
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -8794,7 +8453,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   >
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <input
-                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                         value={ph.title}
                         onChange={(e) => updatePhase(pi, { title: e.target.value })}
                         placeholder="6-12 meses antes do casamento"
@@ -8858,11 +8517,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section
-            title="Orçamento Proposto"
-            id="orcamento"
-            rodape={notaDaSeccao("orcamento", "Nota sobre o orçamento")}
-          >
+          <Section title="Orçamento Proposto" id="orcamento">
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -8909,7 +8564,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       Preço (sem IVA)
                       <Ajuda sobre="para que servem os preços por linha">
                         Os preços por linha são{" "}
-                        <strong className="font-semibold text-[var(--bo-text)]">só para ti</strong>:
+                        <strong className="font-semibold text-foreground/85">só para ti</strong>:
                         servem para somar e para avisar quando o total já não bate certo. O PDF
                         continua a mostrar as linhas sem preço e um «
                         {doc.totalLabel || "Valor Total"}» único, como nas tuas propostas.
@@ -8925,7 +8580,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     <span className="flex w-16 shrink-0 items-center justify-center gap-1">
                       Extra
                       <Ajuda sobre="o que faz a caixa Extra">
-                        <strong className="font-semibold text-[var(--bo-text)]">Extra</strong> marca
+                        <strong className="font-semibold text-foreground/85">Extra</strong> marca
                         uma linha como opcional: ela sai assinalada no quadro do PDF e, por baixo do
                         total, a proposta passa a mostrar também o valor <em>sem</em> essa linha.
                         Uma proposta só, com as duas versões lá dentro — em vez de dois documentos a
@@ -9080,7 +8735,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             className={`bo-input px-2.5 py-2 text-right text-xs ${
                               semPreco
                                 ? "border-dashed bg-[var(--bo-tinta-3)] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
-                                : "font-medium text-[var(--bo-text)]"
+                                : "font-medium text-foreground/90"
                             }`}
                             defaultValue={l.preco === null ? "" : String(l.preco)}
                             // `onBlur` e não `onChange`: normalizar a cada tecla
@@ -9119,7 +8774,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             quadrícula ao ser carregado. */}
                         {ordemDoOrcamento[0] === i && (
                           <Ajuda className="@min-[36rem]:hidden" sobre="o que faz a caixa Extra">
-                            <strong className="font-semibold text-[var(--bo-text)]">Extra</strong>{" "}
+                            <strong className="font-semibold text-foreground/85">Extra</strong>{" "}
                             marca uma linha como opcional: ela sai assinalada no quadro do PDF e,
                             por baixo do total, a proposta passa a mostrar também o valor{" "}
                             <em>sem</em> essa linha. Uma proposta só, com as duas versões lá dentro
@@ -9149,7 +8804,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                 // — com a fórmula ao lado a explicar uma conta
                                 // que já não era a desta linha.
                                 key={`unitario:${i}:${escala.unitario}`}
-                                className="bo-input px-2.5 py-2 text-right text-xs text-[var(--bo-tinta-72)]"
+                                className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
                                 defaultValue={String(escala.unitario)}
                                 onBlur={(e) => definirUnitario(i, e.target.value)}
                                 placeholder="45"
@@ -9202,13 +8857,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         quando há preços por linha para contar. */}
                     {contagem.total > 0 &&
                       (contagem.comPreco === 0 && parseMoneyText(totalInput) > 0 ? (
-                        <span className="text-xs text-[var(--bo-text-muted)]">
+                        <span className="text-xs text-foreground/55">
                           Preço definido no total — as linhas não levam valor
                         </span>
                       ) : contagem.comPreco > 0 ? (
-                        <span className="text-xs text-[var(--bo-text-muted)]">
-                          {contagem.frase}
-                        </span>
+                        <span className="text-xs text-foreground/55">{contagem.frase}</span>
                       ) : null)}
                   </div>
                   {/* ── UMAS COM PREÇO, OUTRAS SEM: A SOMA ESTÁ INCOMPLETA ──
@@ -9218,7 +8871,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       está errado por baixo — e é a partir dele que o aviso de
                       desalinhamento e o botão que arruma o total falam. */}
                   {contagem.incompleta && (
-                    <p className="flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                    <p className="flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
                       <span aria-hidden="true">⚠</span>
                       <span>
                         {contagem.semPreco === 1
@@ -9248,13 +8901,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <div className="mt-1 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2.5">
                         {/* O IMPACTO, na frase que ela pediu: quantos estão
                             marcados, e quanto vale a proposta com eles. */}
-                        <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                        <p className="text-xs leading-relaxed text-foreground/70">
                           {`${v.linhasExtra} ${v.linhasExtra === 1 ? "item marcado" : "itens marcados"} como extra · versão com extras: `}
-                          <strong className="font-semibold text-[var(--bo-text)]">
+                          <strong className="font-semibold text-foreground/85">
                             {eur(v.comoOTotal.comExtras)}
                           </strong>
                           {" · versão base: "}
-                          <strong className="font-semibold text-[var(--bo-text)]">
+                          <strong className="font-semibold text-foreground/85">
                             {eur(v.comoOTotal.base)}
                           </strong>
                         </p>
@@ -9297,7 +8950,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         reconhecimento; um rótulo reescrito à mão deixa de ser
                         reconhecido, e é para esse que a caixa existe. */}
                     {caixaDeIngles({ tipo: "totalLabel" }, "Rótulo do total", {
-                      className: "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                      className: "bo-input px-2.5 py-2 text-xs text-foreground/75",
                       placeholder: "Decoration Total",
                     })}
                   </div>
@@ -9439,7 +9092,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               nova em vez de descer. */}
                           <div className="col-span-2 min-w-0 @min-[26rem]:col-span-1">
                             <input
-                              className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                              className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                               value={ex.label}
                               onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
                               data-campo={`extraRotulo:${i}`}
@@ -9450,7 +9103,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               { tipo: "extraRotulo", i },
                               "Descrição da linha adicional",
                               {
-                                className: "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                className: "bo-input px-2.5 py-2 text-xs text-foreground/75",
                                 placeholder: "Líquen team travel",
                                 // EMPILHADA: esta já vive numa célula estreita
                                 // de uma grelha de dois (o rótulo à esquerda, o
@@ -9481,7 +9134,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               selector do IVA, a deslocação calculada, o anular). */}
                           <input
                             key={`${i}:${ex.valueText}`}
-                            className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] text-right"
+                            className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
                             defaultValue={numero === null ? (ex.valueText ?? "") : String(numero)}
                             onBlur={(e) => definirValorDoAdicional(i, e.target.value)}
                             placeholder="896"
@@ -9489,7 +9142,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             aria-label={`Valor de ${ex.label?.trim() || "linha adicional sem nome"}`}
                           />
                           <select
-                            className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
+                            className="bo-input px-2 py-2 text-xs text-foreground/75"
                             value={modo}
                             onChange={(e) =>
                               definirIvaDoAdicional(i, e.target.value as ModoDeIvaDoAdicional)
@@ -9565,7 +9218,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[26rem]:grid-cols-[minmax(0,1fr)_10rem_auto]"
                     >
                       <input
-                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] @min-[26rem]:col-span-1"
+                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-foreground/75 @min-[26rem]:col-span-1"
                         value={r.item}
                         onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
                         placeholder="Coordenação do dia"
@@ -9573,7 +9226,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         data-campo={chaveDoCampo({ tipo: "linhaEstimada", i })}
                       />
                       <input
-                        className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] text-right"
+                        className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
                         value={r.price}
                         onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
                         placeholder="1.500,00 €"
@@ -9710,11 +9363,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section
-            title="Total, IVA e validade"
-            id="total"
-            rodape={notaDaSeccao("total", "Nota sobre o total")}
-          >
+          <Section title="Total, IVA e validade" id="total">
             <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
               {/**
                * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
@@ -9757,7 +9406,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 const efectivo = money.base;
                 const servicos = round2(efectivo - degrau);
                 return (
-                  <p className="text-xs leading-relaxed text-[var(--bo-text-muted)] @min-[26rem]:col-span-2">
+                  <p className="text-xs leading-relaxed text-foreground/60 @min-[26rem]:col-span-2">
                     Este campo é <strong className="font-semibold">só os serviços</strong>. O{" "}
                     <strong className="font-semibold">Preço final</strong> do pedido mostra outro
                     número, porque leva também os adicionais:{" "}
@@ -9795,7 +9444,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 errado sem dar o gesto que o arruma é meio trabalho. */}
               {desvio && (
                 <div className="@min-[26rem]:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
-                  <span className="text-xs text-[var(--bo-tinta-72)]">
+                  <span className="text-xs text-foreground/70">
                     O total está escrito à mão e difere da soma das linhas em{" "}
                     <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
                   </span>
@@ -9878,17 +9527,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       dizia base 3280 e IVA 754,40 sobre um documento que vale
                       2666,67 e 613,33. Um quadro que mente sobre o dinheiro é
                       pior do que um quadro a menos. */}
-                  <span className="block font-medium text-[var(--bo-tinta-72)]">
+                  <span className="block font-medium text-foreground/70">
                     {vatMode === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
                   </span>
                   {money.base > 0 && (
                     <>
-                      <span className="mt-0.5 block text-[var(--bo-text-muted)]">
+                      <span className="mt-0.5 block text-foreground/55">
                         base {eur(duasFormas[vatMode].base)} · IVA {eur(duasFormas[vatMode].iva)}
                       </span>
-                      <span className="block text-[var(--bo-text-muted)]">
+                      <span className="block text-foreground/55">
                         o cliente paga{" "}
-                        <strong className="font-semibold text-[var(--bo-text)]">
+                        <strong className="font-semibold text-foreground/80">
                           {eur(duasFormas[vatMode].total)}
                         </strong>
                       </span>
@@ -10156,7 +9805,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <p className="flex items-center gap-2 font-display text-base text-[#4d6350]">
                 <span aria-hidden="true">✓</span> Proposta enviada
               </p>
-              <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
+              <p className="text-sm leading-relaxed text-foreground/60">
                 A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisas de
                 fazer mais nada.
               </p>
@@ -10178,7 +9827,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             </div>
           ) : (
             <>
-              <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
+              <p className="text-sm leading-relaxed text-foreground/60">
                 Confirma os dados abaixo. Ao enviar, o cliente recebe a proposta em PDF por email.
               </p>
               {/* ── SEM DESTINATÁRIO, DIZ-SE AQUI E NÃO DEPOIS ──────────────
@@ -10189,7 +9838,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Agora está antes do dedo, e diz ONDE se resolve — no painel do
                   pedido, que passou a deixar corrigir os contactos. */}
               {!emailDoCliente && (
-                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
                   <span aria-hidden="true">⚠</span>
                   <span>
                     Este pedido não tem email de cliente. A proposta é gravada e o link continua a
@@ -10243,7 +9892,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   a ressalva sobre o que o documento traduz (e o que não
                   traduz) está no passo 2, ao lado do botão que o gera. */}
               <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="text-sm text-[var(--bo-text-muted)]">Idioma</span>
+                <span className="text-sm text-foreground/60">Idioma</span>
                 <Segmented
                   size="sm"
                   ariaLabel="Idioma da proposta"
@@ -10566,7 +10215,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 existe para responder a «quanto vai a proposta», não para abrir
                 a discussão que o bloco de totais já resolve.
                 Ficam o total sem IVA, o total a pagar e o estado de guardado. */}
-            <p className="mr-auto min-w-0 truncate text-xs text-[var(--bo-text-muted)]">
+            <p className="mr-auto min-w-0 truncate text-xs text-foreground/55">
               {/* ── A ETIQUETA VIAJA COM O NÚMERO ────────────────────────────
                   A escolha acima — no telemóvel, o que o CLIENTE paga — estava
                   certa. O que estava errado era a palavra: «Total» ficava FORA
@@ -10588,13 +10237,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <>
                   <span className="sm:hidden">
                     <span className="text-foreground/45">A pagar</span>{" "}
-                    <strong className="font-semibold text-[var(--bo-text)]">
+                    <strong className="font-semibold text-foreground/85">
                       {eur(totais.aPagar)}
                     </strong>
                   </span>
                   <span className="hidden sm:inline">
                     <span className="text-foreground/45">Total</span>{" "}
-                    <strong className="font-semibold text-[var(--bo-text)]">
+                    <strong className="font-semibold text-foreground/85">
                       {eur(totais.total)}
                     </strong>{" "}
                     <span className="text-foreground/45">
@@ -10613,47 +10262,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     Preenche o conteúdo e avança para pré-visualizar.
                   </span>
                 </>
-              )}
-              {/* ══════════════════════════════════════════════════════════
-                  O PREÇO QUE NÃO CHEGOU AO PEDIDO
-                  ══════════════════════════════════════════════════════════
-
-                  Fica ao lado do indicador da gravação porque é da mesma
-                  família — «onde é que o meu trabalho está» —, mas é um aviso
-                  À PARTE e não um quarto estado daquele: o rascunho pode estar
-                  guardado e o preço na mesma por chegar, e juntá-los obrigava
-                  o indicador a escolher qual das duas verdades dizia.
-
-                  Diz o que aconteceu, com o número, e o que fazer — a regra
-                  dela. Sem o número isto era «algo correu mal» com outra
-                  roupa: ela precisa de ver QUE valor ficou por gravar para
-                  saber se o cartão do pedido está certo ou não.
-              */}
-              {precoPorChegar && (
-                <span
-                  className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
-                  aria-live="assertive"
-                  title={
-                    precoPorChegar.porque ??
-                    "A proposta continua certa; o que não ficou gravado foi o valor no pedido."
-                  }
-                >
-                  <span>
-                    {precoPorChegar.base == null
-                      ? "O pedido ficou com o valor antigo"
-                      : `O pedido ficou sem o valor de ${eur(precoPorChegar.base)}`}
-                  </span>
-                  {precoPorChegar.valeTentarDeNovo && (
-                    <button
-                      type="button"
-                      className="alvo-toque foco-largo underline underline-offset-2 disabled:opacity-60"
-                      disabled={precoAGravar}
-                      onClick={() => void tentarGravarOPreco(precoPorChegar.base)}
-                    >
-                      {precoAGravar ? "A tentar…" : "Tentar de novo"}
-                    </button>
-                  )}
-                </span>
               )}
               {(gravadoEm || porGravar || soNesteComputador || naoDuraAoDeploy) &&
                 (() => {
@@ -10981,14 +10589,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 usa; o que muda é a altura em que aparece. */
             cortesPorConfirmar ? (
               <div className="ml-auto flex flex-col items-end gap-2">
-                <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75">
                   <p className="font-medium">O documento sai com conteúdo cortado:</p>
                   <ul className="mt-1 flex flex-col gap-0.5">
                     {cortesPorConfirmar.map((c) => (
                       <li key={`${c.where}:${c.unit}`}>· {fraseDeCorte(c)}</li>
                     ))}
                   </ul>
-                  <p className="mt-1.5 text-[var(--bo-text-muted)]">
+                  <p className="mt-1.5 text-foreground/55">
                     Volta ao conteúdo para encurtar o que ficou cortado, ou envia assim mesmo se for
                     de propósito.
                   </p>
@@ -11037,17 +10645,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  uma secção para a folha seguinte (ver `proposal-paginas.ts`),
                  e prometer um número exacto seria mentir na última frase. */
               <div className="ml-auto flex max-w-lg flex-col items-end gap-2">
-                <p className="text-right text-sm leading-relaxed text-[var(--bo-tinta-72)]">
+                <p className="text-right text-sm leading-relaxed text-foreground/70">
                   Enviar para{" "}
-                  <strong className="font-medium text-[var(--bo-text)]">
+                  <strong className="font-medium text-foreground/85">
                     {quote.email || "o cliente"}
                   </strong>
                   ? Vai um PDF de cerca de {folhasAproximadas(doc as ProposalDoc)} páginas,{" "}
                   {idiomaDoPdf === "en" ? "em inglês" : "em português"}, com{" "}
-                  <strong className="font-medium text-[var(--bo-text)]">
-                    {eur(totais.aPagar)}
-                  </strong>{" "}
-                  a pagar.
+                  <strong className="font-medium text-foreground/85">{eur(totais.aPagar)}</strong> a
+                  pagar.
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button variant="ghost" onClick={() => setConfirmSend(false)}>
@@ -11241,12 +10847,10 @@ function LinhaDeTotal({
         regua ? "border-t border-[var(--bo-hairline-strong)] pt-1.5" : ""
       }`}
     >
-      <dt className={forte ? "text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-muted)]"}>
-        {rotulo}
-      </dt>
+      <dt className={forte ? "text-foreground/75" : "text-foreground/55"}>{rotulo}</dt>
       <dd
         className={`tabular-nums ${
-          forte ? "text-sm font-semibold text-[var(--bo-text)]" : "text-[var(--bo-tinta-72)]"
+          forte ? "text-sm font-semibold text-foreground/90" : "text-foreground/70"
         }`}
       >
         {valor}
@@ -11325,10 +10929,10 @@ function BarraDaSeleccao({
   if (quantas === 0) return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#4d6350]/35 bg-[#4d6350]/[0.06] px-3 py-2">
-      <p className="text-xs font-medium text-[var(--bo-tinta-72)]">
+      <p className="text-xs font-medium text-foreground/75">
         {quantas === 1 ? "1 fotografia escolhida" : `${quantas} fotografias escolhidas`}
       </p>
-      <label className="flex items-center gap-1.5 text-xs text-[var(--bo-text-muted)]">
+      <label className="flex items-center gap-1.5 text-xs text-foreground/60">
         Mover para
         <select
           // Volta sempre a «—» depois de mover: é uma acção, não um estado, e
@@ -11353,7 +10957,7 @@ function BarraDaSeleccao({
       <button
         type="button"
         onClick={onLimpar}
-        className="alvo-toque text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:text-[var(--bo-text)]"
+        className="alvo-toque text-xs font-medium text-foreground/55 transition-colors hover:text-foreground/80"
       >
         Limpar
       </button>
@@ -11660,15 +11264,13 @@ function AccoesDaFoto({
                 className={`alvo-toque !justify-start flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors disabled:opacity-30 ${
                   a.destrutiva
                     ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07]"
-                    : "text-[var(--bo-text)] hover:bg-[var(--bo-tinta-6)]"
+                    : "text-foreground/80 hover:bg-[var(--bo-tinta-6)]"
                 } ${primeiraDestrutiva ? "mt-1 border-t border-[var(--bo-hairline)] pt-3" : ""}`}
               >
                 <span
                   aria-hidden="true"
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[13px] ${
-                    a.activa
-                      ? "bg-[#4d6350] text-white"
-                      : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
+                    a.activa ? "bg-[#4d6350] text-white" : "bg-[var(--bo-tinta-6)] text-foreground/60"
                   }`}
                 >
                   {a.glifo}
@@ -11754,7 +11356,7 @@ function AvisoDeOrdem({
   if (!mostrar) return null;
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2">
-      <p className="min-w-[16rem] flex-1 text-[11px] leading-relaxed text-[var(--bo-text-muted)]">
+      <p className="min-w-[16rem] flex-1 text-[11px] leading-relaxed text-foreground/55">
         {onde} estão pela ordem da lista de <strong className="font-medium">Serviços</strong>, que é
         a ordem por que o PDF sai — e não pela ordem em que foram escritas. Arruma os Serviços e
         isto acompanha.
@@ -11762,7 +11364,7 @@ function AvisoDeOrdem({
       <button
         type="button"
         onClick={onFixar}
-        className="alvo-toque shrink-0 rounded-lg border border-[var(--bo-hairline-strong)] px-2.5 py-1 text-[11px] font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
+        className="alvo-toque shrink-0 rounded-lg border border-[var(--bo-hairline-strong)] px-2.5 py-1 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
       >
         Arrumar eu
       </button>
@@ -11816,27 +11418,12 @@ function Section({
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
   accao,
-  /**
-   * O que fica no FUNDO da secção, depois do conteúdo — hoje, a nota interna
-   * daquela secção.
-   *
-   * ── PORQUE É UMA RANHURA DA SECÇÃO E NÃO MAIS UM FILHO ──────────────────
-   *
-   * Podia ser escrito como último filho em cada uma das seis. Seria a mesma
-   * coisa até ao dia em que uma delas ficasse com a nota no meio do conteúdo
-   * — e uma nota interna que aparece onde calha, ao pé de campos que SAEM na
-   * proposta, é exactamente o que o papel amarelo do `NotasInternas` existe
-   * para evitar. A ranhura garante que está sempre no mesmo sítio, por baixo
-   * de tudo, e que se dobra com a secção como o resto.
-   */
-  rodape,
 }: {
   title: string;
   children: React.ReactNode;
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
-  rodape?: React.ReactNode;
 }) {
   const [fechada, setFechada] = useState(false);
 
@@ -11883,12 +11470,12 @@ function Section({
             >
               ▶
             </span>
-            <h3 className="font-display text-base leading-tight text-[var(--bo-text)] group-hover:text-foreground">
+            <h3 className="font-display text-base leading-tight text-foreground/90 group-hover:text-foreground">
               {title}
             </h3>
           </button>
         ) : (
-          <h3 className="font-display shrink-0 text-base leading-tight text-[var(--bo-text)]">
+          <h3 className="font-display shrink-0 text-base leading-tight text-foreground/90">
             {title}
           </h3>
         )}
@@ -11899,7 +11486,6 @@ function Section({
           no formulário, e fechá-la não pode apagar o que lá está escrito. */}
       <div id={corpoId} hidden={fechada}>
         {children}
-        {rodape}
       </div>
     </Card>
   );
@@ -11945,7 +11531,7 @@ function StepNav({
               className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium motion-safe:transition-colors inline-flex items-center ${
                 active
                   ? "bg-[#4d6350] text-white"
-                  : "text-foreground/50 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+                  : "text-foreground/50 hover:bg-[var(--bo-tinta-6)] hover:text-foreground/80"
               }`}
             >
               <span
@@ -11977,7 +11563,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-[var(--bo-hairline)] pb-1.5">
       <dt className="text-foreground/45">{label}</dt>
-      <dd className="text-right text-[var(--bo-text)]">{value}</dd>
+      <dd className="text-right text-foreground/85">{value}</dd>
     </div>
   );
 }
@@ -12028,7 +11614,7 @@ function CopiarResumo({ texto }: { texto: string }) {
       </Button>
       {falhou && (
         <div className="mt-2 max-w-md rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] p-3">
-          <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+          <p className="text-xs leading-relaxed text-foreground/70">
             Não foi possível copiar automaticamente. O texto está seleccionado: copia com
             Cmd/Ctrl+C.
           </p>
@@ -12039,7 +11625,7 @@ function CopiarResumo({ texto }: { texto: string }) {
             value={texto}
             onFocus={(e) => e.currentTarget.select()}
             rows={4}
-            className="bo-input mt-2 w-full px-3 py-2 text-xs text-[var(--bo-text)]"
+            className="bo-input mt-2 w-full px-3 py-2 text-xs text-foreground/85"
           />
         </div>
       )}
@@ -12162,7 +11748,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
     <div className="mt-3 border-t border-[var(--bo-hairline)] pt-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="bo-eyebrow">Só para si</span>
-        <span className="text-xs text-[var(--bo-tinta-72)]">
+        <span className="text-xs text-foreground/70">
           Margem{" "}
           <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-[#4d6350]"}`}>
             {eur(total.margem)} · {Math.round(total.percentagem)}%
@@ -12176,7 +11762,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         Não sai no PDF nem em nada que vá para o cliente.
       </p>
       {magra && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[var(--bo-tinta-72)]">
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-foreground/70">
           <span aria-hidden="true">⚠</span>
           <span>
             Abaixo dos {limite}% que definiu
@@ -12225,7 +11811,7 @@ function CustoDaGeracao({
         {medido ? ", pelas últimas gerações neste computador" : ""}.
       </p>
       {pesado && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
           <span aria-hidden="true">⚠</span>
           <span>
             Um anexo deste tamanho pode ser recusado pelo servidor de email do cliente — muitos
@@ -12236,7 +11822,7 @@ function CustoDaGeracao({
         </p>
       )}
       {orcamento.aperta && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
           <span aria-hidden="true">⚠</span>
           <span>
             Com esta quantidade de fotografias, o servidor demora{" "}
@@ -12281,7 +11867,7 @@ function PreviewSummary({
   const fotosPorConfirmar = countPendingImages(doc);
   return (
     <Section title="Resumo da proposta">
-      <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+      <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
         Esta é a forma da proposta que o cliente vai receber. Para o documento completo, usa
         «Descarregar PDF».
       </p>
@@ -12320,7 +11906,7 @@ function PreviewSummary({
       {groups.length > 0 && (
         <div className="mt-5">
           <p className="bo-eyebrow mb-2">Serviços</p>
-          <ul className="flex flex-col gap-1 text-sm text-[var(--bo-tinta-72)]">
+          <ul className="flex flex-col gap-1 text-sm text-foreground/75">
             {groups.map((g, i) => (
               <li key={i} className="flex gap-2">
                 <span className="text-foreground/40">{g.letter || `${i + 1}.`}</span>
@@ -12342,11 +11928,11 @@ function PreviewSummary({
       {extras.length > 0 && (
         <div className="mt-5">
           <p className="bo-eyebrow mb-2">Valores adicionais</p>
-          <ul className="flex flex-col gap-1 text-sm text-[var(--bo-tinta-72)]">
+          <ul className="flex flex-col gap-1 text-sm text-foreground/75">
             {extras.map((e, i) => (
               <li key={i} className="flex items-baseline justify-between gap-3">
                 <span>{e.label || "—"}</span>
-                <span className="text-[var(--bo-text-muted)]">{e.valueText || "—"}</span>
+                <span className="text-foreground/55">{e.valueText || "—"}</span>
               </li>
             ))}
           </ul>
@@ -12358,15 +11944,15 @@ function PreviewSummary({
           <dl className="flex flex-col gap-1.5 text-sm">
             <div className="flex items-baseline justify-between">
               <dt className="text-foreground/50">Sem IVA</dt>
-              <dd className="text-[var(--bo-text)]">{eur(money.base)}</dd>
+              <dd className="text-foreground/80">{eur(money.base)}</dd>
             </div>
             <div className="flex items-baseline justify-between">
               <dt className="text-foreground/50">IVA ({Math.round(money.vatRate * 100)}%)</dt>
-              <dd className="text-[var(--bo-text)]">{eur(money.vat)}</dd>
+              <dd className="text-foreground/80">{eur(money.vat)}</dd>
             </div>
             <div className="flex items-baseline justify-between border-t border-[var(--bo-hairline)] pt-1.5">
-              <dt className="font-medium text-[var(--bo-tinta-72)]">Com IVA</dt>
-              <dd className="text-base text-[var(--bo-text)]">{eur(money.gross)}</dd>
+              <dt className="font-medium text-foreground/70">Com IVA</dt>
+              <dd className="text-base text-foreground/90">{eur(money.gross)}</dd>
             </div>
             {/* A PERCENTAGEM É A DO DOCUMENTO. Este resumo dizia «Sinal 30%»
                 escrito à letra ao lado do valor certo: numa proposta a 40%
@@ -12631,7 +12217,7 @@ function SelectorDeLayout({
                   elevação, e o `aria-checked` diz o mesmo a quem ouve. */}
               <span
                 className={`mt-1 block text-[10px] leading-tight ${
-                  activo ? "font-semibold text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"
+                  activo ? "font-semibold text-foreground/85" : "text-foreground/55"
                 }`}
               >
                 {rotulo}
@@ -13147,7 +12733,7 @@ function Thumb({
                perdeu) e se o problema é dela (não é). O resto está escrito no
                `title` e, por extenso, no comentário da escuta lá em cima. */
             <>
-              <span className="font-medium text-[var(--bo-text-muted)]">Fotografia guardada</span>
+              <span className="font-medium text-foreground/55">Fotografia guardada</span>
               {/* Curta porque tem de CABER: a caixa tem 104 px de altura e
                   `overflow-hidden`, e a frase inteira levava o «Abrir ficheiro»
                   para fora do corte. A explicação toda vai no `title` — é a
@@ -13160,7 +12746,7 @@ function Thumb({
                   href={ultimoAlvo}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 underline underline-offset-2 text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
+                  className="mt-1 underline underline-offset-2 text-foreground/60 hover:text-foreground/80"
                 >
                   Abrir ficheiro
                 </a>
@@ -13181,7 +12767,7 @@ function Thumb({
                   caixa desta altura, cada linha custa uma coisa que já lá
                   estava. */}
               <span
-                className="font-medium text-[var(--bo-text-muted)]"
+                className="font-medium text-foreground/55"
                 title="A fotografia está guardada. Não consegui mostrá-la neste ecrã."
               >
                 Imagem guardada
@@ -13204,7 +12790,7 @@ function Thumb({
                     aoTentarDeNovo?.();
                     tentarDeNovo();
                   }}
-                  className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)]"
+                  className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-[var(--bo-tinta-6)]"
                 >
                   Tentar novamente
                 </button>
@@ -13213,7 +12799,7 @@ function Thumb({
                     href={ultimoAlvo}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline underline-offset-2 text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
+                    className="underline underline-offset-2 text-foreground/60 hover:text-foreground/80"
                   >
                     Abrir ficheiro
                   </a>
@@ -13245,7 +12831,7 @@ function Thumb({
                   a captura mostrava o «Tentar» encostado ao corte de baixo. Numa
                   caixa de 75 px, cada linha custa uma coisa que já lá estava. */}
               <span
-                className="font-medium text-[var(--bo-text-muted)]"
+                className="font-medium text-foreground/55"
                 title={
                   estadoDosUrls === "falhou"
                     ? "Não consegui ir buscar as fotografias desta proposta."
@@ -13259,7 +12845,7 @@ function Thumb({
                   type="button"
                   onClick={aoTentarDeNovo}
                   aria-label="Ir buscar outra vez as fotografias desta proposta"
-                  className="mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)]"
+                  className="mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-[var(--bo-tinta-6)]"
                 >
                   Tentar
                 </button>

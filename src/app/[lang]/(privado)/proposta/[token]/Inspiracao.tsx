@@ -1,8 +1,6 @@
 "use client";
 
-import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import { contar, type TextosDaPagina } from "./textos-da-pagina";
@@ -110,45 +108,8 @@ export interface BoardParaEcra {
   principal?: number;
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * NENHUMA FOTOGRAFIA DE BOARD ENTRA COM PRESSA — NENHUMA SE VÊ
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Isto foi 11, depois 4, e agora é 0. Vale a pena dizer porquê, porque as três
- * decisões foram tomadas com o mesmo cuidado e só a última olhou para a ORDEM
- * das secções.
- *
- * O 11 era um defeito: o contador reiniciava a cada mood board, portanto uma
- * proposta com três boards mandava onze fotografias sem espera. O 4 corrigiu a
- * contagem — passou a ser por documento — mas manteve a premissa de que as
- * primeiras fotografias da grelha se vêem cedo.
- *
- * Não se vêem. A ordem do documento é: capa → apresentação → índice → serviços
- * → cronograma → INSPIRAÇÃO. Num telemóvel de 390 pontos, a capa acaba por
- * volta dos 680 px e a primeira fotografia de board está milhares de pixéis
- * abaixo — depois de três secções de texto. Nenhuma das quatro estava à vista.
- *
- * O que elas faziam era competir. Cada uma é a candidata de 1200 px (105 KB em
- * AVIF, 130 em WebP), portanto eram 420 a 520 KB a disputar a ligação com a
- * CAPA, que é a única coisa que o casal está mesmo a ver. Num 4G de quinta,
- * isso é a capa a demorar segundos por causa de fotografias que ninguém pediu.
- *
- * ── E NÃO SE PERDE NADA ───────────────────────────────────────────────────
- *
- * `loading="lazy"` não quer dizer «só quando aparecer»: o navegador começa a
- * buscá-las com muita antecedência — milhares de pixéis, mais ainda numa
- * ligação lenta. E cada célula pinta o seu borrão a partir do HTML antes de
- * qualquer ida à rede, portanto nenhuma caixa fica vazia enquanto isso.
- *
- * ── PORQUE É QUE É ZERO E NÃO UM ──────────────────────────────────────────
- *
- * Porque nem no documento sem capa a primeira fotografia de board está à vista:
- * continua a haver a apresentação, o índice e os serviços pelo meio. Nesse
- * caso o elemento de maior pintura é o TÍTULO — os nomes do casal — que é
- * texto, e o que o serve é a letra, não uma imagem.
- */
-const FOTOS_ANSIOSAS = 0;
+/** Quantas fotos entram antes de o navegador deixar de carregar à frente. */
+const FOTOS_ANSIOSAS = 4;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -275,174 +236,6 @@ function destacada(board: BoardParaEcra): number | null {
  * regra desta página), e um respiro que desaparece deixa o título encostado ao
  * bloco anterior — o buraco exactamente onde se queria o ar.
  */
-/**
- * O nome do momento SEM fotografia por baixo — a preto sobre o papel.
- *
- * Existia inline, no caminho «nenhuma das fotografias resolveu». Passa a ser
- * partilhado porque há um SEGUNDO caminho para o mesmo sítio, e era ele que
- * estava a falhar: ver `Respiro`.
- */
-function TituloDoMomento({ titulo, subtitulo }: { titulo: string; subtitulo?: string }) {
-  return (
-    <>
-      <h3
-        className="text-foreground/90 text-balance"
-        style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 34px)" }}
-      >
-        {titulo}
-      </h3>
-      {subtitulo && (
-        <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">{subtitulo}</p>
-      )}
-    </>
-  );
-}
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O MOMENTO DE RESPIRAÇÃO — e o título que desiste com a fotografia
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Isto era um bloco inline. Passa a componente por uma razão só, e ela é um
- * defeito que a dona do negócio viu no telemóvel dela, na proposta a sério:
- *
- *     um rectângulo cinzento, sem fotografia nenhuma, com «Saída dos noivos»
- *     escrito por cima
- *
- * ── PORQUE É QUE A REDE QUE JÁ EXISTIA NÃO O APANHOU ──────────────────────
- *
- * O ficheiro já dizia a coisa certa, e por extenso: «um título branco sobre
- * nada nenhum é o defeito que isto existe para não ter». Só que essa guarda é
- * o `respiro()`, que corre UMA vez, no servidor, e pergunta se a fotografia
- * TEM endereço. Tinha.
- *
- * O que falhou foi o endereço, já depois de a página estar desenhada — uma
- * assinatura expirada, uma derivada que não chegou a ser feita. Aí a célula
- * desiste e devolve `null`, e a faixa do título, que é irmã dela e não filha,
- * fica desenhada por cima do vazio: o véu escuro sobre o papel branco dá o
- * cinzento, e o nome do momento por cima dele.
- *
- * Havia dois caminhos para o mesmo sítio e só um estava tapado. Aqui os dois
- * convergem no `TituloDoMomento` — o nome volta a preto, sobre o papel, como
- * já acontecia quando a fotografia faltava desde o início.
- */
-function Respiro({
-  token,
-  foto,
-  ansiosa,
-  rotulo,
-  textos,
-  aoAmpliar,
-  aoDesistir,
-  titulo,
-  subtitulo,
-}: {
-  token: string;
-  foto?: FotoDaProposta;
-  ansiosa: boolean;
-  rotulo: string;
-  textos: TextosDaPagina;
-  aoAmpliar: (alvo: HTMLElement | null) => void;
-  aoDesistir: () => void;
-  titulo: string;
-  subtitulo?: string;
-}) {
-  /**
-   * ── CAÍDO ENQUANTO FOR O MESMO ENDEREÇO, E NÃO PARA SEMPRE ──────────────
-   *
-   * A primeira versão disto era um `caiu: boolean`, e a rede que já existia
-   * apanhou-a: quando as assinaturas morrem, esta página tem um botão que as
-   * VOLTA A PEDIR — e com um booleano o momento nunca regressava. O casal
-   * carregava em «recarregar» e ficava com o nome a preto e a fotografia por
-   * baixo dele para sempre.
-   *
-   * Guardar QUAL endereço falhou resolve-o sem efeito nenhum: assinaturas
-   * novas mudam o endereço, a comparação deixa de bater, e o momento volta.
-   * Um endereço novo é uma hipótese nova.
-   */
-  const [enderecoQueFalhou, setEnderecoQueFalhou] = useState<string | null>(null);
-  const endereco = foto?.miniatura ?? foto?.original ?? null;
-  const caiu = enderecoQueFalhou !== null && enderecoQueFalhou === endereco;
-
-  const desistir = useCallback(() => {
-    setEnderecoQueFalhou(endereco);
-    aoDesistir();
-  }, [aoDesistir, endereco]);
-
-  if (caiu) return <TituloDoMomento titulo={titulo} subtitulo={subtitulo} />;
-
-  return (
-    /* Sem `mb-9`: o afastamento até à grelha é do PAR, e vive agora na
-       grelha — que só é desenhada quando tem fotografias. Ver o comentário
-       lá em baixo: com ele aqui, um board de uma só fotografia levava 36 px
-       a separá-lo de uma grelha vazia. */
-    <div className="relative">
-      <Celula
-        token={token}
-        foto={foto}
-        /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
-                   milhares de pixéis de distância, e três fotografias
-                   grandes a carregar de uma vez são meio megabyte gasto
-                   antes de a primeira secção acabar de se desenhar. */
-        ansiosa={ansiosa}
-        /* Mais alta do que a capa (que ainda tem a página toda por
-                 baixo dela) e com tecto: uma foto ao alto a 1024 px de
-                 largura são 1500 px de altura, e isso não é um respiro, é um
-                 ecrã inteiro sem uma palavra. */
-        tecto="min(64vh, 560px)"
-        larguraNoEcra="(min-width: 1024px) 1024px, 100vw"
-        rotulo={rotulo}
-        textos={textos}
-        aoAmpliar={aoAmpliar}
-        aoDesistir={desistir}
-      />
-      {/*
-       * ── O NOME DO MOMENTO POR CIMA DA FOTOGRAFIA ──────────────
-       *
-       * Palavras dela: «as secções principais abrem com uma imagem a
-       * toda a largura e o nome do momento por cima». O título
-       * estava por baixo, e por baixo ele é uma legenda: lê-se
-       * depois da fotografia, e o que ela quer é que se leia COM ela.
-       *
-       * `pointer-events-none` porque a fotografia por baixo é
-       * clicável (amplia), e uma faixa de texto por cima roubava-lhe
-       * metade da área de toque sem dizer que o fazia.
-       *
-       * O véu escuro não é decoração: sem ele, um título branco
-       * sobre uma fotografia de mesa posta em luz alta desaparece.
-       * Começa em transparente a meio da altura para não escurecer a
-       * fotografia inteira — o que se quer é ler o texto, não pôr um
-       * filtro na foto dela.
-       */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-sm bg-gradient-to-t from-black/60 via-black/25 to-transparent"
-        style={{ height: "58%" }}
-      />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-7">
-        <h3
-          className="text-balance text-white"
-          style={{
-            fontFamily: "var(--font-playfair)",
-            fontSize: "clamp(22px, 3.4vw, 34px)",
-            textShadow: "0 1px 12px rgba(0,0,0,0.35)",
-          }}
-        >
-          {titulo}
-        </h3>
-        {subtitulo && (
-          <p
-            className="mt-1.5 text-sm leading-relaxed text-white/85"
-            style={{ textShadow: "0 1px 10px rgba(0,0,0,0.35)" }}
-          >
-            {subtitulo}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function respiro(board: BoardParaEcra, fotos: Record<string, FotoDaProposta>): number | null {
   const resolve = (i: number) => {
     const f = fotos[board.fotos[i]];
@@ -544,42 +337,9 @@ export default function Inspiracao({
   const boardAberto = aberta ? boards[aberta.board] : null;
   const fotoAberta = boardAberto ? fotos[boardAberto.fotos[aberta!.i]] : undefined;
 
-  /**
-   * ── QUANTAS FOTOGRAFIAS VÊM ANTES DE CADA BOARD ────────────────────────
-   *
-   * O `FOTOS_ANSIOSAS` diz «quantas fotos entram antes de o navegador deixar
-   * de carregar à frente» — uma frase sobre o DOCUMENTO. Só que a conta era
-   * feita com o índice dentro de cada board, e portanto recomeçava do zero em
-   * cada um.
-   *
-   * MEDIDO numa proposta de três boards e 46 fotografias, com os pesos que
-   * este ficheiro já tem escritos (105,3 KB a 1200 px em AVIF): saíam ONZE
-   * pedidos com pressa — a capa, o respiro do primeiro board e três células
-   * por board. Dessas onze, UMA está no ecrã; as outras dez estão entre mil e
-   * quinhentos e quinze mil píxeis abaixo.
-   *
-   * Num 4G de 1,5 Mbps são 1 158 KB antes de a página servir para alguma
-   * coisa — 6,2 s —, e o pior nem é o total: é a capa, que é a única que o
-   * casal está a ver, ficar em fila atrás de dez fotografias que ele não
-   * alcança sem rolar meio minuto.
-   *
-   * Com a conta no documento ficam quatro, que é o que o número sempre disse.
-   * O número não muda; muda o sítio onde se conta.
-   */
-  const fotosAntesDoBoard: number[] = [];
-  {
-    let contadas = 0;
-    for (const board of boards) {
-      fotosAntesDoBoard.push(contadas);
-      contadas += board.fotos.length;
-    }
-  }
-
   return (
     <>
       {boards.map((board, b) => {
-        /** A posição desta fotografia no documento inteiro, e não no board. */
-        const noDocumento = (i: number) => (fotosAntesDoBoard[b] ?? 0) + i;
         const oRespiro = respiro(board, fotos);
         /**
          * ── QUANTAS COLUNAS TEM ESTA SECÇÃO ────────────────────────────────
@@ -604,30 +364,7 @@ export default function Inspiracao({
           return f?.largura && f?.altura ? f.altura / f.largura : ALTURA_POR_OMISSAO;
         });
         return (
-          /**
-           * ── O AFASTAMENTO ENTRE MOOD BOARDS ─────────────────────────────
-           *
-           * Era `mt-24 sm:mt-36` — 96 px no telemóvel. Palavras dela: os
-           * «buracos brancos» entre os mood boards.
-           *
-           * MEDIDO num 390×844, com oito boards: o branco entre dois boards
-           * era de 96 px, e o branco entre dois CAPÍTULOS do documento — entre
-           * «Serviços» e «Orçamento Proposto», que são secções de topo — é de
-           * 64 px (`Documento.tsx`, `mt-16 sm:mt-24`).
-           *
-           * A hierarquia estava ao contrário. Um mood board não é um capítulo:
-           * é uma parte DENTRO do capítulo «Inspiração». Separá-lo do vizinho
-           * com uma vez e meia o intervalo que separa dois capítulos diz ao
-           * olho que ali acabou alguma coisa maior do que acabou — e é isso
-           * que se lê como buraco, e não como respiração.
-           *
-           * `mt-12 sm:mt-16` (48/64) põe-no um degrau ABAIXO do capítulo, que
-           * é onde ele vive. E não é pouco: cada board abre com uma fotografia
-           * a toda a largura com o nome do momento por cima — o separador mais
-           * forte desta página inteira não precisa de 96 px de branco a
-           * anunciá-lo.
-           */
-          <section key={board.chave} className="mt-12 first:mt-6 sm:mt-16" data-sobe="bloco">
+          <section key={board.chave} className="mt-24 first:mt-6 sm:mt-36">
             {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
               «Devia haver mais momentos assim, a separar secções: uma foto a
               toda a largura entre blocos.» Vem ANTES do título de propósito:
@@ -637,17 +374,70 @@ export default function Inspiracao({
 
               Ver `respiro`, acima, para qual das fotografias é. */}
             {oRespiro !== null && (
-              <Respiro
-                token={token}
-                foto={fotos[board.fotos[oRespiro]]}
-                ansiosa={noDocumento(oRespiro) < FOTOS_ANSIOSAS}
-                rotulo={contar(textos.contagem, oRespiro + 1, board.fotos.length)}
-                textos={textos}
-                aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
-                aoDesistir={marcarFalha}
-                titulo={board.titulo}
-                subtitulo={board.subtitulo}
-              />
+              <div className="relative mb-9">
+                <Celula
+                  token={token}
+                  foto={fotos[board.fotos[oRespiro]]}
+                  /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
+                     milhares de pixéis de distância, e três fotografias
+                     grandes a carregar de uma vez são meio megabyte gasto
+                     antes de a primeira secção acabar de se desenhar. */
+                  ansiosa={b === 0}
+                  /* Mais alta do que a capa (que ainda tem a página toda por
+                   baixo dela) e com tecto: uma foto ao alto a 1024 px de
+                   largura são 1500 px de altura, e isso não é um respiro, é um
+                   ecrã inteiro sem uma palavra. */
+                  tecto="min(64vh, 560px)"
+                  larguraNoEcra="(min-width: 1024px) 1024px, 100vw"
+                  rotulo={contar(textos.contagem, oRespiro + 1, board.fotos.length)}
+                  textos={textos}
+                  aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
+                  aoDesistir={marcarFalha}
+                />
+                {/*
+                 * ── O NOME DO MOMENTO POR CIMA DA FOTOGRAFIA ──────────────
+                 *
+                 * Palavras dela: «as secções principais abrem com uma imagem a
+                 * toda a largura e o nome do momento por cima». O título
+                 * estava por baixo, e por baixo ele é uma legenda: lê-se
+                 * depois da fotografia, e o que ela quer é que se leia COM ela.
+                 *
+                 * `pointer-events-none` porque a fotografia por baixo é
+                 * clicável (amplia), e uma faixa de texto por cima roubava-lhe
+                 * metade da área de toque sem dizer que o fazia.
+                 *
+                 * O véu escuro não é decoração: sem ele, um título branco
+                 * sobre uma fotografia de mesa posta em luz alta desaparece.
+                 * Começa em transparente a meio da altura para não escurecer a
+                 * fotografia inteira — o que se quer é ler o texto, não pôr um
+                 * filtro na foto dela.
+                 */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-sm bg-gradient-to-t from-black/60 via-black/25 to-transparent"
+                  style={{ height: "58%" }}
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-7">
+                  <h3
+                    className="text-balance text-white"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(22px, 3.4vw, 34px)",
+                      textShadow: "0 1px 12px rgba(0,0,0,0.35)",
+                    }}
+                  >
+                    {board.titulo}
+                  </h3>
+                  {board.subtitulo && (
+                    <p
+                      className="mt-1.5 text-sm leading-relaxed text-white/85"
+                      style={{ textShadow: "0 1px 10px rgba(0,0,0,0.35)" }}
+                    >
+                      {board.subtitulo}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
             {/*
              * Sem respiro — a secção cujas fotografias nenhuma resolveu — o
@@ -656,7 +446,22 @@ export default function Inspiracao({
              * defeito que isto existe para não ter.
              */}
             {oRespiro === null && (
-              <TituloDoMomento titulo={board.titulo} subtitulo={board.subtitulo} />
+              <>
+                <h3
+                  className="text-foreground/90 text-balance"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(22px, 3.4vw, 34px)",
+                  }}
+                >
+                  {board.titulo}
+                </h3>
+                {board.subtitulo && (
+                  <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">
+                    {board.subtitulo}
+                  </p>
+                )}
+              </>
             )}
 
             {/* ── A GRELHA ─────────────────────────────────────────────────────
@@ -672,60 +477,43 @@ export default function Inspiracao({
               px davam o mesmo tamanho a que elas já saem na folha A4, e voltar
               a esse tamanho num ecrã era fazer o trabalho todo para não
               resolver nada. */}
-            {/**
-             * ── A GRELHA SÓ EXISTE QUANDO TEM FOTOGRAFIAS ───────────────
-             *
-             * MEDIDO: num board cuja ÚNICA fotografia é o respiro, o branco
-             * até ao board seguinte era de 132 px em vez dos 96 dos outros.
-             * Os 36 px a mais eram o `mb-9` do respiro — que existe para o
-             * separar da grelha — a separá-lo de uma grelha VAZIA.
-             *
-             * O afastamento é do PAR, não do respiro: passa para a grelha, e
-             * a grelha deixa de ser desenhada quando não tem nada dentro.
-             * Assim o intervalo entre boards é o mesmo em todos, que é o que
-             * faz um ritmo ser um ritmo.
-             */}
-            {naGrelha.length > 0 && (
-              <div
-                className={`flex flex-col gap-4 sm:flex-row ${oRespiro !== null ? "mt-9" : "mt-3"}`}
-              >
-                {arrumadas.map((coluna, c) => (
-                  /*
-                   * ── UMA COLUNA, E NO TELEMÓVEL NENHUMA ──────────────────
-                   *
-                   * `contents` faz este `div` desaparecer da disposição e deixa
-                   * as fotografias serem filhas directas do `flex` de cima. É o
-                   * que permite ter as duas coisas: acima de `sm` são duas
-                   * colunas equilibradas, e abaixo é uma coluna só onde o
-                   * `order` de cada fotografia lhe devolve a ordem que ELA
-                   * arrumou no estúdio.
-                   *
-                   * O `order` não faz mal nenhum do lado de cima: dentro de cada
-                   * coluna os índices já são crescentes (o empacotamento nunca
-                   * recua), portanto ordená-los por ele é deixá-los como estão.
-                   */
-                  <div
-                    key={c}
-                    className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4"
-                    style={{ minWidth: 0 }}
-                  >
-                    {coluna.map(({ id, i }) => (
-                      <Celula
-                        key={id}
-                        token={token}
-                        foto={fotos[id]}
-                        ansiosa={noDocumento(i) < FOTOS_ANSIOSAS}
-                        rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
-                        textos={textos}
-                        aoAmpliar={(alvo) => abrir(b, i, alvo)}
-                        aoDesistir={marcarFalha}
-                        ordem={i}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="mt-3 flex flex-col gap-4 sm:flex-row">
+              {arrumadas.map((coluna, c) => (
+                /*
+                 * ── UMA COLUNA, E NO TELEMÓVEL NENHUMA ──────────────────
+                 *
+                 * `contents` faz este `div` desaparecer da disposição e deixa
+                 * as fotografias serem filhas directas do `flex` de cima. É o
+                 * que permite ter as duas coisas: acima de `sm` são duas
+                 * colunas equilibradas, e abaixo é uma coluna só onde o
+                 * `order` de cada fotografia lhe devolve a ordem que ELA
+                 * arrumou no estúdio.
+                 *
+                 * O `order` não faz mal nenhum do lado de cima: dentro de cada
+                 * coluna os índices já são crescentes (o empacotamento nunca
+                 * recua), portanto ordená-los por ele é deixá-los como estão.
+                 */
+                <div
+                  key={c}
+                  className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4"
+                  style={{ minWidth: 0 }}
+                >
+                  {coluna.map(({ id, i }) => (
+                    <Celula
+                      key={id}
+                      token={token}
+                      foto={fotos[id]}
+                      ansiosa={i < FOTOS_ANSIOSAS}
+                      rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
+                      textos={textos}
+                      aoAmpliar={(alvo) => abrir(b, i, alvo)}
+                      aoDesistir={marcarFalha}
+                      ordem={i}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
 
             {/*
              * ── A PAUSA DE LEITURA ────────────────────────────────────────
@@ -835,6 +623,20 @@ function Celula({
   /** Esta célula esgotou as tentativas. Ver `houveFalha`, acima. */
   aoDesistir: () => void;
 }) {
+  // A grelha pede a MINIATURA. O original é o plano B — e é plano B, não
+  // primeira escolha: as fotografias anteriores ao bucket das miniaturas não
+  // têm nenhuma, e essas pagam o ficheiro inteiro porque não há alternativa.
+  // Sem `tentarDeNovo`: a célula que desiste desaparece, e quem a faz voltar é
+  // o botão do pé da galeria (`recarregar`), que reassina o documento inteiro.
+  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(
+    foto?.miniatura ?? foto?.original,
+    foto?.original,
+  );
+  // Sem medida guardada, vale a forma que a repartição por colunas assumiu —
+  // ver `PROPORCAO_POR_OMISSAO`. Deixá-la em branco era o que punha uma coluna
+  // a acabar antes da outra.
+  const proporcao =
+    foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : PROPORCAO_POR_OMISSAO;
   /**
    * A derivada intermédia desta fotografia.
    *
@@ -844,43 +646,10 @@ function Celula({
    * `api/proposta/[token]/foto/[id]`). Ver `signProposalMids` para o porquê de
    * a rota ter deixado de ser o caminho de todos os dias.
    */
-  const media = foto ? (foto.media ?? enderecoDaRotaDaFoto(token, foto)) : "";
-
-  /**
-   * ── A GRELHA DEIXA DE CAIR NO ORIGINAL ─────────────────────────────────
-   *
-   * A cascata era `miniatura ?? original` com o original como plano B. Numa
-   * fotografia SEM miniatura — o caso das anteriores ao bucket, que são
-   * precisamente as das propostas antigas que estão nas caixas de correio —
-   * isso punha o ficheiro inteiro dentro de uma caixa de 350 px.
-   *
-   * O degrau do meio existia e estava a ser saltado: a derivada de 1200 px
-   * está calculada aqui em cima e existe SEMPRE, porque quando ainda não foi
-   * fabricada cai na rota que a fabrica.
-   *
-   * A conta, com os pesos medidos neste ficheiro e um 4G de 1,5 Mbps:
-   *
-   *     original   2 600 KB ÷ 187,5 KB/s = 13,9 s
-   *     1200 px      105 KB ÷ 187,5 KB/s =  0,56 s
-   *
-   * Treze segundos por fotografia, numa página que é feita de fotografias. O
-   * próprio `useFotoComPlanoB` foi escrito por causa deste defeito e tem a
-   * medição no cabeçalho — aceita uma lista desde então, e esta página era a
-   * única que continuava a passar-lhe uma cadeia só.
-   *
-   * O original fica onde deve estar: em último, para quando nem a derivada
-   * responde. Sem `tentarDeNovo` — a célula que desiste desaparece, e quem a
-   * faz voltar é o botão do pé da galeria, que reassina o documento inteiro.
-   */
-  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(foto?.miniatura ?? media, [
-    media,
-    foto?.original,
-  ]);
-  // Sem medida guardada, vale a forma que a repartição por colunas assumiu —
-  // ver `PROPORCAO_POR_OMISSAO`. Deixá-la em branco era o que punha uma coluna
-  // a acabar antes da outra.
-  const proporcao =
-    foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : PROPORCAO_POR_OMISSAO;
+  const media = foto
+    ? (foto.media ??
+      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
+    : "";
   /**
    * O `srcset` só vale enquanto a primeira escolha está de pé.
    *
@@ -889,51 +658,6 @@ function Celula({
    * que acabou de falhar.
    */
   const temSrcset = !!foto?.miniatura && alvo === foto.miniatura;
-  /**
-   * ── A OFERTA EM AVIF, E PORQUE É QUE ELA É CONDICIONADA ────────────────
-   *
-   * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio,
-   * média por fotografia:
-   *
-   *     lado    webp      avif     densidade num telemóvel de 390 pt
-   *      400   22,5 KB   17,2 KB    1,1x
-   *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe hoje
-   *
-   * Numa proposta de quarenta e seis fotografias são 5,8 MB em WebP contra
-   * 4,7 MB em AVIF: 19% menos, com os MESMOS pixéis.
-   *
-   * ── `min-resolution: 1.5dppx`, e não «sempre» ─────────────────────────
-   *
-   * A oferta em AVIF só tem o candidato de 1200 (não há AVIF de 400 do lado
-   * das propostas). Um `<source>` que casa DESLIGA o `srcset` do `<img>` — e
-   * num ecrã de densidade 1, onde o navegador escolheria a de 400 (22 KB),
-   * passar a servir a de 1200 em AVIF (105 KB) seria cinco vezes pior.
-   *
-   * A pergunta é então: a partir de que densidade é que a de 1200 JÁ ERA a
-   * escolhida? O navegador escolhe a de 1200 quando a fatia pede mais de 400
-   * pixéis, portanto a fronteira é `400 ÷ largura-da-fatia-em-pontos`. Com as
-   * fatias que esta casa serve:
-   *
-   *     ecrã     fatia (pontos)   fronteira
-   *      320 pt      294 (92vw)     1,36 dppx
-   *      360 pt      331 (92vw)     1,21 dppx
-   *      390 pt      359 (92vw)     1,11 dppx
-   *      640 pt      294 (46vw)     1,36 dppx
-   *     1024 pt     1024            0,39 dppx
-   *
-   * A pior de todas é 1,36. Um portão a 1,5 fica acima de todas elas: onde
-   * ele casa, a de 1200 já era a escolhida, e a troca é estritamente melhor.
-   *
-   * ── E PORQUE É QUE DESCEU DE 2 PARA 1,5 ──────────────────────────────────
-   *
-   * Porque a 2 ficava de fora uma densidade inteira de gente: um portátil
-   * Windows a 150% de escala reporta exactamente 1,5. Não é um caso de
-   * laboratório — é como se vê uma proposta num escritório. E a conta acima
-   * mostra que a 1,5 não há ecrã nenhum onde a troca piore alguma coisa.
-   *
-   * Guardado pelo `portao-do-avif.test.ts`, com esta aritmética lá dentro.
-   */
-  const ofertaAvif = temSrcset && foto?.mediaAvif ? foto.mediaAvif : null;
 
   // Avisar o pai NUM EFEITO, e não durante o desenho: mudar estado do pai a
   // meio do render de um filho é o aviso que o React dá («Cannot update a
@@ -973,25 +697,13 @@ function Celula({
     /* O `order` só tem efeito quando as colunas desaparecem (telemóvel, com o
        `display: contents`); acima de `sm` as fotografias já estão em ordem
        crescente dentro da sua coluna. Ver `arrumarPorColunas`. */
-    /* O `data-sobe` vai na `<figure>` e NUNCA no `<button>` lá dentro: é o
-       botão que leva `content-visibility: auto` (`.foto-adiavel`), e uma
-       animação numa caixa cuja pintura o browser está a saltar é uma
-       negociação que não vale a pena ter. Aqui fora não há nada a negociar. */
-    <figure
-      className="foto-inteira m-0"
-      data-sobe="foto"
-      style={ordem === undefined ? undefined : { order: ordem }}
-    >
+    <figure className="foto-inteira m-0" style={ordem === undefined ? undefined : { order: ordem }}>
       <button
         type="button"
         onClick={(e) => aoAmpliar(e.currentTarget)}
         disabled={!alvo || desistiu}
         aria-label={`${textos.ampliar}: ${rotulo}`}
-        /* `foto-adiavel` SÓ com a forma conhecida — a razão está escrita na
-           classe, em `globals.css`: saltar o desenho de uma caixa cuja altura
-           venha do conteúdo faz a página encolher por baixo do dedo. Com
-           `aspectRatio` a altura é da CAIXA e não do conteúdo, e aí é seguro. */
-        className={`group focus-visible:outline-moss relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-moss)_12%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default${proporcao ? " foto-adiavel" : ""}`}
+        className="group focus-visible:outline-moss relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-moss)_12%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
         style={
           proporcao || tecto
             ? {
@@ -1012,12 +724,8 @@ function Celula({
             className="absolute inset-0 h-full w-full scale-105 object-cover blur-md"
           />
         )}
-        <picture>
-          {/* A proposta primeiro; o `<img>` a seguir é o que existe sempre. */}
-          {ofertaAvif && (
-            <source type="image/avif" media="(min-resolution: 1.5dppx)" srcSet={ofertaAvif} />
-          )}
-          {}
+        {
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             key={alvo}
             src={alvo}
@@ -1058,7 +766,7 @@ function Celula({
             onError={aoFalhar}
             className="relative block h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
           />
-        </picture>
+        }
       </button>
     </figure>
   );
@@ -1161,38 +869,7 @@ function Lupa({
     };
   }, []);
 
-  /**
-   * ══════════════════════════════════════════════════════════════════════════
-   * A LUPA TEM DE SAIR DA SECÇÃO — SENÃO NÃO TAPA O ECRÃ
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * Um elemento `position: fixed` é medido pelo ECRÃ — excepto se algum
-   * antepassado tiver um `transform`, e aí passa a ser medido por esse
-   * antepassado. É a regra do «bloco de contenção», e apanhou-nos aqui.
-   *
-   * A secção da Inspiração leva `prop-chega`, a animação que a faz subir ao
-   * entrar (`globals.css`). Essa animação acaba em `transform: none` — só que
-   * corre com preenchimento `both` sobre uma linha de tempo de scroll, e o
-   * valor CALCULADO no fim é `translateY(0)`, que não é `none`. Um `transform`
-   * a zero continua a ser um `transform`, e continua a ser bloco de contenção.
-   *
-   * MEDIDO num Chromium a 390×780, com a mesma regra de CSS: com uma
-   * fotografia à vista e o dedo em cima dela, o diálogo ia de 270 a 3202 px
-   * num ecrã de 0 a 780 — ou seja, do tamanho da SECÇÃO. Não tapava o ecrã.
-   * Um casal que carregasse numa fotografia via meio ecrã preto e a fotografia
-   * fora dele.
-   *
-   * O portal resolve-o pela raiz, e não por remendo: a lupa passa a ser filha
-   * do `<body>`, onde não há antepassado nenhum com `transform`. É o que a
-   * galeria pública desta casa já faz (`GaleriaClient.tsx`), e a partir de hoje
-   * qualquer animação nova numa secção da proposta é inofensiva para ela.
-   *
-   * O React mantém o contexto e a subida dos eventos através de um portal —
-   * o foco, o Escape e o gesto lateral continuam a funcionar como antes.
-   */
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
+  return (
     <div
       ref={dialogo}
       role="dialog"
@@ -1296,7 +973,6 @@ function Lupa({
           </button>
         )}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

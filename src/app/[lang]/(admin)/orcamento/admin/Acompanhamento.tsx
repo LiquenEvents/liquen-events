@@ -406,12 +406,12 @@ export default function Acompanhamento({
           {/* 24 px de algarismo num cartão de 105 é o que não deixava a legenda
               caber ao lado dele. `text-xl` no telemóvel, o tamanho de sempre a
               partir de 640. */}
-          <p className="text-xl sm:text-2xl font-light text-[var(--bo-text)]">{linhas.length}</p>
+          <p className="text-xl sm:text-2xl font-light text-foreground/85">{linhas.length}</p>
         </Card>
         <Card padding="sm">
           <p className="bo-eyebrow mb-1">Prazo a acabar</p>
           <p
-            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[#8a2a22]" : "text-[var(--bo-text)]"}`}
+            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[#8a2a22]" : "text-foreground/85"}`}
           >
             {expirando.length}
           </p>
@@ -425,7 +425,7 @@ export default function Acompanhamento({
         <Card padding="sm" className="col-span-2 @min-[26rem]:col-span-1">
           <p className="bo-eyebrow mb-1">Seguimentos devidos</p>
           <p
-            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[#8a6420]" : "text-[var(--bo-text)]"}`}
+            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[#8a6420]" : "text-foreground/85"}`}
           >
             {devidos.length}
           </p>
@@ -460,7 +460,7 @@ export default function Acompanhamento({
                 key={p.id}
                 className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--bo-hairline-strong)] p-3"
               >
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--bo-tinta-72)]">
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground/75">
                   {`${p.clientName} · ${eurOuSemValor(p.total)}`}
                 </span>
                 {(
@@ -485,7 +485,7 @@ export default function Acompanhamento({
                         },
                       )
                     }
-                    className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] transition-colors hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] disabled:opacity-50"
+                    className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85 disabled:opacity-50"
                   >
                     {v.label}
                   </button>
@@ -615,7 +615,7 @@ function LinhaCartao({
     <div className={`rounded-2xl border bg-[var(--bo-surface,#fff)] p-4 ${borda}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[var(--bo-text)]">{p.clientName}</p>
+          <p className="truncate text-sm font-medium text-foreground/85">{p.clientName}</p>
           <p className="mt-0.5 text-xs text-foreground/45">
             {eurOuSemValor(p.total)}
             {quote?.date && ` · casamento ${dataCurta(quote.date)}`}
@@ -674,7 +674,7 @@ function LinhaCartao({
               className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors disabled:opacity-50 ${
                 activo
                   ? "border-[#4d6350] bg-[#4d6350] text-white"
-                  : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)]"
+                  : "border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-[#4d6350]/40 hover:text-foreground/85"
               }`}
             >
               {e.label}
@@ -685,7 +685,7 @@ function LinhaCartao({
           type="button"
           onClick={() => setSeguimentoAberto((v) => !v)}
           aria-expanded={seguimentoAberto}
-          className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
+          className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-foreground/30 hover:text-foreground/85"
         >
           {p.followUpAt ? "Mudar seguimento" : "Marcar seguimento"}
         </button>
@@ -750,7 +750,7 @@ function LinhaCartao({
       {/* ── Porque é que se perdeu ──────────────────────────────────────── */}
       {aRecusar && (
         <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-3">
-          <p className="text-[11px] text-[var(--bo-text-muted)]">
+          <p className="text-[11px] text-foreground/60">
             Porque é que se perdeu? Fica só do lado de cá, e é o que permite saber daqui a um ano
             quantas se perderam por preço.
           </p>
@@ -763,8 +763,8 @@ function LinhaCartao({
                 onClick={() => setMotivo(m.id)}
                 className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors ${
                   motivo === m.id
-                    ? "border-foreground/40 bg-[var(--bo-tinta-10)] text-[var(--bo-text)]"
-                    : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30"
+                    ? "border-foreground/40 bg-[var(--bo-tinta-10)] text-foreground/80"
+                    : "border-[var(--bo-hairline-strong)] text-foreground/55 hover:border-foreground/30"
                 }`}
               >
                 {m.label}

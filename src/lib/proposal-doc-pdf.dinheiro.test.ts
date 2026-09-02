@@ -1,6 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   PDFDocument,
   PDFName,
@@ -672,86 +670,5 @@ describe("o valor escrito à mão sai como o resto da folha", () => {
 
     const semNumero = await textoDoPdf(comAdicional("a definir"));
     expect(semNumero).toContain("Deslocação da equipa");
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O «TOTAL A PAGAR» NÃO TEM INTERRUPTOR — E ISSO É UMA DECISÃO DELA
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Havia no documento um `mostrarTotalAPagar?: boolean`, com um comentário a
- * dizer que a linha estava «desligada por omissão» e que «continua a poder
- * ligar-se». Nenhuma das duas coisas era verdade há muito:
- *
- *  · nada em código o lia — o gerador deixou de o consultar quando o argumento
- *    a favor caiu (está escrito lá: sem a linha impressa, o casal não ligava os
- *    2.950,79 € de uma página aos 3.025,80 € da outra);
- *
- *  · e depois ela pediu o CONTRÁRIO do que o campo permitia: «quero sempre que
- *    nas propostas apareça assim na parte do orçamento».
- *
- * Uma análise a este código leu aquele comentário e concluiu, com toda a
- * lógica, que faltava construir o interruptor. Construí-lo teria desfeito um
- * pedido dela.
- *
- * Esta rede existe para o próximo que lá chegar: um campo com este nome só pode
- * voltar se alguém o LER. Um campo que ninguém lê é uma promessa por cumprir
- * escrita no sítio onde as pessoas vão procurar o que o produto faz.
- */
-describe("o «Total a pagar» não é opcional", () => {
-  /** O código de um ficheiro, sem comentários — a história vive nos
-   *  comentários e não pode ser confundida com um campo a sério. */
-  function codigo(caminho: string): string {
-    return readFileSync(join(process.cwd(), caminho), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^[ \t]*\/\/.*$/gm, "");
-  }
-
-  const FICHEIROS = [
-    "src/lib/proposal-doc.ts",
-    "src/lib/proposal-doc-pdf.ts",
-    "src/lib/proposta-de-pdf/tipos.ts",
-  ];
-
-  it("CONTROLO POSITIVO: os ficheiros foram mesmo lidos", () => {
-    // Sem isto, um caminho errado dava cadeias vazias e a regra a seguir
-    // passava por não encontrar nada — que é o defeito ao contrário.
-    for (const f of FICHEIROS) {
-      expect(codigo(f).length, `${f}: veio vazio`).toBeGreaterThan(500);
-    }
-    expect(codigo("src/lib/proposal-doc.ts")).toContain("totalAmount");
-  });
-
-  it("não voltou um interruptor que ninguém lê", () => {
-    for (const f of FICHEIROS) {
-      expect(
-        codigo(f),
-        `${f}: voltou o \`mostrarTotalAPagar\`. Se é para existir, alguém tem ` +
-          "de o ler — e antes disso vale a pena reler o pedido dela: «quero " +
-          "sempre que nas propostas apareça assim na parte do orçamento».",
-      ).not.toContain("mostrarTotalAPagar");
-    }
-  });
-
-  it("e a linha sai mesmo, com adicionais e sem eles", async () => {
-    /**
-     * É esta a razão de o interruptor não fazer falta, e prende-se aqui ao lado
-     * da rede de cima para as duas se lerem juntas: o comportamento é o que
-     * torna o campo desnecessário, não o contrário.
-     */
-    const semAdicionais = await textoDoPdf(
-      proposta({ totalAmount: 7890, totalVatMode: "acrescer" }),
-    );
-    expect(semAdicionais).toContain("Total a pagar");
-
-    const comAdicionais = await textoDoPdf(
-      proposta({
-        totalAmount: 7890,
-        totalVatMode: "acrescer",
-        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
-      }),
-    );
-    expect(comAdicionais).toContain("Total a pagar");
   });
 });

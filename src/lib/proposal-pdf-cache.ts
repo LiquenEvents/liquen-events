@@ -5,15 +5,6 @@ import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render"
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { guardarPdfDaProposta, lerPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { log } from "@/lib/logger";
-import { chaveDoPdf, PropostaIncompleta } from "@/lib/proposal-pdf-chave";
-
-/**
- * Reexportados do `proposal-pdf-chave`, que não traz o `pdf-lib` nem o `sharp`
- * atrás. Quem só precisa da chave — os dois `route.ts` que servem o PDF já
- * guardado — deve importar de LÁ; a razão está escrita nesse ficheiro. Aqui
- * ficam para não obrigar a mudar quem já os importava daqui.
- */
-export { chaveDoPdf, PropostaIncompleta };
 
 /**
  * O PDF já desenhado, guardado por conteúdo.
@@ -96,9 +87,8 @@ let bytesGuardados = 0;
  *
  *   · o PDF guardado no envio ficava com uma chave que mais ninguém calculava;
  *   · `lerPdfDaProposta` procurava pela outra e não encontrava nada;
- *   · `pdfGuardadoEmFluxo` — o atalho que serve o ficheiro guardado sem o
- *     redesenhar, e que existe precisamente para isto não demorar — nunca
- *     disparava;
+ *   · `urlDoPdfDaProposta` — o atalho que manda o casal direito ao CDN e que
+ *     existe precisamente para isto não demorar — nunca disparava;
  *   · e cada abertura redesenhava o documento inteiro, oitenta fotografias
  *     pelo `sharp`, num processo a frio.
  *
@@ -118,6 +108,27 @@ let bytesGuardados = 0;
  * cada proposta desenha uma vez e grava com a chave nova. A partir daí é o
  * atalho. Não é preciso migrar nada.
  */
+function canonico(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(canonico);
+  if (valor && typeof valor === "object") {
+    const entradas = Object.entries(valor as Record<string, unknown>)
+      // `undefined` não sobrevive a uma ida à base — deixá-lo entrar aqui fazia
+      // o documento em memória e o documento lido divergirem outra vez, pelo
+      // mesmo motivo e sem se ver.
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return Object.fromEntries(entradas.map(([k, v]) => [k, canonico(v)]));
+  }
+  return valor;
+}
+
+export function chaveDoPdf(doc: ProposalDoc, idioma: IdiomaDaProposta): string {
+  return createHash("sha256")
+    .update(`${idioma}:${JSON.stringify(canonico(doc))}`)
+    .digest("base64url")
+    .slice(0, 32);
+}
+
 function guardar(chave: string, pdf: Buffer<ArrayBuffer>): void {
   if (pdf.length > MAXIMO_POR_ENTRADA) return;
   const jaLa = cache.get(chave);
@@ -295,6 +306,12 @@ export async function pdfDaPropostaEmCache(
  * qualquer: a resposta ao cliente é diferente (isto é temporário e tem
  * conserto) e a mensagem para os registos também.
  */
+export class PropostaIncompleta extends Error {
+  constructor(public readonly emFalta: number) {
+    super(`A proposta sairia com ${emFalta} fotografia(s) em falta.`);
+    this.name = "PropostaIncompleta";
+  }
+}
 
 /** Só para os testes: esvaziar entre casos. */
 export function esvaziarCachePdf(): void {

@@ -44,7 +44,7 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
  */
 
 const KIND_CHIP: Record<MaterialKind, { bg: string; text: string }> = {
-  consumivel: { bg: "#f6efe1", text: "#84692d" }, // 4,26:1 → 4,55:1 sobre #f6efe1
+  consumivel: { bg: "#f6efe1", text: "#8a6d2f" },
   reutilizavel: { bg: "#e7efe4", text: "#3a5c39" },
 };
 
@@ -741,7 +741,7 @@ function Catalogo() {
         <div className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <p className="text-sm font-medium">Antes de gravar:</p>
-            <p className="text-sm text-[var(--bo-tinta-72)]">
+            <p className="text-sm text-foreground/75">
               <strong>{plano.novos}</strong> novos · <strong>{plano.atualizados}</strong>{" "}
               atualizados
               {plano.erros > 0 && (
@@ -754,7 +754,7 @@ function Catalogo() {
           </div>
 
           {plano.erros > 0 && (
-            <ul className="mt-3 space-y-1 text-xs text-[var(--bo-tinta-72)]">
+            <ul className="mt-3 space-y-1 text-xs text-foreground/70">
               {plano.linhas
                 .filter((l) => l.estado === "erro")
                 .slice(0, 8)

@@ -13,23 +13,6 @@ const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  /**
-   * ── SÓ OS `*.spec.ts` SÃO PASSEIOS ───────────────────────────────────────
-   *
-   * Por omissão o Playwright recolhe `*.spec.ts` E `*.test.ts`. Nesta casa a
-   * segunda extensão é do vitest, e desde que os ajudantes do `e2e/` passaram a
-   * ter testes de unidade (`caca/harness.rotulos.test.ts`) havia ficheiros aqui
-   * dentro que importam `vitest` — que o Playwright tentava carregar e rebentava
-   * antes de correr passeio nenhum:
-   *
-   *     Error: Vitest cannot be imported in a CommonJS module using require().
-   *        at caca/harness.rotulos.test.ts:1
-   *
-   * Um passo inteiro do CI vermelho sem um único teste ter chegado a correr.
-   * Dizer aqui o que é um passeio resolve-o na origem, e vale para qualquer
-   * teste de unidade que venha a nascer nesta pasta.
-   */
-  testMatch: "**/*.spec.ts",
   // As passkeys correm à parte, em `playwright.passkeys.config.ts`. A razão
   // está lá escrita: precisam de GRAVAR, e o servidor de produção que este
   // ficheiro arranca recusa escritas sem Supabase — de propósito.

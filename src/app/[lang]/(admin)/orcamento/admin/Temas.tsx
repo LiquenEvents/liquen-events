@@ -28,7 +28,6 @@ import {
   EmptyState,
   Field,
   MenuDeAccoes,
-  PerguntaDestrutiva,
   Toolbar,
   type AccaoDeItem,
 } from "./ui";
@@ -646,9 +645,6 @@ export default function Temas() {
   const [newNotes, setNewNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-
-  /** O tema à espera de resposta à pergunta de o eliminar. */
-  const [aEliminar, setAEliminar] = useState<ThemeSummary | null>(null);
   const [search, setSearch] = useState("");
   // Guardada entre sessões: quem trabalha com a biblioteca todos os dias escolhe
   // uma vez e não quer voltar a escolher. Começa em "compacto" porque com seis
@@ -1015,6 +1011,21 @@ export default function Temas() {
   }
 
   async function removeTheme(t: ThemeSummary) {
+    // Quantas fotos se perdem pode ser desconhecido (pasta ilegível) ou apenas
+    // um mínimo (contagem truncada) — a frase tem de continuar a fazer sentido.
+    const photos =
+      t.imageCount === null
+        ? " e as fotos que tiver lá dentro"
+        : t.imageCount > 0
+          ? ` e as suas ${t.imageCount}${t.truncated ? "+" : ""} fotos`
+          : "";
+    if (
+      !window.confirm(
+        `Eliminar o tema "${t.name}"${photos}? ` +
+          "As propostas já feitas com estas fotos não são afetadas. Esta ação não pode ser anulada.",
+      )
+    )
+      return;
     setThemes((prev) => prev.filter((x) => x.id !== t.id));
     if (openId === t.id) setOpenId(null);
     // O cartão sai da lista já e volta se o servidor recusar — e é isso que a
@@ -1164,83 +1175,40 @@ export default function Temas() {
   // um ecrã irmão da lista, não um separador dentro dela.
   if (revendo) return <BibliotecaRevisao onBack={() => setRevendo(false)} />;
 
-  /**
-   * ── A PERGUNTA DE ELIMINAR UM TEMA ────────────────────────────────────
-   *
-   * Escrita uma vez e posta nos DOIS ramos do desenho: eliminar chega-se tanto
-   * da lista como de dentro da pasta aberta, e esse ramo devolve outro
-   * componente. Sem isto, a pergunta pedida lá dentro não tinha onde aparecer.
-   *
-   * O que se perde vai numa LISTA e não espremido no meio de uma frase — é
-   * para isso que a `oQueSePerde` existe. A contagem de fotos pode ser
-   * desconhecida (pasta ilegível) ou um mínimo (contagem truncada), e as três
-   * versões têm de fazer sentido.
-   */
-  const perguntaDeEliminar = (
-    <PerguntaDestrutiva
-      aberto={!!aEliminar}
-      onFechar={() => setAEliminar(null)}
-      titulo={`Eliminar o tema «${aEliminar?.name ?? ""}»?`}
-      oQueSePerde={
-        aEliminar
-          ? [
-              aEliminar.imageCount === null
-                ? "As fotografias que estiverem lá dentro"
-                : aEliminar.imageCount > 0
-                  ? `${aEliminar.imageCount}${aEliminar.truncated ? "+" : ""} ${
-                      aEliminar.imageCount === 1 ? "fotografia" : "fotografias"
-                    }`
-                  : "A pasta, que está vazia",
-            ]
-          : []
-      }
-      aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
-      rotuloConfirmar="Eliminar o tema"
-      onConfirmar={() => {
-        const t = aEliminar;
-        setAEliminar(null);
-        if (t) void removeTheme(t);
-      }}
-    />
-  );
-
   if (open) {
     return (
-      <>
-        <ThemeFolder
-          key={open.id}
-          theme={open}
-          // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
-          // o cartão do destino tem de somar as fotos que lá chegaram, senão a
-          // contagem só se corrige no próximo carregamento da página.
-          themes={themes}
-          onCopiedTo={(destId, added) =>
-            setThemes((prev) =>
-              prev.map((t) =>
-                t.id === destId && t.imageCount !== null
-                  ? { ...t, imageCount: t.imageCount + added }
-                  : t,
-              ),
-            )
-          }
-          onBack={() => setOpenId(null)}
-          onFolderState={(s) => syncCard(open.id, s)}
-          onRename={(name) =>
-            setThemes((prev) =>
-              prev
-                .map((t) => (t.id === open.id ? { ...t, name } : t))
-                .sort((a, b) => a.name.localeCompare(b.name, "pt")),
-            )
-          }
-          onCover={(coverPath, coverUrl) =>
-            setThemes((prev) =>
-              prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
-            )
-          }
-          onDelete={() => setAEliminar(open)}
-        />
-        {perguntaDeEliminar}
-      </>
+      <ThemeFolder
+        key={open.id}
+        theme={open}
+        // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
+        // o cartão do destino tem de somar as fotos que lá chegaram, senão a
+        // contagem só se corrige no próximo carregamento da página.
+        themes={themes}
+        onCopiedTo={(destId, added) =>
+          setThemes((prev) =>
+            prev.map((t) =>
+              t.id === destId && t.imageCount !== null
+                ? { ...t, imageCount: t.imageCount + added }
+                : t,
+            ),
+          )
+        }
+        onBack={() => setOpenId(null)}
+        onFolderState={(s) => syncCard(open.id, s)}
+        onRename={(name) =>
+          setThemes((prev) =>
+            prev
+              .map((t) => (t.id === open.id ? { ...t, name } : t))
+              .sort((a, b) => a.name.localeCompare(b.name, "pt")),
+          )
+        }
+        onCover={(coverPath, coverUrl) =>
+          setThemes((prev) =>
+            prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
+          )
+        }
+        onDelete={() => removeTheme(open)}
+      />
     );
   }
 
@@ -1263,7 +1231,7 @@ export default function Temas() {
           {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
               tem é o projecto em pausa manda-a correr o schema por nada. */}
           <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">{blocked.titulo}</p>
-          <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">{blocked.texto}</p>
+          <p className="text-sm leading-relaxed text-foreground/75">{blocked.texto}</p>
         </Card>
       )}
 
@@ -1297,7 +1265,7 @@ export default function Temas() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Procurar tema…"
                   aria-label="Procurar tema por nome ou nota"
-                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
                 />
               </div>
               {/* O TAMANHO DA BIBLIOTECA, dito por ela própria. Era preciso
@@ -1359,7 +1327,7 @@ export default function Temas() {
                       setOrdem(o);
                       guardarOrdem(o);
                     }}
-                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-[var(--bo-tinta-72)]"
+                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
                   >
                     {ORDENS.map((o) => (
                       <option key={o.valor} value={o.valor}>
@@ -1389,8 +1357,8 @@ export default function Temas() {
                       }}
                       className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
                         densidade === valor
-                          ? "bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
-                          : "text-foreground/40 hover:text-[var(--bo-text-muted)]"
+                          ? "bg-[var(--bo-tinta-6)] text-foreground/70"
+                          : "text-foreground/40 hover:text-foreground/60"
                       }`}
                     >
                       {rotulo}
@@ -1413,8 +1381,8 @@ export default function Temas() {
                 onClick={() => setVerArquivados((v) => !v)}
                 className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
                   verArquivados
-                    ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
-                    : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-[var(--bo-text-muted)]"
+                    ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-foreground/70"
+                    : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-foreground/60"
                 }`}
               >
                 Arquivados ({arquivados})
@@ -1688,7 +1656,7 @@ export default function Temas() {
                       do que o vizinho e a grelha perdia a linha de base. Ao
                       fim de duas linhas ainda pode cortar — mas aí já se leu o
                       que distingue. */}
-                  <p className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-[var(--bo-text)]">
+                  <p className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-foreground/85">
                     {t.name}
                   </p>
                   {/* ══════════════════════════════════════════════════════
@@ -1772,7 +1740,6 @@ export default function Temas() {
           ))}
         </div>
       )}
-      {perguntaDeEliminar}
     </div>
   );
 }
@@ -2169,15 +2136,6 @@ function ThemeFolder({
   /** Onde ela cairia se a largasse agora — é o que desenha o espaço aberto. */
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
-
-  /**
-   * As fotografias à espera de resposta à pergunta de as remover.
-   *
-   * Um estado só para os dois caminhos — a foto solta e o lote seleccionado —,
-   * com o `emBloco` a dizer qual deles age. Dois estados separados seriam duas
-   * janelas a poderem abrir ao mesmo tempo.
-   */
-  const [aRemover, setARemover] = useState<{ alvos: ThemeImage[]; emBloco: boolean } | null>(null);
   /** A ação em bloco que está a decorrer (transferir ou remover), com a
    *  contagem verdadeira. `null` = nada a acontecer. */
   const [emBloco, setEmBloco] = useState<AccaoEmBloco | null>(null);
@@ -3213,25 +3171,21 @@ function ThemeFolder({
     });
   }
 
-  /** Perguntar por uma foto solta. Quem age é o `removeImages`. */
-  function pedirParaRemoverUma(im: ThemeImage) {
-    setARemover({ alvos: [im], emBloco: false });
+  async function removeOne(im: ThemeImage) {
+    if (!window.confirm("Remover esta foto do tema? Esta ação não pode ser anulada.")) return;
+    await removeImages([im]);
   }
 
-  /**
-   * Perguntar pelo lote seleccionado.
-   *
-   * Sem selecção não há pergunta nenhuma: perguntar «remover 0 fotografias?»
-   * seria pedir uma decisão sobre nada.
-   */
-  function pedirParaRemoverAsSeleccionadas() {
+  async function removeSelected() {
     const targets = images.filter((i) => selected.has(i.path));
     if (targets.length === 0) return;
-    setARemover({ alvos: targets, emBloco: true });
-  }
-
-  async function removeSelected(targets: ThemeImage[]) {
-    if (targets.length === 0) return;
+    if (
+      !window.confirm(
+        `Remover ${plural(targets.length, "foto", "fotos")} de "${theme.name}"? ` +
+          "As propostas já feitas com estas fotos não são afetadas. Esta ação não pode ser anulada.",
+      )
+    )
+      return;
     setBulkBusy(true);
     // A remoção é otimista: a grelha e a seleção esvaziam-se já, e a barra de
     // ações desaparece com elas. O cartão fica no lugar dela, no mesmo sítio
@@ -3454,7 +3408,7 @@ function ThemeFolder({
                   }
                 }}
                 aria-label="Nome do tema"
-                className="bo-input px-3 py-1.5 text-sm text-[var(--bo-text)]"
+                className="bo-input px-3 py-1.5 text-sm text-foreground/85"
               />
               <SugestaoDeNome valor={name} onAceitar={setName} />
             </div>
@@ -3462,7 +3416,7 @@ function ThemeFolder({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className="alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-[#4d6350]"
+              className="alvo-toque font-display text-xl text-foreground/85 hover:text-[#4d6350]"
               title="Renomear tema"
             >
               {theme.name}
@@ -3503,7 +3457,7 @@ function ThemeFolder({
           meio aparentemente parado antes de a primeira entrar na grelha. */}
       {verifying && (
         <Card padding="sm" className="mb-4">
-          <p className="text-sm text-[var(--bo-text)]">
+          <p className="text-sm text-foreground/80">
             A verificar {plural(verifying.total, "foto", "fotos")} — {verifying.done} de{" "}
             {verifying.total}…
           </p>
@@ -3516,7 +3470,7 @@ function ThemeFolder({
       {progress && (
         <Card padding="sm" className="mb-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm text-[var(--bo-text)]">
+            <p className="text-sm text-foreground/80">
               A carregar <strong className="font-medium">{progress.done}</strong> de{" "}
               {plural(progress.total, "foto", "fotos")}…
             </p>
@@ -3549,7 +3503,7 @@ function ThemeFolder({
           {thumbJob?.running ? (
             <>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm text-[var(--bo-text)]">
+                <p className="text-sm text-foreground/80">
                   A gerar miniaturas —{" "}
                   <strong className="font-medium">
                     {plural(thumbJob.generated, "criada", "criadas")}
@@ -3590,7 +3544,7 @@ function ThemeFolder({
             </>
           ) : (
             <>
-              <p className="text-sm text-[var(--bo-text)]">
+              <p className="text-sm text-foreground/80">
                 {missingThumbs
                   ? "Há fotos antigas sem miniatura — a grelha está a mostrar as fotos em tamanho real (uns 2,6 MB cada), e é por isso que este tema demora a abrir."
                   : "As miniaturas deste tema estão feitas."}
@@ -3622,7 +3576,7 @@ function ThemeFolder({
 
       {failed.length > 0 && (
         <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
-          <p className="text-sm text-[var(--bo-text)]">
+          <p className="text-sm text-foreground/80">
             {plural(failed.length, "foto não subiu", "fotos não subiram")}. Os ficheiros ficaram
             guardados — não é preciso voltar a escolhê-los.
           </p>
@@ -3643,7 +3597,7 @@ function ThemeFolder({
           botão, e por LOTE: nunca uma pergunta foto a foto. */}
       {skipped.length > 0 && (
         <Card padding="sm" className="mb-4">
-          <p className="text-sm text-[var(--bo-text)]">
+          <p className="text-sm text-foreground/80">
             {plural(skipped.length, "foto não foi adicionada", "fotos não foram adicionadas")} —{" "}
             {skipped.some((s) => s.reason === "no-tema") &&
             skipped.some((s) => s.reason === "no-lote")
@@ -3696,7 +3650,7 @@ function ThemeFolder({
           número em que ela tem de agir, e as fotos continuam aqui. */}
       {copyReport && (
         <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
-          <p className="text-sm text-[var(--bo-text)]">
+          <p className="text-sm text-foreground/80">
             {copyReport.failed.length > 0
               ? `${copyReport.failed.length} de ${
                   copyReport.copied.length + copyReport.existing.length + copyReport.failed.length
@@ -3744,7 +3698,7 @@ function ThemeFolder({
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 backdrop-blur">
-              <p className="text-sm text-[var(--bo-text)]">
+              <p className="text-sm text-foreground/85">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
               <span className="bo-text-muted hidden text-xs sm:inline">
@@ -3783,12 +3737,7 @@ function ThemeFolder({
                 <Button size="sm" variant="secondary" onClick={clearSelection}>
                   Limpar seleção
                 </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  loading={bulkBusy}
-                  onClick={pedirParaRemoverAsSeleccionadas}
-                >
+                <Button size="sm" variant="danger" loading={bulkBusy} onClick={removeSelected}>
                   Remover
                 </Button>
               </div>
@@ -3878,7 +3827,7 @@ function ThemeFolder({
           // Falha de leitura NÃO é "tema sem fotos": dizer-lhe para arrastar
           // fotos aqui seria convidá-la a duplicar o que já lá está.
           <div className="py-12 text-center">
-            <p className="text-sm text-[var(--bo-tinta-72)]">
+            <p className="text-sm text-foreground/75">
               Não foi possível ler a pasta deste tema agora.
             </p>
             <p className="bo-text-muted mt-1 text-xs">
@@ -4078,7 +4027,7 @@ function ThemeFolder({
                     </button>
                     <button
                       type="button"
-                      onClick={() => pedirParaRemoverUma(im)}
+                      onClick={() => removeOne(im)}
                       aria-label={`Remover foto ${i + 1} de ${images.length}`}
                       // Num ecrã tátil não há "passar o rato": aí o × está sempre
                       // visível, senão a foto não se conseguia remover de todo.
@@ -4113,35 +4062,6 @@ function ThemeFolder({
           </>
         )}
       </div>
-
-      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
-          Uma janela para os dois caminhos — a foto solta e o lote. Folha
-          inferior no telemóvel, ao pé do polegar; o verbo no botão. */}
-      <PerguntaDestrutiva
-        aberto={!!aRemover}
-        onFechar={() => setARemover(null)}
-        titulo={
-          !aRemover
-            ? ""
-            : aRemover.alvos.length === 1
-              ? "Remover esta fotografia do tema?"
-              : `Remover ${plural(aRemover.alvos.length, "fotografia", "fotografias")} de «${theme.name}»?`
-        }
-        aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
-        rotuloConfirmar={
-          aRemover && aRemover.alvos.length > 1 ? "Remover as fotografias" : "Remover a fotografia"
-        }
-        // Fecha primeiro e só depois age: a grelha é optimista, e no lote a
-        // barra de progresso toma o lugar da selecção — uma caixa por cima
-        // taparia precisamente o que diz que ainda há pedidos a caminho.
-        onConfirmar={() => {
-          const pedido = aRemover;
-          setARemover(null);
-          if (!pedido) return;
-          if (pedido.emBloco) void removeSelected(pedido.alvos);
-          else void removeImages(pedido.alvos);
-        }}
-      />
     </div>
   );
 }

@@ -101,26 +101,6 @@ export const THEME_AVIF_BUCKET = "theme-avif";
 export const THEME_AVIF_MICRO_BUCKET = "theme-avif-micro";
 
 /**
- * ── E O IRMÃO DAS DE 1200 px, QUE FALTAVA — E ERA O QUE MAIS PESAVA ───────
- *
- * O AVIF existia para as de 400 px (grelhas do back office) e para as de 96
- * (micro). Não existia para as de 1200 — que são precisamente as ÚNICAS que o
- * casal descarrega: a página da proposta serve a de 1200 em qualquer telemóvel
- * (ver o `srcset` da `Inspiracao.tsx`; a 390 pontos com três pixéis por ponto
- * pede ~1030, e a de 400 nunca chega a ser escolhida).
- *
- * Ou seja: a oferta em AVIF estava montada em todo o lado MENOS onde os bytes
- * doem — numa proposta de quarenta e seis fotografias a ~200 KB cada.
- *
- * Pela medição que está no `derivadas.ts`, feita com estas fotografias: aos
- * 1200 px o AVIF ao desconto da casa pesa ~28% menos do que o WebP, com o
- * mesmo número de pixéis. Não se mexe na resolução de propósito — já houve uma
- * queixa de fotografias «desfocadas» e ela veio de servir menos pixéis; aqui
- * são os mesmos pixéis, em menos bytes.
- */
-export const THEME_AVIF_MID_BUCKET = "theme-avif-medias";
-
-/**
  * Validade dos URLs assinados da biblioteca: 6 horas.
  *
  * Está aqui, e não junto ao resto do `theme-storage.ts`, por causa da

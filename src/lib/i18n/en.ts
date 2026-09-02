@@ -57,15 +57,6 @@ export const en: Dict = {
   },
 
   common: {
-    /**
-     * O nome do estado de espera de uma navegação lenta.
-     *
-     * Não aparece aos olhos — quem vê recebe o logótipo a respirar, que é
-     * o que ela pediu. Isto é para quem OUVE o ecrã, e existe porque a
-     * regra da casa é «nunca um estado de espera sem nome»: um logótipo é
-     * bonito e não é um nome.
-     */
-    aAbrir: "Opening the page…",
     pedirOrcamento: "Request a quote",
     verGaleria: "View gallery",
     verServicos: "View services",

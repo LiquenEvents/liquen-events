@@ -4,16 +4,7 @@ import { useMemo, useState, useDeferredValue } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
-import {
-  Button,
-  Card,
-  EmptyState,
-  Field,
-  MenuDeAccoes,
-  PerguntaDestrutiva,
-  Toolbar,
-  type AccaoDeItem,
-} from "./ui";
+import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -131,15 +122,6 @@ export default function Fornecedores() {
   const [adding, setAdding] = useState(false);
 
   /**
-   * O fornecedor à espera de resposta à pergunta de o remover.
-   *
-   * Guarda-se a ficha e não só o `id`: o nome tem de aparecer na pergunta — sem
-   * ele ela tem de se lembrar em qual linha tocou — e a lista pode mudar entre
-   * a pergunta e a resposta.
-   */
-  const [aRemover, setARemover] = useState<Supplier | null>(null);
-
-  /**
    * As acções de uma ficha, como DADOS — a forma é de quem as desenha.
    *
    * Estão aqui e não em linha para que os três ícones do computador e os três
@@ -164,7 +146,7 @@ export default function Fornecedores() {
       rotulo: "Remover",
       icone: CaixoteIcon,
       destrutiva: true,
-      onAccao: () => pedirParaRemover(s.id),
+      onAccao: () => remove(s.id),
     },
   ];
   const [form, setForm] = useState(EMPTY_FORM);
@@ -255,24 +237,10 @@ export default function Fornecedores() {
     setAdding(false);
   }
 
-  /**
-   * Perguntar primeiro. A pergunta fica fora do `remove` de propósito: o
-   * `remove` é o que age, e quem quiser um dia remover sem perguntar (um lote,
-   * um desfazer) não tem de contornar uma caixa — basta não a abrir.
-   */
-  function pedirParaRemover(id: string) {
-    const s = suppliers.find((x) => x.id === id);
-    // Sem ficha não há nome para pôr na pergunta, e uma pergunta que não diz o
-    // que se perde não vale o toque.
-    if (!s) {
-      void remove(id);
-      return;
-    }
-    setARemover(s);
-  }
-
   async function remove(id: string) {
     const s = suppliers.find((x) => x.id === id);
+    if (!confirm(`Remover o fornecedor${s ? ` "${s.name}"` : ""}? Esta ação não pode ser anulada.`))
+      return;
     // Repõe-se ESTA ficha no sítio dela, não a lista inteira de antes do
     // pedido. Repor a lista desfazia o que tivesse gravado bem enquanto este
     // pedido ia a caminho: ela apaga dois fornecedores seguidos, o segundo
@@ -420,7 +388,7 @@ export default function Fornecedores() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Procurar fornecedor…"
               aria-label="Procurar fornecedores"
-              className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+              className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
             />
           </div>
         }
@@ -571,7 +539,7 @@ export default function Fornecedores() {
                     <button
                       onClick={() => setEditingId(null)}
                       aria-label="Fechar edição"
-                      className="text-sm text-foreground/30 transition-colors hover:text-[var(--bo-text-muted)]"
+                      className="text-sm text-foreground/30 transition-colors hover:text-foreground/60"
                     >
                       ×
                     </button>
@@ -644,7 +612,7 @@ export default function Fornecedores() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[var(--bo-text)] text-sm font-semibold truncate">
+                        <p className="text-foreground/78 text-sm font-semibold truncate">
                           {s.name}
                         </p>
                         {s.preferred && (
@@ -699,21 +667,21 @@ export default function Fornecedores() {
                             { preferred: !s.preferred },
                           )
                         }
-                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-muted)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
+                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-foreground/55 hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
                         {EstrelaIcon(!!s.preferred)}
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Editar"
                       >
                         {LapisIcon}
                       </button>
                       <button
-                        onClick={() => pedirParaRemover(s.id)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        onClick={() => remove(s.id)}
+                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Remover"
                       >
                         ×
@@ -811,25 +779,6 @@ export default function Fornecedores() {
           ))}
         </div>
       )}
-
-      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
-          Folha inferior no telemóvel, ao pé do polegar; diálogo centrado no
-          computador; e o verbo no botão em vez de «OK». */}
-      <PerguntaDestrutiva
-        aberto={!!aRemover}
-        onFechar={() => setARemover(null)}
-        titulo={`Remover o fornecedor «${aRemover?.name ?? ""}»?`}
-        aviso="Esta acção não pode ser anulada."
-        rotuloConfirmar="Remover"
-        // Fecha primeiro e só depois age: a lista é optimista — a ficha sai
-        // logo e volta se o servidor recusar — e uma caixa por cima atrasaria
-        // um gesto que hoje é instantâneo.
-        onConfirmar={() => {
-          const s = aRemover;
-          setARemover(null);
-          if (s) void remove(s.id);
-        }}
-      />
     </div>
   );
 }

@@ -1,12 +1,10 @@
 import "server-only";
 import { opcoesDeCarregamento } from "./cache-das-fotos";
-import type { Sharp } from "sharp";
-import { oSharp } from "./sharp-adiado";
+import sharp, { type Sharp } from "sharp";
 import { getSupabase } from "@/lib/supabase";
 import {
   PROPOSAL_BUCKET,
   PROPOSAL_MID_BUCKET,
-  PROPOSAL_AVIF_MID_BUCKET,
   PROPOSAL_THUMB_BUCKET,
   uploadProposalMid,
   uploadProposalThumb,
@@ -15,7 +13,6 @@ import {
   THEME_BUCKET,
   THEME_AVIF_BUCKET,
   THEME_AVIF_MICRO_BUCKET,
-  THEME_AVIF_MID_BUCKET,
   THEME_MID_BUCKET,
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
@@ -255,21 +252,8 @@ const FAMILIAS = [
        * com quarenta e seis. É uma avaria, não um ganho por cobrar.
        */
       { bucket: THEME_MID_BUCKET, ...MEDIA, papel: "essencial" as Papel },
-      // Os mesmos tamanhos, na oferta que só alguns navegadores aceitam.
+      // Os mesmos dois tamanhos, na oferta que só alguns navegadores aceitam.
       // Ver `THEME_AVIF_BUCKET`: é uma proposta, não uma substituição.
-      /**
-       * ── E A DE 1200 EM AVIF, QUE FALTAVA ONDE MAIS PESA ────────────────
-       *
-       * O AVIF estava montado para as de 400 (grelhas do back office) e para
-       * as micro — e não para as de 1200, que são as ÚNICAS que o casal
-       * descarrega: a página serve a de 1200 em qualquer telemóvel.
-       *
-       * Pela medição que está aqui em cima, com estas fotografias: aos 1200 px
-       * o AVIF ao desconto da casa pesa ~28% menos, com os MESMOS pixéis. Não
-       * se mexe na resolução de propósito — a queixa de fotografias
-       * «desfocadas» veio de servir menos pixéis, e não se volta lá.
-       */
-      { bucket: THEME_AVIF_MID_BUCKET, ...MEDIA, avif: true, papel: "leve" as Papel },
       { bucket: THEME_AVIF_BUCKET, ...MINIATURA, avif: true, papel: "leve" as Papel },
       {
         bucket: THEME_AVIF_MICRO_BUCKET,
@@ -287,15 +271,6 @@ const FAMILIAS = [
       // A mesma de 1200 px, do lado das propostas: as fotografias que o casal
       // vê tanto podem vir da Biblioteca como ter sido carregadas no pedido.
       { bucket: PROPOSAL_MID_BUCKET, ...MEDIA, papel: "essencial" as Papel },
-      /**
-       * A oferta em AVIF do lado das propostas, que não existia de todo.
-       *
-       * `leve` e não `essencial`, e a distinção é a de sempre: sem a de 1200
-       * em WebP a página cai para o ORIGINAL (2200 px, ~2,6 MB) e isso é uma
-       * avaria; sem esta, o `<picture>` pede a WebP e a página fica
-       * exactamente como estava. Uma é rede de segurança, a outra é um ganho.
-       */
-      { bucket: PROPOSAL_AVIF_MID_BUCKET, ...MEDIA, avif: true, papel: "leve" as Papel },
     ],
   },
 ] as const;
@@ -838,7 +813,7 @@ async function gerarAsDeUmaFoto(
       try {
         // Um `sharp` novo por derivada, sobre os MESMOS bytes: um pipeline não
         // se reaproveita depois de `toBuffer`. O que não se repete é a viagem.
-        const derivada = (await oSharp())(bytes)
+        const derivada = sharp(bytes)
           // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
           // foto de telemóvel deitada sai com os lados trocados face ao
           // original — e a miniatura ficava com outra proporção do que a grelha
@@ -962,9 +937,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     // Os MESMOS números do lote e do navegador (`image-worker.ts`): uma
     // miniatura fabricada aqui tem de ser indistinguível de uma fabricada lá,
     // ou a mesma foto muda de aspecto conforme o caminho por onde veio.
-    const derivada = await (
-      await oSharp()
-    )(bytes)
+    const derivada = await sharp(bytes)
       .rotate()
       .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: MINIATURA.qualidade - FORMATO.desconto })
@@ -1049,9 +1022,7 @@ export async function derivadaMediaAPedido(
       return { bytes: null, motivo: semResposta ? "storage-sem-resposta" : "original-em-falta" };
     }
     const bytes = Buffer.from(await data.arrayBuffer());
-    const derivada = await (
-      await oSharp()
-    )(bytes)
+    const derivada = await sharp(bytes)
       .rotate()
       // `withoutEnlargement`: uma fotografia que já seja mais pequena do que
       // 1200 sai como está. Esticá-la aqui seria fabricar pixéis que não

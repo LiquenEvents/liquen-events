@@ -404,10 +404,10 @@ export default function AdminLogin() {
         <Card padding="lg" className="w-full">
           <div className="mb-5 text-center">
             <p className="bo-eyebrow mb-2">Área Restrita</p>
-            <h1 className="font-display text-2xl leading-tight text-[var(--bo-text)]">
+            <h1 className="font-display text-2xl leading-tight text-foreground/90">
               Painel de Gestão
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+            <p className="mt-2 text-sm leading-relaxed text-foreground/55">
               {/* «Bem-vinda» presumia que quem entra é mulher. Hoje é verdade e
                   amanhã deixa de ser — e a frase não ganha nada com o género:
                   o que ela faz é dizer o que se segue. */}
@@ -560,7 +560,7 @@ export default function AdminLogin() {
                 onClick={() => setMostrarSenha((v) => !v)}
                 /* 40 px com rato, 44 no dedo — o mínimo das HIG, o mesmo que o
                    `ui/Button` usa. */
-                className="absolute bottom-0 right-0.5 flex h-10 w-10 items-center justify-center rounded-lg text-foreground/40 transition-colors hover:text-[var(--bo-tinta-72)] pointer-coarse:h-11 pointer-coarse:w-11"
+                className="absolute bottom-0 right-0.5 flex h-10 w-10 items-center justify-center rounded-lg text-foreground/40 transition-colors hover:text-foreground/70 pointer-coarse:h-11 pointer-coarse:w-11"
                 aria-label={mostrarSenha ? "Ocultar a palavra-passe" : "Mostrar a palavra-passe"}
                 aria-pressed={mostrarSenha}
                 /* Fora da ordem de tabulação: quem anda de campo em campo com o
@@ -626,7 +626,7 @@ export default function AdminLogin() {
                 onChange={(e) => setManterSessao(e.target.checked)}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
               />
-              <span className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
+              <span className="text-xs leading-relaxed text-foreground/60">
                 Manter a sessão iniciada 30 dias neste aparelho.
                 {/* A CONSEQUÊNCIA APARECE NO ESTADO QUE SE ESCOLHE, não na
                     omissão — que é a MESMA regra de antes, virada ao contrário
@@ -679,7 +679,7 @@ export default function AdminLogin() {
                 // palavra-passe falhou, e reescrever o email é atrito a mais.
                 setEmailRecuperacao(email);
               }}
-              className="alvo-toque mt-4 w-full text-center text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)]"
+              className="alvo-toque mt-4 w-full text-center text-xs text-foreground/50 underline underline-offset-4 hover:text-foreground/75"
             >
               Esqueceste-te da palavra-passe?
             </button>
@@ -690,7 +690,7 @@ export default function AdminLogin() {
               onFocus={aoFocarCampo}
               onBlur={aoSairDoCampo}
             >
-              <p className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
+              <p className="text-xs leading-relaxed text-foreground/55">
                 Escreve o teu email e enviamos-te uma ligação para definires uma palavra-passe nova.
                 A ligação serve uma vez e dura 30 minutos.
               </p>
@@ -714,7 +714,7 @@ export default function AdminLogin() {
                   aria-live="polite"
                   className={
                     respostaRecuperacao.tipo === "ok"
-                      ? "text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+                      ? "text-xs leading-relaxed text-foreground/70"
                       : "flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
                   }
                 >
@@ -732,7 +732,7 @@ export default function AdminLogin() {
                     setARecuperar(false);
                     setRespostaRecuperacao(null);
                   }}
-                  className="alvo-toque text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)]"
+                  className="alvo-toque text-xs text-foreground/50 underline underline-offset-4 hover:text-foreground/75"
                 >
                   Voltar
                 </button>
@@ -762,13 +762,13 @@ export default function AdminLogin() {
                   telemóvel. A classe põe-lhe os 44 px do dedo (e só no dedo:
                   `(pointer: coarse)`, ver globals.css), sem mexer na letra nem
                   no sublinhado. Passa a 232×44. */}
-              <summary className="alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
+              <summary className="alvo-toque cursor-pointer list-none text-xs font-medium text-foreground/60 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground/85 hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
                 Mudaste de telemóvel ou de computador?
               </summary>
-              <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+              <p className="mt-2 text-xs leading-relaxed text-foreground/55">
                 Entra aqui com o email e a palavra-passe. Já dentro, abre{" "}
-                <span className="font-medium text-[var(--bo-tinta-72)]">«{ONDE_SE_REGISTA}»</span>,
-                no fundo da barra lateral, e regista este aparelho. Da próxima vez entras só com o
+                <span className="font-medium text-foreground/70">«{ONDE_SE_REGISTA}»</span>, no
+                fundo da barra lateral, e regista este aparelho. Da próxima vez entras só com o
                 rosto ou a impressão digital. Podes registar mais do que um — e apagar de lá o que
                 já não usas.
               </p>

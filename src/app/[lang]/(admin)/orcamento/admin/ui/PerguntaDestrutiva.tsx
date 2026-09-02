@@ -115,7 +115,7 @@ export function PerguntaDestrutiva({
     >
       {oQueSePerde.length > 0 && (
         <>
-          <p className="text-sm text-[var(--bo-tinta-72)]">Desaparece com isto:</p>
+          <p className="text-sm text-foreground/70">Desaparece com isto:</p>
           <ul className="mt-2 space-y-1 text-sm">
             {oQueSePerde.map((linha, i) => (
               <li key={i} className="flex gap-2">

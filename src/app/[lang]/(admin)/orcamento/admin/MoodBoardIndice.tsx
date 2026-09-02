@@ -217,7 +217,7 @@ function EntradaDoIndice({
           {...attributes}
           {...listeners}
           aria-label={`Arrastar a página ${pos + 1}`}
-          className="alvo-toque flex h-7 w-4 shrink-0 cursor-grab items-center justify-center rounded text-foreground/25 transition-colors hover:text-[var(--bo-text-muted)] active:cursor-grabbing"
+          className="alvo-toque flex h-7 w-4 shrink-0 cursor-grab items-center justify-center rounded text-foreground/25 transition-colors hover:text-foreground/60 active:cursor-grabbing"
         >
           <span aria-hidden="true">⠿</span>
         </button>
@@ -231,10 +231,10 @@ function EntradaDoIndice({
         title={oQueFalta ? `Página ${pos + 1}: ${oQueFalta}` : undefined}
         className={`alvo-toque flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
           activo
-            ? "border-[#4d6350]/55 bg-[#4d6350]/[0.07] text-[var(--bo-text)]"
+            ? "border-[#4d6350]/55 bg-[#4d6350]/[0.07] text-foreground/85"
             : vazio
               ? "border-dashed border-foreground/20 text-foreground/45"
-              : "border-[var(--bo-hairline-strong)] text-[var(--bo-tinta-72)] hover:border-foreground/25"
+              : "border-[var(--bo-hairline-strong)] text-foreground/75 hover:border-foreground/25"
         }`}
       >
         <span className="text-foreground/30 tabular-nums">{pos + 1}</span>

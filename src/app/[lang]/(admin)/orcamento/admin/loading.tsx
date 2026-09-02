@@ -33,7 +33,7 @@ export default function AdminLoading() {
        * ecrã. O `<main>` que faltava está agora no `(admin)/layout.tsx`, sem
        * padding nenhum, e não há nada para cancelar.
        */
-      className="ecra-de-espera min-h-screen bg-[var(--bo-chao)] flex"
+      className="ecra-de-espera min-h-screen bg-[var(--bo-surface-sunken)] flex"
       role="status"
       aria-busy="true"
       aria-label="A carregar o back office"

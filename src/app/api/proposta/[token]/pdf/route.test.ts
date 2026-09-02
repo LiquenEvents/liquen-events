@@ -21,25 +21,13 @@ const db = vi.hoisted(() => ({
    * `null` é o caso normal destes testes: o armazenamento não está configurado
    * aqui, e a rota desenha como sempre fez. Só o bloco do fim o liga.
    */
-  guardado: null as Response | null,
+  urlDirecto: null as string | null,
 }));
 
 vi.mock("@/lib/proposal-pdf-guardado", () => ({
+  urlDoPdfDaProposta: vi.fn(async () => db.urlDirecto),
   guardarPdfDaProposta: vi.fn(async () => true),
   lerPdfDaProposta: vi.fn(async () => null),
-}));
-
-/**
- * O ficheiro guardado, encaminhado em fluxo pelo NOSSO endereço.
- *
- * `db.guardado` a `null` é o caso normal deste ficheiro — não há armazenamento
- * configurado aqui e a rota desenha, como sempre fez. Só o bloco do fim o liga.
- * O que este duplo devolve é uma `Response` inteira, porque é isso que a função
- * a sério devolve: os cabeçalhos dela são dela, e têm testes próprios em
- * `pdf-do-armazenamento.test.ts`.
- */
-vi.mock("@/lib/pdf-do-armazenamento", () => ({
-  pdfGuardadoEmFluxo: vi.fn(async () => db.guardado),
 }));
 
 vi.mock("@/lib/proposal-token", () => ({
@@ -100,7 +88,7 @@ beforeEach(() => {
   db.rendered = [];
   // Por omissão o ficheiro NÃO está guardado — é o estado em que o resto deste
   // ficheiro foi escrito, e o que faz a rota desenhar como sempre fez.
-  db.guardado = null;
+  db.urlDirecto = null;
   vi.clearAllMocks();
 });
 
@@ -281,65 +269,31 @@ describe("GET /api/proposta/[token]/pdf — quando já está guardado", () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
   });
 
-  const guardadoFalso = () =>
-    new Response("%PDF-1.7 fingido", {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": 'attachment; filename="Proposta.pdf"',
-        "Cache-Control": "private, no-store, must-revalidate",
-      },
-    });
-
-  it("serve o ficheiro guardado sem o desenhar", async () => {
-    db.guardado = guardadoFalso();
+  it("reencaminha para o ficheiro em vez de o reenviar", async () => {
+    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
 
     const res = await call();
 
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("application/pdf");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("https://cdn.exemplo/pdf-assinado");
     // E não se desenhou nada — era esse o custo que isto existe para não pagar.
     expect(db.rendered).toHaveLength(0);
   });
 
-  it("NUNCA reencaminha o casal para outro domínio", async () => {
-    /**
-     * ── A REGRESSÃO QUE ESTE TESTE EXISTE PARA APANHAR ──────────────────
-     *
-     * Isto respondia `302` para o endereço assinado do armazenamento, e a
-     * barra do Safari passava a mostrar `<referência>.supabase.co`. Palavras
-     * dela: «quero algo muito mais bonito e sem ser com este url super
-     * desconfiado». Um link de um email da Líquen que aterra num domínio que
-     * ninguém reconhece é o que se ensina toda a gente a não abrir — e do
-     * outro lado está um casal prestes a decidir milhares de euros.
-     *
-     * O ficheiro é o mesmo e vem do mesmo sítio; o que mudou é que passa por
-     * aqui, em fluxo. Ver `pdf-do-armazenamento.ts` — e é MAIS CURTO do que
-     * era, que a conta lá está feita.
-     */
-    db.guardado = guardadoFalso();
+  it("o reencaminhamento não fica guardado por cache nenhuma", async () => {
+    // O endereço assinado expira em minutos. Um cache partilhado a guardar
+    // este 302 servia um link morto a quem carregasse a seguir.
+    db.urlDirecto = "https://cdn.exemplo/pdf-assinado";
 
     const res = await call();
 
-    expect(res.status, "voltou a reencaminhar").toBeLessThan(300);
-    expect(res.headers.get("location"), "voltou a mandar o casal para outro domínio").toBeNull();
-  });
-
-  it("os cabeçalhos do ficheiro guardado chegam intactos a quem carregou", async () => {
-    // A rota não pode reescrever o que a função do fluxo decidiu: o nome do
-    // anexo e o «descarregar» são dela, e têm testes próprios.
-    db.guardado = guardadoFalso();
-
-    const res = await call();
-
-    expect(res.headers.get("content-disposition")).toBe('attachment; filename="Proposta.pdf"');
-    expect(res.headers.get("cache-control")).toMatch(/no-store/);
+    expect(res.headers.get("Cache-Control")).toMatch(/no-store/);
   });
 
   it("não estando guardado, desenha e serve como sempre", async () => {
     // `null` quer dizer «não está lá», e não «falhou»: o caminho de antes
     // continua inteiro por baixo.
-    db.guardado = null;
+    db.urlDirecto = null;
 
     const res = await call();
 

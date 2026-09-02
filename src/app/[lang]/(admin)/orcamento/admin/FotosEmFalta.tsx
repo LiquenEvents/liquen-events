@@ -81,7 +81,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
 
   if (estado === "falhou" || !r?.verificou) {
     return (
-      <div className={`${CAIXA} bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]`}>
+      <div className={`${CAIXA} bg-[var(--bo-tinta-6)] text-foreground/60`}>
         Não foi possível confirmar as fotografias.{" "}
         <strong className="font-medium">Isto não quer dizer que estejam bem.</strong>{" "}
         <button type="button" onClick={() => void verificar()} className="alvo-toque underline">
@@ -115,7 +115,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
           <p className="text-[11px]">{PORQUE_SUSPEITA[motivo]}</p>
           <ul className="mt-1 flex flex-col gap-0.5">
             {fotos.map((f) => (
-              <li key={f.id} className="text-[var(--bo-tinta-72)] text-[12px]">
+              <li key={f.id} className="text-foreground/70 text-[12px]">
                 {f.onde}{" "}
                 <span className="text-foreground/45">
                   ({f.largura}×{f.altura})
@@ -169,7 +169,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
             <p className="text-[11px]">{PORQUE_FALTA[motivo]}</p>
             <ul className="mt-1 flex flex-col gap-0.5">
               {fotos.map((f) => (
-                <li key={f.id} className="text-[12px] text-[var(--bo-tinta-72)]">
+                <li key={f.id} className="text-[12px] text-foreground/70">
                   {f.onde}
                 </li>
               ))}

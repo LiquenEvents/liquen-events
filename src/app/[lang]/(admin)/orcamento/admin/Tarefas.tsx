@@ -5,18 +5,10 @@ import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
-import {
-  Button,
-  Card,
-  EmptyState,
-  Field,
-  MenuDeAccoes,
-  PerguntaDestrutiva,
-  type AccaoDeItem,
-} from "./ui";
+import { Button, Card, EmptyState, Field, MenuDeAccoes, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
-import { corDeTexto, metaFor } from "./status-meta";
+import { metaFor } from "./status-meta";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -144,7 +136,7 @@ const TaskRow = memo(function TaskRow({
       </button>
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"}`}
+          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
         >
           {t.title}
         </p>
@@ -192,8 +184,7 @@ const TaskRow = memo(function TaskRow({
             className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-sm shrink-0"
             style={{
               background: `${metaFor(PRIORITY_META, t.priority).color}22`,
-              // A cor de ESCREVER, não a de preencher: medido 2,40:1 antes.
-              color: corDeTexto(metaFor(PRIORITY_META, t.priority).color),
+              color: metaFor(PRIORITY_META, t.priority).color,
             }}
           >
             {metaFor(PRIORITY_META, t.priority).label}
@@ -242,7 +233,7 @@ const TaskRow = memo(function TaskRow({
                  desenho de 13 para 25 px SEM crescer a linha (a coluna do título
                  já mede 34) e sem margens negativas, que era o que voltaria a
                  encostar os dois um ao outro. O ícone continua com 13 px. */
-              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
               aria-label="Editar tarefa"
             >
               {LapisIcon}
@@ -252,7 +243,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-foreground/55 hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
             aria-label="Eliminar"
           >
             {CaixoteIcon}
@@ -299,19 +290,6 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
 
-  /**
-   * ── A PERGUNTA DE ELIMINAR ────────────────────────────────────────────
-   *
-   * O que estava aqui era `confirm('Eliminar a tarefa "X"?')`. A caixa do
-   * browser não cabe num ecrã de 375 px, aparece no TOPO — longe do polegar,
-   * e longe da linha em que ela acabou de tocar —, diz «OK» em vez de dizer o
-   * que vai fazer, e bloqueia o fio principal enquanto está aberta.
-   *
-   * Guarda-se a tarefa e não só o `id`: o título tem de aparecer na pergunta,
-   * e a linha pode desaparecer da lista entre a pergunta e a resposta.
-   */
-  const [aEliminar, setAEliminar] = useState<Task | null>(null);
-
   // new-task form
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("normal");
@@ -320,54 +298,6 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "",
   );
   const [area, setArea] = useState("");
-
-  /**
-   * ══════════════════════════════════════════════════════════════════════════
-   * A EQUIPA É UMA LISTA DE PESSOAS, NÃO UMA CAIXA DE TEXTO
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * O responsável era escrito à mão. «Ana», «ana» e «Ana R.» eram três
-   * colaboradoras diferentes para o produto — e uma tarefa atribuída a uma
-   * delas não aparecia no filtro das outras duas. O sistema sabe exactamente
-   * quem trabalha aqui (as contas estão configuradas) e nunca o perguntava.
-   *
-   * VAZIO NÃO É «NÃO HÁ NINGUÉM». É «não sei quem são»: a instalação com
-   * palavra-passe partilhada não tem contas nomeadas, e aí o campo tem de
-   * continuar a aceitar um nome escrito à mão. Uma lista vazia que fechasse o
-   * campo tirava a funcionalidade a quem ainda não migrou.
-   *
-   * Pelo `useCachedList` e não por um efeito próprio: é o gancho que esta
-   * página já usa para as tarefas, trata da cache e da revalidação, e evita
-   * mais uma gravação de estado escrita dentro de um `useEffect` — que é um
-   * aviso que este ficheiro não tem nenhum e não vai passar a ter.
-   */
-  const { data: respostaDaEquipa } = useCachedList<{ nomes?: string[] }>(
-    "equipa",
-    "/api/admin/equipa",
-  );
-  const equipa = useMemo(
-    () => (Array.isArray(respostaDaEquipa?.nomes) ? respostaDaEquipa.nomes : []),
-    [respostaDaEquipa],
-  );
-
-  /**
-   * As opções do campo de responsável.
-   *
-   * A equipa configurada MAIS o que já estiver escrito naquela tarefa. A
-   * segunda metade é a que evita o estrago: há tarefas antigas atribuídas a
-   * nomes que não são conta nenhuma («Ana R.», «o fornecedor»), e uma lista
-   * fechada apagava-as em silêncio no primeiro `select` que se tocasse. Uma
-   * migração que perde dados não é uma migração.
-   */
-  const opcoesDeResponsavel = useCallback(
-    (actual: string): string[] => {
-      const nomes = [...equipa];
-      const escrito = (actual ?? "").trim();
-      if (escrito && !nomes.includes(escrito)) nomes.push(escrito);
-      return nomes;
-    },
-    [equipa],
-  );
 
   // filter
   const [who, setWho] = useState<string>("Todos");
@@ -535,6 +465,8 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   const remove = useCallback(
     async (id: string) => {
       const t = tasksRef.current.find((x) => x.id === id);
+      // Only confirm when there's real content to lose (skip trivial empties).
+      if (t && !confirm(`Eliminar a tarefa "${t.title}"?`)) return;
       // Guardamos a tarefa e o sítio dela, não a lista: se a eliminação for
       // recusada devolve-se ESTA linha ao lugar sem mexer no que outras
       // gravações tenham feito entretanto (ver a nota em `toggle`).
@@ -558,51 +490,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     [setTasks, gravar],
   );
 
-  /**
-   * Perguntar primeiro, e só depois eliminar.
-   *
-   * A pergunta fica aqui e não dentro do `remove` de propósito: o `remove` é o
-   * que AGE — tira a linha, chama o servidor, repõe-na se for recusado — e
-   * misturar as duas coisas fazia com que qualquer sítio que quisesse eliminar
-   * sem perguntar (uma acção em lote, um desfazer) tivesse de contornar a
-   * caixa em vez de simplesmente não a abrir.
-   *
-   * Sem a tarefa não há nada para nomear na pergunta, e uma pergunta que não
-   * diz o que se perde não vale o toque: nesse caso elimina-se e pronto.
-   */
-  const pedirParaEliminar = useCallback(
-    (id: string) => {
-      const t = tasksRef.current.find((x) => x.id === id);
-      if (!t) {
-        void remove(id);
-        return;
-      }
-      setAEliminar(t);
-    },
-    [remove],
-  );
-
   // Uma passagem só: as pessoas, e quantas tarefas por fazer tem cada uma. Antes
   // cada botão de pessoa varria a lista toda (`tasks.filter`) a cada render.
   const { people, openByPerson } = useMemo(() => {
     const counts = new Map<string, number>();
     const seen: string[] = [];
-    /**
-     * A EQUIPA ENTRA PRIMEIRO, mesmo quem não tem tarefa nenhuma.
-     *
-     * Esta lista nascia só do que estivesse ESCRITO nas tarefas — ou seja, uma
-     * colaboradora sem nada atribuído não existia no filtro, e não havia como
-     * perguntar «o que é que a Ana tem?» e receber «nada». A ausência de
-     * resposta e a resposta «nada» são coisas diferentes.
-     *
-     * Os nomes escritos à mão que não são conta nenhuma continuam a aparecer, a
-     * seguir: são as tarefas antigas, e desaparecerem do filtro seria
-     * escondê-las.
-     */
-    for (const nome of equipa) {
-      counts.set(nome, 0);
-      seen.push(nome);
-    }
     for (const t of tasks) {
       if (!t.assignee) continue;
       if (!counts.has(t.assignee)) {
@@ -612,7 +504,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       if (!t.done) counts.set(t.assignee, counts.get(t.assignee)! + 1);
     }
     return { people: ["Todos", ...seen], openByPerson: counts };
-  }, [tasks, equipa]);
+  }, [tasks]);
 
   // Filtrar e ordenar acontecia em CADA render — inclusive a cada tecla escrita
   // no campo "Nova tarefa", que é estado deste componente. Só depende da lista
@@ -649,7 +541,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 if (e.key === "Enter") saveEditTask(t.id);
                 if (e.key === "Escape") setEditingTaskId(null);
               }}
-              className="bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] w-full"
+              className="bo-input px-3 py-2 text-sm text-foreground/70 w-full"
             />
             <div className="flex flex-wrap gap-2">
               <select
@@ -657,7 +549,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 onChange={(e) =>
                   setEditTaskFields({ ...editTaskFields, priority: e.target.value as TaskPriority })
                 }
-                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
               >
                 <option value="alta">Alta</option>
                 <option value="normal">Normal</option>
@@ -667,38 +559,18 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 type="date"
                 value={editTaskFields.dueDate}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, dueDate: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1"
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1"
               />
-              {equipa.length > 0 ? (
-                <select
-                  aria-label="Responsável"
-                  value={editTaskFields.assignee}
-                  onChange={(e) =>
-                    setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
-                  }
-                  className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
-                >
-                  <option value="">Sem responsável</option>
-                  {opcoesDeResponsavel(editTaskFields.assignee).map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  value={editTaskFields.assignee}
-                  onChange={(e) =>
-                    setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
-                  }
-                  placeholder="Responsável"
-                  className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
-                />
-              )}
+              <input
+                value={editTaskFields.assignee}
+                onChange={(e) => setEditTaskFields({ ...editTaskFields, assignee: e.target.value })}
+                placeholder="Responsável"
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60 flex-1 min-w-[100px]"
+              />
               <select
                 value={editTaskFields.area}
                 onChange={(e) => setEditTaskFields({ ...editTaskFields, area: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
+                className="bo-input px-2 py-1.5 text-xs text-foreground/60"
               >
                 <option value="">Área…</option>
                 {AREAS.map((a) => (
@@ -728,7 +600,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         overdue={!!t.dueDate && !t.done && t.dueDate < todayStr}
         onToggle={toggle}
         onEdit={startEditTask}
-        onRemove={pedirParaEliminar}
+        onRemove={remove}
       />
     );
   }
@@ -786,7 +658,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               portátil a linha fica exactamente como estava; `!justify-start`
               porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
               a classe centra por omissão. */}
-          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-foreground/55 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
             <svg
               width="12"
               height="12"
@@ -804,33 +676,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
             Detalhes (opcional)
           </summary>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {equipa.length > 0 ? (
-              <Field
-                as="select"
-                label="Responsável"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-              >
-                <option value="">Sem responsável</option>
-                {opcoesDeResponsavel(assignee).map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </Field>
-            ) : (
-              /* Sem contas nomeadas configuradas não há equipa a listar, e o
-                 campo continua a ser o de sempre. Ver a nota no `equipa`: uma
-                 lista vazia é «não sei quem são», não «não há ninguém». */
-              <Field
-                label="Responsável"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-                // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
-                // exemplo acaba por sair daqui para sítios onde não devia estar.
-                placeholder="Ex.: quem fica responsável"
-              />
-            )}
+            <Field
+              label="Responsável"
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
+              // exemplo acaba por sair daqui para sítios onde não devia estar.
+              placeholder="Ex.: quem fica responsável"
+            />
             <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
               <option value="">Sem área</option>
               {AREAS.map((a) => (
@@ -954,10 +807,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 {showDone ? "▾" : "▸"} Concluídas ({done.length})
               </Button>
               {showDone && (
-                <Card
-                  padding="none"
-                  className="overflow-hidden divide-y divide-[var(--bo-hairline)]"
-                >
+                <Card padding="none" className="overflow-hidden divide-y divide-[var(--bo-hairline)]">
                   {done.map(row)}
                 </Card>
               )}
@@ -965,25 +815,6 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
           )}
         </>
       )}
-
-      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
-          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
-          polegar, onde o dedo já está), diálogo centrado no computador, e o
-          verbo repetido no botão em vez de «OK». */}
-      <PerguntaDestrutiva
-        aberto={!!aEliminar}
-        onFechar={() => setAEliminar(null)}
-        titulo={`Eliminar a tarefa «${aEliminar?.title ?? ""}»?`}
-        rotuloConfirmar="Eliminar"
-        // Fecha PRIMEIRO e só depois age: a lista é optimista — a linha sai
-        // logo e volta se o servidor recusar — e uma caixa aberta por cima
-        // atrasaria um gesto que hoje é instantâneo.
-        onConfirmar={() => {
-          const t = aEliminar;
-          setAEliminar(null);
-          if (t) void remove(t.id);
-        }}
-      />
     </div>
   );
 }
