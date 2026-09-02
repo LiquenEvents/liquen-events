@@ -158,11 +158,32 @@ describe("o movimento da proposta", () => {
     );
   });
 
-  it("a entrada só corre quando a cortina anuncia que está a subir", () => {
-    // Sem o atributo — JavaScript desligado, segunda visita no mesmo
-    // separador, movimento reduzido — não há animação nenhuma e a página é a
-    // de sempre.
-    expect(BLOCO).toMatch(/html\[data-cortina="a-sair"\] \.prop-folha/);
+  it("a entrada espera pelo instante em que o pano sobe — e não por um sinal do guião", () => {
+    /**
+     * ── ISTO JÁ ESTEVE AGARRADO A UM ATRIBUTO ─────────────────────────────
+     *
+     * Era `html[data-cortina="a-sair"] .prop-folha`: o guião punha o atributo
+     * no instante em que DECIDIA levantar a cortina, e a folha entrava com
+     * ele.
+     *
+     * O guião deixou de decidir isso. Quem manda no tempo do pano passou a ser
+     * o CSS, numa animação só — ela mandou o ficheiro e sublinhou-a: «fica
+     * parado 2 segundos e sobe nos últimos 270 ms». O atributo já não aparece,
+     * e uma regra pendurada nele nunca mais correria: a folha da proposta
+     * entrava parada, e ninguém dava por isso porque uma animação que não
+     * corre não deixa rasto.
+     *
+     * Passa a esperar pelo mesmo instante que o zoom da capa do sítio espera,
+     * escrito uma vez no `:root`. E ganha a propriedade que o `hero-settle` já
+     * tinha: num dia em que o JavaScript não corra, isto continua a acontecer.
+     */
+    expect(BLOCO, "a entrada deixou de esperar pelo instante da subida").toMatch(
+      /\.prop-folha \{[\s\S]*?var\(--cortina-sobe\)/,
+    );
+    expect(
+      BLOCO.replace(/\/\*[\s\S]*?\*\//g, ""),
+      "voltou a estar pendurada num sinal que o guião já não dá",
+    ).not.toContain('data-cortina="a-sair"');
   });
 });
 
