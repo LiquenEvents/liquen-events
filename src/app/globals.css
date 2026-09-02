@@ -3673,7 +3673,13 @@ body:has(.barra-consentimento) footer {
 .cortina {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* Acima da barra dos cookies (`z-[70]`) e do aviso de navegação (80).
+     Estava em 60, e na proposta e no back office nunca se notou porque ali não
+     há barra de cookies. No sítio há — e a fotografia mostrou o rodapé de
+     consentimento a espreitar por baixo do logótipo, que parece uma página
+     partida a meio e não uma a caminho. É o mesmo defeito que o aviso de
+     navegação já tinha tido, e a mesma correcção. */
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3714,6 +3720,47 @@ body:has(.barra-consentimento) footer {
 /* Posta pelo guião quando o documento está lido E o mínimo já passou. */
 .cortina--a-sair {
   animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+/* ── A VARIANTE DO LOGÓTIPO, PARA O SÍTIO ─────────────────────────────────
+   O emblema a respirar, sem texto: `from{opacity:.9;transform:scale(.9)}
+   to{opacity:1;transform:scale(1)}`, 1,25 s em alternado — os valores dela.
+   Quem chega ao sítio vem de uma pesquisa ou de um anúncio e quer ver o
+   trabalho; o logótipo diz de quem é a casa sem pedir que se leia nada. */
+@keyframes cortina-a-respirar {
+  from {
+    opacity: 0.9;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cortina__pulso {
+  display: block;
+  animation: cortina-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
+}
+
+.cortina__logo {
+  /* Os 32 px do exemplo dela eram para um SÍMBOLO quadrado. Este logótipo traz
+     as nove letras de «LÍQUEN EVENTS» — a essa largura não se lê, e já foi
+     medido uma vez numa fotografia. 150 px é a medida do ecrã de espera da
+     proposta, e é onde o nome se lê. */
+  width: 150px;
+  max-width: 45vw;
+  height: auto;
+}
+
+/* Quem pediu menos movimento leva o logótipo QUIETO — e não nenhum.
+   A cortina do lema desaparece por completo nesse caso; aqui o guião também a
+   fecha logo, portanto isto é só a rede: se por alguma razão ela chegar a ser
+   pintada, não pulsa. */
+@media (prefers-reduced-motion: reduce) {
+  .cortina__pulso {
+    animation: none;
+  }
 }
 
 .cortina__lema {

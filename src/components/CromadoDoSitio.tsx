@@ -4,6 +4,7 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import { AvisoDeCarregamento } from "@/components/AvisoDeCarregamento";
+import { Cortina } from "@/components/Cortina";
 import SpeculationRules from "@/components/SpeculationRules";
 import PageTransition from "@/components/PageTransition";
 import HeroWarm from "@/components/HeroWarm";
@@ -91,6 +92,18 @@ export default function CromadoDoSitio({
       >
         {skipLabel}
       </a>
+      {/*
+        O ARRANQUE DO SÍTIO, COM O LOGÓTIPO A RESPIRAR.
+
+        Palavras dela, com o segundo exemplo: «é isto que eu quero quando
+        carrega, mas para a Líquen com a animação».
+
+        É a MESMA peça da proposta e do back office — mesmo guião, mesma saída
+        em cortina, mesmas redes de segurança — com o logótipo em vez do lema.
+        A razão de não ser o lema aqui é de ritmo: quem chega ao sítio vem de
+        uma pesquisa ou de um anúncio e quer ver o trabalho, não ler uma frase.
+      */}
+      <Cortina locale={locale} variante="logotipo" />
       <ScrollProgress />
       {/*
         O aviso de que uma página está a demorar. Palavras dela: «caso demore

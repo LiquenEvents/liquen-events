@@ -35,8 +35,13 @@ const CSS = readFileSync("src/app/globals.css", "utf8");
 /** Só o bloco da cortina, para não apanhar as outras animações do ficheiro. */
 const BLOCO = CSS.slice(CSS.indexOf("A CORTINA DA PROPOSTA"));
 
-/** O mínimo declarado no guião — lido dele, para o teste não repetir o número. */
-const MIN = Number(/var MIN=(\d+)/.exec(GUIAO)?.[1]);
+/**
+ * O mínimo por omissão do guião — lido dele, para o teste não repetir o número.
+ *
+ * Ele passou a vir do elemento (`data-minimo`), porque o lema e o logótipo
+ * ficam tempos diferentes no ecrã; o valor aqui é o de recurso, o do lema.
+ */
+const MIN = Number(/data-minimo"\)\|\|(\d+)\)/.exec(GUIAO)?.[1]);
 
 afterEach(cleanup);
 
@@ -339,6 +344,97 @@ describe("a cortina, e o que não pode mudar", () => {
       expect(document.querySelector(".cortina")?.classList.contains("cortina--fora")).toBe(false);
     } finally {
       if (real) Object.defineProperty(window, "sessionStorage", real);
+      vi.useRealTimers();
+    }
+  });
+
+  it("a variante do logótipo mostra o emblema e NÃO o lema", () => {
+    const { container } = render(<Cortina locale="pt" variante="logotipo" />);
+    expect(container.querySelector(".cortina__logo")).not.toBeNull();
+    expect(
+      container.querySelector(".cortina__lema"),
+      "no sítio não se pede que se leia",
+    ).toBeNull();
+  });
+
+  it("e essa TEM nome para quem ouve o ecrã — a do lema não precisa", () => {
+    /**
+     * A do lema aparece por cima de um `loading.tsx` cujo `aria-busy` já diz
+     * «isto está a carregar». No sítio não há esse ecrã por baixo: sem nome,
+     * quem ouve ficava sem saber que algo estava a acontecer.
+     */
+    const logo = render(<Cortina locale="pt" variante="logotipo" />);
+    const el = logo.container.querySelector(".cortina")!;
+    expect(el.getAttribute("role")).toBe("status");
+    expect(el.getAttribute("aria-label")).toMatch(/abrir/i);
+    expect(el.getAttribute("aria-hidden")).toBeNull();
+    cleanup();
+
+    const lema = render(<Cortina locale="pt" />);
+    expect(lema.container.querySelector(".cortina")!.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("cada variante leva o seu mínimo — o lema precisa de tempo para SER LIDO", () => {
+    // Números diferentes porque o conteúdo é diferente: duas linhas a ler
+    // contra um emblema que se reconhece num relance.
+    const lema = render(<Cortina locale="pt" />);
+    expect(lema.container.querySelector(".cortina")!.getAttribute("data-minimo")).toBe("1000");
+    cleanup();
+    const logo = render(<Cortina locale="pt" variante="logotipo" />);
+    expect(logo.container.querySelector(".cortina")!.getAttribute("data-minimo")).toBe("900");
+  });
+
+  it("o guião lê o mínimo do elemento, e respeita-o", () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = `<div class="cortina" data-minimo="900"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+      new Function(GUIAO)();
+      const aSair = () =>
+        !!document.querySelector(".cortina")?.classList.contains("cortina--a-sair");
+      vi.advanceTimersByTime(850);
+      expect(aSair()).toBe(false);
+      vi.advanceTimersByTime(50);
+      expect(aSair()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tranca o scroll enquanto está no ecrã, e devolve-o EXACTAMENTE como estava", () => {
+    /**
+     * Detalhe do exemplo dela, e vale a pena: sem isto, dá para arrastar uma
+     * página que não se vê, e ao sair a página aparece já a meio.
+     *
+     * Devolver o valor ANTERIOR e não `""` é o que impede isto de pisar quem
+     * já tinha uma regra de scroll própria.
+     */
+    vi.useFakeTimers();
+    const antes = "clip";
+    try {
+      document.documentElement.style.overflow = antes;
+      document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+      new Function(GUIAO)();
+      expect(document.documentElement.style.overflow, "trancado enquanto se vê").toBe("hidden");
+
+      vi.advanceTimersByTime(1000);
+      document
+        .querySelector(".cortina")!
+        .dispatchEvent(
+          Object.assign(new Event("animationend"), { animationName: "cortina-a-subir" }),
+        );
+      expect(document.documentElement.style.overflow, "devolvido como estava").toBe(antes);
+    } finally {
+      document.documentElement.style.overflow = "";
       vi.useRealTimers();
     }
   });
