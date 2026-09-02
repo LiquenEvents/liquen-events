@@ -427,6 +427,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // abertas — a primeira desenha o mapa do armazenamento a quem perguntar, a
   // segunda gasta-o.
   { path: "./admin/derivadas/route", methods: ["GET", "POST"] },
+  // O aquecimento dos PDF das propostas já enviadas. O GET conta e o POST
+  // DESENHA — cada volta são até oito documentos de vários megabytes, com o
+  // `pdf-lib` e o `sharp` a correr numa função. Sem sessão, é uma maneira de
+  // qualquer pessoa gastar a conta do estúdio a partir de fora.
+  { path: "./admin/aquecimento-pdf/route", methods: ["GET", "POST"] },
   // A auditoria dos valores inchados lê os pedidos e as propostas TODOS, com os
   // nomes dos noivos e o dinheiro de cada um. Só lê — mas o que lê é a base
   // inteira, e é a leitura que a guarda protege.

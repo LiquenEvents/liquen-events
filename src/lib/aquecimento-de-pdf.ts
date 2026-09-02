@@ -394,3 +394,84 @@ export async function aquecerPdfsEmFalta(
 
   return resumo;
 }
+
+/** O que se sabe da fila, sem desenhar nem perguntar ao armazenamento. */
+export type ContagemDoAquecimento = {
+  /** As que já seguiram para um casal e têm documento — o universo disto. */
+  enviadas: number;
+  /** As que já se CONFIRMOU guardadas, com a chave deste documento. */
+  quentes: number;
+  /** As que falharam três vezes: não voltam a ser tentadas por esta via. */
+  desistidas: number;
+  /** Falharam há menos de uma semana e estão à espera da vez. */
+  adiadas: number;
+  /**
+   * Quantas faltam, NO MÁXIMO.
+   *
+   * É um tecto e não uma certeza, e vale a pena dizer porquê: uma proposta
+   * cujo PDF foi desenhado por um casal a abrir o link ESTÁ quente, e esta
+   * contagem não sabe — só o armazenamento sabe, e perguntar-lhe uma vez por
+   * proposta era a ida cara que este número existe para evitar.
+   *
+   * Enganar-se para cima é o lado certo de se enganar: um número que desce
+   * mais depressa do que o esperado é uma boa surpresa; um que fica parado em
+   * três quando já não falta nada era uma varredura que nunca acabava.
+   */
+  porAquecer: number;
+};
+
+/**
+ * Quantas propostas falta aquecer — a pergunta barata.
+ *
+ * Não desenha nada, não fala com o armazenamento e não escreve estado. Lê a
+ * lista das propostas e a memória do aquecimento, e faz contas.
+ *
+ * Existe porque ninguém sabia o tamanho da fila. «Aquecer tudo» sem saber
+ * quantas são é um botão que se carrega às cegas — e a regra dela é que nunca
+ * há um estado de espera sem nome. Isto dá-lhe o nome: um número.
+ */
+export async function contarPorAquecer(): Promise<ContagemDoAquecimento> {
+  const vazia: ContagemDoAquecimento = {
+    enviadas: 0,
+    quentes: 0,
+    desistidas: 0,
+    adiadas: 0,
+    porAquecer: 0,
+  };
+
+  let estado: EstadoDoAquecimento;
+  let propostas: PropostaParaAquecer[];
+  try {
+    estado = (await getState<EstadoDoAquecimento>(CHAVE_DO_ESTADO)) ?? { falhadas: {} };
+    propostas = await listAllProposals();
+  } catch (e) {
+    log.warn("aquecimento-pdf: não se conseguiu contar a fila", { erro: String(e) });
+    return vazia;
+  }
+
+  const falhadas = estado.falhadas ?? {};
+  const feitas = estado.feitas ?? {};
+  const agora = Date.now();
+  const c = { ...vazia };
+
+  for (const proposta of propostas) {
+    if (!proposta.doc || !proposta.sentAt) continue;
+    c.enviadas++;
+
+    const falha = falhadas[proposta.id];
+    if (falha && falha.tentativas >= TENTATIVAS_ATE_DESISTIR) {
+      c.desistidas++;
+      continue;
+    }
+    // A mesma regra do aquecimento: a chave é o `sha256` do CONTEÚDO, portanto
+    // uma proposta revista não bate com a memória e volta a contar como fria.
+    if (feitas[proposta.id] === chaveDoPdf(proposta.doc, idiomaDaProposta(proposta))) {
+      c.quentes++;
+      continue;
+    }
+    if (falha && agora - +new Date(falha.tentadaEm) < ESPERA_APOS_FALHA_MS) c.adiadas++;
+    c.porAquecer++;
+  }
+
+  return c;
+}
