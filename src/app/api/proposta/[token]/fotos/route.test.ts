@@ -27,7 +27,15 @@ vi.mock("@/lib/rate-limit", () => ({
   clientIp: () => "1.2.3.4",
   rateLimit: async () => H.limite,
 }));
-vi.mock("@/lib/proposal-storage", () => ({
+/**
+ * O módulo das ASSINATURAS, e não o `proposal-storage`.
+ *
+ * Mudaram de casa para o `sharp` sair do grafo da página da proposta (ver
+ * `proposal-assinaturas.ts`). Se este caminho voltar a ser o antigo, o
+ * assinador real corre e o CONTROLO POSITIVO abaixo apanha-o — foi assim que
+ * esta linha se descobriu.
+ */
+vi.mock("@/lib/proposal-assinaturas", () => ({
   signProposalPaths: async (paths: string[]) => {
     H.assinados.push(...paths);
     return new Map(paths.map((p) => [p, `https://storage.example/o/${encodeURIComponent(p)}`]));

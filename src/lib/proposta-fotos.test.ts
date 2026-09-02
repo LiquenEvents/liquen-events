@@ -22,7 +22,15 @@ const H = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/proposal-storage", () => ({
+/**
+ * O módulo das ASSINATURAS, e não o `proposal-storage`.
+ *
+ * Mudaram de casa para o `sharp` sair do grafo da página que o casal abre — o
+ * porquê está no `proposal-assinaturas.ts`. Se este caminho voltar a ser o
+ * antigo, o `proposta-fotos` deixa de estar simulado e passa a assinar contra
+ * o Supabase a sério: os casos abaixo ficariam verdes por não medirem nada.
+ */
+vi.mock("@/lib/proposal-assinaturas", () => ({
   signProposalPaths: vi.fn(async (paths: string[]) => {
     H.pedidosOriginais.push([...paths]);
     return new Map(paths.filter((p) => H.originais.has(p)).map((p) => [p, H.originais.get(p)!]));

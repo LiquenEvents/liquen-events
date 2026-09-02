@@ -37,7 +37,7 @@
  * passeio do browser; não o substitui. Para a proposta, é o único que há.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -141,6 +141,140 @@ for (const { nome, dir, tecto } of ROTAS) {
         "      meio segundo. Vê o que entrou de novo antes de subir o número.",
     );
     chumbou = true;
+  }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE CADA FUNÇÃO LEVA CONSIGO — E PORQUE É QUE ISTO SE LÊ DO BUILD
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Há um teste que guarda a configuração do `sharp` (`tracing-do-sharp.test.ts`)
+ * e ele faz o que pode: compara duas listas de texto dentro do `next.config.ts`.
+ * O que ele NÃO pode fazer é ver o resultado — e é no resultado que as avarias
+ * vivem.
+ *
+ * Foi assim que a inclusão `"/**"` pôde crescer sem ninguém dar por ela: está
+ * escrita para TODAS as rotas, e são 135. O `favicon.ico` leva 17,8 MB de
+ * bibliotecas de imagem que não tem como usar.
+ *
+ * O que se lê aqui é o rastreio que o próprio build escreve por rota
+ * (`*.nft.json`): a lista exacta dos ficheiros que vão viajar com cada função.
+ * Sem servidor, sem rede, sem plataforma.
+ *
+ * ── AS DUAS REGRAS ────────────────────────────────────────────────────────
+ *
+ *  1. QUEM PRECISA, LEVA. Uma rota cujo rastreio traga o `sharp` tem de trazer
+ *     também o vínculo nativo e o `libvips`. Sem isto, a avaria é a que já
+ *     aconteceu em produção: o back office deixou de listar os temas com
+ *     «Could not load the "sharp" module … libvips-cpp.so: No such file».
+ *     Passa a ser vermelho no CI em vez de vermelho no telemóvel dela.
+ *
+ *  2. NINGUÉM LEVA O QUE NÃO CORRE AQUI. As variantes `musl` e `wasm32` são de
+ *     outras plataformas e pesam 27 MB juntas. Já são excluídas; isto guarda
+ *     que continuem a ser.
+ *
+ * A terceira regra — que uma rota que NÃO usa o `sharp` também não o carregue —
+ * ainda não se pode exigir: hoje falhariam 135 de 135. Fica a contagem à vista,
+ * que é o que torna o custo impossível de ignorar, e a regra entra quando a
+ * inclusão for estreitada às rotas que dele precisam.
+ */
+const NATIVO = "@img/sharp-linux-x64/lib/";
+const LIBVIPS = "@img/sharp-libvips-linux-x64/lib/libvips-cpp.so";
+const FORASTEIRAS = ["sharp-wasm32", "sharp-linuxmusl-x64", "sharp-libvips-linuxmusl-x64"];
+
+/** Todos os rastreios que o build escreveu, um por rota. */
+function rastreios(dir = path.join(".next", "server", "app"), fora = []) {
+  if (!existsSync(dir)) return fora;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) rastreios(p, fora);
+    else if (e.name.endsWith(".nft.json")) fora.push(p);
+  }
+  return fora;
+}
+
+const traços = rastreios();
+if (traços.length === 0) {
+  console.error(
+    "\n  ✗ não encontrei um único rastreio em .next/server/app.\n" +
+      "      Ou o build não correu, ou o Next mudou onde os escreve. Uma rede que\n" +
+      "      não encontra nada para medir não é uma rede.",
+  );
+  chumbou = true;
+} else {
+  let comSharp = 0;
+  let comPeso = 0;
+  const semPar = [];
+  const comForasteiras = [];
+
+  for (const t of traços) {
+    const ficheiros = JSON.parse(readFileSync(t, "utf8")).files ?? [];
+    const rota = t.replace(/^\.next[/\\]server[/\\]app[/\\]/, "").replace(/\.nft\.json$/, "");
+    const usaSharp = ficheiros.some((f) => f.includes("node_modules/sharp/"));
+    const temNativo = ficheiros.some((f) => f.includes(NATIVO) && f.endsWith(".node"));
+    const temLibvips = ficheiros.some((f) => f.includes(LIBVIPS));
+
+    if (usaSharp) comSharp++;
+    if (temNativo || temLibvips) comPeso++;
+    if (usaSharp && !(temNativo && temLibvips)) {
+      semPar.push(
+        `${rota} (nativo: ${temNativo ? "sim" : "NÃO"}, libvips: ${temLibvips ? "sim" : "NÃO"})`,
+      );
+    }
+    const intrusas = FORASTEIRAS.filter((n) => ficheiros.some((f) => f.includes(n)));
+    if (intrusas.length > 0) comForasteiras.push(`${rota} → ${intrusas.join(", ")}`);
+  }
+
+  console.log(`\nO que cada função leva consigo (${traços.length} rotas):\n`);
+
+  if (semPar.length > 0) {
+    console.error(`  ✗ ${semPar.length} rota(s) trazem o \`sharp\` SEM o par que o faz correr:`);
+    for (const r of semPar) console.error(`      ${r}`);
+    console.error(
+      "      É esta a avaria que tirou a lista dos temas em produção. A inclusão do\n" +
+        "      `next.config.ts` tem de cobrir estas rotas.",
+    );
+    chumbou = true;
+  } else {
+    console.log(`  ✓ as ${comSharp} rotas que usam o \`sharp\` levam o nativo e o libvips`);
+  }
+
+  if (comForasteiras.length > 0) {
+    console.error(`  ✗ ${comForasteiras.length} rota(s) levam variantes de outra plataforma:`);
+    for (const r of comForasteiras) console.error(`      ${r}`);
+    chumbou = true;
+  } else {
+    console.log("  ✓ nenhuma rota leva as variantes `musl`/`wasm32` (27 MB que não correm aqui)");
+  }
+
+  const aMais = comPeso - comSharp;
+  console.log(
+    `  · ${comPeso} de ${traços.length} rotas carregam as bibliotecas de imagem; ` +
+      `${comSharp} podem usá-las.`,
+  );
+  if (aMais > 0) {
+    /**
+     * A frase sobre a proposta é CALCULADA e não escrita.
+     *
+     * Esteve escrita à mão — «e a proposta que o casal abre é uma delas» — e no
+     * dia em que deixou de ser verdade continuou a sair, a dizer a um número
+     * certo uma coisa errada. Um relatório que mente é pior do que um que
+     * cala.
+     */
+    const daProposta = traços.find((t) => t.includes("proposta") && t.includes("[token]"));
+    const propostaPaga =
+      daProposta !== undefined &&
+      JSON.parse(readFileSync(daProposta, "utf8")).files.some(
+        (f) => f.includes(NATIVO) || f.includes(LIBVIPS),
+      );
+    console.log(
+      `      ${aMais} rotas levam ~17,8 MB que não têm como usar — ~8 MB comprimidos a ir\n` +
+        "      buscar e a descomprimir antes de a função escrever o primeiro byte." +
+        (propostaPaga
+          ? "\n      E a proposta que o casal abre é uma delas."
+          : "\n      A proposta que o casal abre já NÃO é uma delas."),
+    );
   }
 }
 

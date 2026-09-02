@@ -28,10 +28,29 @@ import config from "../../next.config";
  * Isto é o alarme: as duas listas não se podem tocar.
  */
 
-const tracing = (mapa: Record<string, string[]> | undefined) => mapa?.["/**"] ?? [];
+/**
+ * ── AS INCLUSÕES DEIXARAM DE VIVER TODAS NA MESMA CHAVE ────────────────────
+ *
+ * Havia uma chave só, `"/**"`, e por isso este ficheiro lia-a directamente. As
+ * bibliotecas nativas de imagem passaram para `"/api/**"` — 135 rotas
+ * carregavam 17,8 MB que 31 podiam usar, e o porquê está por extenso no
+ * `next.config.ts`.
+ *
+ * O que este ficheiro guarda não muda com isso, porque nunca foi a chave: é
+ * que uma exclusão não pode engolir o que uma inclusão garantiu. Junta-se
+ * TODAS as inclusões, venham de que chave vierem — se um dia alguém acrescentar
+ * uma chave nova, o alarme cobre-a sem ninguém se lembrar dele.
+ */
+const todos = (mapa: Record<string, string[]> | undefined) => Object.values(mapa ?? {}).flat();
 
-const INCLUIDOS = tracing(config.outputFileTracingIncludes as Record<string, string[]> | undefined);
-const EXCLUIDOS = tracing(config.outputFileTracingExcludes as Record<string, string[]> | undefined);
+const INCLUIDOS = todos(config.outputFileTracingIncludes as Record<string, string[]> | undefined);
+const EXCLUIDOS = todos(config.outputFileTracingExcludes as Record<string, string[]> | undefined);
+
+/** Que chave é que garante um dado padrão. */
+function chaveDe(padrao: string): string | undefined {
+  const mapa = (config.outputFileTracingIncludes ?? {}) as Record<string, string[]>;
+  return Object.keys(mapa).find((k) => mapa[k].includes(padrao));
+}
 
 /** O padrão sem o `/**\/*` do fim — a pasta que ele apanha. */
 const pasta = (padrao: string) => padrao.replace(/\/\*\*\/\*$/, "").replace(/^\.\//, "");
@@ -68,6 +87,44 @@ describe("o que o `sharp` leva para dentro da função", () => {
     );
     expect(INCLUIDOS, "o libvips deixou de viajar com a função").toContain(
       "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    );
+  });
+
+  it("e viaja com uma chave que apanha as rotas que dele precisam", () => {
+    /**
+     * As 31 rotas que usam o `sharp` estão TODAS debaixo de `/api` — foi
+     * medido, e é o que autoriza a chave a ser estreita. Este caso guarda duas
+     * coisas que se partem de maneiras diferentes:
+     *
+     *  1. `"/api/*"` NÃO casa com `/api/temas/[id]/imagens` — medido com o
+     *     próprio picomatch do Next. Uma estrela a menos e a avaria dos temas
+     *     volta, exactamente onde já esteve.
+     *  2. Uma rota de PÁGINA que passasse a precisar do `sharp` ficaria de
+     *     fora desta chave em silêncio. Quem apanha esse caso é o
+     *     `scripts/peso-das-rotas.mjs`, que lê o rastreio do build — este
+     *     ficheiro só lê a intenção, e não tem como saber o que o build fez.
+     */
+    for (const par of [
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    ]) {
+      const chave = chaveDe(par);
+      expect(chave, `${par} deixou de estar em chave nenhuma`).toBeDefined();
+      expect(
+        chave,
+        `a chave \`${chave}\` tem uma estrela a menos: não casa com uma rota aninhada ` +
+          "como `/api/temas/[id]/imagens`, que é onde a avaria dos temas viveu",
+      ).not.toMatch(/\/\*$/);
+    }
+  });
+
+  it("as imagens do email ficam na chave larga — falham em silêncio", () => {
+    // O `readFileSync` do `email-assinatura.ts` rebenta sem elas, a assinatura
+    // sai sem banner, e ninguém dá por isso porque o ficheiro está no
+    // repositório e o sítio mostra-o na mesma. São 19 KB: não valem o risco de
+    // uma chave estreita.
+    expect(chaveDe("public/email/**/*"), "as imagens do email ficaram numa chave estreita").toBe(
+      "/**",
     );
   });
 

@@ -181,8 +181,48 @@ const nextConfig: NextConfig = {
      * ele abre. Com `/**` porque o pedaço partilhado pode cair em qualquer
      * rota — foi precisamente o que aconteceu com `/api/temas`.
      */
-    "/**": [
-      "public/email/**/*",
+    /**
+     * ── PORQUE É QUE A CHAVE DEIXOU DE SER `"/**"` ────────────────────────
+     *
+     * Era `"/**"`, e a razão era boa: a avaria dos temas foi real e a resposta
+     * segura era «vai para todas». O que ninguém reviu depois foi o preço.
+     *
+     * MEDIDO, e pela primeira vez, com a rede nova do `peso-das-rotas.mjs`:
+     *
+     *     135 de 135 rotas carregavam as bibliotecas de imagem;
+     *      31 podiam usá-las.
+     *
+     * O `favicon.ico` levava 17,8 MB de `libvips` sem ter um único `require`
+     * que lá chegasse. E a proposta que o casal abre era uma das 104 que
+     * pagavam sem usar: 8,77 MB comprimidos para a plataforma ir buscar e
+     * descomprimir antes de a função escrever o primeiro byte, contra 1,02 MB
+     * sem elas. É 8,6× menos artefacto, e é a maior parcela isolada do ecrã
+     * branco de que ela se queixou ao abrir a proposta do email.
+     *
+     * `"/api/**"` e não `"/api/*"`: MEDIDO com o próprio picomatch do Next, o
+     * segundo não casa com `/api/temas/[id]/imagens`. É a mesma armadilha de
+     * uma estrela que este ficheiro já documenta em cima.
+     *
+     * ── O QUE IMPEDE ISTO DE VOLTAR A PARTIR OS TEMAS ─────────────────────
+     *
+     * Não é a atenção de ninguém: é o `scripts/peso-das-rotas.mjs`, que corre
+     * depois do build e é bloqueante no CI. Ele lê o rastreio que o build
+     * escreve por rota e reprova se alguma rota trouxer o `sharp` SEM o
+     * vínculo nativo e o `libvips` — que é, exactamente, a avaria dos temas.
+     * A regra existia na cabeça de quem escreveu esta chave; agora existe no
+     * CI.
+     */
+    /**
+     * As imagens do rodapé dos emails FICAM na chave larga, e de propósito.
+     *
+     * Hoje todas as rotas que enviam email estão debaixo de `/api` — verifiquei
+     * uma a uma. Mas são 19 KB, e o modo de falhar delas é o pior que há: o
+     * `readFileSync` do `email-assinatura.ts` rebenta, a assinatura sai sem
+     * banner, e ninguém dá por isso porque o ficheiro está no repositório e o
+     * sítio mostra-o na mesma. Dezanove kilobytes não valem um risco desses.
+     */
+    "/**": ["public/email/**/*"],
+    "/api/**": [
       "./node_modules/@img/sharp-linux-x64/**/*",
       "./node_modules/@img/sharp-libvips-linux-x64/**/*",
     ],
