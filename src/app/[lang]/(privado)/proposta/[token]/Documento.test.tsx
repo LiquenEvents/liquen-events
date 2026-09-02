@@ -251,6 +251,41 @@ describe("as fotografias", () => {
     expect(borrao?.getAttribute("alt")).toBe("");
   });
 
+  /**
+   * ── A CAPA VERTICAL ENCOSTAVA-SE À ESQUERDA ──────────────────────────────
+   *
+   * Palavras dela, a olhar para a proposta no telemóvel: «a foto de capa não
+   * está ao meio».
+   *
+   * A caixa da capa tem `aspect-ratio` E `max-height`. Quando a altura bate no
+   * tecto — e bate nas capas VERTICAIS, que são altas — o navegador encolhe a
+   * LARGURA para manter a proporção. E uma caixa de bloco mais estreita do que
+   * o contentor fica encostada à esquerda, porque é isso que uma caixa de bloco
+   * faz.
+   *
+   * MEDIDO num Chromium, com um contentor de 350 px e uma caixa de
+   * `aspect-ratio: 3/4; max-height: 280px`: largura 210 px, `x = 0`. Cento e
+   * quarenta pixéis de vazio, todos do lado direito.
+   *
+   * Não se corrige tirando o `aspect-ratio` (reserva o espaço e impede o texto
+   * de saltar) nem o `max-height` (impede uma capa vertical de ocupar a página
+   * inteira antes de uma palavra). O que faltava era dizer o que fazer com o
+   * espaço que sobra.
+   *
+   * Isto verifica-se pela classe e não pela geometria, porque o jsdom não faz
+   * layout: não sabe calcular `aspect-ratio` nem `max-height`, e um teste que
+   * medisse `getBoundingClientRect` aqui daria zeros e passaria sempre.
+   */
+  it("a caixa da capa fica centrada quando encolhe", () => {
+    desenhar();
+    const caixa = capa().closest("[style*='aspect-ratio']");
+    expect(caixa, "nenhuma caixa à volta da capa").not.toBeNull();
+    expect(
+      caixa?.className,
+      "a capa volta a encostar-se à esquerda quando a altura bate no tecto",
+    ).toContain("mx-auto");
+  });
+
   it("a forma reserva-se na caixa, e não na imagem", () => {
     // Sem isto, o texto por baixo salta quando a fotografia chega — e um salto
     // lê-se como lentidão mesmo quando não é.

@@ -319,7 +319,30 @@ export default async function ProposalPage({
     String(proposal.clientName ?? "")
       .trim()
       .split(/\s+/)[0] ?? "";
-  const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
+
+  /**
+   * ── E CUMPRIMENTAM-SE OS DOIS, NÃO UM ────────────────────────────────────
+   *
+   * Palavras dela: «em vez de dizer Olá x diga o nome dos dois noivos».
+   *
+   * Isto dizia `Olá, {primeira palavra do nome do cliente}` — e o nome do
+   * cliente é o de QUEM PEDIU o orçamento. Numa proposta de casamento há duas
+   * pessoas, e cumprimentar só uma delas, em Playfair a 52 px, na primeira
+   * linha que o casal lê, é dizer-lhes que o documento é para um deles.
+   *
+   * `doc.clientNames` é o campo que ela própria escreve no estúdio e que o
+   * documento já mostra como «NOIVOS» mais abaixo — «Lola e João», na forma que
+   * ela escolheu. Usar esse texto é usar a autoria dela em vez de inventar uma
+   * junção a partir de dois campos.
+   *
+   * A cascata mantém as guardas que já existiam, e pela mesma razão: sem os
+   * dois nomes cai-se no primeiro nome de quem pediu, e sem nome nenhum
+   * cumprimenta-se na mesma — «Olá.» — que é uma frase inteira e não denuncia
+   * que falta ali um campo.
+   */
+  const nomesDoCasal = String(proposal.doc?.clientNames ?? "").trim();
+  const aQuemSeFala = nomesDoCasal || primeiroNome;
+  const saudacao = aQuemSeFala ? `${t.greeting}, ${aQuemSeFala}.` : `${t.greeting}.`;
 
   /**
    * AS FOTOGRAFIAS, ASSINADAS AQUI E NÃO POR UM PEDIDO DO NAVEGADOR.
