@@ -3630,42 +3630,34 @@ body:has(.barra-consentimento) footer {
    A CORTINA DA PROPOSTA
    ══════════════════════════════════════════════════════════════════════════
 
-   O porquê inteiro está no `CortinaDaProposta.tsx`. O que interessa saber
-   aqui, ao ler o CSS: esta cortina NÃO segura o ecrã. O `140ms` de atraso na
-   entrada é o que faz uma proposta rápida nunca chegar a pintá-la, e o
-   `3.5s` da subida é a saída que não precisa de JavaScript nenhum.
+   O porquê inteiro está no `CortinaDaProposta.tsx` — incluindo porque é que
+   ela DEIXOU de ser invisível numa ligação rápida, e a que custo. Em duas
+   linhas: ela abriu a proposta no telemóvel, não viu animação nenhuma, e
+   escolheu vê-la sempre.
+
+   O que interessa saber ao ler o CSS: a cortina já nasce visível (opacidade
+   1), e quem manda no tempo dela é o `MIN` do guião — não este ficheiro. O
+   `4s` da subida aqui em baixo é só a saída que não precisa de JavaScript.
 
    Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
 
-/* Cada grupo de palavras: sobe do seu degrau, materializa-se até aos 35%,
-   fica legível até aos 65% e sai pelo mesmo degrau, ao contrário. É a leitura
-   dela do efeito — a profundidade em camadas vem das distâncias diferentes,
-   não do fade. */
+/* Cada grupo de palavras sobe do SEU degrau e materializa-se. É a leitura dela
+   do efeito — «o truque não é o fade, é a frase estar partida em grupos, cada
+   um a subir de uma distância diferente». A saída não está aqui: as palavras
+   sobem agarradas à cortina, num só gesto, em vez de saírem primeiro e a
+   cortina depois. Duas saídas seguidas leem-se como uma hesitação. */
 @keyframes cortina-palavras {
   0% {
     opacity: 0;
     transform: translateY(var(--degrau, 14px));
   }
-  35% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  65% {
+  40% {
     opacity: 1;
     transform: translateY(0);
   }
   100% {
-    opacity: 0;
-    transform: translateY(calc(var(--degrau, 14px) * -1));
-  }
-}
-
-@keyframes cortina-a-aparecer {
-  from {
-    opacity: 0;
-  }
-  to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -3690,23 +3682,20 @@ body:has(.barra-consentimento) footer {
      já está por baixo das fotografias (`--color-noite`), escolhido para
      impedir um flash branco — o trabalho é o mesmo, à escala do ecrã. */
   background: var(--color-noite);
-  /* Nasce invisível. A entrada só arranca aos 140ms: uma proposta que chegue
-     antes disso levanta a cortina sem ela ter sido pintada uma única vez. */
-  opacity: 0;
-  animation:
-    cortina-a-aparecer 0.18s linear 0.14s forwards,
-    /* A SAÍDA SEM JAVASCRIPT. Se o guião não correr — bloqueado, falhado,
-       desligado —, é esta linha que impede um casal de ficar preso a olhar
-       para um ecrã escuro com a proposta por baixo. */
-    cortina-a-subir 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) 3.5s forwards;
+  /* Visível desde o primeiro fotograma. Antes nascia a zero e só aparecia aos
+     140 ms, para uma página rápida a levantar sem a pintar; era isso que fazia
+     com que ela nunca a visse. */
+  opacity: 1;
+  /* A SAÍDA SEM JAVASCRIPT. Se o guião não correr — bloqueado, falhado,
+     desligado —, é esta linha que impede um casal de ficar preso a olhar para
+     um ecrã escuro com a proposta por baixo. Aos 4 s, que é folga larga sobre
+     o mínimo de 1 s por que o guião espera. */
+  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) 4s forwards;
 }
 
-/* Posta pelo guião quando o documento acabou de ser lido. Substitui as duas
-   animações de cima: a `opacity: 1` fixa o que a entrada já tinha alcançado,
-   para a subida não começar por um salto. */
+/* Posta pelo guião quando o documento está lido E o mínimo já passou. */
 .cortina--a-sair {
-  opacity: 1;
-  animation: cortina-a-subir 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
 }
 
 .cortina__lema {
@@ -3725,10 +3714,12 @@ body:has(.barra-consentimento) footer {
   letter-spacing: -0.01em;
 }
 
+/* 1 s ao todo: os primeiros 40% (~400 ms) a subir e a materializar-se, e o
+   resto — ~600 ms — completamente legível. É o tempo que ela descreveu. */
 .cortina__lema > span {
   display: block;
   opacity: 0;
-  animation: cortina-palavras 2s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  animation: cortina-palavras 1s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
 }
 
 @media (min-width: 640px) {
@@ -3747,10 +3738,9 @@ body:has(.barra-consentimento) footer {
   }
 }
 
-/* Quem pediu menos movimento não leva cortina NENHUMA — não uma mais calma.
-   O ecrã de espera do `loading.tsx` continua a dizer que algo está a
-   acontecer, que é o que a regra exige; o que desaparece é uma cortina a
-   deslizar por cima da proposta de quem pediu para não a ver. */
+/* Quem pediu menos movimento não leva cortina NENHUMA — não uma mais calma, e
+   também não o segundo de espera. O ecrã de espera do `loading.tsx` continua a
+   dizer que algo está a acontecer, que é o que a regra exige. */
 @media (prefers-reduced-motion: reduce) {
   .cortina {
     display: none;
