@@ -516,13 +516,26 @@ describe("a cortina, e o que não pode mudar", () => {
     }
   });
 
-  it("tranca o scroll enquanto está no ecrã, e devolve-o EXACTAMENTE como estava", () => {
+  it("NÃO tranca o scroll — quem quer descer, desce", () => {
     /**
-     * Detalhe do exemplo dela, e vale a pena: sem isto, dá para arrastar uma
-     * página que não se vê, e ao sair a página aparece já a meio.
+     * ── ISTO JÁ FOI O CONTRÁRIO, E VALE A PENA SABER PORQUÊ ───────────────
      *
-     * Devolver o valor ANTERIOR e não `""` é o que impede isto de pisar quem
-     * já tinha uma regra de scroll própria.
+     * Trancava. Era um detalhe copiado do exemplo dela, com um argumento que
+     * parecia bom: sem tranca, dá para arrastar uma página que não se vê, e ao
+     * sair a cortina a página aparece já a meio.
+     *
+     * O defeito apareceu quando a cortina passou de 1000 para 2200 ms. Um
+     * passeio da galeria que desce dois ecrãs e conta as fotografias
+     * carregadas passou a encontrar TRÊS em vez de quatro — três vezes
+     * seguidas, e só no telemóvel, onde é preciso descer para haver grelha.
+     * O gesto dele caía dentro da tranca e não fazia nada.
+     *
+     * E o que aquele passeio faz é o que uma pessoa faz: chegar e arrastar
+     * para baixo. Uma tranca que engole um gesto não protege ninguém — devolve
+     * silêncio a quem pediu alguma coisa, que é o que o briefing dela proíbe.
+     *
+     * Quem arrasta durante a cortina fica onde pediu para ficar. O que fica a
+     * proteger o toque é o `touch-action: pan-y` do CSS, no caso a seguir.
      */
     vi.useFakeTimers();
     const antes = "clip";
@@ -535,19 +548,33 @@ describe("a cortina, e o que não pode mudar", () => {
       });
       Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
       new Function(GUIAO)();
-      expect(document.documentElement.style.overflow, "trancado enquanto se vê").toBe("hidden");
+      expect(
+        document.documentElement.style.overflow,
+        "voltou a trancar o scroll — um gesto durante a cortina deixa de fazer efeito",
+      ).toBe(antes);
 
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(3000);
       document
         .querySelector(".cortina")!
         .dispatchEvent(
           Object.assign(new Event("animationend"), { animationName: "cortina-a-subir" }),
         );
-      expect(document.documentElement.style.overflow, "devolvido como estava").toBe(antes);
+      expect(document.documentElement.style.overflow, "e não pisa quem já lá tinha regra").toBe(
+        antes,
+      );
     } finally {
       document.documentElement.style.overflow = "";
       vi.useRealTimers();
     }
+  });
+
+  it("o dedo arrasta a página por baixo, mas o toque para na cortina", () => {
+    // As duas metades da mesma decisão: `pan-y` deixa passar o arrastar
+    // vertical, e a caixa continua a intercetar o toque — ninguém carrega às
+    // cegas num botão que não vê. Sem isto, uma caixa que cobre o ecrã inteiro
+    // come o gesto de quem quer descer.
+    expect(BLOCO).toMatch(/\.cortina \{[\s\S]*?touch-action: pan-y;/);
+    expect(GUIAO, "a tranca do scroll voltou pelo guião").not.toContain("overflow");
   });
 
   it("o elemento leva `suppressHydrationWarning` — sem ele, a 2.ª entrada suja a consola", () => {
@@ -578,7 +605,7 @@ describe("a cortina, e o que não pode mudar", () => {
     expect(fonte).toContain("suppressHydrationWarning");
   });
 
-  it("voltar pela cache do browser fecha-a já, e devolve o scroll", () => {
+  it("voltar pela cache do browser fecha-a já", () => {
     /**
      * Palavras dela: «se eu volto para trás no browser aquilo fica assim um
      * bocado coiso».
@@ -586,9 +613,9 @@ describe("a cortina, e o que não pode mudar", () => {
      * Quando uma página volta da cache de histórico, o guião NÃO corre outra
      * vez — `document.currentScript` só existe durante a leitura. Ou seja: a
      * cortina volta ao ecrã exactamente no estado em que estava quando se saiu.
-     * Se se saiu com ela levantada, volta-se a um ecrã escuro, com o scroll
-     * trancado, e sem ninguém para o destrancar — o `animationend` e o
-     * `setTimeout` que fariam esse trabalho ficaram na visita anterior.
+     * Se se saiu com ela levantada, volta-se a um ecrã escuro sem ninguém para
+     * o levantar — o `animationend` e o `setTimeout` que fariam esse trabalho
+     * ficaram na visita anterior.
      *
      * O `pageshow` com `persisted` é o único aviso que o browser dá de que
      * isto aconteceu. Uma página que volta JÁ ESTÁ carregada: não há nada para
@@ -606,10 +633,9 @@ describe("a cortina, e o que não pode mudar", () => {
       Object.defineProperty(document, "readyState", { value: "loading", configurable: true });
       new Function(GUIAO)();
 
-      // Está no ecrã e o scroll está trancado — saiu-se a meio.
+      // Está no ecrã — saiu-se a meio.
       const el = () => document.querySelector(".cortina")!;
       expect(el().classList.contains("cortina--fora")).toBe(false);
-      expect(document.documentElement.style.overflow).toBe("hidden");
 
       // E volta-se pela cache do browser.
       const volta = new Event("pageshow") as Event & { persisted: boolean };
@@ -617,7 +643,6 @@ describe("a cortina, e o que não pode mudar", () => {
       window.dispatchEvent(volta);
 
       expect(el().classList.contains("cortina--fora"), "fecha-se sem esperar").toBe(true);
-      expect(document.documentElement.style.overflow, "e devolve o scroll").toBe(antes);
     } finally {
       document.documentElement.style.overflow = "";
       vi.useRealTimers();

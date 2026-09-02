@@ -70,6 +70,25 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * elemento já fora do documento e não faz nada — nunca uma segunda subida a
  * piscar no ecrã.
  *
+ * ── E NÃO TRANCA O SCROLL ─────────────────────────────────────────────────
+ *
+ * Trancava. `document.documentElement.style.overflow = "hidden"` enquanto ela
+ * estivesse no ecrã, para não se poder arrastar uma página que não se vê.
+ *
+ * O defeito apareceu quando a cortina passou a durar 2200 ms em vez de 1000:
+ * um teste da galeria que desce dois ecrãs e conta as fotografias carregadas
+ * passou a encontrar três em vez de quatro. Não era o teste — era que o gesto
+ * dele deixou de fazer efeito, porque chegava dentro da tranca. E o que um
+ * teste faz ali é o que uma pessoa faz: chegar ao sítio e arrastar para baixo.
+ *
+ * Uma tranca que engole um gesto não protege ninguém; devolve silêncio a quem
+ * pediu alguma coisa, que é precisamente o que o briefing proíbe. Portanto sai.
+ *
+ * O que fica no lugar é `touch-action: pan-y` na cortina (ver o `globals.css`):
+ * o dedo passa a arrastar a página POR BAIXO dela, e o toque continua a ser
+ * intercetado — ninguém carrega às cegas num botão que não vê. Quem arrasta
+ * durante a cortina fica onde pediu para ficar quando ela sobe.
+ *
  * ── QUEM PEDIU MENOS MOVIMENTO NÃO LEVA CORTINA ───────────────────────────
  *
  * Com `prefers-reduced-motion: reduce` isto é `display: none`. Não é uma
@@ -123,7 +142,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * durante a leitura do documento, praticamente no primeiro instante em que a
  * cortina existe. Não é somado ao carregamento: é comparado com ele.
  */
-export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var scrollAntes=raiz.style.overflow;var fora=function(){c.classList.add("cortina--fora");raiz.style.overflow=scrollAntes;raiz.setAttribute("data-cortina","fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}raiz.style.overflow="hidden";c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir"||e.animationName==="cortina-a-subir-ja")fora()});addEventListener("pageshow",function(e){if(e&&e.persisted)fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");raiz.setAttribute("data-cortina","a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
+export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var fora=function(){c.classList.add("cortina--fora");raiz.setAttribute("data-cortina","fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir"||e.animationName==="cortina-a-subir-ja")fora()});addEventListener("pageshow",function(e){if(e&&e.persisted)fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");raiz.setAttribute("data-cortina","a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

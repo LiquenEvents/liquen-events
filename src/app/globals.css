@@ -3728,6 +3728,15 @@ body:has(.barra-consentimento) footer {
   /* O que acontece dentro da cortina não pode obrigar a página por baixo a
      recalcular — e é a página por baixo que está a montar-se neste momento. */
   contain: layout paint;
+  /* ── O DEDO PASSA, O TOQUE NÃO ─────────────────────────────────────────
+     A cortina cobre o ecrã inteiro, e uma caixa que cobre o ecrã inteiro come
+     o arrastar de quem quer descer. Com `pan-y`, o navegador trata o arrastar
+     vertical como scroll da página por baixo — mas um TOQUE continua a parar
+     aqui, que é o que impede alguém de carregar às cegas num botão que não vê.
+
+     Isto substitui o `overflow: hidden` que o guião punha na raiz. O porquê
+     inteiro, e o defeito que o obrigou a sair, estão no `Cortina.tsx`. */
+  touch-action: pan-y;
 }
 
 /* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
