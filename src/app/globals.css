@@ -204,7 +204,22 @@
 
      Serve para uma coisa só, mas importante: o que estiver por baixo da
      cortina não deve gastar a sua animação enquanto ninguém a pode ver. */
-  --cortina-minimo: 2200ms;
+  /* ── O PANO SEGURA E SOBE NUMA SÓ ANIMAÇÃO ────────────────────────────
+     Palavras dela, a apontar para o ficheiro que mandou: «é isto —
+     `0%, 88% { translateY(0) }` fica parado dois segundos, e sobe nos últimos
+     270 ms».
+
+     São dois números porque há duas coisas a acontecer: o pano dura
+     `--cortina-total`, e começa a subir aos 88% disso. O que estiver por baixo
+     e quiser entrar com ele (o zoom da capa, a folha da proposta) espera por
+     `--cortina-sobe` — que é o mesmo instante, escrito uma vez.
+
+     A saída é CSS puro, e é isso que a torna melhor do que a que cá estava. O
+     argumento é dela e está escrito no ficheiro que mandou: «um preloader que
+     precise de JavaScript para sair é um ecrã preto permanente no dia em que o
+     script falhar — e esse dia chega sempre». */
+  --cortina-total: 2250ms;
+  --cortina-sobe: 1980ms; /* 88% de 2250 */
 }
 
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
@@ -2365,8 +2380,8 @@ body[data-menu-open] .whatsapp-fixed {
    uma animação a correr para ninguém, e a gastar bateria a fazê-lo.
 
    ── PORQUE É QUE É UM ATRASO E NÃO UM GANCHO NA CORTINA ─────────────────
-   O gancho existe e está ali ao lado: a proposta entra com
-   `html[data-cortina="a-sair"] .prop-folha`. Aqui não serve, e a razão é o dia
+   O gancho existiu, e a proposta usava-o (`html[data-cortina="a-sair"]`).
+   Nenhuma das duas o usa hoje, e a razão é a mesma: o dia
    em que o JavaScript não corre — bloqueado, falhado, uma rede que engoliu o
    ficheiro. Nesse dia o atributo nunca aparece: com um gancho, a fotografia
    ficava presa no primeiro fotograma da animação, 8% mais fechada, PARA
@@ -2381,7 +2396,7 @@ body[data-menu-open] .whatsapp-fixed {
    espera, sem salto quando ela arranca. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-navigated]) .hero-settle {
-    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) var(--cortina-minimo) backwards;
+    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) var(--cortina-sobe) backwards;
   }
 }
 
@@ -3675,41 +3690,55 @@ body:has(.barra-consentimento) footer {
 
    Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
 
-/* Cada LETRA entra pela sua borda: as pares sobem de baixo, as ímpares caem de
-   cima. Palavras dela: «as letras deslocam-se, tipo uma cai e a outra entra».
+/* ══════════════════════════════════════════════════════════════════════════
+   OS GRUPOS DE PALAVRAS — E O TRUQUE NÃO É O ATRASO
+   ══════════════════════════════════════════════════════════════════════════
 
-   O `--de` vem escrito no HTML, letra a letra, e traz o sinal — `135%` sobe,
-   `-135%` cai. Não são 100% porque o recorte da linha tem respiro para os
-   descendentes (ver `.cortina__linha`), e a 100% ficava uma fatia da letra
-   pousada na borda, à vista, antes de ela arrancar. MEDIDO num Chromium a
-   390 pt: a linha mede 46 px de janela para 34 de letra, portanto é preciso
-   deslocá-la 40 para a tirar dali; 135% são 45,4 px.
+   Palavras dela, no ficheiro que mandou: «cada grupo parte de mais longe e sai
+   para mais longe do que o anterior: 10px, 20px, 30px. Os atrasos são quase
+   nada — se fosse o atraso a fazer o trabalho, lia-se como três palavras em
+   fila indiana. É o DESENCONTRO DAS DISTÂNCIAS que dá a leitura em camadas: as
+   três percorrem o mesmo tempo a velocidades diferentes, e o olho lê isso como
+   profundidade.»
 
-   A saída não está aqui: as letras sobem agarradas à cortina, num só gesto, em
-   vez de saírem primeiro e a cortina depois. Duas saídas seguidas leem-se como
-   uma hesitação. */
-@keyframes cortina-letra {
-  from {
-    transform: translateY(var(--de, 135%));
+   ── E A PARAGEM É QUE FAZ DISTO UMA FRASE ────────────────────────────────
+
+   Entra a subir, PÁRA de 35% a 65% para se ler, e sai a subir. Sem a paragem
+   isto era um efeito; com ela é uma frase.
+
+   ── O QUE ISTO SUBSTITUI, E PORQUÊ ───────────────────────────────────────
+
+   Estavam as letras a entrar uma a uma, alternadas, recortadas pela linha.
+   Fi-las a pedido dela — «uma cai e a outra entra» — e ela viu-as. Depois
+   mandou este ficheiro e disse «é isto». É outra coisa, e é a dela: as letras
+   saem, os grupos entram.
+
+   Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
+@keyframes cortina-grupo {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--dy, 10px));
   }
-  to {
+  35%,
+  65% {
+    opacity: 1;
     transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(var(--dy, 10px) * -1));
   }
 }
 
-/* A rede de segurança sem JavaScript.
-   Cheguei a pôr aqui um `visibility: hidden` no último fotograma, para o
-   elemento ficar terminado e não só fora do ecrã. O teste dos 60 fps apanhou-o
-   — `visibility` não é uma propriedade de compositor — e tem razão: a regra
-   desta casa é `transform` e `opacity`, e não se abre uma excepção por um caso
-   que hoje não se alcança. Fora do ecrã pelo `transform`, o elemento não
-   intercepta nem cobre nada; no caminho normal quem o fecha de vez é o
-   `display: none` do `.cortina--fora`. */
-@keyframes cortina-a-subir {
-  from {
+/* O PANO. Uma animação só: fica parado 88% do tempo e sobe nos últimos 12%.
+   É de propósito que não são duas animações nem um temporizador — assim ele
+   sai sozinho, sem JavaScript nenhum. */
+@keyframes cortina-segurar {
+  0%,
+  88% {
     transform: translateY(0);
   }
-  to {
+  100% {
     transform: translateY(-100%);
   }
 }
@@ -3718,11 +3747,8 @@ body:has(.barra-consentimento) footer {
   position: fixed;
   inset: 0;
   /* Acima da barra dos cookies (`z-[70]`) e do aviso de navegação (80).
-     Estava em 60, e na proposta e no back office nunca se notou porque ali não
-     há barra de cookies. No sítio há — e a fotografia mostrou o rodapé de
-     consentimento a espreitar por baixo do logótipo, que parece uma página
-     partida a meio e não uma a caminho. É o mesmo defeito que o aviso de
-     navegação já tinha tido, e a mesma correcção. */
+     A fotografia mostrou o rodapé de consentimento a espreitar por baixo do
+     lema, que parece uma página partida a meio e não uma a caminho. */
   z-index: 90;
   display: flex;
   align-items: center;
@@ -3730,63 +3756,90 @@ body:has(.barra-consentimento) footer {
   padding: 2rem;
   /* ── UMA SÓ COR, EM TODA A CASA ─────────────────────────────────────────
      Palavras dela: «quero esse verde mais claro, que nós temos, que é o mesmo
-     verde do site online».
-
-     É o `moss-dark`: o verde do menu e da barra do sítio. Começou por ser o
-     `--color-noite`, o verde-quase-preto que está por baixo das fotografias —
-     e por um dia a proposta abriu em quase-preto e o sítio em verde. Não há
-     razão para serem dois: é a mesma frase, da mesma casa, e uma casa tem uma
-     cor. O escuro fazia o que o escuro faz num teatro; este faz o que faz uma
-     porta, que é dizer onde se entrou.
-
-     O creme sobre este verde dá ~5,9:1 — folgado para as WCAG, e a frase é
-     grande. */
+     verde do site online». É o `moss-dark`: o verde do menu e da barra do
+     sítio. O creme sobre este verde dá ~5,9:1 — folgado para as WCAG. */
   background: var(--color-moss-dark);
-  /* Visível desde o primeiro fotograma. Antes nascia a zero e só aparecia aos
-     140 ms, para uma página rápida a levantar sem a pintar; era isso que fazia
-     com que ela nunca a visse. */
   opacity: 1;
-  /* A SAÍDA SEM JAVASCRIPT. Se o guião não correr — bloqueado, falhado,
-     desligado —, é esta linha que impede um casal de ficar preso a olhar para
-     um ecrã escuro com a proposta por baixo. Aos 4 s, que é folga larga sobre
-     o mínimo de 1 s por que o guião espera. */
-  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) 4s forwards;
+  /* Dela, e vale a pena: no instante em que o pano já está a subir mas ainda
+     está no documento, não pode engolir um toque do que está por baixo. */
+  pointer-events: none;
+  /* ── A SAÍDA, SEM UMA LINHA DE JAVASCRIPT ───────────────────────────────
+     Fica parado 88% do tempo e sobe nos últimos 12%. Uma animação só, e não
+     duas nem um temporizador: assim o pano sai sozinho. Se o guião não correr
+     — bloqueado, falhado, desligado — o casal não fica preso atrás dele.
+
+     A curva é a do menu e da cortina do ficheiro dela, e não a das entradas de
+     conteúdo: acelera e trava nas duas pontas, e é isso que faz um pano
+     parecer um pano e não uma camada a deslizar. */
+  animation: cortina-segurar var(--cortina-total) cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
   /* ── A CAMADA VEM ANTES DO MOVIMENTO ────────────────────────────────────
      Sem isto, o WebKit só promove a cortina a camada própria no instante em
-     que ela COMEÇA a subir — e criar e rasterizar uma camada do ecrã inteiro
-     (num iPhone a 3×, ~3 milhões de pixéis) no mesmo fotograma em que o
-     movimento arranca é um solavanco. Com `will-change` a camada já existe.
-     É retirado assim que ela sai (ver `.cortina--fora`), para não ficar uma
-     camada do ecrã inteiro pendurada na memória do telemóvel a vida toda. */
+     que ela COMEÇA a subir — e criar uma camada do ecrã inteiro no mesmo
+     fotograma em que o movimento arranca é um solavanco. */
   will-change: transform;
   /* O que acontece dentro da cortina não pode obrigar a página por baixo a
      recalcular — e é a página por baixo que está a montar-se neste momento. */
   contain: layout paint;
-  /* ── O DEDO PASSA, O TOQUE NÃO ─────────────────────────────────────────
-     A cortina cobre o ecrã inteiro, e uma caixa que cobre o ecrã inteiro come
-     o arrastar de quem quer descer. Com `pan-y`, o navegador trata o arrastar
-     vertical como scroll da página por baixo — mas um TOQUE continua a parar
-     aqui, que é o que impede alguém de carregar às cegas num botão que não vê.
-
-     Isto substitui o `overflow: hidden` que o guião punha na raiz. O porquê
-     inteiro, e o defeito que o obrigou a sair, estão no `Cortina.tsx`. */
-  touch-action: pan-y;
 }
 
-/* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
-   Porque ela é desenhada pelo React, e o guião corre ANTES da hidratação.
+/* ══════════════════════════════════════════════════════════════════════════
+   O MOTE
+   ══════════════════════════════════════════════════════════════════════════
+
+   ── A LETRA É DO SISTEMA, E ISSO NÃO É UMA CEDÊNCIA ──────────────────────
+
+   Era a Playfair, a serifada da marca, para o casal encontrar a mesma casa no
+   rodapé do sítio e no PDF. Ela pediu esta, do ficheiro que mandou.
+
+   E traz um ganho que a serifada nunca podia dar: uma letra do sistema não se
+   descarrega. A Playfair chegava lá pelos 300–900 ms — DENTRO do tempo em que
+   as palavras se mexem — e quando chegava a frase re-media-se e repintava-se a
+   meio do movimento. Havia uma máquina inteira só para tapar isso (o
+   `fontes-por-assentar`, que punha Georgia à espera). Deixa de ser precisa:
+   não há nada por que esperar. */
+.cortina__lema {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 0.35em;
+  text-align: center;
+  margin: 0;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--color-cream);
+}
+
+/* A quebra no sítio certo. O lema tem uma vírgula, e é aí que a frase respira
+   — deixá-lo quebrar onde calhasse punha «eternizamos» pendurado no fim da
+   primeira linha em metade dos telemóveis. Um item de largura inteira e altura
+   zero força a mudança de linha sem ocupar espaço nenhum. */
+.cortina__quebra {
+  flex-basis: 100%;
+  height: 0;
+}
+
+.cortina__grupo {
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  /* Nasce invisível e é a animação que o traz. Sem `forwards` ele voltava ao
+     estado inicial no fim — invisível, no meio do pano ainda a subir. */
+  opacity: 0;
+  animation: cortina-grupo 2000ms cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+/* ── ESCONDER DE VEZ, SEM SAIR DO DOCUMENTO ──────────────────────────────
+   A cortina é desenhada pelo React e o guião corre ANTES da hidratação.
    Removê-la deixava o React a hidratar um `<main>` a que faltava um filho:
-   erro #418, e o React a reconstruir a subárvore — ou seja, a pôr a cortina
-   DE VOLTA, já sem ninguém para a tirar.
-
-   MEDIDO num Chromium, com o JavaScript a chegar 2,5 s depois: a cortina
-   ficava no ecrã até aos ~7 s. Numa quinta com 4G fraco — que é exactamente
-   onde isto tinha de funcionar — o casal ficava sete segundos atrás de um
-   ecrã escuro com a proposta por baixo.
-
-   Esconder em vez de remover resolve-o pela raiz: o elemento continua onde o
-   servidor o pôs, a hidratação encontra o que espera, e mudar-lhe a CLASSE é
-   o mesmo que os guiões de tema desta casa já fazem antes de hidratar. */
+   erro #418, e o React a reconstruir a subárvore — ou seja, a pôr a cortina DE
+   VOLTA, já sem ninguém para a tirar. MEDIDO num Chromium com o JavaScript a
+   chegar 2,5 s depois: ficava no ecrã até aos ~7 s. Esconder pela CLASSE
+   resolve-o pela raiz. */
 .cortina--fora {
   display: none !important;
   /* A camada já não serve para nada: largá-la devolve a memória. */
@@ -3798,143 +3851,17 @@ body:has(.barra-consentimento) footer {
 
    1. Um documento PRÉ-RENDERIZADO. O navegador desenha a página seguinte em
       segredo quando o dedo se aproxima de uma ligação, e esse documento corre
-      os guiões todos — incluindo este. Sem esta trava, a cortina fazia a sua
-      animação inteira numa página que ninguém está a ver, e chegava ao ecrã já
-      gasta. O guião tira a classe no `prerenderingchange`, que é o instante em
-      que a página passa a ser mesmo a página.
+      os guiões todos. Sem esta trava, o pano fazia a sua animação inteira numa
+      página que ninguém está a ver, e chegava ao ecrã já gasto.
 
-   2. VOLTAR PELA CACHE DO HISTÓRICO. Aí a cortina tem de recomeçar do
-      princípio, e uma animação de CSS só recomeça se for interrompida: pôr a
-      classe, forçar o cálculo, tirar a classe.
-
-   O `!important` é o mesmo que o `.cortina--fora` já usa, e pela mesma razão:
-   isto tem de ganhar a uma animação que já está declarada. */
+   2. VOLTAR PELA CACHE DO HISTÓRICO. Aí tem de recomeçar do princípio, e uma
+      animação de CSS só recomeça se for interrompida: pôr a classe, forçar o
+      cálculo, tirar a classe. */
 .cortina--parada,
-.cortina--parada .cortina__letra {
+.cortina--parada .cortina__grupo {
   animation: none !important;
 }
 
-/* Posta pelo guião quando o documento está lido E o mínimo já passou.
-   ── PORQUE É QUE A SAÍDA TEM UM NOME PRÓPRIO ────────────────────────────
-   Porque a `.cortina` JÁ tem uma animação com o nome `cortina-a-subir` viva,
-   parada nos 4 s de atraso da rede de segurança. Reutilizar o mesmo nome aqui
-   obrigava o motor a RE-CRONOMETRAR essa animação em vez de começar uma nova
-   — e a desmontar e remontar a animação acelerada exactamente no instante em
-   que ela tem de se mexer. Um nome diferente tira a ambiguidade. */
-.cortina--a-sair {
-  animation: cortina-a-subir-ja 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
-}
-
-@keyframes cortina-a-subir-ja {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-100%);
-  }
-}
-
-.cortina__lema {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* Zero, e não os 4 px de antes: quem separa as linhas passou a ser a
-     entrelinha. O `gap` somava-se aos `margin` negativos do recorte e as duas
-     linhas encavalitavam-se. */
-  gap: 0;
-  text-align: center;
-  font-family: var(--font-display), Georgia, serif;
-  font-weight: 300;
-  font-size: 24px;
-  /* Era 1,25 com 4 px de `gap` — 34 px de linha a linha. É 1,4 com `gap` zero
-     — 33,6 px. A mesma mancha de texto, e agora com espaço para o recorte não
-     morder os descendentes. */
-  line-height: 1.4;
-  color: var(--color-cream);
-  /* Um texto claro sobre escuro engorda; o espacejamento negativo devolve-lhe
-     a forma que tem no rodapé, que é onde o casal o volta a encontrar. */
-  letter-spacing: -0.01em;
-}
-
-/* Quanto tempo isto leva ao todo está no `Cortina.tsx`, ao lado do `MINIMO`
-   que o guarda: ~1,57 s a montar-se letra a letra, e ~630 ms com a frase
-   inteira parada e legível. */
-/* ── A LETRA NÃO PODE TROCAR A MEIO DA ANIMAÇÃO ──────────────────────────
-   O lema é desenhado em Playfair, que é carregada com `display: swap`. Num 4G
-   frio a letra chega lá pelos 300–900 ms — ou seja, DENTRO do segundo em que
-   as palavras estão a subir. Quando chega, as duas linhas re-medem-se e
-   repintam-se a meio do movimento.
-
-   A casa já tem a máquina para isto: o guião do `layout.tsx` marca o
-   documento com `fontes-por-assentar` e tira a marca no `document.fonts.ready`.
-   Enquanto ela lá estiver, o lema fica em Georgia — uma serifada do sistema,
-   já lá, sem pedido nenhum — e a Playfair só entra quando as letras assentam,
-   altura em que a cortina já saiu ou está de saída. */
-.fontes-por-assentar .cortina__lema {
-  font-family: Georgia, "Times New Roman", serif;
-}
-
-/* ── A LINHA É A JANELA ──────────────────────────────────────────────────
-   `overflow: hidden` é o que transforma «uma letra a aparecer» em «uma letra a
-   entrar»: fora desta caixa não há letra nenhuma para ver.
-
-   O respiro (`padding`) existe porque um recorte colado à caixa de texto corta
-   os descendentes — o «g» de «eternizamos», a vírgula, o «ç». A Playfair ocupa
-   ~1,34 em entre o topo do ascendente e o fundo do descendente, e a linha tem
-   1,4 em; o respiro de 0,25 em de cada lado é a folga por cima disso. O
-   `margin` negativo devolve ao documento exactamente o espaço que o `padding`
-   lhe tirou, para o recorte não empurrar as duas linhas uma da outra.
-
-   E o respiro lateral é para o `letter-spacing` negativo do lema: ele encolhe
-   o avanço DEPOIS da última letra, e sem esta folga a caixa fechava-lhe em
-   cima de uma fracção de pixel do lado direito. */
-.cortina__linha {
-  display: block;
-  overflow: hidden;
-  padding: 0.25em 0.08em;
-  margin: -0.25em -0.08em;
-}
-
-/* A palavra não quebra por dentro. Sem isto, o navegador muda de linha entre
-   duas letras coladas e a frase parte-se a meio de uma palavra num ecrã
-   estreito — que é a conta que está escrita no `Cortina.tsx`. */
-.cortina__palavra {
-  display: inline-block;
-  white-space: nowrap;
-}
-
-/* A duração e o atraso de cada letra vêm do HTML: são a única coisa que muda
-   de letra para letra, e escrevê-los aqui obrigava a uma regra por letra. */
-.cortina__letra {
-  display: inline-block;
-  animation-name: cortina-letra;
-  /* A curva de assinatura da casa, e não uma inventada aqui ao lado. */
-  animation-timing-function: var(--ease-out);
-  /* `backwards`: durante o atraso a letra fica onde vai NASCER, fora da
-     janela. Sem isto ficava parada no sítio final, à vista, e só depois
-     saltava para fora para entrar — que é o contrário do efeito. */
-  animation-fill-mode: backwards;
-}
-
-@media (min-width: 640px) {
-  .cortina__lema {
-    font-size: 28px;
-  }
-}
-@media (min-width: 768px) {
-  .cortina__lema {
-    font-size: 32px;
-  }
-}
-@media (min-width: 1024px) {
-  .cortina__lema {
-    font-size: 35px;
-  }
-}
-
-/* Quem pediu menos movimento não leva cortina NENHUMA — não uma mais calma, e
-   também não o segundo de espera. O ecrã de espera do `loading.tsx` continua a
-   dizer que algo está a acontecer, que é o que a regra exige. */
 @media (prefers-reduced-motion: reduce) {
   .cortina {
     display: none;
@@ -4121,9 +4048,20 @@ body:has(.barra-consentimento) footer {
    `backwards` e nunca `forwards`: acaba em `transform: none`, sem deixar um
    bloco de contenção — a lição está escrita no `.view-in`, e o visualizador
    de fotografias desta página é `position: fixed` lá dentro. */
+/* ── DEIXOU DE SER UM GANCHO E PASSOU A SER UM ATRASO ────────────────────
+   Estava agarrada a `html[data-cortina="a-sair"]`, um atributo que o guião
+   punha no instante em que decidia levantar a cortina. O guião deixou de
+   decidir isso: quem manda no tempo do pano passou a ser o CSS, numa animação
+   só (ver `cortina-segurar`). O atributo já não aparece, e uma regra pendurada
+   nele nunca mais correria — a folha da proposta entrava parada.
+
+   Passa a esperar pelo mesmo instante que o zoom da capa do sítio espera,
+   escrito uma vez: `--cortina-sobe`. E ganha a propriedade que o comentário do
+   `hero-settle` já explica — num dia em que o JavaScript não corra, isto
+   continua a acontecer, porque nunca dependeu dele. */
 @media (prefers-reduced-motion: no-preference) {
-  html[data-cortina="a-sair"] .prop-folha {
-    animation: prop-entrada 520ms var(--ease-out) 60ms backwards;
+  .prop-folha {
+    animation: prop-entrada 520ms var(--ease-out) var(--cortina-sobe) backwards;
   }
 }
 
