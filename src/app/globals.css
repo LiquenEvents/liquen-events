@@ -3693,6 +3693,24 @@ body:has(.barra-consentimento) footer {
   animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) 4s forwards;
 }
 
+/* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
+   Porque ela é desenhada pelo React, e o guião corre ANTES da hidratação.
+   Removê-la deixava o React a hidratar um `<main>` a que faltava um filho:
+   erro #418, e o React a reconstruir a subárvore — ou seja, a pôr a cortina
+   DE VOLTA, já sem ninguém para a tirar.
+
+   MEDIDO num Chromium, com o JavaScript a chegar 2,5 s depois: a cortina
+   ficava no ecrã até aos ~7 s. Numa quinta com 4G fraco — que é exactamente
+   onde isto tinha de funcionar — o casal ficava sete segundos atrás de um
+   ecrã escuro com a proposta por baixo.
+
+   Esconder em vez de remover resolve-o pela raiz: o elemento continua onde o
+   servidor o pôs, a hidratação encontra o que espera, e mudar-lhe a CLASSE é
+   o mesmo que os guiões de tema desta casa já fazem antes de hidratar. */
+.cortina--fora {
+  display: none !important;
+}
+
 /* Posta pelo guião quando o documento está lido E o mínimo já passou. */
 .cortina--a-sair {
   animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;

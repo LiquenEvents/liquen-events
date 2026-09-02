@@ -56,7 +56,11 @@ describe("quanto tempo a cortina fica", () => {
     });
     new Function(GUIAO)();
     const el = () => document.querySelector(".cortina");
-    return { el, aSair: () => !!el()?.classList.contains("cortina--a-sair") };
+    return {
+      el,
+      aSair: () => !!el()?.classList.contains("cortina--a-sair"),
+      fora: () => !!el()?.classList.contains("cortina--fora"),
+    };
   }
 
   it("com a página já pronta, espera pelo mínimo antes de sair", () => {
@@ -97,18 +101,52 @@ describe("quanto tempo a cortina fica", () => {
 
   it("se o CSS já a levantou, o guião não a faz subir outra vez", () => {
     // Página muito lenta: a rede de segurança do CSS levantou a cortina aos 4 s
-    // e o `animationend` tirou-a. Quando o documento ficar lido não pode haver
-    // uma segunda subida a piscar por cima da proposta já visível.
-    const { el } = montar({ aLer: true });
-    const antes = el()!;
-    antes.dispatchEvent(
+    // e o `animationend` escondeu-a. Quando o documento ficar lido não pode
+    // haver uma segunda subida a piscar por cima da proposta já visível.
+    const { el, fora, aSair } = montar({ aLer: true });
+    el()!.dispatchEvent(
       Object.assign(new Event("animationend"), { animationName: "cortina-a-subir" }),
     );
-    expect(el()).toBeNull();
+    expect(fora()).toBe(true);
 
     document.dispatchEvent(new Event("DOMContentLoaded"));
     vi.advanceTimersByTime(5000);
-    expect(antes.classList.contains("cortina--a-sair"), "uma segunda subida a piscar").toBe(false);
+    expect(aSair(), "uma segunda subida a piscar").toBe(false);
+  });
+
+  it("ESCONDE-SE, e nunca sai do documento — é o defeito da hidratação", () => {
+    /**
+     * O defeito, medido num Chromium com o JavaScript a chegar 2,5 s depois:
+     * a cortina ficava no ecrã até aos ~7 s, com o erro #418 do React.
+     *
+     * A causa: ela é desenhada pelo React e o guião corre ANTES da hidratação.
+     * Removê-la deixava o React a hidratar um `<main>` a que faltava um filho;
+     * o React reconstruía a subárvore e punha a cortina DE VOLTA — já sem o
+     * `animationend` que a tirava, porque esse ficara no elemento antigo.
+     *
+     * Numa quinta com 4G fraco, que é exactamente onde isto tinha de
+     * funcionar, o casal ficava sete segundos atrás de um ecrã escuro com a
+     * proposta por baixo.
+     */
+    expect(GUIAO, "remover o elemento é o que parte a hidratação").not.toContain(".remove()");
+
+    const { el, fora } = montar({ aLer: false });
+    vi.advanceTimersByTime(1000);
+    el()!.dispatchEvent(
+      Object.assign(new Event("animationend"), { animationName: "cortina-a-subir" }),
+    );
+    expect(el(), "o elemento tem de continuar onde o servidor o pôs").not.toBeNull();
+    expect(fora(), "e sai de vista pela classe, não do documento").toBe(true);
+  });
+
+  it("esconde-se à mesma se o `animationend` nunca chegar", () => {
+    // Separador em segundo plano, animações desligadas pelo sistema: o evento
+    // pode nunca vir. Sem esta rede, a cortina ficava no ecrã para sempre.
+    const { fora } = montar({ aLer: false });
+    vi.advanceTimersByTime(1000);
+    expect(fora()).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(fora(), "ninguém pode ficar preso atrás dela").toBe(true);
   });
 });
 
@@ -147,6 +185,34 @@ describe("a cortina, e o que não pode mudar", () => {
     expect(BLOCO).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{\s*\.cortina \{\s*display: none;/,
     );
+  });
+
+  it("e com movimento reduzido o guião fecha-a JÁ, sem esperar por uma animação", () => {
+    /**
+     * O segundo defeito que o Chromium apanhou. Com `display: none` uma
+     * animação não corre — portanto o `animationend` nunca chegava e a cortina
+     * ficava no documento para sempre, marcada como se ainda estivesse a
+     * caminho. Invisível, mas por acidente e não por decisão.
+     */
+    vi.useFakeTimers();
+    try {
+      const mm = vi.fn().mockReturnValue({ matches: true });
+      vi.stubGlobal("matchMedia", mm);
+      document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      new Function(GUIAO)();
+      expect(mm).toHaveBeenCalledWith("(prefers-reduced-motion: reduce)");
+      expect(
+        document.querySelector(".cortina")?.classList.contains("cortina--fora"),
+        "fechada de imediato, sem esperar por nada",
+      ).toBe(true);
+      vi.unstubAllGlobals();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a frase é o lema do estúdio, na língua do casal — e não uma inventada", () => {

@@ -121,7 +121,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * durante a leitura do documento, praticamente no primeiro instante em que a
  * cortina existe. Não é somado ao carregamento: é comparado com ele.
  */
-export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=1000;var fim=function(e){if(!e||e.animationName==="cortina-a-subir")c.remove()};c.addEventListener("animationend",fim);var sair=function(){if(!c.isConnected)return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair")};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
+export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=1000;var fora=function(){c.classList.add("cortina--fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir")fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
 
 /** Os degraus: cada grupo sobe de mais longe e sai pelo mesmo, ao contrário. */
 const DEGRAUS = ["14px", "28px"] as const;
