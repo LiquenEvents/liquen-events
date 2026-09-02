@@ -214,6 +214,132 @@ describe("quanto tempo a cortina fica", () => {
   });
 });
 
+describe("o que está por baixo não gasta a sua vez", () => {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UMA ANIMAÇÃO POR BAIXO DE UMA CORTINA OPACA É UMA ANIMAÇÃO PERDIDA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A fotografia de capa do sítio tem um zoom lento — entra um pouco mais
+   * fechada e vai abrindo. Dura 2,2 s e arrancava no primeiro fotograma.
+   *
+   * A cortina tapa a página durante 2,2 s.
+   *
+   * Ou seja: o gesto acabava exactamente no instante em que passava a haver
+   * alguém para o ver. Desde que a cortina existe, ninguém que entrou no sítio
+   * viu aquela fotografia abrir — e o telemóvel gastou bateria a desenhá-la.
+   *
+   * É o mesmo defeito do esqueleto a pulsar por trás da cortina, que já foi
+   * corrigido uma vez. Este ficheiro passa a guardá-lo pela raiz.
+   */
+  const RAIZ = /:root \{[\s\S]*?\n\}/.exec(CSS)?.[0] ?? "";
+  const MINIMO_NO_CSS = Number(/--cortina-minimo:\s*(\d+)ms/.exec(RAIZ)?.[1]);
+
+  it("o tempo da cortina é o MESMO no componente e no CSS", () => {
+    // Dois sítios com o mesmo número é uma promessa; sem isto, é um acidente à
+    // espera de acontecer. Quem manda é o componente — o token do CSS é a
+    // cópia que o CSS precisa de ler para saber quando pode começar a mexer-se.
+    expect(MINIMO_NO_CSS, "desapareceu o token `--cortina-minimo` do `:root`").toBeGreaterThan(0);
+    expect(
+      MINIMO_NO_CSS,
+      `o componente espera ${MINIMO} ms e o CSS julga que são ${MINIMO_NO_CSS} — ` +
+        "o que está por baixo passa a arrancar cedo ou tarde de mais",
+    ).toBe(MINIMO);
+  });
+
+  it("o zoom da capa espera pela cortina, e espera EXACTAMENTE o que ela dura", () => {
+    const regra = /html:not\(\[data-navigated\]\) \.hero-settle \{[\s\S]*?\n {2}\}/.exec(CSS)?.[0];
+    expect(regra, "desapareceu o zoom da capa").toBeDefined();
+    expect(
+      regra,
+      "o zoom da capa voltou a arrancar no primeiro fotograma — corre inteiro por baixo da cortina",
+    ).toContain("var(--cortina-minimo)");
+  });
+
+  it("e segura o enquadramento durante a espera, para não haver salto", () => {
+    // Sem `backwards`, a fotografia ficava no enquadramento FINAL durante os
+    // 2,2 s e saltava para o inicial no instante em que a cortina sobe — que é
+    // o único instante em que alguém está a olhar.
+    const regra = /html:not\(\[data-navigated\]\) \.hero-settle \{[\s\S]*?\n {2}\}/.exec(CSS)?.[0];
+    expect(regra).toMatch(/backwards/);
+    // E nunca `forwards`: um preenchimento para a frente deixa montado um
+    // bloco de contenção que já não serve para nada. É a mesma regra que a
+    // entrada da proposta segue, e pela mesma razão.
+    expect(regra).not.toMatch(/forwards/);
+  });
+});
+
+describe("a mesma cortina em toda a casa", () => {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * PORQUE É QUE ISTO PRECISA DE UM TESTE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela, a olhar para o telemóvel: «quando carrego em ver proposta
+   * online, a animação está muito rápida — eu quero igual ao que está no site».
+   *
+   * Foi verificar: já era o mesmo componente, com os mesmos tempos. O que ela
+   * viu não foi uma proposta mais rápida — foi a trava de sessão a esconder-lhe
+   * a cortina à segunda entrada no mesmo separador, que se lê exactamente como
+   * «foi muito rápida».
+   *
+   * Mas a pergunta dela é a certa, e merece rede: nada garantia que os dois
+   * ficassem iguais. Bastava alguém dar um `data-minimo` diferente a um deles,
+   * ou pôr-lhe uma chave de sessão, e a proposta e o sítio separavam-se sem
+   * ninguém dar por isso — até um casal ver uma coisa e ela outra.
+   *
+   * É isso que estes casos guardam: não o valor, mas a IGUALDADE.
+   */
+  const MONTAGENS = {
+    sítio: readFileSync("src/components/CromadoDoSitio.tsx", "utf8"),
+    proposta: readFileSync("src/app/[lang]/(privado)/layout.tsx", "utf8"),
+    "back office": readFileSync("src/app/[lang]/(admin)/layout.tsx", "utf8"),
+  };
+
+  /** O `<Cortina …>` escrito em cada sítio, tal e qual. */
+  function montagem(fonte: string): string {
+    const m = /<Cortina\b[^>]*\/>/.exec(fonte);
+    expect(m, "desapareceu a cortina deste sítio").not.toBeNull();
+    return m![0];
+  }
+
+  it("o sítio e a proposta recebem a cortina EXACTAMENTE igual", () => {
+    // Tirando o `locale`, que cada um busca à sua maneira, o que sobra tem de
+    // ser a mesma coisa: sem chave de sessão, sem tempos próprios, sem nada.
+    const semLocale = (m: string) => m.replace(/locale=\{[^}]*\}/, "locale={…}");
+    expect(semLocale(montagem(MONTAGENS.sítio))).toBe(semLocale(montagem(MONTAGENS.proposta)));
+  });
+
+  it("nem o sítio nem a proposta levam trava de sessão — vêem-se SEMPRE", () => {
+    // A queixa dela, nas duas pontas: «fiz refresh e já não aparece» (no
+    // sítio) e «está muito rápida» (na proposta, que era a cortina a não
+    // aparecer de todo à segunda entrada).
+    for (const onde of ["sítio", "proposta"] as const) {
+      expect(
+        montagem(MONTAGENS[onde]),
+        `a trava de sessão voltou ao ${onde} — é ela que come o refresh`,
+      ).not.toContain("chaveDeSessao");
+    }
+  });
+
+  it("o back office continua a levá-la — e é o único", () => {
+    // Ali quem está do outro lado é ela, a recarregar o painel dezenas de vezes
+    // por dia. 2,2 s de cada vez é um imposto sobre o trabalho dela.
+    expect(montagem(MONTAGENS["back office"])).toContain("chaveDeSessao");
+  });
+
+  it("ninguém pode dar tempos próprios a uma das casas", () => {
+    // O `data-minimo` sai do componente e de mais lado nenhum. Se algum dia
+    // passar a ser uma prop, é aqui que se dá por isso — antes de a proposta e
+    // o sítio começarem a contar tempos diferentes.
+    for (const [onde, fonte] of Object.entries(MONTAGENS)) {
+      expect(montagem(fonte), `${onde} passou a mandar no tempo da sua cortina`).not.toMatch(
+        /minimo|data-minimo|duracao|atraso/i,
+      );
+    }
+  });
+});
+
 describe("a cortina, e o que não pode mudar", () => {
   it("sai sozinha mesmo que o JavaScript nunca corra", () => {
     /**
@@ -605,48 +731,152 @@ describe("a cortina, e o que não pode mudar", () => {
     expect(fonte).toContain("suppressHydrationWarning");
   });
 
-  it("voltar pela cache do browser fecha-a já", () => {
+  it("voltar pela cache do browser faz a cortina RECOMEÇAR — é o que ela pediu", () => {
     /**
-     * Palavras dela: «se eu volto para trás no browser aquilo fica assim um
-     * bocado coiso».
+     * ── ISTO JÁ FEZ O CONTRÁRIO, E A HISTÓRIA É A DELA ────────────────────
      *
      * Quando uma página volta da cache de histórico, o guião NÃO corre outra
-     * vez — `document.currentScript` só existe durante a leitura. Ou seja: a
-     * cortina volta ao ecrã exactamente no estado em que estava quando se saiu.
-     * Se se saiu com ela levantada, volta-se a um ecrã escuro sem ninguém para
-     * o levantar — o `animationend` e o `setTimeout` que fariam esse trabalho
-     * ficaram na visita anterior.
+     * vez — `document.currentScript` só existe durante a leitura. O que corre é
+     * este ouvinte, que ficou vivo dentro do documento congelado. Sem ele, a
+     * cortina voltava ao ecrã exactamente no estado em que estava quando se
+     * saiu: se se saiu a meio da subida, voltava-se a um ecrã verde parado, sem
+     * ninguém para o levantar — o `animationend` e o `setTimeout` que fariam
+     * esse trabalho ficaram na visita anterior. Eram as palavras dela: «se eu
+     * volto para trás no browser aquilo fica assim um bocado coiso».
      *
-     * O `pageshow` com `persisted` é o único aviso que o browser dá de que
-     * isto aconteceu. Uma página que volta JÁ ESTÁ carregada: não há nada para
-     * a cortina cobrir, e ela fecha-se sem mínimo nenhum.
+     * A primeira resposta foi FECHÁ-LA de imediato. Resolveu o ecrã parado, e
+     * criou a queixa seguinte: «volto atrás e volto a entrar e já não aparece.
+     * Eu quero que apareça sempre».
+     *
+     * Portanto agora recomeça: tira as classes de saída, tira o atributo da
+     * raiz, e volta a contar do princípio. O que ela pediu, e não uma versão
+     * defensiva do que ela pediu.
      */
     vi.useFakeTimers();
-    const antes = "clip";
     try {
-      document.documentElement.style.overflow = antes;
       document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
       Object.defineProperty(document, "currentScript", {
         value: document.getElementById("g"),
         configurable: true,
       });
-      Object.defineProperty(document, "readyState", { value: "loading", configurable: true });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
       new Function(GUIAO)();
 
-      // Está no ecrã — saiu-se a meio.
+      // Uma visita inteira: a cortina sobe e sai.
       const el = () => document.querySelector(".cortina")!;
-      expect(el().classList.contains("cortina--fora")).toBe(false);
+      vi.advanceTimersByTime(MIN + 1200);
+      expect(el().classList.contains("cortina--fora"), "a primeira visita nem chegou ao fim").toBe(
+        true,
+      );
 
       // E volta-se pela cache do browser.
       const volta = new Event("pageshow") as Event & { persisted: boolean };
       Object.defineProperty(volta, "persisted", { value: true });
       window.dispatchEvent(volta);
 
-      expect(el().classList.contains("cortina--fora"), "fecha-se sem esperar").toBe(true);
+      expect(el().classList.contains("cortina--fora"), "voltou e não se vê").toBe(false);
+      expect(el().classList.contains("cortina--a-sair"), "voltou já a meio da saída").toBe(false);
+      expect(
+        document.documentElement.hasAttribute("data-cortina"),
+        "o atributo da visita anterior ficou colado à raiz",
+      ).toBe(false);
+
+      // E fica o tempo todo outra vez, do princípio.
+      vi.advanceTimersByTime(MIN - 50);
+      expect(el().classList.contains("cortina--a-sair"), "saiu antes de a frase se ler").toBe(
+        false,
+      );
+      vi.advanceTimersByTime(50);
+      expect(el().classList.contains("cortina--a-sair")).toBe(true);
     } finally {
-      document.documentElement.style.overflow = "";
       vi.useRealTimers();
     }
+  });
+
+  it("mas no back office, voltar continua a fechá-la — lá a razão é outra", () => {
+    // Onde há chave de sessão, quem está do outro lado é ela, a trabalhar. Uma
+    // cortina a recomeçar a cada Voltar seria um imposto, não uma marca.
+    vi.useFakeTimers();
+    try {
+      sessionStorage.clear();
+      document.body.innerHTML = `<div class="cortina" data-sessao="cortina:teste"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+      new Function(GUIAO)();
+      const el = () => document.querySelector(".cortina")!;
+      expect(el().classList.contains("cortina--fora")).toBe(false);
+
+      const volta = new Event("pageshow") as Event & { persisted: boolean };
+      Object.defineProperty(volta, "persisted", { value: true });
+      window.dispatchEvent(volta);
+      expect(el().classList.contains("cortina--fora"), "recomeçou onde não devia").toBe(true);
+    } finally {
+      sessionStorage.clear();
+      vi.useRealTimers();
+    }
+  });
+
+  it("num documento PRÉ-RENDERIZADO fica parada — senão chega ao ecrã já gasta", () => {
+    /**
+     * A causa que ninguém podia adivinhar a olhar para o ecrã.
+     *
+     * O sítio manda o navegador desenhar a página seguinte em segredo mal o
+     * dedo se aproxima de uma ligação (`SpeculationRules.tsx`) — é o que a faz
+     * abrir instantânea. Esse documento invisível corre os guiões todos: sem
+     * esta guarda, a cortina fazia lá a animação inteira, para ninguém, e
+     * chegava ao ecrã já fechada.
+     *
+     * A classe `cortina--parada` existe para isto: enquanto lá estiver, o CSS
+     * não deixa nenhuma animação andar — nem a da cortina nem a das letras.
+     */
+    vi.useFakeTimers();
+    try {
+      Object.defineProperty(document, "prerendering", { value: true, configurable: true });
+      document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+      new Function(GUIAO)();
+
+      const el = () => document.querySelector(".cortina")!;
+      expect(
+        el().classList.contains("cortina--parada"),
+        "arrancou dentro do pré-carregamento",
+      ).toBe(true);
+
+      // Passa muito mais do que o mínimo, e não acontece nada: a página ainda
+      // não é a página.
+      vi.advanceTimersByTime(MIN * 3);
+      expect(el().classList.contains("cortina--a-sair"), "gastou-se sem ninguém a ver").toBe(false);
+      expect(el().classList.contains("cortina--fora")).toBe(false);
+
+      // A pessoa carrega na ligação: o documento passa a ser mesmo a página.
+      Object.defineProperty(document, "prerendering", { value: false, configurable: true });
+      document.dispatchEvent(new Event("prerenderingchange"));
+      expect(el().classList.contains("cortina--parada"), "ficou congelada para sempre").toBe(false);
+
+      // E só agora começa a contar.
+      vi.advanceTimersByTime(MIN - 50);
+      expect(el().classList.contains("cortina--a-sair")).toBe(false);
+      vi.advanceTimersByTime(50);
+      expect(el().classList.contains("cortina--a-sair"), "não arrancou na activação").toBe(true);
+    } finally {
+      Reflect.deleteProperty(document, "prerendering");
+      vi.useRealTimers();
+    }
+  });
+
+  it("a classe que congela existe no CSS, e apanha também as letras", () => {
+    // Sem a metade do CSS, a do guião não faz nada. E se apanhasse só a
+    // cortina, as letras corriam à mesma dentro de um pré-carregamento e
+    // chegavam ao ecrã montadas.
+    expect(BLOCO).toMatch(/\.cortina--parada,\s*\.cortina--parada \.cortina__letra \{/);
+    expect(BLOCO).toMatch(/\.cortina--parada[\s\S]{0,120}animation: none !important;/);
   });
 
   it("um `pageshow` que NÃO vem da cache não fecha nada", () => {
