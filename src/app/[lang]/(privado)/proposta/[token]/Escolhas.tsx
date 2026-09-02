@@ -62,8 +62,28 @@ type Estado = "quieto" | "a-enviar" | "seguiu" | "falhou";
 
 /** A fotografia de uma opção. Sem fotografia não desenha caixa nenhuma: uma
  *  moldura cinzenta ao lado de um rótulo lê-se como uma foto que não carregou. */
-function FotoDaOpcao({ foto, alt }: { foto?: FotoDaProposta; alt: string }) {
-  const { alvo, aoFalhar, desistiu } = useFotoComPlanoB(foto?.miniatura, foto?.original);
+function FotoDaOpcao({ foto, alt, token }: { foto?: FotoDaProposta; alt: string; token: string }) {
+  /**
+   * ── O DEGRAU DO MEIO, QUE AQUI FALTAVA ───────────────────────────────────
+   *
+   * A cascata era `miniatura → original`, sem nada pelo meio. E o original é o
+   * ficheiro tal como saiu da máquina: 2,6 MB numa proposta típica, dentro de
+   * uma caixa pequena, ao lado de uma pergunta.
+   *
+   * Basta a miniatura de 400 px falhar — uma assinatura caducada, um ficheiro
+   * que ainda não tem derivada — para o telemóvel do casal descarregar
+   * megabytes para desenhar um quadrado. É exactamente o defeito que a grelha
+   * já corrigiu (ver `Inspiracao.tsx`); as escolhas ficaram para trás.
+   *
+   * O degrau do meio é a derivada de 1200 px: do CDN quando já está assinada, e
+   * da nossa rota quando ainda não existe — que é quem a fabrica. O original
+   * continua a ser a última rede, mas deixa de ser a PRIMEIRA alternativa.
+   */
+  const media = foto
+    ? (foto.media ??
+      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
+    : "";
+  const { alvo, aoFalhar, desistiu } = useFotoComPlanoB(foto?.miniatura, [media, foto?.original]);
   if (!foto || !alvo || desistiu) return null;
   return (
     <span
@@ -184,7 +204,7 @@ export default function Escolhas({ escolhas, escolhido, fotos, token, textos, em
                         : "border-foreground/12 hover:border-moss/50 hover:bg-moss/4"
                     }`}
                   >
-                    <FotoDaOpcao foto={fotos[`e${i}o${j}`]} alt={rotulo} />
+                    <FotoDaOpcao foto={fotos[`e${i}o${j}`]} alt={rotulo} token={token} />
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="text-foreground/85 text-sm font-medium">{rotulo}</span>
                       {escolhida && (

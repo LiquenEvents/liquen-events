@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Escolhas from "./Escolhas";
 import { textosDaPagina } from "./textos-da-pagina";
@@ -289,5 +289,61 @@ describe("as fotografias das opções não nascem em branco", () => {
     // marcada como decoração seria ruído no HTML e mais nada.
     desenhar({ fotos: { e0o0: { id: "f1", miniatura: "mini/o1" } } });
     expect(document.querySelector('img[aria-hidden="true"]')).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA ESCOLHA NÃO PODE CUSTAR 2,6 MB PARA DESENHAR UM QUADRADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A cascata destas fotografias era `miniatura → original`, sem nada pelo meio.
+ * O original é o ficheiro tal como saiu da máquina — 2,6 MB numa proposta
+ * típica — e ia para dentro de uma caixa pequena, ao lado de uma pergunta.
+ *
+ * Bastava a miniatura de 400 px falhar (uma assinatura caducada, um ficheiro
+ * ainda sem derivada) para o telemóvel do casal descarregar megabytes. É o
+ * mesmo defeito que a grelha já tinha corrigido; as escolhas ficaram para trás,
+ * e ninguém deu por isso porque a falha é rara e silenciosa — quando acontece,
+ * a fotografia até aparece. Só demora.
+ */
+describe("as fotografias das opções têm degrau do meio", () => {
+  const COM_FOTO = {
+    e0o0: { id: "f1", miniatura: "mini/o1", original: "orig/o1", largura: 4, altura: 3 },
+  };
+
+  it("quando a miniatura falha, vai à derivada de 1200 — não ao original", () => {
+    desenhar({ fotos: COM_FOTO });
+    const img = document.querySelector('img:not([aria-hidden="true"])') as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("mini/o1");
+
+    fireEvent.error(img);
+    expect(
+      img.getAttribute("src"),
+      "caiu direito ao original: 2,6 MB para desenhar um quadrado pequeno",
+    ).toBe("/api/proposta/tok-1/foto/f1");
+  });
+
+  it("e o original continua a ser a última rede, depois do degrau do meio", () => {
+    // Adiar não é apagar: se a derivada também falhar, mais vale a fotografia
+    // pesada do que uma caixa vazia ao lado de uma pergunta.
+    desenhar({ fotos: COM_FOTO });
+    const img = document.querySelector('img:not([aria-hidden="true"])') as HTMLImageElement;
+    fireEvent.error(img);
+    fireEvent.error(img);
+    expect(img.getAttribute("src")).toBe("orig/o1");
+  });
+
+  it("com a derivada já assinada, nem passa pela nossa rota", () => {
+    // O caminho normal: os bytes vêm do CDN directos ao telemóvel, sem
+    // atravessarem a nossa função.
+    desenhar({
+      fotos: {
+        e0o0: { id: "f1", miniatura: "mini/o1", media: "https://cdn/o1-1200", original: "orig/o1" },
+      },
+    });
+    const img = document.querySelector('img:not([aria-hidden="true"])') as HTMLImageElement;
+    fireEvent.error(img);
+    expect(img.getAttribute("src")).toBe("https://cdn/o1-1200");
   });
 });
