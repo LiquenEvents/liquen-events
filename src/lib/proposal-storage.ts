@@ -3,17 +3,35 @@ import { oSharp } from "./sharp-adiado";
 import { opcoesDeCarregamento } from "./cache-das-fotos";
 import { randomUUID } from "node:crypto";
 import { getSupabase } from "./supabase";
-import {
-  THEME_BUCKET,
-  THEME_MID_BUCKET,
-  THEME_AVIF_MID_BUCKET,
-  THEME_SIGNED_TTL,
-  THEME_THUMB_BUCKET,
-  caminhoDoRefDeTema,
-  ehRefDeTema,
-  separarRefs,
-} from "./theme-ref";
+import { THEME_BUCKET, THEME_THUMB_BUCKET, caminhoDoRefDeTema, ehRefDeTema } from "./theme-ref";
 import { log } from "./logger";
+/**
+ * As assinaturas vivem noutro ficheiro, e a seta aponta só neste sentido — o
+ * porquê está por extenso no `proposal-assinaturas.ts`. Em duas linhas: a
+ * página que o casal abre só precisa das assinaturas, e enquanto elas
+ * estivessem aqui ela levava consigo o `sharp` que este ficheiro usa para
+ * confirmar carregamentos, e nunca chama.
+ */
+import {
+  PROPOSAL_BUCKET,
+  PROPOSAL_MID_BUCKET,
+  PROPOSAL_THUMB_BUCKET,
+  SIGNED_TTL,
+  assinarLote,
+  signProposalThumbs,
+} from "./proposal-assinaturas";
+
+/** Quem já os importava daqui continua a poder — mudou a casa, não a porta. */
+export {
+  PROPOSAL_AVIF_MID_BUCKET,
+  PROPOSAL_BUCKET,
+  PROPOSAL_MID_BUCKET,
+  PROPOSAL_THUMB_BUCKET,
+  signProposalMids,
+  signProposalMidsAvif,
+  signProposalPaths,
+} from "./proposal-assinaturas";
+export { signProposalThumbs };
 
 /**
  * Storage for proposal mood-board / cover images, backed by a private Supabase
@@ -26,11 +44,6 @@ import { log } from "./logger";
  * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. The bucket is created on
  * first use (idempotent), so no manual Supabase setup step is needed.
  */
-export const PROPOSAL_BUCKET = "proposal-assets";
-
-// 10-year signed URLs — effectively permanent for the admin's own preview use;
-// the bucket stays private so nothing is publicly enumerable.
-const SIGNED_TTL = 60 * 60 * 24 * 365 * 10;
 
 let bucketReady = false;
 
@@ -809,7 +822,6 @@ export async function fetchProposalThumbBytes(ref: string): Promise<Buffer | nul
  * por célula para desenhar 174 px. A miniatura pesa ~30–60 KB, e é o browser
  * que já a fabrica na mesma descodificação que faz para encolher o original.
  */
-export const PROPOSAL_THUMB_BUCKET = "proposal-thumbs";
 
 let thumbBucketReady = false;
 
@@ -861,7 +873,6 @@ async function ensureThumbBucket(): Promise<boolean> {
  * derivadas em falta LISTA as pastas de cada bucket para saber o que gerar, e
  * uma família escondida dentro da outra apareceria como um pedido chamado «m».
  */
-export const PROPOSAL_MID_BUCKET = "proposal-medias";
 
 /**
  * ── A MESMA, EM AVIF: UMA OFERTA, NÃO UMA SUBSTITUIÇÃO ────────────────────
@@ -878,7 +889,6 @@ export const PROPOSAL_MID_BUCKET = "proposal-medias";
  * em qualquer telemóvel. Numa proposta de quarenta e seis, ~28% de cada uma é
  * a diferença entre uma página que se vê e uma que se espera.
  */
-export const PROPOSAL_AVIF_MID_BUCKET = "proposal-avif-medias";
 
 let midBucketReady = false;
 
@@ -1112,132 +1122,6 @@ export async function fetchProposalCoverBytes(ref: string): Promise<Buffer | nul
  * da Biblioteca de Temas fazia exactamente isso — quatro idas por foto, das
  * quais duas eram assinaturas.
  */
-/**
- * Assina um lote contra UM bucket. `silencioso` para as derivadas: uma
- * instalação sem miniaturas devolve um mapa vazio e a grelha cai para o
- * original — isso é o comportamento normal, não um erro para os registos.
- */
-async function assinarLote(
-  bucket: string,
-  paths: string[],
-  silencioso: boolean,
-  ttl: number,
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const sb = getSupabase();
-  if (!sb || paths.length === 0) return out;
-  try {
-    const { data, error } = await sb.storage.from(bucket).createSignedUrls(paths, ttl);
-    if (error && !silencioso)
-      log.error("proposal-storage: assinatura em lote falhou", error, { bucket, n: paths.length });
-    for (const row of data ?? []) {
-      if (row?.path && row.signedUrl) out.set(row.path, row.signedUrl);
-    }
-  } catch (e) {
-    if (!silencioso)
-      log.error("proposal-storage: assinatura em lote falhou", e, { bucket, n: paths.length });
-  }
-  return out;
-}
-
-/**
- * Assina uma lista de referências de documento **contra o bucket certo para
- * cada uma**, e devolve o mapa com a chave ORIGINAL.
- *
- * As duas famílias e porquê estão juntas: um mood board pode ter fotos
- * carregadas à mão (`<pedido>/<uuid>.jpg`, no bucket da proposta) misturadas
- * com fotos escolhidas da Biblioteca (`tema:<pasta>/<x>.jpg`, no bucket dos
- * temas). Quem desenha a grelha não devia ter de saber a diferença — passa a
- * lista toda e recebe um URL por referência.
- *
- * São dois pedidos, um por bucket, EM PARALELO — e não um pedido por foto. Com
- * um lote só de proposta (o caso de hoje) o segundo pedido nem chega a existir,
- * portanto isto custa exactamente o mesmo que custava.
- *
- * A chave do mapa é a referência tal como está no documento, `tema:` incluído.
- * O Storage devolve o caminho SEM prefixo, por isso é aqui que ele volta a ser
- * posto — se fosse omitido, quem chama procuraria pela chave que tem e não
- * encontrava nada.
- *
- * Cada bucket com o SEU prazo. A pasta de um pedido assina a 10 anos porque é
- * a pré-visualização dela própria; a biblioteca assina a 6 horas
- * ({@link THEME_SIGNED_TTL}) porque é o activo do estúdio inteiro. Assinar um
- * `tema:` com o prazo das propostas passaria calado e desfazia essa decisão.
- */
-async function assinarRefs(
-  refs: string[],
-  bucketDaProposta: string,
-  bucketDoTema: string,
-  silencioso: boolean,
-): Promise<Map<string, string>> {
-  const { daBiblioteca, daProposta } = separarRefs(refs);
-  const [proprias, deTema] = await Promise.all([
-    assinarLote(bucketDaProposta, daProposta, silencioso, SIGNED_TTL),
-    assinarLote(bucketDoTema, daBiblioteca.map(caminhoDoRefDeTema), silencioso, THEME_SIGNED_TTL),
-  ]);
-  for (const ref of daBiblioteca) {
-    const url = deTema.get(caminhoDoRefDeTema(ref));
-    if (url) proprias.set(ref, url);
-  }
-  return proprias;
-}
-
-export async function signProposalPaths(paths: string[]): Promise<Map<string, string>> {
-  return assinarRefs(paths, PROPOSAL_BUCKET, THEME_BUCKET, false);
-}
-
-export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
-  return assinarRefs(paths, PROPOSAL_THUMB_BUCKET, THEME_THUMB_BUCKET, true);
-}
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * AS DERIVADAS DE 1200 PX, DIRECTAS DO STORAGE
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Palavras dela, sobre a capa da proposta: «esta foto demora imenso tempo a
- * carregar, e eu quero que seja super rápida e fluida a aparecer».
- *
- * ── O caminho longo ───────────────────────────────────────────────────────
- *
- * A derivada intermédia era servida SEMPRE pela rota `/api/proposta/…/foto/…`,
- * e essa rota é um desvio: abre o token na base de dados, descarrega os bytes
- * do Storage para dentro da função, e só então os manda para o telemóvel. Os
- * mesmos bytes atravessam a nossa função a caminho de um sítio onde já estavam.
- * Com o arranque a frio de uma função é o dobro ou o triplo do tempo — e a capa
- * é a primeira coisa que o casal vê ao abrir o link.
- *
- * Assinada, a fotografia vem do CDN do Storage directamente ao telemóvel. É o
- * mesmo caminho que as miniaturas de 400 px já fazem, e é por isso que elas
- * apareciam depressa e a grande não aparecia.
- *
- * ── E porque é que a rota continua a existir ──────────────────────────────
- *
- * Porque uma derivada pode não existir ainda: o Supabase só assina o que lá
- * está, e um caminho em falta simplesmente não vem no mapa. Onde não vier, quem
- * desenha usa a rota — que a fabrica, guarda e serve. A rota deixa de ser o
- * caminho de todos os dias e passa a ser o de arranque, que é o seu lugar.
- *
- * `silencioso` como nas miniaturas: uma derivada por fabricar é o caso normal
- * de uma proposta acabada de enviar, e não um erro para escrever no registo.
- */
-export async function signProposalMids(paths: string[]): Promise<Map<string, string>> {
-  return assinarRefs(paths, PROPOSAL_MID_BUCKET, THEME_MID_BUCKET, true);
-}
-
-/**
- * As mesmas de 1200 px, na oferta em AVIF.
- *
- * `silencioso`, e desta vez a palavra pesa mais do que nas outras: uma
- * derivada AVIF em falta é o caso NORMAL de tudo o que foi carregado antes
- * destes buckets existirem. Não é um erro, não se regista, e não se fabrica à
- * pressa dentro do pedido — quem não a tiver recebe o WebP de sempre, que é o
- * que o `<picture>` garante. É por isso que estas derivadas são «leves» no
- * lote: a página não depende delas para existir.
- */
-export async function signProposalMidsAvif(paths: string[]): Promise<Map<string, string>> {
-  return assinarRefs(paths, PROPOSAL_AVIF_MID_BUCKET, THEME_AVIF_MID_BUCKET, true);
-}
 
 /**
  * COPIAR AS FOTOS DE UMA PROPOSTA PARA OUTRO PEDIDO.

@@ -1,12 +1,21 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { isPendingImage, type ProposalDoc } from "./proposal-doc";
+/**
+ * Do módulo das ASSINATURAS, e não do `proposal-storage`.
+ *
+ * É este `import` que mantém o `sharp` fora do grafo da página que o casal
+ * abre — o porquê inteiro está no `proposal-assinaturas.ts`. Trocá-lo por
+ * `./proposal-storage` volta a arrastar 87 ficheiros e 0,8 MB para dentro da
+ * função, e desarma o passo que tira as bibliotecas nativas de imagem das
+ * rotas que não as usam.
+ */
 import {
   signProposalMids,
   signProposalMidsAvif,
   signProposalPaths,
   signProposalThumbs,
-} from "./proposal-storage";
+} from "./proposal-assinaturas";
 import { ehRefDeTema, caminhoDoRefDeTema } from "./theme-ref";
 import { formasDeCaminhos, lqipsDeCaminhos } from "./biblioteca-fotos-store";
 import { urlsGuardados, guardarUrls } from "./urls-assinados";

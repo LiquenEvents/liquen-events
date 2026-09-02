@@ -254,10 +254,26 @@ if (traços.length === 0) {
       `${comSharp} podem usá-las.`,
   );
   if (aMais > 0) {
+    /**
+     * A frase sobre a proposta é CALCULADA e não escrita.
+     *
+     * Esteve escrita à mão — «e a proposta que o casal abre é uma delas» — e no
+     * dia em que deixou de ser verdade continuou a sair, a dizer a um número
+     * certo uma coisa errada. Um relatório que mente é pior do que um que
+     * cala.
+     */
+    const daProposta = traços.find((t) => t.includes("proposta") && t.includes("[token]"));
+    const propostaPaga =
+      daProposta !== undefined &&
+      JSON.parse(readFileSync(daProposta, "utf8")).files.some(
+        (f) => f.includes(NATIVO) || f.includes(LIBVIPS),
+      );
     console.log(
-      `      ${aMais} rotas levam ~17,8 MB que não têm como usar. São ~8 MB comprimidos\n` +
-        "      a ir buscar e a descomprimir antes de a função escrever o primeiro byte,\n" +
-        "      e a proposta que o casal abre é uma delas.",
+      `      ${aMais} rotas levam ~17,8 MB que não têm como usar — ~8 MB comprimidos a ir\n` +
+        "      buscar e a descomprimir antes de a função escrever o primeiro byte." +
+        (propostaPaga
+          ? "\n      E a proposta que o casal abre é uma delas."
+          : "\n      A proposta que o casal abre já NÃO é uma delas."),
     );
   }
 }
