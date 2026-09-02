@@ -3630,42 +3630,34 @@ body:has(.barra-consentimento) footer {
    A CORTINA DA PROPOSTA
    ══════════════════════════════════════════════════════════════════════════
 
-   O porquê inteiro está no `CortinaDaProposta.tsx`. O que interessa saber
-   aqui, ao ler o CSS: esta cortina NÃO segura o ecrã. O `140ms` de atraso na
-   entrada é o que faz uma proposta rápida nunca chegar a pintá-la, e o
-   `3.5s` da subida é a saída que não precisa de JavaScript nenhum.
+   O porquê inteiro está no `CortinaDaProposta.tsx` — incluindo porque é que
+   ela DEIXOU de ser invisível numa ligação rápida, e a que custo. Em duas
+   linhas: ela abriu a proposta no telemóvel, não viu animação nenhuma, e
+   escolheu vê-la sempre.
+
+   O que interessa saber ao ler o CSS: a cortina já nasce visível (opacidade
+   1), e quem manda no tempo dela é o `MIN` do guião — não este ficheiro. O
+   `4s` da subida aqui em baixo é só a saída que não precisa de JavaScript.
 
    Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
 
-/* Cada grupo de palavras: sobe do seu degrau, materializa-se até aos 35%,
-   fica legível até aos 65% e sai pelo mesmo degrau, ao contrário. É a leitura
-   dela do efeito — a profundidade em camadas vem das distâncias diferentes,
-   não do fade. */
+/* Cada grupo de palavras sobe do SEU degrau e materializa-se. É a leitura dela
+   do efeito — «o truque não é o fade, é a frase estar partida em grupos, cada
+   um a subir de uma distância diferente». A saída não está aqui: as palavras
+   sobem agarradas à cortina, num só gesto, em vez de saírem primeiro e a
+   cortina depois. Duas saídas seguidas leem-se como uma hesitação. */
 @keyframes cortina-palavras {
   0% {
     opacity: 0;
     transform: translateY(var(--degrau, 14px));
   }
-  35% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  65% {
+  40% {
     opacity: 1;
     transform: translateY(0);
   }
   100% {
-    opacity: 0;
-    transform: translateY(calc(var(--degrau, 14px) * -1));
-  }
-}
-
-@keyframes cortina-a-aparecer {
-  from {
-    opacity: 0;
-  }
-  to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -3681,7 +3673,13 @@ body:has(.barra-consentimento) footer {
 .cortina {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* Acima da barra dos cookies (`z-[70]`) e do aviso de navegação (80).
+     Estava em 60, e na proposta e no back office nunca se notou porque ali não
+     há barra de cookies. No sítio há — e a fotografia mostrou o rodapé de
+     consentimento a espreitar por baixo do logótipo, que parece uma página
+     partida a meio e não uma a caminho. É o mesmo defeito que o aviso de
+     navegação já tinha tido, e a mesma correcção. */
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3690,23 +3688,79 @@ body:has(.barra-consentimento) footer {
      já está por baixo das fotografias (`--color-noite`), escolhido para
      impedir um flash branco — o trabalho é o mesmo, à escala do ecrã. */
   background: var(--color-noite);
-  /* Nasce invisível. A entrada só arranca aos 140ms: uma proposta que chegue
-     antes disso levanta a cortina sem ela ter sido pintada uma única vez. */
-  opacity: 0;
-  animation:
-    cortina-a-aparecer 0.18s linear 0.14s forwards,
-    /* A SAÍDA SEM JAVASCRIPT. Se o guião não correr — bloqueado, falhado,
-       desligado —, é esta linha que impede um casal de ficar preso a olhar
-       para um ecrã escuro com a proposta por baixo. */
-    cortina-a-subir 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) 3.5s forwards;
+  /* Visível desde o primeiro fotograma. Antes nascia a zero e só aparecia aos
+     140 ms, para uma página rápida a levantar sem a pintar; era isso que fazia
+     com que ela nunca a visse. */
+  opacity: 1;
+  /* A SAÍDA SEM JAVASCRIPT. Se o guião não correr — bloqueado, falhado,
+     desligado —, é esta linha que impede um casal de ficar preso a olhar para
+     um ecrã escuro com a proposta por baixo. Aos 4 s, que é folga larga sobre
+     o mínimo de 1 s por que o guião espera. */
+  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) 4s forwards;
 }
 
-/* Posta pelo guião quando o documento acabou de ser lido. Substitui as duas
-   animações de cima: a `opacity: 1` fixa o que a entrada já tinha alcançado,
-   para a subida não começar por um salto. */
+/* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
+   Porque ela é desenhada pelo React, e o guião corre ANTES da hidratação.
+   Removê-la deixava o React a hidratar um `<main>` a que faltava um filho:
+   erro #418, e o React a reconstruir a subárvore — ou seja, a pôr a cortina
+   DE VOLTA, já sem ninguém para a tirar.
+
+   MEDIDO num Chromium, com o JavaScript a chegar 2,5 s depois: a cortina
+   ficava no ecrã até aos ~7 s. Numa quinta com 4G fraco — que é exactamente
+   onde isto tinha de funcionar — o casal ficava sete segundos atrás de um
+   ecrã escuro com a proposta por baixo.
+
+   Esconder em vez de remover resolve-o pela raiz: o elemento continua onde o
+   servidor o pôs, a hidratação encontra o que espera, e mudar-lhe a CLASSE é
+   o mesmo que os guiões de tema desta casa já fazem antes de hidratar. */
+.cortina--fora {
+  display: none !important;
+}
+
+/* Posta pelo guião quando o documento está lido E o mínimo já passou. */
 .cortina--a-sair {
-  opacity: 1;
-  animation: cortina-a-subir 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+/* ── A VARIANTE DO LOGÓTIPO, PARA O SÍTIO ─────────────────────────────────
+   O emblema a respirar, sem texto: `from{opacity:.9;transform:scale(.9)}
+   to{opacity:1;transform:scale(1)}`, 1,25 s em alternado — os valores dela.
+   Quem chega ao sítio vem de uma pesquisa ou de um anúncio e quer ver o
+   trabalho; o logótipo diz de quem é a casa sem pedir que se leia nada. */
+@keyframes cortina-a-respirar {
+  from {
+    opacity: 0.9;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cortina__pulso {
+  display: block;
+  animation: cortina-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
+}
+
+.cortina__logo {
+  /* Os 32 px do exemplo dela eram para um SÍMBOLO quadrado. Este logótipo traz
+     as nove letras de «LÍQUEN EVENTS» — a essa largura não se lê, e já foi
+     medido uma vez numa fotografia. 150 px é a medida do ecrã de espera da
+     proposta, e é onde o nome se lê. */
+  width: 150px;
+  max-width: 45vw;
+  height: auto;
+}
+
+/* Quem pediu menos movimento leva o logótipo QUIETO — e não nenhum.
+   A cortina do lema desaparece por completo nesse caso; aqui o guião também a
+   fecha logo, portanto isto é só a rede: se por alguma razão ela chegar a ser
+   pintada, não pulsa. */
+@media (prefers-reduced-motion: reduce) {
+  .cortina__pulso {
+    animation: none;
+  }
 }
 
 .cortina__lema {
@@ -3725,10 +3779,12 @@ body:has(.barra-consentimento) footer {
   letter-spacing: -0.01em;
 }
 
+/* 1 s ao todo: os primeiros 40% (~400 ms) a subir e a materializar-se, e o
+   resto — ~600 ms — completamente legível. É o tempo que ela descreveu. */
 .cortina__lema > span {
   display: block;
   opacity: 0;
-  animation: cortina-palavras 2s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  animation: cortina-palavras 1s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
 }
 
 @media (min-width: 640px) {
@@ -3747,12 +3803,91 @@ body:has(.barra-consentimento) footer {
   }
 }
 
-/* Quem pediu menos movimento não leva cortina NENHUMA — não uma mais calma.
-   O ecrã de espera do `loading.tsx` continua a dizer que algo está a
-   acontecer, que é o que a regra exige; o que desaparece é uma cortina a
-   deslizar por cima da proposta de quem pediu para não a ver. */
+/* Quem pediu menos movimento não leva cortina NENHUMA — não uma mais calma, e
+   também não o segundo de espera. O ecrã de espera do `loading.tsx` continua a
+   dizer que algo está a acontecer, que é o que a regra exige. */
 @media (prefers-reduced-motion: reduce) {
   .cortina {
     display: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O AVISO DE QUE UMA PÁGINA ESTÁ A DEMORAR
+   ══════════════════════════════════════════════════════════════════════════
+
+   O porquê está no `AvisoDeCarregamento.tsx`. A regra desta peça é a OPOSTA
+   da cortina, e é a diferença que importa ao ler isto: a cortina tem um
+   mínimo e vê-se sempre, porque é marca; isto é INFORMAÇÃO, e informação que
+   não é precisa é ruído. Nasce invisível e só aparece se a navegação demorar
+   mais de 400 ms — a receita que os próprios documentos do Next recomendam.
+
+   Só `transform` e `opacity`. */
+
+@keyframes aviso-a-aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* A respiração do logótipo, tal como no exemplo dela: `from{opacity:.9;
+   transform:scale(.9)} to{opacity:1;transform:scale(1)}`, em alternado. */
+@keyframes aviso-logo-a-respirar {
+  from {
+    opacity: 0.9;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.a-caminho {
+  position: fixed;
+  inset: 0;
+  /* Acima da barra dos cookies, que é `z-[70]`.
+     MEDIDO numa fotografia: com os dois no mesmo nível, ganhava a barra —
+     desenhada depois — e o aviso saía com um rodapé de consentimento por
+     cima, que parece uma página partida a meio e não uma a caminho. */
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  /* O creme da casa, e NÃO o verde-quase-preto da cortina.
+     A cortina cobre a chegada a uma proposta e pode ser escura — é um
+     momento. Isto acontece ENTRE duas páginas claras do sítio, e um flash
+     preto pelo meio lê-se como uma avaria, não como um cuidado. */
+  background: var(--color-cream);
+  opacity: 0;
+  animation: aviso-a-aparecer 0.25s ease 0.4s forwards;
+}
+
+.a-caminho__logo {
+  /* Os 56 px do exemplo dela eram para um SÍMBOLO. Este logótipo traz as nove
+     letras de «LÍQUEN EVENTS» ao lado do emblema — a essa largura, medido numa
+     fotografia a 390 px, as letras não se liam. 150 px é a mesma medida do
+     ecrã de espera da proposta (`loading.tsx`), e é onde o nome se lê. */
+  width: 150px;
+  max-width: 45vw;
+  height: auto;
+  animation: aviso-logo-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
+}
+
+/* ── AQUI O MOVIMENTO REDUZIDO NÃO APAGA A PEÇA ───────────────────────────
+   A cortina desaparece por completo para quem pediu menos movimento, porque
+   é decoração. Esta não pode: é o que diz que algo está a acontecer, e a
+   regra dela é que isso nunca falta. Fica o logótipo quieto, sem respirar e
+   sem aparição — e continua a só surgir se a página demorar mesmo. */
+@media (prefers-reduced-motion: reduce) {
+  .a-caminho {
+    animation: none;
+    opacity: 1;
+    transition-delay: 0.4s;
+  }
+  .a-caminho__logo {
+    animation: none;
   }
 }

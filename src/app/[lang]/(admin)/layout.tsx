@@ -1,4 +1,6 @@
 import { Geist } from "next/font/google";
+import { normalizeLocale } from "@/lib/i18n";
+import { Cortina } from "@/components/Cortina";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -139,9 +141,34 @@ const geist = Geist({
  * barra de navegação por cima, e a página começa onde a página começa. Os
  * `-mt-24` das raízes saíram todos no mesmo movimento.
  */
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
+
   return (
     <main id="conteudo" data-admin-mode className={`flex-1 ${geist.variable}`}>
+      {/*
+        A MESMA CORTINA DA PROPOSTA, À ENTRADA DO BACK OFFICE.
+
+        Palavras dela: «este que aparece quando carregamos no ver proposta,
+        aquela parte inicial de animação — eu quero que faças isso quando nós
+        entramos também no back office».
+
+        É o mesmo componente e o mesmo lema, de propósito: o estúdio abre o
+        dia com a mesma frase com que o casal abre a proposta.
+
+        Com UMA diferença, e é a `chaveDeSessao`. Um casal abre a proposta uma
+        vez; ela abre e recarrega isto dezenas de vezes por dia, e um segundo
+        de cortina a cada recarga deixava de ser marca e passava a ser um
+        imposto sobre o trabalho dela. Assim vê-se uma vez por separador — à
+        ENTRADA, que é o que ela pediu — e não outra vez a cada F5.
+      */}
+      <Cortina locale={normalizeLocale(lang)} chaveDeSessao="cortina:back-office" />
       {children}
     </main>
   );
