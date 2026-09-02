@@ -324,7 +324,7 @@ function SeccaoDobrada({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-16 max-w-2xl sm:mt-24">
+    <section className="mt-16 max-w-2xl sm:mt-24" data-sobe="seccao">
       {/*
        * ABERTAS DE RAIZ — decisão dela, e a certa.
        *
@@ -891,7 +891,23 @@ export default function Documento({
                fotograma de espera entre «os bytes chegaram» e «vê-se». Nas
                outras da página continua `async`, que aí é o certo — são muitas
                e nenhuma é a que se está a olhar. */
-              decoding="sync"
+              /**
+               * `async` e não `sync`, e a troca tem uma razão medida.
+               *
+               * `sync` põe a descodificação da capa — ~200 KB a 1200 px — NA
+               * LINHA PRINCIPAL, no instante em que os bytes chegam. Num 4G
+               * esse instante cai dentro do segundo em que a cortina está a
+               * animar, e uma descodificação dessas é uma paragem de vários
+               * fotogramas. Era isto que ela via: «a animação trava um bocado».
+               *
+               * O que o `sync` comprava era um fotograma de espera. Pagava
+               * vários, e pagava-os no pior momento possível.
+               *
+               * O `fetchPriority="high"` FICA: continua a ser a fotografia
+               * mais importante da página e há-de ser pedida primeiro. O que
+               * muda é só onde ela é descodificada.
+               */
+              decoding="async"
               className="relative block h-full w-full object-cover"
             />
           </picture>
@@ -899,7 +915,7 @@ export default function Documento({
       )}
 
       {/* ── APRESENTAÇÃO ─────────────────────────────────────────────────── */}
-      <div className="max-w-2xl">
+      <div className="max-w-2xl" data-sobe="seccao">
         <Titulo
           sobretitulo={t.sobretituloApresentacao}
           titulo={numerada("apresentacao", doc.headerTitle || t.tituloApresentacao)}
@@ -1171,7 +1187,11 @@ export default function Documento({
                  * porque num telemóvel um rótulo e um número de quarenta
                  * pontos lado a lado ou encolhem o número ou partem a linha.
                  */}
-                <div className="border-foreground/15 mt-5 border-t pt-5">
+                {/* O total sobe de 20 px — o único elemento do documento acima
+                    dos 14 das secções, e a razão é o que ele é. Não é mais
+                    alto nem mais forte: chega um instante DEPOIS das linhas
+                    que soma, que é como se lê uma conta. */}
+                <div className="border-foreground/15 mt-5 border-t pt-5" data-sobe="total">
                   <p className="text-foreground/70 text-[11px] tracking-[0.22em] uppercase">
                     {t.totalAPagar}
                   </p>
@@ -1371,7 +1391,7 @@ export default function Documento({
           que ela faz é acabar a proposta com o trabalho dela em vez de uma
           cláusula de arbitragem. */}
       {fecho && (
-        <div className="relative mt-20 overflow-hidden rounded-sm sm:mt-28">
+        <div className="relative mt-20 overflow-hidden rounded-sm sm:mt-28" data-sobe="foto">
           {/* O MESMO BORRÃO DA CAPA, que esta tinha ficado sem.
               O `lqip` são poucas centenas de bytes que já vêm no HTML: está
               pintado antes de qualquer ida à rede. Aqui a fotografia é

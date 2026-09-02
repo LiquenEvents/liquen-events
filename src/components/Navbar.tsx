@@ -155,7 +155,27 @@ const MobileMenu = memo(function MobileMenu({
     // the button. Waiting a second frame reliably lands on the menu instead.
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => focusables()[0]?.focus());
+      /**
+       * ── O FOCO VAI PARA O PAINEL, E NÃO PARA O PRIMEIRO LINK ────────────
+       *
+       * Palavras dela, com a fotografia: «aparece este retângulo branco à
+       * volta quando eu carrego no menu, quero que tires isso».
+       *
+       * O retângulo era o ANEL DE FOCO. Isto punha o foco no primeiro item
+       * («SOBRE»), e um foco posto por programa faz o `:focus-visible` casar
+       * — portanto o browser desenhava o anel à volta de um link em que
+       * ninguém tinha carregado. Num telemóvel, onde não há teclado nenhum,
+       * lê-se como um defeito.
+       *
+       * A correcção NÃO é apagar o anel: ele é o que diz a quem navega por
+       * teclado onde está, e a auditoria de acessibilidade desta casa é um
+       * `error` e não um aviso. A correcção é mover o foco para o PAINEL —
+       * que é `role="dialog"` e leva `tabIndex={-1}` — em vez de para um dos
+       * itens. É o padrão de um diálogo: o leitor de ecrã anuncia o menu, o
+       * primeiro `Tab` leva ao primeiro link, e aí sim o anel aparece, para
+       * quem o pediu com o teclado.
+       */
+      raf2 = requestAnimationFrame(() => menu?.focus());
     });
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -169,7 +189,13 @@ const MobileMenu = memo(function MobileMenu({
       if (items.length === 0) return;
       const first = items[0];
       const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
+      /**
+       * O foco começa agora no PRÓPRIO painel (ver o `menu.focus()` acima), e
+       * daí um `Shift+Tab` saía do menu pela porta de trás — para o cromado do
+       * sítio, por baixo de um diálogo aberto. Do painel para trás é o último
+       * item, como se já se estivesse no primeiro.
+       */
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === menu)) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
@@ -188,6 +214,9 @@ const MobileMenu = memo(function MobileMenu({
   return (
     <div
       ref={menuRef}
+      // Recebe o foco à abertura, e só por programa: `-1` mantém-no fora da
+      // ordem de tabulação, portanto ninguém aterra aqui a carregar em Tab.
+      tabIndex={-1}
       role="dialog"
       aria-modal={isOpen}
       aria-label={t.nav.menuLabel}

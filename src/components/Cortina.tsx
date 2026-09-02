@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 /**
@@ -122,7 +121,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * durante a leitura do documento, praticamente no primeiro instante em que a
  * cortina existe. Não é somado ao carregamento: é comparado com ele.
  */
-export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var scrollAntes=raiz.style.overflow;var fora=function(){c.classList.add("cortina--fora");raiz.style.overflow=scrollAntes};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}raiz.style.overflow="hidden";c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir")fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
+export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var scrollAntes=raiz.style.overflow;var fora=function(){c.classList.add("cortina--fora");raiz.style.overflow=scrollAntes;raiz.setAttribute("data-cortina","fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}raiz.style.overflow="hidden";c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir"||e.animationName==="cortina-a-subir-ja")fora()});addEventListener("pageshow",function(e){if(e&&e.persisted)fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");raiz.setAttribute("data-cortina","a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
 
 /** Os degraus: cada grupo sobe de mais longe e sai pelo mesmo, ao contrário. */
 const DEGRAUS = ["14px", "28px"] as const;
@@ -130,33 +129,19 @@ const DEGRAUS = ["14px", "28px"] as const;
 const ATRASOS = ["0ms", "60ms"] as const;
 
 /**
- * Quanto tempo cada variante fica no ecrã, no mínimo.
+ * Quanto tempo a cortina fica no ecrã, no mínimo.
  *
- * Números diferentes porque o conteúdo é diferente, e não por acaso: o lema
- * são duas linhas para LER — ~400 ms a subir mais ~600 ms legível, que é o
- * tempo que ela descreveu. Um logótipo reconhece-se num relance e não se lê;
- * 900 ms é o número do exemplo dela, e chega.
+ * ~400 ms a subir mais ~600 ms com a frase legível — o tempo que ela
+ * descreveu. Duas linhas para LER pedem-no, e é o mesmo em todo o lado,
+ * porque em todo o lado é a mesma frase.
  */
-const MINIMOS = { lema: 1000, logotipo: 900 } as const;
+const MINIMO = 1000;
 
 export function Cortina({
   locale,
   chaveDeSessao,
-  variante = "lema",
 }: {
   locale: Locale;
-  /**
-   * O que se vê enquanto a página não chega.
-   *
-   * `lema` — as duas linhas do lema do estúdio. É a da PROPOSTA e a do back
-   * office: um momento com palavras, para quem está a abrir um documento.
-   *
-   * `logotipo` — o emblema a respirar, sem texto. É a do SÍTIO, e a razão é
-   * de ritmo: quem chega ao sítio vem de uma pesquisa ou de um anúncio e
-   * quer ver o trabalho, não ler uma frase. O logótipo diz de quem é a casa
-   * sem pedir nada em troca.
-   */
-  variante?: "lema" | "logotipo";
   /**
    * Quando presente, esta cortina só se vê UMA VEZ por sessão do separador.
    *
@@ -174,14 +159,13 @@ export function Cortina({
 }) {
   const t = getDictionary(locale);
   const grupos = [t.footer.sloganLine1, t.footer.sloganLine2];
-  const logotipo = variante === "logotipo";
 
   return (
     <>
       <div
-        className={logotipo ? "cortina cortina--logotipo" : "cortina"}
+        className="cortina"
         data-sessao={chaveDeSessao}
-        data-minimo={MINIMOS[variante]}
+        data-minimo={MINIMO}
         /**
          * ── PORQUE É QUE ISTO PRECISA DE EXISTIR ──────────────────────────
          *
@@ -221,45 +205,26 @@ export function Cortina({
          * estúdio seria ler publicidade a alguém que está à espera da
          * proposta. A cortina é para os olhos; a espera já tem nome.
          */
-        aria-hidden={logotipo ? undefined : "true"}
         /**
-         * A variante do logótipo TEM nome; a do lema não precisa.
+         * Escondida de quem ouve o ecrã, e de propósito.
          *
-         * O lema aparece por cima de um `loading.tsx` cujo `aria-busy` já diz
-         * «isto está a carregar», na língua do leitor de ecrã — anunciar o lema
-         * do estúdio por cima disso era ler publicidade a quem está à espera.
-         * No sítio não há esse ecrã por baixo: sem isto, quem ouve ficava sem
-         * saber que algo estava a acontecer, e a regra dela é que isso nunca
-         * falta.
+         * Onde ela aparece há sempre, por baixo, quem já nomeia a espera: o
+         * `aria-busy` do `loading.tsx` na proposta, e no sítio a própria página,
+         * que chega inteira. Anunciar por cima disso o lema do estúdio seria
+         * ler publicidade a quem está à espera. A cortina é para os olhos.
          */
-        role={logotipo ? "status" : undefined}
-        aria-label={logotipo ? t.common.aAbrir : undefined}
+        aria-hidden="true"
       >
-        {logotipo ? (
-          <span className="cortina__pulso">
-            <Image
-              src="/logo-liquen-branco.png"
-              alt=""
-              width={150}
-              height={90}
-              className="cortina__logo"
-              priority
-            />
-          </span>
-        ) : (
-          <p className="cortina__lema">
-            {grupos.map((grupo, i) => (
-              <span
-                key={i}
-                style={
-                  { "--degrau": DEGRAUS[i], animationDelay: ATRASOS[i] } as React.CSSProperties
-                }
-              >
-                {grupo}
-              </span>
-            ))}
-          </p>
-        )}
+        <p className="cortina__lema">
+          {grupos.map((grupo, i) => (
+            <span
+              key={i}
+              style={{ "--degrau": DEGRAUS[i], animationDelay: ATRASOS[i] } as React.CSSProperties}
+            >
+              {grupo}
+            </span>
+          ))}
+        </p>
       </div>
       {/*
         O guião vai INLINE e a seguir ao elemento, de propósito: corre durante a

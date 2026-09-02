@@ -472,7 +472,7 @@ export default async function ProposalPage({
           `Documento` prende a prosa a `max-w-2xl` por dentro — cada coisa com
           a largura que lhe serve, em vez de uma só para as duas. Sem
           documento, a página fica exactamente como estava. */}
-      <div className={`w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
+      <div className={`prop-folha w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
         {/*
          * ── O QUE ESTAVA AQUI E SAIU ────────────────────────────────────
          *

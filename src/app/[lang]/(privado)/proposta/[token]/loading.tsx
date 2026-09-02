@@ -74,7 +74,20 @@ export default function ADescarregarAProposta() {
           movimento — e o que pulsa é a opacidade, que corre no compositor. */}
       <div
         aria-hidden
-        className="w-full max-w-5xl flex flex-col items-center motion-safe:animate-pulse"
+        /**
+         * O pulsar SAIU, e é uma correcção e não uma perda.
+         *
+         * Este esqueleto vive por baixo da cortina, que é opaca e cobre o ecrã
+         * inteiro durante todo o tempo em que ele existe. Ou seja: era uma
+         * animação infinita de opacidade, num contentor da largura toda com
+         * seis caixas, a correr a cada fotograma — para NINGUÉM. E a competir
+         * pela mesma linha principal que a animação que se vê.
+         *
+         * Quem nomeia a espera é o `aria-busy` lá em cima e, para os olhos, a
+         * cortina. Não faz falta um segundo movimento por baixo de uma coisa
+         * opaca.
+         */
+        className="w-full max-w-5xl flex flex-col items-center"
       >
         {/* O sítio do nome do casal. */}
         <div className="h-9 sm:h-12 w-64 sm:w-96 rounded-md bg-foreground/[0.06]" />

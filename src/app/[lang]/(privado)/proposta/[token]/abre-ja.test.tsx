@@ -98,14 +98,33 @@ describe("o ecrã que a proposta mostra enquanto chega", () => {
     expect(semComentarios(FONTE)).toContain(logo);
   });
 
-  it("o movimento obedece a quem pediu menos movimento", () => {
+  it("o esqueleto não anima — ninguém o vê a mexer, e quem o vê pediu que não mexesse", () => {
+    /**
+     * ── ESTE CASO GUARDAVA O CONTRÁRIO, E MUDOU ────────────────────────────
+     *
+     * Guardava que o esqueleto pulsava (`motion-safe:animate-pulse`). Deixou
+     * de pulsar, e a razão vale a pena ficar escrita, porque a primeira
+     * leitura é «tiraram uma animação, isto está mais pobre».
+     *
+     * A cortina (`components/Cortina.tsx`) cobre este ecrã inteiro, opaca,
+     * durante toda a vida dele: da primeira entrega do servidor até o
+     * documento estar lido, que é exactamente quando o esqueleto é
+     * substituído. Ou seja, com movimento ligado, NINGUÉM vê este esqueleto —
+     * e uma animação infinita de opacidade num contentor da largura toda, com
+     * seis caixas, estava a correr a cada fotograma por baixo de uma coisa
+     * opaca, a disputar a linha principal com a animação que se vê.
+     *
+     * E quem O VÊ é precisamente quem pediu MENOS movimento: para esses a
+     * cortina é `display: none`, e o esqueleto fica à vista. Um esqueleto
+     * quieto é o que essa pessoa pediu.
+     *
+     * Portanto: nenhuma animação aqui. Se um dia voltar a fazer falta, tem de
+     * ser `motion-safe` e de opacidade — e este caso passa a ter de mudar de
+     * novo, com a razão escrita.
+     */
     const codigo = semComentarios(FONTE);
-    expect(codigo, "o pulsar deixou de ser `motion-safe`").toContain("motion-safe:animate-pulse");
-    // `animate-pulse` do Tailwind é opacidade — corre no compositor e não
-    // mexe em layout. Se alguém trocar por uma animação de tamanho ou posição,
-    // isto passa a custar em cada fotograma, num telemóvel fraco.
-    expect(codigo, "apareceu uma animação que não é a de opacidade").not.toMatch(
-      /animate-(bounce|spin|ping)/,
+    expect(codigo, "voltou uma animação a correr por baixo da cortina").not.toMatch(
+      /animate-(pulse|bounce|spin|ping)/,
     );
   });
 });

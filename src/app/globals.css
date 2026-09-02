@@ -3661,6 +3661,14 @@ body:has(.barra-consentimento) footer {
   }
 }
 
+/* A rede de segurança sem JavaScript.
+   Cheguei a pôr aqui um `visibility: hidden` no último fotograma, para o
+   elemento ficar terminado e não só fora do ecrã. O teste dos 60 fps apanhou-o
+   — `visibility` não é uma propriedade de compositor — e tem razão: a regra
+   desta casa é `transform` e `opacity`, e não se abre uma excepção por um caso
+   que hoje não se alcança. Fora do ecrã pelo `transform`, o elemento não
+   intercepta nem cobre nada; no caminho normal quem o fecha de vez é o
+   `display: none` do `.cortina--fora`. */
 @keyframes cortina-a-subir {
   from {
     transform: translateY(0);
@@ -3684,10 +3692,20 @@ body:has(.barra-consentimento) footer {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  /* O verde-quase-preto da casa, e não o preto do exemplo. É o mesmo tom que
-     já está por baixo das fotografias (`--color-noite`), escolhido para
-     impedir um flash branco — o trabalho é o mesmo, à escala do ecrã. */
-  background: var(--color-noite);
+  /* ── UMA SÓ COR, EM TODA A CASA ─────────────────────────────────────────
+     Palavras dela: «quero esse verde mais claro, que nós temos, que é o mesmo
+     verde do site online».
+
+     É o `moss-dark`: o verde do menu e da barra do sítio. Começou por ser o
+     `--color-noite`, o verde-quase-preto que está por baixo das fotografias —
+     e por um dia a proposta abriu em quase-preto e o sítio em verde. Não há
+     razão para serem dois: é a mesma frase, da mesma casa, e uma casa tem uma
+     cor. O escuro fazia o que o escuro faz num teatro; este faz o que faz uma
+     porta, que é dizer onde se entrou.
+
+     O creme sobre este verde dá ~5,9:1 — folgado para as WCAG, e a frase é
+     grande. */
+  background: var(--color-moss-dark);
   /* Visível desde o primeiro fotograma. Antes nascia a zero e só aparecia aos
      140 ms, para uma página rápida a levantar sem a pintar; era isso que fazia
      com que ela nunca a visse. */
@@ -3697,6 +3715,17 @@ body:has(.barra-consentimento) footer {
      um ecrã escuro com a proposta por baixo. Aos 4 s, que é folga larga sobre
      o mínimo de 1 s por que o guião espera. */
   animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) 4s forwards;
+  /* ── A CAMADA VEM ANTES DO MOVIMENTO ────────────────────────────────────
+     Sem isto, o WebKit só promove a cortina a camada própria no instante em
+     que ela COMEÇA a subir — e criar e rasterizar uma camada do ecrã inteiro
+     (num iPhone a 3×, ~3 milhões de pixéis) no mesmo fotograma em que o
+     movimento arranca é um solavanco. Com `will-change` a camada já existe.
+     É retirado assim que ela sai (ver `.cortina--fora`), para não ficar uma
+     camada do ecrã inteiro pendurada na memória do telemóvel a vida toda. */
+  will-change: transform;
+  /* O que acontece dentro da cortina não pode obrigar a página por baixo a
+     recalcular — e é a página por baixo que está a montar-se neste momento. */
+  contain: layout paint;
 }
 
 /* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
@@ -3715,51 +3744,27 @@ body:has(.barra-consentimento) footer {
    o mesmo que os guiões de tema desta casa já fazem antes de hidratar. */
 .cortina--fora {
   display: none !important;
+  /* A camada já não serve para nada: largá-la devolve a memória. */
+  will-change: auto;
 }
 
-/* Posta pelo guião quando o documento está lido E o mínimo já passou. */
+/* Posta pelo guião quando o documento está lido E o mínimo já passou.
+   ── PORQUE É QUE A SAÍDA TEM UM NOME PRÓPRIO ────────────────────────────
+   Porque a `.cortina` JÁ tem uma animação com o nome `cortina-a-subir` viva,
+   parada nos 4 s de atraso da rede de segurança. Reutilizar o mesmo nome aqui
+   obrigava o motor a RE-CRONOMETRAR essa animação em vez de começar uma nova
+   — e a desmontar e remontar a animação acelerada exactamente no instante em
+   que ela tem de se mexer. Um nome diferente tira a ambiguidade. */
 .cortina--a-sair {
-  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  animation: cortina-a-subir-ja 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
 }
 
-/* ── A VARIANTE DO LOGÓTIPO, PARA O SÍTIO ─────────────────────────────────
-   O emblema a respirar, sem texto: `from{opacity:.9;transform:scale(.9)}
-   to{opacity:1;transform:scale(1)}`, 1,25 s em alternado — os valores dela.
-   Quem chega ao sítio vem de uma pesquisa ou de um anúncio e quer ver o
-   trabalho; o logótipo diz de quem é a casa sem pedir que se leia nada. */
-@keyframes cortina-a-respirar {
+@keyframes cortina-a-subir-ja {
   from {
-    opacity: 0.9;
-    transform: scale(0.9);
+    transform: translateY(0);
   }
   to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.cortina__pulso {
-  display: block;
-  animation: cortina-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
-}
-
-.cortina__logo {
-  /* Os 32 px do exemplo dela eram para um SÍMBOLO quadrado. Este logótipo traz
-     as nove letras de «LÍQUEN EVENTS» — a essa largura não se lê, e já foi
-     medido uma vez numa fotografia. 150 px é a medida do ecrã de espera da
-     proposta, e é onde o nome se lê. */
-  width: 150px;
-  max-width: 45vw;
-  height: auto;
-}
-
-/* Quem pediu menos movimento leva o logótipo QUIETO — e não nenhum.
-   A cortina do lema desaparece por completo nesse caso; aqui o guião também a
-   fecha logo, portanto isto é só a rede: se por alguma razão ela chegar a ser
-   pintada, não pulsa. */
-@media (prefers-reduced-motion: reduce) {
-  .cortina__pulso {
-    animation: none;
+    transform: translateY(-100%);
   }
 }
 
@@ -3781,6 +3786,21 @@ body:has(.barra-consentimento) footer {
 
 /* 1 s ao todo: os primeiros 40% (~400 ms) a subir e a materializar-se, e o
    resto — ~600 ms — completamente legível. É o tempo que ela descreveu. */
+/* ── A LETRA NÃO PODE TROCAR A MEIO DA ANIMAÇÃO ──────────────────────────
+   O lema é desenhado em Playfair, que é carregada com `display: swap`. Num 4G
+   frio a letra chega lá pelos 300–900 ms — ou seja, DENTRO do segundo em que
+   as palavras estão a subir. Quando chega, as duas linhas re-medem-se e
+   repintam-se a meio do movimento.
+
+   A casa já tem a máquina para isto: o guião do `layout.tsx` marca o
+   documento com `fontes-por-assentar` e tira a marca no `document.fonts.ready`.
+   Enquanto ela lá estiver, o lema fica em Georgia — uma serifada do sistema,
+   já lá, sem pedido nenhum — e a Playfair só entra quando as letras assentam,
+   altura em que a cortina já saiu ou está de saída. */
+.fontes-por-assentar .cortina__lema {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
 .cortina__lema > span {
   display: block;
   opacity: 0;
@@ -3889,5 +3909,95 @@ body:has(.barra-consentimento) footer {
   }
   .a-caminho__logo {
     animation: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O MOVIMENTO DA PROPOSTA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela: «quero que haja uma animação entre o eternizamos memórias e
+   o PDF, e animações pelo PDF todo, nas fotos, nos textos — quero que aquilo
+   fique espetacularmente bom».
+
+   ── O QUE JÁ CÁ ESTAVA, E PORQUE É QUE NÃO CHEGAVA ───────────────────────
+
+   O `prop-chega`, aqui em cima, com as três regras da casa escritas por
+   extenso. Duas coisas o travavam:
+
+     1. Estava aplicado a UM elemento — a moldura de uma secção. Tudo o resto
+        do documento (a capa, a apresentação, as condições, a fotografia de
+        fecho, os mood boards por dentro, as escolhas, o total) chegava
+        parado.
+
+     2. Depende do `animation-timeline: view()`, que é recente. Num telemóvel
+        com um Safari mais antigo, `@supports` falha e NÃO HÁ MOVIMENTO
+        NENHUM — não uma versão mais pobre: nenhuma. É bem possível que fosse
+        isso que ela estava a ver quando pediu isto.
+
+   ── PORQUE É QUE ESTE MECANISMO É OUTRO ──────────────────────────────────
+
+   Este funciona em todo o lado, e não pede nada ao browser além de um
+   `IntersectionObserver` — que a casa já usa em quatro sítios, com um
+   ajudante partilhado (`lib/motion/observeInView.ts`).
+
+   ── E PORQUE É QUE NUNCA PODE DEIXAR UMA PROPOSTA EM BRANCO ──────────────
+
+   Esta é a regra que manda em tudo o resto. O estado escondido NÃO EXISTE no
+   CSS até o guião o pôr, elemento a elemento — é o padrão `cl-armed` que esta
+   casa já usa nos logótipos dos clientes. Sem JavaScript, com um erro no
+   guião, com o `IntersectionObserver` em falta: nenhum elemento leva
+   `por-subir`, nenhum sai do sítio, e o casal lê a proposta inteira.
+
+   E NUNCA se mexe na opacidade. Só `transform`. Um `opacity: 0` à espera de
+   JavaScript é a maneira de servir a um casal um documento em branco de vinte
+   mil euros — está escrito duas vezes neste ficheiro, das duas vezes em que
+   aconteceu.
+
+   ── A ESCADA DAS DISTÂNCIAS ──────────────────────────────────────────────
+
+   A distância diz a importância, e é sempre pequena. A escala da casa já
+   existia: menu 4px, aviso 8px, bloco 12px, secção 14px, página 32px.
+
+       bloco dentro de uma secção .....  8px
+       fotografia ..................... 12px
+       secção ......................... 14px
+       o TOTAL A PAGAR ................ 20px   ← o único acima de 14
+*/
+
+/* A ARMAÇÃO É INSTANTÂNEA; SÓ A LARGADA É QUE ANIMA.
+   Tinha a transição nas duas, e um Chromium mostrou o que isso faz: ao ser
+   armado, o elemento TRANSITA de zero para o seu degrau — ou seja, desliza
+   para BAIXO à frente de quem olha, e só depois sobe. Duas viagens onde só
+   podia haver uma. Com a transição apenas no `.subiu`, o degrau é posto sem
+   um fotograma de movimento e o que se vê é só a subida. */
+[data-sobe].por-subir {
+  transform: translateY(var(--sobe, 12px));
+}
+[data-sobe].por-subir.subiu {
+  transform: none;
+  transition: transform 620ms var(--ease-out);
+}
+
+/* ── A ENTRADA DO DOCUMENTO, COLADA À SAÍDA DA CORTINA ────────────────────
+   A cortina sobe e o documento vem por baixo dela, um pouco atrasado, para o
+   olho ler UM gesto e não dois. O atributo é posto pelo guião da cortina no
+   instante exacto em que ela começa a subir.
+
+   `backwards` e nunca `forwards`: acaba em `transform: none`, sem deixar um
+   bloco de contenção — a lição está escrita no `.view-in`, e o visualizador
+   de fotografias desta página é `position: fixed` lá dentro. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-cortina="a-sair"] .prop-folha {
+    animation: prop-entrada 520ms var(--ease-out) 60ms backwards;
+  }
+}
+
+@keyframes prop-entrada {
+  from {
+    transform: translateY(18px);
+  }
+  to {
+    transform: none;
   }
 }
