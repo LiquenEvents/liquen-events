@@ -3641,23 +3641,25 @@ body:has(.barra-consentimento) footer {
 
    Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
 
-/* Cada grupo de palavras sobe do SEU degrau e materializa-se. É a leitura dela
-   do efeito — «o truque não é o fade, é a frase estar partida em grupos, cada
-   um a subir de uma distância diferente». A saída não está aqui: as palavras
-   sobem agarradas à cortina, num só gesto, em vez de saírem primeiro e a
-   cortina depois. Duas saídas seguidas leem-se como uma hesitação. */
-@keyframes cortina-palavras {
-  0% {
-    opacity: 0;
-    transform: translateY(var(--degrau, 14px));
+/* Cada LETRA entra pela sua borda: as pares sobem de baixo, as ímpares caem de
+   cima. Palavras dela: «as letras deslocam-se, tipo uma cai e a outra entra».
+
+   O `--de` vem escrito no HTML, letra a letra, e traz o sinal — `135%` sobe,
+   `-135%` cai. Não são 100% porque o recorte da linha tem respiro para os
+   descendentes (ver `.cortina__linha`), e a 100% ficava uma fatia da letra
+   pousada na borda, à vista, antes de ela arrancar. MEDIDO num Chromium a
+   390 pt: a linha mede 46 px de janela para 34 de letra, portanto é preciso
+   deslocá-la 40 para a tirar dali; 135% são 45,4 px.
+
+   A saída não está aqui: as letras sobem agarradas à cortina, num só gesto, em
+   vez de saírem primeiro e a cortina depois. Duas saídas seguidas leem-se como
+   uma hesitação. */
+@keyframes cortina-letra {
+  from {
+    transform: translateY(var(--de, 135%));
   }
-  40% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
+  to {
+    transform: none;
   }
 }
 
@@ -3726,6 +3728,15 @@ body:has(.barra-consentimento) footer {
   /* O que acontece dentro da cortina não pode obrigar a página por baixo a
      recalcular — e é a página por baixo que está a montar-se neste momento. */
   contain: layout paint;
+  /* ── O DEDO PASSA, O TOQUE NÃO ─────────────────────────────────────────
+     A cortina cobre o ecrã inteiro, e uma caixa que cobre o ecrã inteiro come
+     o arrastar de quem quer descer. Com `pan-y`, o navegador trata o arrastar
+     vertical como scroll da página por baixo — mas um TOQUE continua a parar
+     aqui, que é o que impede alguém de carregar às cegas num botão que não vê.
+
+     Isto substitui o `overflow: hidden` que o guião punha na raiz. O porquê
+     inteiro, e o defeito que o obrigou a sair, estão no `Cortina.tsx`. */
+  touch-action: pan-y;
 }
 
 /* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
@@ -3772,20 +3783,27 @@ body:has(.barra-consentimento) footer {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  /* Zero, e não os 4 px de antes: quem separa as linhas passou a ser a
+     entrelinha. O `gap` somava-se aos `margin` negativos do recorte e as duas
+     linhas encavalitavam-se. */
+  gap: 0;
   text-align: center;
   font-family: var(--font-display), Georgia, serif;
   font-weight: 300;
   font-size: 24px;
-  line-height: 1.25;
+  /* Era 1,25 com 4 px de `gap` — 34 px de linha a linha. É 1,4 com `gap` zero
+     — 33,6 px. A mesma mancha de texto, e agora com espaço para o recorte não
+     morder os descendentes. */
+  line-height: 1.4;
   color: var(--color-cream);
   /* Um texto claro sobre escuro engorda; o espacejamento negativo devolve-lhe
      a forma que tem no rodapé, que é onde o casal o volta a encontrar. */
   letter-spacing: -0.01em;
 }
 
-/* 1 s ao todo: os primeiros 40% (~400 ms) a subir e a materializar-se, e o
-   resto — ~600 ms — completamente legível. É o tempo que ela descreveu. */
+/* Quanto tempo isto leva ao todo está no `Cortina.tsx`, ao lado do `MINIMO`
+   que o guarda: ~1,57 s a montar-se letra a letra, e ~630 ms com a frase
+   inteira parada e legível. */
 /* ── A LETRA NÃO PODE TROCAR A MEIO DA ANIMAÇÃO ──────────────────────────
    O lema é desenhado em Playfair, que é carregada com `display: swap`. Num 4G
    frio a letra chega lá pelos 300–900 ms — ou seja, DENTRO do segundo em que
@@ -3801,10 +3819,46 @@ body:has(.barra-consentimento) footer {
   font-family: Georgia, "Times New Roman", serif;
 }
 
-.cortina__lema > span {
+/* ── A LINHA É A JANELA ──────────────────────────────────────────────────
+   `overflow: hidden` é o que transforma «uma letra a aparecer» em «uma letra a
+   entrar»: fora desta caixa não há letra nenhuma para ver.
+
+   O respiro (`padding`) existe porque um recorte colado à caixa de texto corta
+   os descendentes — o «g» de «eternizamos», a vírgula, o «ç». A Playfair ocupa
+   ~1,34 em entre o topo do ascendente e o fundo do descendente, e a linha tem
+   1,4 em; o respiro de 0,25 em de cada lado é a folga por cima disso. O
+   `margin` negativo devolve ao documento exactamente o espaço que o `padding`
+   lhe tirou, para o recorte não empurrar as duas linhas uma da outra.
+
+   E o respiro lateral é para o `letter-spacing` negativo do lema: ele encolhe
+   o avanço DEPOIS da última letra, e sem esta folga a caixa fechava-lhe em
+   cima de uma fracção de pixel do lado direito. */
+.cortina__linha {
   display: block;
-  opacity: 0;
-  animation: cortina-palavras 1s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  overflow: hidden;
+  padding: 0.25em 0.08em;
+  margin: -0.25em -0.08em;
+}
+
+/* A palavra não quebra por dentro. Sem isto, o navegador muda de linha entre
+   duas letras coladas e a frase parte-se a meio de uma palavra num ecrã
+   estreito — que é a conta que está escrita no `Cortina.tsx`. */
+.cortina__palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* A duração e o atraso de cada letra vêm do HTML: são a única coisa que muda
+   de letra para letra, e escrevê-los aqui obrigava a uma regra por letra. */
+.cortina__letra {
+  display: inline-block;
+  animation-name: cortina-letra;
+  /* A curva de assinatura da casa, e não uma inventada aqui ao lado. */
+  animation-timing-function: var(--ease-out);
+  /* `backwards`: durante o atraso a letra fica onde vai NASCER, fora da
+     janela. Sem isto ficava parada no sítio final, à vista, e só depois
+     saltava para fora para entrar — que é o contrário do efeito. */
+  animation-fill-mode: backwards;
 }
 
 @media (min-width: 640px) {
