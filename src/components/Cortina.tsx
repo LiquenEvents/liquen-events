@@ -121,14 +121,33 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * durante a leitura do documento, praticamente no primeiro instante em que a
  * cortina existe. Não é somado ao carregamento: é comparado com ele.
  */
-export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=1000;var fora=function(){c.classList.add("cortina--fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir")fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
+export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=1000;var fora=function(){c.classList.add("cortina--fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir")fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
 
 /** Os degraus: cada grupo sobe de mais longe e sai pelo mesmo, ao contrário. */
 const DEGRAUS = ["14px", "28px"] as const;
 /** O desencontro entre grupos. O segundo arranca um piscar depois do primeiro. */
 const ATRASOS = ["0ms", "60ms"] as const;
 
-export function CortinaDaProposta({ locale }: { locale: Locale }) {
+export function Cortina({
+  locale,
+  chaveDeSessao,
+}: {
+  locale: Locale;
+  /**
+   * Quando presente, esta cortina só se vê UMA VEZ por sessão do separador.
+   *
+   * Existe para o back office e não para a proposta, e a diferença é de quem
+   * está do outro lado. Um casal abre a proposta uma vez, talvez duas — cada
+   * vez é a primeira impressão de um estúdio. Ela abre e recarrega o back
+   * office dezenas de vezes por dia, e um segundo de cortina a cada vez é um
+   * imposto sobre o trabalho dela, não uma marca.
+   *
+   * Guardado no `sessionStorage`, ou seja: uma vez por separador, e esquecido
+   * quando ela o fecha. Numa janela privada o acesso pode rebentar — daí o
+   * `try` no guião —, e nesse caso vê-se sempre, que é o lado certo de falhar.
+   */
+  chaveDeSessao?: string;
+}) {
   const t = getDictionary(locale).footer;
   const grupos = [t.sloganLine1, t.sloganLine2];
 
@@ -136,6 +155,7 @@ export function CortinaDaProposta({ locale }: { locale: Locale }) {
     <>
       <div
         className="cortina"
+        data-sessao={chaveDeSessao}
         /**
          * Escondida de quem ouve o ecrã, e de propósito.
          *

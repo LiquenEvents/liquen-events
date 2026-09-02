@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { normalizeLocale } from "@/lib/i18n";
-import { CortinaDaProposta } from "./CortinaDaProposta";
+import { Cortina } from "@/components/Cortina";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -98,7 +98,7 @@ export default async function LayoutPrivado({
         por baixo, e continua a ser ele a nomear a espera para quem ouve o
         ecrã e para quem pediu menos movimento.
       */}
-      <CortinaDaProposta locale={normalizeLocale(lang)} />
+      <Cortina locale={normalizeLocale(lang)} />
       {children}
     </main>
   );

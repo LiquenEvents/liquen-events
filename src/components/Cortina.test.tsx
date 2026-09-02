@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CortinaDaProposta, GUIAO } from "./CortinaDaProposta";
+import { Cortina, GUIAO } from "./Cortina";
 import { getDictionary } from "@/lib/i18n";
 
 /**
@@ -218,7 +218,7 @@ describe("a cortina, e o que não pode mudar", () => {
   it("a frase é o lema do estúdio, na língua do casal — e não uma inventada", () => {
     for (const locale of ["pt", "en"] as const) {
       const t = getDictionary(locale).footer;
-      const { container } = render(<CortinaDaProposta locale={locale} />);
+      const { container } = render(<Cortina locale={locale} />);
       const grupos = [...container.querySelectorAll(".cortina__lema > span")].map(
         (s) => s.textContent,
       );
@@ -228,7 +228,7 @@ describe("a cortina, e o que não pode mudar", () => {
   });
 
   it("cada grupo sobe do seu degrau — é isso o efeito, e não o fade", () => {
-    const { container } = render(<CortinaDaProposta locale="pt" />);
+    const { container } = render(<Cortina locale="pt" />);
     const degraus = [...container.querySelectorAll(".cortina__lema > span")].map((s) =>
       (s as HTMLElement).style.getPropertyValue("--degrau"),
     );
@@ -237,7 +237,7 @@ describe("a cortina, e o que não pode mudar", () => {
   });
 
   it("não é anunciada a quem ouve o ecrã: a espera já tem nome no `loading.tsx`", () => {
-    const { container } = render(<CortinaDaProposta locale="pt" />);
+    const { container } = render(<Cortina locale="pt" />);
     expect(container.querySelector(".cortina")?.getAttribute("aria-hidden")).toBe("true");
   });
 
@@ -254,11 +254,92 @@ describe("a cortina, e o que não pode mudar", () => {
      *     na rede de segurança de 4 s — a proposta abre, mas devagar e em
      *     silêncio. Verificado também numa build de produção real.
      */
-    const html = renderToStaticMarkup(<CortinaDaProposta locale="pt" />);
+    const html = renderToStaticMarkup(<Cortina locale="pt" />);
     expect(html).toContain("<script>");
     expect(html.indexOf("<script>"), "o guião tem de vir DEPOIS da cortina").toBeGreaterThan(
       html.indexOf('class="cortina"'),
     );
     expect(html).toContain("</div><script>");
+  });
+
+  it("com uma chave de sessão, vê-se uma vez e não outra vez a cada recarga", () => {
+    /**
+     * O back office não é a proposta. Um casal abre a proposta uma vez; ela
+     * abre e recarrega o painel dezenas de vezes por dia, e um segundo de
+     * cortina a cada recarga deixava de ser marca e passava a ser um imposto
+     * sobre o trabalho dela.
+     */
+    vi.useFakeTimers();
+    try {
+      sessionStorage.clear();
+      const montar = () => {
+        document.body.innerHTML = `<div class="cortina" data-sessao="cortina:teste"></div><script id="g"></script>`;
+        Object.defineProperty(document, "currentScript", {
+          value: document.getElementById("g"),
+          configurable: true,
+        });
+        Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+        new Function(GUIAO)();
+        return !!document.querySelector(".cortina")?.classList.contains("cortina--fora");
+      };
+
+      expect(montar(), "à primeira entrada vê-se").toBe(false);
+      expect(montar(), "à segunda já não").toBe(true);
+
+      // E um separador novo volta a vê-la: a memória é da sessão, não do disco.
+      sessionStorage.clear();
+      expect(montar()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sem chave de sessão vê-se SEMPRE — é o caso da proposta", () => {
+    // A proposta de um casal não pode ter memória: cada abertura é a primeira
+    // impressão de alguém, e pode ser outra pessoa a abrir o mesmo link.
+    vi.useFakeTimers();
+    try {
+      sessionStorage.clear();
+      const montar = () => {
+        document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+        Object.defineProperty(document, "currentScript", {
+          value: document.getElementById("g"),
+          configurable: true,
+        });
+        Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+        new Function(GUIAO)();
+        return !!document.querySelector(".cortina")?.classList.contains("cortina--fora");
+      };
+      expect(montar()).toBe(false);
+      expect(montar(), "sem chave, nunca se lembra de nada").toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("uma janela privada, onde o sessionStorage rebenta, vê a cortina à mesma", () => {
+    // Falhar para o lado de mostrar: uma cortina a mais é um segundo; uma
+    // excepção não apanhada aqui era o guião a morrer e a cortina a ficar.
+    vi.useFakeTimers();
+    const real = Object.getOwnPropertyDescriptor(window, "sessionStorage");
+    try {
+      Object.defineProperty(window, "sessionStorage", {
+        configurable: true,
+        get() {
+          throw new Error("acesso negado");
+        },
+      });
+      document.body.innerHTML = `<div class="cortina" data-sessao="cortina:teste"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+      expect(() => new Function(GUIAO)()).not.toThrow();
+      expect(document.querySelector(".cortina")?.classList.contains("cortina--fora")).toBe(false);
+    } finally {
+      if (real) Object.defineProperty(window, "sessionStorage", real);
+      vi.useRealTimers();
+    }
   });
 });
