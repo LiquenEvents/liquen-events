@@ -198,6 +198,19 @@ const NAO_TOCADAS: Record<string, Record<string, string>> = {
       "`default now()` na criação e explicitamente na reposição (`extraColumns` em " +
       "backup-restore.ts) — repor um pedido de Março com a data de hoje desarrumava a lista.",
   },
+  biblioteca_fotos: {
+    urls:
+      "LIDA E ESCRITA, mas fora do mapper — de propósito. É o endereço assinado de cada " +
+      "ficheiro por família (`original`, `miniatura`, `media`, `mediaAvif`), e quem lhe " +
+      "toca é o `urls-assinados.ts`, com o cliente do Supabase directo. Duas razões para " +
+      "não passar pelo repositório: (1) mantém a coluna FORA do tipo `Foto`, portanto " +
+      "fora do `toRow`/`fromRow` e, por consequência, fora da cópia de segurança — uma " +
+      "cópia restaurada noutro projecto traria endereços assinados por OUTRO Supabase, " +
+      "bem formados e completamente mortos; (2) o modo de ficheiro do repositório não " +
+      "tem Storage, logo não há endereços para guardar e a funcionalidade é, ali, um " +
+      "não-acontecimento. A razão de a coluna existir está escrita por extenso no " +
+      "`db/schema.sql` e no `urls-assinados.ts`.",
+  },
   proposal_themes: {
     manual_paths:
       "PLANEADA E AINDA POR LIGAR (TEMAS-PLANO.md §4.4): a lista de fotos de um tema " +

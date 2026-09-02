@@ -8,6 +8,7 @@ import {
 } from "./proposal-storage";
 import { ehRefDeTema, caminhoDoRefDeTema } from "./theme-ref";
 import { formasDeCaminhos, lqipsDeCaminhos } from "./biblioteca-fotos-store";
+import { urlsGuardados, guardarUrls } from "./urls-assinados";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -198,18 +199,76 @@ export async function fotosDaProposta(
   const caminhoReal = (ref: string) => (ehRefDeTema(ref) ? caminhoDoRefDeTema(ref) : ref);
   const caminhos = porAssinar.map(caminhoReal);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE JÁ FOI ASSINADO UMA VEZ NÃO SE ASSINA OUTRA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «caso as pessoas vão ver as propostas outra vez no email,
+   * mas já esteja muito mais rápido».
+   *
+   * Estava ao contrário. Isto assinava tudo A CADA VISITA, e o Supabase devolve
+   * um token novo de cada vez — portanto o endereço de cada fotografia mudava
+   * sempre. A chave da cache do navegador inclui o endereço inteiro, logo para
+   * o telemóvel o mesmo ficheiro com outro endereço é OUTRA fotografia.
+   *
+   * As fotografias estão gravadas com validade de um ano, e esse ano nunca
+   * valia nada: numa proposta de 46 fotografias, reabrir o link do email
+   * voltava a descarregar 6,6 a 9,2 MB. Mais de meio minuto numa ligação rural.
+   *
+   * Guardar o endereço é seguro porque o conteúdo de um caminho nunca muda — a
+   * razão longa está no `urls-assinados.ts`, e a garantia de que uma proposta
+   * revista nunca serve um endereço velho também.
+   */
+  const guardados = await urlsGuardados(caminhos);
+
+  /** O endereço guardado desta referência, nesta família — se ainda servir. */
+  const doCache = (ref: string, familia: string): string | undefined =>
+    guardados.get(caminhoReal(ref))?.[familia];
+
+  /** As que ainda não têm endereço guardado nesta família são as que se assinam. */
+  const emFalta = (familia: string) => porAssinar.filter((r) => !doCache(r, familia));
+
   const [originais, miniaturas, medias, mediasAvif, formas, lqips] = await Promise.all([
-    signProposalPaths(porAssinar),
-    signProposalThumbs(porAssinar),
+    signProposalPaths(emFalta("original")),
+    signProposalThumbs(emFalta("miniatura")),
     // A de 1200 px assinada, quando já existe: é ela que a capa e a galeria
     // pedem num telemóvel, e era a única que fazia o desvio pela nossa função.
-    signProposalMids(porAssinar),
+    signProposalMids(emFalta("media")),
     // E a oferta em AVIF da mesma, quando existir. Vai no mesmo lote de
     // assinaturas: uma ida a mais ao armazenamento por página, não por foto.
-    signProposalMidsAvif(porAssinar),
+    signProposalMidsAvif(emFalta("mediaAvif")),
     formasDeCaminhos(caminhos),
     lqipsDeCaminhos(caminhos),
   ]);
+
+  /** O endereço final de uma referência: o guardado, ou o acabado de assinar. */
+  const enderecoDe = (ref: string, familia: string, frescos: Map<string, string>) =>
+    doCache(ref, familia) ?? frescos.get(ref);
+
+  /**
+   * E o que foi assinado agora fica guardado, para a próxima visita não pagar.
+   *
+   * Com `await` e não solto: uma função sem estado pode ser congelada antes de
+   * uma promessa por segurar chegar ao fim, e aí perdia-se exactamente a
+   * gravação que faz isto valer a pena. Por fotografia, isto acontece uma vez
+   * na vida dela.
+   */
+  const novos = new Map<string, Record<string, string>>();
+  for (const [familia, frescos] of [
+    ["original", originais],
+    ["miniatura", miniaturas],
+    ["media", medias],
+    ["mediaAvif", mediasAvif],
+  ] as const) {
+    for (const ref of porAssinar) {
+      const url = frescos.get(ref);
+      if (!url) continue;
+      const caminho = caminhoReal(ref);
+      novos.set(caminho, { ...(novos.get(caminho) ?? {}), [familia]: url });
+    }
+  }
+  await guardarUrls(novos, guardados);
 
   return inventario.map(({ id, ref }) => {
     const directo = enderecoDirecto(ref);
@@ -219,10 +278,16 @@ export async function fotosDaProposta(
     const lqip = lqips.get(caminho);
     return {
       id,
-      ...(miniaturas.get(ref) ? { miniatura: miniaturas.get(ref) } : {}),
-      ...(medias.get(ref) ? { media: medias.get(ref) } : {}),
-      ...(mediasAvif.get(ref) ? { mediaAvif: mediasAvif.get(ref) } : {}),
-      ...(originais.get(ref) ? { original: originais.get(ref) } : {}),
+      ...(enderecoDe(ref, "miniatura", miniaturas)
+        ? { miniatura: enderecoDe(ref, "miniatura", miniaturas) }
+        : {}),
+      ...(enderecoDe(ref, "media", medias) ? { media: enderecoDe(ref, "media", medias) } : {}),
+      ...(enderecoDe(ref, "mediaAvif", mediasAvif)
+        ? { mediaAvif: enderecoDe(ref, "mediaAvif", mediasAvif) }
+        : {}),
+      ...(enderecoDe(ref, "original", originais)
+        ? { original: enderecoDe(ref, "original", originais) }
+        : {}),
       ...(forma ? { largura: forma.largura, altura: forma.altura } : {}),
       ...(lqip ? { lqip } : {}),
     };

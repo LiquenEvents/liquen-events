@@ -929,6 +929,33 @@ create table if not exists public.biblioteca_fotos (
   largura     int,
   altura      int,
   lqip        text,                      -- placeholder curto servido inline (nulo até existir)
+  -- ══════════════════════════════════════════════════════════════════════════
+  -- O ENDEREÇO ASSINADO DESTE FICHEIRO, POR BALDE
+  -- ══════════════════════════════════════════════════════════════════════════
+  --
+  -- `{"proposal-medias": "https://…?token=…", "proposal-thumbs": "…"}`.
+  --
+  -- Existe porque a página do casal assinava tudo de novo A CADA VISITA. O
+  -- Supabase devolve um token novo de cada vez, portanto o endereço mudava
+  -- sempre — e a chave da cache do navegador inclui o endereço inteiro. As
+  -- fotografias estão gravadas com validade de um ano, e esse ano nunca valia
+  -- nada: reabrir a proposta descarregava tudo outra vez. Numa proposta de 46
+  -- fotografias são 6,6 a 9,2 MB, que num 4G rural são mais de meio minuto.
+  --
+  -- Guardar o endereço só é seguro porque o CONTEÚDO de um caminho nunca muda:
+  -- cada ficheiro tem um uuid gerado no carregamento, trocar uma fotografia
+  -- grava um caminho NOVO, e a única reescrita refaz os mesmos bytes a partir
+  -- do mesmo original (ver `cache-das-fotos.ts`). Portanto caminho → bytes é
+  -- imutável, e caminho → endereço pode ser permanente.
+  --
+  -- A chave é o CAMINHO, nunca a proposta: uma revisão muda QUE caminhos o
+  -- documento lista, não o que um caminho significa. Por isso não há nada a
+  -- invalidar quando ela revê uma proposta.
+  --
+  -- SE A CHAVE JWT DO SUPABASE FOR ALGUM DIA ROTACIONADA, todos estes endereços
+  -- morrem de uma vez e as fotografias deixam de abrir. A reparação é uma linha:
+  --     update public.biblioteca_fotos set urls = null;
+  urls        jsonb,
   -- A cor dominante, '#rrggbb'. Calculada no NAVEGADOR de quem carrega a foto
   -- (ver `corDe` em image-worker.ts): do lado da proposta as fotos chegam por
   -- URLs assinados de outro domínio e ler-lhes os píxeis lançaria. É o que
@@ -941,6 +968,8 @@ create table if not exists public.biblioteca_fotos (
 
 -- Para instalações que já tinham a tabela antes de a cor existir.
 alter table public.biblioteca_fotos add column if not exists cor text;
+-- E antes de os endereços assinados passarem a ser guardados (ver a coluna).
+alter table public.biblioteca_fotos add column if not exists urls jsonb;
 
 create index if not exists biblioteca_fotos_pasta_idx on public.biblioteca_fotos (pasta);
 create index if not exists biblioteca_fotos_md5_idx
