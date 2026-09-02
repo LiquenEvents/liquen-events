@@ -3764,3 +3764,83 @@ body:has(.barra-consentimento) footer {
     display: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O AVISO DE QUE UMA PÁGINA ESTÁ A DEMORAR
+   ══════════════════════════════════════════════════════════════════════════
+
+   O porquê está no `AvisoDeCarregamento.tsx`. A regra desta peça é a OPOSTA
+   da cortina, e é a diferença que importa ao ler isto: a cortina tem um
+   mínimo e vê-se sempre, porque é marca; isto é INFORMAÇÃO, e informação que
+   não é precisa é ruído. Nasce invisível e só aparece se a navegação demorar
+   mais de 400 ms — a receita que os próprios documentos do Next recomendam.
+
+   Só `transform` e `opacity`. */
+
+@keyframes aviso-a-aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* A respiração do logótipo, tal como no exemplo dela: `from{opacity:.9;
+   transform:scale(.9)} to{opacity:1;transform:scale(1)}`, em alternado. */
+@keyframes aviso-logo-a-respirar {
+  from {
+    opacity: 0.9;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.a-caminho {
+  position: fixed;
+  inset: 0;
+  /* Acima da barra dos cookies, que é `z-[70]`.
+     MEDIDO numa fotografia: com os dois no mesmo nível, ganhava a barra —
+     desenhada depois — e o aviso saía com um rodapé de consentimento por
+     cima, que parece uma página partida a meio e não uma a caminho. */
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  /* O creme da casa, e NÃO o verde-quase-preto da cortina.
+     A cortina cobre a chegada a uma proposta e pode ser escura — é um
+     momento. Isto acontece ENTRE duas páginas claras do sítio, e um flash
+     preto pelo meio lê-se como uma avaria, não como um cuidado. */
+  background: var(--color-cream);
+  opacity: 0;
+  animation: aviso-a-aparecer 0.25s ease 0.4s forwards;
+}
+
+.a-caminho__logo {
+  /* Os 56 px do exemplo dela eram para um SÍMBOLO. Este logótipo traz as nove
+     letras de «LÍQUEN EVENTS» ao lado do emblema — a essa largura, medido numa
+     fotografia a 390 px, as letras não se liam. 150 px é a mesma medida do
+     ecrã de espera da proposta (`loading.tsx`), e é onde o nome se lê. */
+  width: 150px;
+  max-width: 45vw;
+  height: auto;
+  animation: aviso-logo-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
+}
+
+/* ── AQUI O MOVIMENTO REDUZIDO NÃO APAGA A PEÇA ───────────────────────────
+   A cortina desaparece por completo para quem pediu menos movimento, porque
+   é decoração. Esta não pode: é o que diz que algo está a acontecer, e a
+   regra dela é que isso nunca falta. Fica o logótipo quieto, sem respirar e
+   sem aparição — e continua a só surgir se a página demorar mesmo. */
+@media (prefers-reduced-motion: reduce) {
+  .a-caminho {
+    animation: none;
+    opacity: 1;
+    transition-delay: 0.4s;
+  }
+  .a-caminho__logo {
+    animation: none;
+  }
+}
