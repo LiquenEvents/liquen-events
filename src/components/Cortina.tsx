@@ -183,6 +183,37 @@ export function Cortina({
         data-sessao={chaveDeSessao}
         data-minimo={MINIMOS[variante]}
         /**
+         * ── PORQUE É QUE ISTO PRECISA DE EXISTIR ──────────────────────────
+         *
+         * O guião corre durante a leitura do documento, ANTES da hidratação, e
+         * o seu trabalho é mudar a classe deste elemento. Quando o React chega,
+         * encontra uma classe que não foi ele a escrever, e queixa-se:
+         *
+         *     A tree hydrated but some attributes of the server rendered HTML
+         *     didn't match the client properties. This won't be patched up.
+         *
+         * Não é um aviso a apanhar um defeito — é um aviso a apanhar uma coisa
+         * que se faz DE PROPÓSITO, e que o próprio React diz que não vai
+         * desfazer («won't be patched up»). É o mesmo padrão dos guiões de tema
+         * que escolhem claro ou escuro antes do primeiro pixel, e a mesma
+         * resposta que a documentação do React dá para eles.
+         *
+         * ── COMO É QUE ISTO APARECEU ──────────────────────────────────────
+         *
+         * Não apareceu a olho: apareceu no E2E, e só depois de a cortina
+         * chegar ao back office com a `chaveDeSessao`. É preciso uma SEGUNDA
+         * entrada no mesmo separador para o guião esconder a cortina já no
+         * primeiro instante — e é aí que a classe do servidor e a do React
+         * deixam de bater certo. A primeira entrada nunca falha.
+         *
+         * Reproduzido com `next dev` (o React só é explícito em
+         * desenvolvimento): 1.ª entrada limpa, 2.ª e 3.ª com o erro.
+         *
+         * O `suppressHydrationWarning` vale só para ESTE elemento e só para os
+         * seus atributos e texto — não cala nada mais na página.
+         */
+        suppressHydrationWarning
+        /**
          * Escondida de quem ouve o ecrã, e de propósito.
          *
          * O `aria-busy` do `loading.tsx` já diz «isto está a carregar», e

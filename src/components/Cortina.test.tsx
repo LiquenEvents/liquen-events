@@ -438,4 +438,32 @@ describe("a cortina, e o que não pode mudar", () => {
       vi.useRealTimers();
     }
   });
+
+  it("o elemento leva `suppressHydrationWarning` — sem ele, a 2.ª entrada suja a consola", () => {
+    /**
+     * ── O DEFEITO, E PORQUE É QUE ESTE TESTE LÊ A FONTE ────────────────────
+     *
+     * O guião corre antes da hidratação e muda a classe deste elemento. Na
+     * SEGUNDA entrada de um separador — quando a chave de sessão o manda
+     * esconder já no primeiro instante — o React encontra `cortina--fora` onde
+     * desenhou só `cortina`, e escreve na consola:
+     *
+     *     A tree hydrated but some attributes of the server rendered HTML
+     *     didn't match the client properties. This won't be patched up.
+     *
+     * Partiu DOIS testes de ponta a ponta que exigem uma consola limpa
+     * (`temas.spec.ts` e `caca/a02-editor-stress.spec.ts`, este último por
+     * fazer `page.reload()`), e não se via a olho nenhum: a primeira entrada
+     * nunca falha.
+     *
+     * Reproduzido com `next dev`, três entradas seguidas: a 1.ª limpa, a 2.ª e
+     * a 3.ª com o erro. Com a correcção, as três limpas.
+     *
+     * Lê-se da FONTE porque `suppressHydrationWarning` é uma instrução para o
+     * React e não sai no HTML — não há como perguntá-lo ao DOM. O que este
+     * caso guarda é que ninguém o tire por parecer supérfluo.
+     */
+    const fonte = readFileSync("src/components/Cortina.tsx", "utf8");
+    expect(fonte).toContain("suppressHydrationWarning");
+  });
 });
