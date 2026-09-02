@@ -108,7 +108,7 @@ export default function CromadoDoSitio({
         da proposta. No sítio a cortina não abre um documento — abre a casa, e a
         casa tem uma cor.
       */}
-      <Cortina locale={locale} chaveDeSessao="cortina:sitio" />
+      <Cortina locale={locale} />
       <ScrollProgress />
       {/*
         O aviso de que uma página está a demorar. Palavras dela: «caso demore

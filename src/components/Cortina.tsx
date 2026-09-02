@@ -70,6 +70,47 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * elemento já fora do documento e não faz nada — nunca uma segunda subida a
  * piscar no ecrã.
  *
+ * ── VÊ-SE SEMPRE, E «SEMPRE» QUER DIZER TRÊS COISAS ───────────────────────
+ *
+ * Palavras dela: «abri o sítio e apareceu, mas depois saí e voltei a entrar e
+ * já não aparecia. Ou fiz refresh e já não aparece. Eu quero que apareça
+ * sempre — ou quando faço refresh, ou quando volto atrás e volto a entrar».
+ *
+ * Tinha razão, e a culpa era de uma correcção minha. Quando ela se queixou de
+ * que voltar para trás no browser deixava isto «um bocado coiso», eu travei a
+ * cortina a UMA VEZ POR SEPARADOR. Resolveu o Voltar e apanhou junto o refresh
+ * e a re-entrada — um remédio largo de mais para a doença.
+ *
+ * Sai a trava do sítio e da proposta. Fica no back office, e só lá, porque ali
+ * a razão é outra e continua de pé: ela recarrega o painel dezenas de vezes por
+ * dia, e 2,2 s a cada vez é um imposto sobre o trabalho dela.
+ *
+ * Mas tirar a trava não chega, porque «não aparecer» tinha TRÊS causas e só uma
+ * era ela:
+ *
+ *  1. **O refresh e a re-entrada** — a trava. Sai.
+ *
+ *  2. **VOLTAR PELO HISTÓRICO.** O documento é restaurado inteiro e este guião
+ *     NÃO volta a correr (`document.currentScript` só existe durante a
+ *     leitura). O que corre é o ouvinte de `pageshow`, que ficou vivo dentro do
+ *     documento congelado — e que até aqui fechava a cortina. Passa a
+ *     RECOMEÇÁ-LA: tira as classes de saída, congela a animação por um cálculo
+ *     de estilo (é a única maneira de uma animação de CSS voltar ao princípio),
+ *     e larga-a outra vez. Onde há chave de sessão — o back office — continua a
+ *     fechar, que é o que lá faz sentido.
+ *
+ *  3. **O PRÉ-CARREGAMENTO, que ninguém podia adivinhar.** O sítio manda o
+ *     navegador desenhar a página seguinte em segredo mal o dedo se aproxima de
+ *     uma ligação (`SpeculationRules.tsx`) — é o que a faz abrir instantânea. Só
+ *     que esse documento invisível corre os guiões todos: a cortina fazia lá a
+ *     animação inteira, para ninguém, e chegava ao ecrã já gasta. Com a trava
+ *     de sessão era pior ainda — o pré-carregamento GASTAVA a chave, e nem um
+ *     separador novo a salvava.
+ *
+ *     A casa já tinha a resposta noutro sítio: o `PlausibleTracker` não conta
+ *     uma visita que ainda não aconteceu, e faz isso com `document.prerendering`
+ *     e o evento `prerenderingchange`. É o mesmo idioma aqui.
+ *
  * ── E NÃO TRANCA O SCROLL ─────────────────────────────────────────────────
  *
  * Trancava. `document.documentElement.style.overflow = "hidden"` enquanto ela
@@ -142,7 +183,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  * durante a leitura do documento, praticamente no primeiro instante em que a
  * cortina existe. Não é somado ao carregamento: é comparado com ele.
  */
-export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var fora=function(){c.classList.add("cortina--fora");raiz.setAttribute("data-cortina","fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir"||e.animationName==="cortina-a-subir-ja")fora()});addEventListener("pageshow",function(e){if(e&&e.persisted)fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");raiz.setAttribute("data-cortina","a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
+export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var fora=function(){c.classList.add("cortina--fora");raiz.setAttribute("data-cortina","fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir"||e.animationName==="cortina-a-subir-ja")fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");raiz.setAttribute("data-cortina","a-sair");setTimeout(fora,1000)};var arranca=function(){c.classList.remove("cortina--parada");t0=Date.now();if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}};var recomeca=function(){c.classList.remove("cortina--fora","cortina--a-sair");raiz.removeAttribute("data-cortina");c.classList.add("cortina--parada");void c.offsetWidth;arranca()};addEventListener("pageshow",function(e){if(!e||!e.persisted)return;if(chave){fora();return}recomeca()});if(document.prerendering){c.classList.add("cortina--parada");document.addEventListener("prerenderingchange",arranca,{once:true})}else{arranca()}})();`;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -219,11 +260,15 @@ export function Cortina({
   /**
    * Quando presente, esta cortina só se vê UMA VEZ por sessão do separador.
    *
-   * Existe para o back office e não para a proposta, e a diferença é de quem
-   * está do outro lado. Um casal abre a proposta uma vez, talvez duas — cada
-   * vez é a primeira impressão de um estúdio. Ela abre e recarrega o back
-   * office dezenas de vezes por dia, e um segundo de cortina a cada vez é um
-   * imposto sobre o trabalho dela, não uma marca.
+   * Existe para o BACK OFFICE, e só para ele. A diferença é de quem está do
+   * outro lado: um casal abre a proposta uma vez, talvez duas, e cada vez é a
+   * primeira impressão de um estúdio; ela abre e recarrega o painel dezenas de
+   * vezes por dia, e 2,2 s de cortina a cada vez é um imposto sobre o trabalho
+   * dela, não uma marca.
+   *
+   * Houve um dia em que o sítio e a proposta também a tinham. Foi um erro meu,
+   * e ela apanhou-o: «fiz refresh e já não aparece». O porquê inteiro está no
+   * cabeçalho deste ficheiro.
    *
    * Guardado no `sessionStorage`, ou seja: uma vez por separador, e esquecido
    * quando ela o fecha. Numa janela privada o acesso pode rebentar — daí o

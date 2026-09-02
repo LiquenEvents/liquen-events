@@ -3759,6 +3759,27 @@ body:has(.barra-consentimento) footer {
   will-change: auto;
 }
 
+/* ── A CORTINA À ESPERA DA SUA VEZ ───────────────────────────────────────
+   Serve dois casos, e nos dois o que é preciso é a animação NÃO andar:
+
+   1. Um documento PRÉ-RENDERIZADO. O navegador desenha a página seguinte em
+      segredo quando o dedo se aproxima de uma ligação, e esse documento corre
+      os guiões todos — incluindo este. Sem esta trava, a cortina fazia a sua
+      animação inteira numa página que ninguém está a ver, e chegava ao ecrã já
+      gasta. O guião tira a classe no `prerenderingchange`, que é o instante em
+      que a página passa a ser mesmo a página.
+
+   2. VOLTAR PELA CACHE DO HISTÓRICO. Aí a cortina tem de recomeçar do
+      princípio, e uma animação de CSS só recomeça se for interrompida: pôr a
+      classe, forçar o cálculo, tirar a classe.
+
+   O `!important` é o mesmo que o `.cortina--fora` já usa, e pela mesma razão:
+   isto tem de ganhar a uma animação que já está declarada. */
+.cortina--parada,
+.cortina--parada .cortina__letra {
+  animation: none !important;
+}
+
 /* Posta pelo guião quando o documento está lido E o mínimo já passou.
    ── PORQUE É QUE A SAÍDA TEM UM NOME PRÓPRIO ────────────────────────────
    Porque a `.cortina` JÁ tem uma animação com o nome `cortina-a-subir` viva,

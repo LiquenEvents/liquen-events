@@ -115,7 +115,7 @@ export default async function LayoutPrivado({
         por baixo, e continua a ser ele a nomear a espera para quem ouve o
         ecrã e para quem pediu menos movimento.
       */}
-      <Cortina locale={normalizeLocale(lang)} chaveDeSessao="cortina:proposta" />
+      <Cortina locale={normalizeLocale(lang)} />
       {children}
       {/*
         O guião que põe o documento a mexer. Depois dos filhos, de propósito:
