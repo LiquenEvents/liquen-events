@@ -18,6 +18,16 @@ import { round2 } from "@/lib/money";
  *  with or without a `data:` prefix — the renderer sniffs the format). */
 export type ImageData = string;
 
+/**
+ * O tecto da frase de intenção, em caracteres.
+ *
+ * Três linhas numa medida de leitura, e o limite existe para que sejam TRÊS:
+ * o sítio dela é uma abertura, não um parágrafo de apresentação, e uma frase
+ * que passe daqui deixa de se ler de uma vez e passa a empurrar a fotografia
+ * de capa para fora do ecrã, que é exactamente o contrário do que se quer.
+ */
+export const MAX_INTENCAO = 200;
+
 /** Taxa de IVA por omissão (23% — taxa normal em Portugal continental). */
 export const DEFAULT_VAT_RATE = 0.23;
 
@@ -411,6 +421,37 @@ export interface ProposalDoc {
 
   /**
    * ════════════════════════════════════════════════════════════════════════
+   * A FRASE DE INTENÇÃO — a única coisa desta proposta que não é um dado
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «Pensámos o vosso dia em branco e azul, com a serenidade do Redondo em
+   * setembro.» Três linhas, escritas à mão, proposta a proposta, sobre o que
+   * ela viu quando pensou naquele casamento.
+   *
+   * É a primeira coisa que o casal lê na página, e substitui um sobretítulo em
+   * maiúsculas que dizia «PROPOSTA PARA O SEU EVENTO» — quer dizer, que dizia
+   * a quem abriu um link de uma proposta que aquilo era uma proposta.
+   *
+   * ── NÃO TEM TEXTO POR OMISSÃO, E ISSO É A DECISÃO ────────────────────────
+   *
+   * Palavras dela: «uma frase genérica é pior do que nenhuma». Uma frase da
+   * casa aqui seria lida como escrita para aquele casal, e no dia em que dois
+   * casais a comparassem seria pior do que nunca ter existido. Vazio quer
+   * dizer vazio: a página não desenha nada e a abertura fica com o nome deles.
+   *
+   * ── SÓ NA PÁGINA ─────────────────────────────────────────────────────────
+   *
+   * Decisão dela: o PDF fica exactamente como está. Por isso este campo entra
+   * no `NUNCA_NO_PDF` — e, por ser visto pela página, no `VISTO_NA_PAGINA` do
+   * selo de versão, ao lado do `headerTitle`. Mudá-la por baixo de um casal
+   * que já leu a proposta é mudar o que ele leu.
+   */
+  intencao?: string;
+  /** A {@link ProposalDoc.intencao} em inglês. */
+  intencaoEn?: string;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
    * CONTRA QUE PORTUGUÊS É QUE CADA TRADUÇÃO FOI ESCRITA
    * ════════════════════════════════════════════════════════════════════════
    *
@@ -719,29 +760,28 @@ export interface ProposalDoc {
   budgetExtrasSomam?: boolean;
 
   /**
-   * ── NÃO HÁ INTERRUPTOR DO «TOTAL A PAGAR», E É DE PROPÓSITO ──────────────
+   * Desenhar a linha «Total a pagar» a fechar o orçamento.
    *
-   * Havia aqui um `mostrarTotalAPagar?: boolean`, com um comentário a dizer
-   * que a linha estava «desligada por omissão» e que «continua a poder
-   * ligar-se». Saiu, porque as duas coisas tinham deixado de ser verdade:
+   * DESLIGADA POR OMISSÃO. Esteve ligada, com o argumento de que a soma dos
+   * adicionais — cada um com o seu próprio IVA — não é trivial e não se deve
+   * pedir de cabeça a quem lê. O argumento continua de pé; o que ele não pesou
+   * foi a folha de referência.
    *
-   *  · NADA em código o lia. O gerador do PDF deixou de o consultar quando o
-   *    argumento a favor de o ter caiu — está escrito lá, com o caso à frente:
-   *    sem essa linha impressa, o casal não tinha como ligar os 2.950,79 € de
-   *    uma página aos 3.025,80 € da outra, e a soma que ninguém escreve é a
-   *    soma que o casal faz de cabeça, e faz mal.
+   * A proposta feita à mão fecha o quadro em «Valor Total», com a coordenação e
+   * a deslocação por baixo, e mais nada. Ela abriu uma proposta gerada, viu um
+   * bloco «Total a pagar» em corpo 22 que a folha dela não tem, e disse que não
+   * estava igual. Num documento que ela envia há anos, um número grande a mais é
+   * um número que ninguém lhe pediu.
    *
-   *  · E depois ela pediu o contrário do que este campo permitia: «quero
-   *    sempre que nas propostas apareça assim na parte do orçamento». Hoje a
-   *    escada — TOTAL, IVA, Total a pagar — sai sempre, com adicionais ou sem
-   *    eles, e há testes a prendê-lo em `proposal-doc-pdf.dinheiro.test.ts`.
+   * Continua a poder ligar-se — é uma linha por proposta, e nas propostas com
+   * muitos adicionais é ela que responde ao «então quanto é ao todo?». Só deixou
+   * de ser o que sai sem ninguém escolher.
    *
-   * Ou seja: um campo morto cuja documentação prometia uma escolha que já não
-   * existia — e que descrevia como estado actual precisamente aquilo que ela
-   * mandou mudar. Uma análise a este código leu esse comentário e concluiu, com
-   * toda a lógica, que faltava construir o interruptor. Construí-lo teria
-   * desfeito um pedido dela.
+   * Nota: só governa o total de FECHO, o que soma os adicionais. Uma proposta
+   * sem adicionais nenhuns continua a fechar no total de sempre, com o rótulo
+   * escrito no estúdio — que é a linha «Valor Total» da folha antiga.
    */
+  mostrarTotalAPagar?: boolean;
   // Organização template: per-item estimated values.
   budgetRows?: BudgetRow[];
   totalEstimatedText?: string; // "[Valor Total]" / "12.500,00 €"

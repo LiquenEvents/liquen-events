@@ -428,7 +428,7 @@ export default function MaterialListas() {
             const aberta = abertaId === lista.id;
             const criticas = minhas.filter((l) => l.critical).length;
             return (
-              <li key={lista.id} className="rounded-xl border border-[var(--bo-hairline-strong)]">
+              <li key={lista.id} className="rounded-xl border border-foreground/12">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4">
                   <button
                     type="button"
@@ -476,11 +476,11 @@ export default function MaterialListas() {
                 </div>
 
                 {aberta && (
-                  <div className="border-t border-[var(--bo-hairline)] p-4">
+                  <div className="border-t border-foreground/[0.08] p-4">
                     {minhas.length === 0 ? (
                       <p className="bo-text-muted text-sm">Lista vazia.</p>
                     ) : (
-                      <ul className="divide-y divide-[var(--bo-hairline)]">
+                      <ul className="divide-y divide-foreground/[0.06]">
                         {minhas.map((l) => {
                           const item = porId.get(l.itemId);
                           const porCada = porCadaQuantos(l.qtyPerPax);
@@ -609,7 +609,7 @@ export default function MaterialListas() {
                     {anular && (
                       <div
                         role="status"
-                        className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
+                        className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-foreground/[0.04] px-3 py-2 text-xs text-foreground/70"
                       >
                         <span>{anular.texto}</span>
                         <Button size="sm" variant="ghost" onClick={anular.repor}>

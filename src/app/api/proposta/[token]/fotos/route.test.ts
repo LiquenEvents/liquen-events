@@ -27,15 +27,7 @@ vi.mock("@/lib/rate-limit", () => ({
   clientIp: () => "1.2.3.4",
   rateLimit: async () => H.limite,
 }));
-/**
- * O módulo das ASSINATURAS, e não o `proposal-storage`.
- *
- * Mudaram de casa para o `sharp` sair do grafo da página da proposta (ver
- * `proposal-assinaturas.ts`). Se este caminho voltar a ser o antigo, o
- * assinador real corre e o CONTROLO POSITIVO abaixo apanha-o — foi assim que
- * esta linha se descobriu.
- */
-vi.mock("@/lib/proposal-assinaturas", () => ({
+vi.mock("@/lib/proposal-storage", () => ({
   signProposalPaths: async (paths: string[]) => {
     H.assinados.push(...paths);
     return new Map(paths.map((p) => [p, `https://storage.example/o/${encodeURIComponent(p)}`]));
@@ -48,9 +40,6 @@ vi.mock("@/lib/proposal-assinaturas", () => ({
     H.assinados.push(...paths);
     return new Map(paths.map((p) => [p, `https://storage.example/d/${encodeURIComponent(p)}`]));
   },
-  // A oferta em AVIF: vazia, que é o caso normal de quem foi carregado antes
-  // de o bucket existir. O que este ficheiro guarda é o que É assinado.
-  signProposalMidsAvif: async () => new Map<string, string>(),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
   formasDeCaminhos: async () => new Map(),

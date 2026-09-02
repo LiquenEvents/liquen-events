@@ -273,12 +273,12 @@ export default function EventTimeline({ quote, onChange }: Props) {
     // e a 1440, e nesta zona do dossier há vários painéis destes empilhados.
     // `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma vista:
     // 12 px de volta no telemóvel, computador na mesma.
-    <section className="border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
+    <section className="border-t border-foreground/10 pt-[var(--bo-p-vista)]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Cronograma do Dia</p>
         {items.length > 0 && (
           <div className="flex shrink-0 items-center gap-1.5">
-            <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
+            <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
               {items.length} {items.length === 1 ? "momento" : "momentos"}
             </span>
             <button
@@ -288,7 +288,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
               aria-label="Imprimir guião do dia"
               // 27×27 medidos a 375 px — um botão de ícone sem rótulo, que é
               // a classe de alvo mais fácil de falhar com o polegar.
-              className="alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] motion-safe:transition-colors"
+              className="alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-foreground/[0.06] hover:text-foreground/75 motion-safe:transition-colors"
             >
               <svg
                 width="15"
@@ -366,12 +366,12 @@ export default function EventTimeline({ quote, onChange }: Props) {
       ) : (
         <div className="relative mb-5 pl-1">
           {/* vertical line */}
-          <div className="absolute left-[3.25rem] top-3 bottom-3 w-px bg-[var(--bo-tinta-10)]" />
+          <div className="absolute left-[3.25rem] top-3 bottom-3 w-px bg-foreground/10" />
           <ul className="flex flex-col">
             {items.map((i) => (
               <li
                 key={i.id}
-                className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-[var(--bo-tinta-3)]"
+                className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-foreground/[0.02]"
               >
                 {editing?.id === i.id && editing.field === "time" ? (
                   /* ── A SAÍDA, PARA QUEM NÃO TEM ESCAPE ──────────────────
@@ -386,7 +386,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                       onBlur={commitEdit}
                       onKeyDown={editKeys}
                       aria-label="Editar hora"
-                      className="bo-input w-[100px] shrink-0 px-2 py-0.5 text-xs tabular-nums text-[var(--bo-text)]"
+                      className="bo-input w-[100px] shrink-0 px-2 py-0.5 text-xs tabular-nums text-foreground/80"
                     />
                     <DesistirDaEdicao onDesistir={() => setEditing(null)} oQue="a hora" />
                   </span>
@@ -419,7 +419,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                         onBlur={commitEdit}
                         onKeyDown={editKeys}
                         aria-label="Editar momento"
-                        className="bo-input w-full px-2 py-0.5 text-sm text-[var(--bo-text)]"
+                        className="bo-input w-full px-2 py-0.5 text-sm text-foreground/80"
                       />
                       <DesistirDaEdicao onDesistir={() => setEditing(null)} oQue="o momento" />
                     </span>
@@ -428,7 +428,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                       type="button"
                       onClick={() => startEdit(i.id, "title", i.title)}
                       title="Editar momento"
-                      className="alvo-toque !justify-start w-full rounded-md text-left text-sm leading-snug text-[var(--bo-text)] decoration-dotted underline-offset-2 hover:underline"
+                      className="alvo-toque !justify-start w-full rounded-md text-left text-sm leading-snug text-foreground/80 decoration-dotted underline-offset-2 hover:underline"
                     >
                       {i.title}
                     </button>
@@ -443,7 +443,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                         onKeyDown={editKeys}
                         aria-label="Editar responsável"
                         placeholder="Responsável"
-                        className="bo-input w-full px-2 py-0.5 text-xs text-[var(--bo-tinta-72)]"
+                        className="bo-input w-full px-2 py-0.5 text-xs text-foreground/70"
                       />
                       <DesistirDaEdicao onDesistir={() => setEditing(null)} oQue="o responsável" />
                     </span>
@@ -470,7 +470,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(i.id)}
-                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
+                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
                   aria-label={`Remover ${i.time} ${i.title}`}
                 >
                   <svg

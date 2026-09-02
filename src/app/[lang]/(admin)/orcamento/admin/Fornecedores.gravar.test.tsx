@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
@@ -141,12 +141,7 @@ describe("Fornecedores — o servidor recusa a escrita", () => {
       expect(screen.getAllByText("Flores do Alentejo").length).toBeGreaterThan(0),
     );
 
-    // Remover deixou de ser um clique: passa pela pergunta da casa, em vez do
-    // `confirm()` do browser. O que este teste mede — a reposição da ficha
-    // quando o servidor recusa — não muda; muda o caminho até lá.
     await user.click(screen.getAllByRole("button", { name: "Remover" })[0]);
-    const caixa = await screen.findByRole("dialog");
-    await user.click(within(caixa).getByRole("button", { name: /^Remover$/ }));
 
     const aviso = await screen.findByText(/A sessão expirou/);
     expect(aviso).toHaveTextContent("Flores do Alentejo");

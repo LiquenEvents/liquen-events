@@ -102,7 +102,6 @@ import {
 } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
-import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
 import {
   faltaADataDoEvento,
   AVISO_SEM_DATA,
@@ -161,11 +160,11 @@ const VIEW_WRAP =
 // user opens ships its JS, keeping the back-office's initial load lean.
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
-  { id: "pendente", label: "Novo", color: "bg-[var(--bo-tinta-10)] text-foreground/50" },
+  { id: "pendente", label: "Novo", color: "bg-foreground/10 text-foreground/50" },
   { id: "em_revisao", label: "Aguardar resposta", color: "bg-moss/15 text-moss" },
   { id: "cotado", label: "Proposta enviada", color: "bg-moss/25 text-moss" },
   { id: "aceite", label: "Ganho", color: "bg-moss/35 text-moss" },
-  { id: "rejeitado", label: "Perdido", color: "bg-[var(--bo-tinta-10)] text-foreground/30" },
+  { id: "rejeitado", label: "Perdido", color: "bg-foreground/8 text-foreground/30" },
 ];
 
 // Short, human-readable form of the long internal id (e.g.
@@ -401,7 +400,7 @@ function statusBadge(status: QuoteStatus): ReactNode {
   const s = STATUS_OPTIONS.find((o) => o.id === status);
   return (
     <span
-      className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm ${s?.color ?? "bg-[var(--bo-tinta-10)] text-foreground/30"}`}
+      className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-sm ${s?.color ?? "bg-foreground/8 text-foreground/30"}`}
     >
       {s?.label ?? status}
     </span>
@@ -494,7 +493,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         <span className="block">
           <span
             className={`block truncate ${
-              ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-[var(--bo-text)]"
+              ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-foreground/85"
             }`}
           >
             {q.name}
@@ -611,7 +610,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         return (
           <span
             className={`tabular-nums whitespace-nowrap ${
-              parado ? "font-medium text-amber-600" : "text-[var(--bo-text-muted)]"
+              parado ? "font-medium text-amber-600" : "text-foreground/60"
             }`}
           >
             {d}d
@@ -672,7 +671,7 @@ const QuoteCard = memo(function QuoteCard({
           ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
           : isSelected
             ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
-            : "border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] bg-white "
+            : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white "
       }`}
     >
       {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
@@ -742,7 +741,7 @@ const QuoteCard = memo(function QuoteCard({
                     ? "bg-[#8a2a22]/15 text-[#8a2a22]"
                     : tom === "aviso"
                       ? "bg-[#c08a3e]/15 text-[#8a6420]"
-                      : "bg-[var(--bo-tinta-6)] text-foreground/45"
+                      : "bg-foreground/[0.06] text-foreground/45"
                 }`}
                 title={`Entrou ${esperaEmPalavras(espera)} e ainda não teve resposta`}
               >
@@ -799,18 +798,18 @@ const QuoteCard = memo(function QuoteCard({
           <span>{cat?.label ?? "—"}</span>
           {et && (
             <>
-              <span className="hidden sm:block w-px h-2.5 bg-[var(--bo-tinta-10)]" />
+              <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
               <span>{et.label}</span>
             </>
           )}
-          <span className="hidden sm:block w-px h-2.5 bg-[var(--bo-tinta-10)]" />
+          <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
           <span>{q.guests} convidados</span>
           {/* ONDE É. A região reconhecida e a distância a Évora dizem, antes
               de abrir seja o que for, se aquele casamento é ali ao lado ou se
               obriga a dormir fora — que muda o preço e a equipa. */}
           {ctx.regiao && (
             <>
-              <span className="hidden sm:block w-px h-2.5 bg-[var(--bo-tinta-10)]" />
+              <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
               <span title={ctx.aproximado ? "Região, não morada" : undefined}>
                 {ctx.regiao}
                 {ctx.km !== null && ctx.km > 0 && ` · ≈ ${ctx.km} km`}
@@ -822,7 +821,7 @@ const QuoteCard = memo(function QuoteCard({
             if (!cd || cd.tone === "past") return null;
             return (
               <>
-                <span className="hidden sm:block w-px h-2.5 bg-[var(--bo-tinta-10)]" />
+                <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
                 {/* QUANDO É O EVENTO — «a data é o que decide». Era um de
                     cinco factos todos iguais nesta fila; passa a ter peso
                     sempre, e não só quando já está em cima. O vermelho continua
@@ -899,7 +898,7 @@ const QuoteCard = memo(function QuoteCard({
             referência à esquerda deixa de haver duas pontas para separar, por
             isso a fila deixa de ser `justify-between` e encosta ao fim, ao pé
             do resto dos números. */}
-        <div className="flex items-center justify-end mt-3 pt-3 border-t border-[var(--bo-hairline)]">
+        <div className="flex items-center justify-end mt-3 pt-3 border-t border-foreground/[0.07]">
           <div className="flex items-center gap-3">
             {q.quotedPrice ? (
               <span className="text-[#4d6350] text-[13px] font-semibold">
@@ -2396,24 +2395,6 @@ export default function AdminClient({
     return varrerDerivadasEmFundo();
   }, [armazenamentoLigado]);
 
-  /**
-   * E os PDF das propostas que ela JÁ enviou aquecem pelo mesmo caminho.
-   *
-   * Palavras dela: «quero que a rapidez não seja só nas futuras, mas também
-   * nas que já enviei». O aquecimento nocturno faz seis por noite e com
-   * oitenta na fila são duas semanas; isto faz oito por lote enquanto o
-   * separador estiver aberto, e põe as mesmas oitenta em uns quinze minutos.
-   *
-   * Um efeito à parte e não uma linha dentro do de cima, de propósito: são
-   * dois trabalhos com ritmos diferentes, e este arranca 45 s depois para
-   * deixar as derivadas — que são as que ela VÊ — passarem à frente. O porquê
-   * inteiro está em `varrer-aquecimento.ts`.
-   */
-  useEffect(() => {
-    if (!armazenamentoLigado) return;
-    return varrerAquecimentoEmFundo();
-  }, [armazenamentoLigado]);
-
   // Lock background scroll while the detail drawer is open as a mobile overlay
   // (mirrors the nav-drawer lock above). The inline xl panel never locks.
   useTrincoDeScroll(!!selected && isDetailOverlay);
@@ -3708,7 +3689,7 @@ export default function AdminClient({
           `pt-24` para cancelar, e o `<main>` que faltava está no layout do
           grupo. Enquanto os dois se cruzaram, a raiz começava a `top: -96px` —
           os primeiros 96 px do back office estavam fora do ecrã. */}
-      <div className="min-h-screen bg-[var(--bo-chao)] flex">
+      <div className="min-h-screen bg-[var(--bo-surface-sunken)] flex">
         <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         {/* Repor uma cópia troca os dados TODOS no servidor, e a lista que está
             aqui em memória não tem como saber o que mudou. É o único sítio onde
@@ -3793,7 +3774,7 @@ export default function AdminClient({
         <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
           <aside
             inert={navEhGaveta && !navOpen}
-            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
+            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
               navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
             } ${
               /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
@@ -4240,27 +4221,7 @@ export default function AdminClient({
               A partir daqui fica a faixa com os botões, que é o que serve para
               alguma coisa a meio de uma lista. No computador não encolhe nada:
               lá o espaço não é o problema. */}
-          {/* ── O FIO DO CABEÇALHO SÓ APARECE QUANDO HÁ COISA POR CIMA ──────
-              Da análise do site que ela mandou: lá o cabeçalho começa sem
-              moldura e ganha-a ao rolar. A razão é boa e aqui é ainda melhor,
-              porque o chão do painel passou a branco: no topo, um cabeçalho
-              branco com um risco por baixo desenha uma linha a separar o nada.
-              O fio passa a dizer uma coisa — «há conteúdo escondido acima» — em
-              vez de estar sempre lá.
-
-              O `border-b` FICA sempre; o que muda é a cor. Ligar e desligar a
-              moldura mudava a altura do cabeçalho em 1 px a cada rolagem, e um
-              salto de um pixel numa lista é pior do que um risco a mais.
-
-              O gatilho é o `desceu` que já existe para o cabeçalho encolher —
-              com a histerese dele (desce aos 24, volta aos 8), que evita o
-              tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
-              novo. */}
-          <header
-            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors duration-150 ${
-              desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
-            }`}
-          >
+          <header className="sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b border-[var(--bo-hairline)] pt-safe">
             <div
               className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5 motion-safe:transition-[padding] duration-200 ${
                 desceu ? "py-1.5" : "py-2.5"
@@ -4336,10 +4297,9 @@ export default function AdminClient({
                     o nome da vista está sempre também na barra de baixo ou na
                     gaveta de onde se veio. */}
                 <h1
-                  className="text-[var(--bo-text)] font-medium leading-none truncate motion-safe:transition-[font-size] duration-200"
+                  className="text-foreground/88 font-bold leading-none truncate motion-safe:transition-[font-size] duration-200"
                   style={{
-                    fontFamily: "var(--font-display)",
-                    letterSpacing: "var(--bo-tracking-display)",
+                    fontFamily: "var(--font-playfair)",
                     // A meio de uma lista o título é o que menos falta faz —
                     // por isso é ele que encolhe primeiro.
                     fontSize: desceu ? "clamp(16px, 2.6vw, 30px)" : "clamp(19px, 2.6vw, 30px)",
@@ -4366,7 +4326,7 @@ export default function AdminClient({
                   // No telemóvel vive na gaveta (ver lá o porquê): aqui os
                   // 50 px que ocupava eram quase metade do que sobrava para o
                   // título da vista.
-                  className="alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)] transition-colors"
+                  className="alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-foreground/[0.06] hover:text-foreground/55 transition-colors"
                 >
                   <svg
                     width="16"
@@ -4800,7 +4760,7 @@ export default function AdminClient({
                        se pode procurar continua dito por inteiro no
                        `aria-label`, que é quem serve o leitor de ecrã. */
                     placeholder="Procurar pedidos…"
-                    className="w-full bg-white border border-[var(--bo-hairline)] rounded-xl pl-10 pr-3 py-2.5 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22 focus:outline-none focus:border-foreground/25 transition-colors"
+                    className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 transition-colors"
                   />
                   <kbd className="pointer-coarse:hidden absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] text-[var(--bo-text-faint)] lg:block">
                     /
@@ -4816,7 +4776,7 @@ export default function AdminClient({
                   className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium transition-colors ${
                     filtrosActivos > 0
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
-                      : "bg-white border-[var(--bo-hairline)] text-[var(--bo-text-muted)]"
+                      : "bg-white border-foreground/[0.09] text-foreground/60"
                   }`}
                 >
                   <svg
@@ -4852,7 +4812,7 @@ export default function AdminClient({
                   className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border transition-all ${
                     mineOnly
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
-                      : "bg-white border-[var(--bo-hairline)] text-foreground/45 hover:text-[var(--bo-text-muted)]"
+                      : "bg-white border-foreground/[0.09] text-foreground/45 hover:text-foreground/65"
                   }`}
                 >
                   <svg
@@ -4873,7 +4833,7 @@ export default function AdminClient({
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
                   aria-label="Filtrar por categoria"
-                  className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                 >
                   <option value="all">Todas as categorias</option>
                   {CATEGORIES.map((c) => (
@@ -4886,7 +4846,7 @@ export default function AdminClient({
                   value={filterEspera}
                   onChange={(e) => setFilterEspera(e.target.value as typeof filterEspera)}
                   aria-label="Filtrar por tempo de espera"
-                  className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
+                  className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                 >
                   <option value="all">Qualquer espera</option>
                   <option value="3">Espera há 3+ dias</option>
@@ -4897,7 +4857,7 @@ export default function AdminClient({
                     value={filterMes}
                     onChange={(e) => setFilterMes(e.target.value)}
                     aria-label="Filtrar por mês do evento"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                   >
                     <option value="all">Todos os meses</option>
                     {mesesDisponiveis.map((m) => (
@@ -4912,7 +4872,7 @@ export default function AdminClient({
                     value={filterRegiao}
                     onChange={(e) => setFilterRegiao(e.target.value)}
                     aria-label="Filtrar por região"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                   >
                     <option value="all">Todas as regiões</option>
                     {regioesDisponiveis.map((r) => (
@@ -4927,7 +4887,7 @@ export default function AdminClient({
                     value={filterPlanner}
                     onChange={(e) => setFilterPlanner(e.target.value)}
                     aria-label="Filtrar por planner"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
+                    className="bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                   >
                     <option value="all">Todas as planners</option>
                     {plannersDisponiveis.map((n) => (
@@ -4944,7 +4904,7 @@ export default function AdminClient({
                   /* `col-span-2` no telemóvel: «Quem espera há mais tempo» não
                      cabe em meia largura, e um selector com o rótulo cortado
                      não diz por que ordem a lista está. */
-                  className="col-span-2 flex-1 lg:flex-none bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
+                  className="col-span-2 flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 "
                 >
                   <option value="espera">Quem espera há mais tempo</option>
                   <option value="recent">Mais recentes</option>
@@ -4965,7 +4925,7 @@ export default function AdminClient({
                   // Media 85x38 e passava despercebido porque, a 375 px, ficava
                   // fora da margem — os filtros novos mudaram a dobra da barra
                   // e trouxeram-no para dentro do ecrã, onde a régua o apanhou.
-                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-[var(--bo-hairline)] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-[var(--bo-text-muted)] transition-colors whitespace-nowrap"
+                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-foreground/[0.09] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-foreground/65 transition-colors whitespace-nowrap"
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
@@ -5009,7 +4969,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -5019,7 +4979,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -5033,7 +4993,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-6)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white " : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -5071,7 +5031,7 @@ export default function AdminClient({
                 {tagFilter && (
                   <button
                     onClick={() => setTagFilter(null)}
-                    className="text-foreground/35 text-[10px] hover:text-[var(--bo-text-muted)] transition-colors ml-1"
+                    className="text-foreground/35 text-[10px] hover:text-foreground/60 transition-colors ml-1"
                   >
                     Limpar
                   </button>
@@ -5106,7 +5066,7 @@ export default function AdminClient({
                       if (v) applyBulkStatus(v, seleccionadosAVista);
                     }}
                     aria-label="Marcar pedidos selecionados como"
-                    className="bo-input px-2 py-1.5 text-xs text-[var(--bo-tinta-72)] disabled:opacity-50"
+                    className="bo-input px-2 py-1.5 text-xs text-foreground/70 disabled:opacity-50"
                   >
                     {/* Era aqui que vivia o «A aplicar…». Um `<option>` de um
                         `<select>` fechado é texto que ninguém vê: quem está a
@@ -5128,7 +5088,7 @@ export default function AdminClient({
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
                 >
                   Exportar seleção
                 </button>
@@ -5140,7 +5100,7 @@ export default function AdminClient({
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-foreground/[0.12] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -5158,7 +5118,7 @@ export default function AdminClient({
                 </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
-                  className="ml-auto text-foreground/40 text-xs hover:text-[var(--bo-tinta-72)] transition-colors"
+                  className="ml-auto text-foreground/40 text-xs hover:text-foreground/70 transition-colors"
                 >
                   Limpar
                 </button>
@@ -5270,7 +5230,7 @@ export default function AdminClient({
                   <button
                     type="button"
                     onClick={() => setVisibleCount((c) => c + LIST_PAGE_SIZE)}
-                    className="w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-[var(--bo-tinta-72)] bg-white border border-[var(--bo-hairline)] rounded-xl hover:border-foreground/20 transition-colors"
+                    className="w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-foreground/70 bg-white border border-foreground/[0.08] rounded-xl hover:border-foreground/20 transition-colors"
                   >
                     Mostrar mais ({filtered.length - visibleCount} restante
                     {filtered.length - visibleCount !== 1 ? "s" : ""})
@@ -5304,7 +5264,7 @@ export default function AdminClient({
                        que rola fica por cima dele: o `sticky` do estúdio cola
                        ali e nunca mais o tapa, sem guerra de `z-index` e sem o
                        estúdio ter de saber que existe um pé por baixo. */
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]"
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-foreground/[0.08] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]"
                     // A altura medida ganha à classe — e só existe na coluna do
                     // computador. Ver `alturaDoDetalhe`.
                     style={
@@ -5314,7 +5274,7 @@ export default function AdminClient({
                     }
                   >
                     <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-                      <div className="sticky top-0 z-10 border-b border-[var(--bo-hairline)] bg-white px-3.5 pt-3.5 sm:px-7 sm:pt-5">
+                      <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-3.5 pt-3.5 sm:px-7 sm:pt-5">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <h2
@@ -5327,7 +5287,7 @@ export default function AdminClient({
                                Tailwind's layered `truncate`, so a long name would
                                wrap to many lines and shove the content down.
                                Clamp to 2 lines with an ellipsis instead. */
-                              className="line-clamp-2 break-words font-display text-xl leading-tight text-[var(--bo-text)] focus:outline-none sm:text-2xl"
+                              className="line-clamp-2 break-words font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
                             >
                               {selected.name}
                             </h2>
@@ -5594,7 +5554,7 @@ export default function AdminClient({
                           role="status"
                           className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#8a6420]/25 bg-[#8a6420]/[0.07] px-3.5 py-2.5"
                         >
-                          <p className="min-w-0 flex-1 text-xs leading-snug text-[var(--bo-tinta-72)]">
+                          <p className="min-w-0 flex-1 text-xs leading-snug text-foreground/75">
                             Ficou por gravar {fraseDoQueMudou(rascunhoPorRepor.mudou)} deste pedido
                             {rascunhoPorRepor.quando ? `, ${rascunhoPorRepor.quando}` : ""}.
                           </p>
@@ -5743,7 +5703,7 @@ export default function AdminClient({
                           <SectionCard eyebrow="Gestão do pedido" padding="md">
                             <div className="flex flex-col gap-5">
                               {/* Factos do evento — contexto compacto, só leitura. */}
-                              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--bo-text-muted)]">
+                              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/55">
                                 {[
                                   {
                                     l: "Tipo",
@@ -5855,7 +5815,7 @@ export default function AdminClient({
                                     id="pedido-estado"
                                     value={editStatus}
                                     onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   >
                                     {STATUS_OPTIONS.map((s) => (
                                       <option key={s.id} value={s.id}>
@@ -5875,7 +5835,7 @@ export default function AdminClient({
                                     value={editPrice}
                                     onChange={(e) => setEditPrice(e.target.value)}
                                     placeholder="Ex.: 12500"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                   {(() => {
                                     /**
@@ -5928,7 +5888,7 @@ export default function AdminClient({
                                     type="date"
                                     value={editDate}
                                     onChange={(e) => setEditDate(e.target.value)}
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                   {editDate &&
                                     (() => {
@@ -5959,7 +5919,7 @@ export default function AdminClient({
                                       erroDeConvidados ? "erro-dos-convidados" : undefined
                                     }
                                     onChange={(e) => setEditGuests(e.target.value)}
-                                    className={`bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full${
+                                    className={`bo-input px-3 py-2 text-sm text-foreground/80 w-full${
                                       erroDeConvidados ? " border-[#8a2a22]" : ""
                                     }`}
                                   />
@@ -5989,7 +5949,7 @@ export default function AdminClient({
                                     value={editAssigned}
                                     onChange={(e) => setEditAssigned(e.target.value)}
                                     placeholder="Nome do membro da equipa…"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                 </div>
                                 <div>
@@ -6001,7 +5961,7 @@ export default function AdminClient({
                                     value={editLocation}
                                     onChange={(e) => setEditLocation(e.target.value)}
                                     placeholder="Local do evento…"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                 </div>
                               </div>
@@ -6022,7 +5982,7 @@ export default function AdminClient({
 
                                 Ficam num bloco próprio e por baixo: são os
                                 dados de QUEM, e o que está em cima é o QUÊ. */}
-                              <div className="grid grid-cols-1 gap-4 border-t border-[var(--bo-hairline)] pt-4 sm:grid-cols-3">
+                              <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-3">
                                 <div>
                                   <label htmlFor="pedido-nome" className="bo-eyebrow block mb-1.5">
                                     Nome do cliente
@@ -6032,7 +5992,7 @@ export default function AdminClient({
                                     value={editNome}
                                     onChange={(e) => setEditNome(e.target.value)}
                                     placeholder="Quem pediu…"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                 </div>
                                 <div>
@@ -6047,7 +6007,7 @@ export default function AdminClient({
                                     value={editEmail}
                                     onChange={(e) => setEditEmail(e.target.value)}
                                     placeholder="para onde a proposta segue…"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                   {/* O aviso aparece só quando falta MESMO, e diz
                                     a consequência em vez de dizer «campo
@@ -6075,13 +6035,13 @@ export default function AdminClient({
                                     value={editTelefone}
                                     onChange={(e) => setEditTelefone(e.target.value)}
                                     placeholder="+351…"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                   />
                                 </div>
                               </div>
 
                               {/* Etiquetas + seguimento — gravam sozinhos. */}
-                              <div className="grid grid-cols-1 gap-4 border-t border-[var(--bo-hairline)] pt-4 sm:grid-cols-2">
+                              <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-2">
                                 <TagsField
                                   key={`tags-${selected.id}`}
                                   quote={selected}
@@ -6121,18 +6081,18 @@ export default function AdminClient({
                                     value={editLostReason}
                                     onChange={(e) => setEditLostReason(e.target.value)}
                                     placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] resize-none w-full"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
                                   />
                                 </div>
                               )}
                               {selected.status === "rejeitado" &&
                                 selected.lostReason &&
                                 editStatus !== "rejeitado" && (
-                                  <div className="rounded-lg border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)] px-3 py-2">
-                                    <p className="mb-1 text-[9px] uppercase tracking-[0.2em] text-[var(--bo-text-muted)]">
+                                  <div className="rounded-lg border border-foreground/[0.07] bg-foreground/[0.04] px-3 py-2">
+                                    <p className="mb-1 text-[9px] uppercase tracking-[0.2em] text-foreground/60">
                                       Motivo de perda anterior
                                     </p>
-                                    <p className="text-xs text-[var(--bo-tinta-72)]">
+                                    <p className="text-xs text-foreground/72">
                                       {selected.lostReason}
                                     </p>
                                   </div>
@@ -6152,7 +6112,7 @@ export default function AdminClient({
                                   value={editNotes}
                                   onChange={(e) => setEditNotes(e.target.value)}
                                   placeholder="Notas internas sobre este pedido…"
-                                  className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] resize-none w-full"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
                                 />
                                 {/* ── E A NOTA QUE FOI ESCRITA NO ESTÚDIO ────
                                     A caixa acima é do PEDIDO. Esta é a nota da
@@ -6165,32 +6125,32 @@ export default function AdminClient({
 
                               {/* Estimativa calculada — contexto para definir o preço. */}
                               {selected.priceBreakdown && (
-                                <div className="rounded-lg bg-[var(--bo-tinta-6)] p-3 flex flex-col gap-1.5">
+                                <div className="rounded-lg bg-foreground/[0.04] p-3 flex flex-col gap-1.5">
                                   <p className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
                                     Estimativa calculada
                                   </p>
                                   {selected.priceBreakdown.addonsCost > 0 && (
                                     <div className="flex justify-between text-[10px]">
-                                      <span className="text-[var(--bo-text-muted)]">Extras</span>
-                                      <span className="text-[var(--bo-tinta-72)]">
+                                      <span className="text-foreground/60">Extras</span>
+                                      <span className="text-foreground/72">
                                         {formatPrice(selected.priceBreakdown.addonsCost)}
                                       </span>
                                     </div>
                                   )}
                                   <div className="flex justify-between text-[10px]">
-                                    <span className="text-[var(--bo-text-muted)]">Subtotal</span>
-                                    <span className="text-[var(--bo-tinta-72)]">
+                                    <span className="text-foreground/60">Subtotal</span>
+                                    <span className="text-foreground/72">
                                       {formatPrice(selected.priceBreakdown.subtotal)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between text-[10px]">
-                                    <span className="text-[var(--bo-text-muted)]">IVA 23%</span>
-                                    <span className="text-[var(--bo-tinta-72)]">
+                                    <span className="text-foreground/60">IVA 23%</span>
+                                    <span className="text-foreground/72">
                                       {formatPrice(selected.priceBreakdown.iva)}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between border-t border-[var(--bo-hairline)] pt-1 text-xs font-medium">
-                                    <span className="text-[var(--bo-text-muted)]">Total</span>
+                                  <div className="flex justify-between border-t border-foreground/8 pt-1 text-xs font-medium">
+                                    <span className="text-foreground/60">Total</span>
                                     <span className="font-semibold text-[#4d6350]">
                                       {formatPrice(selected.priceBreakdown.total)}
                                     </span>
@@ -6216,7 +6176,7 @@ export default function AdminClient({
                                   navigator.clipboard?.writeText(selected.email);
                                   toast("Email copiado", "success");
                                 }}
-                                className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-[var(--bo-text-muted)]"
+                                className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
                                 title="Copiar email"
                                 aria-label="Copiar email"
                               >
@@ -6236,7 +6196,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`tel:${selected.phone}`}
-                                className="alvo-toque text-xs text-[var(--bo-tinta-72)] hover:text-[var(--bo-text)]"
+                                className="alvo-toque text-xs text-foreground/70 hover:text-foreground/90"
                               >
                                 {selected.phone}
                               </a>
@@ -6261,14 +6221,10 @@ export default function AdminClient({
                               )}
                             </div>
                             {selected.company && (
-                              <p className="text-xs text-[var(--bo-tinta-72)]">
-                                {selected.company}
-                              </p>
+                              <p className="text-xs text-foreground/70">{selected.company}</p>
                             )}
                             {selected.nif && (
-                              <p className="text-xs text-[var(--bo-tinta-72)]">
-                                NIF: {selected.nif}
-                              </p>
+                              <p className="text-xs text-foreground/70">NIF: {selected.nif}</p>
                             )}
                           </div>
                         </SectionCard>
@@ -6277,7 +6233,7 @@ export default function AdminClient({
                         {selected.notes && (
                           <div>
                             <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                            <p className="rounded-lg bg-[var(--bo-tinta-6)] p-3 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                            <p className="rounded-lg bg-foreground/[0.04] p-3 text-xs leading-relaxed text-foreground/72">
                               {selected.notes}
                             </p>
                           </div>
@@ -6299,12 +6255,12 @@ export default function AdminClient({
                         <div
                           id="detail-tools"
                           ref={toolsRef}
-                          className="flex scroll-mt-24 flex-col gap-[var(--bo-gap-vista)] border-t border-[var(--bo-hairline)] pt-5 sm:pt-8"
+                          className="flex scroll-mt-24 flex-col gap-[var(--bo-gap-vista)] border-t border-foreground/[0.08] pt-5 sm:pt-8"
                         >
                           {/* Section header — the command centre of the pedido. */}
                           <div className="flex flex-col gap-1.5">
                             <p className="bo-eyebrow">Ferramentas do pedido</p>
-                            <p className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                            <p className="text-xs leading-relaxed text-foreground/55">
                               Tudo o que precisa para preparar, cobrar e propor — num só lugar.
                             </p>
                           </div>
@@ -6361,7 +6317,7 @@ export default function AdminClient({
                                   className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
                                       ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
-                                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] "
+                                      : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] "
                                   }`}
                                 >
                                   <span
@@ -6369,7 +6325,7 @@ export default function AdminClient({
                                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
                                       active
                                         ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
-                                        : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
+                                        : "bg-foreground/[0.05] text-foreground/55"
                                     }`}
                                   >
                                     {tab.icon}
@@ -6377,9 +6333,7 @@ export default function AdminClient({
                                   <span className="flex min-w-0 flex-col gap-1">
                                     <span
                                       className={`text-xs font-semibold uppercase tracking-[0.08em] ${
-                                        active
-                                          ? "text-[var(--bo-text)]"
-                                          : "text-[var(--bo-tinta-72)]"
+                                        active ? "text-foreground/85" : "text-foreground/70"
                                       }`}
                                     >
                                       {tab.label}
@@ -6393,7 +6347,7 @@ export default function AdminClient({
                                       className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
                                         active
                                           ? "bg-[#4d6350]/15 text-[#4d6350]"
-                                          : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
+                                          : "bg-foreground/[0.07] text-foreground/55"
                                       }`}
                                     >
                                       {badge}
@@ -6464,8 +6418,8 @@ export default function AdminClient({
                                   agora vê (ver `e2e/ergonomia-tactil.mjs`). Só
                                   cresce sob `(pointer: coarse)`; no portátil
                                   fica como estava. */}
-                                  <details className="group border-t border-[var(--bo-hairline-strong)] pt-4">
-                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
+                                  <details className="group border-t border-foreground/10 pt-4">
+                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                       <svg
                                         className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
                                         width="14"
@@ -6725,7 +6679,7 @@ export default function AdminClient({
                                   )}
 
                                   {/* Step 2 — talk to the client. */}
-                                  <p className="bo-eyebrow border-t border-[var(--bo-hairline-strong)] pt-6 text-foreground/45">
+                                  <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
                                     2 · Falar com o cliente
                                   </p>
                                   <ClientMessenger
@@ -6772,8 +6726,8 @@ export default function AdminClient({
                                   />
 
                                   {/* Activity history — de-emphasised, collapsed by default. */}
-                                  <details className="group border-t border-[var(--bo-hairline-strong)] pt-4">
-                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
+                                  <details className="group border-t border-foreground/10 pt-4">
+                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                       <svg
                                         className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
                                         width="14"
@@ -6849,7 +6803,7 @@ export default function AdminClient({
                               : "Guardado";
                         const haQueFazer = alteracoesPorConfirmar || alarme || gravacao.porGravar;
                         return (
-                          <div className="shrink-0 border-t border-[var(--bo-hairline)] bg-white">
+                          <div className="shrink-0 border-t border-foreground/[0.08] bg-white">
                             {/* A mesma medida e o mesmo respiro do corpo
                                   (`max-w-3xl px-5 sm:px-7`), para o botão ficar
                                   alinhado com o que está por cima dele. */}

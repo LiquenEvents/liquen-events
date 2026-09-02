@@ -185,7 +185,7 @@ export default function PainelDoEstudio({
         </div>
 
         {paginas.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[var(--bo-hairline-strong)] px-3 py-6 text-center text-[12px] leading-relaxed text-foreground/45">
+          <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-[12px] leading-relaxed text-foreground/45">
             Ainda não há páginas de inspiração.
             <br />
             Aparecem aqui à medida que as fizeres.
@@ -195,7 +195,7 @@ export default function PainelDoEstudio({
             <div
               role="tablist"
               aria-label="O que mostrar"
-              className="mb-3 flex gap-1 rounded-lg bg-[var(--bo-tinta-6)] p-0.5"
+              className="mb-3 flex gap-1 rounded-lg bg-foreground/[0.04] p-0.5"
             >
               {(
                 [
@@ -211,8 +211,8 @@ export default function PainelDoEstudio({
                   onClick={() => setVista(id)}
                   className={`flex-1 rounded-[6px] px-2 py-1.5 text-[11px] motion-safe:transition-colors ${
                     vista === id
-                      ? "bg-white text-[var(--bo-text)] "
-                      : "text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
+                      ? "bg-white text-foreground/85 "
+                      : "text-foreground/55 hover:text-foreground/80"
                   }`}
                 >
                   {rotulo}
@@ -236,7 +236,7 @@ export default function PainelDoEstudio({
                     <button
                       type="button"
                       onClick={() => onEscolherFotos(aVer.bi)}
-                      className="mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] motion-safe:transition-colors hover:border-[#4d6350]/40 hover:text-[var(--bo-text)]"
+                      className="mt-3 w-full rounded-lg border border-foreground/[0.12] px-3 py-2 text-[12px] text-foreground/65 motion-safe:transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85"
                     >
                       Escolher fotografias para esta página
                     </button>

@@ -408,14 +408,14 @@ export default function DefinicoesProposta() {
     <div className="flex flex-col gap-4">
       <Card padding="md">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium text-[var(--bo-text)]">Deslocação</h2>
+          <h2 className="text-sm font-medium text-foreground/85">Deslocação</h2>
           <span
             className={`text-[11px] ${desactualizado ? "text-[#8a2a22]" : "text-foreground/45"}`}
           >
             {idade(p.definidoEm.deslocacao)}
           </span>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+        <p className="mt-1 text-xs leading-relaxed text-foreground/55">
           A deslocação é uma conta: quilómetros de ida e volta a partir de{" "}
           {d.base.trim() || "onde a casa está"}, vezes o custo de cada quilómetro. O gasóleo muda
           todas as semanas — este número tem de ser teu, não do programa.
@@ -514,7 +514,7 @@ export default function DefinicoesProposta() {
 
             Não foi apanhado antes porque o passeio do telemóvel nunca visitava
             as Definições — passou a visitar (ver `e2e/admin-mobile.spec.ts`). */}
-        <label className="alvo-toque !justify-start mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-[var(--bo-text-muted)]">
+        <label className="alvo-toque !justify-start mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-foreground/68">
           <input
             type="checkbox"
             checked={d.idaEVolta}
@@ -525,32 +525,30 @@ export default function DefinicoesProposta() {
         </label>
 
         {/* ── O que isto faz, em euros ─────────────────────────────────── */}
-        <div className="mt-4 rounded-xl bg-[var(--bo-tinta-3)] p-3">
+        <div className="mt-4 rounded-xl bg-foreground/[0.02] p-3">
           {contaSuspensa ? (
-            <p className="text-[11px] leading-relaxed text-[var(--bo-text-muted)]">
-              <strong className="font-semibold text-[var(--bo-text)]">—</strong> Não mostro o custo
-              por quilómetro enquanto houver um campo por corrigir: o que aparecia aqui era o valor
+            <p className="text-[11px] leading-relaxed text-foreground/60">
+              <strong className="font-semibold text-foreground/85">—</strong> Não mostro o custo por
+              quilómetro enquanto houver um campo por corrigir: o que aparecia aqui era o valor
               ANTERIOR, e isso é pior do que não mostrar nada. Corrige o campo marcado a vermelho e
               a conta volta.
             </p>
           ) : (
             <>
-              <p className="text-[11px] text-[var(--bo-text-muted)]">
+              <p className="text-[11px] text-foreground/60">
                 Cada quilómetro fica a{" "}
-                <strong className="font-semibold text-[var(--bo-text)]">{eur(custo.total)}</strong>{" "}
+                <strong className="font-semibold text-foreground/85">{eur(custo.total)}</strong>{" "}
                 <span className="text-foreground/45">
                   (combustível {eur(custo.combustivel)} + portagens {eur(custo.portagens)} +
                   desgaste {eur(custo.desgaste)})
                 </span>
               </p>
               {exemplos.length > 0 ? (
-                <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--bo-text-muted)]">
+                <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/60">
                   {exemplos.map(({ sitio, s }) => (
                     <li key={sitio}>
                       <span className="text-foreground/45">{sitio}:</span>{" "}
-                      <strong className="font-semibold text-[var(--bo-text)]">
-                        {eur(s!.valor)}
-                      </strong>{" "}
+                      <strong className="font-semibold text-foreground/85">{eur(s!.valor)}</strong>{" "}
                       <span className="text-foreground/40">({s!.formula})</span>
                     </li>
                   ))}
@@ -578,10 +576,10 @@ export default function DefinicoesProposta() {
 
       <Card padding="md">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium text-[var(--bo-text)]">Margem mínima</h2>
+          <h2 className="text-sm font-medium text-foreground/85">Margem mínima</h2>
           <span className="text-[11px] text-foreground/45">{idade(p.definidoEm.margem)}</span>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+        <p className="mt-1 text-xs leading-relaxed text-foreground/55">
           Abaixo desta percentagem o estúdio avisa enquanto escreve a proposta. Não impede nada — há
           eventos que se fazem com margem baixa de propósito.
         </p>

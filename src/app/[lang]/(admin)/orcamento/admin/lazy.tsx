@@ -18,7 +18,7 @@ function ViewLoading() {
 
 // Detail-panel tools — a shimmering eyebrow+bar holds the layout while loading.
 const PanelLoading = () => (
-  <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
+  <div className="border-t border-foreground/10 pt-5">
     <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />
     <div className="bo-skeleton h-9 w-full" aria-hidden />
   </div>

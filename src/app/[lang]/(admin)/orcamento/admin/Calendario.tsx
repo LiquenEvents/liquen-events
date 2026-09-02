@@ -5,7 +5,7 @@ import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/ty
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
-import { Button, Card, EmptyState, Field, PerguntaDestrutiva } from "./ui";
+import { Button, Card, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -165,18 +165,18 @@ function AddEventModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Adicionar ao calendário — ${dateLabel}`}
-        className="relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
+        className="relative w-full max-w-md bg-white border border-foreground/10 rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
-            <p className="text-[var(--bo-tinta-72)] text-sm capitalize">{dateLabel}</p>
+            <p className="text-foreground/75 text-sm capitalize">{dateLabel}</p>
           </div>
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-[var(--bo-text-muted)] motion-safe:transition-colors"
+            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-foreground/65 motion-safe:transition-colors"
           >
             ×
           </button>
@@ -191,7 +191,7 @@ function AddEventModal({
                 type="button"
                 aria-pressed={form.kind === k}
                 onClick={() => setForm((f) => ({ ...f, kind: k }))}
-                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-[var(--bo-hairline-strong)] hover:border-foreground/30"}`}
+                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-foreground/15 hover:border-foreground/30"}`}
                 style={
                   form.kind === k
                     ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
@@ -260,15 +260,6 @@ export default function Calendario({ quotes, onOpen }: Props) {
     refresh: recarregar,
   } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
   const [modalDate, setModalDate] = useState<string | null>(null);
-
-  /**
-   * A marcação à espera de resposta à pergunta de a remover.
-   *
-   * Guarda-se o título e não só o `id`, porque é o título que aparece na
-   * pergunta: numa grelha de mês, os alvos são de 9 px e a marcação em que ela
-   * tocou não é óbvia depois de a caixa abrir.
-   */
-  const [aRemover, setARemover] = useState<{ id: string; title: string } | null>(null);
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -341,19 +332,9 @@ export default function Calendario({ quotes, onOpen }: Props) {
     return true;
   }
 
-  /**
-   * Perguntar primeiro, e é aqui que a pergunta faz mais falta: o alvo de
-   * remoção é a própria marcação na grelha, com 9 px de altura, e um toque a
-   * mais numa lista apertada apaga o que estava lá.
-   *
-   * A pergunta fica fora do `deleteEvent` de propósito: esse é o que age, e
-   * quem quiser um dia remover sem perguntar não tem de contornar uma caixa.
-   */
-  function pedirParaRemover(id: string, title: string) {
-    setARemover({ id, title });
-  }
-
   async function deleteEvent(id: string, title: string) {
+    // Single-click delete is a footgun on a tiny target — confirm first.
+    if (!window.confirm(`Remover "${title}" do calendário?`)) return;
     // Optimistic remove, but put THIS event back if the server rejects the
     // delete — otherwise it silently reappears on the next reload and the team
     // never learns it failed.
@@ -590,7 +571,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   miudinha. Sobe para o degrau de display da casa, na letra da
                   casa. */}
               <h3
-                className="font-display leading-tight text-[var(--bo-text)]"
+                className="font-display leading-tight text-foreground/90"
                 style={{ fontSize: "clamp(26px, 3.5vw, 36px)" }}
               >
                 {MONTHS[month]} {year}
@@ -612,7 +593,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 Exportar
               </Button>
               <div
-                className="flex items-center rounded-xl border border-[var(--bo-hairline)] p-0.5"
+                className="flex items-center rounded-xl border border-foreground/[0.08] p-0.5"
                 role="group"
                 aria-label="Navegação do mês"
               >
@@ -688,7 +669,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
           <div
             role="group"
             aria-label={`Calendário de ${MONTHS[month]} ${year}`}
-            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)]"
+            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-foreground/[0.06] bg-foreground/[0.06]"
           >
             {cells.map((c) => {
               if (!c.inMonth) {
@@ -698,7 +679,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     aria-hidden="true"
                     className="min-h-[52px] sm:min-h-[80px] bg-white p-1.5 sm:p-2"
                   >
-                    <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
+                    <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/[0.15]">
                       {c.day}
                     </span>
                   </div>
@@ -801,7 +782,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
                         title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-foreground/[0.035] text-foreground/65 hover:bg-foreground/[0.07] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -815,11 +796,11 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         key={ev.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          pedirParaRemover(ev.id, ev.title);
+                          deleteEvent(ev.id, ev.title);
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-foreground/[0.035] text-foreground/65 hover:line-through hover:bg-foreground/[0.07] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -879,8 +860,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
           {/* ── Day peek: everything on the selected day, with real targets ── */}
           {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
-            <div className="mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
+            <div className="mt-5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-foreground/[0.06]">
                 <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
                 <div className="flex items-center gap-1">
                   <Button variant="subtle" size="sm" onClick={() => openAdd(selectedDay)}>
@@ -897,12 +878,12 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   </Button>
                 </div>
               </div>
-              <div className="divide-y divide-[var(--bo-hairline)]">
+              <div className="divide-y divide-foreground/[0.05]">
                 {selectedQuotes.map((q) => (
                   <button
                     key={q.id}
                     onClick={() => onOpen(q)}
-                    className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
+                    className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-foreground/[0.03] motion-safe:transition-colors"
                   >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
@@ -910,7 +891,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                      <span className="block text-foreground/75 text-xs font-medium truncate">
                         {q.name}
                       </span>
                       <span className="block text-foreground/40 text-[10px] truncate">
@@ -931,7 +912,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                      <span className="block text-foreground/75 text-xs font-medium truncate">
                         {ev.time ? `${ev.time} · ` : ""}
                         {ev.title}
                       </span>
@@ -941,7 +922,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       </span>
                     </span>
                     <button
-                      onClick={() => pedirParaRemover(ev.id, ev.title)}
+                      onClick={() => deleteEvent(ev.id, ev.title)}
                       aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                       className="text-foreground/35 hover:text-[#8a2a22] text-[9px] tracking-[0.15em] uppercase shrink-0 motion-safe:transition-colors"
                     >
@@ -982,15 +963,15 @@ export default function Calendario({ quotes, onOpen }: Props) {
           style={{ "--cena": 1 } as React.CSSProperties}
           className="bo-cena overflow-hidden self-start"
         >
-          <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-[var(--bo-hairline)]">
+          <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-foreground/[0.07]">
             Próximos eventos
           </p>
-          <div className="divide-y divide-[var(--bo-hairline)]">
+          <div className="divide-y divide-foreground/[0.06]">
             {upcoming.map((q) => (
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
+                className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-foreground/[0.02] motion-safe:transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">
@@ -1014,9 +995,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[var(--bo-tinta-72)] text-xs font-medium truncate">
-                      {q.name}
-                    </p>
+                    <p className="text-foreground/70 text-xs font-medium truncate">{q.name}</p>
                     <p className="text-foreground/40 text-[11px] truncate">
                       {eventTypeLabel(q)} · {q.guests} convidados
                     </p>
@@ -1059,23 +1038,6 @@ export default function Calendario({ quotes, onOpen }: Props) {
           onCreate={createEvent}
         />
       )}
-
-      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
-          Folha inferior no telemóvel — ao pé do polegar, e não no topo do ecrã
-          a que o dedo teria de subir — e o verbo no botão em vez de «OK». */}
-      <PerguntaDestrutiva
-        aberto={!!aRemover}
-        onFechar={() => setARemover(null)}
-        titulo={`Remover «${aRemover?.title ?? ""}» do calendário?`}
-        rotuloConfirmar="Remover"
-        // Fecha primeiro e só depois age: a grelha é optimista — a marcação sai
-        // logo e volta se o servidor recusar.
-        onConfirmar={() => {
-          const m = aRemover;
-          setARemover(null);
-          if (m) void deleteEvent(m.id, m.title);
-        }}
-      />
     </>
   );
 }

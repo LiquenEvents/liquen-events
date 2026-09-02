@@ -7,10 +7,9 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
-import { corDeTexto, metaFor } from "./status-meta";
+import { metaFor } from "./status-meta";
 import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
-import { useEntradaAoChegar } from "./ui/useEntradaAoChegar";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
@@ -415,7 +414,7 @@ function AvisoConflito({
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
             {doBrowser ? "Neste browser" : "O que escreveste"}
           </p>
-          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+          <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
             {conflito.meu || "(vazio)"}
           </p>
         </div>
@@ -423,7 +422,7 @@ function AvisoConflito({
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
             No servidor
           </p>
-          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+          <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
             {conflito.servidor.value || "(vazio)"}
           </p>
         </div>
@@ -437,7 +436,7 @@ function AvisoConflito({
         </button>
         <button
           onClick={() => onEscolher("servidor")}
-          className={`px-3 py-1.5 rounded-lg border border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+          className={`px-3 py-1.5 rounded-lg border border-foreground/15 text-foreground/60 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
         >
           Ficar com a do servidor
         </button>
@@ -487,7 +486,7 @@ function LinhaEstado({
         Guardado no servidor{estado.quando ? ` às ${estado.quando}` : ""}
       </span>
     );
-  return <span className="text-[var(--bo-text-faint)] text-[10px]">Guardado no servidor</span>;
+  return <span className="text-foreground/22 text-[10px]">Guardado no servidor</span>;
 }
 
 /** A leitura falhou: dizê-lo é obrigatório — um "Sem notas." seria outra mentira. */
@@ -590,7 +589,7 @@ const MetaReceita = memo(function MetaReceita({
               }}
               placeholder="Ex: 15000"
               aria-label="Meta de receita deste mês"
-              className="bo-input flex-1 px-3 py-2 text-sm text-[var(--bo-tinta-72)]"
+              className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
             />
             <button
               onClick={() => void saveGoal()}
@@ -601,7 +600,7 @@ const MetaReceita = memo(function MetaReceita({
             </button>
             <button
               onClick={() => setEditingGoal(false)}
-              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-[var(--bo-text-muted)] transition-colors px-1"
+              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-foreground/60 transition-colors px-1"
               aria-label="Fechar"
             >
               ×
@@ -639,7 +638,7 @@ const MetaReceita = memo(function MetaReceita({
               {Math.min(100, Math.round((wonThisMonth / goal) * 100))}%
             </span>
           </div>
-          <div className="h-2.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
+          <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
             <div
               className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
               style={{
@@ -808,7 +807,7 @@ const NotasEquipa = memo(function NotasEquipa({
             }}
             aria-label="Notas da equipa"
             placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
-            className="bo-input w-full px-3 py-2 text-sm text-[var(--bo-tinta-72)] resize-none"
+            className="bo-input w-full px-3 py-2 text-sm text-foreground/70 resize-none"
           />
           <div className="flex items-center justify-between gap-3 mt-2">
             <LinhaEstado
@@ -830,7 +829,7 @@ const NotasEquipa = memo(function NotasEquipa({
         <>
           {teamNotes ? (
             <p
-              className="text-[var(--bo-text-muted)] text-sm leading-relaxed whitespace-pre-wrap cursor-text"
+              className="text-foreground/55 text-sm leading-relaxed whitespace-pre-wrap cursor-text"
               onClick={() => setEditingNotes(true)}
             >
               {teamNotes}
@@ -942,7 +941,7 @@ function AEsperaDeResposta({
   if (linhas.length === 0) return null;
   return (
     <section aria-labelledby="a-espera-de-resposta-titulo" className="bo-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-[var(--bo-hairline)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-foreground/[0.07]">
         <div>
           <h3 id="a-espera-de-resposta-titulo" className="bo-eyebrow">
             À espera de resposta
@@ -963,7 +962,7 @@ function AEsperaDeResposta({
           </p>
         </div>
       </div>
-      <ul className="divide-y divide-[var(--bo-hairline)]">
+      <ul className="divide-y divide-foreground/[0.06]">
         {linhas.slice(0, 8).map(({ quote, dias, valor }) => (
           <li key={quote.id} className="px-5 py-3">
             {/* A linha inteira é UM botão, com o mesmo desenho da «Atividade
@@ -978,7 +977,7 @@ function AEsperaDeResposta({
               className={`alvo-toque !justify-between w-full flex items-center justify-between gap-3 text-left rounded ${FOCUS_RING}`}
             >
               <span className="min-w-0">
-                <span className="block text-[var(--bo-tinta-72)] text-sm font-medium truncate">
+                <span className="block text-foreground/72 text-sm font-medium truncate">
                   {quote.name}
                 </span>
                 <span className="block text-foreground/35 text-xs mt-0.5 truncate">
@@ -998,7 +997,7 @@ function AEsperaDeResposta({
         ))}
       </ul>
       {linhas.length > 8 && (
-        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-[var(--bo-hairline)]">
+        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-foreground/[0.06]">
           e mais {linhas.length - 8} — vê-as todas na lista de pedidos.
         </p>
       )}
@@ -1106,7 +1105,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
       }}
     >
       <summary
-        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-[var(--bo-tinta-3)] ${FOCUS_RING}`}
+        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-foreground/[0.03] ${FOCUS_RING}`}
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold text-[var(--bo-text)]">
@@ -1150,21 +1149,6 @@ export default function Overview({
   arquivados = 0,
   onVerArquivados,
 }: Props) {
-  /**
-   * ── OS DOIS BLOCOS QUE ESPERAM POR SER VISTOS ────────────────────────────
-   *
-   * Os quatro blocos desta vista entram em cascata (`.bo-cena`). Os dois
-   * primeiros estão sempre no ecrã; estes dois estão abaixo da dobra num
-   * telemóvel, e faziam a sua entrada enquanto ninguém olhava — quando ela lá
-   * chegava a rolar, já estava tudo parado.
-   *
-   * Passam a esperar pela chegada. A animação é a mesma; muda o instante. Ver
-   * o `useEntradaAoChegar` para as três redes que garantem que o bloco aparece
-   * mesmo que o gatilho falhe.
-   */
-  const chegadaDosNumeros = useEntradaAoChegar<HTMLDivElement>();
-  const chegadaDaEspera = useEntradaAoChegar<HTMLDivElement>();
-
   /**
    * ── O QUE AQUI DENTRO AINDA LÊ O RELÓGIO, E PORQUE É QUE FICA ─────────────
    *
@@ -1474,12 +1458,8 @@ export default function Overview({
             {dateLabel}
           </p>
           <h2
-            className="text-foreground font-normal"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(26px, 3.5vw, 40px)",
-              letterSpacing: "var(--bo-tracking-display)",
-            }}
+            className="text-foreground font-bold"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
           >
             {greeting}, {userName}.
           </h2>
@@ -1508,8 +1488,8 @@ export default function Overview({
               </svg>
             </span>
             <h3
-              className="text-[var(--bo-text)] font-medium text-base sm:text-xl mb-2"
-              style={{ fontFamily: "var(--font-display)" }}
+              className="text-foreground/80 font-bold text-base sm:text-xl mb-2"
+              style={{ fontFamily: "var(--font-playfair)" }}
             >
               {tudoArquivado ? "Está tudo arquivado." : "Ainda sem pedidos por aqui."}
             </h3>
@@ -1554,7 +1534,7 @@ export default function Overview({
                  ficarem da mesma altura quando aparecem juntos. */
               className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium transition-colors motion-reduce:transition-none ${
                 tudoArquivado && onVerArquivados
-                  ? "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
+                  ? "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15"
                   : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
               } ${FOCUS_RING}`}
             >
@@ -1616,12 +1596,8 @@ export default function Overview({
             {dateLabel}
           </p>
           <h2
-            className="text-foreground font-normal"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(26px, 3.5vw, 40px)",
-              letterSpacing: "var(--bo-tracking-display)",
-            }}
+            className="text-foreground font-bold"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 3.5vw, 40px)" }}
           >
             {greeting}, {userName}.
           </h2>
@@ -1643,7 +1619,7 @@ export default function Overview({
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
-                  : "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
+                  : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 "
               }`}
             >
               <svg
@@ -1695,8 +1671,8 @@ export default function Overview({
                     : `Próximo evento · faltam ${data.nextEventDays} dias`}
               </p>
               <h3
-                className="text-[var(--bo-text)] font-medium text-lg leading-tight truncate"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="text-foreground/80 font-bold text-lg leading-tight truncate"
+                style={{ fontFamily: "var(--font-playfair)" }}
               >
                 {data.nextEvent.name}
               </h3>
@@ -1825,7 +1801,6 @@ export default function Overview({
            cada um por si e o bloco a que pertencem não se animava de todo.
            Uma cascata de blocos que anima filhos não é uma cascata: é um
            tremor. */
-        ref={chegadaDosNumeros}
         style={{ "--cena": 2 } as React.CSSProperties}
         className="bo-cena flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-[1.4fr_1fr_1fr] sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
       >
@@ -1865,7 +1840,7 @@ export default function Overview({
                A partir de 640 tudo volta a `block`, e a ordem do DOM — número,
                rótulo, frase — é a que se vê. A ordem do DOM não muda em lado
                nenhum, portanto quem ouve a página ouve sempre o mesmo. */
-            className={`foco-largo flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
             <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
@@ -1906,7 +1881,7 @@ export default function Overview({
         ))}
       </div>
 
-      <div ref={chegadaDaEspera} style={{ "--cena": 3 } as React.CSSProperties} className="bo-cena">
+      <div style={{ "--cena": 3 } as React.CSSProperties} className="bo-cena">
         <AEsperaDeResposta
           linhas={data.semResposta}
           pendurado={data.pendurado}
@@ -1999,7 +1974,7 @@ export default function Overview({
                 return (
                   <div key={f.id}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="flex items-center gap-2 text-[var(--bo-text-muted)] text-xs">
+                      <span className="flex items-center gap-2 text-foreground/55 text-xs">
                         <span
                           className="w-2 h-2 rounded-full"
                           style={{ background: STATUS_META[f.id].color }}
@@ -2008,7 +1983,7 @@ export default function Overview({
                       </span>
                       <span className="text-foreground/40 text-[11px] tabular-nums">{count}</span>
                     </div>
-                    <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
                       <div
                         className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                         style={{
@@ -2021,14 +1996,14 @@ export default function Overview({
                 );
               })}
             </div>
-            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-[var(--bo-hairline)]">
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
               <span className="text-foreground/35 text-xs">
                 Pedidos que acabam em evento
                 <span className="block text-foreground/25 text-[10px]">
                   de cada 100 decididos, quantos ganhou
                 </span>
               </span>
-              <span className="text-[var(--bo-tinta-72)] text-sm font-semibold tabular-nums">
+              <span className="text-foreground/75 text-sm font-semibold tabular-nums">
                 {data.conversion}%
               </span>
             </div>
@@ -2057,7 +2032,7 @@ export default function Overview({
               </div>
               <div>
                 <p
-                  className="text-[var(--bo-tinta-72)] font-light leading-none mb-1"
+                  className="text-foreground/70 font-light leading-none mb-1"
                   style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.outstanding)}
@@ -2069,7 +2044,7 @@ export default function Overview({
             </div>
             {data.billed > 0 ? (
               <>
-                <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
+                <div className="relative h-2 rounded-full overflow-hidden bg-foreground/[0.06]">
                   <div
                     className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
                     style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
@@ -2096,14 +2071,14 @@ export default function Overview({
                 falta receber aparecem aqui.
               </p>
             )}
-            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-[var(--bo-hairline)]">
+            <div className="flex items-center justify-between mt-3.5 pt-3.5 sm:mt-5 sm:pt-4 border-t border-foreground/[0.07]">
               <span className="text-foreground/35 text-xs">
                 Valor médio por evento ganho
                 <span className="block text-foreground/25 text-[10px]">
                   quanto vale, em média, cada pedido fechado
                 </span>
               </span>
-              <span className="text-[var(--bo-tinta-72)] text-sm font-semibold tabular-nums">
+              <span className="text-foreground/75 text-sm font-semibold tabular-nums">
                 {eur(data.avgTicket)}
               </span>
             </div>
@@ -2113,7 +2088,7 @@ export default function Overview({
         {/* Needs attention + recent activity */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
           <div className="bo-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--bo-hairline)]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/[0.07]">
               <h3 className="bo-eyebrow">Precisam de atenção</h3>
               <div className="flex items-center gap-2">
                 {data.staleCount > 0 && (
@@ -2128,7 +2103,7 @@ export default function Overview({
                 )}
               </div>
             </div>
-            <div className="divide-y divide-[var(--bo-hairline)] max-h-[360px] overflow-y-auto">
+            <div className="divide-y divide-foreground/[0.06] max-h-[360px] overflow-y-auto">
               {data.needAction.length === 0 && (
                 <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
                   <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
@@ -2142,12 +2117,10 @@ export default function Overview({
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`w-full text-left px-5 py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`w-full text-left px-5 py-3.5 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
                   <div className="min-w-0">
-                    <p className="text-[var(--bo-tinta-72)] text-sm truncate font-medium">
-                      {q.name}
-                    </p>
+                    <p className="text-foreground/72 text-sm truncate font-medium">{q.name}</p>
                     <p className="text-foreground/30 text-xs truncate mt-0.5">
                       {eventTypeLabel(q)} · {q.guests} convidados
                     </p>
@@ -2162,8 +2135,7 @@ export default function Overview({
                         className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-md"
                         style={{
                           background: `${metaFor(STATUS_META, q.status).color}18`,
-                          // A cor de ESCREVER, não a de preencher: medido 3,16:1 antes.
-                          color: corDeTexto(metaFor(STATUS_META, q.status).color),
+                          color: metaFor(STATUS_META, q.status).color,
                         }}
                       >
                         {metaFor(STATUS_META, q.status).label}
@@ -2171,7 +2143,7 @@ export default function Overview({
                     )}
                     <TempoDesde
                       iso={q.submittedAt}
-                      className="text-[var(--bo-text-faint)] text-[10px] mt-1 block"
+                      className="text-foreground/22 text-[10px] mt-1 block"
                     />
                   </div>
                 </button>
@@ -2180,19 +2152,17 @@ export default function Overview({
           </div>
 
           <div className="bo-card overflow-hidden">
-            <h3 className="bo-eyebrow px-5 py-4 border-b border-[var(--bo-hairline)]">
+            <h3 className="bo-eyebrow px-5 py-4 border-b border-foreground/[0.07]">
               Atividade recente
             </h3>
-            <div className="divide-y divide-[var(--bo-hairline)]">
+            <div className="divide-y divide-foreground/[0.06]">
               {data.recent.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
-                  <span className="text-[var(--bo-text-muted)] text-xs truncate font-medium">
-                    {q.name}
-                  </span>
+                  <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
                   <TempoDesde
                     iso={q.submittedAt}
                     className="text-foreground/30 text-[10px] shrink-0"
@@ -2226,7 +2196,7 @@ export default function Overview({
                   </p>
                   <button
                     onClick={onNew}
-                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
                   >
                     <svg
                       width="12"

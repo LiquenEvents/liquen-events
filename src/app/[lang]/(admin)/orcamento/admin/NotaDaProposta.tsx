@@ -66,7 +66,7 @@ export default function NotaDaProposta({ quoteId }: { quoteId: string }) {
       {/* `break-words`: a nota é texto livre e pode trazer um link ou um IBAN
           — uma cadeia sem espaços não parte sozinha, e a 390 px é a FICHA
           inteira que passa a andar para o lado. */}
-      <p className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+      <p className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/75">
         {nota}
       </p>
     </div>

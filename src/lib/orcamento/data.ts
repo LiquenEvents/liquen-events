@@ -810,32 +810,13 @@ export function guestRangeLabel(id: unknown, locale = "pt"): string {
 export const CEREMONY_TYPES: { id: string; label: string; en: string }[] = [
   { id: "civil", label: "Civil", en: "Civil" },
   { id: "religiosa", label: "Religiosa", en: "Religious" },
-  { id: "simbolica", label: "Simbólica", en: "Symbolic" },
-];
-
-/**
- * ── A QUE SAIU, E QUE CONTINUA A SABER-SE LER ────────────────────────────────
- *
- * «Retira esta opção», sobre a «Civil e religiosa». Sai da lista que o
- * formulário oferece, e mais ninguém a pode escolher.
- *
- * Mas não pode sair DAQUI, e a razão não é sentimental. O `ceremonyType` fica
- * gravado no pedido pelo id, e o `ceremonyTypeLabel` devolve VAZIO para um id
- * que não conheça — é o que a nota do `validation.ts` diz por extenso. Apagá-la
- * da tabela punha em branco a linha «Cerimónia» de todos os pedidos que já a
- * escolheram, e um pedido é a resposta de um casal: o que eles disseram não
- * deixa de ser verdade por nós termos mudado o formulário.
- *
- * Fica portanto conhecida para LER e desconhecida para ESCOLHER — que é a
- * diferença entre encurtar um formulário e apagar arquivo.
- */
-const CERIMONIAS_RETIRADAS: { id: string; label: string; en: string }[] = [
   { id: "civil-religiosa", label: "Civil e religiosa", en: "Civil and religious" },
+  { id: "simbolica", label: "Simbólica", en: "Symbolic" },
 ];
 
 /** O rótulo do tipo de cerimónia, na língua do pedido. Vazio se não o conhecermos. */
 export function ceremonyTypeLabel(id: unknown, locale = "pt"): string {
-  const c = [...CEREMONY_TYPES, ...CERIMONIAS_RETIRADAS].find((x) => x.id === id);
+  const c = CEREMONY_TYPES.find((x) => x.id === id);
   if (!c) return "";
   return locale.startsWith("en") ? c.en : c.label;
 }

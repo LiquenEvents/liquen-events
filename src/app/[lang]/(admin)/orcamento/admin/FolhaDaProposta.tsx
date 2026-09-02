@@ -107,14 +107,8 @@ export default function FolhaDaProposta({
 
   return (
     <div
-      /* Isto é a folha que o casal recebe, e não interface do back office: o
-         marcador devolve-lhe a letra do documento verdadeiro (ver a regra
-         `[data-folha-do-cliente]` no `globals.css`). Sem ele, a prévia mudava
-         de letra quando o back office mudou, e ela passava a conferir uma
-         folha que não é a que sai. */
-      data-folha-do-cliente=""
       className={`relative w-full overflow-hidden rounded-md border ${
-        daCapa ? "border-transparent" : "border-[var(--bo-hairline-strong)] bg-white"
+        daCapa ? "border-transparent" : "border-foreground/15 bg-white"
       }`}
       style={{
         aspectRatio: `${PAGINA_W} / ${PAGINA_H}`,
@@ -192,7 +186,7 @@ function Capa({
           style={{ width: cq(52), height: cq(1.1), background: DOURADO }}
         />
         <p
-          className="mt-[3cqw] font-display leading-tight"
+          className="mt-[3cqw] font-serif leading-tight"
           style={{ fontSize: cq(40), color: CREME }}
         >
           {resumo.titulo || "—"}
@@ -200,7 +194,7 @@ function Capa({
         {resumo.linhas.map((l, i) => (
           <p
             key={i}
-            className={i === 0 ? "mt-[2.5cqw]" : "mt-[1.4cqw] font-display-italico"}
+            className={i === 0 ? "mt-[2.5cqw]" : "mt-[1.4cqw] font-serif italic"}
             style={{
               fontSize: cq(11),
               color: i === 0 ? CREME_APAGADO : "#8d8f88",
@@ -237,7 +231,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
         </p>
       )}
       <p
-        className="absolute truncate font-display text-[var(--bo-text)]"
+        className="absolute truncate font-serif text-foreground/85"
         style={{
           left: pct(PAGINA_M, PAGINA_W),
           right: pct(PAGINA_M, PAGINA_W),
@@ -265,7 +259,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
            em pequenino — quem olhasse para a grelha via uma folha discreta em
            vez de um problema. */
         <p
-          className="absolute font-display-italico"
+          className="absolute font-serif italic"
           style={{
             left: pct(PAGINA_M, PAGINA_W),
             right: pct(PAGINA_M, PAGINA_W),
@@ -292,7 +286,7 @@ function FolhaDeTexto({ resumo }: { resumo: ResumoDaPagina }) {
               <p
                 key={i}
                 className={`truncate ${
-                  rubrica ? "font-display text-[var(--bo-tinta-72)]" : "text-[var(--bo-text-muted)]"
+                  rubrica ? "font-serif text-foreground/75" : "text-foreground/55"
                 }`}
                 style={{
                   fontSize: cq(rubrica ? 11 : CORPO),

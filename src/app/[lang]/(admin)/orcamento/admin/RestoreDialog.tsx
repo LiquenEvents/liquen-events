@@ -279,10 +279,10 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         role="dialog"
         aria-modal="true"
         aria-label="Repor cópia de segurança"
-        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
+        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-[var(--bo-sombra-modal)]"
       >
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between border-b border-[var(--bo-hairline)] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-foreground/[0.07] px-6 py-4">
           <div>
             <p className="bo-eyebrow">Repor cópia de segurança</p>
             <p className="bo-text-muted mt-0.5 text-xs">
@@ -298,7 +298,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
           <button
             onClick={onClose}
             disabled={fase === "a-repor"}
-            className="alvo-toque text-lg leading-none text-foreground/30 transition-colors hover:text-[var(--bo-text-muted)] disabled:opacity-30"
+            className="alvo-toque text-lg leading-none text-foreground/30 transition-colors hover:text-foreground/60 disabled:opacity-30"
             aria-label="Fechar"
           >
             ×
@@ -315,7 +315,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
               <p className="text-sm font-medium text-[#8a2a22]">Nada foi alterado.</p>
               <ul className="mt-1 list-disc space-y-0.5 pl-5">
                 {erros.map((e, i) => (
-                  <li key={i} className="text-sm text-[var(--bo-tinta-72)]">
+                  <li key={i} className="text-sm text-foreground/75">
                     {e}
                   </li>
                 ))}
@@ -326,7 +326,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
           {/* ── 1. Escolher o ficheiro ── */}
           {fase === "escolher" && (
             <div>
-              <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">
+              <p className="text-sm leading-relaxed text-foreground/75">
                 Escolhe o ficheiro <strong>liquen-backup-….json</strong> que descarregaste do botão{" "}
                 <strong>Backup</strong>. Carregá-lo mostra primeiro um <strong>ensaio</strong>: o
                 que aconteceria a cada conjunto de dados, sem escrever nada.
@@ -343,7 +343,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                     const f = e.target.files?.[0];
                     if (f) void escolherFicheiro(f);
                   }}
-                  className="block w-full text-sm text-[var(--bo-tinta-72)] file:mr-3 file:rounded-full file:border-0 file:bg-[#4d6350] file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
+                  className="block w-full text-sm text-foreground/70 file:mr-3 file:rounded-full file:border-0 file:bg-[#4d6350] file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
                 />
               </label>
               {ocupado && <p className="bo-text-muted mt-3 text-sm">A ler a cópia…</p>}
@@ -369,37 +369,37 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
               ))}
 
               {/* A tabela do ensaio */}
-              <div className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)]">
+              <div className="overflow-x-auto rounded-xl border border-foreground/[0.08]">
                 <table className="w-full min-w-[34rem] text-left text-sm">
                   <caption className="sr-only">
                     O que aconteceria a cada conjunto de dados se repusesse esta cópia
                   </caption>
                   <thead>
-                    <tr className="border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]">
-                      <th scope="col" className="px-3 py-2 font-medium text-[var(--bo-text-muted)]">
+                    <tr className="border-b border-foreground/[0.08] bg-foreground/[0.02]">
+                      <th scope="col" className="px-3 py-2 font-medium text-foreground/60">
                         Conjunto
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2 text-right font-medium text-[var(--bo-text-muted)]"
+                        className="px-3 py-2 text-right font-medium text-foreground/60"
                       >
                         Na cópia
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2 text-right font-medium text-[var(--bo-text-muted)]"
+                        className="px-3 py-2 text-right font-medium text-foreground/60"
                       >
                         Estão lá
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2 text-right font-medium text-[var(--bo-text-muted)]"
+                        className="px-3 py-2 text-right font-medium text-foreground/60"
                       >
                         Novos
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2 text-right font-medium text-[var(--bo-text-muted)]"
+                        className="px-3 py-2 text-right font-medium text-foreground/60"
                       >
                         Substituídos
                       </th>
@@ -410,11 +410,8 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                   </thead>
                   <tbody>
                     {plano.datasets.map((d) => (
-                      <tr
-                        key={d.key}
-                        className="border-b border-[var(--bo-hairline)] last:border-0"
-                      >
-                        <th scope="row" className="px-3 py-2 font-normal text-[var(--bo-text)]">
+                      <tr key={d.key} className="border-b border-foreground/[0.05] last:border-0">
+                        <th scope="row" className="px-3 py-2 font-normal text-foreground/80">
                           {d.label}
                           {d.skipped && (
                             <span className="bo-text-muted block text-xs">
@@ -422,16 +419,16 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                             </span>
                           )}
                         </th>
-                        <td className="px-3 py-2 text-right tabular-nums text-[var(--bo-tinta-72)]">
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
                           {d.skipped ? "—" : d.incoming}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-[var(--bo-tinta-72)]">
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
                           {d.current}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-[var(--bo-tinta-72)]">
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
                           {d.skipped ? "—" : d.created}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-[var(--bo-tinta-72)]">
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
                           {d.skipped ? "—" : d.replaced}
                         </td>
                         <td
@@ -449,13 +446,13 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
               {/* Numeração fiscal */}
               {plano.counters.length > 0 && (
-                <div className="rounded-xl border border-[var(--bo-hairline)] px-4 py-3">
+                <div className="rounded-xl border border-foreground/[0.08] px-4 py-3">
                   <p className="text-foreground/30 text-[10px] uppercase tracking-[0.25em]">
                     Numeração de faturas
                   </p>
                   <ul className="mt-2 space-y-1">
                     {plano.counters.map((c) => (
-                      <li key={c.year} className="text-sm text-[var(--bo-tinta-72)]">
+                      <li key={c.year} className="text-sm text-foreground/75">
                         {c.year}: fica em <strong>{c.willBe}</strong>
                         {c.raised && (
                           <span className="text-[#8a2a22]">
@@ -481,7 +478,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                 <div className="rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/30 px-4 py-4">
                   <label
                     htmlFor="restore-frase"
-                    className="block text-sm leading-relaxed text-[var(--bo-text)]"
+                    className="block text-sm leading-relaxed text-foreground/80"
                   >
                     Para repor, escreve <strong>{RESTORE_CONFIRM_PHRASE}</strong> aqui. Vai apagar{" "}
                     <strong>{plural(plano.totals.current, "registo", "registos")}</strong> e
@@ -496,13 +493,13 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                     autoComplete="off"
                     spellCheck={false}
                     placeholder={RESTORE_CONFIRM_PHRASE}
-                    className="bo-input mt-3 px-3 py-2 text-sm text-[var(--bo-text)] placeholder-foreground/25"
+                    className="bo-input mt-3 px-3 py-2 text-sm text-foreground/80 placeholder-foreground/25"
                   />
                 </div>
               )}
 
               {fase === "a-repor" && (
-                <p className="text-sm text-[var(--bo-tinta-72)]" role="status">
+                <p className="text-sm text-foreground/75" role="status">
                   A repor… não feches este separador.
                 </p>
               )}
@@ -520,7 +517,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                     : "border border-[#8a2a22]/30 bg-[#f6e6df]/60"
                 }`}
               >
-                <p className="text-sm font-medium text-[var(--bo-text)]">
+                <p className="text-sm font-medium text-foreground/85">
                   {resultado.ok
                     ? "Cópia reposta."
                     : `Reposição INCOMPLETA — ${plural(resultado.failed.length, "conjunto ficou por repor", "conjuntos ficaram por repor")}.`}
@@ -533,7 +530,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
               {copiaPorGuardar != null && (
                 <div className="rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/40 px-4 py-3">
-                  <p className="text-sm text-[var(--bo-text)]">
+                  <p className="text-sm text-foreground/80">
                     O download automático da cópia anterior não passou. Guarda-a à mão:
                   </p>
                   <Button
@@ -558,7 +555,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                   </p>
                   <ul className="mt-2 space-y-1">
                     {resultado.failed.map((f) => (
-                      <li key={`${f.key}-${f.label}`} className="text-sm text-[var(--bo-text)]">
+                      <li key={`${f.key}-${f.label}`} className="text-sm text-foreground/80">
                         <strong>{f.label}</strong> — {f.error}
                       </li>
                     ))}
@@ -566,23 +563,23 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                 </div>
               )}
 
-              <div className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)]">
+              <div className="overflow-x-auto rounded-xl border border-foreground/[0.08]">
                 <table className="w-full min-w-[22rem] text-left text-sm">
                   <caption className="sr-only">Conjuntos repostos</caption>
                   <thead>
-                    <tr className="border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]">
-                      <th scope="col" className="px-3 py-2 font-medium text-[var(--bo-text-muted)]">
+                    <tr className="border-b border-foreground/[0.08] bg-foreground/[0.02]">
+                      <th scope="col" className="px-3 py-2 font-medium text-foreground/60">
                         Conjunto
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2 text-right font-medium text-[var(--bo-text-muted)]"
+                        className="px-3 py-2 text-right font-medium text-foreground/60"
                       >
                         Apagados
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2 text-right font-medium text-[var(--bo-text-muted)]"
+                        className="px-3 py-2 text-right font-medium text-foreground/60"
                       >
                         Repostos
                       </th>
@@ -590,17 +587,14 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                   </thead>
                   <tbody>
                     {resultado.applied.map((a) => (
-                      <tr
-                        key={a.key}
-                        className="border-b border-[var(--bo-hairline)] last:border-0"
-                      >
-                        <th scope="row" className="px-3 py-2 font-normal text-[var(--bo-text)]">
+                      <tr key={a.key} className="border-b border-foreground/[0.05] last:border-0">
+                        <th scope="row" className="px-3 py-2 font-normal text-foreground/80">
                           {a.label}
                         </th>
-                        <td className="px-3 py-2 text-right tabular-nums text-[var(--bo-tinta-72)]">
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
                           {a.deleted}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-[var(--bo-tinta-72)]">
+                        <td className="px-3 py-2 text-right tabular-nums text-foreground/70">
                           {a.inserted}
                         </td>
                       </tr>
@@ -618,7 +612,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         </div>
 
         {/* Rodapé */}
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--bo-hairline)] px-6 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-foreground/[0.08] px-6 py-4">
           {fase === "plano" && (
             <Button variant="ghost" size="sm" onClick={reiniciar} disabled={ocupado}>
               Escolher outro ficheiro

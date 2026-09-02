@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
-import { Button, PerguntaDestrutiva } from "./ui";
+import { Button } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import EmailTemplatesBilingue from "./EmailTemplatesBilingue";
@@ -95,7 +95,7 @@ const DESCRIPTIONS: Record<string, string> = {
 type Mode = "visual" | "advanced";
 type Field = "subject" | "visual" | "advanced";
 
-const inputCls = "bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22";
+const inputCls = "bo-input px-3 py-2 text-sm text-foreground/70 placeholder-foreground/22";
 
 /** The body as stored/sent, given the current editor state. */
 function computeBody(mode: Mode, doc: RichDoc, html: string): string {
@@ -234,25 +234,6 @@ function EditorClassico() {
   const [doc, setDoc] = useState<RichDoc>(emptyRichDoc);
   const [htmlBody, setHtmlBody] = useState("");
   const [mode, setMode] = useState<Mode>("visual");
-
-  /**
-   * ── AS TRÊS PERGUNTAS DESTE EDITOR, NUMA JANELA SÓ ─────────────────────
-   *
-   * Nenhuma destas é um «apagar», e todas as três são destrutivas na mesma:
-   * o que se perde é TRABALHO. Trocar de modelo com o rascunho por gravar,
-   * descartar o que está por publicar, e voltar ao editor visual a partir de
-   * HTML escrito à mão — nas três, quem responde «sim» perde o que escreveu.
-   *
-   * Uma janela e um estado, com a acção lá dentro: três estados seriam três
-   * folhas a poderem abrir ao mesmo tempo, e é o mesmo desenho que o
-   * `Inventario` já usa.
-   */
-  const [aPerguntar, setAPerguntar] = useState<{
-    titulo: string;
-    aviso?: string;
-    rotulo: string;
-    fazer: () => void;
-  } | null>(null);
   const [baselineBody, setBaselineBody] = useState("");
 
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -504,14 +485,10 @@ function EditorClassico() {
     // precisamente isso que se perdia.
     guardarRascunhoAgora();
     if (dirty && rascunhoFalhou.current) {
-      setAPerguntar({
-        titulo: "Mudar de modelo e perder o que escreveu?",
-        aviso:
-          "Este aparelho não está a deixar guardar o rascunho, e as alterações a este modelo ainda não foram publicadas.",
-        rotulo: "Mudar de modelo",
-        fazer: () => selectInto(t),
-      });
-      return;
+      const ok = window.confirm(
+        "Este computador não deixa guardar o rascunho, e as alterações que fez a este modelo ainda não foram guardadas. Se mudar de modelo agora, perde-as. Continuar?",
+      );
+      if (!ok) return;
     }
     selectInto(t);
   }
@@ -520,16 +497,10 @@ function EditorClassico() {
    *  que diz o que faz, não como efeito colateral de clicar noutro modelo. */
   function descartarRascunho() {
     if (!selected) return;
-    setAPerguntar({
-      titulo: "Descartar as alterações por publicar?",
-      aviso: "O modelo volta ao que está guardado no servidor.",
-      rotulo: "Descartar",
-      fazer: descartarRascunhoMesmo,
-    });
-  }
-
-  function descartarRascunhoMesmo() {
-    if (!selected) return;
+    const ok = window.confirm(
+      "Descartar as alterações por publicar e voltar ao modelo que está guardado no servidor?",
+    );
+    if (!ok) return;
     apagarRascunho(selected.key);
     rascunhoFalhou.current = false;
     setRascunhoEm(null);
@@ -605,17 +576,13 @@ function EditorClassico() {
       activeFieldRef.current = "visual";
       return;
     }
-    setAPerguntar({
-      titulo: "Voltar ao editor visual?",
-      aviso:
-        "Este HTML foi escrito à mão. Ao voltar, a formatação avançada é convertida em texto simples e pode perder-se.",
-      rotulo: "Voltar ao visual",
-      fazer: () => {
-        setDoc(docFromPlainText(htmlToPlainText(htmlBody)));
-        setMode("visual");
-        activeFieldRef.current = "visual";
-      },
-    });
+    const ok = window.confirm(
+      "Este HTML foi escrito à mão. Ao voltar ao editor visual, a formatação avançada é convertida em texto simples e pode perder-se. Continuar?",
+    );
+    if (!ok) return;
+    setDoc(docFromPlainText(htmlToPlainText(htmlBody)));
+    setMode("visual");
+    activeFieldRef.current = "visual";
   }
 
   /**
@@ -734,10 +701,10 @@ function EditorClassico() {
     <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
       {/* Left: template list */}
       <div className="bo-card overflow-hidden self-start">
-        <div className="px-4 py-3 border-b border-[var(--bo-hairline)]">
+        <div className="px-4 py-3 border-b border-foreground/[0.07]">
           <p className="bo-eyebrow">Modelos ({templates.length})</p>
         </div>
-        <div className="divide-y divide-[var(--bo-hairline)]">
+        <div className="divide-y divide-foreground/[0.06]">
           {templates.map((t) => {
             const active = t.key === selectedKey;
             return (
@@ -745,11 +712,11 @@ function EditorClassico() {
                 key={t.key}
                 onClick={() => trocarDeModelo(t)}
                 className={`w-full text-left px-4 py-3 transition-colors ${
-                  active ? "bg-[#4d6350]/10" : "hover:bg-[var(--bo-tinta-3)]"
+                  active ? "bg-[#4d6350]/10" : "hover:bg-foreground/[0.02]"
                 }`}
               >
                 <p
-                  className={`text-sm truncate ${active ? "text-[#4d6350] font-medium" : "text-[var(--bo-tinta-72)]"}`}
+                  className={`text-sm truncate ${active ? "text-[#4d6350] font-medium" : "text-foreground/70"}`}
                 >
                   {t.name}
                   {/* A MARCA DO TRABALHO POR PUBLICAR.
@@ -786,7 +753,7 @@ function EditorClassico() {
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="min-w-0">
                 <p className="bo-eyebrow">A editar</p>
-                <p className="text-sm text-[var(--bo-tinta-72)] mt-1 truncate">{selected.name}</p>
+                <p className="text-sm text-foreground/70 mt-1 truncate">{selected.name}</p>
                 <p className="text-[11px] text-foreground/40 mt-1 leading-snug">
                   {DESCRIPTIONS[selected.key] ?? "Modelo de email."}
                 </p>
@@ -873,7 +840,7 @@ function EditorClassico() {
                 <button
                   type="button"
                   onClick={switchToAdvanced}
-                  className="text-[11px] text-foreground/35 hover:text-[var(--bo-text-muted)] underline underline-offset-2"
+                  className="text-[11px] text-foreground/35 hover:text-foreground/60 underline underline-offset-2"
                 >
                   HTML avançado
                 </button>
@@ -916,8 +883,8 @@ function EditorClassico() {
                 />
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
                   Modo secundário para quem sabe HTML. Os campos entre chavetas (ex.:{" "}
-                  <span className="font-mono text-[var(--bo-text-muted)]">{"{nome}"}</span>) são
-                  substituídos no envio. À direita vê como fica.
+                  <span className="font-mono text-foreground/55">{"{nome}"}</span>) são substituídos
+                  no envio. À direita vê como fica.
                 </p>
               </>
             )}
@@ -940,10 +907,10 @@ function EditorClassico() {
               da Líquen (Catarina Gaspar, contactos e logótipo) entra sozinha — não precisas de te
               despedir nem de repetir o nome da empresa.
             </p>
-            <div className="rounded-lg border border-[var(--bo-hairline)] overflow-hidden">
-              <div className="px-3 py-2 bg-[var(--bo-tinta-3)] border-b border-[var(--bo-hairline)]">
+            <div className="rounded-lg border border-foreground/[0.08] overflow-hidden">
+              <div className="px-3 py-2 bg-foreground/[0.03] border-b border-foreground/[0.06]">
                 <p className="text-[10px] text-foreground/40">Assunto</p>
-                <p className="text-sm text-[var(--bo-tinta-72)] truncate">
+                <p className="text-sm text-foreground/75 truncate">
                   {previewSubject || <span className="text-foreground/30">(sem assunto)</span>}
                 </p>
               </div>
@@ -969,25 +936,6 @@ function EditorClassico() {
           Seleciona um modelo para editar.
         </div>
       )}
-
-      {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
-          As três perguntas deste editor cabem aqui: cada uma traz o seu título,
-          o seu aviso e o que fazer se a resposta for sim. */}
-      <PerguntaDestrutiva
-        aberto={!!aPerguntar}
-        onFechar={() => setAPerguntar(null)}
-        titulo={aPerguntar?.titulo ?? ""}
-        aviso={aPerguntar?.aviso}
-        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
-        // Fecha primeiro e só depois age, como nos outros ecrãs: o que vem a
-        // seguir é uma troca de vista, e uma caixa aberta por cima dela ficaria
-        // pendurada sobre um ecrã que já mudou.
-        onConfirmar={() => {
-          const pedido = aPerguntar;
-          setAPerguntar(null);
-          pedido?.fazer();
-        }}
-      />
     </div>
   );
 }

@@ -14,79 +14,35 @@ const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O BACK OFFICE TEM UMA LETRA SÓ, E A SERIFA É DO CLIENTE
+ * A LETRA DA CASA NO BACK OFFICE
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Este ficheiro já guardou o contrário, e vale a pena dizê-lo por extenso em
- * vez de o apagar.
+ * Palavras dela, a olhar para o deploy verdadeiro: «o back office está com a
+ * mesma estrutura, não me diz nada — eu gostava de o levar ao nível da Apple e
+ * da Pixelmatters».
  *
- * Guardava que a letra de DISPLAY do back office era o Playfair. Isso nasceu
- * de uma frase dela: «o back office está com a mesma estrutura, não me diz
- * nada». Estava certo para o que ela via nessa altura.
+ * Uma das razões era uma linha de CSS. O bloco do back office redefinia
+ * `--font-playfair` para o Inter, de propósito, para um ar «calm ChatGPT-app».
+ * Resultado: os 38 sítios que pedem a letra de DISPLAY — títulos de página,
+ * nome do casal, números do dinheiro — pediam-na e recebiam a mesma sans do
+ * resto da interface. O back office ficou sem cara nenhuma, e era a única
+ * página da Líquen sem a letra da Líquen.
  *
- * Depois ela pôs à frente uma referência — um produto de letra única, títulos
- * grandes em sans apertada — e disse duas coisas seguidas, sem ambiguidade:
- * «não quero estes títulos com este tipo de letra» e «quero este tipo de letra
- * no back office todo». Não é uma hipótese de desenho: é uma instrução, e é
- * mais recente do que a que este ficheiro guardava.
+ * ── AS DUAS COISAS QUE ESTE FICHEIRO GUARDA ───────────────────────────────
  *
- * ── O QUE SE GUARDA AGORA ─────────────────────────────────────────────────
+ * 1. Que a redefinição não volta. É uma linha, é fácil de repor «para
+ *    uniformizar», e o efeito não dá erro nenhum — só apaga a identidade.
  *
- * 1. QUE A LETRA É UMA SÓ. `--font-display` dentro do back office aponta para
- *    a sans do trabalho. Os ~29 sítios que pedem `font-display` mudam por
- *    causa desta linha, sem se lhes tocar.
- *
- * 2. QUE NINGUÉM ESCREVE A FAMÍLIA À MÃO. Eram seis os sítios que pediam
- *    `var(--font-playfair)` num `style` — quatro na Visão Geral, um no título
- *    da vista, um no «À escolha do casal». Seis sítios escritos à mão são seis
- *    maneiras de ficar de fora da próxima decisão; passaram todos a pedir o
- *    token.
- *
- * 3. QUE A FOLHA DO CLIENTE NÃO MUDOU DE LETRA. A proposta que chega ao casal
- *    é em Playfair — está escrito no `Documento.tsx`, que vive em `(privado)`.
- *    A `FolhaDaProposta` é a PRÉ-VISUALIZAÇÃO dessa folha. Se a prévia
- *    seguisse o back office, ela passava a conferir uma folha diferente da que
- *    sai — que é exactamente o defeito do `letra-da-previa.test.ts`, com as
- *    palavras dela por trás: «uma pré-visualização parcial dá falsa
- *    confiança».
- *
- *    A excepção não é uma lista de ficheiros: é um marcador,
- *    `data-folha-do-cliente`, e as duas metades — o marcador no componente e a
- *    regra no CSS — são guardadas aqui juntas, porque qualquer uma delas
- *    sozinha não pinta nada e não dá erro nenhum.
- *
- * 4. A FRONTEIRA DOS 16 px, agora só onde ainda há serifa. O Playfair tem
+ * 2. A FRONTEIRA DOS 16 px, que é a parte que se parte sozinha. O Playfair tem
  *    altura-de-x baixa: a 14 px lê-se como um Inter de 12,5, e o chão desta
- *    casa são 12. Fora da folha do cliente isso deixou de poder acontecer,
- *    porque fora dela já não há Playfair.
+ *    casa são 12 (ver o bloco «CHÃO DA LETRA» no `globals.css`). Um
+ *    `font-display` numa legenda pequena não parte nada, não avisa, e põe texto
+ *    por baixo do chão. Foi assim que a Biblioteca de Temas tinha uma descrição
+ *    de 14 px em display — prosa vestida de título.
  */
 
 const CSS = readFileSync("src/app/globals.css", "utf8");
 const RAIZ = "src/app/[lang]/(admin)/orcamento/admin/";
-const FOLHA = `${RAIZ}FolhaDaProposta.tsx`;
-
-/** A regra que pinta a letra do painel, do selector até à chaveta que o fecha. */
-function regraDaLetra(css: string): string {
-  const i = css.indexOf("[data-admin-mode] {");
-  if (i < 0) return "";
-  const fim = css.indexOf("\n}", i);
-  return css.slice(i, fim < 0 ? css.length : fim);
-}
-
-/**
- * O bloco do back office, do selector até à chaveta que o fecha.
- *
- * Antes isto era `indexOf(SELECTOR + ",")` com um `i >= 0 ? i : 0` a seguir —
- * e o selector com vírgula NÃO existe no ficheiro, portanto a busca começava
- * sempre em zero e a asserção passava por causa de um `var(--font-inter)`
- * qualquer do sítio público. Um teste que não conseguia reprovar.
- */
-function blocoDoBackOffice(css: string): string {
-  const i = css.indexOf(`${SELECTOR_ADMIN} {`);
-  if (i < 0) return "";
-  const fim = css.indexOf("\n}", i);
-  return css.slice(i, fim < 0 ? css.length : fim);
-}
 
 /** Comentários fora, com as linhas de pé — a lição já custou seis testes. */
 function semComentarios(fonte: string): string {
@@ -105,105 +61,36 @@ function ficheiros(): string[] {
 }
 
 describe("a letra da casa no back office", () => {
-  it("a letra do painel é a que ela escolheu, e é uma só", () => {
-    const regra = regraDaLetra(semComentarios(CSS));
-    expect(regra, "a regra `[data-admin-mode]` da letra desapareceu").not.toBe("");
-    // O texto de trabalho E os títulos, na mesma família: é isso que ela pediu
-    // — «este tipo de letra no back office todo».
-    expect(regra, "o texto de trabalho deixou de ser o Geist").toMatch(
-      /font-family:\s*\n?\s*var\(--font-geist\)/,
-    );
-    expect(regra, "a letra de título deixou de acompanhar a do trabalho").toMatch(
-      /--font-display:\s*\n?\s*var\(--font-geist\)/,
-    );
-  });
-
-  it("a letra é carregada no grupo do back office, e não na raiz do sítio", () => {
-    // Se voltar para a raiz, o sítio público passa a pré-carregar um ficheiro
-    // que nunca chega a pintar nada — no telemóvel de um casal, num 4G.
-    const layoutAdmin = semComentarios(readFileSync("src/app/[lang]/(admin)/layout.tsx", "utf8"));
-    expect(layoutAdmin, "o Geist deixou de ser carregado no grupo `(admin)`").toMatch(
-      /Geist\(\{[^}]*variable:\s*"--font-geist"/,
-    );
-    /**
-     * A lista de famílias do `import`, e não o texto do ficheiro.
-     *
-     * Aqui estava `semComentarios(...)` seguido de um `not.toContain`, e não
-     * conseguia reprovar: as duas primeiras linhas do `layout.tsx` da raiz
-     * falam de `/pt/*` e `/en/*` DENTRO de um comentário de linha, e esses
-     * `/*` abrem um comentário de bloco de mentira que a função só fecha 200
-     * linhas abaixo. As declarações das letras estão lá pelo meio — eram
-     * apagadas antes de a asserção as ver. Posto o defeito de propósito (o
-     * Geist declarado na raiz), o teste passou na mesma.
-     *
-     * Ler o `import` resolve os dois lados: é imune a comentários, e uma
-     * frase em prosa que mencione o Geist deixa de chumbar o teste.
-     */
-    const layoutRaiz = readFileSync("src/app/[lang]/layout.tsx", "utf8");
-    const familias = layoutRaiz.match(/import\s*\{([^}]*)\}\s*from\s*"next\/font\/google"/);
-    expect(familias, "a raiz deixou de importar letras do `next/font/google`").not.toBeNull();
-    expect(
-      familias?.[1] ?? "",
-      "o Geist subiu para a raiz e o sítio público passou a pagá-lo",
-    ).not.toMatch(/\bGeist\b/);
-  });
-
-  it("e há uma rede por baixo, se a letra não chegar", () => {
-    // Uma `font-family` cuja variável não existe é inválida, e a propriedade
-    // herda. O que ela herda tem de ser UMA letra para tudo — senão uma rede
-    // cortada a meio deixa o painel com títulos numa família e o resto noutra.
-    const bloco = blocoDoBackOffice(semComentarios(CSS));
-    expect(bloco, "o bloco do back office mudou de selector").not.toBe("");
-    expect(bloco, "a rede por baixo deixou de ser uma letra só").toMatch(
-      /--font-display:\s*\n?\s*var\(--font-inter\)/,
+  it("o back office deixou de trocar o Playfair por Inter", () => {
+    const css = semComentarios(CSS);
+    // A redefinição vivia dentro do bloco do back office. Se voltar, volta
+    // exactamente assim: `--font-playfair:` seguido de `var(--font-inter)`.
+    expect(css, "alguém repôs a redefinição de `--font-playfair` para o Inter").not.toMatch(
+      /--font-playfair:\s*\n?\s*var\(--font-inter\)/,
     );
   });
 
   it("o texto de trabalho continua todo em Inter", () => {
-    // A `font-family` da raiz do back office não se toca — se um dia ela virar
-    // serifa, o ecrã de trabalho fica ilegível numa densidade que é para ser
-    // lida de relance.
-    const bloco = blocoDoBackOffice(semComentarios(CSS));
-    expect(bloco, "o bloco do back office mudou de selector").not.toBe("");
+    // O que se devolveu foi a letra de DISPLAY. A `font-family` da raiz do
+    // back office não se toca — se um dia ela também virar serifa, o ecrã de
+    // trabalho fica ilegível numa densidade que é para ser lida de relance.
+    const css = semComentarios(CSS);
+    const i = css.indexOf(`${SELECTOR_ADMIN},`);
+    const bloco = css.slice(i >= 0 ? i : 0, (i >= 0 ? i : 0) + 4000);
     expect(bloco).toMatch(/font-family:\s*\n?\s*var\(--font-inter\)/);
   });
 
-  it("nenhum ecrã escreve a família à mão", () => {
-    // Quem escreve `var(--font-playfair)` num `style` fica de fora do token —
-    // e da próxima vez que a letra do back office mudar, fica para trás sem
-    // dar erro nenhum. Quem precisa mesmo da serifa marca-se como folha do
-    // cliente, que é o caso de baixo.
-    const soltos = execSync(`grep -rn "var(--font-playfair)" --include=*.tsx "${RAIZ}" || true`, {
-      encoding: "utf8",
-    })
-      .split("\n")
-      .filter((l) => l && !l.includes(".test."));
-    expect(soltos, `a família escrita à mão em:\n  ${soltos.join("\n  ")}`).toEqual([]);
-  });
-
-  it("a folha do cliente mantém a letra do documento que sai", () => {
-    // As duas metades, juntas: sem o marcador a regra não apanha nada, e sem a
-    // regra o marcador não pinta nada. Nenhuma das duas falhas dá erro.
-    const css = semComentarios(CSS);
-    expect(css, "a regra da folha do cliente desapareceu do globals.css").toMatch(
-      /\[data-folha-do-cliente\][^{]*\{[^}]*--font-display:\s*\n?\s*var\(--font-playfair\)/,
-    );
-    expect(
-      semComentarios(readFileSync(FOLHA, "utf8")),
-      "a `FolhaDaProposta` deixou de se marcar como folha do cliente",
-    ).toContain("data-folha-do-cliente");
-  });
-
-  it("nenhum `font-display` da folha do cliente desce abaixo dos 16 px", () => {
-    // Só na folha, porque só na folha é que `font-display` ainda dá Playfair.
+  it("nenhum `font-display` desce abaixo dos 16 px", () => {
+    // O Playfair a 14 px lê-se como um Inter de 12,5, e o chão da casa são 12.
     const proibidos = /text-\[(?:[0-9]|1[0-5])(?:\.\d+)?px\]|text-xs\b|text-sm\b/;
     const faltas: string[] = [];
-    semComentarios(readFileSync(FOLHA, "utf8"))
-      .split("\n")
-      .forEach((l, n) => {
+    for (const f of ficheiros()) {
+      const linhas = semComentarios(readFileSync(f, "utf8")).split("\n");
+      linhas.forEach((l, n) => {
         if (!l.includes("font-display")) return;
-        if (proibidos.test(l)) faltas.push(`${FOLHA}:${n + 1}`);
+        if (proibidos.test(l)) faltas.push(`${f}:${n + 1}`);
       });
+    }
     expect(
       faltas,
       `\`font-display\` com letra abaixo de 16 px em:\n  ${faltas.join("\n  ")}`,
@@ -212,8 +99,7 @@ describe("a letra da casa no back office", () => {
 
   it("e há mesmo sítios a pedir a letra de display — senão isto não guarda nada", () => {
     // O controlo positivo. Se um dia alguém tirar o `font-display` de todo o
-    // lado, os casos de cima passam por não haver nada que eles possam
-    // reprovar.
+    // lado, o caso de cima passa por não haver nada que ele possa reprovar.
     expect(ficheiros().length).toBeGreaterThan(5);
   });
 });

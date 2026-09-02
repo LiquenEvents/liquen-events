@@ -241,7 +241,6 @@ vi.mock("@/lib/proposal-storage", () =>
       // aí só era lida DENTRO de uma função, e um mock em falta não se notava.
       // Agora é lida no topo do módulo, e a falta rebentava cinco rotas.
       PROPOSAL_MID_BUCKET: "proposal-medias",
-      PROPOSAL_AVIF_MID_BUCKET: "proposal-avif-medias",
     },
   ),
 );
@@ -427,11 +426,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // abertas — a primeira desenha o mapa do armazenamento a quem perguntar, a
   // segunda gasta-o.
   { path: "./admin/derivadas/route", methods: ["GET", "POST"] },
-  // O aquecimento dos PDF das propostas já enviadas. O GET conta e o POST
-  // DESENHA — cada volta são até oito documentos de vários megabytes, com o
-  // `pdf-lib` e o `sharp` a correr numa função. Sem sessão, é uma maneira de
-  // qualquer pessoa gastar a conta do estúdio a partir de fora.
-  { path: "./admin/aquecimento-pdf/route", methods: ["GET", "POST"] },
   // A auditoria dos valores inchados lê os pedidos e as propostas TODOS, com os
   // nomes dos noivos e o dinheiro de cada um. Só lê — mas o que lê é a base
   // inteira, e é a leitura que a guarda protege.
@@ -524,17 +518,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/[id]/tempo-activo/route", methods: ["GET", "POST"] },
   // O histórico devolve o que se cobrou em cada ronda de negociação, e com
   // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
-  // Cortar os links já enviados de um pedido. É a rota que fecha uma porta do
-  // lado do casal, e o GET diz se e quando já foi cortada — as duas coisas são
-  // do back office e nenhuma pode ser feita, nem lida, por quem tem só o link.
-  // Quem trabalha aqui. Saber os nomes da equipa de uma empresa não é
-  // informação pública — um endereço aberto a listá-los é meio caminho para
-  // tentar entrar com um deles.
-  // O relato de um erro do browser. Escreve no registo da casa — uma rota
-  // aberta a fazê-lo é um megafone para quem a encontrar.
-  { path: "./admin/erro-do-cliente/route", methods: ["POST"] },
-  { path: "./admin/equipa/route", methods: ["GET"] },
-  { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
   // A memória de preços atravessa TODAS as propostas já enviadas: o que se
   // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa

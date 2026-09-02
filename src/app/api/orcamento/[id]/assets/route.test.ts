@@ -49,7 +49,6 @@ vi.mock("@/lib/proposal-storage", () => ({
   // O degrau do MEIO da cascata do estúdio: assinada e directa do Storage,
   // quando lá está. Ver `mediasAssinadas` na rota.
   signProposalMids: (refs: string[]) => st.assinarMedias(refs),
-  signProposalMidsAvif: async () => new Map<string, string>(),
   uploadProposalThumb: vi.fn(async () => ""),
   // A de 1200 px — a que a PÁGINA DO CASAL mostra. Passou a chegar já feita do
   // browser, em vez de nascer no servidor à primeira vez que alguém olha.

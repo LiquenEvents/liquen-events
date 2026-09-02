@@ -357,12 +357,12 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
           carregamento, por isso nunca sai do ecrã. */}
       <header
         ref={cabecalho}
-        className="sticky top-0 z-10 border-b border-[var(--bo-hairline-strong)] bg-white/95 px-4 py-3 backdrop-blur"
+        className="sticky top-0 z-10 border-b border-foreground/10 bg-white/95 px-4 py-3 backdrop-blur"
       >
-        <p className="truncate text-sm text-[var(--bo-tinta-72)]">{titulo}</p>
+        <p className="truncate text-sm text-foreground/70">{titulo}</p>
         <p className="text-2xl font-medium tabular-nums">
           {p.carregados} <span className="text-foreground/45">de {p.total}</span>{" "}
-          <span className="text-base text-[var(--bo-text-muted)]">carregados</span>
+          <span className="text-base text-foreground/60">carregados</span>
         </p>
         <div
           role="progressbar"
@@ -370,7 +370,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
           aria-valuemin={0}
           aria-valuemax={p.total}
           aria-valuenow={p.carregados}
-          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
+          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
         >
           {/* `scaleX` e não `width`: mudar a largura obriga o telemóvel a
               refazer a disposição a cada marcação, e este é o ecrã que corre
@@ -383,7 +383,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         </div>
         {(!online || pendentesDeste > 0) && (
           <p
-            className={`mt-2 text-xs ${envioFalhou && online ? "text-[#8a2a22]" : "text-[var(--bo-text-muted)]"}`}
+            className={`mt-2 text-xs ${envioFalhou && online ? "text-[#8a2a22]" : "text-foreground/60"}`}
           >
             {!online && "Sem rede. "}
             {pendentesDeste > 0 &&
@@ -405,7 +405,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
               type="button"
               onClick={() => setVeiculo("todos")}
               className={`shrink-0 rounded-full px-3 py-1 text-xs ${
-                veiculo === "todos" ? "bg-[var(--bo-tinta-10)]" : "bg-[var(--bo-tinta-6)]"
+                veiculo === "todos" ? "bg-foreground/[0.10]" : "bg-foreground/[0.04]"
               }`}
             >
               Todas
@@ -416,7 +416,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 type="button"
                 onClick={() => setVeiculo(v)}
                 className={`shrink-0 rounded-full px-3 py-1 text-xs ${
-                  veiculo === v ? "bg-[var(--bo-tinta-10)]" : "bg-[var(--bo-tinta-6)]"
+                  veiculo === v ? "bg-foreground/[0.10]" : "bg-foreground/[0.04]"
                 }`}
               >
                 {v}
@@ -446,7 +446,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
             />
           </div>
         ) : (
-          <p className="px-4 py-10 text-center text-sm text-[var(--bo-text-muted)]">
+          <p className="px-4 py-10 text-center text-sm text-foreground/60">
             Sem checklist. Gera-a primeiro no pedido, no computador.
           </p>
         )
@@ -456,7 +456,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         <div role="group" aria-label="Material a carregar">
           {porCategoria.map(([categoria, linhas]) => (
             <section key={categoria}>
-              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-[var(--bo-text-muted)] uppercase backdrop-blur">
+              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-[11px] tracking-[0.14em] text-foreground/55 uppercase backdrop-blur">
                 {categoria}
               </h2>
               <ul>
@@ -471,7 +471,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                         type="button"
                         onClick={() => marcar(i)}
                         aria-pressed={carregado}
-                        className="flex min-h-[56px] w-full items-center gap-3 border-b border-[var(--bo-hairline)] px-4 text-left active:bg-[var(--bo-tinta-6)]"
+                        className="flex min-h-[56px] w-full items-center gap-3 border-b border-foreground/[0.06] px-4 text-left active:bg-foreground/[0.04]"
                       >
                         <span
                           aria-hidden
@@ -491,12 +491,12 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                             {i.name}
                           </span>
                           {i.note && (
-                            <span className="block truncate text-xs text-[var(--bo-text-muted)]">
+                            <span className="block truncate text-xs text-foreground/55">
                               {i.note}
                             </span>
                           )}
                         </span>
-                        <span className="shrink-0 text-sm tabular-nums text-[var(--bo-tinta-72)]">
+                        <span className="shrink-0 text-sm tabular-nums text-foreground/70">
                           {i.qty}
                           {i.unit ? ` ${i.unit}` : ""}
                         </span>
@@ -513,7 +513,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
       {/* Barra fixa: o gesto que fecha o carregamento fica sempre ao alcance do
           polegar, sem ter de rolar até ao fim de 41 linhas. */}
       {itens.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-[var(--bo-hairline-strong)] bg-white/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-foreground/10 bg-white/95 p-4 backdrop-blur">
           {fechada ? (
             /* O DESFECHO À VISTA, e uma saída.
                Uma acção que não deixa marca é indistinguível de uma que não
@@ -522,21 +522,16 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="min-w-0 flex-1 text-sm">
                 <strong className="font-medium text-[#4d6350]">Carrinha dada por carregada</strong>
-                {horaDoFecho && (
-                  <span className="text-[var(--bo-text-muted)]"> às {horaDoFecho}</span>
-                )}
+                {horaDoFecho && <span className="text-foreground/60"> às {horaDoFecho}</span>}
                 {p.carregados < p.total && (
-                  <span className="text-[var(--bo-text-muted)]">
-                    {" "}
-                    · {p.total - p.carregados} por marcar
-                  </span>
+                  <span className="text-foreground/55"> · {p.total - p.carregados} por marcar</span>
                 )}
               </p>
               {estado !== "devolvida" && (
                 <button
                   type="button"
                   onClick={() => marcarFecho("preparada")}
-                  className="alvo-toque shrink-0 rounded-lg px-2 text-xs text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2"
+                  className="alvo-toque shrink-0 rounded-lg px-2 text-xs text-foreground/60 underline decoration-dotted underline-offset-2"
                 >
                   Reabrir
                 </button>
@@ -552,7 +547,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => setConfirmar(false)}
-                  className="min-h-[48px] flex-1 rounded-xl bg-[var(--bo-tinta-6)] px-4"
+                  className="min-h-[48px] flex-1 rounded-xl bg-foreground/[0.06] px-4"
                 >
                   Voltar
                 </button>

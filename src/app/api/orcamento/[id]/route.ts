@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Proposal, Quote } from "@/lib/orcamento/types";
 import { transicaoDoPedido, type AcontecimentoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { ehMotivoDeRecusa } from "@/lib/orcamento/desfecho";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
-import { apagarPedidoSemContrato } from "@/lib/apagar-pedido";
+import { getQuote, updateQuote, deleteQuote } from "@/lib/quotes-store";
 import {
   semearProducaoAoGanhar,
   preverGeracaoDoEvento,
@@ -634,43 +633,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * APAGAR PASSA A APAGAR MESMO
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Continua a ser distinto do arquivo (`PATCH { archived: true }`), que é
- * reversível e guarda a linha. O que muda é o que «apagar» quer dizer.
- *
- * Isto tirava a linha do pedido e mais nada. As PROPOSTAS ficavam — com o nome
- * do casal, o email e o documento inteiro — porque a chave estrangeira é
- * `on delete set null`: em vez de irem atrás, ficavam órfãs e intactas. As
- * fotografias ficavam no bucket, e o rascunho do estúdio no `app_state`.
- *
- * A política de privacidade PUBLICADA no sítio promete o contrário: «pedidos
- * que não deem origem a contrato são eliminados no prazo máximo de 12 meses».
- * Uma linha apagada com os dados todos no sítio não é um apagamento — é a
- * aparência de um.
- *
- * O comentário que aqui estava dizia que os rascunhos ficavam porque «o
- * proposals-store não expõe um apagamento limpo». Já expõe: o `deleteProposal`
- * está lá. Era uma razão que tinha deixado de ser verdade e ninguém foi
- * corrigir — como o `mostrarTotalAPagar`.
- *
- * ── O QUE CONTINUA A FICAR, E BEM ─────────────────────────────────────────
- *
- * Contratos e facturas são registos fiscais e conservam-se anos. É por isso
- * que a promessa da política fala de pedidos SEM contrato, e é por isso que um
- * pedido com contrato responde 409 em vez de ser apagado a meio: quem quiser
- * tratar desse caso decide-o com a contabilidade à frente, não com um botão.
- *
- * ── E RESPONDE COM O QUE FICOU POR APAGAR ─────────────────────────────────
- *
- * Um apagamento silencioso é indistinguível de um que não aconteceu, que é
- * precisamente o defeito que isto veio corrigir. Se o bucket recusar uma
- * fotografia, isso chega a quem carregou no botão — senão fica um ficheiro com
- * a cara de um casal num sítio que ninguém sabe que ainda existe.
- */
+// Hard delete — for junk/test leads. This is deliberately distinct from
+// archiving (PATCH { archived: true }), a reversible soft-delete that keeps the
+// record. Deleting only removes the quote itself: the contracts and the already
+// issued invoices are fiscal records and are intentionally left untouched — the
+// invoices table outlives the invoicing code, which moved out of this app.
+// (Draft proposals are left too — proposals-store exposes no clean delete
+// helper.)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -681,27 +650,8 @@ export async function DELETE(
 
   const { id } = await params;
   try {
-    const r = await apagarPedidoSemContrato(id);
-    if (!r.apagado && r.motivo === "nao-existe") {
-      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
-    }
-    if (!r.apagado && r.motivo === "tem-contrato") {
-      return NextResponse.json(
-        {
-          error:
-            "Este pedido deu origem a contrato, e um contrato é um registo fiscal " +
-            "que tem de ser conservado. Nada foi apagado.",
-        },
-        { status: 409 },
-      );
-    }
-    if (!r.apagado) {
-      return NextResponse.json(
-        { error: "Não consegui apagar este pedido.", falhou: r.falhou },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json({ ok: true, contou: r.contou, falhou: r.falhou });
+    await deleteQuote(id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     log.error("orcamento DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

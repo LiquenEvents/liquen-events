@@ -233,7 +233,7 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
       </div>
 
       {mode !== null && (
-        <div className="mb-4 rounded-2xl border border-dashed border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
+        <div className="mb-4 rounded-2xl border border-dashed border-foreground/15 bg-foreground/[0.02] p-4">
           <Field
             as="textarea"
             label={mode === "call" ? "Registar chamada" : "Adicionar nota"}
@@ -289,7 +289,7 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
 
       <div className="relative">
         {entries.length > 1 && (
-          <div className="absolute left-3 top-3 bottom-3 w-px bg-[var(--bo-tinta-6)]" />
+          <div className="absolute left-3 top-3 bottom-3 w-px bg-foreground/[0.07]" />
         )}
         <div className="flex flex-col">
           {entries.map((entry, i) => {
@@ -315,14 +315,14 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
                 </div>
                 <div className="flex-1 min-w-0 pt-0.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[var(--bo-text-muted)] text-xs font-medium leading-snug whitespace-pre-line">
+                    <p className="text-foreground/65 text-xs font-medium leading-snug whitespace-pre-line">
                       {entry.summary}
                     </p>
-                    <span className="text-[var(--bo-text-faint)] text-[10px] shrink-0 whitespace-nowrap">
+                    <span className="text-foreground/22 text-[10px] shrink-0 whitespace-nowrap">
                       {timeLabel(entry.at)}
                     </span>
                   </div>
-                  <p className="text-[var(--bo-text-faint)] text-[10px] mt-0.5">
+                  <p className="text-foreground/28 text-[10px] mt-0.5">
                     {m.label}
                     {entry.actor ? ` · ${entry.actor}` : ""}
                   </p>

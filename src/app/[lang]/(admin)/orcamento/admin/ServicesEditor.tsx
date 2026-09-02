@@ -80,7 +80,7 @@ export interface ServicesEditorProps {
 // para não ficarem duas utilidades da MESMA propriedade a disputar a cascata.)
 const ROW_INPUT =
   "min-w-0 rounded-md border border-[var(--bo-control-border,rgba(42,38,32,0.5))] " +
-  "bg-[var(--bo-surface,#ffffff)] px-2 py-1.5 text-xs leading-5 text-[var(--bo-text)] " +
+  "bg-[var(--bo-surface,#ffffff)] px-2 py-1.5 text-xs leading-5 text-foreground/85 " +
   "transition-colors focus:border-[var(--bo-accent,#4c6350)] focus:outline-none";
 /** `alvo-toque`: 44 px no dedo, sem mexer no aspeto com rato (ver globals.css).
  *  `!justify-start` porque a classe centra o conteúdo e este botão é uma linha
@@ -97,8 +97,8 @@ const ROW_ACTIONS =
  *  pelo `alvo-toque`. Estes ícones estão encostados uns aos outros, e é aqui
  *  que acertar ao lado custa uma remoção que não se queria. */
 const ICON_BTN =
-  "alvo-toque inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--bo-text-muted)] " +
-  "hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] disabled:opacity-30 " +
+  "alvo-toque inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground/60 " +
+  "hover:bg-foreground/[0.07] hover:text-foreground/90 disabled:opacity-30 " +
   "disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors";
 
 /** Os campos onde se escreve: o marcador continua a ser um `<input>` («a)» tem
@@ -729,7 +729,7 @@ export default function ServicesEditor({
        * a explicar gestos que ali não existem.
        */}
       <details className="pointer-coarse:hidden group -mt-2 mb-3">
-        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-foreground/70 [&::-webkit-details-marker]:hidden">
           <span
             aria-hidden
             className="grid h-4 w-4 place-items-center rounded-full border border-foreground/20 text-[10px] leading-none"
@@ -739,14 +739,10 @@ export default function ServicesEditor({
           Atalhos de teclado
         </summary>
         <p className="mt-2 text-xs leading-relaxed text-foreground/50">
-          <strong className="font-semibold text-[var(--bo-tinta-72)]">Enter</strong> abre a linha
-          seguinte ·{" "}
-          <strong className="font-semibold text-[var(--bo-tinta-72)]">
-            Enter numa linha vazia
-          </strong>{" "}
-          abre um grupo novo ·{" "}
-          <strong className="font-semibold text-[var(--bo-tinta-72)]">Alt+↑/↓</strong> move ·{" "}
-          <strong className="font-semibold text-[var(--bo-tinta-72)]">Ctrl+Z</strong> anula. Colar
+          <strong className="font-semibold text-foreground/70">Enter</strong> abre a linha seguinte
+          · <strong className="font-semibold text-foreground/70">Enter numa linha vazia</strong>{" "}
+          abre um grupo novo · <strong className="font-semibold text-foreground/70">Alt+↑/↓</strong>{" "}
+          move · <strong className="font-semibold text-foreground/70">Ctrl+Z</strong> anula. Colar
           várias linhas cria uma linha por cada.
         </p>
       </details>
@@ -766,7 +762,7 @@ export default function ServicesEditor({
                 <SortableRow
                   key={gid}
                   id={gid}
-                  className="rounded-lg border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-2.5"
+                  className="rounded-lg border border-foreground/[0.08] bg-foreground/[0.015] p-2.5"
                 >
                   {({ handleProps }) => (
                     <>
@@ -883,7 +879,7 @@ export default function ServicesEditor({
                                   // razão (ver o comentário no título do
                                   // grupo) — falta só aplicar aqui o que ali já
                                   // estava certo.
-                                  className="group/row flex flex-wrap items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-[var(--bo-tinta-3)] focus-within:bg-[var(--bo-tinta-3)]"
+                                  className="group/row flex flex-wrap items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-foreground/[0.03] focus-within:bg-foreground/[0.03]"
                                 >
                                   {({ handleProps }) => (
                                     <>
@@ -1110,9 +1106,9 @@ export default function ServicesEditor({
       {removal && (
         <div
           role="status"
-          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-[var(--bo-hairline-strong)] bg-white px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
+          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-foreground/10 bg-white px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
         >
-          <span className="text-[var(--bo-tinta-72)]">{removal.label}</span>
+          <span className="text-foreground/75">{removal.label}</span>
           <button
             type="button"
             onClick={undoRemoval}
@@ -1208,7 +1204,7 @@ function DragHandle({
       {...rest}
       aria-label={`${label} (ou usa as setas)`}
       title="Arrastar para reordenar"
-      className="[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-[var(--bo-text)] focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
+      className="[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-foreground/80 focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
     >
       <span aria-hidden="true" className="text-[13px] leading-none">
         ⠿

@@ -34,66 +34,26 @@ function bloco(): string {
   return fim === -1 ? resto : resto.slice(0, fim);
 }
 
-/**
- * O mesmo bloco, SEM COMENTÁRIOS.
- *
- * Sem isto as afirmações pelo negativo — «não levanta o 10 nem o 11» — leem a
- * prosa que está ao lado da regra, e essa prosa FALA do 10 e do 11 para
- * explicar porque é que ficam de fora. O teste dava-se por satisfeito com um
- * comentário em vez de olhar para a regra. Já me apanhou uma vez hoje, no
- * `chao-com-prefixo.test.ts`.
- */
-function regra(): string {
-  return bloco().replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 describe("o chão absoluto da letra", () => {
   it("levanta o 7, o 8 e o 9 ao degrau que a casa já tinha", () => {
-    const b = regra();
-    /**
-     * ── PELA SUBCADEIA, E NÃO PELA CLASSE NUA ──────────────────────────────
-     *
-     * Isto exigia `.text-\[9px\]` — a classe nua — e era essa a forma que a
-     * regra tinha. MEDIDO num browser, a 1280, com a Visão Geral montada: três
-     * rótulos («Pedidos ativos», «Por responder», «Próximos 7 dias») pediam
-     * `lg:text-[9px]` e saíam mesmo a 9 px, porque o Tailwind compila essa
-     * variante para `.lg\:text-\[9px\]` — outro nome de classe, dentro de uma
-     * media query — e a classe nua não lhe toca.
-     *
-     * A regra passou a `[class*="text-[9px]"]`, que apanha o nome onde quer que
-     * ele apareça. Este teste passa a exigir essa forma: é ela, e não a outra,
-     * que cumpre o que o bloco promete.
-     */
-    for (const px of [7, 8, 9, 10, 11]) {
-      expect(b, `o ${px}px ficou de fora`).toContain(`[class*="text-[${px}px]"]`);
+    const b = bloco();
+    for (const px of [7, 8, 9]) {
+      expect(b, `o ${px}px ficou de fora`).toContain(`.text-\\[${px}px\\]`);
     }
     // O degrau da casa, e não um número inventado ao lado dele.
     expect(b).toMatch(/font-size:\s*var\(--bo-fs-caption\)/);
   });
 
   /**
-   * ── ESTA RÉGUA MUDOU DE ALVO, E A RAZÃO FICA ESCRITA ────────────────────
-   *
-   * Guardava o contrário: que o 10 e o 11 NÃO entravam aqui, porque eram «o
-   * registo denso do computador» e levantá-los mudava a densidade da tabela do
-   * portátil «sem ninguém pedir».
-   *
-   * A premissa dessa frase era ninguém ter pedido. Deixou de ser verdade: com
-   * a medição à frente — 593 tamanhos escritos à mão contra onze usos da escala
-   * declarada —, a dona do negócio disse «arruma em todo o back office».
-   *
-   * Uma guarda cuja premissa caiu não se contorna nem se apaga: muda de alvo e
-   * diz porquê. O que ela agora guarda é o fim da escada — que o chão pára no
-   * 11 e não continua a subir sozinho pela escala acima, engolindo o `label`
-   * (13) e o `body` (15), que são degraus com trabalho a fazer e não erros.
+   * A régua ao contrário, e é a que impede isto de virar o outro bloco: o 10 e
+   * o 11 são o registo denso do computador. Levantá-los aqui mudava a densidade
+   * da tabela sem ninguém pedir — que é precisamente o que o `escala-movel`
+   * guarda, e com razão.
    */
-  it("e PÁRA no 11 — o 12 é o degrau, não mais um número a levantar", () => {
-    // Pelo NÚMERO e não por uma grafia: escrito `.text-\[13px\]`, esta guarda
-    // ficava cega assim que a regra mudasse de forma, e uma guarda cega passa a
-    // verde por não estar a olhar. Lê a regra sem comentários.
-    const b = regra();
-    expect(b, "o 13px (o degrau `label`) foi engolido pelo chão").not.toMatch(/13px/);
-    expect(b, "o 15px (o degrau `body`) foi engolido pelo chão").not.toMatch(/15px/);
+  it("e NÃO levanta o 10 nem o 11 — esses são a densidade do computador", () => {
+    const b = bloco();
+    expect(b).not.toContain(".text-\\[10px\\]");
+    expect(b).not.toContain(".text-\\[11px\\]");
   });
 
   it("não tem largura nenhuma — é um limite do olho, não do ecrã", () => {

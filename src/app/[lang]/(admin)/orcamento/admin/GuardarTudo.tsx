@@ -192,7 +192,7 @@ export default function BotaoGuardarTudo() {
             <p
               className={
                 frases.tudoBem
-                  ? "flex-1 text-[12px] font-semibold text-[var(--bo-text)]"
+                  ? "flex-1 text-[12px] font-semibold text-foreground/80"
                   : "flex-1 text-[12px] font-semibold text-[#8a2a22]"
               }
             >
@@ -208,7 +208,7 @@ export default function BotaoGuardarTudo() {
               type="button"
               onClick={accao.dispensarResposta}
               aria-label="Fechar"
-              className="alvo-toque -mt-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+              className="alvo-toque -mt-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/35 hover:bg-foreground/[0.06] hover:text-foreground/70"
             >
               <svg
                 width="13"
@@ -231,7 +231,7 @@ export default function BotaoGuardarTudo() {
                   className={
                     l.mau
                       ? "text-[11px] leading-snug text-[#8a2a22]"
-                      : "text-[11px] leading-snug text-[var(--bo-text-muted)]"
+                      : "text-[11px] leading-snug text-foreground/55"
                   }
                 >
                   <span aria-hidden>{l.mau ? "⚠ " : "✓ "}</span>

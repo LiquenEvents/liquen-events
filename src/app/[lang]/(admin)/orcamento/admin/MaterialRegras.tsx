@@ -255,7 +255,7 @@ export default function MaterialRegras() {
 
   return (
     <div>
-      <div className="rounded-xl border border-[var(--bo-hairline-strong)] p-4">
+      <div className="rounded-xl border border-foreground/12 p-4">
         <p className="mb-3 text-sm font-medium">Regra nova</p>
         {/* O `Field` desenha o controlo a partir das propriedades. Um `<input>`
             ou `<select>` passado por DENTRO ia parar aos filhos de um elemento
@@ -350,7 +350,7 @@ export default function MaterialRegras() {
           />
         </div>
       ) : (
-        <ul className="mt-6 divide-y divide-[var(--bo-hairline)]">
+        <ul className="mt-6 divide-y divide-foreground/[0.08]">
           {regras.map((r) => (
             <li key={r.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
               <span className={r.enabled ? "font-medium" : "font-medium opacity-45"}>{r.name}</span>
@@ -359,7 +359,7 @@ export default function MaterialRegras() {
                 {r.matchValue ? ` “${r.matchValue}”` : ""} → {alvo(r)}
               </span>
               {!r.enabled && (
-                <span className="rounded bg-[var(--bo-tinta-10)] px-1.5 text-[10px] tracking-wide uppercase">
+                <span className="rounded bg-foreground/[0.08] px-1.5 text-[10px] tracking-wide uppercase">
                   desligada
                 </span>
               )}

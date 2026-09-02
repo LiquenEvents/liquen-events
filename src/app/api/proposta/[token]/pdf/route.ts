@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { propostaDoLink } from "@/lib/proposta-do-link";
-import { chaveDoPdf, PropostaIncompleta } from "@/lib/proposal-pdf-chave";
-import { pdfGuardadoEmFluxo } from "@/lib/pdf-do-armazenamento";
+import { chaveDoPdf, pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { urlDoPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { respostaPdf } from "@/lib/pdf-resposta";
@@ -10,18 +10,8 @@ import { log } from "@/lib/logger";
 
 // pdf-lib + sharp precisam do runtime Node.
 export const runtime = "nodejs";
-/**
- * Tecto de uma geração — e agora também da ENTREGA.
- *
- * Eram 20 s, e chegavam quando a função só desenhava: quem descarregava o
- * ficheiro descarregava-o do CDN, com a função já fora do caminho. Desde que
- * o ficheiro guardado passou a ser encaminhado por aqui (ver
- * `pdf-do-armazenamento.ts`), a função fica aberta enquanto o telemóvel
- * recebe — e uma proposta anda pelos 0,5–4 MB, numa quinta com 4G fraco.
- *
- * 60 s é o mesmo tecto que as rotas mais pesadas desta casa já usam.
- */
-export const maxDuration = 60;
+// Teto de uma geração, para um documento grande não prender um worker.
+export const maxDuration = 20;
 
 /**
  * O PDF da proposta, servido pelo MESMO link assinado que o casal usa para a
@@ -114,61 +104,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     );
 
     /**
-     * ── SE ELE JÁ ESTÁ GUARDADO, NÃO SE DESENHA: ENCAMINHA-SE ─────────────
+     * ── SE ELE JÁ ESTÁ GUARDADO, NÃO PRECISA DE NOS ATRAVESSAR ────────────
      *
      * Palavras dela: «para ver a proposta em PDF quando carrego demora mesmo
-     * muito tempo a abrir». O PDF passou a ficar guardado no envio, e isso
-     * tirou o desenho do caminho.
+     * muito tempo a abrir».
      *
-     * ── E DEIXOU DE SER UM REENCAMINHAMENTO ───────────────────────────────
+     * O PDF passou a ficar guardado no envio, e isso tirou o desenho do
+     * caminho. Mas os bytes continuavam a fazer duas viagens: armazenamento →
+     * esta função → o telemóvel dela. Numa proposta com quarenta e seis
+     * fotografias são megabytes a passar por um sítio que não precisava de os
+     * ver, com um arranque a frio pelo meio.
      *
-     * Isto respondia `302` para o endereço assinado do armazenamento. Palavras
-     * dela sobre o resultado: «quando carregamos na proposta por email aparece
-     * este url… quero algo muito mais bonito e sem ser com este url super
-     * desconfiado» — a barra do Safari passava a mostrar
-     * `<referência>.supabase.co` a um casal prestes a decidir milhares de
-     * euros. E depois: «quero que o pdf continue a ser rapido… mas com um url
-     * adequado».
-     *
-     * Passa a ser servido POR AQUI, em fluxo, e é mais curto do que era: ver o
-     * `pdf-do-armazenamento.ts`, que tem a conta feita. Em resumo — o
-     * reencaminhamento não poupava arranque a frio nenhum (a função corria de
-     * qualquer maneira, para saber para onde mandar), custava ao telemóvel uma
-     * ligação nova a um segundo domínio, e ainda levava um pedido escondido
-     * para assinar o endereço.
-     *
+     * Com o endereço assinado, o ficheiro vai do CDN directo a quem carregou.
      * `null` quer dizer que não está lá — e aí desenha-se, como antes.
      */
-    const guardado = await pdfGuardadoEmFluxo(
-      request,
-      proposal.id,
-      chaveDoPdf(proposal.doc, idioma),
-      nome,
-    );
-    if (guardado) return guardado;
-
-    /**
-     * ── O DESENHADOR SÓ ENTRA AQUI, E SÓ SE FOR PRECISO ────────────────────
-     *
-     * Um `import` no topo do ficheiro é pago em TODOS os pedidos. O
-     * `proposal-pdf-cache` traz o `pdf-lib` e o `sharp` atrás — medido, 212 ms
-     * de módulos — e o caminho de cima, que é o normal, não desenha nada:
-     * manda o browser directamente ao armazenamento. Pagava-se o desenhador
-     * para não o usar, exactamente no instante em que ela carrega no botão.
-     *
-     * Aqui em baixo é o caminho raro: o ficheiro ainda não está guardado, e
-     * então há mesmo que o desenhar. É o único sítio onde o custo se justifica.
-     */
-    const { pdfDaPropostaEmCache } = await import("@/lib/proposal-pdf-cache");
+    const directo = await urlDoPdfDaProposta(proposal.id, chaveDoPdf(proposal.doc, idioma), nome);
+    if (directo) {
+      return NextResponse.redirect(directo, {
+        status: 302,
+        // O endereço expira em minutos: um reencaminhamento guardado por um
+        // cache partilhado seria um link morto servido a quem carregasse
+        // depois. É a mesma regra da página e do PDF em si.
+        headers: { "Cache-Control": "private, no-store, must-revalidate" },
+      });
+    }
 
     const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     // O NOME é o mesmo com que o ficheiro seguiu no email: o casal tem-no na
     // caixa de correio e tem de reconhecer o que descarrega como o mesmo.
-    // `descarregar`: o caminho de cima (ficheiro guardado) já descarrega, pelo
-    // `download` do endereço assinado. Sem isto os dois caminhos da MESMA rota
-    // faziam coisas diferentes — ver `OpcoesPdf.descarregar`.
-    return respostaPdf(request, pdf, { nome, descarregar: true });
+    return respostaPdf(request, pdf, { nome });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.

@@ -251,39 +251,6 @@ describe("Segmented", () => {
     fireEvent.keyDown(screen.getByRole("radiogroup", { name: "Vista" }), { key: "ArrowRight" });
     expect(onChange).toHaveBeenCalledWith("list");
   });
-  /**
-   * ── O ESTADO DE ANTES DE HAVER MEDIÇÃO ────────────────────────────────────
-   *
-   * A pílula deslizante é POSICIONADA POR MEDIÇÃO, e medir precisa de browser.
-   * Entre o HTML do servidor e o React chegar não há medição nenhuma — e o
-   * segmento activo tem de se ver na mesma, senão o controlo aparece sem nada
-   * escolhido e corrige-se à vista, que é o defeito que se acabou de tirar às
-   * maiúsculas do back office.
-   *
-   * O jsdom é exactamente esse mundo: não tem disposição, tudo mede zero. Por
-   * isso é aqui que este estado se guarda — e o que o browser sabe (que a
-   * pílula anda) guarda-se no `e2e/pilula-dos-filtros.spec.ts`.
-   */
-  it("sem medição possível, o segmento activo fica com o seu próprio fundo", () => {
-    render(
-      <Segmented
-        ariaLabel="Vista"
-        value="list"
-        onChange={() => {}}
-        options={[
-          { value: "list", label: "Lista" },
-          { value: "board", label: "Quadro" },
-        ]}
-      />,
-    );
-    const activo = screen.getByRole("radio", { name: "Lista" });
-    expect(activo.className, "o segmento activo ficou sem fundo e sem pílula").toContain(
-      "bg-white",
-    );
-    // E nenhuma pílula: sem medição ela não existe, em vez de existir no canto
-    // superior esquerdo à espera de deslizar para o sítio.
-    expect(document.querySelectorAll("span[aria-hidden='true']").length).toBe(0);
-  });
 });
 
 /* ------------------------------------------------------------------------- *

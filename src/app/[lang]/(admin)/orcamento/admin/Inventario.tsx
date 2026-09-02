@@ -107,7 +107,7 @@ const CONDITION_LABEL: Record<Condition, string> = {
 const CONDITION_CHIP: Record<Condition, { bg: string; text: string }> = {
   novo: { bg: "#e7efe4", text: "#3a5c39" },
   bom: { bg: "#eef1e6", text: "#525a2f" },
-  usado: { bg: "#f6efe1", text: "#84692d" }, // 4,26:1 → 4,55:1 sobre #f6efe1
+  usado: { bg: "#f6efe1", text: "#8a6d2f" },
   danificado: { bg: "#f6e6df", text: "#8a2a22" },
 };
 
@@ -210,7 +210,7 @@ function CampoNome({ f, set, className }: CampoDeEdicao) {
       onChange={(e) => set({ ...f, name: e.target.value })}
       placeholder="Nome *"
       aria-label="Nome"
-      className={cn("bo-input text-sm text-[var(--bo-text)]", className)}
+      className={cn("bo-input text-sm text-foreground/80", className)}
     />
   );
 }
@@ -221,7 +221,7 @@ function CampoCategoria({ f, set, className }: CampoDeEdicao) {
       value={f.category}
       onChange={(e) => set({ ...f, category: e.target.value })}
       aria-label="Categoria"
-      className={cn("bo-input text-sm text-[var(--bo-tinta-72)]", className)}
+      className={cn("bo-input text-sm text-foreground/70", className)}
     >
       {PROP_CATEGORIES.map((c) => (
         <option key={c} value={c}>
@@ -240,7 +240,7 @@ function CampoQuantidade({ f, set, className }: CampoDeEdicao) {
       value={f.quantity}
       onChange={(e) => set({ ...f, quantity: e.target.value })}
       aria-label="Quantidade"
-      className={cn("bo-input text-sm text-[var(--bo-text)]", className)}
+      className={cn("bo-input text-sm text-foreground/80", className)}
     />
   );
 }
@@ -251,7 +251,7 @@ function CampoEstado({ f, set, className }: CampoDeEdicao) {
       value={f.condition}
       onChange={(e) => set({ ...f, condition: e.target.value as Condition })}
       aria-label="Estado"
-      className={cn("bo-input text-sm text-[var(--bo-tinta-72)]", className)}
+      className={cn("bo-input text-sm text-foreground/70", className)}
     >
       {CONDITIONS.map((c) => (
         <option key={c} value={c}>
@@ -269,7 +269,7 @@ function CampoLocalizacao({ f, set, className }: CampoDeEdicao) {
       onChange={(e) => set({ ...f, location: e.target.value })}
       placeholder="Localização"
       aria-label="Localização"
-      className={cn("bo-input text-sm text-[var(--bo-text)]", className)}
+      className={cn("bo-input text-sm text-foreground/80", className)}
     />
   );
 }
@@ -594,14 +594,14 @@ export default function Inventario() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Procurar item…"
                 aria-label="Procurar itens do inventário"
-                className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+                className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
               />
             </div>
             <select
               value={cond}
               onChange={(e) => setCond(e.target.value as "Todos" | Condition)}
               aria-label="Filtrar por estado"
-              className="bo-input px-3 py-2.5 text-sm text-[var(--bo-tinta-72)] sm:w-44"
+              className="bo-input px-3 py-2.5 text-sm text-foreground/70 sm:w-44"
             >
               <option value="Todos">Todos os estados</option>
               {CONDITIONS.map((c) => (
@@ -752,9 +752,9 @@ export default function Inventario() {
             totals.map(([c, t]) => (
               <span
                 key={c}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] text-foreground/50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground/[0.04] px-2.5 py-1 text-[11px] text-foreground/50"
               >
-                <span className="font-medium text-[var(--bo-tinta-72)]">{c}</span>
+                <span className="font-medium text-foreground/70">{c}</span>
                 <span className="text-foreground/35">
                   {t.items} {t.items === 1 ? "item" : "itens"} · {t.qty} un.
                 </span>
@@ -837,7 +837,7 @@ export default function Inventario() {
                 /* A linha em edição é um caso à parte, e é o cartão que decide:
                    os mesmos cinco campos, empilhados em vez de em colunas. */
                 editingId === i.id ? (
-                  <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4">
+                  <div className="flex flex-col gap-2.5 rounded-xl border border-foreground/[0.08] bg-foreground/[0.015] p-4">
                     <CampoNome f={editForm} set={setEditForm} className="w-full px-2.5 py-2" />
                     <CampoCategoria f={editForm} set={setEditForm} className="w-full px-2.5 py-2" />
                     <div className="flex gap-2">
@@ -872,10 +872,10 @@ export default function Inventario() {
                      nome · categoria · quantidade e estado na mesma linha ·
                      localização. As acções em baixo, por extenso — no dedo não
                      há hover, e dois ícones de 14 px não são um alvo. */
-                  <div className="rounded-xl border border-[var(--bo-hairline)] bg-white p-4">
+                  <div className="rounded-xl border border-foreground/[0.08] bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-medium text-[var(--bo-text)]">{i.name}</p>
+                        <p className="font-medium text-foreground/80">{i.name}</p>
                         {i.notes && (
                           <p className="mt-0.5 line-clamp-1 text-xs text-foreground/40">
                             {i.notes}
@@ -889,7 +889,7 @@ export default function Inventario() {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="tabular-nums text-[var(--bo-tinta-72)]">
+                        <p className="tabular-nums text-foreground/75">
                           {i.quantity}
                           {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
                         </p>
@@ -919,7 +919,7 @@ export default function Inventario() {
                       <CampoNome f={editForm} set={setEditForm} className="w-full px-2.5 py-1.5" />
                     ) : (
                       <span className="block">
-                        <span className="block font-medium text-[var(--bo-text)]">{i.name}</span>
+                        <span className="block font-medium text-foreground/80">{i.name}</span>
                         {i.notes && (
                           <span className="mt-0.5 line-clamp-1 block text-xs text-foreground/40">
                             {i.notes}
@@ -959,7 +959,7 @@ export default function Inventario() {
                         className="w-20 px-2.5 py-1.5 text-right"
                       />
                     ) : (
-                      <span className="whitespace-nowrap tabular-nums text-[var(--bo-tinta-72)]">
+                      <span className="whitespace-nowrap tabular-nums text-foreground/70">
                         {i.quantity}
                         {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
                       </span>
@@ -1038,14 +1038,14 @@ export default function Inventario() {
                         <span className="hidden com-rato:flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(i)}
-                            className="alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Editar"
                           >
                             {LapisIcon}
                           </button>
                           <button
                             onClick={() => perguntarSeRemove(i)}
-                            className="alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Remover"
                           >
                             {CruzIcon}

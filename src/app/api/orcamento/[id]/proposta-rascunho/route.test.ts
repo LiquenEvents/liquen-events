@@ -22,9 +22,6 @@ const st = vi.hoisted(() => ({
   soNoFicheiroEfemero: false,
   save: vi.fn(),
   clear: vi.fn(),
-  /** A CHAVE que a leitura foi buscar. É isto que prova a porta do resgate:
-   *  o duplo devolve sempre o mesmo, o que interessa é a gaveta pedida. */
-  read: vi.fn(),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({
@@ -59,8 +56,7 @@ vi.mock("@/lib/proposal-drafts", async () => {
     porqueNaoGuardou: real.porqueNaoGuardou,
     ehFalhaPermanente: real.ehFalhaPermanente,
     avisoDeSitioEfemero: real.avisoDeSitioEfemero,
-    getProposalDraft: vi.fn(async (id: string) => {
-      st.read(id);
+    getProposalDraft: vi.fn(async () => {
       if (st.throwOnGet) throw new Error("db down");
       return st.stored;
     }),
@@ -137,84 +133,6 @@ describe("GET /api/orcamento/[id]/proposta-rascunho", () => {
   it("devolve 500 tratado quando a leitura falha", async () => {
     st.throwOnGet = true;
     expect((await GET(...req("GET"))).status).toBe(500);
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A PORTA DO RESGATE — a gaveta estava cheia e não havia como a abrir
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O `PUT` já guardava, e bem, a versão que ia ser esmagada: vai para
- * `<chave>--sobreposto` e o nome dela volta em `resgate`. Metade da regra da
- * casa cumprida — «se falhar, não perder trabalho».
- *
- * A outra metade não existia. A lista de variantes que a LEITURA aceita é
- * fechada de propósito, e `sobreposto` não estava nela: um
- * `GET ?variante=sobreposto` caía no `else` e devolvia o rascunho do estúdio.
- * Ou seja: o trabalho da outra pessoa ficava guardado num sítio que nenhuma
- * parte do produto conseguia abrir. Uma promessa cumprida a meio é uma
- * promessa por cumprir.
- *
- * Estes testes olham para a CHAVE PEDIDA e não para o que o duplo devolve —
- * é a chave que é a porta. E o último faz a volta inteira: sobrepor, ler o
- * nome que a resposta dá, e ir buscar essa gaveta com ele.
- */
-describe("GET — a gaveta do resgate", () => {
-  it("`?variante=sobreposto` vai à gaveta do resgate, e não ao rascunho do estúdio", async () => {
-    await GET(...req("GET", undefined, undefined, "?variante=sobreposto"));
-    expect(
-      st.read,
-      "a leitura foi ao rascunho do estúdio: a porta do resgate continua fechada",
-    ).toHaveBeenCalledWith("q-1--sobreposto");
-  });
-
-  it("a ferramenta antiga das linhas também tem a sua gaveta de resgate", async () => {
-    // A chave do resgate é construída sobre a chave JÁ escolhida, portanto as
-    // linhas geram `<pedido>--orcamento-linhas--sobreposto`. Deixar esta de
-    // fora repetia o mesmo defeito na outra metade do estúdio.
-    await GET(...req("GET", undefined, undefined, "?variante=orcamento-linhas--sobreposto"));
-    expect(st.read).toHaveBeenCalledWith("q-1--orcamento-linhas--sobreposto");
-  });
-
-  it("A LISTA CONTINUA FECHADA: uma variante inventada é ignorada", async () => {
-    /**
-     * É esta propriedade que impede quem chame a rota de escolher a chave que
-     * quiser dentro do espaço de nomes do `app_state`. Abrir a porta do
-     * resgate não pode ser abrir a porta a tudo.
-     */
-    await GET(...req("GET", undefined, undefined, "?variante=qualquer-coisa"));
-    expect(st.read).toHaveBeenCalledWith("q-1");
-  });
-
-  it("sem variante nenhuma, continua a ser o rascunho do estúdio", async () => {
-    await GET(...req("GET"));
-    expect(st.read).toHaveBeenCalledWith("q-1");
-  });
-
-  it("A VOLTA INTEIRA: sobrepor, e depois abrir a gaveta pelo nome que a resposta deu", async () => {
-    st.stored = {
-      doc: { ref: "as duas horas de trabalho da Catarina" },
-      updatedAt: "2026-07-28T22:30:00.000Z",
-      savedBy: "Catarina",
-    };
-    const escrita = await PUT(
-      ...req("PUT", {
-        doc: { ref: "o documento da manhã" },
-        baseUpdatedAt: "2026-07-28T22:00:00.000Z",
-      }),
-    );
-    const { resgate } = await escrita.json();
-    expect(resgate).toBe("q-1--sobreposto");
-
-    // E agora o que antes era impossível: pegar nesse nome e ir lá buscar.
-    const variante = resgate.slice("q-1--".length);
-    st.read.mockClear();
-    await GET(...req("GET", undefined, undefined, `?variante=${variante}`));
-    expect(
-      st.read,
-      "o nome que a própria rota devolveu não abre a gaveta que ela própria escreveu",
-    ).toHaveBeenCalledWith(resgate);
   });
 });
 

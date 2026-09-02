@@ -124,35 +124,8 @@ const hexParaRgb = (h: string): RGB => {
   return [0, 2, 4].map((i) => parseInt(largo.slice(i, i + 2), 16)) as RGB;
 };
 
-/**
- * `rgba(13, 13, 13, 0.58)` → `{ cor, alpha }`; `#ffffff` → alpha 1.
- *
- * E `var(--bo-tinta-58)` também: os três tokens de papel do texto passaram a
- * ser APELIDOS de degraus numerados da escada da tinta — é a regra da análise
- * («o nome diz a opacidade») com os nomes de papel por cima, que dizem o que a
- * coisa é. Sem esta linha, este guarda rebentava com «valor de cor que não sei
- * ler» num sítio onde o valor está perfeitamente lá, uma indirecção adiante.
- *
- * UM nível de indirecção, de propósito. Uma escada de apelidos de apelidos
- * deixa de se poder ler de uma olhadela, e este teste existe para dizer que
- * número é que uma pessoa vê no ecrã.
- */
-function lerCor(valor: string, css: string = CSS): { cor: RGB; alpha: number } {
-  const referencia = valor.trim().match(/^var\(\s*(--[a-z0-9-]+)\s*\)$/i);
-  if (referencia) {
-    const apontado = css.match(new RegExp(`${referencia[1]}\\s*:\\s*([^;]+);`));
-    expect(
-      apontado,
-      `o token ${referencia[1]}, para onde ${valor} aponta, não existe no globals.css`,
-    ).not.toBeNull();
-    const dentro = apontado![1].trim();
-    expect(
-      dentro.startsWith("var("),
-      `${valor} aponta para ${referencia[1]}, que aponta para outro token — uma escada de ` +
-        `apelidos de apelidos deixa de se poder ler de uma olhadela`,
-    ).toBe(false);
-    return lerCor(dentro, css);
-  }
+/** `rgba(13, 13, 13, 0.58)` → `{ cor, alpha }`; `#ffffff` → alpha 1. */
+function lerCor(valor: string): { cor: RGB; alpha: number } {
   const rgba = valor.match(/rgba?\(([^)]+)\)/);
   if (rgba) {
     const partes = rgba[1].split(",").map((p) => parseFloat(p.trim()));

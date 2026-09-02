@@ -104,7 +104,7 @@ async function docCompleto(): Promise<ProposalDoc> {
      * A SOMA LIGADA — porque é ela que este documento existe para medir.
      *
      * O «Total a pagar» passou a estar DESLIGADO por omissão (a folha feita à
-     * mão não o tem). Numa proposta com valores
+     * mão não o tem — ver `mostrarTotalAPagar`). Numa proposta com valores
      * adicionais e sem ele, o `totalText` que o estúdio escreveu não chega a ser
      * impresso em lado nenhum: o documento mostra as parcelas e não o todo. Não
      * há motor de leitura que devolva um número que a folha não tem, e a
@@ -113,6 +113,7 @@ async function docCompleto(): Promise<ProposalDoc> {
      * A proposta cheia é a que exercita o quadro TODO, e por isso liga-a. A que
      * corre com a omissão é a magra, aqui ao lado.
      */
+    mostrarTotalAPagar: true,
     coverImages: [a, b],
   });
 }

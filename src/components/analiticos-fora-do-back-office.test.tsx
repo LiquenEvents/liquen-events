@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -51,26 +51,6 @@ import { cleanup, render } from "@testing-library/react";
  * do BACK OFFICE; a forma do token é do ficheiro ao lado, que já a mede.
  */
 const SEGMENTO_TOKEN = "token-de-teste";
-
-/**
- * ── NADA FICA MONTADO QUANDO UM TESTE ACABA ──────────────────────────────
- *
- * Este projecto não corre o vitest com `globals`, portanto a limpeza
- * automática da testing-library NÃO está ligada: o que se desenha fica
- * montado até ao fim do ficheiro.
- *
- * Com o `GoogleTag` e o `Analytics` isso nunca deu nada — devolvem uma
- * etiqueta ou uma cadeia vazia e não têm estado. O `ConsentBanner` tem dois
- * `useEffect` e um `useState`, e aí o React deixa trabalho agendado no
- * `scheduler`. Quando esse trabalho corre, o ambiente jsdom já foi desmontado
- * e o que sai é `ReferenceError: window is not defined` — um erro NÃO
- * APANHADO, que não reprova teste nenhum e reprova a corrida inteira.
- *
- * Foi assim que aconteceu: 9105 testes verdes e o CI vermelho, com cinco
- * destes erros. Localmente não se via a correr só este ficheiro (acaba
- * depressa de mais) — só na suite completa.
- */
-afterEach(cleanup);
 
 /** Onde os analíticos NÃO podem existir. */
 const CALADOS = [
@@ -278,59 +258,12 @@ describe("ConsentBanner — a regra deixou de estar escrita à mão", () => {
 
   it("continua fora do back office", () => {
     pathname.value = "/pt/orcamento/admin";
-    const { container, unmount } = render(<ConsentBanner locale="pt" />);
+    const { container } = render(<ConsentBanner locale="pt" />);
     expect(container.innerHTML).toBe("");
-    unmount();
-  });
-
-  /**
-   * ── O AVISO DE COOKIES TAPAVA O FIM DA PROPOSTA DO CASAL ───────────────
-   *
-   * MEDIDO num 390×844, com a proposta a sério e a página no fundo: a barra
-   * desenha 116 px encostados ao chão, e debaixo dela ficavam as duas últimas
-   * linhas do documento — «Válida até …» e «Emitida a …». Não é uma questão de
-   * ter de rolar mais: a página JÁ estava no fim. Aquelas linhas eram
-   * inalcançáveis.
-   *
-   * O sítio público resolve isto com uma reserva (`--reserva-consentimento`),
-   * que o rodapé, o herói e os dois botões flutuantes consomem. O ramo privado
-   * não tem rodapé nem flutuantes — foi desenhado sem cromado nenhum —, por
-   * isso não havia lá nada para consumir a reserva.
-   *
-   * ── E A CORRECÇÃO NÃO É RESERVAR ESPAÇO: É NÃO ESTAR LÁ ────────────────
-   *
-   * Nas rotas com token NÃO É MONTADO analítico nenhum — o Plausible, o Google
-   * tag, os Web Vitals e a captura de origem calam-se todos por `isTokenRoute`,
-   * e essa é a regra mais antiga deste projecto. Este aviso governa exactamente
-   * esses cookies. Pedir a um casal consentimento para cookies que aquela
-   * página nunca põe é pedir por nada — e cobrar-lhe por isso 116 px do
-   * documento que ele foi lá ler.
-   *
-   * O `semAnaliticos()` já dizia as duas coisas de uma vez. O banner só lia
-   * metade dele.
-   */
-  it("não aparece na proposta do casal — ali não há cookie nenhum para consentir", () => {
-    for (const p of [
-      `/proposta/${SEGMENTO_TOKEN}`,
-      `/pt/proposta/${SEGMENTO_TOKEN}`,
-      `/en/proposta/${SEGMENTO_TOKEN}`,
-      `/portal/${SEGMENTO_TOKEN}`,
-    ]) {
-      pathname.value = p;
-      const { container, unmount } = render(<ConsentBanner locale="pt" />);
-      expect(container.innerHTML, `o aviso de cookies desenhou em ${p}`).toBe("");
-      unmount();
-    }
   });
 
   it("continua a aparecer no site público", () => {
-    // O controlo positivo dos dois casos acima: sem ele, um banner que nunca
-    // desenhasse em lado nenhum passava neste ficheiro inteiro.
-    for (const p of MEDIDOS) {
-      pathname.value = p;
-      const { container, unmount } = render(<ConsentBanner locale="pt" />);
-      expect(container.innerHTML, `o aviso de cookies desapareceu de ${p}`).not.toBe("");
-      unmount();
-    }
+    const { container } = render(<ConsentBanner locale="pt" />);
+    expect(container.innerHTML).not.toBe("");
   });
 });

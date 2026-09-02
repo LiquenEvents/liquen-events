@@ -39,18 +39,11 @@ import { entrarNoBackOffice } from "./semear-pedido";
  *
  * ── Quando não há como entrar ─────────────────────────────────────────────
  *
- * Sem `ADMIN_PASSWORD_HASH` não se entra — e isso é uma condição do ambiente,
- * não uma avaria. Grava-se o estado ANÓNIMO na mesma: sem ficheiro, todos os
- * projectos que dependem deste rebentavam a arrancar. Com ele, cada passeio
- * tenta entrar como sempre tentou e salta-se sozinho, que é o que já fazia.
- *
- * E é por isso que a exigência olha para o SEGREDO e não só para o `CI`: o
- * `ci.yml` tem passos que não têm nada que ver com o back office — o
- * desempenho da galeria é o caso — e esses não recebem o segredo de propósito.
- * O Playwright corre sempre os projectos de que se depende, mesmo com um
- * `--grep` que os filtraria, portanto este arranque entra também aí. Exigir
- * login num passo que nunca teve credenciais era pintar de vermelho um passo
- * que está bem — e foi ao certo o que aconteceu à primeira passagem.
+ * Fora do CI, uma máquina sem `ADMIN_PASSWORD_HASH` não entra — e isso é uma
+ * condição do ambiente, não uma avaria. Aqui grava-se o estado ANÓNIMO na
+ * mesma: sem ficheiro, todos os projectos que dependem deste rebentavam a
+ * arrancar. Com ele, cada passeio tenta entrar como sempre tentou e salta-se
+ * sozinho, que é o que já fazia.
  */
 
 setup("entra uma vez, e é essa a sessão de toda a passagem", async ({ page }) => {
@@ -58,11 +51,10 @@ setup("entra uma vez, e é essa a sessão de toda a passagem", async ({ page }) 
   fs.mkdirSync(path.dirname(ESTADO_ADMIN), { recursive: true });
 
   const dentro = await entrarNoBackOffice(page);
-  if (process.env.CI && process.env.ADMIN_PASSWORD_HASH) {
+  if (process.env.CI) {
     expect(
       dentro,
-      "este ambiente TEM `ADMIN_PASSWORD_HASH` e mesmo assim não entrei — isto é avaria, " +
-        "não é falta de configuração.",
+      "não entrei no back office para guardar a sessão — ADMIN_PASSWORD_HASH em falta no CI?",
     ).toBe(true);
   }
 

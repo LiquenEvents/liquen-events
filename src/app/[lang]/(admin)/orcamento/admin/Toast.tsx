@@ -166,7 +166,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       onMouseLeave={resume}
       onFocus={pause}
       onBlur={resume}
-      className={`pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm bg-white border border-[var(--bo-hairline-strong)] rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)] transition-all duration-300 ${
+      className={`pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm bg-white border border-foreground/10 rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)] transition-all duration-300 ${
         shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
       }`}
     >
@@ -174,7 +174,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         className="w-2 h-2 rounded-full flex-shrink-0"
         style={{ background: DOT[toast.kind] }}
       />
-      <p className="flex-1 text-[var(--bo-tinta-72)] text-sm leading-snug">{toast.message}</p>
+      <p className="flex-1 text-foreground/75 text-sm leading-snug">{toast.message}</p>
       {/* ── 9×14 PX, E É O BOTÃO QUE FECHA UM AVISO ──────────────────────
           MEDIDO a 375 px: nove píxeis de largura por catorze de altura. É o
           alvo mais pequeno de todo o back office, e está no elemento que
@@ -189,7 +189,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           para o texto não encolher por causa disto. */}
       <button
         onClick={onClose}
-        className="alvo-toque pointer-coarse:-mr-1.5 text-foreground/40 hover:text-[var(--bo-tinta-72)] transition-colors text-sm leading-none shrink-0"
+        className="alvo-toque pointer-coarse:-mr-1.5 text-foreground/40 hover:text-foreground/70 transition-colors text-sm leading-none shrink-0"
         aria-label="Fechar"
       >
         ×

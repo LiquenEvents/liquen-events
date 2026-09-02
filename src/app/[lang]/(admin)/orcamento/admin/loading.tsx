@@ -33,7 +33,7 @@ export default function AdminLoading() {
        * ecrã. O `<main>` que faltava está agora no `(admin)/layout.tsx`, sem
        * padding nenhum, e não há nada para cancelar.
        */
-      className="ecra-de-espera min-h-screen bg-[var(--bo-chao)] flex"
+      className="ecra-de-espera min-h-screen bg-[var(--bo-surface-sunken)] flex"
       role="status"
       aria-busy="true"
       aria-label="A carregar o back office"
@@ -60,7 +60,7 @@ export default function AdminLoading() {
       {/* ── Main column ── */}
       <div className="flex-1 min-w-0">
         {/* Header (matches the sticky white bar) */}
-        <header className="sticky top-0 z-20 bg-white/97 border-b border-[var(--bo-hairline)] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
+        <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
           <div className="min-w-0">
             <div className="bo-skeleton h-2 w-28 mb-3" />
             <div className="bo-skeleton h-6 w-52" />
@@ -93,10 +93,10 @@ export default function AdminLoading() {
             ))}
           </div>
           <div className="bo-card overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--bo-hairline)]">
+            <div className="px-5 py-4 border-b border-foreground/[0.07]">
               <div className="bo-skeleton h-2.5 w-36" />
             </div>
-            <div className="divide-y divide-[var(--bo-hairline)]">
+            <div className="divide-y divide-foreground/[0.06]">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-5 py-4">
                   <div className="bo-skeleton w-9 h-9 !rounded-full shrink-0" />

@@ -131,9 +131,9 @@ export function PaginaEmConstrucao({
         type="button"
         onClick={alternar}
         aria-expanded={false}
-        className={`z-10 flex items-center gap-1.5 rounded-full border border-[var(--bo-hairline-strong)] bg-white/95 px-3 py-1.5 text-xs backdrop-blur ${flutuante}`}
+        className={`z-10 flex items-center gap-1.5 rounded-full border border-foreground/15 bg-white/95 px-3 py-1.5 text-xs backdrop-blur ${flutuante}`}
       >
-        <span className="tabular-nums text-[var(--bo-tinta-72)]">
+        <span className="tabular-nums text-foreground/75">
           {total} {total === 1 ? "foto" : "fotos"}
         </span>
         {aMais > 0 && <span className="text-[#8a6420]">· {aMais} a mais</span>}
@@ -143,7 +143,7 @@ export function PaginaEmConstrucao({
 
   return (
     <div
-      className={`z-10 rounded-xl border border-[var(--bo-hairline-strong)] bg-white/95 p-2 shadow-[var(--bo-sombra-suspensa)] backdrop-blur ${
+      className={`z-10 rounded-xl border border-foreground/15 bg-white/95 p-2 shadow-[var(--bo-sombra-suspensa)] backdrop-blur ${
         ancorada ? "w-full" : "w-[7.5rem]"
       } ${flutuante}`}
       aria-label="A página em construção"
@@ -160,7 +160,7 @@ export function PaginaEmConstrucao({
           onClick={alternar}
           aria-expanded
           aria-label="Esconder a página em construção"
-          className="alvo-invisivel relative -mr-0.5 -mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-foreground/40 hover:text-[var(--bo-tinta-72)]"
+          className="alvo-invisivel relative -mr-0.5 -mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-foreground/40 hover:text-foreground/70"
         >
           <svg
             width="11"
@@ -187,7 +187,7 @@ export function PaginaEmConstrucao({
           return (
             <span
               key={`${f.path}:${i}`}
-              className={`relative block aspect-square overflow-hidden rounded bg-[var(--bo-tinta-6)] ${
+              className={`relative block aspect-square overflow-hidden rounded bg-foreground/[0.06] ${
                 entrando ? "ring-1 ring-[#4d6350]" : ""
               } ${excedente ? "opacity-40" : ""}`}
             >
@@ -207,7 +207,7 @@ export function PaginaEmConstrucao({
         })}
       </div>
 
-      <p className="mt-1.5 text-[10px] leading-snug text-[var(--bo-text-muted)]">
+      <p className="mt-1.5 text-[10px] leading-snug text-foreground/60">
         <span className="tabular-nums">{total}</span> de {maximo}
         {total > 9 && <span className="text-foreground/40"> · mostra 9</span>}
       </p>

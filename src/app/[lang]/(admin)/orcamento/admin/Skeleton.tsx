@@ -97,10 +97,10 @@ export function ViewSkeleton() {
       </div>
       {/* Panel */}
       <div className="bo-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-[var(--bo-hairline)]">
+        <div className="px-5 py-4 border-b border-foreground/[0.07]">
           <SkeletonBar className="h-2.5 w-36" />
         </div>
-        <div className="divide-y divide-[var(--bo-hairline)]">
+        <div className="divide-y divide-foreground/[0.06]">
           {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonRow key={i} />
           ))}
@@ -114,7 +114,7 @@ export function ViewSkeleton() {
 export function SkeletonList({ rows = 5 }: { rows?: number }) {
   return (
     <div
-      className="bo-card overflow-hidden divide-y divide-[var(--bo-hairline)]"
+      className="bo-card overflow-hidden divide-y divide-foreground/[0.06]"
       role="status"
       aria-busy="true"
     >

@@ -13,8 +13,6 @@ import {
   type ProposalDoc,
 } from "@/lib/proposal-doc";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 /**
  * O documento inteiro desenhado para ecrã. O que se prende aqui é o que o
@@ -24,25 +22,11 @@ import { join } from "node:path";
 afterEach(cleanup);
 
 const FOTOS: FotoDaProposta[] = [
-  {
-    id: "c0",
-    marca: "mc0",
-    miniatura: "mini/capa",
-    original: "orig/capa",
-    largura: 1600,
-    altura: 1067,
-  },
-  {
-    id: "b0f0",
-    marca: "mb0f0",
-    miniatura: "mini/0-0",
-    original: "orig/0-0",
-    largura: 1200,
-    altura: 800,
-  },
-  { id: "b0f1", marca: "mb0f1", miniatura: "mini/0-1", original: "orig/0-1" },
+  { id: "c0", miniatura: "mini/capa", original: "orig/capa", largura: 1600, altura: 1067 },
+  { id: "b0f0", miniatura: "mini/0-0", original: "orig/0-0", largura: 1200, altura: 800 },
+  { id: "b0f1", miniatura: "mini/0-1", original: "orig/0-1" },
   // b0f2 NÃO resolveu: nem miniatura nem original. Não pode virar buraco.
-  { id: "b0f2", marca: "mb0f2" },
+  { id: "b0f2" },
 ];
 
 const DOC: ProposalDoc = {
@@ -216,7 +200,7 @@ describe("as fotografias", () => {
     desenhar();
     const srcset = capa().getAttribute("srcset") ?? "";
     expect(srcset).toContain("mini/capa 400w");
-    expect(srcset).toContain("/api/proposta/tk/foto/c0?v=mc0 1200w");
+    expect(srcset).toContain("/api/proposta/tk/foto/c0 1200w");
   });
 
   /**
@@ -234,9 +218,7 @@ describe("as fotografias", () => {
       <Documento
         doc={DOC}
         idioma="pt"
-        fotos={[
-          { id: "c0", marca: "mc0", miniatura: "mini/capa", media: "https://cdn/media-capa" },
-        ]}
+        fotos={[{ id: "c0", miniatura: "mini/capa", media: "https://cdn/media-capa" }]}
         token="tk"
       />,
     );
@@ -256,9 +238,7 @@ describe("as fotografias", () => {
       <Documento
         doc={DOC}
         idioma="pt"
-        fotos={[
-          { id: "c0", marca: "mc0", miniatura: "mini/capa", lqip: "data:image/jpeg;base64,AAAA" },
-        ]}
+        fotos={[{ id: "c0", miniatura: "mini/capa", lqip: "data:image/jpeg;base64,AAAA" }]}
         token="tk"
       />,
     );
@@ -269,55 +249,12 @@ describe("as fotografias", () => {
     expect(borrao?.getAttribute("alt")).toBe("");
   });
 
-  /**
-   * ── A CAPA VERTICAL ENCOSTAVA-SE À ESQUERDA ──────────────────────────────
-   *
-   * Palavras dela, a olhar para a proposta no telemóvel: «a foto de capa não
-   * está ao meio».
-   *
-   * A caixa da capa tem `aspect-ratio` E `max-height`. Quando a altura bate no
-   * tecto — e bate nas capas VERTICAIS, que são altas — o navegador encolhe a
-   * LARGURA para manter a proporção. E uma caixa de bloco mais estreita do que
-   * o contentor fica encostada à esquerda, porque é isso que uma caixa de bloco
-   * faz.
-   *
-   * MEDIDO num Chromium, com um contentor de 350 px e uma caixa de
-   * `aspect-ratio: 3/4; max-height: 280px`: largura 210 px, `x = 0`. Cento e
-   * quarenta pixéis de vazio, todos do lado direito.
-   *
-   * Não se corrige tirando o `aspect-ratio` (reserva o espaço e impede o texto
-   * de saltar) nem o `max-height` (impede uma capa vertical de ocupar a página
-   * inteira antes de uma palavra). O que faltava era dizer o que fazer com o
-   * espaço que sobra.
-   *
-   * Isto verifica-se pela classe e não pela geometria, porque o jsdom não faz
-   * layout: não sabe calcular `aspect-ratio` nem `max-height`, e um teste que
-   * medisse `getBoundingClientRect` aqui daria zeros e passaria sempre.
-   */
-  it("a caixa da capa fica centrada quando encolhe", () => {
-    desenhar();
-    const caixa = capa().closest("[style*='aspect-ratio']");
-    expect(caixa, "nenhuma caixa à volta da capa").not.toBeNull();
-    expect(
-      caixa?.className,
-      "a capa volta a encostar-se à esquerda quando a altura bate no tecto",
-    ).toContain("mx-auto");
-  });
-
   it("a forma reserva-se na caixa, e não na imagem", () => {
     // Sem isto, o texto por baixo salta quando a fotografia chega — e um salto
     // lê-se como lentidão mesmo quando não é.
     desenhar();
-    /**
-     * A caixa procura-se pela FORMA, e não por ser o pai da imagem.
-     *
-     * Era `capa().parentElement`, e caiu no dia em que a imagem passou a viver
-     * dentro de um `<picture>` (a oferta em AVIF). O que interessa provar é que
-     * a forma está reservada por uma CAIXA à volta — quantos elementos há pelo
-     * meio é assunto de quem desenha.
-     */
-    const caixa = capa().closest("[style*='aspect-ratio']");
-    expect(caixa, "nenhuma caixa à volta da capa reserva a forma").not.toBeNull();
+    const caixa = capa().parentElement;
+    expect(caixa?.getAttribute("style")).toContain("aspect-ratio");
   });
 
   it("e diz que largura ocupa — senão pede sempre a maior", () => {
@@ -325,71 +262,14 @@ describe("as fotografias", () => {
     expect(capa().getAttribute("sizes")).toBe("(min-width: 1024px) 1024px, 100vw");
   });
 
-  /**
-   * ── ESTE CASO GUARDAVA O CONTRÁRIO, E A RAZÃO MUDOU DE SÍTIO ──────────────
-   *
-   * Guardava «uma capa sem miniatura fica com o original e sem `srcset` a
-   * mentir», e a razão escrita era boa: «um `srcset` com uma medida só dizia ao
-   * navegador que o original tem 1200, e ele tem 2200». O defeito a evitar era
-   * MENTIR sobre a largura do original.
-   *
-   * Só que a conclusão de então — servir o original — tinha um custo que não
-   * estava contado. Sem miniatura, a capa era o ficheiro tal como saiu da
-   * máquina: 2,6 MB, sem alternativa nenhuma, com `fetchPriority="high"` e
-   * `decoding="sync"`. E quem não tem miniatura são precisamente as propostas
-   * ANTIGAS, anteriores ao bucket das miniaturas — as que estão nas caixas de
-   * correio de casais que podem voltar a abrir o link.
-   *
-   * O que mudou não foi a regra, foi haver um terceiro degrau que a cumpre: a
-   * derivada de 1200 px, que TEM mesmo 1200. O original deixa de aparecer na
-   * oferta, portanto não há largura nenhuma por onde mentir — e a de 400 só
-   * entra quando existe.
-   */
-  it("uma capa sem miniatura serve a derivada de 1200, e não o original", () => {
+  it("uma capa sem miniatura fica com o original e sem `srcset` a mentir", () => {
+    // Sem miniatura não há candidato de 400 px: um `srcset` com uma medida só
+    // dizia ao navegador que o original tem 1200, e ele tem 2200.
     render(
-      <Documento
-        doc={DOC}
-        idioma="pt"
-        fotos={[{ id: "c0", marca: "mc0", original: "orig/capa" }]}
-        token="tk"
-      />,
+      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", original: "orig/capa" }]} token="tk" />,
     );
-    expect(capa().getAttribute("src"), "a capa voltou a servir o original inteiro").not.toBe(
-      "orig/capa",
-    );
-    // Sem `media` assinada, o degrau do meio é a nossa rota — é ela que fabrica
-    // a derivada, guarda e serve.
-    expect(capa().getAttribute("src")).toBe("/api/proposta/tk/foto/c0?v=mc0");
-  });
-
-  it("e o `srcset` da capa nunca anuncia uma largura que não é verdade", () => {
-    // A razão do caso antigo, mantida: o que está no `srcset` como `1200w` tem
-    // de ter mesmo 1200. O original tem 2200 e por isso nunca lá entra.
-    render(
-      <Documento
-        doc={DOC}
-        idioma="pt"
-        fotos={[{ id: "c0", marca: "mc0", original: "orig/capa" }]}
-        token="tk"
-      />,
-    );
-    const srcset = capa().getAttribute("srcset") ?? "";
-    expect(srcset, "o original entrou na oferta com uma largura inventada").not.toContain(
-      "orig/capa",
-    );
-    expect(srcset).toBe("/api/proposta/tk/foto/c0?v=mc0 1200w");
-  });
-
-  it("com miniatura, a oferta tem os dois degraus", () => {
-    render(
-      <Documento
-        doc={DOC}
-        idioma="pt"
-        fotos={[{ id: "c0", marca: "mc0", miniatura: "mini/capa", media: "https://cdn/capa-1200" }]}
-        token="tk"
-      />,
-    );
-    expect(capa().getAttribute("srcset")).toBe("mini/capa 400w, https://cdn/capa-1200 1200w");
+    expect(capa().getAttribute("src")).toBe("orig/capa");
+    expect(capa().getAttribute("srcset")).toBeNull();
   });
 
   it("a grelha pede a MINIATURA, nunca o original", () => {
@@ -418,12 +298,7 @@ describe("as fotografias", () => {
 
   it("um board sem uma única foto resolvida não chega a aparecer", () => {
     render(
-      <Documento
-        doc={DOC}
-        idioma="pt"
-        fotos={[{ id: "c0", marca: "mc0", miniatura: "mini/capa" }]}
-        token="tk"
-      />,
+      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", miniatura: "mini/capa" }]} token="tk" />,
     );
     expect(screen.queryByRole("heading", { name: "Inspiração" })).toBeNull();
     // E o índice também não promete o que não existe.
@@ -867,22 +742,8 @@ describe("o orçamento", () => {
  */
 describe("o fecho", () => {
   const DUAS_CAPAS: FotoDaProposta[] = [
-    {
-      id: "c0",
-      marca: "mc0",
-      miniatura: "mini/capa0",
-      original: "orig/capa0",
-      largura: 1600,
-      altura: 1067,
-    },
-    {
-      id: "c1",
-      marca: "mc1",
-      miniatura: "mini/capa1",
-      original: "orig/capa1",
-      largura: 1600,
-      altura: 1067,
-    },
+    { id: "c0", miniatura: "mini/capa0", original: "orig/capa0", largura: 1600, altura: 1067 },
+    { id: "c1", miniatura: "mini/capa1", original: "orig/capa1", largura: 1600, altura: 1067 },
   ];
 
   const comCapas = (fotos: FotoDaProposta[], coverImages: string[]) =>
@@ -924,7 +785,7 @@ describe("o fecho", () => {
     comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
     const imagens = Array.from(document.querySelectorAll("img"));
     expect(imagens[imagens.length - 1].getAttribute("srcset")).toContain(
-      "/api/proposta/tk/foto/c1?v=mc1 1200w",
+      "/api/proposta/tk/foto/c1 1200w",
     );
   });
 
@@ -934,49 +795,6 @@ describe("o fecho", () => {
     comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
     const imagens = Array.from(document.querySelectorAll("img"));
     expect(imagens[imagens.length - 1].getAttribute("loading")).toBe("lazy");
-  });
-
-  /**
-   * ── E O FECHO TAMBÉM NÃO NASCE EM BRANCO ──────────────────────────────
-   *
-   * A capa já tinha o borrão; o fecho tinha ficado sem. E é a fotografia onde
-   * mais se nota: é PREGUIÇOSA de propósito, e ocupa meio ecrã. O que o casal
-   * via ao chegar ao fim da proposta era um rectângulo vazio do tamanho de uma
-   * fotografia — a última coisa que a proposta lhe mostra.
-   *
-   * O `lqip` são poucas centenas de bytes que já vêm no HTML: está lá pintado
-   * antes de qualquer ida à rede, e é calculado no envio para TODAS as fotos
-   * (ver `proposta-fotos`). Estava calculado, servido, e deitado fora.
-   */
-  it("o fecho tem o borrão por baixo, como a capa", () => {
-    comCapas(
-      [DUAS_CAPAS[0], { ...DUAS_CAPAS[1], lqip: "data:image/jpeg;base64,FECHO" }],
-      ["ped/capa0.jpg", "ped/capa1.jpg"],
-    );
-    const borroes = Array.from(document.querySelectorAll('img[aria-hidden="true"]'));
-    expect(
-      borroes.map((b) => b.getAttribute("src")),
-      "o fecho voltou a nascer como um rectângulo vazio",
-    ).toContain("data:image/jpeg;base64,FECHO");
-  });
-
-  it("e a fotografia do fecho fica POR CIMA do borrão", () => {
-    // O borrão está em `absolute`; sem uma posição na de cima, a última
-    // fotografia da proposta ficava por baixo dele — desfocada para sempre.
-    comCapas(
-      [DUAS_CAPAS[0], { ...DUAS_CAPAS[1], lqip: "data:image/jpeg;base64,FECHO" }],
-      ["ped/capa0.jpg", "ped/capa1.jpg"],
-    );
-    const imagens = Array.from(document.querySelectorAll("img"));
-    const ultima = imagens[imagens.length - 1];
-    expect(ultima.getAttribute("src")).toBe("mini/capa1");
-    expect(ultima.className).toContain("relative");
-  });
-
-  it("sem borrão gravado, não se inventa caixa nenhuma", () => {
-    // As propostas anteriores ao `lqip` não têm nenhum.
-    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
-    expect(document.querySelectorAll('img[aria-hidden="true"]')).toHaveLength(0);
   });
 
   /**
@@ -1111,144 +929,5 @@ describe("a página do casal e a folha dizem o mesmo número", () => {
     expect(screen.getByText(/de 800 a 1\.200 €/)).toBeTruthy();
     // Controlo positivo: os oito milhões que a leitura antiga inventava.
     expect(screen.queryByText(/8\.001\.200/)).toBeNull();
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A ESCALA DO DOCUMENTO — quatro degraus, e nenhum deles a fingir
- * ════════════════════════════════════════════════════════════════════════════
- *
- * MEDIDA NUM BROWSER A SÉRIO, a 390×844, com uma proposta a sério:
- *
- *     26 px  Playfair    «2. Serviços»            ← o capítulo
- *     17 px  Inter w500  «Cerimónia»              ← o momento
- *     15 px  Inter w400  «Arco floral»            ← o que ele leva
- *     14 px  Inter w400  «Em tons de branco…»     ← o que isso é
- *
- * O nome do momento era o ÚNICO título desta página em letra de texto — tudo
- * o resto que titula é a serifada —, e por isso o salto de 26 para 17 não se
- * lia como degrau, lia-se como o fim dos títulos. E o nome do serviço estava
- * a UM PIXEL e a um tom de cinzento da sua própria descrição: num telemóvel
- * ao sol, a lista do que o casal recebe era um bloco cinzento só.
- *
- * ── O QUE O JSDOM PODE E NÃO PODE DIZER, E PORQUE ESTÁ ESCRITO ───────────
- *
- * A primeira versão deste bloco perguntava ao `getComputedStyle` o tamanho e
- * o peso, e passou a mentir-me: aqui não há folha de estilos do Tailwind
- * nenhuma (o `font-medium` não chega a existir) e o `clamp()` não é
- * resolvido — devolve a cadeia como está. Uma comparação de números sobre
- * isso não compara nada.
- *
- * Portanto pergunta-se ao que EXISTE mesmo neste ambiente: as declarações
- * escritas no elemento. A família e o `clamp` vivem num `style` em linha, e
- * daí saem números a sério; o peso vive numa classe, e é a classe que se lê,
- * dito por extenso em vez de disfarçado de medição.
- *
- * O que este bloco prende é a ORDEM dos degraus, não os números: quem quiser
- * afinar um tamanho pode; quem esborratar a hierarquia não.
- */
-describe("a escala do documento", () => {
-  /**
-   * ── O TAMANHO VEM DO CÓDIGO, E ESTÁ AQUI ESCRITO PORQUÊ ─────────────────
-   *
-   * PERGUNTEI AO JSDOM. Um `<h2 style={{ fontFamily: "var(--font-playfair)",
-   * fontSize: "clamp(26px, 4.2vw, 40px)" }}>` sai de lá com o atributo
-   * `style` a valer exactamente `"font-family: var(--font-playfair);"` — o
-   * `font-size` não está lá. O analisador de CSS do jsdom não conhece
-   * `clamp()` e deita a declaração fora em silêncio.
-   *
-   * Ou seja: neste ambiente o tamanho NÃO É OBSERVÁVEL, nem pelo
-   * `getComputedStyle` nem pelo atributo. Foi o controlo positivo que o
-   * apanhou — duas vezes, porque a minha primeira correcção também partia do
-   * princípio de que o atributo o guardava.
-   *
-   * Então lê-se do ficheiro. É a mesma decisão do `tons-do-documento.test.ts`:
-   * onde o desenho não se deixa medir, mede-se a declaração.
-   */
-  const clamps = () => {
-    const fonte = readFileSync(
-      join(process.cwd(), "src/app/[lang]/(privado)/proposta/[token]/Documento.tsx"),
-      "utf8",
-    );
-    const todos = [...fonte.matchAll(/fontSize:\s*"clamp\(\s*([\d.]+)px/g)].map((m) =>
-      Number(m[1]),
-    );
-    return todos;
-  };
-  /** A família, essa, sobrevive ao atributo — e é lida de lá. */
-  const familia = (el: HTMLElement) =>
-    ((el.getAttribute("style") ?? "").match(/font-family:\s*([^;]+)/)?.[1] ?? "").trim();
-
-  const capitulo = () => screen.getByRole("heading", { level: 2, name: /Serviços/ });
-  const momento = () => screen.getByRole("heading", { level: 3, name: /Decoração Cerimónia/ });
-
-  it("CONTROLO POSITIVO: os degraus estão desenhados, e os tamanhos foram lidos", () => {
-    // Sem isto, um selector errado ou uma expressão regular que deixasse de
-    // casar davam listas vazias e `undefined` — e o teste seguinte comparava
-    // nada com nada.
-    desenhar();
-    expect(screen.getByText("Arco floral")).toBeTruthy();
-    expect(screen.getByText("Com lisianthus")).toBeTruthy();
-    expect(capitulo()).toBeTruthy();
-    expect(momento()).toBeTruthy();
-    expect(clamps().length, "deixou de haver tamanhos em clamp no Documento.tsx").toBeGreaterThan(
-      1,
-    );
-  });
-
-  it("o nome do momento é da letra dos títulos, não da do texto", () => {
-    desenhar();
-    expect(familia(momento()), "o nome do momento saiu da letra dos títulos").toBe(
-      familia(capitulo()),
-    );
-    expect(familia(momento())).toContain("playfair");
-  });
-
-  it("o momento é MENOR do que o capítulo — é um degrau, não um empate", () => {
-    /**
-     * O `Documento.tsx` declara dois tamanhos em `clamp`: o do capítulo
-     * (`Titulo`) e o do momento (`Momento`), por esta ordem no ficheiro.
-     * O que se prende é a ORDEM entre eles, não os números — quem quiser
-     * afinar um tamanho pode; quem os empatar ou trocar não.
-     */
-    const [doCapitulo, doMomento] = clamps();
-    expect(doMomento, `momento ${doMomento} não é menor que capítulo ${doCapitulo}`).toBeLessThan(
-      doCapitulo,
-    );
-  });
-
-  it("o nome do serviço distingue-se da descrição por PESO, não por um pixel", () => {
-    /**
-     * A regra escrita ao contrário do que se corrigiu: NÃO se exige que o nome
-     * seja maior — não é, são 15 contra 14. Exige-se que seja mais pesado, que
-     * é de onde vem o degrau sem custar legibilidade à prosa dela.
-     *
-     * Lê-se a classe porque é isso que existe: ver o cabeçalho.
-     */
-    desenhar();
-    expect(screen.getByText("Arco floral").className).toMatch(/\bfont-medium\b/);
-    expect(
-      screen.getByText("Com lisianthus").className,
-      "a descrição ganhou peso — e aí o degrau desaparece outra vez",
-    ).not.toMatch(/\bfont-(medium|semibold|bold)\b/);
-  });
-
-  it("a descrição NÃO foi encolhida para arranjar o degrau", () => {
-    // O caminho fácil era descê-la um degrau. É prosa dela, escrita para ser
-    // lida: roubar-lhe tamanho para arrumar uma escala é pagar legibilidade
-    // com desenho. `text-sm` são os 14 px que ela já tinha.
-    desenhar();
-    expect(screen.getByText("Com lisianthus").className).toMatch(/\btext-sm\b/);
-  });
-
-  it("o mesmo degrau serve as fases do cronograma — é um só componente", () => {
-    // Estava escrito à mão nos dois sítios, com a linha de classes copiada.
-    desenhar({
-      serviceGroups: [],
-      cronograma: [{ title: "Montagem", items: ["Chegada às 8h"] }],
-    });
-    const fase = screen.getByRole("heading", { level: 3, name: "Montagem" });
-    expect(familia(fase)).toContain("playfair");
   });
 });

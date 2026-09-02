@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
@@ -61,20 +61,12 @@ function montar(apagar: () => unknown) {
   );
 }
 
-/**
- * Abre o menu «⋯» da primeira linha, carrega em «Apagar» e responde que sim.
- *
- * A pergunta deixou de ser o `confirm()` do browser e passou a ser a janela da
- * casa — folha inferior no telemóvel, ao pé do polegar. O que estes testes
- * medem, a reposição da linha quando o servidor recusa, não muda; muda o
- * caminho até lá.
- */
+/** Abre o menu «⋯» da primeira linha e carrega em «Apagar». A confirmação é um
+ *  `window.confirm`, e é irreversível de propósito: aqui responde-se que sim. */
 async function apagarAPrimeira() {
   const menus = screen.getAllByRole("button", { name: /Acções de Ana e Rui/ });
   await userEvent.click(menus[0]);
   await userEvent.click(screen.getAllByRole("menuitem", { name: "Apagar" })[0]);
-  const caixa = await screen.findByRole("dialog");
-  await userEvent.click(within(caixa).getByRole("button", { name: /^Apagar a proposta$/ }));
 }
 
 const aviso = () => screen.getByRole("alert").textContent ?? "";

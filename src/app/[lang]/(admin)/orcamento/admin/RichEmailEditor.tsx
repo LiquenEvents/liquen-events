@@ -190,7 +190,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
       <div
         role="toolbar"
         aria-label="Ferramentas de formatação"
-        className="flex flex-wrap items-center gap-1 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-1.5 mb-2"
+        className="flex flex-wrap items-center gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.03] p-1.5 mb-2"
       >
         <TbGroup>
           <TbButton label="Negrito" onRun={() => run("bold")}>
@@ -292,7 +292,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
               <div
                 role="menu"
                 aria-label="Cor do texto"
-                className="bo-entrada absolute z-10 mt-1 flex gap-1 rounded-lg border border-[var(--bo-hairline-strong)] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
+                className="bo-entrada absolute z-10 mt-1 flex gap-1 rounded-lg border border-foreground/10 bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
               >
                 {BRAND_TEXT_COLORS.map((c) => (
                   <button
@@ -303,7 +303,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
                     aria-label={c.label}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => applyColor(c.value)}
-                    className="h-6 w-6 rounded-full border border-[var(--bo-hairline-strong)]"
+                    className="h-6 w-6 rounded-full border border-foreground/15"
                     style={{ background: c.value }}
                   />
                 ))}
@@ -324,7 +324,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
         />
       )}
       {buttonOpen && (
-        <div className="mb-2 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-3">
+        <div className="mb-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
           <label className="bo-eyebrow block mb-1">Texto do botão</label>
           <input
             value={btnLabel}
@@ -352,7 +352,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
             <button
               type="button"
               onClick={() => setButtonOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)]"
+              className="px-3 py-1.5 rounded-lg text-xs text-foreground/55 hover:bg-foreground/[0.06]"
             >
               Cancelar
             </button>
@@ -372,7 +372,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
         onFocus={onFocus}
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
-        className="bo-input w-full min-h-[320px] px-3.5 py-3 text-sm leading-relaxed text-[var(--bo-text)] [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_a]:text-[#4d6350] [&_a]:underline"
+        className="bo-input w-full min-h-[320px] px-3.5 py-3 text-sm leading-relaxed text-foreground/80 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_a]:text-[#4d6350] [&_a]:underline"
       />
     </div>
   );
@@ -385,7 +385,7 @@ function TbGroup({ children }: { children: ReactNode }) {
 }
 
 function TbDivider() {
-  return <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--bo-tinta-10)]" />;
+  return <span aria-hidden className="mx-0.5 h-5 w-px bg-foreground/10" />;
 }
 
 function TbButton({
@@ -412,7 +412,7 @@ function TbButton({
       aria-expanded={onOpen ? !!expanded : undefined}
       onMouseDown={onRun ? (e) => e.preventDefault() : undefined}
       onClick={onOpen ?? onRun}
-      className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-[var(--bo-tinta-72)] hover:bg-white hover:text-[var(--bo-text)] motion-safe:transition-colors"
+      className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-foreground/70 hover:bg-white hover:text-foreground/90 motion-safe:transition-colors"
     >
       {children}
     </button>
@@ -435,7 +435,7 @@ function MiniForm({
   confirmLabel: string;
 }) {
   return (
-    <div className="mb-2 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-3">
+    <div className="mb-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
       <label className="bo-eyebrow block mb-1">{label}</label>
       <div className="flex gap-2">
         <input
@@ -460,7 +460,7 @@ function MiniForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)]"
+          className="px-3 py-1.5 rounded-lg text-xs text-foreground/55 hover:bg-foreground/[0.06]"
         >
           Cancelar
         </button>

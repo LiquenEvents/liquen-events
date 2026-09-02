@@ -104,12 +104,12 @@ export default function FollowUpField({ quote, onChange }: Props) {
           value={value}
           onChange={(e) => void persist(e.target.value || undefined)}
           aria-describedby={value ? hintId : undefined}
-          className="bo-input flex-1 px-3 py-2 text-sm text-[var(--bo-tinta-72)]"
+          className="bo-input flex-1 px-3 py-2 text-sm text-foreground/70"
         />
         {value && (
           <button
             onClick={() => void persist(undefined)}
-            className="alvo-toque px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-[var(--bo-text-muted)] transition-colors"
+            className="alvo-toque px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-foreground/65 transition-colors"
           >
             Limpar
           </button>
@@ -124,7 +124,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
           <button
             key={p.label}
             onClick={() => void persist(plusDays(p.days))}
-            className="alvo-toque px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] transition-colors"
+            className="alvo-toque px-2.5 py-1 rounded-full bg-foreground/[0.05] text-foreground/45 text-[11px] hover:bg-foreground/[0.09] hover:text-foreground/70 transition-colors"
           >
             {p.label}
           </button>

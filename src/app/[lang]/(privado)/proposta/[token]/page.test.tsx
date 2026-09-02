@@ -312,44 +312,6 @@ describe("página pública da proposta — o cumprimento", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
   });
 
-  /**
-   * ── E CUMPRIMENTAM-SE OS DOIS ────────────────────────────────────────────
-   *
-   * Palavras dela: «em vez de dizer Olá x diga o nome dos dois noivos».
-   *
-   * O `clientName` é o de QUEM PEDIU o orçamento — uma pessoa. Numa proposta de
-   * casamento há duas, e cumprimentar só uma delas na primeira linha que o
-   * casal lê é dizer-lhes que o documento é para um deles.
-   *
-   * O `doc.clientNames` é o campo que ela escreve no estúdio, e que o documento
-   * já mostra mais abaixo como «NOIVOS»: «Lola e João», na forma que ela
-   * escolheu. Usa-se o texto dela em vez de se inventar uma junção.
-   */
-  it("cumprimenta os DOIS noivos quando o documento os nomeia", async () => {
-    db.proposal = proposta({ clientName: "Lola Ferreira" });
-    db.proposal.doc = { ...(db.proposal.doc ?? {}), clientNames: "Lola e João" };
-    await abrir();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Lola e João.");
-  });
-
-  it("e o nome dos dois manda sobre o de quem pediu o orçamento", async () => {
-    // Sem isto, uma proposta com os dois nomes preenchidos continuava a
-    // cumprimentar só quem submeteu o formulário.
-    db.proposal = proposta({ clientName: "Ana Dias" });
-    db.proposal.doc = { ...(db.proposal.doc ?? {}), clientNames: "Ana e Rui" };
-    await abrir();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana e Rui.");
-  });
-
-  it("com o campo dos dois vazio, cai para o primeiro nome de quem pediu", async () => {
-    // A cascata mantém-se: as propostas antigas, criadas antes de este campo
-    // ser exigido, continuam a cumprimentar como sempre cumprimentaram.
-    db.proposal = proposta({ clientName: "Ana Dias" });
-    db.proposal.doc = { ...(db.proposal.doc ?? {}), clientNames: "   " };
-    await abrir();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
-  });
-
   it("sem nome nenhum, escreve «Olá.» — nunca «Olá, .»", async () => {
     db.proposal = proposta({ clientName: "" });
     await abrir();
@@ -376,76 +338,6 @@ describe("página pública da proposta — o cumprimento", () => {
     db.proposal = proposta({ clientName: "", idioma: "en" });
     await abrir("bom", "en");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Hello.");
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A ABERTURA É O NOME DELES — E AS PROPOSTAS ANTIGAS NÃO A ESTRAGAM
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Aqui viveu uma «frase de intenção»: um parágrafo escrito no Estúdio, por
- * proposta, que a página desenhava debaixo do nome do casal. Saiu por decisão
- * dela — mandou a fotografia do parágrafo e escreveu «nao quero estes textos
- * na proposta»; perguntei se era aquele texto ou o campo, e a resposta foi
- * «não quero o campo, ponto final».
- *
- * ── PORQUE É QUE APAGAR O CÓDIGO NÃO CHEGA ────────────────────────────────
- *
- * O campo foi apagado do Estúdio e da página, mas o VALOR não desaparece de
- * lado nenhum: vive dentro do `doc` (jsonb `proposals.doc`) de todas as
- * propostas em que alguém o escreveu, e essas propostas continuam a abrir-se
- * pelo link que o casal tem no email. Se um dia alguém voltar a passar o `doc`
- * por um componente que desenhe o que não conhece, a frase volta — numa
- * proposta que já foi enviada, por baixo de quem já a leu.
- *
- * É por isso que este teste dá à página uma proposta COM a frase guardada, e
- * não uma sem ela: a ausência que interessa provar é a do desenho, não a do
- * dado.
- */
-describe("a frase de intenção não volta pelas propostas que já a têm guardada", () => {
-  const FRASE = "Pensámos o vosso dia em branco e verde, com a serenidade do Alentejo.";
-
-  it("uma proposta com a frase guardada abre sem a desenhar", async () => {
-    db.proposal = proposta({
-      clientName: "Ana Dias",
-      doc: { ref: "PO Decoração", intencao: FRASE, intencaoEn: "We imagined your day…" },
-    });
-    await abrir();
-    // CONTROLO POSITIVO: a página abriu mesmo, e é a da proposta.
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
-    expect(screen.queryByText(FRASE), "a frase de intenção foi desenhada").toBeNull();
-  });
-
-  it("e em inglês também não — nem a caixa inglesa, nem o recurso ao português", async () => {
-    // A regra antiga caía para o português quando a caixa inglesa estava
-    // vazia. Se alguém a repuser sem pensar, é por aqui que ela reaparece.
-    db.proposal = proposta({
-      clientName: "Ana Dias",
-      idioma: "en",
-      doc: { ref: "PO Decoração", intencao: FRASE, intencaoEn: "" },
-    });
-    await abrir("bom", "en");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Hello, Ana.");
-    expect(screen.queryByText(FRASE)).toBeNull();
-  });
-
-  it("a abertura tem UM título e mais nada por baixo dele", async () => {
-    /**
-     * O teste acima procura a frase que conhecemos. Este não conhece frase
-     * nenhuma: mede o que a abertura CONTÉM. Um campo novo de prosa que
-     * alguém acrescente amanhã ao cabeçalho — outro nome, outra frase —
-     * aparece aqui sem ninguém ter de se lembrar de o vir escrever.
-     */
-    db.proposal = proposta({
-      clientName: "Ana Dias",
-      doc: { ref: "PO Decoração", intencao: FRASE },
-    });
-    await abrir();
-    const titulo = screen.getByRole("heading", { level: 1 });
-    const cabecalho = titulo.closest("header");
-    expect(cabecalho, "o cumprimento devia viver num <header>").not.toBeNull();
-    expect(cabecalho!.textContent?.trim()).toBe("Olá, Ana.");
   });
 });
 

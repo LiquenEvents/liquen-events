@@ -84,7 +84,7 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
   }, [lista]);
 
   return (
-    <div className="mt-2 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#fff)] p-3">
+    <div className="mt-2 rounded-xl border border-foreground/[0.10] bg-[var(--bo-surface,#fff)] p-3">
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="search"
@@ -136,11 +136,9 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
                       onEscolher(s);
                       toast(`"${s.nome}" acrescentado`, "success");
                     }}
-                    className="alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)]"
+                    className="alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-foreground/[0.12] hover:bg-foreground/[0.02]"
                   >
-                    <span className="block text-xs font-medium text-[var(--bo-text)]">
-                      {s.nome}
-                    </span>
+                    <span className="block text-xs font-medium text-foreground/80">{s.nome}</span>
                     {s.descricao && (
                       <span className="mt-0.5 block truncate text-[11px] text-foreground/45">
                         {s.descricao}

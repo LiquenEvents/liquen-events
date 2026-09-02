@@ -136,11 +136,8 @@ describe("um lote de derivadas", () => {
 
     await gerarLoteDeDerivadas("leve");
 
-    // Três fotografias, TRÊS derivadas AVIF cada (400, micro e 1200): nove
-    // escritas, três downloads. Eram duas até a de 1200 em AVIF existir — e é
-    // o número dos downloads que este passeio guarda, não o das escritas: uma
-    // família nova tem de sair do MESMO ficheiro descarregado.
-    expect(st.escritos).toHaveLength(9);
+    // Três fotografias, duas derivadas AVIF cada: seis escritas, três downloads.
+    expect(st.escritos).toHaveLength(6);
     expect(st.descarregados).toHaveLength(3);
     expect(new Set(st.descarregados).size).toBe(3);
   });

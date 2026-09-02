@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import { normalizeLocale } from "@/lib/i18n";
-import { Cortina } from "@/components/Cortina";
-import { MovimentoDaProposta } from "./MovimentoDaProposta";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -74,57 +71,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function LayoutPrivado({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ lang: string }>;
-}) {
-  const { lang } = await params;
-
+export default function LayoutPrivado({ children }: { children: React.ReactNode }) {
   // Sem `<main>` com o `pt-24` do sítio: aqui não há barra de navegação por
   // cima, e a página começa onde a página começa.
   return (
     <main id="conteudo" className="flex-1">
-      {/*
-        ── E PORQUE É QUE ELA TEM CHAVE DE SESSÃO ─────────────────────────
-
-        Palavras dela: «se eu volto para trás no browser aquilo fica assim um
-        bocado coiso».
-
-        Fica, e a razão é concreta: esta página é `force-dynamic`, portanto sai
-        com `no-store` — e uma página `no-store` NÃO entra na cache de
-        histórico do browser. Carregar em Voltar não é voltar: é carregar a
-        página toda de novo. Sem chave, a cortina de um segundo tocava outra
-        vez, e outra, a cada Voltar.
-
-        Com a chave, o casal vê a cortina UMA vez — a primeira, que é a que
-        interessa — e o Voltar devolve-lhes a proposta de imediato. Uma
-        proposta DIFERENTE no mesmo separador continua a ter a sua primeira
-        vez, porque é outro documento noutro separador ou noutra visita.
-
-        A CORTINA VEM DAQUI, E NÃO DO `loading.tsx`, POR UMA RAZÃO SÓ: a
-        língua. O `loading.tsx` não recebe parâmetros — está nos documentos do
-        Next à letra, e é por isso que ele não tem uma única frase escrita. Um
-        layout recebe, e o lema tem de chegar na língua do casal.
-
-        E chega ANTES do resto: o layout é das primeiras coisas que o servidor
-        entrega, portanto a cortina está no ecrã enquanto a proposta ainda vem
-        a caminho — que é o trabalho dela. O esqueleto do `loading.tsx` fica
-        por baixo, e continua a ser ele a nomear a espera para quem ouve o
-        ecrã e para quem pediu menos movimento.
-      */}
-      <Cortina locale={normalizeLocale(lang)} />
       {children}
-      {/*
-        O guião que põe o documento a mexer. Depois dos filhos, de propósito:
-        quando ele corre, o que há para medir já está no documento.
-
-        O porquê inteiro — e sobretudo porque é que ele NUNCA pode deixar uma
-        proposta em branco — está no ficheiro dele.
-      */}
-      <MovimentoDaProposta />
     </main>
   );
 }

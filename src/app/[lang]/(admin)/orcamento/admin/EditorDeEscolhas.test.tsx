@@ -201,10 +201,8 @@ describe("o destaque do «À escolha do casal»", () => {
   it("o nome é um título, e não um rótulo de campo", () => {
     render(<EditorDeEscolhas escolhas={[]} fotos={[]} bilingue={false} onChange={() => {}} />);
     const titulo = screen.getByRole("heading", { name: /À escolha do casal/i });
-    // Na letra de título do back office. Pede o TOKEN e não uma família: o
-    // back office passou a ter uma letra só, e quem escrevesse a família à mão
-    // ficava de fora dessa decisão (ver `letra-da-casa.test.ts`).
-    expect(titulo.getAttribute("style")).toContain("--font-display");
+    // Na serifada do documento — a mesma que dá nome às secções da proposta.
+    expect(titulo.getAttribute("style")).toContain("--font-playfair");
     expect(titulo.className).not.toContain("uppercase");
   });
 

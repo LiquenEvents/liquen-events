@@ -1,4 +1,3 @@
-import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { eurDocumento, milharesComPonto, montanteNaLingua } from "@/lib/money";
 import {
   depositPercentOf,
@@ -94,62 +93,6 @@ import { textosDaPagina, fase, type SeccaoDobravel } from "./textos-da-pagina";
  * As DATAS já eram localizadas e continuam.
  */
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A OFERTA EM AVIF DE UMA FOTOGRAFIA GRANDE
- * ════════════════════════════════════════════════════════════════════════════
- *
- * MEDIDO com o `sharp` deste projecto e seis fotografias reais do sítio, média
- * por fotografia:
- *
- *     lado    webp      avif     densidade num telemóvel de 390 pt
- *      400   22,5 KB   17,2 KB    1,1x
- *     1200  130,1 KB  105,3 KB    3,3x   ← a que o telemóvel escolhe hoje
- *
- * Numa proposta de quarenta e seis fotografias são 5,8 MB em WebP contra
- * 4,7 MB em AVIF: 19% menos, com os MESMOS pixéis. Não se mexe na resolução de
- * propósito — a queixa de fotografias «desfocadas» veio de servir MENOS pixéis
- * (a de 400 numa fatia que pedia 1030) e não se volta lá.
- *
- * ── `min-resolution: 1.5dppx`, e não «sempre» ─────────────────────────
- *
- * A oferta em AVIF só tem o candidato de 1200 (não há AVIF de 400 do lado
- * das propostas). Um `<source>` que casa DESLIGA o `srcset` do `<img>` — e
- * num ecrã de densidade 1, onde o navegador escolheria a de 400 (22 KB),
- * passar a servir a de 1200 em AVIF (105 KB) seria cinco vezes pior.
- *
- * A pergunta é então: a partir de que densidade é que a de 1200 JÁ ERA a
- * escolhida? O navegador escolhe a de 1200 quando a fatia pede mais de 400
- * pixéis, portanto a fronteira é `400 ÷ largura-da-fatia-em-pontos`. Com as
- * fatias que esta casa serve:
- *
- *     ecrã     fatia (pontos)   fronteira
- *      320 pt      294 (92vw)     1,36 dppx
- *      360 pt      331 (92vw)     1,21 dppx
- *      390 pt      359 (92vw)     1,11 dppx
- *      640 pt      294 (46vw)     1,36 dppx
- *     1024 pt     1024            0,39 dppx
- *
- * A pior de todas é 1,36. Um portão a 1,5 fica acima de todas elas: onde
- * ele casa, a de 1200 já era a escolhida, e a troca é estritamente melhor.
- *
- * ── E PORQUE É QUE DESCEU DE 2 PARA 1,5 ──────────────────────────────────
- *
- * Porque a 2 ficava de fora uma densidade inteira de gente: um portátil
- * Windows a 150% de escala reporta exactamente 1,5. Não é um caso de
- * laboratório — é como se vê uma proposta num escritório. E a conta acima
- * mostra que a 1,5 não há ecrã nenhum onde a troca piore alguma coisa.
- *
- * Guardado pelo `portao-do-avif.test.ts`, com esta aritmética lá dentro.
- *
- * `null` — nenhuma oferta — é o caso NORMAL de tudo o que foi carregado antes
- * de o bucket existir. O `<img>` ao lado existe sempre.
- */
-function OfertaAvif({ foto }: { foto?: { mediaAvif?: string } }) {
-  if (!foto?.mediaAvif) return null;
-  return <source type="image/avif" media="(min-resolution: 1.5dppx)" srcSet={foto.mediaAvif} />;
-}
-
 /** Um bloco de texto corrido — as notas, as condições, as observações. */
 function Lista({ itens }: { itens?: readonly string[] }) {
   const linhas = (itens ?? []).map((l) => l?.trim()).filter(Boolean);
@@ -158,7 +101,7 @@ function Lista({ itens }: { itens?: readonly string[] }) {
     <ul className="mt-4 space-y-2.5">
       {linhas.map((l, i) => (
         <li key={i} className="text-foreground/75 relative pl-5 text-[15px] leading-relaxed">
-          <span aria-hidden className="text-moss-dark absolute top-0 left-0">
+          <span aria-hidden className="text-moss/60 absolute top-0 left-0">
             ·
           </span>
           {l}
@@ -181,7 +124,7 @@ function Titulo({
   return (
     <header id={id} className="scroll-mt-6">
       {sobretitulo && (
-        <p className="text-foreground/70 mb-2 text-[10px] tracking-[0.4em] uppercase">
+        <p className="text-foreground/60 mb-2 text-[10px] tracking-[0.4em] uppercase">
           {sobretitulo}
         </p>
       )}
@@ -203,76 +146,8 @@ function Titulo({
  * voltar à esquerda), e as fotografias ficam com a largura toda, que é o que
  * esta página existe para lhes dar.
  */
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * O DEGRAU DO MEIO — «Cerimónia», «Jantar», «Bar e copo de água»
- * ════════════════════════════════════════════════════════════════════════════
- *
- * MEDIDO num 390×844, com uma proposta a sério. A escala desenhada desta
- * página era esta:
- *
- *     26 px  Playfair   «2. Serviços»            ← o capítulo
- *     17 px  Inter w500  «Cerimónia»             ← o momento
- *     15 px  Inter w400  «Arco floral»           ← o que ele leva
- *     14 px  Inter w400  «Em tons de branco…»    ← o que isso é
- *
- * Duas coisas estavam a esborratar-se aí.
- *
- * 1. O NOME DO MOMENTO ERA O ÚNICO TÍTULO EM LETRA DE TEXTO. Tudo o que
- *    titula nesta página é a serifada — a capa, os capítulos, o nome de cada
- *    mood board por cima da fotografia. Só este não era, e por isso o salto
- *    de 26 para 17 não se lia como um degrau: lia-se como o fim dos títulos.
- *    E «Cerimónia», «Jantar», «Bar» não são rótulos de lista — são os
- *    momentos do dia dela, que é o que esta proposta vende.
- *
- * 2. O NOME DO SERVIÇO E A SUA DESCRIÇÃO ERAM QUASE A MESMA COISA: 15 px
- *    contra 14, o mesmo peso, a mesma família. Um pixel e um tom de cinzento
- *    a separar «Arco floral» de «Em tons de branco e verde, com eucalipto e
- *    lisianthus» — num telemóvel ao sol, isso não é hierarquia nenhuma, e a
- *    lista do que o casal recebe lia-se como um bloco cinzento só.
- *
- * ── O QUE NÃO SE FEZ, E PORQUÊ ───────────────────────────────────────────
- *
- * Não se encolheu a descrição para ganhar o degrau. Era o caminho fácil — 14
- * para 13 dá logo dois pixéis de diferença — e é o errado: aquilo é prosa
- * dela, escrita para ser lida, e roubar-lhe tamanho para arrumar uma escala
- * é pagar legibilidade com desenho. O degrau vem do PESO e da força da tinta,
- * que é onde ele não custa nada a quem lê.
- *
- * ── UM SÓ SÍTIO ──────────────────────────────────────────────────────────
- *
- * Este título estava escrito à mão em dois sítios — nos grupos de serviços e
- * nas fases do cronograma — com a mesma linha de classes copiada. Passa a ser
- * um componente: o dia em que alguém mudar o degrau do meio, muda-o uma vez.
- */
-function Momento({ children }: { children: React.ReactNode }) {
-  return (
-    <h3
-      className="text-foreground/90 flex items-baseline gap-3 text-balance"
-      style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.6vw, 24px)" }}
-    >
-      {children}
-    </h3>
-  );
-}
-
-/**
- * ── `prop-chega`: a secção sobe ao entrar no ecrã ─────────────────────────
- *
- * A regra vive no `globals.css`, com as três leis de movimento desta casa
- * escritas por extenso. As duas que decidem esta linha:
- *
- *  · a opacidade NUNCA desce no repouso — se a animação não vier, a secção
- *    está lá na mesma, direita e legível;
- *  · não leva JavaScript nenhum — é o browser a segui-la fora do fio
- *    principal, o que importa numa página onde ela se queixou de travar.
- */
 function Seccao({ children, larga = false }: { children: React.ReactNode; larga?: boolean }) {
-  return (
-    <section className={`prop-chega mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>
-      {children}
-    </section>
-  );
+  return <section className={`mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>{children}</section>;
 }
 
 /**
@@ -324,7 +199,7 @@ function SeccaoDobrada({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-16 max-w-2xl sm:mt-24" data-sobe="seccao">
+    <section className="mt-16 max-w-2xl sm:mt-24">
       {/*
        * ABERTAS DE RAIZ — decisão dela, e a certa.
        *
@@ -359,12 +234,12 @@ function SeccaoDobrada({
               seria HTML inválido e um nível a menos no índice da página. */}
           <span
             aria-hidden
-            className="text-moss-dark absolute top-[0.35em] left-0 text-[13px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+            className="text-moss/70 absolute top-[0.35em] left-0 text-[13px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
           >
             ▸
           </span>
           {sobretitulo && (
-            <span className="text-foreground/70 mb-2 block text-[10px] tracking-[0.4em] uppercase">
+            <span className="text-foreground/60 mb-2 block text-[10px] tracking-[0.4em] uppercase">
               {sobretitulo}
             </span>
           )}
@@ -379,7 +254,7 @@ function SeccaoDobrada({
            * por baixo, uma linha a dizer do que ele trata passa a ser ruído
            * entre o título e a primeira cláusula.
            */}
-          <span className="text-foreground/70 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+          <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
             {resumo}
           </span>
         </summary>
@@ -487,27 +362,6 @@ export default function Documento({
   const capa = (doc.coverImages ?? [])
     .map((_, i) => porId.get(`c${i}`))
     .find((f) => f?.miniatura || f?.original);
-
-  /**
-   * ── O DEGRAU DO MEIO DA CAPA, QUE FALTAVA ─────────────────────────────────
-   *
-   * A capa tinha uma cascata de dois degraus: a miniatura de 400 e, se ela
-   * faltasse, o ORIGINAL. E o original é o ficheiro tal como saiu da máquina —
-   * 2,6 MB numa proposta típica.
-   *
-   * Quem não tem miniatura são precisamente as propostas ANTIGAS, anteriores ao
-   * bucket das miniaturas — as que estão nas caixas de correio de casais que
-   * podem voltar a abrir o link. Nessas, a capa era servida assim: o original
-   * inteiro, sem `srcSet` nenhum (o bloco todo era condicional à miniatura),
-   * com `fetchPriority="high"` e `decoding="sync"`. Megabytes, com prioridade
-   * máxima, descodificados no fio principal, como primeira coisa à vista.
-   *
-   * O degrau do meio existe e a grelha já o usava: a derivada de 1200 px, do
-   * CDN quando já está assinada, e da nossa rota quando ainda não existe — que
-   * é quem a fabrica. O original deixa de aparecer aqui: continua alcançável,
-   * mas pela rota, que o converte antes de o servir.
-   */
-  const capaMedia = capa ? (capa.media ?? enderecoDaRotaDaFoto(token, capa)) : "";
 
   // ── A APRESENTAÇÃO ────────────────────────────────────────────────────────
   // Os mesmos campos, pela mesma ordem, com a mesma regra do papel: um rótulo
@@ -790,29 +644,7 @@ export default function Documento({
           fotografia de capa resolvida. */}
       {capa && (
         <div
-          /**
-           * ── `mx-auto`: A CAPA VERTICAL ENCOSTAVA-SE À ESQUERDA ────────────
-           *
-           * Palavras dela, a olhar para a proposta no telemóvel: «a foto de
-           * capa não está ao meio».
-           *
-           * A causa é a combinação de `aspect-ratio` com `max-height` nesta
-           * caixa. Quando a altura bate no tecto — e bate nas capas VERTICAIS,
-           * que são altas — o navegador encolhe a LARGURA para manter a
-           * proporção. Uma caixa de bloco mais estreita do que o contentor fica
-           * encostada à esquerda, porque é isso que uma caixa de bloco faz.
-           *
-           * MEDIDO num Chromium, com um contentor de 350 px e uma caixa de
-           * `aspect-ratio: 3/4; max-height: 280px`: ficou com 210 px de largura,
-           * em `x = 0` — 140 px de vazio todo do lado direito. É exactamente o
-           * que se via na fotografia que ela mandou.
-           *
-           * Não se corrige tirando o `aspect-ratio` (é ele que reserva o espaço
-           * e impede o texto de saltar) nem o `max-height` (é ele que impede uma
-           * capa vertical de ocupar a página inteira antes de uma palavra). O
-           * que faltava era dizer o que fazer com o espaço que sobra: centrar.
-           */
-          className="relative mx-auto mb-12 overflow-hidden rounded-sm"
+          className="relative mb-12 overflow-hidden rounded-sm"
           style={{
             // 21:9 no telemóvel seria uma nesga; 3:2 numa janela larga seria
             // meia página antes de uma palavra. A forma real da fotografia,
@@ -844,78 +676,60 @@ export default function Documento({
               className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
             />
           )}
-          <picture>
-            <OfertaAvif foto={capa} />
-            {}
-            <img
-              src={capa.miniatura ?? capaMedia}
-              /**
-               * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
-               *
-               * A capa desenha-se com a largura toda do documento — até
-               * 1024 px numa janela larga, e num iPhone ~390 pontos com
-               * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
-               * conta da galeria, no sítio onde ela se vê mais: a primeira
-               * coisa que o casal olha ao abrir a proposta.
-               *
-               * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
-               *
-               * A derivada de 1200 px era servida SEMPRE pela nossa rota —
-               * que abre o token, descarrega os bytes para dentro da função
-               * e só então os reencaminha. Os mesmos bytes a atravessar-nos
-               * a caminho de um sítio onde já estavam, com um arranque a
-               * frio pelo meio. Assinada (`capa.media`), vem do CDN
-               * directamente ao telemóvel.
-               *
-               * A rota fica para quando a derivada ainda não foi fabricada:
-               * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
-               * de todos os dias e passa a ser o de arranque.
-               *
-               * A de 400 só entra na oferta quando existe. O que NÃO pode
-               * faltar é a de 1200: sem ela, um documento sem miniatura ficava
-               * sem candidato nenhum e servia o original inteiro.
-               */
-              srcSet={[capa.miniatura ? `${capa.miniatura} 400w` : null, `${capaMedia} 1200w`]
-                .filter(Boolean)
-                .join(", ")}
-              /* A capa ocupa a largura da página, com o tecto de 1024 px do
-               `max-w-5xl`. Sem isto o navegador assume `100vw` e num ecrã
-               grande pede a maior sem precisar. */
-              sizes="(min-width: 1024px) 1024px, 100vw"
-              alt=""
-              /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={capa.miniatura ?? capa.original}
+            {...(capa.miniatura
+              ? {
+                  /**
+                   * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
+                   *
+                   * A capa desenha-se com a largura toda do documento — até
+                   * 1024 px numa janela larga, e num iPhone ~390 pontos com
+                   * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
+                   * conta da galeria, no sítio onde ela se vê mais: a primeira
+                   * coisa que o casal olha ao abrir a proposta.
+                   *
+                   * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
+                   *
+                   * A derivada de 1200 px era servida SEMPRE pela nossa rota —
+                   * que abre o token, descarrega os bytes para dentro da função
+                   * e só então os reencaminha. Os mesmos bytes a atravessar-nos
+                   * a caminho de um sítio onde já estavam, com um arranque a
+                   * frio pelo meio. Assinada (`capa.media`), vem do CDN
+                   * directamente ao telemóvel.
+                   *
+                   * A rota fica para quando a derivada ainda não foi fabricada:
+                   * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
+                   * de todos os dias e passa a ser o de arranque.
+                   */
+                  srcSet: `${capa.miniatura} 400w, ${
+                    capa.media ??
+                    `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`
+                  } 1200w`,
+                  /* A capa ocupa a largura da página, com o tecto de 1024 px
+                     do `max-w-5xl`. Sem isto o navegador assume `100vw` e num
+                     ecrã grande pede a maior sem precisar. */
+                  sizes: "(min-width: 1024px) 1024px, 100vw",
+                }
+              : {})}
+            alt=""
+            /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
                de busca, porque é ela o elemento de maior pintura da página. */
-              fetchPriority="high"
-              /* `sync` e não `async`: numa imagem que já foi buscada com
+            fetchPriority="high"
+            /* `sync` e não `async`: numa imagem que já foi buscada com
                prioridade alta, descodificar fora do fio principal só adiciona um
                fotograma de espera entre «os bytes chegaram» e «vê-se». Nas
                outras da página continua `async`, que aí é o certo — são muitas
                e nenhuma é a que se está a olhar. */
-              /**
-               * `async` e não `sync`, e a troca tem uma razão medida.
-               *
-               * `sync` põe a descodificação da capa — ~200 KB a 1200 px — NA
-               * LINHA PRINCIPAL, no instante em que os bytes chegam. Num 4G
-               * esse instante cai dentro do segundo em que a cortina está a
-               * animar, e uma descodificação dessas é uma paragem de vários
-               * fotogramas. Era isto que ela via: «a animação trava um bocado».
-               *
-               * O que o `sync` comprava era um fotograma de espera. Pagava
-               * vários, e pagava-os no pior momento possível.
-               *
-               * O `fetchPriority="high"` FICA: continua a ser a fotografia
-               * mais importante da página e há-de ser pedida primeiro. O que
-               * muda é só onde ela é descodificada.
-               */
-              decoding="async"
-              className="relative block h-full w-full object-cover"
-            />
-          </picture>
+            decoding="sync"
+            className="relative block h-full w-full object-cover"
+          />
         </div>
       )}
 
       {/* ── APRESENTAÇÃO ─────────────────────────────────────────────────── */}
-      <div className="max-w-2xl" data-sobe="seccao">
+      <div className="max-w-2xl">
         <Titulo
           sobretitulo={t.sobretituloApresentacao}
           titulo={numerada("apresentacao", doc.headerTitle || t.tituloApresentacao)}
@@ -924,7 +738,7 @@ export default function Documento({
           <dl className="mt-7 grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
             {apresentacao.map(([chave, valor]) => (
               <div key={chave} className="border-foreground/8 border-t pt-3">
-                <dt className="text-foreground/70 text-[10px] tracking-[0.24em] uppercase">
+                <dt className="text-foreground/60 text-[10px] tracking-[0.24em] uppercase">
                   {t.campos[chave]}
                 </dt>
                 <dd className="text-foreground/85 mt-1 text-[15px] leading-relaxed">{valor}</dd>
@@ -935,7 +749,7 @@ export default function Documento({
 
         {indice.length > 1 && (
           <nav aria-label={p.nestaPagina} className="mt-10">
-            <p className="text-foreground/70 text-[10px] tracking-[0.3em] uppercase">
+            <p className="text-foreground/55 text-[10px] tracking-[0.3em] uppercase">
               {p.nestaPagina}
             </p>
             <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
@@ -965,17 +779,17 @@ export default function Documento({
           <div className="mt-8 space-y-9">
             {(doc.serviceGroups ?? []).map((g, i) => (
               <div key={g.id ?? i}>
-                <Momento>
+                <h3 className="text-foreground/85 flex items-baseline gap-3 text-[17px] font-medium">
                   {g.letter && (
-                    <span className="text-moss-dark text-xs tracking-[0.2em]">{g.letter}</span>
+                    <span className="text-moss/70 text-xs tracking-[0.2em]">{g.letter}</span>
                   )}
                   {g.title}
-                </Momento>
+                </h3>
                 {(g.items ?? []).length > 0 && (
                   <ul className="mt-3 space-y-2.5">
                     {(g.items ?? []).map((it, j) => (
                       <li key={it.id ?? j} className="border-foreground/8 border-t pt-2.5">
-                        <span className="text-foreground text-[15px] font-medium">{it.label}</span>
+                        <span className="text-foreground/85 text-[15px]">{it.label}</span>
                         {it.desc?.trim() && (
                           <span className="text-foreground/65 block text-sm leading-relaxed">
                             {it.desc}
@@ -1001,7 +815,7 @@ export default function Documento({
           <div className="mt-8 space-y-8">
             {(doc.cronograma ?? []).map((fase, i) => (
               <div key={i}>
-                <Momento>{fase.title}</Momento>
+                <h3 className="text-foreground/85 text-[17px] font-medium">{fase.title}</h3>
                 <Lista itens={fase.items} />
               </div>
             ))}
@@ -1069,7 +883,7 @@ export default function Documento({
                 >
                   <span className="text-foreground/85 text-[15px]">{r.item}</span>
                   {r.extra && (
-                    <span className="text-foreground/70 shrink-0 text-[11px] tracking-[0.14em] uppercase">
+                    <span className="text-foreground/55 shrink-0 text-[11px] tracking-[0.14em] uppercase">
                       {t.marcaExtra}
                     </span>
                   )}
@@ -1097,7 +911,7 @@ export default function Documento({
           )}
 
           {quantosExtras > 0 && (
-            <p className="text-foreground/70 mt-3 text-[13px] leading-relaxed">
+            <p className="text-foreground/60 mt-3 text-[13px] leading-relaxed">
               {quantosExtras === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(quantosExtras)}
             </p>
           )}
@@ -1187,12 +1001,8 @@ export default function Documento({
                  * porque num telemóvel um rótulo e um número de quarenta
                  * pontos lado a lado ou encolhem o número ou partem a linha.
                  */}
-                {/* O total sobe de 20 px — o único elemento do documento acima
-                    dos 14 das secções, e a razão é o que ele é. Não é mais
-                    alto nem mais forte: chega um instante DEPOIS das linhas
-                    que soma, que é como se lê uma conta. */}
-                <div className="border-foreground/15 mt-5 border-t pt-5" data-sobe="total">
-                  <p className="text-foreground/70 text-[11px] tracking-[0.22em] uppercase">
+                <div className="border-foreground/15 mt-5 border-t pt-5">
+                  <p className="text-foreground/60 text-[11px] tracking-[0.22em] uppercase">
                     {t.totalAPagar}
                   </p>
                   <p
@@ -1272,14 +1082,14 @@ export default function Documento({
               <summary className="marker:content-none pointer-coarse:min-h-11 relative cursor-pointer list-none pl-5 [&::-webkit-details-marker]:hidden">
                 <span
                   aria-hidden
-                  className="text-moss-dark absolute top-[0.2em] left-0 text-[11px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                  className="text-moss/70 absolute top-[0.2em] left-0 text-[11px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
                 >
                   ▸
                 </span>
                 <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
                   {t.notasImportantes}
                 </h3>
-                <span className="text-foreground/70 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+                <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
                   {resumoDe("notasImportantes", fixos.notasImportantes ?? [])}
                 </span>
               </summary>
@@ -1369,7 +1179,7 @@ export default function Documento({
         >
           <Lista itens={fixos.faseamento} />
           {totais.aPagar > 0 && (
-            <p className="text-foreground/70 mt-4 text-[13px] leading-relaxed">
+            <p className="text-foreground/60 mt-4 text-[13px] leading-relaxed">
               {t.baseDoCalculo(eur(totais.aPagar))}
             </p>
           )}
@@ -1391,31 +1201,13 @@ export default function Documento({
           que ela faz é acabar a proposta com o trabalho dela em vez de uma
           cláusula de arbitragem. */}
       {fecho && (
-        <div className="relative mt-20 overflow-hidden rounded-sm sm:mt-28" data-sobe="foto">
-          {/* O MESMO BORRÃO DA CAPA, que esta tinha ficado sem.
-              O `lqip` são poucas centenas de bytes que já vêm no HTML: está
-              pintado antes de qualquer ida à rede. Aqui a fotografia é
-              preguiçosa de propósito (está no fim de uma página com quarenta e
-              seis), e uma imagem preguiçosa sem borrão é um rectângulo vazio a
-              ocupar meio ecrã no momento em que o casal chega ao fim da
-              proposta — a última coisa que vê. */}
-          {fecho.lqip && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={fecho.lqip}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
-            />
-          )}
-          <picture>
-            <OfertaAvif foto={fecho} />
-            {}
-            <img
-              src={fecho.miniatura ?? fecho.original}
-              {...(fecho.miniatura
-                ? {
-                    /* A MESMA regra da capa, que esta tinha ficado sem: com a
+        <div className="mt-20 overflow-hidden rounded-sm sm:mt-28">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fecho.miniatura ?? fecho.original}
+            {...(fecho.miniatura
+              ? {
+                  /* A MESMA regra da capa, que esta tinha ficado sem: com a
                      derivada assinada (`fecho.media`), os bytes vêm do CDN
                      directos ao telemóvel. A nossa rota abre o token,
                      descarrega os bytes para dentro da função e só então os
@@ -1423,31 +1215,26 @@ export default function Documento({
                      de um sítio onde já estavam, com um arranque a frio pelo
                      meio. Fica para quando a derivada ainda não existe: é ela
                      que a fabrica e guarda. */
-                    srcSet: `${fecho.miniatura} 400w, ${
-                      fecho.media ?? enderecoDaRotaDaFoto(token, fecho)
-                    } 1200w`,
-                    sizes: "(min-width: 1024px) 1024px, 100vw",
-                  }
-                : {})}
-              alt=""
-              /* Preguiçosa, ao contrário da capa: está no fim de uma página com
+                  srcSet: `${fecho.miniatura} 400w, ${
+                    fecho.media ??
+                    `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)}`
+                  } 1200w`,
+                  sizes: "(min-width: 1024px) 1024px, 100vw",
+                }
+              : {})}
+            alt=""
+            /* Preguiçosa, ao contrário da capa: está no fim de uma página com
                quarenta e seis fotografias, e quem lá chega já esperou o que
                tinha a esperar. */
-              loading="lazy"
-              decoding="async"
-              /* `relative`: o borrão está em `absolute` por baixo, e sem isto a
-                 fotografia a sério ficava ATRÁS dele. */
-              /* `mx-auto block` pela mesma razão da capa: `aspect-ratio` com
-                 `max-height` encolhe a largura quando a altura bate no tecto, e
-                 o que sobrava ficava todo de um lado. Ver a nota na capa. */
-              className="relative mx-auto block w-full object-cover"
-              style={{
-                aspectRatio:
-                  fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",
-                maxHeight: "min(62vh, 560px)",
-              }}
-            />
-          </picture>
+            loading="lazy"
+            decoding="async"
+            className="w-full object-cover"
+            style={{
+              aspectRatio:
+                fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",
+              maxHeight: "min(62vh, 560px)",
+            }}
+          />
         </div>
       )}
     </article>

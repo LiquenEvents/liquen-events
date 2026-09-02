@@ -33,8 +33,6 @@ const st = vi.hoisted(() => ({
   subirRebenta: false,
   /** Quantas vezes se tentou criar o bucket. */
   criacoes: 0,
-  /** Quantas vezes se DESCEU um ficheiro — a pergunta «existe?» não pode. */
-  descidas: 0,
   cliente: null as unknown,
 }));
 
@@ -44,7 +42,6 @@ vi.mock("./logger", () => ({ log: { warn: vi.fn(), error: vi.fn(), info: vi.fn()
 import {
   guardarPdfDaProposta,
   lerPdfDaProposta,
-  existePdfDaProposta,
   esquecerBucketDePdfs,
 } from "./proposal-pdf-guardado";
 
@@ -70,26 +67,7 @@ function storageFalso() {
             st.ficheiros.set(caminho, bytes);
             return { error: null };
           },
-          async list(pasta: string, opcoes?: { search?: string; limit?: number }) {
-            const prefixo = `${pasta}/`;
-            const procura = (opcoes?.search ?? "").toLowerCase();
-            const nomes = [...st.ficheiros.keys()]
-              .filter((c) => c.startsWith(prefixo))
-              .map((c) => c.slice(prefixo.length))
-              /**
-               * `search` do Storage é um `ilike`, e portanto INSENSÍVEL A
-               * MAIÚSCULAS. As chaves são `base64url` — `A` e `a` são chaves
-               * diferentes e ficheiros diferentes. É por isso que a função
-               * confere o nome à letra depois de listar, e é isso que este
-               * duplo tem de reproduzir: um duplo sensível a maiúsculas fazia
-               * a confirmação passar por não haver nada que a pusesse à prova.
-               */
-              .filter((nome) => !procura || nome.toLowerCase().startsWith(procura))
-              .slice(0, opcoes?.limit ?? 100);
-            return { data: nomes.map((name) => ({ name })), error: null };
-          },
           async download(caminho: string) {
-            st.descidas += 1;
             const b = st.ficheiros.get(caminho);
             if (!b) return { data: null, error: { message: "Object not found" } };
             // `new Uint8Array(b)` e não o `Buffer` directo: o `Buffer` do Node
@@ -110,7 +88,6 @@ beforeEach(() => {
   st.criarRebenta = false;
   st.subirRebenta = false;
   st.criacoes = 0;
-  st.descidas = 0;
   st.cliente = storageFalso();
   esquecerBucketDePdfs();
 });
@@ -191,103 +168,5 @@ describe("guardar e ler o PDF de uma proposta", () => {
     // O caminho é construído aqui; um id vindo de fora não pode subir níveis.
     await guardarPdfDaProposta("../../outra", "chave-A", BYTES);
     expect([...st.ficheiros.keys()].every((c) => !c.includes(".."))).toBe(true);
-  });
-});
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * PERGUNTAR «JÁ ESTÁ LÁ?» NÃO É O MESMO QUE O IR BUSCAR
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O aquecimento nocturno faz esta pergunta uma vez por proposta, e a resposta
- * quase sempre é «sim». Fazê-la com o `lerPdfDaProposta` era descer o ficheiro
- * inteiro — megabytes — para o deitar fora a seguir, multiplicado por todas as
- * propostas que ela já enviou, todas as noites.
- */
-describe("saber se o PDF já lá está, sem o trazer", () => {
-  it("diz que sim quando lá está, e sem descer um byte", async () => {
-    await guardarPdfDaProposta("p-1", "chave-A", BYTES);
-    st.descidas = 0;
-
-    expect(await existePdfDaProposta("p-1", "chave-A")).toBe(true);
-    expect(st.descidas, "a pergunta desceu o ficheiro em vez de o listar").toBe(0);
-  });
-
-  it("diz que não quando não está", async () => {
-    await guardarPdfDaProposta("p-1", "chave-A", BYTES);
-
-    expect(await existePdfDaProposta("p-1", "chave-B")).toBe(false);
-    expect(await existePdfDaProposta("p-2", "chave-A")).toBe(false);
-  });
-
-  /**
-   * A armadilha, e a razão de a função conferir o nome à letra depois de
-   * listar.
-   *
-   * O `search` do Storage é um `ilike`: não distingue maiúsculas. As chaves
-   * são `sha256` em `base64url`, onde `A` e `a` são caracteres diferentes e
-   * portanto ficheiros diferentes — dois documentos distintos podem dar chaves
-   * que só diferem numa caixa. Sem a confirmação à letra, o aquecimento via o
-   * PDF de OUTRO documento e dava esta proposta por feita.
-   *
-   * Um falso «existe» é o pior dos dois erros: a proposta fica por aquecer e
-   * ninguém dá por isso.
-   */
-  it("uma chave que só difere nas maiúsculas não passa pela outra", async () => {
-    await guardarPdfDaProposta("p-1", "chaveMAIUSCULA", BYTES);
-
-    expect(await existePdfDaProposta("p-1", "chavemaiuscula")).toBe(false);
-    // E a verdadeira continua a ser encontrada — senão isto passava por
-    // responder «não» a tudo.
-    expect(await existePdfDaProposta("p-1", "chaveMAIUSCULA")).toBe(true);
-  });
-
-  it("sem id, sem chave, ou sem armazenamento, a resposta é «não sei» — que é «não»", async () => {
-    // As duas respostas levam ao mesmo sítio: desenhar. Distingui-las aqui só
-    // daria a quem chama uma decisão que não tem de tomar.
-    expect(await existePdfDaProposta("", "chave-A")).toBe(false);
-    expect(await existePdfDaProposta("p-1", "")).toBe(false);
-    st.cliente = null;
-    expect(await existePdfDaProposta("p-1", "chave-A")).toBe(false);
-  });
-
-  it("um armazenamento que rebenta não lança — responde que não", async () => {
-    st.cliente = {
-      storage: {
-        from() {
-          return {
-            async list() {
-              throw new Error("a rede caiu");
-            },
-          };
-        },
-      },
-    };
-    await expect(existePdfDaProposta("p-1", "chave-A")).resolves.toBe(false);
-  });
-
-  it("saneia o id da mesma maneira que a gravação", async () => {
-    /**
-     * Aqui estava um `resolves.toBe(false)` sobre um id de travessia, e não
-     * conseguia reprovar: sem ficheiro nenhum naquele sítio, a resposta era
-     * «não» com ou sem saneamento. Um teste que não distingue o certo do
-     * errado.
-     *
-     * O que importa não é a resposta a um id estranho: é que as DUAS metades
-     * concordem. A gravação constrói o caminho com o id saneado; se a pergunta
-     * o construísse de outra maneira, procurava numa pasta onde nunca ninguém
-     * escreveu e respondia «não existe» a um ficheiro que existe — e o
-     * aquecimento redesenhava-o todas as noites, para sempre.
-     */
-    await guardarPdfDaProposta("../../outra", "chave-A", BYTES);
-
-    expect(
-      await existePdfDaProposta("../../outra", "chave-A"),
-      "a pergunta e a gravação deixaram de construir o mesmo caminho",
-    ).toBe(true);
-    expect(
-      [...st.ficheiros.keys()].every((c) => !c.includes("..")),
-      "o caminho escapou",
-    ).toBe(true);
   });
 });

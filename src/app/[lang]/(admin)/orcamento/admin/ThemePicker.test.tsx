@@ -1606,14 +1606,9 @@ describe("os chips lêem-se", () => {
   it("o tom é escrito, e não o 55% do botão fantasma", async () => {
     await openPicker(true);
     const chip = screen.getByRole("button", { name: /^Terracotta,/ });
-    // O 55% do fantasma dá ~4,5:1 — em cima da linha da AA para letra pequena, e
-    // estes chips são a navegação deste painel. Por isso pedem um degrau acima.
-    //
-    // Era `text-foreground/75`, escrito à mão; passou a ser o degrau `72` da
-    // escada da tinta (8,03:1). O que este teste guarda não muda: que o chip
-    // NÃO herda o tom do fantasma.
-    expect(chip.className).toContain("text-[var(--bo-tinta-72)]");
-    expect(chip.className).not.toContain("text-foreground/55");
+    // 55% dá ~4,5:1 — em cima da linha da AA para letra pequena, e estes chips
+    // são a navegação deste painel.
+    expect(chip.className).toContain("text-foreground/75");
   });
 });
 
