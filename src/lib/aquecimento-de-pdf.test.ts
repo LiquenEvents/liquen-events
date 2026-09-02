@@ -41,14 +41,24 @@ const est = vi.hoisted(() => ({
   msPorDesenho: 0,
   agora: 0,
   esvaziou: 0,
+  /** Quantas vezes se PERGUNTOU ao armazenamento. A contagem não pode perguntar. */
+  perguntas: 0,
+  /** Para provar que uma base de dados calada não derruba nada. */
+  aListaRebenta: false,
 }));
 
 vi.mock("@/lib/proposals-store", () => ({
-  listAllProposals: async () => est.propostas,
+  listAllProposals: async () => {
+    if (est.aListaRebenta) throw new Error("sem rede");
+    return est.propostas;
+  },
 }));
 
 vi.mock("@/lib/proposal-pdf-guardado", () => ({
-  existePdfDaProposta: async (id: string, chave: string) => est.existentes.has(`${id}/${chave}`),
+  existePdfDaProposta: async (id: string, chave: string) => {
+    est.perguntas++;
+    return est.existentes.has(`${id}/${chave}`);
+  },
 }));
 
 vi.mock("@/lib/app-state", () => ({
@@ -96,6 +106,7 @@ import {
   TENTATIVAS_ATE_DESISTIR,
   ESPERA_APOS_FALHA_MS,
   CHAVE_DO_ESTADO,
+  contarPorAquecer,
   type EstadoDoAquecimento,
 } from "./aquecimento-de-pdf";
 
@@ -126,6 +137,8 @@ beforeEach(() => {
   est.rebentaEm = new Map();
   est.msPorDesenho = 0;
   est.esvaziou = 0;
+  est.perguntas = 0;
+  est.aListaRebenta = false;
   relogioParado();
 });
 
@@ -451,5 +464,115 @@ describe("o chão do orçamento cabe o pior desenho", () => {
     expect(fonte, "o chão deixou de travar o arranque de um desenho").toMatch(
       /limite - Date\.now\(\) < CHAO_MS/,
     );
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PERGUNTA BARATA: QUANTAS FALTAM?
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Ninguém sabia o tamanho da fila. «Aquecer tudo» sem saber quantas são é um
+ * botão que se carrega às cegas, e a regra dela é que nunca há um estado de
+ * espera sem nome.
+ *
+ * O que se prende aqui é sobretudo o que a contagem NÃO faz: não desenha, não
+ * pergunta ao armazenamento e não escreve estado nenhum. Uma contagem cara é
+ * uma contagem que ninguém pede — e um botão de contar que desenha PDF é a
+ * pior maneira possível de descobrir quantos faltam.
+ */
+describe("contar as propostas por aquecer", () => {
+  it("conta sem desenhar, sem perguntar ao armazenamento e sem gravar nada", async () => {
+    est.propostas = [proposta("a"), proposta("b"), proposta("c")];
+    const c = await contarPorAquecer();
+
+    expect(c.enviadas).toBe(3);
+    expect(c.porAquecer).toBe(3);
+    expect(est.desenhadas, "contar não desenha").toEqual([]);
+    expect(est.perguntas, "contar não fala com o armazenamento").toBe(0);
+    expect(est.gravado, "contar não escreve estado").toBeNull();
+  });
+
+  it("as que já se confirmou quentes não contam", async () => {
+    est.propostas = [proposta("a"), proposta("b")];
+    est.estado = { falhadas: {}, feitas: { a: "k-a-pt" } } satisfies EstadoDoAquecimento;
+
+    const c = await contarPorAquecer();
+    expect(c.quentes).toBe(1);
+    expect(c.porAquecer).toBe(1);
+  });
+
+  it("uma proposta REVISTA volta a contar como fria", async () => {
+    /**
+     * A garantia que faz esta memória ser segura: a chave é o `sha256` do
+     * CONTEÚDO. Se ela reviu o documento, a chave muda, não bate com o que
+     * está guardado, e a proposta volta à fila — que é o que tem de acontecer,
+     * porque o PDF guardado é agora o da versão antiga.
+     */
+    est.propostas = [proposta("a")];
+    est.estado = { falhadas: {}, feitas: { a: "k-VERSAO-ANTIGA-pt" } };
+
+    const c = await contarPorAquecer();
+    expect(c.quentes).toBe(0);
+    expect(c.porAquecer).toBe(1);
+  });
+
+  it("as que já desistiram saem da conta — senão o número nunca chegava a zero", async () => {
+    est.propostas = [proposta("a"), proposta("b")];
+    est.estado = {
+      falhadas: {
+        a: {
+          emFalta: 1,
+          tentadaEm: new Date(est.agora).toISOString(),
+          tentativas: TENTATIVAS_ATE_DESISTIR,
+        },
+      },
+    } satisfies EstadoDoAquecimento;
+
+    const c = await contarPorAquecer();
+    expect(c.desistidas).toBe(1);
+    expect(c.porAquecer, "uma que nunca será feita não é trabalho por fazer").toBe(1);
+  });
+
+  it("as adiadas contam como por aquecer — só ainda não é a vez delas", async () => {
+    // Falhou ontem: fica para a semana que vem, mas continua a faltar. Não
+    // mostrá-la era dizer que está tudo quente quando não está.
+    est.propostas = [proposta("a")];
+    est.estado = {
+      falhadas: {
+        a: {
+          emFalta: 0,
+          tentadaEm: new Date(est.agora - ESPERA_APOS_FALHA_MS / 7).toISOString(),
+          tentativas: 1,
+        },
+      },
+    } satisfies EstadoDoAquecimento;
+
+    const c = await contarPorAquecer();
+    expect(c.adiadas).toBe(1);
+    expect(c.porAquecer).toBe(1);
+  });
+
+  it("uma proposta sem documento ou por enviar não é candidata a nada", async () => {
+    // As de linhas, criadas em `/api/propostas`, nunca tiveram documento; e uma
+    // que ainda não seguiu para ninguém não tem quem lhe abra o link.
+    est.propostas = [
+      proposta("a"),
+      { id: "sem-doc", sentAt: "2026-08-01T10:00:00.000Z" },
+      proposta("por-enviar", { sentAt: null }),
+    ];
+    const c = await contarPorAquecer();
+    expect(c.enviadas).toBe(1);
+    expect(c.porAquecer).toBe(1);
+  });
+
+  it("se a base de dados não responder, devolve zeros em vez de rebentar", async () => {
+    // Isto alimenta um número no ecrã dela. Um número que falta é melhor do
+    // que um painel que não abre.
+    est.propostas = [proposta("a")];
+    est.aListaRebenta = true;
+
+    const c = await contarPorAquecer();
+    expect(c).toEqual({ enviadas: 0, quentes: 0, desistidas: 0, adiadas: 0, porAquecer: 0 });
   });
 });

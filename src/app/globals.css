@@ -3625,3 +3625,134 @@ body:has(.barra-consentimento) footer {
     display: none !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A CORTINA DA PROPOSTA
+   ══════════════════════════════════════════════════════════════════════════
+
+   O porquê inteiro está no `CortinaDaProposta.tsx`. O que interessa saber
+   aqui, ao ler o CSS: esta cortina NÃO segura o ecrã. O `140ms` de atraso na
+   entrada é o que faz uma proposta rápida nunca chegar a pintá-la, e o
+   `3.5s` da subida é a saída que não precisa de JavaScript nenhum.
+
+   Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
+
+/* Cada grupo de palavras: sobe do seu degrau, materializa-se até aos 35%,
+   fica legível até aos 65% e sai pelo mesmo degrau, ao contrário. É a leitura
+   dela do efeito — a profundidade em camadas vem das distâncias diferentes,
+   não do fade. */
+@keyframes cortina-palavras {
+  0% {
+    opacity: 0;
+    transform: translateY(var(--degrau, 14px));
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(var(--degrau, 14px) * -1));
+  }
+}
+
+@keyframes cortina-a-aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cortina-a-subir {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+.cortina {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  /* O verde-quase-preto da casa, e não o preto do exemplo. É o mesmo tom que
+     já está por baixo das fotografias (`--color-noite`), escolhido para
+     impedir um flash branco — o trabalho é o mesmo, à escala do ecrã. */
+  background: var(--color-noite);
+  /* Nasce invisível. A entrada só arranca aos 140ms: uma proposta que chegue
+     antes disso levanta a cortina sem ela ter sido pintada uma única vez. */
+  opacity: 0;
+  animation:
+    cortina-a-aparecer 0.18s linear 0.14s forwards,
+    /* A SAÍDA SEM JAVASCRIPT. Se o guião não correr — bloqueado, falhado,
+       desligado —, é esta linha que impede um casal de ficar preso a olhar
+       para um ecrã escuro com a proposta por baixo. */
+    cortina-a-subir 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) 3.5s forwards;
+}
+
+/* Posta pelo guião quando o documento acabou de ser lido. Substitui as duas
+   animações de cima: a `opacity: 1` fixa o que a entrada já tinha alcançado,
+   para a subida não começar por um salto. */
+.cortina--a-sair {
+  opacity: 1;
+  animation: cortina-a-subir 0.3s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+.cortina__lema {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 300;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--color-cream);
+  /* Um texto claro sobre escuro engorda; o espacejamento negativo devolve-lhe
+     a forma que tem no rodapé, que é onde o casal o volta a encontrar. */
+  letter-spacing: -0.01em;
+}
+
+.cortina__lema > span {
+  display: block;
+  opacity: 0;
+  animation: cortina-palavras 2s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+@media (min-width: 640px) {
+  .cortina__lema {
+    font-size: 28px;
+  }
+}
+@media (min-width: 768px) {
+  .cortina__lema {
+    font-size: 32px;
+  }
+}
+@media (min-width: 1024px) {
+  .cortina__lema {
+    font-size: 35px;
+  }
+}
+
+/* Quem pediu menos movimento não leva cortina NENHUMA — não uma mais calma.
+   O ecrã de espera do `loading.tsx` continua a dizer que algo está a
+   acontecer, que é o que a regra exige; o que desaparece é uma cortina a
+   deslizar por cima da proposta de quem pediu para não a ver. */
+@media (prefers-reduced-motion: reduce) {
+  .cortina {
+    display: none;
+  }
+}

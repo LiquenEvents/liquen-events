@@ -312,6 +312,44 @@ describe("página pública da proposta — o cumprimento", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
   });
 
+  /**
+   * ── E CUMPRIMENTAM-SE OS DOIS ────────────────────────────────────────────
+   *
+   * Palavras dela: «em vez de dizer Olá x diga o nome dos dois noivos».
+   *
+   * O `clientName` é o de QUEM PEDIU o orçamento — uma pessoa. Numa proposta de
+   * casamento há duas, e cumprimentar só uma delas na primeira linha que o
+   * casal lê é dizer-lhes que o documento é para um deles.
+   *
+   * O `doc.clientNames` é o campo que ela escreve no estúdio, e que o documento
+   * já mostra mais abaixo como «NOIVOS»: «Lola e João», na forma que ela
+   * escolheu. Usa-se o texto dela em vez de se inventar uma junção.
+   */
+  it("cumprimenta os DOIS noivos quando o documento os nomeia", async () => {
+    db.proposal = proposta({ clientName: "Lola Ferreira" });
+    db.proposal.doc = { ...(db.proposal.doc ?? {}), clientNames: "Lola e João" };
+    await abrir();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Lola e João.");
+  });
+
+  it("e o nome dos dois manda sobre o de quem pediu o orçamento", async () => {
+    // Sem isto, uma proposta com os dois nomes preenchidos continuava a
+    // cumprimentar só quem submeteu o formulário.
+    db.proposal = proposta({ clientName: "Ana Dias" });
+    db.proposal.doc = { ...(db.proposal.doc ?? {}), clientNames: "Ana e Rui" };
+    await abrir();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana e Rui.");
+  });
+
+  it("com o campo dos dois vazio, cai para o primeiro nome de quem pediu", async () => {
+    // A cascata mantém-se: as propostas antigas, criadas antes de este campo
+    // ser exigido, continuam a cumprimentar como sempre cumprimentaram.
+    db.proposal = proposta({ clientName: "Ana Dias" });
+    db.proposal.doc = { ...(db.proposal.doc ?? {}), clientNames: "   " };
+    await abrir();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
+  });
+
   it("sem nome nenhum, escreve «Olá.» — nunca «Olá, .»", async () => {
     db.proposal = proposta({ clientName: "" });
     await abrir();

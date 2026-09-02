@@ -24,11 +24,25 @@ import { join } from "node:path";
 afterEach(cleanup);
 
 const FOTOS: FotoDaProposta[] = [
-  { id: "c0", miniatura: "mini/capa", original: "orig/capa", largura: 1600, altura: 1067 },
-  { id: "b0f0", miniatura: "mini/0-0", original: "orig/0-0", largura: 1200, altura: 800 },
-  { id: "b0f1", miniatura: "mini/0-1", original: "orig/0-1" },
+  {
+    id: "c0",
+    marca: "mc0",
+    miniatura: "mini/capa",
+    original: "orig/capa",
+    largura: 1600,
+    altura: 1067,
+  },
+  {
+    id: "b0f0",
+    marca: "mb0f0",
+    miniatura: "mini/0-0",
+    original: "orig/0-0",
+    largura: 1200,
+    altura: 800,
+  },
+  { id: "b0f1", marca: "mb0f1", miniatura: "mini/0-1", original: "orig/0-1" },
   // b0f2 NÃO resolveu: nem miniatura nem original. Não pode virar buraco.
-  { id: "b0f2" },
+  { id: "b0f2", marca: "mb0f2" },
 ];
 
 const DOC: ProposalDoc = {
@@ -202,7 +216,7 @@ describe("as fotografias", () => {
     desenhar();
     const srcset = capa().getAttribute("srcset") ?? "";
     expect(srcset).toContain("mini/capa 400w");
-    expect(srcset).toContain("/api/proposta/tk/foto/c0 1200w");
+    expect(srcset).toContain("/api/proposta/tk/foto/c0?v=mc0 1200w");
   });
 
   /**
@@ -220,7 +234,9 @@ describe("as fotografias", () => {
       <Documento
         doc={DOC}
         idioma="pt"
-        fotos={[{ id: "c0", miniatura: "mini/capa", media: "https://cdn/media-capa" }]}
+        fotos={[
+          { id: "c0", marca: "mc0", miniatura: "mini/capa", media: "https://cdn/media-capa" },
+        ]}
         token="tk"
       />,
     );
@@ -240,7 +256,9 @@ describe("as fotografias", () => {
       <Documento
         doc={DOC}
         idioma="pt"
-        fotos={[{ id: "c0", miniatura: "mini/capa", lqip: "data:image/jpeg;base64,AAAA" }]}
+        fotos={[
+          { id: "c0", marca: "mc0", miniatura: "mini/capa", lqip: "data:image/jpeg;base64,AAAA" },
+        ]}
         token="tk"
       />,
     );
@@ -249,6 +267,41 @@ describe("as fotografias", () => {
     // E é decorativo: quem ouve a página não pode encontrar a mesma fotografia
     // duas vezes.
     expect(borrao?.getAttribute("alt")).toBe("");
+  });
+
+  /**
+   * ── A CAPA VERTICAL ENCOSTAVA-SE À ESQUERDA ──────────────────────────────
+   *
+   * Palavras dela, a olhar para a proposta no telemóvel: «a foto de capa não
+   * está ao meio».
+   *
+   * A caixa da capa tem `aspect-ratio` E `max-height`. Quando a altura bate no
+   * tecto — e bate nas capas VERTICAIS, que são altas — o navegador encolhe a
+   * LARGURA para manter a proporção. E uma caixa de bloco mais estreita do que
+   * o contentor fica encostada à esquerda, porque é isso que uma caixa de bloco
+   * faz.
+   *
+   * MEDIDO num Chromium, com um contentor de 350 px e uma caixa de
+   * `aspect-ratio: 3/4; max-height: 280px`: largura 210 px, `x = 0`. Cento e
+   * quarenta pixéis de vazio, todos do lado direito.
+   *
+   * Não se corrige tirando o `aspect-ratio` (reserva o espaço e impede o texto
+   * de saltar) nem o `max-height` (impede uma capa vertical de ocupar a página
+   * inteira antes de uma palavra). O que faltava era dizer o que fazer com o
+   * espaço que sobra.
+   *
+   * Isto verifica-se pela classe e não pela geometria, porque o jsdom não faz
+   * layout: não sabe calcular `aspect-ratio` nem `max-height`, e um teste que
+   * medisse `getBoundingClientRect` aqui daria zeros e passaria sempre.
+   */
+  it("a caixa da capa fica centrada quando encolhe", () => {
+    desenhar();
+    const caixa = capa().closest("[style*='aspect-ratio']");
+    expect(caixa, "nenhuma caixa à volta da capa").not.toBeNull();
+    expect(
+      caixa?.className,
+      "a capa volta a encostar-se à esquerda quando a altura bate no tecto",
+    ).toContain("mx-auto");
   });
 
   it("a forma reserva-se na caixa, e não na imagem", () => {
@@ -294,27 +347,37 @@ describe("as fotografias", () => {
    */
   it("uma capa sem miniatura serve a derivada de 1200, e não o original", () => {
     render(
-      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", original: "orig/capa" }]} token="tk" />,
+      <Documento
+        doc={DOC}
+        idioma="pt"
+        fotos={[{ id: "c0", marca: "mc0", original: "orig/capa" }]}
+        token="tk"
+      />,
     );
     expect(capa().getAttribute("src"), "a capa voltou a servir o original inteiro").not.toBe(
       "orig/capa",
     );
     // Sem `media` assinada, o degrau do meio é a nossa rota — é ela que fabrica
     // a derivada, guarda e serve.
-    expect(capa().getAttribute("src")).toBe("/api/proposta/tk/foto/c0");
+    expect(capa().getAttribute("src")).toBe("/api/proposta/tk/foto/c0?v=mc0");
   });
 
   it("e o `srcset` da capa nunca anuncia uma largura que não é verdade", () => {
     // A razão do caso antigo, mantida: o que está no `srcset` como `1200w` tem
     // de ter mesmo 1200. O original tem 2200 e por isso nunca lá entra.
     render(
-      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", original: "orig/capa" }]} token="tk" />,
+      <Documento
+        doc={DOC}
+        idioma="pt"
+        fotos={[{ id: "c0", marca: "mc0", original: "orig/capa" }]}
+        token="tk"
+      />,
     );
     const srcset = capa().getAttribute("srcset") ?? "";
     expect(srcset, "o original entrou na oferta com uma largura inventada").not.toContain(
       "orig/capa",
     );
-    expect(srcset).toBe("/api/proposta/tk/foto/c0 1200w");
+    expect(srcset).toBe("/api/proposta/tk/foto/c0?v=mc0 1200w");
   });
 
   it("com miniatura, a oferta tem os dois degraus", () => {
@@ -322,7 +385,7 @@ describe("as fotografias", () => {
       <Documento
         doc={DOC}
         idioma="pt"
-        fotos={[{ id: "c0", miniatura: "mini/capa", media: "https://cdn/capa-1200" }]}
+        fotos={[{ id: "c0", marca: "mc0", miniatura: "mini/capa", media: "https://cdn/capa-1200" }]}
         token="tk"
       />,
     );
@@ -355,7 +418,12 @@ describe("as fotografias", () => {
 
   it("um board sem uma única foto resolvida não chega a aparecer", () => {
     render(
-      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", miniatura: "mini/capa" }]} token="tk" />,
+      <Documento
+        doc={DOC}
+        idioma="pt"
+        fotos={[{ id: "c0", marca: "mc0", miniatura: "mini/capa" }]}
+        token="tk"
+      />,
     );
     expect(screen.queryByRole("heading", { name: "Inspiração" })).toBeNull();
     // E o índice também não promete o que não existe.
@@ -799,8 +867,22 @@ describe("o orçamento", () => {
  */
 describe("o fecho", () => {
   const DUAS_CAPAS: FotoDaProposta[] = [
-    { id: "c0", miniatura: "mini/capa0", original: "orig/capa0", largura: 1600, altura: 1067 },
-    { id: "c1", miniatura: "mini/capa1", original: "orig/capa1", largura: 1600, altura: 1067 },
+    {
+      id: "c0",
+      marca: "mc0",
+      miniatura: "mini/capa0",
+      original: "orig/capa0",
+      largura: 1600,
+      altura: 1067,
+    },
+    {
+      id: "c1",
+      marca: "mc1",
+      miniatura: "mini/capa1",
+      original: "orig/capa1",
+      largura: 1600,
+      altura: 1067,
+    },
   ];
 
   const comCapas = (fotos: FotoDaProposta[], coverImages: string[]) =>
@@ -842,7 +924,7 @@ describe("o fecho", () => {
     comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
     const imagens = Array.from(document.querySelectorAll("img"));
     expect(imagens[imagens.length - 1].getAttribute("srcset")).toContain(
-      "/api/proposta/tk/foto/c1 1200w",
+      "/api/proposta/tk/foto/c1?v=mc1 1200w",
     );
   });
 

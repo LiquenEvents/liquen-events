@@ -16,9 +16,9 @@ import { join } from "node:path";
 const T = textosDaPagina("pt");
 
 const FOTOS: Record<string, FotoDaProposta> = {
-  a: { id: "a", miniatura: "mini/a", original: "orig/a", largura: 1200, altura: 800 },
-  b: { id: "b", miniatura: "mini/b", original: "orig/b" },
-  c: { id: "c", miniatura: "mini/c", original: "orig/c" },
+  a: { id: "a", marca: "ma", miniatura: "mini/a", original: "orig/a", largura: 1200, altura: 800 },
+  b: { id: "b", marca: "mb", miniatura: "mini/b", original: "orig/b" },
+  c: { id: "c", marca: "mc", miniatura: "mini/c", original: "orig/c" },
 };
 
 const BOARD: BoardParaEcra = {
@@ -84,7 +84,7 @@ describe("a grelha", () => {
     expect(semForma.style.aspectRatio).toBe("3 / 2");
   });
 
-  it("só as primeiras entram ansiosas — 46 de uma vez é a conta que isto evita", () => {
+  it("NENHUMA entra ansiosa — nenhuma delas está à vista", () => {
     /*
      * Contadas pela POSIÇÃO DELA e não pela ordem no HTML.
      *
@@ -101,14 +101,40 @@ describe("a grelha", () => {
         return { n: Number(n), modo: b.querySelector("img:last-of-type")?.getAttribute("loading") };
       })
       .sort((x, y) => x.n - y.n);
-    expect(porPosicao.map((x) => x.modo)).toEqual([
-      "eager",
-      "eager",
-      "eager",
-      "eager",
-      "lazy",
-      "lazy",
-    ]);
+    expect(
+      porPosicao.map((x) => x.modo),
+      "uma fotografia de board voltou a entrar com pressa — e nenhuma está à vista:\n" +
+        "a ordem é capa → apresentação → índice → serviços → cronograma → inspiração,\n" +
+        "portanto a primeira da grelha está milhares de píxeis abaixo da dobra e o que\n" +
+        "ela faz é disputar a ligação com a CAPA, que é o que o casal está a ver.",
+    ).toEqual(["lazy", "lazy", "lazy", "lazy", "lazy", "lazy"]);
+  });
+
+  it("a máquina de contar por DOCUMENTO continua lá, para o dia em que o número subir", () => {
+    /**
+     * A outra metade da garantia, e existe porque o caso a seguir a perdeu.
+     *
+     * Com `FOTOS_ANSIOSAS = 0`, contar por board e contar por documento dão o
+     * mesmo resultado — zero — portanto nenhum teste de comportamento
+     * consegue distinguir as duas contas. A conta certa deixou de estar a ser
+     * exercitada, e o que não é exercitado apodrece.
+     *
+     * Isto guarda-a estruturalmente: o índice que decide quem entra com pressa
+     * tem de ser o do DOCUMENTO (a soma das fotografias dos boards anteriores),
+     * e não o índice dentro do board. Se alguém voltar a subir o número — o que
+     * é legítimo, se um dia a inspiração subir na ordem das secções — encontra a
+     * contagem correcta em vez do defeito que já cá esteve: onze fotografias com
+     * pressa numa proposta de três boards, das quais uma se via.
+     */
+    const fonte = readFileSync("src/app/[lang]/(privado)/proposta/[token]/Inspiracao.tsx", "utf8");
+    expect(
+      fonte,
+      "desapareceu a soma das fotografias dos boards anteriores — a contagem por " +
+        "documento foi substituída por uma contagem por board",
+    ).toMatch(/fotosAntesDoBoard\[b\]/);
+    expect(fonte, "a decisão de entrar com pressa deixou de usar o índice no documento").toMatch(
+      /noDocumento\([^)]*\)\s*<\s*FOTOS_ANSIOSAS/,
+    );
   });
 
   it("e o segundo mood board já não tem pressa nenhuma", () => {
@@ -130,8 +156,27 @@ describe("a grelha", () => {
      * de distância.
      *
      * Este caso desenha DOIS boards, que é o mínimo para a diferença
-     * existir. Se alguém voltar a contar por board, as fotografias do
-     * segundo voltam a nascer `eager` e isto fica vermelho.
+     * existir.
+     *
+     * ── E DEPOIS O NÚMERO FOI A ZERO ──────────────────────────────────
+     *
+     * O 4 corrigiu a CONTAGEM mas manteve a premissa de que as primeiras
+     * fotografias da grelha se vêem cedo. Não se vêem: a ordem é capa →
+     * apresentação → índice → serviços → cronograma → inspiração, e num
+     * telemóvel a primeira de board está milhares de píxeis abaixo. As
+     * quatro não estavam à vista — estavam a disputar a ligação com a capa.
+     *
+     * ── O QUE ESTE CASO DEIXOU DE CONSEGUIR PROVAR ────────────────────
+     *
+     * Com zero, contar por board e contar por documento dão o MESMO
+     * resultado. Portanto este caso já não distingue as duas contas, e
+     * dizer que distingue seria mentira.
+     *
+     * O que ele continua a fazer, e é o que interessa hoje, é reprovar se
+     * VOLTAR a haver fotografias com pressa — seja por que conta for. E o
+     * caso a seguir guarda a outra metade: que a máquina de contar por
+     * documento continua lá, para o dia em que alguém queira voltar a
+     * subir o número e precise dela correcta.
      */
     const b1: BoardParaEcra = { ...BOARD, chave: "b1", fotos: ["a", "b", "c", "a"] };
     const b2: BoardParaEcra = { ...BOARD, chave: "b2", titulo: "Jantar", fotos: ["b", "c", "a"] };
@@ -140,11 +185,10 @@ describe("a grelha", () => {
     const modos = [...document.querySelectorAll("button[aria-label]")].map((b) =>
       b.querySelector("img:last-of-type")?.getAttribute("loading"),
     );
-    // Quatro no total do documento, e não quatro por board.
     expect(
       modos.filter((m) => m === "eager").length,
-      "voltou a contar por board: o casal descarrega fotografias que estão a metros de distância",
-    ).toBe(4);
+      "voltou a haver fotografias de board com pressa, em dois boards",
+    ).toBe(0);
     // E as do segundo board — todas elas — esperam pela vez delas.
     const doSegundo = [...document.querySelectorAll("section")]
       .slice(1)
@@ -254,7 +298,7 @@ describe("a grelha oferece dois tamanhos", () => {
     const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     const candidatos = (img.getAttribute("srcset") ?? "").split(",").map((c) => c.trim());
     const daRota = candidatos.find((c) => c.startsWith("/api/"));
-    expect(daRota).toBe("/api/proposta/tk/foto/a 1200w");
+    expect(daRota).toBe("/api/proposta/tk/foto/a?v=ma 1200w");
   });
 
   it("diz que largura a fotografia OCUPA — senão o navegador pede sempre a maior", () => {
@@ -283,7 +327,7 @@ describe("a grelha oferece dois tamanhos", () => {
      * acontecer nas fotografias anteriores ao bucket, ou seja nas propostas
      * antigas que estão nas caixas de correio dos casais.
      */
-    expect(img().getAttribute("src")).toBe("/api/proposta/tk/foto/a");
+    expect(img().getAttribute("src")).toBe("/api/proposta/tk/foto/a?v=ma");
     // E só se ESTA também falhar é que se paga o ficheiro inteiro.
     fireEvent.error(img());
     expect(img().getAttribute("src")).toBe("orig/a");
@@ -754,7 +798,7 @@ describe("a oferta em AVIF das fotografias grandes", () => {
      * escolher por conta própria, quando a primeira escolha acabou de falhar.
      */
     const soOriginal: Record<string, FotoDaProposta> = {
-      a: { id: "a", original: "orig/a", mediaAvif: "avif/a" },
+      a: { id: "a", marca: "ma", original: "orig/a", mediaAvif: "avif/a" },
     };
     render(
       <Inspiracao

@@ -1,3 +1,4 @@
+import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { eurDocumento, milharesComPonto, montanteNaLingua } from "@/lib/money";
 import {
   depositPercentOf,
@@ -506,10 +507,7 @@ export default function Documento({
    * é quem a fabrica. O original deixa de aparecer aqui: continua alcançável,
    * mas pela rota, que o converte antes de o servir.
    */
-  const capaMedia = capa
-    ? (capa.media ??
-      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`)
-    : "";
+  const capaMedia = capa ? (capa.media ?? enderecoDaRotaDaFoto(token, capa)) : "";
 
   // ── A APRESENTAÇÃO ────────────────────────────────────────────────────────
   // Os mesmos campos, pela mesma ordem, com a mesma regra do papel: um rótulo
@@ -792,7 +790,29 @@ export default function Documento({
           fotografia de capa resolvida. */}
       {capa && (
         <div
-          className="relative mb-12 overflow-hidden rounded-sm"
+          /**
+           * ── `mx-auto`: A CAPA VERTICAL ENCOSTAVA-SE À ESQUERDA ────────────
+           *
+           * Palavras dela, a olhar para a proposta no telemóvel: «a foto de
+           * capa não está ao meio».
+           *
+           * A causa é a combinação de `aspect-ratio` com `max-height` nesta
+           * caixa. Quando a altura bate no tecto — e bate nas capas VERTICAIS,
+           * que são altas — o navegador encolhe a LARGURA para manter a
+           * proporção. Uma caixa de bloco mais estreita do que o contentor fica
+           * encostada à esquerda, porque é isso que uma caixa de bloco faz.
+           *
+           * MEDIDO num Chromium, com um contentor de 350 px e uma caixa de
+           * `aspect-ratio: 3/4; max-height: 280px`: ficou com 210 px de largura,
+           * em `x = 0` — 140 px de vazio todo do lado direito. É exactamente o
+           * que se via na fotografia que ela mandou.
+           *
+           * Não se corrige tirando o `aspect-ratio` (é ele que reserva o espaço
+           * e impede o texto de saltar) nem o `max-height` (é ele que impede uma
+           * capa vertical de ocupar a página inteira antes de uma palavra). O
+           * que faltava era dizer o que fazer com o espaço que sobra: centrar.
+           */
+          className="relative mx-auto mb-12 overflow-hidden rounded-sm"
           style={{
             // 21:9 no telemóvel seria uma nesga; 3:2 numa janela larga seria
             // meia página antes de uma palavra. A forma real da fotografia,
@@ -1384,8 +1404,7 @@ export default function Documento({
                      meio. Fica para quando a derivada ainda não existe: é ela
                      que a fabrica e guarda. */
                     srcSet: `${fecho.miniatura} 400w, ${
-                      fecho.media ??
-                      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)}`
+                      fecho.media ?? enderecoDaRotaDaFoto(token, fecho)
                     } 1200w`,
                     sizes: "(min-width: 1024px) 1024px, 100vw",
                   }
@@ -1398,7 +1417,10 @@ export default function Documento({
               decoding="async"
               /* `relative`: o borrão está em `absolute` por baixo, e sem isto a
                  fotografia a sério ficava ATRÁS dele. */
-              className="relative w-full object-cover"
+              /* `mx-auto block` pela mesma razão da capa: `aspect-ratio` com
+                 `max-height` encolhe a largura quando a altura bate no tecto, e
+                 o que sobrava ficava todo de um lado. Ver a nota na capa. */
+              className="relative mx-auto block w-full object-cover"
               style={{
                 aspectRatio:
                   fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",

@@ -1,5 +1,6 @@
 "use client";
 
+import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
@@ -108,8 +109,45 @@ export interface BoardParaEcra {
   principal?: number;
 }
 
-/** Quantas fotos entram antes de o navegador deixar de carregar à frente. */
-const FOTOS_ANSIOSAS = 4;
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NENHUMA FOTOGRAFIA DE BOARD ENTRA COM PRESSA — NENHUMA SE VÊ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto foi 11, depois 4, e agora é 0. Vale a pena dizer porquê, porque as três
+ * decisões foram tomadas com o mesmo cuidado e só a última olhou para a ORDEM
+ * das secções.
+ *
+ * O 11 era um defeito: o contador reiniciava a cada mood board, portanto uma
+ * proposta com três boards mandava onze fotografias sem espera. O 4 corrigiu a
+ * contagem — passou a ser por documento — mas manteve a premissa de que as
+ * primeiras fotografias da grelha se vêem cedo.
+ *
+ * Não se vêem. A ordem do documento é: capa → apresentação → índice → serviços
+ * → cronograma → INSPIRAÇÃO. Num telemóvel de 390 pontos, a capa acaba por
+ * volta dos 680 px e a primeira fotografia de board está milhares de pixéis
+ * abaixo — depois de três secções de texto. Nenhuma das quatro estava à vista.
+ *
+ * O que elas faziam era competir. Cada uma é a candidata de 1200 px (105 KB em
+ * AVIF, 130 em WebP), portanto eram 420 a 520 KB a disputar a ligação com a
+ * CAPA, que é a única coisa que o casal está mesmo a ver. Num 4G de quinta,
+ * isso é a capa a demorar segundos por causa de fotografias que ninguém pediu.
+ *
+ * ── E NÃO SE PERDE NADA ───────────────────────────────────────────────────
+ *
+ * `loading="lazy"` não quer dizer «só quando aparecer»: o navegador começa a
+ * buscá-las com muita antecedência — milhares de pixéis, mais ainda numa
+ * ligação lenta. E cada célula pinta o seu borrão a partir do HTML antes de
+ * qualquer ida à rede, portanto nenhuma caixa fica vazia enquanto isso.
+ *
+ * ── PORQUE É QUE É ZERO E NÃO UM ──────────────────────────────────────────
+ *
+ * Porque nem no documento sem capa a primeira fotografia de board está à vista:
+ * continua a haver a apresentação, o índice e os serviços pelo meio. Nesse
+ * caso o elemento de maior pintura é o TÍTULO — os nomes do casal — que é
+ * texto, e o que o serve é a letra, não uma imagem.
+ */
+const FOTOS_ANSIOSAS = 0;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -805,10 +843,7 @@ function Celula({
    * `api/proposta/[token]/foto/[id]`). Ver `signProposalMids` para o porquê de
    * a rota ter deixado de ser o caminho de todos os dias.
    */
-  const media = foto
-    ? (foto.media ??
-      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
-    : "";
+  const media = foto ? (foto.media ?? enderecoDaRotaDaFoto(token, foto)) : "";
 
   /**
    * ── A GRELHA DEIXA DE CAIR NO ORIGINAL ─────────────────────────────────

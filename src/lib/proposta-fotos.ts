@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { isPendingImage, type ProposalDoc } from "./proposal-doc";
 import {
   signProposalMids,
@@ -8,6 +9,7 @@ import {
 } from "./proposal-storage";
 import { ehRefDeTema, caminhoDoRefDeTema } from "./theme-ref";
 import { formasDeCaminhos, lqipsDeCaminhos } from "./biblioteca-fotos-store";
+import { urlsGuardados, guardarUrls } from "./urls-assinados";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -70,6 +72,22 @@ export interface FotoDaProposta {
    * do caminho real. Ver a regra 1 no cabeçalho.
    */
   id: string;
+  /**
+   * A MARCA desta fotografia: muda quando a fotografia daquele lugar muda.
+   *
+   * O {@link FotoDaProposta.id} diz o LUGAR (`b0f2` é «a terceira do primeiro
+   * mood board»); a `marca` diz QUAL. São coisas diferentes, e confundi-las
+   * custava caro: a rota que fabrica a derivada guardava-a no telemóvel do
+   * casal por um dia, dizendo que o conteúdo de um `id` nunca muda. Muda —
+   * basta ela rever o board, e o mesmo link salta para a revisão nova.
+   *
+   * É um resumo de sentido único da referência (ver `marcaDaRef`): não leva
+   * nenhum byte do caminho real, e é por isso que pode ir num endereço.
+   *
+   * Ver `endereco-da-foto.ts`, que a põe lá, e porque é que tirar o
+   * `immutable` não teria resolvido nada.
+   */
+  marca: string;
   /** O URL da derivada de 400 px. Ausente quando não há miniatura guardada. */
   miniatura?: string;
   /**
@@ -125,6 +143,22 @@ function enderecoDirecto(ref: string): string | null {
   // não guardou nenhum. `image/jpeg` é o que o estúdio sempre gravou.
   if (!ref.includes("/") && ref.length > 128) return `data:image/jpeg;base64,${ref}`;
   return null;
+}
+
+/**
+ * A marca de uma referência: curta, estável, e de sentido único.
+ *
+ * `sha256` truncado a 12 hexadecimais. Truncar é seguro aqui porque isto NÃO
+ * é um segredo nem um validador de segurança: é um desempate de cache. O que
+ * se lhe pede é que duas fotografias diferentes não caiam na mesma marca — e
+ * 48 bits chegam de sobra para as poucas dezenas que um documento tem.
+ *
+ * De sentido único porque a referência É o caminho no bucket, e a regra 1
+ * desta casa diz que ele nunca sai daqui. O casal recebe 12 caracteres que
+ * não dizem nada sobre onde o ficheiro está.
+ */
+export function marcaDaRef(ref: string): string {
+  return createHash("sha256").update(ref).digest("hex").slice(0, 12);
 }
 
 /**
@@ -198,31 +232,96 @@ export async function fotosDaProposta(
   const caminhoReal = (ref: string) => (ehRefDeTema(ref) ? caminhoDoRefDeTema(ref) : ref);
   const caminhos = porAssinar.map(caminhoReal);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE JÁ FOI ASSINADO UMA VEZ NÃO SE ASSINA OUTRA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «caso as pessoas vão ver as propostas outra vez no email,
+   * mas já esteja muito mais rápido».
+   *
+   * Estava ao contrário. Isto assinava tudo A CADA VISITA, e o Supabase devolve
+   * um token novo de cada vez — portanto o endereço de cada fotografia mudava
+   * sempre. A chave da cache do navegador inclui o endereço inteiro, logo para
+   * o telemóvel o mesmo ficheiro com outro endereço é OUTRA fotografia.
+   *
+   * As fotografias estão gravadas com validade de um ano, e esse ano nunca
+   * valia nada: numa proposta de 46 fotografias, reabrir o link do email
+   * voltava a descarregar 6,6 a 9,2 MB. Mais de meio minuto numa ligação rural.
+   *
+   * Guardar o endereço é seguro porque o conteúdo de um caminho nunca muda — a
+   * razão longa está no `urls-assinados.ts`, e a garantia de que uma proposta
+   * revista nunca serve um endereço velho também.
+   */
+  const guardados = await urlsGuardados(caminhos);
+
+  /** O endereço guardado desta referência, nesta família — se ainda servir. */
+  const doCache = (ref: string, familia: string): string | undefined =>
+    guardados.get(caminhoReal(ref))?.[familia];
+
+  /** As que ainda não têm endereço guardado nesta família são as que se assinam. */
+  const emFalta = (familia: string) => porAssinar.filter((r) => !doCache(r, familia));
+
   const [originais, miniaturas, medias, mediasAvif, formas, lqips] = await Promise.all([
-    signProposalPaths(porAssinar),
-    signProposalThumbs(porAssinar),
+    signProposalPaths(emFalta("original")),
+    signProposalThumbs(emFalta("miniatura")),
     // A de 1200 px assinada, quando já existe: é ela que a capa e a galeria
     // pedem num telemóvel, e era a única que fazia o desvio pela nossa função.
-    signProposalMids(porAssinar),
+    signProposalMids(emFalta("media")),
     // E a oferta em AVIF da mesma, quando existir. Vai no mesmo lote de
     // assinaturas: uma ida a mais ao armazenamento por página, não por foto.
-    signProposalMidsAvif(porAssinar),
+    signProposalMidsAvif(emFalta("mediaAvif")),
     formasDeCaminhos(caminhos),
     lqipsDeCaminhos(caminhos),
   ]);
 
+  /** O endereço final de uma referência: o guardado, ou o acabado de assinar. */
+  const enderecoDe = (ref: string, familia: string, frescos: Map<string, string>) =>
+    doCache(ref, familia) ?? frescos.get(ref);
+
+  /**
+   * E o que foi assinado agora fica guardado, para a próxima visita não pagar.
+   *
+   * Com `await` e não solto: uma função sem estado pode ser congelada antes de
+   * uma promessa por segurar chegar ao fim, e aí perdia-se exactamente a
+   * gravação que faz isto valer a pena. Por fotografia, isto acontece uma vez
+   * na vida dela.
+   */
+  const novos = new Map<string, Record<string, string>>();
+  for (const [familia, frescos] of [
+    ["original", originais],
+    ["miniatura", miniaturas],
+    ["media", medias],
+    ["mediaAvif", mediasAvif],
+  ] as const) {
+    for (const ref of porAssinar) {
+      const url = frescos.get(ref);
+      if (!url) continue;
+      const caminho = caminhoReal(ref);
+      novos.set(caminho, { ...(novos.get(caminho) ?? {}), [familia]: url });
+    }
+  }
+  await guardarUrls(novos, guardados);
+
   return inventario.map(({ id, ref }) => {
     const directo = enderecoDirecto(ref);
-    if (directo) return { id, original: directo };
+    if (directo) return { id, marca: marcaDaRef(ref), original: directo };
     const caminho = caminhoReal(ref);
     const forma = formas.get(caminho);
     const lqip = lqips.get(caminho);
     return {
       id,
-      ...(miniaturas.get(ref) ? { miniatura: miniaturas.get(ref) } : {}),
-      ...(medias.get(ref) ? { media: medias.get(ref) } : {}),
-      ...(mediasAvif.get(ref) ? { mediaAvif: mediasAvif.get(ref) } : {}),
-      ...(originais.get(ref) ? { original: originais.get(ref) } : {}),
+      marca: marcaDaRef(ref),
+      ...(enderecoDe(ref, "miniatura", miniaturas)
+        ? { miniatura: enderecoDe(ref, "miniatura", miniaturas) }
+        : {}),
+      ...(enderecoDe(ref, "media", medias) ? { media: enderecoDe(ref, "media", medias) } : {}),
+      ...(enderecoDe(ref, "mediaAvif", mediasAvif)
+        ? { mediaAvif: enderecoDe(ref, "mediaAvif", mediasAvif) }
+        : {}),
+      ...(enderecoDe(ref, "original", originais)
+        ? { original: enderecoDe(ref, "original", originais) }
+        : {}),
       ...(forma ? { largura: forma.largura, altura: forma.altura } : {}),
       ...(lqip ? { lqip } : {}),
     };
