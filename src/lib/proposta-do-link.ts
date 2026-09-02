@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { Proposal } from "@/lib/orcamento/types";
 import { getProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
@@ -92,7 +93,33 @@ function mesmoCliente(a: string | undefined, b: string | undefined): boolean {
  * chamadores já tratam esses dois casos com a mesma frase, de propósito (um
  * link privado nunca diz se um identificador existe).
  */
-export async function propostaDoLink(
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA VISITA, UMA LEITURA — E NÃO DUAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era chamado DUAS VEZES por cada abertura de proposta, e ninguém dava
+ * por isso: uma vez no `generateMetadata` da página (para o título do
+ * separador) e outra no corpo dela. Duas chamadas independentes, cada uma com
+ * a cadeia toda — ler a ligação curta, ler a proposta, e às vezes ler a
+ * proposta outra vez. São três a quatro idas à base de dados repetidas, em
+ * cada visita, a disputar a mesma ligação.
+ *
+ * O `cache` do React resolve-o pela raiz: dentro do MESMO pedido, a segunda
+ * chamada com o mesmo testemunho recebe o resultado da primeira sem tocar na
+ * rede. É o que os documentos do Next mandam usar quando não há um `fetch`
+ * para memorizar sozinho — e aqui não há, porque quem fala com a base de
+ * dados é o cliente do Supabase.
+ *
+ * NÃO é uma cache entre visitas: cada pedido novo lê tudo outra vez. Uma
+ * proposta que ela reveja continua a abrir revista no instante seguinte, que
+ * é a garantia que esta casa nunca abre mão.
+ *
+ * Para os bots que não correm JavaScript — e o WhatsApp é um deles, num link
+ * que os casais reenviam — o `generateMetadata` bloqueia a resposta inteira.
+ * Aí esta poupança não é conforto: é metade do tempo de espera.
+ */
+export const propostaDoLink = cache(async function propostaDoLink(
   token: string | undefined | null,
 ): Promise<PropostaDoLink | null> {
   /**
@@ -327,4 +354,4 @@ export async function propostaDoLink(
     versaoEm: proposta.versaoEm,
     versaoVivaNumero: maisRecente?.versaoNumero,
   };
-}
+});

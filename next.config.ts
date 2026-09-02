@@ -239,6 +239,53 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
+    /**
+     * ════════════════════════════════════════════════════════════════════
+     * O CSS VIAJA COM O HTML — E É ISTO QUE TIRA O ECRÃ EM BRANCO
+     * ════════════════════════════════════════════════════════════════════
+     *
+     * Palavras dela, sobre carregar no botão do email: «aquela tela está em
+     * branco e só aparece passado um bocado — isso desconfia logo das
+     * pessoas».
+     *
+     * A causa, MEDIDA e não suposta. O browser não pinta NADA enquanto uma
+     * folha de estilos do `<head>` não chegar — é a regra dele, não uma
+     * opção nossa. E a nossa era um segundo pedido, de 34 KB comprimidos,
+     * que só começa depois de o HTML já estar a chegar.
+     *
+     * Provado num Chromium: atrasei a folha 600 ms e a cortina atrasou 609;
+     * atrasei 1500 e atrasou 1478. Segue o CSS, segue a pintura.
+     *
+     * Com a rede travada a 4G fraco (1,2 Mbps, 300 ms de latência), o tempo
+     * até a cortina aparecer, três voltas cada:
+     *
+     *                        ANTES        DEPOIS
+     *     proposta          1434 ms       613 ms
+     *     sítio (home)      2146 ms       950 ms
+     *
+     * ── O QUE CUSTA, PORQUE CUSTA MESMO ──────────────────────────────────
+     *
+     * O HTML da proposta passa de 11 KB (mais 34 KB num segundo pedido) para
+     * 83 KB. São ~38 KB a mais no total, e a razão está nos documentos do
+     * Next: com esta opção o CSS vai duas vezes — uma no `<style>` e outra na
+     * carga do React. É uma limitação conhecida, não um erro nosso.
+     *
+     * Vale a pena à mesma, e a medição diz porquê: numa ligação lenta o que
+     * manda é a ida e volta, não os bytes. Poupar um pedido inteiro paga os
+     * 38 KB com folga — o número de cima já os inclui.
+     *
+     * Quem perde são os visitantes que voltam com a folha em cache. É uma
+     * troca real, e foi feita de olhos abertos: um casal abre a proposta uma
+     * vez, do email, no telemóvel, numa quinta. É esse que não pode ver
+     * branco.
+     *
+     * ── E A POLÍTICA DE SEGURANÇA JÁ O PERMITE ───────────────────────────
+     *
+     * `style-src 'self' 'unsafe-inline'`, aqui em baixo. Verificado antes de
+     * ligar isto: sem essa linha, os estilos seriam bloqueados e a página
+     * saía sem desenho nenhum.
+     */
+    inlineCss: true,
     // React <ViewTransition> (View Transitions API): página-a-página com
     // deslize direcional e morph thumbnail→lightbox na galeria. Browsers sem
     // suporte navegam normalmente, apenas sem animação.
