@@ -214,6 +214,61 @@ describe("quanto tempo a cortina fica", () => {
   });
 });
 
+describe("o que está por baixo não gasta a sua vez", () => {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UMA ANIMAÇÃO POR BAIXO DE UMA CORTINA OPACA É UMA ANIMAÇÃO PERDIDA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A fotografia de capa do sítio tem um zoom lento — entra um pouco mais
+   * fechada e vai abrindo. Dura 2,2 s e arrancava no primeiro fotograma.
+   *
+   * A cortina tapa a página durante 2,2 s.
+   *
+   * Ou seja: o gesto acabava exactamente no instante em que passava a haver
+   * alguém para o ver. Desde que a cortina existe, ninguém que entrou no sítio
+   * viu aquela fotografia abrir — e o telemóvel gastou bateria a desenhá-la.
+   *
+   * É o mesmo defeito do esqueleto a pulsar por trás da cortina, que já foi
+   * corrigido uma vez. Este ficheiro passa a guardá-lo pela raiz.
+   */
+  const RAIZ = /:root \{[\s\S]*?\n\}/.exec(CSS)?.[0] ?? "";
+  const MINIMO_NO_CSS = Number(/--cortina-minimo:\s*(\d+)ms/.exec(RAIZ)?.[1]);
+
+  it("o tempo da cortina é o MESMO no componente e no CSS", () => {
+    // Dois sítios com o mesmo número é uma promessa; sem isto, é um acidente à
+    // espera de acontecer. Quem manda é o componente — o token do CSS é a
+    // cópia que o CSS precisa de ler para saber quando pode começar a mexer-se.
+    expect(MINIMO_NO_CSS, "desapareceu o token `--cortina-minimo` do `:root`").toBeGreaterThan(0);
+    expect(
+      MINIMO_NO_CSS,
+      `o componente espera ${MINIMO} ms e o CSS julga que são ${MINIMO_NO_CSS} — ` +
+        "o que está por baixo passa a arrancar cedo ou tarde de mais",
+    ).toBe(MINIMO);
+  });
+
+  it("o zoom da capa espera pela cortina, e espera EXACTAMENTE o que ela dura", () => {
+    const regra = /html:not\(\[data-navigated\]\) \.hero-settle \{[\s\S]*?\n {2}\}/.exec(CSS)?.[0];
+    expect(regra, "desapareceu o zoom da capa").toBeDefined();
+    expect(
+      regra,
+      "o zoom da capa voltou a arrancar no primeiro fotograma — corre inteiro por baixo da cortina",
+    ).toContain("var(--cortina-minimo)");
+  });
+
+  it("e segura o enquadramento durante a espera, para não haver salto", () => {
+    // Sem `backwards`, a fotografia ficava no enquadramento FINAL durante os
+    // 2,2 s e saltava para o inicial no instante em que a cortina sobe — que é
+    // o único instante em que alguém está a olhar.
+    const regra = /html:not\(\[data-navigated\]\) \.hero-settle \{[\s\S]*?\n {2}\}/.exec(CSS)?.[0];
+    expect(regra).toMatch(/backwards/);
+    // E nunca `forwards`: um preenchimento para a frente deixa montado um
+    // bloco de contenção que já não serve para nada. É a mesma regra que a
+    // entrada da proposta segue, e pela mesma razão.
+    expect(regra).not.toMatch(/forwards/);
+  });
+});
+
 describe("a mesma cortina em toda a casa", () => {
   /**
    * ════════════════════════════════════════════════════════════════════════

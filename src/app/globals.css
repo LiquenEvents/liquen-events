@@ -196,6 +196,15 @@
      transições da casa são de estado (cor, contorno, sombra) e não têm entrada
      nem saída. Esta pede-se onde há mesmo uma coisa a desaparecer. */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* ── QUANTO TEMPO A CORTINA TAPA A PÁGINA ────────────────────────────────
+     O mesmo número que o `Cortina.tsx` escreve no elemento (`MINIMO`), aqui em
+     forma de token para o CSS o poder usar. Quem manda continua a ser o
+     componente; isto é a cópia que o CSS lê, e há um caso em
+     `Cortina.test.tsx` que reprova se os dois se separarem.
+
+     Serve para uma coisa só, mas importante: o que estiver por baixo da
+     cortina não deve gastar a sua animação enquanto ninguém a pode ver. */
+  --cortina-minimo: 2200ms;
 }
 
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
@@ -2345,9 +2354,34 @@ body[data-menu-open] .whatsapp-fixed {
 .hero-settle {
   transform: scale(1.06);
 }
+/* ── E PORQUE É QUE ELE ESPERA PELA CORTINA ───────────────────────────────
+   Porque, sem esperar, corria inteiro POR BAIXO DELA. A conta é embaraçosa de
+   tão certa: o zoom dura 2,2 s e arranca no primeiro fotograma; a cortina tapa
+   a página durante 2,2 s. Ou seja, o gesto acabava exactamente no instante em
+   que passava a haver alguém para o ver. Ninguém que entrou no sítio, desde
+   que a cortina existe, alguma vez viu esta fotografia abrir.
+
+   É o mesmo defeito que o esqueleto a pulsar por trás de uma cortina opaca —
+   uma animação a correr para ninguém, e a gastar bateria a fazê-lo.
+
+   ── PORQUE É QUE É UM ATRASO E NÃO UM GANCHO NA CORTINA ─────────────────
+   O gancho existe e está ali ao lado: a proposta entra com
+   `html[data-cortina="a-sair"] .prop-folha`. Aqui não serve, e a razão é o dia
+   em que o JavaScript não corre — bloqueado, falhado, uma rede que engoliu o
+   ficheiro. Nesse dia o atributo nunca aparece: com um gancho, a fotografia
+   ficava presa no primeiro fotograma da animação, 8% mais fechada, PARA
+   SEMPRE. Trocar uma animação perdida por uma fotografia permanentemente
+   errada é mau negócio.
+
+   Com um atraso, o pior que acontece é o zoom arrancar aos 2,2 s enquanto a
+   rede de segurança do CSS só levanta a cortina aos 4 — vê-se metade em vez de
+   se ver tudo, e nada fica errado.
+
+   O `backwards` é o que segura a fotografia no enquadramento inicial durante a
+   espera, sem salto quando ela arranca. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-navigated]) .hero-settle {
-    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) var(--cortina-minimo) backwards;
   }
 }
 
