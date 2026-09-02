@@ -3692,10 +3692,20 @@ body:has(.barra-consentimento) footer {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  /* O verde-quase-preto da casa, e não o preto do exemplo. É o mesmo tom que
-     já está por baixo das fotografias (`--color-noite`), escolhido para
-     impedir um flash branco — o trabalho é o mesmo, à escala do ecrã. */
-  background: var(--color-noite);
+  /* ── UMA SÓ COR, EM TODA A CASA ─────────────────────────────────────────
+     Palavras dela: «quero esse verde mais claro, que nós temos, que é o mesmo
+     verde do site online».
+
+     É o `moss-dark`: o verde do menu e da barra do sítio. Começou por ser o
+     `--color-noite`, o verde-quase-preto que está por baixo das fotografias —
+     e por um dia a proposta abriu em quase-preto e o sítio em verde. Não há
+     razão para serem dois: é a mesma frase, da mesma casa, e uma casa tem uma
+     cor. O escuro fazia o que o escuro faz num teatro; este faz o que faz uma
+     porta, que é dizer onde se entrou.
+
+     O creme sobre este verde dá ~5,9:1 — folgado para as WCAG, e a frase é
+     grande. */
+  background: var(--color-moss-dark);
   /* Visível desde o primeiro fotograma. Antes nascia a zero e só aparecia aos
      140 ms, para uma página rápida a levantar sem a pintar; era isso que fazia
      com que ela nunca a visse. */
@@ -3755,47 +3765,6 @@ body:has(.barra-consentimento) footer {
   }
   to {
     transform: translateY(-100%);
-  }
-}
-
-/* ── A VARIANTE DO LOGÓTIPO, PARA O SÍTIO ─────────────────────────────────
-   O emblema a respirar, sem texto: `from{opacity:.9;transform:scale(.9)}
-   to{opacity:1;transform:scale(1)}`, 1,25 s em alternado — os valores dela.
-   Quem chega ao sítio vem de uma pesquisa ou de um anúncio e quer ver o
-   trabalho; o logótipo diz de quem é a casa sem pedir que se leia nada. */
-@keyframes cortina-a-respirar {
-  from {
-    opacity: 0.9;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.cortina__pulso {
-  display: block;
-  animation: cortina-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
-}
-
-.cortina__logo {
-  /* Os 32 px do exemplo dela eram para um SÍMBOLO quadrado. Este logótipo traz
-     as nove letras de «LÍQUEN EVENTS» — a essa largura não se lê, e já foi
-     medido uma vez numa fotografia. 150 px é a medida do ecrã de espera da
-     proposta, e é onde o nome se lê. */
-  width: 150px;
-  max-width: 45vw;
-  height: auto;
-}
-
-/* Quem pediu menos movimento leva o logótipo QUIETO — e não nenhum.
-   A cortina do lema desaparece por completo nesse caso; aqui o guião também a
-   fecha logo, portanto isto é só a rede: se por alguma razão ela chegar a ser
-   pintada, não pulsa. */
-@media (prefers-reduced-motion: reduce) {
-  .cortina__pulso {
-    animation: none;
   }
 }
 

@@ -348,40 +348,18 @@ describe("a cortina, e o que não pode mudar", () => {
     }
   });
 
-  it("a variante do logótipo mostra o emblema e NÃO o lema", () => {
-    const { container } = render(<Cortina locale="pt" variante="logotipo" />);
-    expect(container.querySelector(".cortina__logo")).not.toBeNull();
-    expect(
-      container.querySelector(".cortina__lema"),
-      "no sítio não se pede que se leia",
-    ).toBeNull();
-  });
-
-  it("e essa TEM nome para quem ouve o ecrã — a do lema não precisa", () => {
+  it("o fundo é o verde da casa, e é o MESMO em todo o lado", () => {
     /**
-     * A do lema aparece por cima de um `loading.tsx` cujo `aria-busy` já diz
-     * «isto está a carregar». No sítio não há esse ecrã por baixo: sem nome,
-     * quem ouve ficava sem saber que algo estava a acontecer.
+     * Palavras dela: «quero esse verde mais claro, que nós temos, que é o
+     * mesmo verde do site online».
+     *
+     * Houve um dia em que a proposta abria em quase-preto e o sítio em verde.
+     * Não há razão para serem dois: é a mesma frase, da mesma casa. Este caso
+     * existe para ninguém voltar a separá-los sem reparar.
      */
-    const logo = render(<Cortina locale="pt" variante="logotipo" />);
-    const el = logo.container.querySelector(".cortina")!;
-    expect(el.getAttribute("role")).toBe("status");
-    expect(el.getAttribute("aria-label")).toMatch(/abrir/i);
-    expect(el.getAttribute("aria-hidden")).toBeNull();
-    cleanup();
-
-    const lema = render(<Cortina locale="pt" />);
-    expect(lema.container.querySelector(".cortina")!.getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("cada variante leva o seu mínimo — o lema precisa de tempo para SER LIDO", () => {
-    // Números diferentes porque o conteúdo é diferente: duas linhas a ler
-    // contra um emblema que se reconhece num relance.
-    const lema = render(<Cortina locale="pt" />);
-    expect(lema.container.querySelector(".cortina")!.getAttribute("data-minimo")).toBe("1000");
-    cleanup();
-    const logo = render(<Cortina locale="pt" variante="logotipo" />);
-    expect(logo.container.querySelector(".cortina")!.getAttribute("data-minimo")).toBe("900");
+    const bloco = CSS.slice(CSS.indexOf("A CORTINA DA PROPOSTA"));
+    expect(bloco).toMatch(/\.cortina \{[\s\S]*?background: var\(--color-moss-dark\);/);
+    expect(bloco, "voltou a haver dois fundos").not.toContain("cortina--verde");
   });
 
   it("o guião lê o mínimo do elemento, e respeita-o", () => {

@@ -98,12 +98,17 @@ export default function CromadoDoSitio({
         Palavras dela, com o segundo exemplo: «é isto que eu quero quando
         carrega, mas para a Líquen com a animação».
 
-        É a MESMA peça da proposta e do back office — mesmo guião, mesma saída
-        em cortina, mesmas redes de segurança — com o logótipo em vez do lema.
-        A razão de não ser o lema aqui é de ritmo: quem chega ao sítio vem de
-        uma pesquisa ou de um anúncio e quer ver o trabalho, não ler uma frase.
+        É a MESMA peça da proposta e do back office, com a MESMA frase. Cheguei
+        a pô-la aqui com o logótipo a respirar; ela viu e disse o que queria:
+        «no site online não quero aquilo do logo — quero a frase a dizer
+        eternizamos memórias, organizamos eventos, com o mesmo cor de fundo do
+        site, aquele a verde clarinho».
+
+        Muda só o fundo: o verde do menu e da barra, em vez do verde-quase-preto
+        da proposta. No sítio a cortina não abre um documento — abre a casa, e a
+        casa tem uma cor.
       */}
-      <Cortina locale={locale} variante="logotipo" chaveDeSessao="cortina:sitio" />
+      <Cortina locale={locale} chaveDeSessao="cortina:sitio" />
       <ScrollProgress />
       {/*
         O aviso de que uma página está a demorar. Palavras dela: «caso demore
