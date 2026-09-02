@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { normalizeLocale } from "@/lib/i18n";
 import { Cortina } from "@/components/Cortina";
+import { MovimentoDaProposta } from "./MovimentoDaProposta";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -116,6 +117,14 @@ export default async function LayoutPrivado({
       */}
       <Cortina locale={normalizeLocale(lang)} chaveDeSessao="cortina:proposta" />
       {children}
+      {/*
+        O guião que põe o documento a mexer. Depois dos filhos, de propósito:
+        quando ele corre, o que há para medir já está no documento.
+
+        O porquê inteiro — e sobretudo porque é que ele NUNCA pode deixar uma
+        proposta em branco — está no ficheiro dele.
+      */}
+      <MovimentoDaProposta />
     </main>
   );
 }

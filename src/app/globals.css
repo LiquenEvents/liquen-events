@@ -3911,3 +3911,93 @@ body:has(.barra-consentimento) footer {
     animation: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O MOVIMENTO DA PROPOSTA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela: «quero que haja uma animação entre o eternizamos memórias e
+   o PDF, e animações pelo PDF todo, nas fotos, nos textos — quero que aquilo
+   fique espetacularmente bom».
+
+   ── O QUE JÁ CÁ ESTAVA, E PORQUE É QUE NÃO CHEGAVA ───────────────────────
+
+   O `prop-chega`, aqui em cima, com as três regras da casa escritas por
+   extenso. Duas coisas o travavam:
+
+     1. Estava aplicado a UM elemento — a moldura de uma secção. Tudo o resto
+        do documento (a capa, a apresentação, as condições, a fotografia de
+        fecho, os mood boards por dentro, as escolhas, o total) chegava
+        parado.
+
+     2. Depende do `animation-timeline: view()`, que é recente. Num telemóvel
+        com um Safari mais antigo, `@supports` falha e NÃO HÁ MOVIMENTO
+        NENHUM — não uma versão mais pobre: nenhuma. É bem possível que fosse
+        isso que ela estava a ver quando pediu isto.
+
+   ── PORQUE É QUE ESTE MECANISMO É OUTRO ──────────────────────────────────
+
+   Este funciona em todo o lado, e não pede nada ao browser além de um
+   `IntersectionObserver` — que a casa já usa em quatro sítios, com um
+   ajudante partilhado (`lib/motion/observeInView.ts`).
+
+   ── E PORQUE É QUE NUNCA PODE DEIXAR UMA PROPOSTA EM BRANCO ──────────────
+
+   Esta é a regra que manda em tudo o resto. O estado escondido NÃO EXISTE no
+   CSS até o guião o pôr, elemento a elemento — é o padrão `cl-armed` que esta
+   casa já usa nos logótipos dos clientes. Sem JavaScript, com um erro no
+   guião, com o `IntersectionObserver` em falta: nenhum elemento leva
+   `por-subir`, nenhum sai do sítio, e o casal lê a proposta inteira.
+
+   E NUNCA se mexe na opacidade. Só `transform`. Um `opacity: 0` à espera de
+   JavaScript é a maneira de servir a um casal um documento em branco de vinte
+   mil euros — está escrito duas vezes neste ficheiro, das duas vezes em que
+   aconteceu.
+
+   ── A ESCADA DAS DISTÂNCIAS ──────────────────────────────────────────────
+
+   A distância diz a importância, e é sempre pequena. A escala da casa já
+   existia: menu 4px, aviso 8px, bloco 12px, secção 14px, página 32px.
+
+       bloco dentro de uma secção .....  8px
+       fotografia ..................... 12px
+       secção ......................... 14px
+       o TOTAL A PAGAR ................ 20px   ← o único acima de 14
+*/
+
+/* A ARMAÇÃO É INSTANTÂNEA; SÓ A LARGADA É QUE ANIMA.
+   Tinha a transição nas duas, e um Chromium mostrou o que isso faz: ao ser
+   armado, o elemento TRANSITA de zero para o seu degrau — ou seja, desliza
+   para BAIXO à frente de quem olha, e só depois sobe. Duas viagens onde só
+   podia haver uma. Com a transição apenas no `.subiu`, o degrau é posto sem
+   um fotograma de movimento e o que se vê é só a subida. */
+[data-sobe].por-subir {
+  transform: translateY(var(--sobe, 12px));
+}
+[data-sobe].por-subir.subiu {
+  transform: none;
+  transition: transform 620ms var(--ease-out);
+}
+
+/* ── A ENTRADA DO DOCUMENTO, COLADA À SAÍDA DA CORTINA ────────────────────
+   A cortina sobe e o documento vem por baixo dela, um pouco atrasado, para o
+   olho ler UM gesto e não dois. O atributo é posto pelo guião da cortina no
+   instante exacto em que ela começa a subir.
+
+   `backwards` e nunca `forwards`: acaba em `transform: none`, sem deixar um
+   bloco de contenção — a lição está escrita no `.view-in`, e o visualizador
+   de fotografias desta página é `position: fixed` lá dentro. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-cortina="a-sair"] .prop-folha {
+    animation: prop-entrada 520ms var(--ease-out) 60ms backwards;
+  }
+}
+
+@keyframes prop-entrada {
+  from {
+    transform: translateY(18px);
+  }
+  to {
+    transform: none;
+  }
+}

@@ -626,7 +626,7 @@ export default function Inspiracao({
            * forte desta página inteira não precisa de 96 px de branco a
            * anunciá-lo.
            */
-          <section key={board.chave} className="mt-12 first:mt-6 sm:mt-16">
+          <section key={board.chave} className="mt-12 first:mt-6 sm:mt-16" data-sobe="bloco">
             {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
               «Devia haver mais momentos assim, a separar secções: uma foto a
               toda a largura entre blocos.» Vem ANTES do título de propósito:
@@ -972,7 +972,15 @@ function Celula({
     /* O `order` só tem efeito quando as colunas desaparecem (telemóvel, com o
        `display: contents`); acima de `sm` as fotografias já estão em ordem
        crescente dentro da sua coluna. Ver `arrumarPorColunas`. */
-    <figure className="foto-inteira m-0" style={ordem === undefined ? undefined : { order: ordem }}>
+    /* O `data-sobe` vai na `<figure>` e NUNCA no `<button>` lá dentro: é o
+       botão que leva `content-visibility: auto` (`.foto-adiavel`), e uma
+       animação numa caixa cuja pintura o browser está a saltar é uma
+       negociação que não vale a pena ter. Aqui fora não há nada a negociar. */
+    <figure
+      className="foto-inteira m-0"
+      data-sobe="foto"
+      style={ordem === undefined ? undefined : { order: ordem }}
+    >
       <button
         type="button"
         onClick={(e) => aoAmpliar(e.currentTarget)}
