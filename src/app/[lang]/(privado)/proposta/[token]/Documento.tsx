@@ -891,7 +891,23 @@ export default function Documento({
                fotograma de espera entre «os bytes chegaram» e «vê-se». Nas
                outras da página continua `async`, que aí é o certo — são muitas
                e nenhuma é a que se está a olhar. */
-              decoding="sync"
+              /**
+               * `async` e não `sync`, e a troca tem uma razão medida.
+               *
+               * `sync` põe a descodificação da capa — ~200 KB a 1200 px — NA
+               * LINHA PRINCIPAL, no instante em que os bytes chegam. Num 4G
+               * esse instante cai dentro do segundo em que a cortina está a
+               * animar, e uma descodificação dessas é uma paragem de vários
+               * fotogramas. Era isto que ela via: «a animação trava um bocado».
+               *
+               * O que o `sync` comprava era um fotograma de espera. Pagava
+               * vários, e pagava-os no pior momento possível.
+               *
+               * O `fetchPriority="high"` FICA: continua a ser a fotografia
+               * mais importante da página e há-de ser pedida primeiro. O que
+               * muda é só onde ela é descodificada.
+               */
+              decoding="async"
               className="relative block h-full w-full object-cover"
             />
           </picture>

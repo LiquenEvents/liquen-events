@@ -3661,6 +3661,14 @@ body:has(.barra-consentimento) footer {
   }
 }
 
+/* A rede de segurança sem JavaScript.
+   Cheguei a pôr aqui um `visibility: hidden` no último fotograma, para o
+   elemento ficar terminado e não só fora do ecrã. O teste dos 60 fps apanhou-o
+   — `visibility` não é uma propriedade de compositor — e tem razão: a regra
+   desta casa é `transform` e `opacity`, e não se abre uma excepção por um caso
+   que hoje não se alcança. Fora do ecrã pelo `transform`, o elemento não
+   intercepta nem cobre nada; no caminho normal quem o fecha de vez é o
+   `display: none` do `.cortina--fora`. */
 @keyframes cortina-a-subir {
   from {
     transform: translateY(0);
@@ -3697,6 +3705,17 @@ body:has(.barra-consentimento) footer {
      um ecrã escuro com a proposta por baixo. Aos 4 s, que é folga larga sobre
      o mínimo de 1 s por que o guião espera. */
   animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) 4s forwards;
+  /* ── A CAMADA VEM ANTES DO MOVIMENTO ────────────────────────────────────
+     Sem isto, o WebKit só promove a cortina a camada própria no instante em
+     que ela COMEÇA a subir — e criar e rasterizar uma camada do ecrã inteiro
+     (num iPhone a 3×, ~3 milhões de pixéis) no mesmo fotograma em que o
+     movimento arranca é um solavanco. Com `will-change` a camada já existe.
+     É retirado assim que ela sai (ver `.cortina--fora`), para não ficar uma
+     camada do ecrã inteiro pendurada na memória do telemóvel a vida toda. */
+  will-change: transform;
+  /* O que acontece dentro da cortina não pode obrigar a página por baixo a
+     recalcular — e é a página por baixo que está a montar-se neste momento. */
+  contain: layout paint;
 }
 
 /* ── PORQUE É QUE A CORTINA NUNCA SAI DO DOCUMENTO ────────────────────────
@@ -3715,11 +3734,28 @@ body:has(.barra-consentimento) footer {
    o mesmo que os guiões de tema desta casa já fazem antes de hidratar. */
 .cortina--fora {
   display: none !important;
+  /* A camada já não serve para nada: largá-la devolve a memória. */
+  will-change: auto;
 }
 
-/* Posta pelo guião quando o documento está lido E o mínimo já passou. */
+/* Posta pelo guião quando o documento está lido E o mínimo já passou.
+   ── PORQUE É QUE A SAÍDA TEM UM NOME PRÓPRIO ────────────────────────────
+   Porque a `.cortina` JÁ tem uma animação com o nome `cortina-a-subir` viva,
+   parada nos 4 s de atraso da rede de segurança. Reutilizar o mesmo nome aqui
+   obrigava o motor a RE-CRONOMETRAR essa animação em vez de começar uma nova
+   — e a desmontar e remontar a animação acelerada exactamente no instante em
+   que ela tem de se mexer. Um nome diferente tira a ambiguidade. */
 .cortina--a-sair {
-  animation: cortina-a-subir 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  animation: cortina-a-subir-ja 0.32s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+@keyframes cortina-a-subir-ja {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
 }
 
 /* ── A VARIANTE DO LOGÓTIPO, PARA O SÍTIO ─────────────────────────────────
@@ -3781,6 +3817,21 @@ body:has(.barra-consentimento) footer {
 
 /* 1 s ao todo: os primeiros 40% (~400 ms) a subir e a materializar-se, e o
    resto — ~600 ms — completamente legível. É o tempo que ela descreveu. */
+/* ── A LETRA NÃO PODE TROCAR A MEIO DA ANIMAÇÃO ──────────────────────────
+   O lema é desenhado em Playfair, que é carregada com `display: swap`. Num 4G
+   frio a letra chega lá pelos 300–900 ms — ou seja, DENTRO do segundo em que
+   as palavras estão a subir. Quando chega, as duas linhas re-medem-se e
+   repintam-se a meio do movimento.
+
+   A casa já tem a máquina para isto: o guião do `layout.tsx` marca o
+   documento com `fontes-por-assentar` e tira a marca no `document.fonts.ready`.
+   Enquanto ela lá estiver, o lema fica em Georgia — uma serifada do sistema,
+   já lá, sem pedido nenhum — e a Playfair só entra quando as letras assentam,
+   altura em que a cortina já saiu ou está de saída. */
+.fontes-por-assentar .cortina__lema {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
 .cortina__lema > span {
   display: block;
   opacity: 0;
