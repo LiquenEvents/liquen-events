@@ -43,6 +43,31 @@ const BLOCO = CSS.slice(CSS.indexOf("A CORTINA DA PROPOSTA"));
  */
 const MIN = Number(/data-minimo"\)\|\|(\d+)\)/.exec(GUIAO)?.[1]);
 
+/**
+ * O mínimo que a cortina REALMENTE usa — o que o componente escreve no
+ * elemento, e não o de recurso do guião.
+ *
+ * Lido daqui e não escrito à mão: é este o número que muda quando alguém
+ * mexer no ritmo da frase, e um teste que o repetisse deixava de o vigiar.
+ */
+const MINIMO = Number(
+  /data-minimo="(\d+)"/.exec(renderToStaticMarkup(<Cortina locale="pt" />))?.[1],
+);
+
+/** Cada letra da frase, com o instante em que acaba de entrar. */
+function letras() {
+  const { container } = render(<Cortina locale="pt" />);
+  const achadas = [...container.querySelectorAll<HTMLElement>(".cortina__letra")].map((el) => ({
+    el,
+    texto: el.textContent ?? "",
+    de: el.style.getPropertyValue("--de"),
+    atraso: parseFloat(el.style.animationDelay),
+    duracao: parseFloat(el.style.animationDuration),
+  }));
+  cleanup();
+  return achadas;
+}
+
 afterEach(cleanup);
 
 describe("quanto tempo a cortina fica", () => {
@@ -96,12 +121,46 @@ describe("quanto tempo a cortina fica", () => {
     expect(aSair(), "o mínimo já passou — sai JÁ, sem mais espera").toBe(true);
   });
 
-  it("continua a ser um segundo, e não os dois mil do exemplo", () => {
-    // O `hold = 2000` do CSS que ela mandou é a linha mais fácil do mundo de
-    // copiar. Dois segundos depois de já se ter carregado no botão lêem-se
-    // como «não funcionou».
-    expect(MIN).toBe(1000);
-    expect(GUIAO).not.toContain("2000");
+  it("o mínimo cobre a frase INTEIRA — a cortina não sai a meio dela", () => {
+    /**
+     * ── O QUE ESTE CASO PASSOU A GUARDAR ──────────────────────────────────
+     *
+     * Guardava um número: «o mínimo é 1000, e não os 2000 do exemplo». Isso
+     * deixou de fazer sentido no dia em que ela pediu a frase a entrar letra a
+     * letra e «mais devagar»: o mínimo subiu para 2200 e um teste pregado a
+     * 1000 só sabia dizer que alguém tinha mexido, não se tinha mexido bem.
+     *
+     * O que importa não é o número: é que a cortina não se levante a meio da
+     * própria frase. Se a última letra ainda vai a entrar quando a cortina
+     * sobe, o casal vê uma frase por acabar a fugir para cima — que é pior do
+     * que não ter animação nenhuma.
+     *
+     * Portanto a conta refaz-se aqui a partir dos tempos que o componente
+     * escreve no HTML, e reprova sozinha se alguém acelerar a frase sem
+     * baixar o mínimo, ou abrandá-la sem o subir.
+     */
+    const todas = letras();
+    expect(todas.length, "a frase deixou de vir partida em letras").toBeGreaterThan(20);
+    const fim = Math.max(...todas.map((l) => l.atraso + l.duracao));
+
+    expect(
+      MINIMO,
+      `a cortina sai aos ${MINIMO} ms e a última letra só acaba de entrar aos ${fim} ms`,
+    ).toBeGreaterThanOrEqual(fim);
+
+    // E depois de montada tem de haver frase parada para LER. Foi sempre este
+    // o pedido dela — «uns 600 ms legível» — e é o que justifica a espera.
+    expect(MINIMO - fim, "a frase monta-se e sai sem dar tempo de a ler").toBeGreaterThanOrEqual(
+      500,
+    );
+
+    /**
+     * E um tecto, porque isto é o único sítio de toda a casa onde uma
+     * animação atrasa uma tarefa de propósito. 2,5 s é o limite em que uma
+     * marca deixa de se ler como marca e passa a ler-se como «não funcionou»
+     * — que era exactamente o defeito dos 2000 ms fixos do exemplo.
+     */
+    expect(MINIMO, "uma cortina assim já não é uma marca, é uma espera").toBeLessThanOrEqual(2500);
   });
 
   it("se o CSS já a levantou, o guião não a faz subir outra vez", () => {
@@ -165,7 +224,10 @@ describe("a cortina, e o que não pode mudar", () => {
      */
     const atraso = /cortina-a-subir[^;]*?(\d+(?:\.\d+)?)s forwards/.exec(BLOCO);
     expect(atraso, "a saída sem JavaScript desapareceu").not.toBeNull();
-    expect(Number(atraso![1]) * 1000).toBeGreaterThan(MIN);
+    expect(
+      Number(atraso![1]) * 1000,
+      "a rede de segurança levanta a cortina a meio da frase",
+    ).toBeGreaterThan(MINIMO);
   });
 
   it("nasce visível — é isso que faz uma proposta rápida chegar a mostrá-la", () => {
@@ -232,13 +294,84 @@ describe("a cortina, e o que não pode mudar", () => {
     }
   });
 
-  it("cada grupo sobe do seu degrau — é isso o efeito, e não o fade", () => {
+  it("uma cai e a outra entra — as letras alternam de lado, e é isso o efeito", () => {
+    /**
+     * Palavras dela, e o que este caso guarda: «as letras deslocam-se, tipo
+     * uma cai e a outra entra».
+     *
+     * Duas maneiras de partir isto sem dar por ela: pôr todas as letras a vir
+     * do mesmo lado (deixa de ser «uma cai e a outra entra» e passa a ser uma
+     * linha inteira a subir devagar), ou pô-las todas a entrar ao mesmo tempo
+     * (deixa de haver letras, há um bloco). Nenhuma das duas passa aqui.
+     */
+    const todas = letras();
+
+    for (let i = 0; i < todas.length; i++) {
+      expect(todas[i].de, `a letra «${todas[i].texto}» não sabe de que lado vem`).toBe(
+        i % 2 === 0 ? "135%" : "-135%",
+      );
+    }
+
+    // E entram uma DE CADA VEZ: os atrasos sobem, sem repetições.
+    const atrasos = todas.map((l) => l.atraso);
+    for (let i = 1; i < atrasos.length; i++) {
+      expect(atrasos[i], "duas letras a entrar no mesmo instante são um bloco").toBeGreaterThan(
+        atrasos[i - 1],
+      );
+    }
+  });
+
+  it("a contagem atravessa as duas linhas — a frase é uma, e não duas", () => {
+    // Se cada linha recomeçasse do zero, a primeira letra de baixo entrava ao
+    // mesmo tempo que a de cima e liam-se como duas frases sobrepostas.
     const { container } = render(<Cortina locale="pt" />);
-    const degraus = [...container.querySelectorAll(".cortina__lema > span")].map((s) =>
-      (s as HTMLElement).style.getPropertyValue("--degrau"),
+    const porLinha = [...container.querySelectorAll(".cortina__linha")].map((linha) =>
+      [...linha.querySelectorAll<HTMLElement>(".cortina__letra")].map((l) =>
+        parseFloat(l.style.animationDelay),
+      ),
     );
-    expect(degraus).toHaveLength(2);
-    expect(new Set(degraus).size, "dois grupos com o mesmo degrau são um fade único").toBe(2);
+    expect(porLinha).toHaveLength(2);
+    expect(
+      Math.min(...porLinha[1]),
+      "a segunda linha recomeçou do zero em vez de continuar a primeira",
+    ).toBeGreaterThan(Math.max(...porLinha[0]));
+  });
+
+  it("nenhuma palavra pode partir-se ao meio quando a linha muda", () => {
+    /**
+     * O preço de partir a frase em letras: um navegador muda de linha entre
+     * duas caixas coladas, e `eternizamos memórias.` mede ~252 pt num ecrã de
+     * 320 com 32 de respiro de cada lado — a quatro pontos de quebrar, e
+     * quebraria a meio de uma palavra.
+     *
+     * A defesa tem duas metades e as duas têm de estar cá: cada letra vive
+     * dentro de uma palavra, e a palavra não quebra por dentro (o
+     * `white-space: nowrap` do CSS). Este caso guarda as duas.
+     */
+    const { container } = render(<Cortina locale="pt" />);
+    for (const letra of container.querySelectorAll(".cortina__letra")) {
+      expect(
+        letra.parentElement?.classList.contains("cortina__palavra"),
+        `a letra «${letra.textContent}» está solta na linha`,
+      ).toBe(true);
+    }
+    expect(BLOCO).toMatch(/\.cortina__palavra \{[\s\S]*?white-space: nowrap;/);
+
+    // E os espaços continuam a ser espaços de verdade, fora das palavras: são
+    // eles, e só eles, que dão à linha um sítio por onde mudar.
+    const palavras = [...container.querySelectorAll(".cortina__palavra")].map((p) => p.textContent);
+    expect(palavras).toEqual(
+      [getDictionary("pt").footer.sloganLine1, getDictionary("pt").footer.sloganLine2]
+        .join(" ")
+        .split(" "),
+    );
+  });
+
+  it("a linha recorta o que sai dela — é o que faz a letra ENTRAR e não aparecer", () => {
+    // Sem `overflow: hidden` a letra não entra por lado nenhum: aparece
+    // deslocada no meio do ecrã e desliza para o sítio, por cima da outra
+    // linha. O recorte é a peça, e não um acabamento.
+    expect(BLOCO).toMatch(/\.cortina__linha \{[\s\S]*?overflow: hidden;/);
   });
 
   it("não é anunciada a quem ouve o ecrã: a espera já tem nome no `loading.tsx`", () => {

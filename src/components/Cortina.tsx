@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 /**
@@ -123,19 +125,72 @@ import { getDictionary, type Locale } from "@/lib/i18n";
  */
 export const GUIAO = `(function(){var c=document.currentScript.previousElementSibling;if(!c||!c.classList.contains("cortina"))return;var t0=Date.now();var MIN=+(c.getAttribute("data-minimo")||1000);var raiz=document.documentElement;var scrollAntes=raiz.style.overflow;var fora=function(){c.classList.add("cortina--fora");raiz.style.overflow=scrollAntes;raiz.setAttribute("data-cortina","fora")};if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){fora();return}var chave=c.getAttribute("data-sessao");if(chave){try{if(sessionStorage.getItem(chave)){fora();return}sessionStorage.setItem(chave,"1")}catch(e){}}raiz.style.overflow="hidden";c.addEventListener("animationend",function(e){if(!e||e.animationName==="cortina-a-subir"||e.animationName==="cortina-a-subir-ja")fora()});addEventListener("pageshow",function(e){if(e&&e.persisted)fora()});var sair=function(){if(c.classList.contains("cortina--fora")||c.classList.contains("cortina--a-sair"))return;var falta=MIN-(Date.now()-t0);if(falta>0){setTimeout(sair,falta);return}c.classList.add("cortina--a-sair");raiz.setAttribute("data-cortina","a-sair");setTimeout(fora,1000)};if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",sair,{once:true})}else{sair()}})();`;
 
-/** Os degraus: cada grupo sobe de mais longe e sai pelo mesmo, ao contrário. */
-const DEGRAUS = ["14px", "28px"] as const;
-/** O desencontro entre grupos. O segundo arranca um piscar depois do primeiro. */
-const ATRASOS = ["0ms", "60ms"] as const;
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FRASE CHEGA LETRA A LETRA — UMAS DE CIMA, OUTRAS DE BAIXO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «a animação está muito depressa e não é a que eu quero. Quero
+ * uma animação mais de tipo, as letras deslocam-se, tipo uma cai e a outra
+ * entra — e quero que seja mais devagar a entrar».
+ *
+ * Estava assim: duas LINHAS inteiras, cada uma a subir em bloco, com 60 ms de
+ * desencontro entre elas. Dois movimentos, e depressa.
+ *
+ * Passa a ser uma letra de cada vez, e alternadas: a primeira sobe de baixo, a
+ * segunda cai de cima, a terceira sobe outra vez. É literalmente o que ela
+ * descreveu — «uma cai e a outra entra» — e é o que faz a frase montar-se à
+ * frente de quem olha em vez de aparecer feita.
+ *
+ * ── O RECORTE É O QUE FAZ ISTO FUNCIONAR ─────────────────────────────────
+ *
+ * Cada linha corta o que sai dela (`overflow: hidden`), portanto uma letra
+ * deslocada de mais do que a sua própria altura está FORA da linha e não se
+ * vê. O que se vê é ela a ENTRAR pela borda — de baixo ou de cima —, e não a
+ * aparecer do nada, transparente, no sítio onde vai ficar. É a diferença
+ * entre uma letra que chega e uma que se revela.
+ *
+ * ── E PORQUE É QUE AS PALAVRAS CONTINUAM INTEIRAS ─────────────────────────
+ *
+ * Porque partir a frase em letras parte também as PALAVRAS: um navegador pode
+ * mudar de linha entre duas caixas coladas, e `eternizamos memórias.` mede
+ * ~252 pt num ecrã de 320 com 32 de respiro de cada lado. Ou seja, está a
+ * quatro pontos de quebrar — e quebraria a meio de uma palavra.
+ *
+ * Daí a camada do meio: linha → palavra → letra. A palavra é uma caixa que não
+ * quebra por dentro, e o único sítio por onde a linha pode mudar é o espaço
+ * entre duas — que é onde ela já mudava antes de isto existir.
+ *
+ * ── E CONTINUA A SER SÓ `transform` ──────────────────────────────────────
+ *
+ * Nenhuma letra mexe na opacidade. São ~39, e 39 opacidades a correr ao mesmo
+ * tempo num telemóvel é o que faz uma animação bonita tremer — que foi
+ * exactamente a queixa anterior dela.
+ */
+
+/** Entre uma letra e a seguinte. */
+const ATRASO_POR_LETRA = 24;
+/** O que cada letra demora a entrar. */
+const DURACAO_DA_LETRA = 700;
 
 /**
  * Quanto tempo a cortina fica no ecrã, no mínimo.
  *
- * ~400 ms a subir mais ~600 ms com a frase legível — o tempo que ela
- * descreveu. Duas linhas para LER pedem-no, e é o mesmo em todo o lado,
- * porque em todo o lado é a mesma frase.
+ * A conta, e não um palpite: a frase tem 37 letras em português e 36 em
+ * inglês (os espaços não entram na contagem porque não se vêem a entrar). A
+ * última arranca aos 36 × 24 = 864 ms e demora 700 a chegar — ou seja, a frase
+ * só está COMPLETA aos ~1,57 s. Abaixo disso a cortina saía a meio da própria
+ * animação, que é o defeito que ela apanhou à vista desarmada.
+ *
+ * 2200 dá ~630 ms com a frase inteira parada e legível depois de montada, que
+ * é o tempo que ela descreveu desde o princípio.
+ *
+ * Era 1000. Ela pediu «mais devagar a entrar», e isto é o dobro — o custo está
+ * dito: numa ligação boa, a proposta e o sítio aparecem ~1,2 s mais tarde do
+ * que apareciam ontem. Numa lenta não custa nada, porque o mínimo é um chão e
+ * não uma espera.
  */
-const MINIMO = 1000;
+const MINIMO = 2200;
 
 export function Cortina({
   locale,
@@ -158,7 +213,23 @@ export function Cortina({
   chaveDeSessao?: string;
 }) {
   const t = getDictionary(locale);
-  const grupos = [t.footer.sloganLine1, t.footer.sloganLine2];
+
+  /**
+   * A frase, partida em linhas → palavras → letras, com o instante de entrada
+   * de cada letra já contado.
+   *
+   * O contador atravessa as DUAS linhas. Se cada uma recomeçasse do zero, as
+   * duas primeiras letras entravam ao mesmo tempo e a frase lia-se como duas
+   * frases; a contagem contínua é o que a faz ler-se como uma só.
+   *
+   * A conta é feita AQUI, no servidor, e não no navegador: o que chega ao
+   * telemóvel é HTML já com os tempos escritos, e a animação arranca no
+   * primeiro fotograma, sem esperar por JavaScript nenhum.
+   */
+  let n = 0;
+  const linhas = [t.footer.sloganLine1, t.footer.sloganLine2].map((linha) =>
+    linha.split(" ").map((palavra) => [...palavra].map((letra) => ({ letra, indice: n++ }))),
+  );
 
   return (
     <>
@@ -200,14 +271,6 @@ export function Cortina({
         /**
          * Escondida de quem ouve o ecrã, e de propósito.
          *
-         * O `aria-busy` do `loading.tsx` já diz «isto está a carregar», e
-         * di-lo na língua do leitor de ecrã. Anunciar por cima disso o lema do
-         * estúdio seria ler publicidade a alguém que está à espera da
-         * proposta. A cortina é para os olhos; a espera já tem nome.
-         */
-        /**
-         * Escondida de quem ouve o ecrã, e de propósito.
-         *
          * Onde ela aparece há sempre, por baixo, quem já nomeia a espera: o
          * `aria-busy` do `loading.tsx` na proposta, e no sítio a própria página,
          * que chega inteira. Anunciar por cima disso o lema do estúdio seria
@@ -216,12 +279,36 @@ export function Cortina({
         aria-hidden="true"
       >
         <p className="cortina__lema">
-          {grupos.map((grupo, i) => (
-            <span
-              key={i}
-              style={{ "--degrau": DEGRAUS[i], animationDelay: ATRASOS[i] } as React.CSSProperties}
-            >
-              {grupo}
+          {linhas.map((palavras, i) => (
+            <span key={i} className="cortina__linha">
+              {palavras.map((letras, p) => (
+                <Fragment key={p}>
+                  {/* O espaço vai FORA da palavra, e é um espaço a sério: é
+                      ele, e só ele, que dá à linha um sítio por onde mudar. */}
+                  {p > 0 ? " " : null}
+                  <span className="cortina__palavra">
+                    {letras.map(({ letra, indice }) => (
+                      <span
+                        key={indice}
+                        className="cortina__letra"
+                        style={
+                          {
+                            animationDelay: `${indice * ATRASO_POR_LETRA}ms`,
+                            animationDuration: `${DURACAO_DA_LETRA}ms`,
+                            /* Uma cai, a seguinte sobe. São as palavras dela:
+                               «uma cai e a outra entra». Os 135% são a altura
+                               da letra mais o respiro do recorte — abaixo
+                               disso via-se-lhe uma fatia antes de entrar. */
+                            "--de": indice % 2 === 0 ? "135%" : "-135%",
+                          } as React.CSSProperties
+                        }
+                      >
+                        {letra}
+                      </span>
+                    ))}
+                  </span>
+                </Fragment>
+              ))}
             </span>
           ))}
         </p>
