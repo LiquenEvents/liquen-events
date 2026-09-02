@@ -87,6 +87,22 @@ export default async function LayoutPrivado({
   return (
     <main id="conteudo" className="flex-1">
       {/*
+        ── E PORQUE É QUE ELA TEM CHAVE DE SESSÃO ─────────────────────────
+
+        Palavras dela: «se eu volto para trás no browser aquilo fica assim um
+        bocado coiso».
+
+        Fica, e a razão é concreta: esta página é `force-dynamic`, portanto sai
+        com `no-store` — e uma página `no-store` NÃO entra na cache de
+        histórico do browser. Carregar em Voltar não é voltar: é carregar a
+        página toda de novo. Sem chave, a cortina de um segundo tocava outra
+        vez, e outra, a cada Voltar.
+
+        Com a chave, o casal vê a cortina UMA vez — a primeira, que é a que
+        interessa — e o Voltar devolve-lhes a proposta de imediato. Uma
+        proposta DIFERENTE no mesmo separador continua a ter a sua primeira
+        vez, porque é outro documento noutro separador ou noutra visita.
+
         A CORTINA VEM DAQUI, E NÃO DO `loading.tsx`, POR UMA RAZÃO SÓ: a
         língua. O `loading.tsx` não recebe parâmetros — está nos documentos do
         Next à letra, e é por isso que ele não tem uma única frase escrita. Um
@@ -98,7 +114,7 @@ export default async function LayoutPrivado({
         por baixo, e continua a ser ele a nomear a espera para quem ouve o
         ecrã e para quem pediu menos movimento.
       */}
-      <Cortina locale={normalizeLocale(lang)} />
+      <Cortina locale={normalizeLocale(lang)} chaveDeSessao="cortina:proposta" />
       {children}
     </main>
   );

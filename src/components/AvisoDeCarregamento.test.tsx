@@ -172,4 +172,19 @@ describe("e o que o CSS tem de prometer", () => {
       /\.a-caminho \{[^}]*display: none/,
     );
   });
+
+  it("carregar em VOLTAR apaga-o — mesmo que o caminho não mude", () => {
+    /**
+     * A armadilha do lado do histórico, irmã da que já estava fechada do lado
+     * do clique. Alguém carrega num link, o aviso aparece, e essa pessoa
+     * carrega em Voltar para a página onde já estava: o caminho nunca muda, o
+     * efeito que o apaga nunca corre, e o logótipo ficava a respirar por cima
+     * de uma página que já lá estava até ao tecto dos oito segundos.
+     */
+    render(<AvisoDeCarregamento locale="pt" />);
+    clicar("/pt/galeria");
+    expect(visivel()).toBe(true);
+    act(() => void window.dispatchEvent(new Event("popstate")));
+    expect(visivel(), "voltar quer dizer que a navegação foi abandonada").toBe(false);
+  });
 });

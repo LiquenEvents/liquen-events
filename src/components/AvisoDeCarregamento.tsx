@@ -103,11 +103,26 @@ export function AvisoDeCarregamento({ locale }: { locale: Locale }) {
     // Na fase de captura: um `onClick` de um componente pode parar a
     // propagação antes de isto chegar a saber que houve um clique.
     document.addEventListener("click", aoClicar, true);
+    /**
+     * O `popstate` é a saída que faltava.
+     *
+     * O aviso só se apaga quando o CAMINHO muda. Se alguém carregar num link,
+     * o aviso aparecer, e essa pessoa carregar em VOLTAR para a página onde já
+     * estava, o caminho nunca chega a mudar — e o logótipo ficava a respirar
+     * por cima de uma página que já lá estava, até ao tecto dos oito segundos.
+     *
+     * Carregar em Voltar quer dizer que a navegação anunciada foi abandonada.
+     * Não há nada a anunciar: apaga-se, sem condições.
+     */
     const aoSair = () => setACaminho(false);
     window.addEventListener("pagehide", aoSair);
+    window.addEventListener("popstate", aoSair);
+    window.addEventListener("pageshow", aoSair);
     return () => {
       document.removeEventListener("click", aoClicar, true);
       window.removeEventListener("pagehide", aoSair);
+      window.removeEventListener("popstate", aoSair);
+      window.removeEventListener("pageshow", aoSair);
     };
   }, []);
 

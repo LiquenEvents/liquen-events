@@ -466,4 +466,97 @@ describe("a cortina, e o que não pode mudar", () => {
     const fonte = readFileSync("src/components/Cortina.tsx", "utf8");
     expect(fonte).toContain("suppressHydrationWarning");
   });
+
+  it("voltar pela cache do browser fecha-a já, e devolve o scroll", () => {
+    /**
+     * Palavras dela: «se eu volto para trás no browser aquilo fica assim um
+     * bocado coiso».
+     *
+     * Quando uma página volta da cache de histórico, o guião NÃO corre outra
+     * vez — `document.currentScript` só existe durante a leitura. Ou seja: a
+     * cortina volta ao ecrã exactamente no estado em que estava quando se saiu.
+     * Se se saiu com ela levantada, volta-se a um ecrã escuro, com o scroll
+     * trancado, e sem ninguém para o destrancar — o `animationend` e o
+     * `setTimeout` que fariam esse trabalho ficaram na visita anterior.
+     *
+     * O `pageshow` com `persisted` é o único aviso que o browser dá de que
+     * isto aconteceu. Uma página que volta JÁ ESTÁ carregada: não há nada para
+     * a cortina cobrir, e ela fecha-se sem mínimo nenhum.
+     */
+    vi.useFakeTimers();
+    const antes = "clip";
+    try {
+      document.documentElement.style.overflow = antes;
+      document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "loading", configurable: true });
+      new Function(GUIAO)();
+
+      // Está no ecrã e o scroll está trancado — saiu-se a meio.
+      const el = () => document.querySelector(".cortina")!;
+      expect(el().classList.contains("cortina--fora")).toBe(false);
+      expect(document.documentElement.style.overflow).toBe("hidden");
+
+      // E volta-se pela cache do browser.
+      const volta = new Event("pageshow") as Event & { persisted: boolean };
+      Object.defineProperty(volta, "persisted", { value: true });
+      window.dispatchEvent(volta);
+
+      expect(el().classList.contains("cortina--fora"), "fecha-se sem esperar").toBe(true);
+      expect(document.documentElement.style.overflow, "e devolve o scroll").toBe(antes);
+    } finally {
+      document.documentElement.style.overflow = "";
+      vi.useRealTimers();
+    }
+  });
+
+  it("um `pageshow` que NÃO vem da cache não fecha nada", () => {
+    // Um carregamento normal também dispara `pageshow`, com `persisted` a
+    // falso. Se isso fechasse a cortina, ela nunca chegava a ver-se.
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "loading", configurable: true });
+      new Function(GUIAO)();
+      window.dispatchEvent(new Event("pageshow"));
+      expect(document.querySelector(".cortina")?.classList.contains("cortina--fora")).toBe(false);
+    } finally {
+      document.documentElement.style.overflow = "";
+      vi.useRealTimers();
+    }
+  });
+
+  it("a saída com nome próprio também é reconhecida pelo `animationend`", () => {
+    // A saída do guião passou a ter o seu próprio nome de animação, para o
+    // motor não ter de re-cronometrar a que já está viva na rede de segurança.
+    // Se o ouvinte não conhecesse o nome novo, a cortina ficava `--a-sair`
+    // para sempre: fora do ecrã, mas nunca `display:none`.
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = `<div class="cortina"></div><script id="g"></script>`;
+      Object.defineProperty(document, "currentScript", {
+        value: document.getElementById("g"),
+        configurable: true,
+      });
+      Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+      new Function(GUIAO)();
+      vi.advanceTimersByTime(1000);
+      document
+        .querySelector(".cortina")!
+        .dispatchEvent(
+          Object.assign(new Event("animationend"), { animationName: "cortina-a-subir-ja" }),
+        );
+      expect(document.querySelector(".cortina")?.classList.contains("cortina--fora")).toBe(true);
+    } finally {
+      document.documentElement.style.overflow = "";
+      vi.useRealTimers();
+    }
+  });
 });

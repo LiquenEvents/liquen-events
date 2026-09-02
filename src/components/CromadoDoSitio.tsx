@@ -103,7 +103,7 @@ export default function CromadoDoSitio({
         A razão de não ser o lema aqui é de ritmo: quem chega ao sítio vem de
         uma pesquisa ou de um anúncio e quer ver o trabalho, não ler uma frase.
       */}
-      <Cortina locale={locale} variante="logotipo" />
+      <Cortina locale={locale} variante="logotipo" chaveDeSessao="cortina:sitio" />
       <ScrollProgress />
       {/*
         O aviso de que uma página está a demorar. Palavras dela: «caso demore
