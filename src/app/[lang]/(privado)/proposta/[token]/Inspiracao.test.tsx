@@ -16,9 +16,9 @@ import { join } from "node:path";
 const T = textosDaPagina("pt");
 
 const FOTOS: Record<string, FotoDaProposta> = {
-  a: { id: "a", miniatura: "mini/a", original: "orig/a", largura: 1200, altura: 800 },
-  b: { id: "b", miniatura: "mini/b", original: "orig/b" },
-  c: { id: "c", miniatura: "mini/c", original: "orig/c" },
+  a: { id: "a", marca: "ma", miniatura: "mini/a", original: "orig/a", largura: 1200, altura: 800 },
+  b: { id: "b", marca: "mb", miniatura: "mini/b", original: "orig/b" },
+  c: { id: "c", marca: "mc", miniatura: "mini/c", original: "orig/c" },
 };
 
 const BOARD: BoardParaEcra = {
@@ -298,7 +298,7 @@ describe("a grelha oferece dois tamanhos", () => {
     const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
     const candidatos = (img.getAttribute("srcset") ?? "").split(",").map((c) => c.trim());
     const daRota = candidatos.find((c) => c.startsWith("/api/"));
-    expect(daRota).toBe("/api/proposta/tk/foto/a 1200w");
+    expect(daRota).toBe("/api/proposta/tk/foto/a?v=ma 1200w");
   });
 
   it("diz que largura a fotografia OCUPA — senão o navegador pede sempre a maior", () => {
@@ -327,7 +327,7 @@ describe("a grelha oferece dois tamanhos", () => {
      * acontecer nas fotografias anteriores ao bucket, ou seja nas propostas
      * antigas que estão nas caixas de correio dos casais.
      */
-    expect(img().getAttribute("src")).toBe("/api/proposta/tk/foto/a");
+    expect(img().getAttribute("src")).toBe("/api/proposta/tk/foto/a?v=ma");
     // E só se ESTA também falhar é que se paga o ficheiro inteiro.
     fireEvent.error(img());
     expect(img().getAttribute("src")).toBe("orig/a");
@@ -798,7 +798,7 @@ describe("a oferta em AVIF das fotografias grandes", () => {
      * escolher por conta própria, quando a primeira escolha acabou de falhar.
      */
     const soOriginal: Record<string, FotoDaProposta> = {
-      a: { id: "a", original: "orig/a", mediaAvif: "avif/a" },
+      a: { id: "a", marca: "ma", original: "orig/a", mediaAvif: "avif/a" },
     };
     render(
       <Inspiracao

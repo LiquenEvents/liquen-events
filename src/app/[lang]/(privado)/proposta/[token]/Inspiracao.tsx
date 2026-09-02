@@ -1,5 +1,6 @@
 "use client";
 
+import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
@@ -842,10 +843,7 @@ function Celula({
    * `api/proposta/[token]/foto/[id]`). Ver `signProposalMids` para o porquê de
    * a rota ter deixado de ser o caminho de todos os dias.
    */
-  const media = foto
-    ? (foto.media ??
-      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
-    : "";
+  const media = foto ? (foto.media ?? enderecoDaRotaDaFoto(token, foto)) : "";
 
   /**
    * ── A GRELHA DEIXA DE CAIR NO ORIGINAL ─────────────────────────────────

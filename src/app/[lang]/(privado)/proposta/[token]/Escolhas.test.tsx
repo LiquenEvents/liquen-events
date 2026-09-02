@@ -255,6 +255,7 @@ describe("as fotografias das opções não nascem em branco", () => {
   const COM_FOTO = {
     e0o0: {
       id: "f1",
+      marca: "mf1",
       miniatura: "mini/o1",
       lqip: "data:image/jpeg;base64,BORRAO",
       largura: 4,
@@ -287,7 +288,7 @@ describe("as fotografias das opções não nascem em branco", () => {
   it("sem borrão gravado, não se inventa caixa nenhuma", () => {
     // As propostas anteriores ao `lqip` não têm nenhum. Uma caixa vazia
     // marcada como decoração seria ruído no HTML e mais nada.
-    desenhar({ fotos: { e0o0: { id: "f1", miniatura: "mini/o1" } } });
+    desenhar({ fotos: { e0o0: { id: "f1", marca: "mf1", miniatura: "mini/o1" } } });
     expect(document.querySelector('img[aria-hidden="true"]')).toBeNull();
   });
 });
@@ -309,7 +310,14 @@ describe("as fotografias das opções não nascem em branco", () => {
  */
 describe("as fotografias das opções têm degrau do meio", () => {
   const COM_FOTO = {
-    e0o0: { id: "f1", miniatura: "mini/o1", original: "orig/o1", largura: 4, altura: 3 },
+    e0o0: {
+      id: "f1",
+      marca: "mf1",
+      miniatura: "mini/o1",
+      original: "orig/o1",
+      largura: 4,
+      altura: 3,
+    },
   };
 
   it("quando a miniatura falha, vai à derivada de 1200 — não ao original", () => {
@@ -321,7 +329,7 @@ describe("as fotografias das opções têm degrau do meio", () => {
     expect(
       img.getAttribute("src"),
       "caiu direito ao original: 2,6 MB para desenhar um quadrado pequeno",
-    ).toBe("/api/proposta/tok-1/foto/f1");
+    ).toBe("/api/proposta/tok-1/foto/f1?v=mf1");
   });
 
   it("e o original continua a ser a última rede, depois do degrau do meio", () => {
@@ -339,7 +347,13 @@ describe("as fotografias das opções têm degrau do meio", () => {
     // atravessarem a nossa função.
     desenhar({
       fotos: {
-        e0o0: { id: "f1", miniatura: "mini/o1", media: "https://cdn/o1-1200", original: "orig/o1" },
+        e0o0: {
+          id: "f1",
+          marca: "mf1",
+          miniatura: "mini/o1",
+          media: "https://cdn/o1-1200",
+          original: "orig/o1",
+        },
       },
     });
     const img = document.querySelector('img:not([aria-hidden="true"])') as HTMLImageElement;

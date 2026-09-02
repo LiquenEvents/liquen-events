@@ -1,3 +1,4 @@
+import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { eurDocumento, milharesComPonto, montanteNaLingua } from "@/lib/money";
 import {
   depositPercentOf,
@@ -506,10 +507,7 @@ export default function Documento({
    * é quem a fabrica. O original deixa de aparecer aqui: continua alcançável,
    * mas pela rota, que o converte antes de o servir.
    */
-  const capaMedia = capa
-    ? (capa.media ??
-      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`)
-    : "";
+  const capaMedia = capa ? (capa.media ?? enderecoDaRotaDaFoto(token, capa)) : "";
 
   // ── A APRESENTAÇÃO ────────────────────────────────────────────────────────
   // Os mesmos campos, pela mesma ordem, com a mesma regra do papel: um rótulo
@@ -1406,8 +1404,7 @@ export default function Documento({
                      meio. Fica para quando a derivada ainda não existe: é ela
                      que a fabrica e guarda. */
                     srcSet: `${fecho.miniatura} 400w, ${
-                      fecho.media ??
-                      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)}`
+                      fecho.media ?? enderecoDaRotaDaFoto(token, fecho)
                     } 1200w`,
                     sizes: "(min-width: 1024px) 1024px, 100vw",
                   }

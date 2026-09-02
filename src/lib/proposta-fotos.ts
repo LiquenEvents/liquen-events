@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { isPendingImage, type ProposalDoc } from "./proposal-doc";
 import {
   signProposalMids,
@@ -71,6 +72,22 @@ export interface FotoDaProposta {
    * do caminho real. Ver a regra 1 no cabeçalho.
    */
   id: string;
+  /**
+   * A MARCA desta fotografia: muda quando a fotografia daquele lugar muda.
+   *
+   * O {@link FotoDaProposta.id} diz o LUGAR (`b0f2` é «a terceira do primeiro
+   * mood board»); a `marca` diz QUAL. São coisas diferentes, e confundi-las
+   * custava caro: a rota que fabrica a derivada guardava-a no telemóvel do
+   * casal por um dia, dizendo que o conteúdo de um `id` nunca muda. Muda —
+   * basta ela rever o board, e o mesmo link salta para a revisão nova.
+   *
+   * É um resumo de sentido único da referência (ver `marcaDaRef`): não leva
+   * nenhum byte do caminho real, e é por isso que pode ir num endereço.
+   *
+   * Ver `endereco-da-foto.ts`, que a põe lá, e porque é que tirar o
+   * `immutable` não teria resolvido nada.
+   */
+  marca: string;
   /** O URL da derivada de 400 px. Ausente quando não há miniatura guardada. */
   miniatura?: string;
   /**
@@ -126,6 +143,22 @@ function enderecoDirecto(ref: string): string | null {
   // não guardou nenhum. `image/jpeg` é o que o estúdio sempre gravou.
   if (!ref.includes("/") && ref.length > 128) return `data:image/jpeg;base64,${ref}`;
   return null;
+}
+
+/**
+ * A marca de uma referência: curta, estável, e de sentido único.
+ *
+ * `sha256` truncado a 12 hexadecimais. Truncar é seguro aqui porque isto NÃO
+ * é um segredo nem um validador de segurança: é um desempate de cache. O que
+ * se lhe pede é que duas fotografias diferentes não caiam na mesma marca — e
+ * 48 bits chegam de sobra para as poucas dezenas que um documento tem.
+ *
+ * De sentido único porque a referência É o caminho no bucket, e a regra 1
+ * desta casa diz que ele nunca sai daqui. O casal recebe 12 caracteres que
+ * não dizem nada sobre onde o ficheiro está.
+ */
+export function marcaDaRef(ref: string): string {
+  return createHash("sha256").update(ref).digest("hex").slice(0, 12);
 }
 
 /**
@@ -272,12 +305,13 @@ export async function fotosDaProposta(
 
   return inventario.map(({ id, ref }) => {
     const directo = enderecoDirecto(ref);
-    if (directo) return { id, original: directo };
+    if (directo) return { id, marca: marcaDaRef(ref), original: directo };
     const caminho = caminhoReal(ref);
     const forma = formas.get(caminho);
     const lqip = lqips.get(caminho);
     return {
       id,
+      marca: marcaDaRef(ref),
       ...(enderecoDe(ref, "miniatura", miniaturas)
         ? { miniatura: enderecoDe(ref, "miniatura", miniaturas) }
         : {}),

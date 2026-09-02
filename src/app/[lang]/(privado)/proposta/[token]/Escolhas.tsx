@@ -1,5 +1,6 @@
 "use client";
 
+import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useState } from "react";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
@@ -79,10 +80,7 @@ function FotoDaOpcao({ foto, alt, token }: { foto?: FotoDaProposta; alt: string;
    * da nossa rota quando ainda não existe — que é quem a fabrica. O original
    * continua a ser a última rede, mas deixa de ser a PRIMEIRA alternativa.
    */
-  const media = foto
-    ? (foto.media ??
-      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
-    : "";
+  const media = foto ? (foto.media ?? enderecoDaRotaDaFoto(token, foto)) : "";
   const { alvo, aoFalhar, desistiu } = useFotoComPlanoB(foto?.miniatura, [media, foto?.original]);
   if (!foto || !alvo || desistiu) return null;
   return (
