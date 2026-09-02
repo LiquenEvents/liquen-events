@@ -2,6 +2,7 @@
 
 import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import { contar, type TextosDaPagina } from "./textos-da-pagina";
@@ -1160,7 +1161,38 @@ function Lupa({
     };
   }, []);
 
-  return (
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A LUPA TEM DE SAIR DA SECÇÃO — SENÃO NÃO TAPA O ECRÃ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Um elemento `position: fixed` é medido pelo ECRÃ — excepto se algum
+   * antepassado tiver um `transform`, e aí passa a ser medido por esse
+   * antepassado. É a regra do «bloco de contenção», e apanhou-nos aqui.
+   *
+   * A secção da Inspiração leva `prop-chega`, a animação que a faz subir ao
+   * entrar (`globals.css`). Essa animação acaba em `transform: none` — só que
+   * corre com preenchimento `both` sobre uma linha de tempo de scroll, e o
+   * valor CALCULADO no fim é `translateY(0)`, que não é `none`. Um `transform`
+   * a zero continua a ser um `transform`, e continua a ser bloco de contenção.
+   *
+   * MEDIDO num Chromium a 390×780, com a mesma regra de CSS: com uma
+   * fotografia à vista e o dedo em cima dela, o diálogo ia de 270 a 3202 px
+   * num ecrã de 0 a 780 — ou seja, do tamanho da SECÇÃO. Não tapava o ecrã.
+   * Um casal que carregasse numa fotografia via meio ecrã preto e a fotografia
+   * fora dele.
+   *
+   * O portal resolve-o pela raiz, e não por remendo: a lupa passa a ser filha
+   * do `<body>`, onde não há antepassado nenhum com `transform`. É o que a
+   * galeria pública desta casa já faz (`GaleriaClient.tsx`), e a partir de hoje
+   * qualquer animação nova numa secção da proposta é inofensiva para ela.
+   *
+   * O React mantém o contexto e a subida dos eventos através de um portal —
+   * o foco, o Escape e o gesto lateral continuam a funcionar como antes.
+   */
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       ref={dialogo}
       role="dialog"
@@ -1264,6 +1296,7 @@ function Lupa({
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

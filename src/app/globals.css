@@ -4083,6 +4083,31 @@ body:has(.barra-consentimento) footer {
 [data-sobe].por-subir {
   transform: translateY(var(--sobe, 12px));
 }
+/* ── A ESCADA, QUE ESTEVE DESCRITA AQUI EM CIMA SEM EXISTIR ──────────────
+   O texto acima descrevia quatro degraus; o CSS tinha um. O `--sobe` nunca
+   chegou a ser declarado em lado nenhum, portanto TUDO subia os 12 px do
+   valor de recurso — incluindo o total a pagar, que o próprio texto dizia ser
+   o único acima de 14.
+
+   Perdeu-se numa correcção: os degraus estavam escritos em linha no TSX, e o
+   teste do portão do AVIF apanhou-os por engano (uma cadeia como «8px» tem a
+   forma de uma fatia de `sizes`). Tirei-os de lá e não os voltei a pôr aqui.
+
+   Vivem aqui, e não no TSX, exactamente por isso: o que o documento diz é o
+   PAPEL de cada peça (`bloco`, `foto`, `seccao`, `total`), e a distância que
+   cada papel merece é uma decisão de desenho, que é deste ficheiro. */
+[data-sobe="bloco"].por-subir {
+  transform: translateY(8px);
+}
+[data-sobe="foto"].por-subir {
+  transform: translateY(12px);
+}
+[data-sobe="seccao"].por-subir {
+  transform: translateY(14px);
+}
+[data-sobe="total"].por-subir {
+  transform: translateY(20px);
+}
 [data-sobe].por-subir.subiu {
   transform: none;
   transition: transform 620ms var(--ease-out);

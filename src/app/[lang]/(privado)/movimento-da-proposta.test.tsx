@@ -165,3 +165,80 @@ describe("o movimento da proposta", () => {
     expect(BLOCO).toMatch(/html\[data-cortina="a-sair"\] \.prop-folha/);
   });
 });
+
+describe("a escada das distâncias", () => {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O TEXTO DESCREVIA QUATRO DEGRAUS E O CÓDIGO TINHA UM
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O comentário do `globals.css` dizia, com números: bloco 8 px, fotografia
+   * 12, secção 14, e o TOTAL A PAGAR 20 — «o único acima de 14». O CSS tinha
+   * uma regra só, `translateY(var(--sobe, 12px))`, e o `--sobe` NUNCA foi
+   * declarado em lado nenhum. Ou seja: tudo subia 12 px, e o texto mentia.
+   *
+   * Perdeu-se numa correcção — os degraus estavam escritos em linha no TSX e o
+   * teste do portão do AVIF apanhou-os por engano, porque uma cadeia como
+   * «8px» tem a forma de uma fatia de `sizes`. Tirei-os de lá e não os voltei a
+   * pôr no CSS.
+   *
+   * Não se perde outra vez: o que este caso guarda não são os números, é a
+   * ESCADA — que os quatro papéis existem, que são distintos, e que a ordem é
+   * a que o desenho diz. Mudar um número passa aqui; apagar um degrau não.
+   */
+  const DEGRAUS = ["bloco", "foto", "seccao", "total"] as const;
+
+  /** A distância de cada papel, lida do CSS. */
+  function degraus(): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const papel of DEGRAUS) {
+      const m = new RegExp(
+        `\\[data-sobe="${papel}"\\]\\.por-subir \\{[^}]*?translateY\\((\\d+)px\\)`,
+      ).exec(BLOCO);
+      if (m) out.set(papel, Number(m[1]));
+    }
+    return out;
+  }
+
+  it("os quatro papéis do documento têm o SEU degrau", () => {
+    const d = degraus();
+    for (const papel of DEGRAUS) {
+      expect(
+        d.get(papel),
+        `o papel «${papel}» ficou sem degrau — volta a subir os 12 px de recurso, ` +
+          "como quando isto esteve escrito e por implementar",
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("a distância cresce com a importância — e o total é o único acima de 14", () => {
+    const d = degraus();
+    const ordem = DEGRAUS.map((p) => d.get(p) ?? 0);
+    for (let i = 1; i < ordem.length; i++) {
+      expect(
+        ordem[i],
+        `«${DEGRAUS[i]}» (${ordem[i]}px) não sobe mais do que «${DEGRAUS[i - 1]}» (${ordem[i - 1]}px) — ` +
+          "a distância é o que diz a importância",
+      ).toBeGreaterThan(ordem[i - 1]);
+    }
+    expect(d.get("total"), "o total a pagar deixou de ser o único acima de 14").toBeGreaterThan(14);
+    for (const papel of ["bloco", "foto", "seccao"] as const) {
+      expect(
+        d.get(papel),
+        `«${papel}» passou os 14 px — a escada perdeu o topo`,
+      ).toBeLessThanOrEqual(14);
+    }
+  });
+
+  it("e continua a ser sempre pequena — isto é para se sentir, não para se ver", () => {
+    // A regra da casa está escrita no próprio bloco: «a distância diz a
+    // importância, e é sempre pequena». Um degrau grande num documento que
+    // alguém está a ler rouba-lhe a linha que está a seguir.
+    for (const [papel, px] of degraus()) {
+      expect(
+        px,
+        `«${papel}» sobe ${px}px — é movimento a mais num documento que se lê`,
+      ).toBeLessThanOrEqual(24);
+    }
+  });
+});

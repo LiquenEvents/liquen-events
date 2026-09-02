@@ -203,6 +203,41 @@ describe("a grelha", () => {
 });
 
 describe("a lupa", () => {
+  it("sai da secção e vai para o corpo do documento — senão não tapa o ecrã", () => {
+    /**
+     * ── O DEFEITO, MEDIDO ─────────────────────────────────────────────────
+     *
+     * Um elemento `position: fixed` é medido pelo ECRÃ — excepto se algum
+     * antepassado tiver um `transform`, e aí passa a ser medido por esse
+     * antepassado. A secção da Inspiração leva `prop-chega`, que a faz subir
+     * ao entrar. Essa animação ACABA em `transform: none`, mas corre com
+     * preenchimento `both` sobre uma linha de tempo de scroll — e o valor
+     * calculado no fim é `translateY(0)`, que não é `none`. Um `transform` a
+     * zero continua a ser um `transform`.
+     *
+     * Reproduzido num Chromium a 390×780 com a mesma regra de CSS: com uma
+     * fotografia à vista e o dedo em cima dela, o diálogo media de 270 a
+     * 3202 px num ecrã de 0 a 780 — o tamanho da SECÇÃO. Não tapava o ecrã.
+     * Um casal que carregasse numa fotografia via meio ecrã preto com a
+     * fotografia fora dele.
+     *
+     * O portal resolve-o pela raiz: a lupa passa a ser filha do `<body>`, onde
+     * não há antepassado nenhum com `transform`. É o que a galeria pública
+     * desta casa já faz. A partir daqui, qualquer animação nova numa secção da
+     * proposta é inofensiva para ela — que é o ponto, porque vêm aí mais.
+     */
+    const { container } = desenhar();
+    abrirPrimeira();
+    const d = lupa();
+    expect(d, "a lupa não abriu").not.toBeNull();
+    expect(
+      container.contains(d),
+      "a lupa voltou para dentro da árvore da secção — um `transform` num " +
+        "antepassado volta a fazê-la deixar de tapar o ecrã",
+    ).toBe(false);
+    expect(d?.parentElement, "a lupa tem de ser filha do corpo do documento").toBe(document.body);
+  });
+
   it("abre no ORIGINAL — é o único sítio onde os pixéis todos valem os bytes", () => {
     desenhar();
     expect(lupa()).toBeNull();
