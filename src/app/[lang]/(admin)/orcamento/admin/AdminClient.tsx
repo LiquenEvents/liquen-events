@@ -102,6 +102,7 @@ import {
 } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
+import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
 import {
   faltaADataDoEvento,
   AVISO_SEM_DATA,
@@ -2393,6 +2394,24 @@ export default function AdminClient({
   useEffect(() => {
     if (!armazenamentoLigado) return;
     return varrerDerivadasEmFundo();
+  }, [armazenamentoLigado]);
+
+  /**
+   * E os PDF das propostas que ela JÁ enviou aquecem pelo mesmo caminho.
+   *
+   * Palavras dela: «quero que a rapidez não seja só nas futuras, mas também
+   * nas que já enviei». O aquecimento nocturno faz seis por noite e com
+   * oitenta na fila são duas semanas; isto faz oito por lote enquanto o
+   * separador estiver aberto, e põe as mesmas oitenta em uns quinze minutos.
+   *
+   * Um efeito à parte e não uma linha dentro do de cima, de propósito: são
+   * dois trabalhos com ritmos diferentes, e este arranca 45 s depois para
+   * deixar as derivadas — que são as que ela VÊ — passarem à frente. O porquê
+   * inteiro está em `varrer-aquecimento.ts`.
+   */
+  useEffect(() => {
+    if (!armazenamentoLigado) return;
+    return varrerAquecimentoEmFundo();
   }, [armazenamentoLigado]);
 
   // Lock background scroll while the detail drawer is open as a mobile overlay
