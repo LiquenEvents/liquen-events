@@ -43,7 +43,7 @@ describe("a coreografia da lupa", () => {
         .map((f) => f.nome)
         .sort(),
       "os `@keyframes lupa-*` desapareceram, ou mudaram de nome",
-    ).toEqual(["lupa-aparece", "lupa-nasce"]);
+    ).toEqual(["lupa-aparece", "lupa-desaparece", "lupa-nasce", "lupa-volta"]);
   });
 
   it("só anima `transform` e `opacity` — mais nada", () => {
@@ -69,7 +69,7 @@ describe("a coreografia da lupa", () => {
       /@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n\}/g,
       "",
     );
-    for (const classe of ["lupa-nasce", "lupa-veu", "lupa-pecas"]) {
+    for (const classe of ["lupa-nasce", "lupa-veu", "lupa-pecas", "lupa-volta", "lupa-veu-sai"]) {
       expect(
         new RegExp(`\\.${classe} \\{[^}]*animation`).test(semNoPreference),
         `a \`.${classe}\` saiu de dentro do \`no-preference\``,
@@ -97,6 +97,70 @@ describe("a coreografia da lupa", () => {
         "backwards",
       );
     }
+  });
+
+  it("as ÚNICAS que acabam invisíveis são as do cometa — e é uma decisão, não um lapso", () => {
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A EXCEPÇÃO, ESCRITA POR EXTENSO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * A regra da casa é que nenhum repouso é invisível: uma animação que acabe
+     * escondida faz de si própria a CONDIÇÃO de o conteúdo existir, e é assim
+     * que se serve a um casal um documento de vinte mil euros em branco.
+     *
+     * A `lupa-volta` e a `lupa-veu-sai` violam-na de propósito, porque
+     * pertencem a um elemento que existe PARA SAIR — uma fotografia
+     * `aria-hidden`, sem foco e sem eventos, pendurada DEPOIS de o diálogo já
+     * ter saído do documento. Nada do que o casal precisa de ler depende
+     * delas.
+     *
+     * E por isso é que ali `forwards` é o correcto e aqui seria um defeito: o
+     * cometa TEM de ficar onde acabou, senão pisca de volta ao tamanho grande
+     * no último fotograma.
+     *
+     * Este caso existe para que a excepção continue a ser exactamente estas
+     * duas. Uma terceira animação a acabar invisível é um defeito, e passaria
+     * despercebida sem isto.
+     */
+    const invisiveis = fotogramasDaLupa()
+      .filter(
+        ({ corpo }) => /to\s*\{[^}]*opacity:\s*0/.test(corpo) || /to\s*\{[^}]*scale\(/.test(corpo),
+      )
+      .map(({ nome }) => nome)
+      .sort();
+    expect(
+      invisiveis,
+      "uma animação da lupa passou a acabar escondida — o repouso tem de ser sempre visível",
+    ).toEqual(["lupa-desaparece", "lupa-volta"]);
+
+    // E o cometa é mesmo um elemento sem papel nenhum, e não a lupa disfarçada.
+    const cometa = /function Regresso\([\s\S]*$/.exec(FONTE)?.[0] ?? "";
+    expect(cometa, "desapareceu o cometa").not.toBe("");
+    expect(cometa, "o cometa passou a ser alcançável por quem ouve o ecrã").toContain(
+      "aria-hidden",
+    );
+    expect(cometa, "o cometa passou a receber toques").toContain("pointer-events-none");
+    expect(cometa, "o cometa ficou sem relógio de segurança").toMatch(/setTimeout\(\s*aoAcabar/);
+    expect(cometa, "o cometa deixou de sair quando a animação acaba").toContain("onAnimationEnd");
+  });
+
+  it("fechar não espera pela animação — a lupa sai no mesmo instante do gesto", () => {
+    /**
+     * A regra dela: nenhuma animação atrasa uma tarefa, e fechar é uma tarefa.
+     * O `fechar` tira a lupa e devolve o foco ANTES de pendurar o que voa —
+     * quem inverter esta ordem faz o casal esperar 240 ms com o foco preso e a
+     * página sem rolar, e parte os 42 casos que guardam a lupa.
+     */
+    const fechar = /const fechar = useCallback\([\s\S]*?\n  \}, \[\]\);/.exec(FONTE)?.[0] ?? "";
+    expect(fechar, "desapareceu o `fechar`").not.toBe("");
+    expect(
+      fechar.indexOf("setRegresso"),
+      "o voo de volta passou a ser pendurado ANTES de a lupa sair",
+    ).toBeGreaterThan(fechar.indexOf("setAberta(null)"));
+    expect(fechar.indexOf("setRegresso"), "o foco passou a voltar depois do voo").toBeGreaterThan(
+      fechar.indexOf("origemDoFoco"),
+    );
   });
 
   it("o que cresce é a MOLDURA, e nunca o diálogo", () => {

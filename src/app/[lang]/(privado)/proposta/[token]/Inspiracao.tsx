@@ -488,6 +488,11 @@ export default function Inspiracao({
    * viagem que ninguém pediu.
    */
   const [aberta, setAberta] = useState<{ board: number; i: number } | null>(null);
+  /**
+   * A fotografia a voltar para a miniatura, DEPOIS de a lupa já ter saído.
+   * Ver o `fechar`, aqui em baixo: fechar é uma tarefa, o voo é decoração.
+   */
+  const [regresso, setRegresso] = useState<RegressoDaLupa | null>(null);
   const [arecarregar, setARecarregar] = useState(false);
   /**
    * Alguma célula desistiu de mostrar a fotografia?
@@ -531,15 +536,38 @@ export default function Inspiracao({
 
   const abrir = useCallback((board: number, i: number, alvo: HTMLElement | null) => {
     origemDoFoco.current = alvo;
+    // Um regresso ainda a voar, com a lupa a abrir por cima, seria um véu preto
+    // a esbater-se sobre uma fotografia que está a nascer. Corta-se.
+    setRegresso(null);
     setAberta({ board, i });
   }, []);
 
-  const fechar = useCallback(() => {
+  /**
+   * ── FECHAR É UMA TAREFA; O VOO DE VOLTA É DECORAÇÃO ─────────────────────
+   *
+   * As três primeiras linhas acontecem no MESMO instante do gesto: a lupa sai
+   * do documento, o foco volta ao botão, o corpo volta a rolar. É a regra dela
+   * — nenhuma animação atrasa uma tarefa — e é também o que mantém os 42 casos
+   * que guardam a lupa: o `queryByRole("dialog")` continua a dar `null` logo a
+   * seguir ao Escape.
+   *
+   * A quarta linha pendura uma fotografia a encolher, que NÃO é diálogo, não
+   * tem foco e não recebe toques. Se o casal fizer outra coisa a meio, não
+   * interrompe nada — não há nada para interromper.
+   *
+   * Uma animação de saída DENTRO da lupa obrigaria o diálogo a ficar montado
+   * mais 240 ms depois de alguém mandar fechar, e com ele o foco preso e a
+   * página que não rola. Era trocar a regra dela por um efeito.
+   */
+  const fechar = useCallback((voo: RegressoDaLupa | null) => {
     setAberta(null);
     // O foco volta ao botão que abriu — sem isto, quem navega por teclado sai
     // do diálogo e reaparece no topo da página, dez mil pixels acima.
     origemDoFoco.current?.focus();
+    setRegresso(voo);
   }, []);
+
+  const limparRegresso = useCallback(() => setRegresso(null), []);
 
   const andar = useCallback(
     (delta: number) => {
@@ -809,6 +837,8 @@ export default function Inspiracao({
           aoAndar={andar}
         />
       )}
+
+      {regresso && <Regresso voo={regresso} aoAcabar={limparRegresso} />}
     </>
   );
 }
@@ -1150,6 +1180,28 @@ const DISTANCIA_DO_GESTO = 48;
  * fotografia a nascer de um sítio que ninguém vê não se lê como «é aquela» —
  * lê-se como um erro.
  */
+/** O que o regresso precisa de saber, medido no instante em que se fecha. */
+type RegressoDaLupa = {
+  /**
+   * Os pixéis que estavam NO ECRÃ — nunca o melhor que existe. Se o original
+   * ainda vem a caminho, o que se está a mostrar é a miniatura, e é ela que
+   * tem de voar: mandar o original voar era começar o regresso com um pedido à
+   * rede, ou seja um rectângulo vazio a encolher.
+   */
+  src: string;
+  /** De onde parte (a caixa da fotografia aberta) e para onde vai. */
+  noEcra: DOMRect;
+  miniatura: DOMRect;
+};
+
+/** Quem pediu menos movimento não leva nenhum — nem uma fotografia a voar. */
+function reduzMovimento(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 function marcarVoo(el: HTMLElement, miniatura: DOMRect, noEcra: DOMRect): boolean {
   if (miniatura.width <= 0 || noEcra.width <= 0) return false;
   if (miniatura.bottom <= 0 || miniatura.top >= window.innerHeight) return false;
@@ -1186,7 +1238,7 @@ function Lupa({
   temAnterior: boolean;
   temSeguinte: boolean;
   textos: TextosDaPagina;
-  aoFechar: () => void;
+  aoFechar: (voo: RegressoDaLupa | null) => void;
   aoAndar: (delta: number) => void;
 }) {
   const dialogo = useRef<HTMLDivElement>(null);
@@ -1238,7 +1290,7 @@ function Lupa({
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        aoFechar();
+        sair();
         return;
       }
       if (e.key === "ArrowRight") {
@@ -1304,6 +1356,27 @@ function Lupa({
     // A chave não muda enquanto esta lupa vive, e o voo é o da ABERTURA.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * ── O REGRESSO, MEDIDO NO INSTANTE EM QUE SE FECHA ──────────────────────
+   *
+   * Medir AQUI e não no elemento que voa: no fotograma seguinte a lupa já não
+   * existe, e a caixa da fotografia grande — de onde o voo parte — já não é
+   * mensurável.
+   *
+   * E o que voa é o que está NO ECRÃ: se o original ainda vem a caminho, o que
+   * o casal está a ver é a miniatura, e é ela que tem de voltar. Mandar o
+   * original voar era começar o regresso com um pedido à rede.
+   */
+  const sair = useCallback(() => {
+    const caixa = moldura.current;
+    const daGrelha = document.querySelector<HTMLElement>(`[data-lupa="${chaveDoAlvo}"]`);
+    const src = carregou ? alvo : (foto?.miniatura ?? alvo);
+    if (!caixa || !daGrelha || !src || reduzMovimento()) return aoFechar(null);
+    const noEcra = caixa.getBoundingClientRect();
+    if (noEcra.width <= 0) return aoFechar(null);
+    aoFechar({ src, noEcra, miniatura: daGrelha.getBoundingClientRect() });
+  }, [aoFechar, chaveDoAlvo, carregou, alvo, foto?.miniatura]);
 
   // Enquanto a lupa está aberta, a página por baixo não rola.
   useEffect(() => {
@@ -1390,7 +1463,7 @@ function Lupa({
          do que se quer: o mundo escurece, a fotografia cresce. */
       className="fixed inset-0 z-50 flex flex-col"
       onClick={(e) => {
-        if (e.target === e.currentTarget) aoFechar();
+        if (e.target === e.currentTarget) sair();
       }}
       onTouchStart={(e) => {
         const t = e.touches[0];
@@ -1417,7 +1490,7 @@ function Lupa({
         <button
           ref={botaoFechar}
           type="button"
-          onClick={aoFechar}
+          onClick={sair}
           aria-label={textos.fechar}
           className="alvo-toque ml-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
         >
@@ -1428,7 +1501,7 @@ function Lupa({
       <div
         className="relative flex min-h-0 flex-1 items-center justify-center px-3 pb-4"
         onClick={(e) => {
-          if (e.target === e.currentTarget) aoFechar();
+          if (e.target === e.currentTarget) sair();
         }}
       >
         {temAnterior && (
@@ -1514,6 +1587,78 @@ function Lupa({
           </button>
         )}
       </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O REGRESSO — a fotografia volta à miniatura DEPOIS de a lupa já ter ido
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Não é um diálogo a fechar-se devagar: é uma fotografia sem papel nenhum na
+ * árvore de acessibilidade, sem foco, sem eventos. Existe por uma razão
+ * exacta — nenhuma animação atrasa uma tarefa, e fechar é uma tarefa. Se a
+ * saída vivesse dentro da lupa, o diálogo teria de ficar montado mais 240 ms
+ * depois do gesto, e com ele o foco preso e a página que não rola. Os 42 casos
+ * que guardam a lupa passariam a esperar por um relógio.
+ *
+ * ── O QUE O PODE DEIXAR PENDURADO, E O QUE O TIRA ─────────────────────────
+ *
+ * O `animationend` é o caminho normal. Só que ele não vem se a animação nunca
+ * começar — um separador em segundo plano, uma folha de estilos que não
+ * chegou. Um véu preto pendurado por cima do documento é o pior defeito que
+ * isto podia ter, por isso há um relógio a tirá-lo de qualquer maneira.
+ *
+ * Com movimento reduzido nem chega a ser montado: quem decide isso é o `sair`,
+ * na lupa, antes de o mandar nascer.
+ *
+ * ── E A PÁGINA VOLTA A ROLAR ENQUANTO ELE VOA ─────────────────────────────
+ *
+ * De propósito: o corpo é destrancado no instante do gesto. Se o casal rolar
+ * durante os 240 ms, o destino fica para trás — e é o preço certo. Prender a
+ * página até a decoração acabar seria exactamente atrasar a tarefa.
+ */
+function Regresso({ voo, aoAcabar }: { voo: RegressoDaLupa; aoAcabar: () => void }) {
+  const aVoar = useRef<HTMLImageElement>(null);
+
+  useLayoutEffect(() => {
+    const el = aVoar.current;
+    if (el) marcarVoo(el, voo.miniatura, voo.noEcra);
+  }, [voo]);
+
+  useEffect(() => {
+    const relogio = window.setTimeout(aoAcabar, 900);
+    return () => window.clearTimeout(relogio);
+  }, [aoAcabar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    /* Filho do `<body>`, pela mesma razão que a lupa: aqui não há antepassado
+       nenhum com `transform`, e um `fixed` medido por uma secção media
+       milhares de pixéis num ecrã de oitocentos. */
+    <div aria-hidden data-regresso className="pointer-events-none fixed inset-0 z-50">
+      <div className="lupa-veu-sai absolute inset-0 bg-black/94" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={aVoar}
+        src={voo.src}
+        alt=""
+        onAnimationEnd={aoAcabar}
+        className="lupa-volta absolute block object-contain"
+        /* Números e não cadeias: o React escreve os `px`. Uma cadeia como
+           «366px» neste ficheiro tem a forma de uma fatia de `sizes` e é
+           apanhada pelo `portao-do-avif.test.ts` — que já apagou uma escada
+           inteira uma vez. */
+        style={{
+          left: voo.noEcra.left,
+          top: voo.noEcra.top,
+          width: voo.noEcra.width,
+          height: voo.noEcra.height,
+        }}
+      />
     </div>,
     document.body,
   );

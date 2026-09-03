@@ -4076,6 +4076,46 @@ body:has(.barra-consentimento) footer {
   }
 }
 
+/* ── E VOLTA PARA LÁ ──────────────────────────────────────────────────────
+
+   Estas duas são as ÚNICAS de toda a casa que acabam invisíveis, e é preciso
+   dizer porquê: pertencem a um elemento que existe PARA SAIR. Não é a lupa a
+   fechar-se devagar — é uma fotografia sem papel na árvore de acessibilidade,
+   sem foco e sem eventos, pendurada depois de o diálogo já ter saído.
+
+   A razão é a regra dela: nenhuma animação atrasa uma tarefa, e fechar é uma
+   tarefa. Uma saída DENTRO da lupa obrigava o diálogo a ficar montado mais
+   240 ms depois de alguém mandar fechar, com o foco preso e a página sem
+   rolar.
+
+   `var(--ease-in)` e não a curva de entrada: uma saída na curva de entrada
+   lê-se como se a coisa ainda pudesse voltar atrás. */
+@media (prefers-reduced-motion: no-preference) {
+  .lupa-volta {
+    animation: lupa-volta 240ms var(--ease-in) forwards;
+    transform-origin: 0 0;
+  }
+  .lupa-veu-sai {
+    animation: lupa-desaparece 240ms linear forwards;
+  }
+}
+@keyframes lupa-volta {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translate(var(--lupa-dx, 0px), var(--lupa-dy, 0px)) scale(var(--lupa-s, 0.92));
+  }
+}
+@keyframes lupa-desaparece {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 [data-sobe].por-subir.subiu {
   transform: none;
   transition: transform 620ms var(--ease-out);
