@@ -1,3 +1,4 @@
+import "../../admin.css";
 import { Geist } from "next/font/google";
 import { normalizeLocale } from "@/lib/i18n";
 import { Cortina } from "@/components/Cortina";

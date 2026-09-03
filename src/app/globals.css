@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* ════════════════════════════════════════════════════════════════════════
+   O BACK OFFICE NÃO VIAJA DENTRO DA PROPOSTA DO CASAL
+   ════════════════════════════════════════════════════════════════════════
+
+   Medido: dos 271 KB que esta folha gerava, 87,8 KB (32%) eram utilitários
+   que SÓ o back office usa — e iam dentro de cada proposta e de cada página
+   do sítio, para um casal que nunca vai ver um painel de administração.
+
+   Não é só peso. O CSS vive no `<head>`, e o `<head>` trava a primeira
+   pintura: na proposta, a cortina está no byte 234.610 de 495.756 — 47% do
+   documento. Tudo o que sai daqui é tempo a menos de ecrã branco antes de a
+   cortina aparecer, que é a queixa dela: «umas vezes abre bem, outras não».
+
+   O que o back office perde aqui, recebe em `admin.css`, importado no
+   layout dele e só lá. Verificado antes de escrever isto: as 2113 classes
+   que a folha única gerava continuam todas a existir, zero perdidas.
+   ════════════════════════════════════════════════════════════════════════ */
+@source not "./[lang]/(admin)";
+
 @theme {
   --color-cream: #f7f4ee;
   --color-cream-dark: #ece7dc;
