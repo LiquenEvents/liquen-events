@@ -964,7 +964,7 @@ export default function Documento({
           />
           <div className="mt-8 space-y-9">
             {(doc.serviceGroups ?? []).map((g, i) => (
-              <div key={g.id ?? i}>
+              <div key={g.id ?? i} data-sobe="bloco">
                 <Momento>
                   {g.letter && (
                     <span className="text-moss-dark text-xs tracking-[0.2em]">{g.letter}</span>
@@ -1000,7 +1000,7 @@ export default function Documento({
           />
           <div className="mt-8 space-y-8">
             {(doc.cronograma ?? []).map((fase, i) => (
-              <div key={i}>
+              <div key={i} data-sobe="bloco">
                 <Momento>{fase.title}</Momento>
                 <Lista itens={fase.items} />
               </div>

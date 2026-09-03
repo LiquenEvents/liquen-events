@@ -1252,3 +1252,66 @@ describe("a escala do documento", () => {
     expect(familia(fase)).toContain("playfair");
   });
 });
+
+describe("o que sobe no documento, e o que fica quieto", () => {
+  it("cada grupo de serviços sobe por si — não o capítulo todo de uma vez", () => {
+    /**
+     * Um capítulo inteiro a chegar de uma vez é UM gesto para vários momentos
+     * do dia. Cada momento — a cerimónia, o jantar, o bar — chega por si, com
+     * o degrau de `bloco` (8 px), que é o mais curto da escada: dentro de uma
+     * secção que já se move, isto é para se sentir e não para se ver.
+     */
+    const { container } = desenhar({
+      serviceGroups: [
+        { letter: "A", title: "Cerimónia", items: [{ label: "Arco floral" }] },
+        { letter: "B", title: "Jantar", items: [{ label: "Centros de mesa" }] },
+        { letter: "C", title: "Bar", items: [{ label: "Copo de água" }] },
+      ],
+    } as Partial<ProposalDoc>);
+    const seccao = container.querySelector("#servicos")?.closest("section");
+    expect(seccao, "desapareceu a secção dos serviços").not.toBeNull();
+    expect(
+      [...seccao!.querySelectorAll("[data-sobe]")].map((e) => e.getAttribute("data-sobe")),
+      "os grupos de serviços deixaram de subir um a um",
+    ).toEqual(["bloco", "bloco", "bloco"]);
+  });
+
+  it("e cada fase do cronograma também", () => {
+    const { container } = desenhar({
+      cronograma: [
+        { title: "Fase 1 · Conceito", items: ["Reunião inicial"] },
+        { title: "Fase 2 · Produção", items: ["Fornecedores"] },
+      ],
+    } as Partial<ProposalDoc>);
+    const fases = [...container.querySelectorAll("[data-sobe='bloco']")].filter((e) =>
+      /Fase \d/.test(e.textContent ?? ""),
+    );
+    expect(fases.length, "as fases do cronograma deixaram de subir uma a uma").toBe(2);
+  });
+
+  it("nada do que o casal lê para DECIDIR se mexe debaixo dos olhos", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * A LINHA QUE SEPARA O QUE SE SENTE DO QUE SE LÊ
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * O que se percorre para SENTIR — as secções, os grupos, as fases, as
+     * fotografias — sobe. O que se lê para DECIDIR fica parado: as linhas de
+     * serviço, que são o inventário do que eles recebem, e as rubricas do
+     * orçamento, que são uma coluna de números que alguém confere com o dedo.
+     *
+     * Uma coluna a chegar linha a linha é uma coluna que não se confere. E
+     * esta casa já pagou catorze euros que a coluna não explicava.
+     *
+     * Sem este caso, a próxima passagem «melhora» a proposta pondo tudo a
+     * mexer-se — que é exactamente o contrário do que ela quer de um documento
+     * de vinte mil euros.
+     */
+    const { container } = desenhar();
+
+    expect(
+      [...container.querySelectorAll("li[data-sobe]")].map((e) => e.textContent),
+      "uma linha de lista passou a mexer-se — é inventário, e lê-se parada",
+    ).toEqual([]);
+  });
+});

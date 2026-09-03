@@ -52,6 +52,18 @@ export function MovimentoDaProposta() {
  *  • A margem negativa de 12% faz o movimento acabar ANTES de o elemento
  *    estar no sítio onde se lê. Uma coisa a mexer-se debaixo do polegar
  *    enquanto se tenta ler não é elegância, é ruído.
+ *
+ *  • E LÊ TUDO ANTES DE ESCREVER SEJA O QUE FOR. Estava a alternar — medir
+ *    um, armá-lo, medir o seguinte — e cada armação invalida o estilo, o que
+ *    obriga o browser a recalcular a página antes de responder à medição
+ *    seguinte. CONTADO num arnês que instrumenta as duas chamadas: com os 57
+ *    elementos que o documento marca hoje, 50 paragens forçadas; com os 65 a
+ *    que os grupos de serviços e as fases do cronograma o levam, 58. Duas
+ *    voltas em vez de uma: a primeira só mede, a segunda só escreve — zero.
+ *
+ *    E é seguro por uma razão exacta, não por sorte: o que se escreve é
+ *    `transform`, que não mexe no layout de ninguém. Nenhum `top` medido na
+ *    primeira volta pode ser alterado pelo que a segunda escreve.
  */
 export const GUIAO_DO_MOVIMENTO = `(function(){
 try{
@@ -64,8 +76,9 @@ var obs=new IntersectionObserver(function(es){
 for(var i=0;i<es.length;i++){if(es[i].isIntersecting){es[i].target.classList.add("subiu");obs.unobserve(es[i].target)}}
 },{rootMargin:"0px 0px -12% 0px"});
 var dobra=window.innerHeight*0.9;
-for(var i=0;i<els.length;i++){
-if(els[i].getBoundingClientRect().top>dobra){els[i].classList.add("por-subir");obs.observe(els[i])}}
+var arma=[];
+for(var i=0;i<els.length;i++){if(els[i].getBoundingClientRect().top>dobra)arma.push(els[i])}
+for(var j=0;j<arma.length;j++){arma[j].classList.add("por-subir");obs.observe(arma[j])}
 };
 if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",arranca,{once:true})}else{arranca()}
 }catch(e){}

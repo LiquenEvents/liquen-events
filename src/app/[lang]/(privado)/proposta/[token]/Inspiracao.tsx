@@ -1171,10 +1171,35 @@ function Lupa({
    * antepassado. É a regra do «bloco de contenção», e apanhou-nos aqui.
    *
    * A secção da Inspiração leva `prop-chega`, a animação que a faz subir ao
-   * entrar (`globals.css`). Essa animação acaba em `transform: none` — só que
-   * corre com preenchimento `both` sobre uma linha de tempo de scroll, e o
-   * valor CALCULADO no fim é `translateY(0)`, que não é `none`. Um `transform`
-   * a zero continua a ser um `transform`, e continua a ser bloco de contenção.
+   * entrar (`globals.css`).
+   *
+   * ── E A CAUSA NÃO É O PREENCHIMENTO, AO CONTRÁRIO DO QUE AQUI ESTAVA ─────
+   *
+   * Esta nota dizia que a culpa era do `animation-fill-mode: both`, que deixa
+   * um `translateY(0)` calculado no fim. É verdade que o deixa — mas NÃO é
+   * essa a causa, e a diferença importa para quem vier corrigir isto.
+   *
+   * MEDIDO num Chromium a 390×780, sete variantes com uma lupa `fixed` dentro:
+   *
+   *   both                      transform calculado: matrix(1,0,0,1,0,0)  presa
+   *   backwards                 transform calculado: none                 PRESA
+   *   fill: none                transform calculado: none                 PRESA
+   *   só a linha de tempo       transform calculado: none                 livre
+   *   both, mas anima opacity   transform calculado: none                 livre
+   *   nada                      transform calculado: none                 livre
+   *
+   * Repare-se nas linhas 2 e 3: com o `transform` calculado a dizer `none`, a
+   * lupa CONTINUA presa. E na linha 5: a animar a opacidade, com o mesmo
+   * `both`, fica livre.
+   *
+   * A regra verdadeira é esta: BASTA A ANIMAÇÃO TOCAR EM `transform` para o
+   * elemento ser bloco de contenção dos `position: fixed` lá dentro — seja
+   * qual for o preenchimento e seja qual for o valor calculado.
+   *
+   * Ou seja: trocar `both` por `backwards` seria um placebo. Não há maneira de
+   * a secção deixar de conter a lupa sem lhe tirar a animação — que é
+   * precisamente o que ela quer lá. O portal não é o remédio conveniente: é o
+   * único.
    *
    * MEDIDO num Chromium a 390×780, com a mesma regra de CSS: com uma
    * fotografia à vista e o dedo em cima dela, o diálogo ia de 270 a 3202 px
