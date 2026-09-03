@@ -453,9 +453,14 @@ describe("MenuDeAccoes", () => {
   it("«com rato» é uma pergunta sobre o ponteiro, e não sobre a largura", async () => {
     // Caminho a partir da raiz do projecto: no jsdom o `import.meta.url` não é
     // um `file:`, portanto um URL relativo não resolve.
-    const css = await readFile(join(process.cwd(), "src/app/globals.css"), "utf8");
+    // As duas folhas: os `@custom-variant` foram com o `@theme` para o
+    // `tema.css`, para o `admin.css` os poder referir sem herdar o
+    // `@source not` do `globals.css`. Ver o cabeçalho do `tema.css`.
+    const css =
+      (await readFile(join(process.cwd(), "src/app/globals.css"), "utf8")) +
+      (await readFile(join(process.cwd(), "src/app/tema.css"), "utf8"));
     const linha = css.split("\n").find((l) => l.startsWith("@custom-variant com-rato"));
-    expect(linha, "globals.css tem de definir a variante `com-rato`").toBeTruthy();
+    expect(linha, "a variante `com-rato` tem de estar definida").toBeTruthy();
     expect(linha).toContain("hover: hover");
     expect(linha).toContain("pointer: fine");
     expect(linha).not.toContain("width");

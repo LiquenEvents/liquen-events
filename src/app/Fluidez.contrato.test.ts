@@ -58,7 +58,16 @@ const RAIZ = process.cwd();
  *  curvas e de propriedades, e um extractor ingénuo lê-os como declarações.
  *  (Só `/* … *​/` — em CSS `//` não é comentário e apagá-lo partiria os `url()`.) */
 const semComentarios = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "");
-const css = semComentarios(readFileSync(join(RAIZ, "src/app/globals.css"), "utf8"));
+/**
+ * As duas folhas juntas. O `@theme` mudou de casa: vive no `tema.css`, para o
+ * `admin.css` o poder referir sem herdar o `@source not` do `globals.css` —
+ * essa exclusão é absoluta e punha o back office sem estilos nenhuns. Ver o
+ * cabeçalho do `tema.css`.
+ */
+const css = semComentarios(
+  readFileSync(join(RAIZ, "src/app/globals.css"), "utf8") +
+    readFileSync(join(RAIZ, "src/app/tema.css"), "utf8"),
+);
 
 /** Propriedades cuja animação OBRIGA a recalcular geometria. */
 const LAYOUT = [

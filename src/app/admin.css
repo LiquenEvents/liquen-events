@@ -1,0 +1,15 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   OS ESTILOS QUE SÓ O BACK OFFICE USA
+   ══════════════════════════════════════════════════════════════════════════
+
+   O `globals.css` deixou de varrer a pasta `(admin)` — ver o comentário lá.
+   Os utilitários que ficaram de fora nascem aqui, e esta folha é importada
+   APENAS no layout do back office, portanto só ela os descarrega.
+
+   `@reference` traz o tema (as cores, as letras, as curvas) sem voltar a
+   escrevê-lo: sem isto o Tailwind não sabia o que é `bg-moss-dark` e não
+   gerava a regra. E porque é só uma referência, o `:root` não sai duplicado.
+   ══════════════════════════════════════════════════════════════════════════ */
+@reference "tailwindcss";
+@reference "./tema.css";
+@import "tailwindcss/utilities.css" layer(utilities) source("./[lang]/(admin)");
