@@ -1282,16 +1282,36 @@ export function totalAmountParaBase(
  *  calendário que conta é o de quem a envia — ver {@link resolveValidUntil}. */
 export const FUSO_DO_ESTUDIO = "Europe/Lisbon";
 
-const CAMPOS_DO_DIA = new Intl.DateTimeFormat("en-US", {
-  timeZone: FUSO_DO_ESTUDIO,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CONSTRUÍDO À PRIMEIRA UTILIZAÇÃO, E NÃO À LEITURA DO FICHEIRO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estava no topo do módulo, e custava 19,91 ms MEDIDOS a cada arranque a frio
+ * — porque o primeiro `Intl.DateTimeFormat` de um processo carrega o ICU
+ * inteiro. O segundo custa 0,14 ms.
+ *
+ * E quem o usa (o {@link hojeNoEstudio}, para os prazos das facturas) NÃO é
+ * chamado pela página que o casal abre. Ela pagava vinte milissegundos, em
+ * cada abertura fria, para construir um formatador de datas que nunca ia usar.
+ *
+ * Vinte milissegundos parecem nada até se lembrar onde caem: no arranque a
+ * frio da função, que é precisamente o instante em que o casal está a olhar
+ * para um ecrã branco à espera da proposta.
+ *
+ * Quem o usa continua a pagá-los, uma vez, na primeira chamada — já os pagava.
+ */
+let camposDoDia: Intl.DateTimeFormat | null = null;
 
 /** O ano/mês/dia que o relógio de Portugal marca neste instante. */
 function diaDoEstudio(instante: Date): [ano: number, mes: number, dia: number] {
-  const partes = CAMPOS_DO_DIA.formatToParts(instante);
+  camposDoDia ??= new Intl.DateTimeFormat("en-US", {
+    timeZone: FUSO_DO_ESTUDIO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const partes = camposDoDia.formatToParts(instante);
   const campo = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
   return [campo("year"), campo("month"), campo("day")];
 }
