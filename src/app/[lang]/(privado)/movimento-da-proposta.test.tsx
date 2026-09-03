@@ -263,3 +263,118 @@ describe("a escada das distâncias", () => {
     }
   });
 });
+
+describe("o arranque não obriga o browser a recalcular a página a cada volta", () => {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * MEDIR UM, ARMAR UM, MEDIR O SEGUINTE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * `getBoundingClientRect()` é uma LEITURA de geometria; `classList.add` é
+   * uma ESCRITA que invalida o estilo. Alternadas, cada leitura obriga o
+   * browser a recalcular estilo e disposição antes de responder — uma paragem
+   * síncrona por elemento, no arranque, no fio principal, que é justamente o
+   * momento em que ele está mais ocupado.
+   *
+   * CONTADO: com os 57 elementos que o documento marca hoje, 50 paragens
+   * forçadas; com os 65 a que os grupos de serviços e as fases do cronograma
+   * o levam, 58. Com duas voltas, zero.
+   *
+   * O que este caso guarda não é a FORMA do ciclo — é a PROPRIEDADE: depois da
+   * primeira escrita, não se volta a ler. Quem o reescrever de outra maneira
+   * passa aqui à mesma, desde que a mantenha.
+   */
+  function ordemDasChamadas(quantos: number, acimaDaDobra: number) {
+    document.body.innerHTML = "";
+    const ordem: string[] = [];
+    const original = DOMTokenList.prototype.add;
+    const espia = vi.spyOn(DOMTokenList.prototype, "add").mockImplementation(function (
+      this: DOMTokenList,
+      ...classes: string[]
+    ) {
+      ordem.push("escreve");
+      return original.apply(this, classes);
+    });
+
+    for (let i = 0; i < quantos; i++) {
+      const el = document.createElement("div");
+      el.setAttribute("data-sobe", "bloco");
+      const top = i < acimaDaDobra ? 40 * i : 900 + 300 * i;
+      el.getBoundingClientRect = () => {
+        ordem.push("lê");
+        return { top } as DOMRect;
+      };
+      document.body.appendChild(el);
+    }
+
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe() {}
+        unobserve() {}
+      },
+    );
+    Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+    new Function(GUIAO_DO_MOVIMENTO)();
+    espia.mockRestore();
+    return ordem;
+  }
+
+  it("lê a página toda ANTES de escrever a primeira classe", () => {
+    const ordem = ordemDasChamadas(57, 6);
+    expect(ordem.filter((o) => o === "lê").length, "não chegou a medir todos").toBe(57);
+
+    let paragens = 0;
+    for (let i = 1; i < ordem.length; i++) {
+      if (ordem[i] === "lê" && ordem[i - 1] === "escreve") paragens++;
+    }
+    expect(
+      paragens,
+      `voltou a ler a geometria depois de escrever, ${paragens} vezes — cada ` +
+        "uma dessas é o browser a recalcular a página inteira, no arranque",
+    ).toBe(0);
+  });
+
+  it("e continua a armar exactamente os mesmos elementos, pela mesma ordem", () => {
+    /**
+     * A prova de que as duas voltas não mudam o resultado — e a razão de ser
+     * seguro: o que se escreve é `transform`, que não mexe na disposição de
+     * ninguém, portanto nenhum `top` medido na primeira volta pode ser
+     * alterado pelo que a segunda escreve.
+     */
+    document.body.innerHTML = "";
+    const tops = [10, 40, 5000, 80, 6000, 7000];
+    const els = tops.map((top) => {
+      const el = document.createElement("div");
+      el.setAttribute("data-sobe", "bloco");
+      el.getBoundingClientRect = () => ({ top }) as DOMRect;
+      document.body.appendChild(el);
+      return el;
+    });
+    const observados: Element[] = [];
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe(el: Element) {
+          observados.push(el);
+        }
+        unobserve() {}
+      },
+    );
+    Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+    new Function(GUIAO_DO_MOVIMENTO)();
+
+    // dobra = 768 × 0,9 = 691,2 no jsdom
+    expect(els.map((e) => e.classList.contains("por-subir"))).toEqual([
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+    ]);
+    expect(observados, "a ordem de observação mudou").toEqual([els[2], els[4], els[5]]);
+  });
+});
