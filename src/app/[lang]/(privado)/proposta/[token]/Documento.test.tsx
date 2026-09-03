@@ -1258,8 +1258,18 @@ describe("o que sobe no documento, e o que fica quieto", () => {
     /**
      * Um capítulo inteiro a chegar de uma vez é UM gesto para vários momentos
      * do dia. Cada momento — a cerimónia, o jantar, o bar — chega por si, com
-     * o degrau de `bloco` (8 px), que é o mais curto da escada: dentro de uma
-     * secção que já se move, isto é para se sentir e não para se ver.
+     * o degrau de `bloco` (8 px), que é o mais curto da escada.
+     *
+     * ── O `titulo` À FRENTE DELES NÃO É RUÍDO: É A BATIDA ─────────────────
+     *
+     * Esta asserção esperava três `bloco` e mais nada, porque a secção subia
+     * INTEIRA (`prop-chega`) e o título vinha agarrado ao corpo dela. Isso
+     * saiu — somava-se aos degraus de dentro e não assentava, ver o
+     * `globals.css` — e a batida passou para o cabeçalho.
+     *
+     * MEDIDO: o título está a uma altura diferente dos blocos, portanto o
+     * observador larga-o 133 ms antes do primeiro momento do dia. É ritmo de
+     * graça, sem uma linha de `transition-delay`.
      */
     const { container } = desenhar({
       serviceGroups: [
@@ -1273,7 +1283,121 @@ describe("o que sobe no documento, e o que fica quieto", () => {
     expect(
       [...seccao!.querySelectorAll("[data-sobe]")].map((e) => e.getAttribute("data-sobe")),
       "os grupos de serviços deixaram de subir um a um",
-    ).toEqual(["bloco", "bloco", "bloco"]);
+    ).toEqual(["titulo", "bloco", "bloco", "bloco"]);
+  });
+
+  it("e nenhum degrau vive dentro de outro — a escada é a escrita, não a somada", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * A ARMADILHA QUE ESTE CASO EXISTE PARA APANHAR
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Um `transform` num antepassado desloca o filho também: os degraus
+     * SOMAM-SE. Esteve assim, e MEDIDO num Chromium a 390×844 na faixa de
+     * entrada da secção:
+     *
+     *     grupo de serviços   declarado  8px  →  andava 21,0px
+     *     o TOTAL A PAGAR     declarado 20px  →  andava 32,1px
+     *
+     * O maior movimento do documento inteiro estava no número que alguém
+     * confere com o dedo — o contrário do que a escada quer dizer.
+     *
+     * É a SEGUNDA vez que esta escada se perde. Da primeira faltava (o
+     * `--sobe` estava descrito e nunca declarado, e tudo subia 12 px); desta
+     * vez sobrava. Nas duas, o que faltou foi alguém a comparar o que o
+     * documento diz com o que o browser faz.
+     *
+     * ── E PORQUE É QUE NÃO BASTA PROCURAR `data-sobe` DENTRO DE `data-sobe` ─
+     *
+     * Porque a versão anterior deste caso fazia exactamente isso, e o CONTROLO
+     * NEGATIVO não a fez falhar: repus a `prop-chega` na secção — a animação
+     * que causou os 21 px e os 32 px — e passou tudo. A `prop-chega` é uma
+     * CLASSE, não um `data-sobe`, e o guarda passava-lhe ao lado.
+     *
+     * Por isso as classes perigosas não são uma lista escrita à mão: são
+     * lidas do `globals.css`. Qualquer classe cuja regra toque em `transform`
+     * ou declare uma `animation` conta como antepassado que desloca.
+     */
+    const CSS_DO_TEMA = readFileSync("src/app/globals.css", "utf8");
+
+    /** As classes que o CSS anima ou transforma — as que deslocam quem está lá dentro. */
+    const classesQueDeslocam = new Set<string>();
+    for (const [, selector, corpo] of CSS_DO_TEMA.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\btransform\s*:|\banimation(-name)?\s*:/.test(corpo)) continue;
+      for (const [, nome] of selector.matchAll(/\.([a-zA-Z][\w-]*)/g)) classesQueDeslocam.add(nome);
+    }
+    expect(
+      classesQueDeslocam.size,
+      "não se encontrou uma única classe que anime `transform` — a leitura do CSS partiu-se " +
+        "e este caso passaria por vacuidade",
+    ).toBeGreaterThan(5);
+
+    const { container } = desenhar();
+    const degraus = [...container.querySelectorAll("[data-sobe]")];
+    expect(degraus.length, "o documento ficou sem degraus nenhuns").toBeGreaterThan(3);
+
+    const aninhados: string[] = [];
+    for (const el of degraus) {
+      for (let pai = el.parentElement; pai; pai = pai.parentElement) {
+        if (pai.hasAttribute("data-sobe")) {
+          aninhados.push(
+            `${el.getAttribute("data-sobe")} dentro de ${pai.getAttribute("data-sobe")}`,
+          );
+          break;
+        }
+        const culpada = [...pai.classList].find((c) => classesQueDeslocam.has(c));
+        if (culpada) {
+          aninhados.push(`${el.getAttribute("data-sobe")} dentro de .${culpada}`);
+          break;
+        }
+      }
+    }
+    expect(
+      aninhados,
+      "um degrau ficou por dentro de outra coisa que desloca — o que se vê passa a ser a soma",
+    ).toEqual([]);
+  });
+
+  it("todo o papel usado no documento tem uma distância declarada — e nenhuma sobra", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O DEFEITO DO `--sobe`, QUE JÁ ACONTECEU E NÃO TINHA REDE
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * A regra genérica é `translateY(var(--sobe, 12px))`, e o `--sobe` nunca é
+     * declarado. Portanto um papel novo no TSX — `data-sobe="titulo"` — sem
+     * degrau no `globals.css` NÃO dá erro: cai nos 12 px de recurso, em
+     * silêncio, e a escada passa a mentir.
+     *
+     * Foi assim que esta casa perdeu a escada inteira uma vez: quatro degraus
+     * descritos em prosa, um só declarado, tudo a subir 12 px durante meses.
+     *
+     * E o CONTROLO NEGATIVO provou que faltava: apaguei o degrau do título do
+     * CSS e a suite inteira ficou verde.
+     *
+     * Compara nos dois sentidos, de propósito. Um papel sem degrau mente sobre
+     * a distância; um degrau sem papel é CSS morto que alguém vai ler e supor
+     * que está em uso.
+     */
+    const CSS_DO_TEMA = readFileSync("src/app/globals.css", "utf8");
+    const declarados = new Set(
+      [...CSS_DO_TEMA.matchAll(/\[data-sobe="([a-z]+)"\]\.por-subir/g)].map((m) => m[1]),
+    );
+    expect(declarados.size, "não se encontrou degrau nenhum no CSS").toBeGreaterThan(3);
+
+    const { container } = desenhar();
+    const usados = new Set(
+      [...container.querySelectorAll("[data-sobe]")].map((e) => e.getAttribute("data-sobe")!),
+    );
+    expect(usados.size, "o documento ficou sem degraus").toBeGreaterThan(2);
+
+    for (const papel of usados) {
+      expect(
+        declarados,
+        `o papel \`${papel}\` é usado no documento e não tem distância declarada — ` +
+          "cai nos 12 px do valor de recurso, em silêncio",
+      ).toContain(papel);
+    }
   });
 
   it("e cada fase do cronograma também", () => {

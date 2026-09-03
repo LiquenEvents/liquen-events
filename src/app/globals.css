@@ -3136,23 +3136,33 @@ body:has(.barra-consentimento) footer {
 
    `entry 0%` a `entry 60%`: acaba antes de a secção chegar ao meio do ecrã,
    ou seja está sempre parada quando se lê. Nenhuma animação atrasa nada. */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .prop-chega {
-      animation: prop-chega linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 60%;
-    }
-  }
-}
-@keyframes prop-chega {
-  from {
-    transform: translateY(14px);
-  }
-  to {
-    transform: none;
-  }
-}
+/* ── E FOI DAQUI QUE ELA SAIU. TRÊS RAZÕES, TODAS MEDIDAS ─────────────────
+
+   Tudo o que está escrito acima era verdade, e mesmo assim a `prop-chega` foi
+   retirada. O que a condenou não foi nenhum dos seus argumentos — foi o que
+   ela fazia AOS OUTROS.
+
+   1. SOMAVA-SE AOS DEGRAUS DE DENTRO. Um `transform` num antepassado desloca
+      o filho também. Medido num Chromium a 390×844, na faixa de entrada: o
+      grupo de serviços, declarado a 8 px, andava 21,0; o TOTAL A PAGAR,
+      declarado a 20, andava 32,1 — o maior movimento do documento inteiro,
+      no número que alguém confere com o dedo.
+
+   2. NÃO ASSENTAVA. Está presa ao scroll, não ao tempo. Se o dedo parar a
+      meio da entrada — que é o que uma pessoa faz quando começa a ler — a
+      secção fica onde ficou. Medido: parada em scrollY 400, 13,56 px fora do
+      sítio; passados dois segundos, os mesmos 13,56 px. É também o que fazia
+      os links do índice «Nesta página» aterrarem 13 px fora do alvo.
+
+   3. NÃO CORRIA EM TODA A PARTE. O `@supports` acima era honesto, e por isso
+      mesmo: onde a linha de tempo de scroll não existe, não havia movimento
+      nenhum. O `data-sobe`, que a substitui, corre em qualquer browser com
+      `IntersectionObserver` — ou seja, dá MAIS movimento à maioria dos
+      telemóveis, e não menos.
+
+   O que ficou no lugar dela: o `data-sobe="titulo"` no cabeçalho de cada
+   capítulo. Um gesto por peça, à distância que a escada lhe dá, e que assenta
+   sempre. Ver a ESCADA DAS DISTÂNCIAS, aqui em baixo. */
 
 /* ── A GRELHA DA PROPOSTA SALTA O QUE ESTÁ FORA DO ECRÃ ──────────────────────
    Palavras dela, sobre a proposta no telemóvel: «trava ao deslizar».
@@ -3913,9 +3923,28 @@ body:has(.barra-consentimento) footer {
    existia: menu 4px, aviso 8px, bloco 12px, secção 14px, página 32px.
 
        bloco dentro de uma secção .....  8px
+       o TÍTULO do capítulo ........... 10px
        fotografia ..................... 12px
        secção ......................... 14px
+       o respiro de um mood board ..... 16px
        o TOTAL A PAGAR ................ 20px   ← o único acima de 14
+
+   ── E NENHUM DEGRAU PODE VIVER DENTRO DE OUTRO ───────────────────────────
+
+   Um `transform` num antepassado desloca o filho também: os degraus SOMAM-SE.
+   Esteve assim, e MEDIDO num Chromium a 390×844 na faixa de entrada da
+   secção:
+
+       grupo de serviços   declarado  8px   →   andava 21,0px
+       o TOTAL A PAGAR     declarado 20px   →   andava 32,1px
+
+   O maior movimento do documento inteiro estava no número que alguém confere
+   com o dedo. É a segunda vez que esta escada se perde — da outra vez faltava
+   (o `--sobe` nunca declarado, aqui em baixo), desta vez sobrava.
+
+   A regra é simples e há um teste a guardá-la: nenhum elemento com
+   `data-sobe` pode ter outro por antepassado. Quem quiser dar movimento a um
+   filho, tira-o ao pai.
 */
 
 /* A ARMAÇÃO É INSTANTÂNEA; SÓ A LARGADA É QUE ANIMA.
@@ -3943,11 +3972,32 @@ body:has(.barra-consentimento) footer {
 [data-sobe="bloco"].por-subir {
   transform: translateY(8px);
 }
+/* O TÍTULO do capítulo. É ele que dá a batida da leitura: está a uma altura
+   diferente dos blocos que se lhe seguem, portanto o observador larga-o num
+   instante diferente — MEDIDO, 133 ms entre o capítulo e o primeiro momento do
+   dia, a passo de leitura, sem uma única linha de `transition-delay`.
+
+   Antes disto a secção subia INTEIRA e o título chegava agarrado ao corpo
+   dela: um só gesto para um capítulo todo, e nenhum ritmo. */
+[data-sobe="titulo"].por-subir {
+  transform: translateY(10px);
+}
 [data-sobe="foto"].por-subir {
   transform: translateY(12px);
 }
 [data-sobe="seccao"].por-subir {
   transform: translateY(14px);
+}
+/* O RESPIRO — a fotografia a toda a largura que abre cada mood board, com o
+   nome do momento por cima. Um degrau acima da secção: é o separador mais forte
+   desta página, e é o que anuncia um momento novo do dia.
+
+   Herdou o gesto que era do board inteiro. O board levava 8 px e continha as
+   fotografias, que levam 12 — e um `transform` no pai desloca o filho, portanto
+   cada fotografia andava 20. Desaninhado, o board não se move e o anúncio
+   passou para quem o faz. */
+[data-sobe="respiro"].por-subir {
+  transform: translateY(16px);
 }
 [data-sobe="total"].por-subir {
   transform: translateY(20px);

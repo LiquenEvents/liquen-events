@@ -8,11 +8,25 @@ import { describe, expect, it } from "vitest";
  * NADA `position: fixed` PODE FICAR PRESO DENTRO DE UMA SECÇÃO DA PROPOSTA
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Toda a secção do documento leva `prop-chega` (ver `Documento.tsx`), a
- * animação que a faz subir ao entrar no ecrã. E uma animação que toque em
- * `transform` faz do elemento o BLOCO DE CONTENÇÃO de qualquer
- * `position: fixed` lá dentro — que deixa de ser medido pelo ecrã e passa a
- * ser medido pela secção.
+ * Os blocos do documento levam `data-sobe`, e o guião do movimento arma-os
+ * com um `transform` enquanto esperam a sua vez. E um `transform` faz do
+ * elemento o BLOCO DE CONTENÇÃO de qualquer `position: fixed` lá dentro — que
+ * deixa de ser medido pelo ecrã e passa a ser medido pelo bloco.
+ *
+ * ── E ISTO SOBREVIVEU À SAÍDA DA `prop-chega` ─────────────────────────────
+ *
+ * O perigo vinha da `prop-chega`, uma animação de scroll que estava SEMPRE em
+ * efeito. Ela saiu (ver o `globals.css`), e este teste continua a ser
+ * necessário — só mudou a natureza do risco, não a regra. Medido num Chromium
+ * a 390×780, com um `fixed` dentro de um bloco marcado:
+ *
+ *     sem nada (controlo) ....... o fixo mede   0..780   (o ecrã)
+ *     `data-sobe` ARMADO ........ o fixo mede 1028..1028
+ *     `data-sobe` LARGADO ....... o fixo mede   0..780
+ *
+ * Ou seja: passou de permanente a passageiro. Um perigo passageiro que dura
+ * exactamente o tempo de alguém tocar numa fotografia continua a ser um
+ * perigo, e a correcção continua a ser a mesma — o portal.
  *
  * ── A REGRA, MEDIDA, E NÃO A QUE SE SUPÕE ─────────────────────────────────
  *
@@ -69,7 +83,7 @@ describe("nada fixo fica preso numa secção da proposta", () => {
     }
     expect(
       presos,
-      "um elemento `fixed` dentro de uma secção com `prop-chega` é medido pela " +
+      "um elemento `fixed` dentro de um bloco com `data-sobe` é medido pelo " +
         "SECÇÃO e não pelo ecrã — tem de sair para o `<body>` por um portal",
     ).toEqual([]);
   });
@@ -87,13 +101,20 @@ describe("nada fixo fica preso numa secção da proposta", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("e a secção continua mesmo a animar o `transform` — é isso que a torna perigosa", () => {
-    // Se um dia o `prop-chega` deixar de tocar em `transform`, a regra acima
-    // deixa de ser necessária — e quem a ler tem de o saber pelo teste, não
-    // por adivinhação.
+  it("e o que arma os blocos continua mesmo a ser um `transform` — é isso que os torna perigosos", () => {
+    /**
+     * Se um dia a armação deixar de tocar em `transform`, a regra acima deixa
+     * de ser necessária — e quem a ler tem de o saber pelo teste, não por
+     * adivinhação.
+     *
+     * Este caso apontava para os `@keyframes prop-chega`, que já não existem.
+     * Se tivesse ficado assim, continuaria VERDE por vacuidade — a expressão
+     * não casava, a comparação era com cadeia vazia, e a rede passava a ser
+     * decoração. Aponta agora para onde o perigo vive de facto.
+     */
     const css = readFileSync("src/app/globals.css", "utf8");
-    const fotogramas = /@keyframes prop-chega \{[\s\S]*?\n\}/.exec(css)?.[0] ?? "";
-    expect(fotogramas, "os fotogramas do `prop-chega` desapareceram").not.toBe("");
-    expect(fotogramas).toMatch(/transform:/);
+    const armacao = /\[data-sobe\]\.por-subir \{[^}]*\}/.exec(css)?.[0] ?? "";
+    expect(armacao, "a regra que arma os blocos desapareceu do CSS").not.toBe("");
+    expect(armacao, "a armação deixou de usar `transform`").toMatch(/transform:/);
   });
 });

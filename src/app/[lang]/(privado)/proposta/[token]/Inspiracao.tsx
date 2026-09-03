@@ -376,8 +376,17 @@ function Respiro({
        grelha — que só é desenhada quando tem fotografias. Ver o comentário
        lá em baixo: com ele aqui, um board de uma só fotografia levava 36 px
        a separá-lo de uma grelha vazia. */
-    <div className="relative">
+    /* ── A CHEGADA DO MOMENTO ─────────────────────────────────────────────
+       O respiro é a abertura de cada mood board, e o nome do momento lê-se COM
+       a fotografia e não depois dela — por isso sobem juntos, num só gesto, e
+       o título nunca leva movimento próprio.
+
+       16 px: um degrau acima da fotografia da grelha (12) e da secção (14),
+       porque isto é o que anuncia um momento novo do dia. A escada vive no
+       `globals.css`; aqui só se diz o PAPEL. */
+    <div className="relative" data-sobe="respiro">
       <Celula
+        semDegrau
         token={token}
         foto={foto}
         /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
@@ -627,7 +636,17 @@ export default function Inspiracao({
            * forte desta página inteira não precisa de 96 px de branco a
            * anunciá-lo.
            */
-          <section key={board.chave} className="mt-12 first:mt-6 sm:mt-16" data-sobe="bloco">
+          /* ── O BOARD NÃO SE MOVE. MOVEM-SE AS FOTOGRAFIAS DELE ──────────
+             Isto levou `data-sobe="bloco"` (8 px) e CONTÉM as fotografias, que
+             levam `data-sobe="foto"` (12). Um `transform` no pai desloca o
+             filho: cada fotografia andava 20 px em vez dos 12 que a escada lhe
+             dá. Um board de fotografias é onde a escada mais tem de ser exacta,
+             porque são dezenas de gestos seguidos.
+
+             O gesto do board não se perdeu: passou para o respiro, a fotografia
+             a toda a largura que o abre — que é o separador mais forte desta
+             página e o sítio certo para o anúncio de um momento novo. */
+          <section key={board.chave} className="mt-12 first:mt-6 sm:mt-16">
             {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
               «Devia haver mais momentos assim, a separar secções: uma foto a
               toda a largura entre blocos.» Vem ANTES do título de propósito:
@@ -795,6 +814,7 @@ function Celula({
   foto,
   ansiosa,
   rotulo,
+  semDegrau = false,
   textos,
   token,
   tecto,
@@ -806,6 +826,12 @@ function Celula({
   foto?: FotoDaProposta;
   ansiosa: boolean;
   rotulo: string;
+  /**
+   * Esta fotografia já vem dentro de um gesto — o do respiro — e por isso não
+   * leva degrau próprio. Somar-lhe-o dava 28 px onde a escada declara 16, e a
+   * escada só vale enquanto disser a verdade.
+   */
+  semDegrau?: boolean;
   textos: TextosDaPagina;
   /** Para pedir a derivada intermédia desta fotografia — ver o `srcset`. */
   token: string;
@@ -979,7 +1005,12 @@ function Celula({
        negociação que não vale a pena ter. Aqui fora não há nada a negociar. */
     <figure
       className="foto-inteira m-0"
-      data-sobe="foto"
+      /* ── QUEM JÁ VEM DENTRO DE UM GESTO NÃO LEVA OUTRO ──────────────────
+         No respiro, o gesto é do RESPIRO — a fotografia e o nome do momento
+         sobem juntos, que é como se lê um anúncio. Um degrau próprio aqui
+         somava-se ao dele (16 + 12 = 28 px) e a escada deixava de dizer o que
+         diz. É a mesma armadilha que já custou os 32 px do total a pagar. */
+      data-sobe={semDegrau ? undefined : "foto"}
       style={ordem === undefined ? undefined : { order: ordem }}
     >
       <button
@@ -1170,8 +1201,14 @@ function Lupa({
    * antepassado tiver um `transform`, e aí passa a ser medido por esse
    * antepassado. É a regra do «bloco de contenção», e apanhou-nos aqui.
    *
-   * A secção da Inspiração leva `prop-chega`, a animação que a faz subir ao
-   * entrar (`globals.css`).
+   * A secção da Inspiração leva `data-sobe`, e o guião do movimento arma-a
+   * com um `transform` enquanto ela espera a sua vez (`globals.css`).
+   *
+   * (Esta nota dizia `prop-chega`, a animação de scroll que aqui esteve. Ela
+   * saiu por somar degraus e por não assentar — e o perigo passou de
+   * permanente a passageiro, não desapareceu. Medido: com o bloco armado, um
+   * `fixed` lá dentro mede 1028 px num ecrã de 780; largado, volta aos 780.
+   * Um perigo que dura o tempo de alguém tocar numa fotografia é um perigo.)
    *
    * ── E A CAUSA NÃO É O PREENCHIMENTO, AO CONTRÁRIO DO QUE AQUI ESTAVA ─────
    *
