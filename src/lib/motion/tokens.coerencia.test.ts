@@ -50,7 +50,8 @@ const semComentarios = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 describe("ficha de movimento ↔ globals.css", () => {
-  const css = lerFonte("../../app/globals.css");
+  // As duas folhas: o `@theme` saiu para o `tema.css` (ver o cabeçalho dele).
+  const css = lerFonte("../../app/globals.css") + lerFonte("../../app/tema.css");
 
   it("EASE_OUT é, caracter a caracter, a mesma curva que `--ease-out` no CSS", () => {
     const m = /--ease-out:\s*([^;]+);/.exec(css);
@@ -326,7 +327,8 @@ describe("as páginas não voltam a escrever tempos à mão", () => {
  * de compilação nem aviso do lint: não gera regra e cala-se.
  */
 describe("o espaço de nomes dos tempos", () => {
-  const css = lerFonte("../../app/globals.css");
+  // As duas folhas: o `@theme` saiu para o `tema.css` (ver o cabeçalho dele).
+  const css = lerFonte("../../app/globals.css") + lerFonte("../../app/tema.css");
 
   it("declara os tempos onde o Tailwind os lê, e não ao lado", () => {
     for (const nome of ["micro", "elemento", "vista", "toque"]) {

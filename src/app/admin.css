@@ -10,5 +10,6 @@
    escrevê-lo: sem isto o Tailwind não sabia o que é `bg-moss-dark` e não
    gerava a regra. E porque é só uma referência, o `:root` não sai duplicado.
    ══════════════════════════════════════════════════════════════════════════ */
-@reference "./globals.css";
+@reference "tailwindcss";
+@reference "./tema.css";
 @import "tailwindcss/utilities.css" layer(utilities) source("./[lang]/(admin)");

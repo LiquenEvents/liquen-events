@@ -42,11 +42,19 @@ import { join } from "node:path";
  */
 
 const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
-const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+/**
+ * As duas folhas juntas. O `@theme` mudou de casa: vive no `tema.css`, para o
+ * `admin.css` o poder referir sem herdar o `@source not` do `globals.css` —
+ * essa exclusão é absoluta e punha o back office sem estilos nenhuns. Ver o
+ * cabeçalho do `tema.css`.
+ */
+const CSS =
+  readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8") +
+  readFileSync(join(process.cwd(), "src/app/tema.css"), "utf8");
 
 /** Os `--color-*` declarados no bloco `@theme`. */
 function tokensDoTema(): Set<string> {
-  const bloco = CSS.slice(CSS.indexOf("@theme"));
+  const bloco = CSS.slice(CSS.indexOf("@theme {"));
   const fim = bloco.indexOf("\n}");
   const nomes = bloco.slice(0, fim).match(/--color-([a-z0-9-]+)\s*:/g) ?? [];
   return new Set(nomes.map((n) => n.replace(/--color-|\s*:/g, "")));

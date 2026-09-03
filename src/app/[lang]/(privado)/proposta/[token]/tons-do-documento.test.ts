@@ -82,8 +82,17 @@ const MINIMO = 4.5;
  * não como um silêncio.
  */
 function paleta(): Record<string, string> {
-  const css = readFileSync(join(RAIZ, "src/app/globals.css"), "utf8");
-  const tema = css.slice(css.indexOf("@theme"), css.indexOf("@theme") + 2000);
+  /**
+   * As duas folhas, porque o `@theme` mudou de casa: vive agora no `tema.css`,
+   * para o `admin.css` o poder referir sem herdar o `@source not` do
+   * `globals.css` (a exclusão é absoluta e punha o back office sem estilos).
+   * Lêem-se as duas juntas para esta conta não voltar a partir se ele mudar
+   * outra vez de sítio.
+   */
+  const css =
+    readFileSync(join(RAIZ, "src/app/globals.css"), "utf8") +
+    readFileSync(join(RAIZ, "src/app/tema.css"), "utf8");
+  const tema = css.slice(css.indexOf("@theme {"), css.indexOf("@theme {") + 2000);
   const fora: Record<string, string> = {};
   for (const [, nome, hex] of tema.matchAll(/--color-([a-z-]+):\s*(#[0-9a-fA-F]{6})/g)) {
     fora[nome] = hex;

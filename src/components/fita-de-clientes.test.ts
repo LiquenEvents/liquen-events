@@ -46,7 +46,13 @@ import { join } from "node:path";
  */
 
 const RAIZ = process.cwd();
-const css = () => readFileSync(join(RAIZ, "src/app/globals.css"), "utf8");
+/**
+ * As duas folhas juntas: o `@theme` saiu para o `tema.css` (ver o cabeçalho
+ * desse ficheiro), e este teste também olha para a paleta.
+ */
+const css = () =>
+  readFileSync(join(RAIZ, "src/app/globals.css"), "utf8") +
+  readFileSync(join(RAIZ, "src/app/tema.css"), "utf8");
 /**
  * O CÓDIGO do componente, sem os comentários.
  *
@@ -333,7 +339,7 @@ describe("o bloco `@theme` do globals.css", () => {
   /** O corpo do `@theme`, do `{` ao `}` que o fecha. */
   const tema = () => {
     const fonte = css();
-    const i = fonte.indexOf("@theme");
+    const i = fonte.indexOf("@theme {");
     expect(i, "o bloco `@theme` desapareceu").toBeGreaterThan(-1);
     const abre = fonte.indexOf("{", i);
     let profundidade = 0;

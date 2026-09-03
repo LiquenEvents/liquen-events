@@ -19,107 +19,7 @@
    ════════════════════════════════════════════════════════════════════════ */
 @source not "./[lang]/(admin)";
 
-@theme {
-  --color-cream: #f7f4ee;
-  --color-cream-dark: #ece7dc;
-  --color-ink: #2a2620;
-  --color-moss: #637a5f;
-  --color-moss-light: #86997f;
-  --color-moss-dark: #4c6150;
-  /* O verde-quase-preto por baixo das fotografias. Estava escrito à mão em
-     dois sítios (`.g-tile` e o `--cv-bg` dos painéis) e a fita dos clientes ia
-     ser o terceiro: é o mesmo tom nos três — o fundo neutro que impede um
-     flash branco enquanto uma fotografia escura carrega. */
-  --color-noite: #12160f;
-  --color-gold: #d6ab3a;
-  --color-gold-dark: #b88f28;
-  /* Gold as TEXT on white/cream. gold (~2:1) and gold-dark (~3:1) fail WCAG AA
-     for body text (4.5:1); this darker shade passes. Keep gold/gold-dark for
-     borders, icons and text on dark backgrounds. */
-  --color-gold-text: #8a6a1d;
-  /* Public site paper surfaces — clean white.
-     cream/cream-dark stay off-white: they're light text/accents on dark
-     sections, not page backgrounds. */
-  --color-surface: #ffffff;
-  --color-surface-raised: #ffffff;
-  --color-surface-elevated: #ffffff;
-  --color-foreground: #2a2620;
-  /* Public marketing site keeps its editorial pairing: Inter for body/UI and
-     Playfair for display headings. The SpaceX/Archivo engineered typeface is
-     scoped to the back office only (see .admin-mode below), where --font-spacex
-     is loaded and applied. */
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-playfair);
-
-  /* ── A curva por omissão de TODAS as transições ──────────────────────────
-     O sítio tem uma curva de assinatura (`--ease-out`, no :root logo abaixo):
-     uma desaceleração forte, que arranca depressa e assenta devagar. Só que
-     essa curva estava a ser pedida À MÃO, e ~300 dos ~322 utilitários
-     `transition-*` do sítio não a pediam — herdavam a omissão do Tailwind,
-     `cubic-bezier(0.4, 0, 0.2, 1)`, que é praticamente simétrica.
-
-     O resultado media-se a olho: passar o rato num link e ver um bloco entrar
-     ao scroll eram, na mesma página, duas linguagens de movimento diferentes.
-     Não é um defeito de nenhuma delas — é a falta de uma.
-
-     Esta linha muda a OMISSÃO, e com ela as ~300 transições que nunca pediram
-     curva nenhuma. Nada muda de posição, de tamanho ou de cor: muda como
-     acelera. Quem quiser outra curva continua a poder pedi-la (`ease-linear`,
-     `.ease-expo`, um `ease-[…]` próprio) — o marquee e as barras de progresso
-     são `linear` de propósito e ficam como estão.
-
-     NOTA para quem vier a seguir: esta variável só alimenta os UTILITÁRIOS do
-     Tailwind. As regras escritas à mão neste ficheiro não a vêem — uma
-     `transition: opacity 0.5s ease` continua em `ease` até alguém lá ir. Por
-     isso as que partilham um gesto com a assinatura foram convergidas à mão
-     (`.lift`, `.field-line`, `.ff-label`, `.cl-black`, `.cl-moss`, `.bo-input`).
-
-     O valor está escrito por extenso porque o `@theme` é lido antes do :root —
-     `var(--ease-out)` aqui não resolveria. `tokens.coerencia.test.ts` guarda a
-     outra ponta (o `--ease-out` ↔ a ficha de JS). */
-  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-
-  /* ── A ESCALA DOS TEMPOS ──────────────────────────────────────────────────
-     Três degraus, e a razão de serem três: o que responde ao dedo, o que
-     move uma coisa, e o que troca um ecrã. Antes disto havia seis números em
-     uso (300, 200, 500, 700, 150, 400) sem regra escrita em lado nenhum, o
-     que quer dizer que cada componente novo escolhia à sorte.
-
-     Alimentam os utilitários do Tailwind (`duration-micro`, `duration-elemento`,
-     `duration-vista`) e a ficha de JS espelha-os, com teste a ligar as pontas.
-
-     O QUARTO tempo — a entrada de uma fotografia ao scroll — não está aqui
-     porque não é um degrau desta escala: é uma escala própria, que acompanha o
-     TAMANHO da fotografia, e vive em `lib/motion/tokens.ts` desde antes disto.
-
-     ── E O PREFIXO ESTAVA ERRADO: AS TRÊS CLASSES NÃO EXISTIAM ─────────────
-     Estava `--duration-micro`. O Tailwind v4 lê os utilitários `duration-*` do
-     espaço `--transition-duration-*`, e só desse. COMPILADO para confirmar, com
-     dois tokens irmãos no mesmo ficheiro:
-
-         --duration-alfa            →  .duration-alfa    NENHUMA REGRA
-         --transition-duration-beta →  .duration-beta     { transition-duration: … }
-
-     As variáveis chegavam ao `:root` com os valores certos — legíveis para
-     quem lesse o CSS — e as regras `.duration-micro`, `.duration-elemento` e
-     `.duration-vista` eram ZERO. Catorze chamadas no back office, em oito
-     ficheiros, a correr todas aos 150 ms do `--default-transition-duration` sem
-     ninguém dar por isso.
-
-     É a armadilha que o `AGENTS.md` avisa e que já mordeu esta casa noutro
-     sítio: no Tailwind v4 uma classe que aponte para um token inexistente não
-     dá erro de compilação nem aviso do lint. Não gera regra e cala-se.
-
-     O nome do token muda; o nome da CLASSE não — `duration-micro` continua a
-     escrever-se igual nos componentes, e passa a fazer o que sempre prometeu. */
-  --transition-duration-micro: 120ms;
-  --transition-duration-elemento: 250ms;
-  --transition-duration-vista: 350ms;
-  /* O toque: 20 ms, e só para o `:active`. Ver `ui/movimento.ts` — a assimetria
-     é deliberada (carrega a 20, larga a 120), e o número vem de uma medição na
-     apple.com: imperceptível como animação, perceptível como suavidade. */
-  --transition-duration-toque: 20ms;
-}
+@import "./tema.css";
 
 /* ════════════════════════════════════════════════════════════════════════════
    COM RATO / SEM RATO — a pergunta certa sobre uma acção escondida
@@ -181,8 +81,6 @@
    Turbopack serviu HTML com as classes novas e CSS sem as regras — os dois
    desenhos apareciam ao mesmo tempo. `rm -rf .next` e reiniciar o servidor.
    Se o resultado for impossível, é isto. */
-@custom-variant com-rato (@media (hover: hover) and (pointer: fine));
-@custom-variant sem-rato (@media not ((hover: hover) and (pointer: fine)));
 
 /* ── Hero type scale — single source of truth for the marketing page heroes.
    Each page had hardcoded a near-identical but drifting clamp() inline
