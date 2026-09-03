@@ -4027,14 +4027,32 @@ body:has(.barra-consentimento) footer {
    `hero-settle` já explica — num dia em que o JavaScript não corra, isto
    continua a acontecer, porque nunca dependeu dele. */
 @media (prefers-reduced-motion: no-preference) {
-  .prop-folha {
-    animation: prop-entrada 520ms var(--ease-out) var(--cortina-sobe) backwards;
+  /* ── E O GESTO FAZIA-SE TODO ÀS ESCONDIDAS ─────────────────────────────
+
+     Arrancava no MESMO instante que o pano (`var(--cortina-sobe)`) e durava
+     520 ms. Só que o pano leva 270 ms a sair — e é opaco.
+
+     A conta, feita com a curva real (`cubic-bezier(0.16, 1, 0.3, 1)`, que
+     gasta quase tudo no princípio): quando o pano sai do ecrã, a entrada já
+     fez 97,6% do percurso. Dos 18 px, sobravam 0,44 px para o casal ver.
+     Fazia-se um gesto que ninguém via, debaixo de um pano.
+
+     Passa a arrancar 130 ms DEPOIS do pano — que é quando os primeiros
+     píxeis da página aparecem e imediatamente antes de a faixa dos nomes ser
+     descoberta. Assim nada do gesto fica escondido, e sobram ~5 px por andar
+     quando o pano sai: o documento assenta à frente de quem está a olhar.
+
+     24 px e não 18: a escala da casa tem «secção 14 px, página 32 px», e isto
+     é a página a chegar — mas vista só a partir do meio, portanto fica no
+     degrau entre as duas. */
+  .prop-abertura {
+    animation: prop-entrada 620ms var(--ease-out) calc(var(--cortina-sobe) + 130ms) backwards;
   }
 }
 
 @keyframes prop-entrada {
   from {
-    transform: translateY(18px);
+    transform: translateY(24px);
   }
   to {
     transform: none;
