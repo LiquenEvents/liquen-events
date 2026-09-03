@@ -1,7 +1,7 @@
 "use client";
 
 import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
@@ -327,6 +327,7 @@ function TituloDoMomento({ titulo, subtitulo }: { titulo: string; subtitulo?: st
  * já acontecia quando a fotografia faltava desde o início.
  */
 function Respiro({
+  chave,
   token,
   foto,
   ansiosa,
@@ -337,6 +338,8 @@ function Respiro({
   titulo,
   subtitulo,
 }: {
+  /** O nome desta fotografia na página — ver `chave`, na `Celula`. */
+  chave: string;
   token: string;
   foto?: FotoDaProposta;
   ansiosa: boolean;
@@ -387,6 +390,7 @@ function Respiro({
     <div className="relative" data-sobe="respiro">
       <Celula
         semDegrau
+        chave={chave}
         token={token}
         foto={foto}
         /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
@@ -657,6 +661,7 @@ export default function Inspiracao({
               Ver `respiro`, acima, para qual das fotografias é. */}
             {oRespiro !== null && (
               <Respiro
+                chave={`${b}-${oRespiro}`}
                 token={token}
                 foto={fotos[board.fotos[oRespiro]]}
                 ansiosa={noDocumento(oRespiro) < FOTOS_ANSIOSAS}
@@ -731,6 +736,7 @@ export default function Inspiracao({
                     {coluna.map(({ id, i }) => (
                       <Celula
                         key={id}
+                        chave={`${b}-${i}`}
                         token={token}
                         foto={fotos[id]}
                         ansiosa={noDocumento(i) < FOTOS_ANSIOSAS}
@@ -791,6 +797,10 @@ export default function Inspiracao({
       {boardAberto && aberta && (
         <Lupa
           foto={fotoAberta}
+          /* De onde ela nasce. Segue a fotografia ABERTA e não a que abriu a
+             lupa: depois de duas setas, voltar à primeira miniatura era nascer
+             do sítio errado. */
+          chaveDoAlvo={`${aberta.board}-${aberta.i}`}
           rotulo={contar(textos.contagem, aberta.i + 1, boardAberto.fotos.length)}
           temAnterior={aberta.i > 0}
           temSeguinte={aberta.i < boardAberto.fotos.length - 1}
@@ -814,6 +824,7 @@ function Celula({
   foto,
   ansiosa,
   rotulo,
+  chave,
   semDegrau = false,
   textos,
   token,
@@ -826,6 +837,16 @@ function Celula({
   foto?: FotoDaProposta;
   ansiosa: boolean;
   rotulo: string;
+  /**
+   * O nome desta célula na página, para a lupa saber de onde nasceu.
+   *
+   * Um atributo no DOM e não um `ref` guardado num mapa, de propósito: quem
+   * pergunta é a lupa, que monta noutro sítio da árvore, e uma pergunta ao
+   * documento é a verdade daquele fotograma — um mapa mantido por outro
+   * componente é exactamente o tipo de estado que fica desactualizado sem
+   * ninguém dar por isso.
+   */
+  chave?: string;
   /**
    * Esta fotografia já vem dentro de um gesto — o do respiro — e por isso não
    * leva degrau próprio. Somar-lhe-o dava 28 px onde a escada declara 16, e a
@@ -1017,6 +1038,7 @@ function Celula({
         type="button"
         onClick={(e) => aoAmpliar(e.currentTarget)}
         disabled={!alvo || desistiu}
+        data-lupa={chave}
         aria-label={`${textos.ampliar}: ${rotulo}`}
         /* `foto-adiavel` SÓ com a forma conhecida — a razão está escrita na
            classe, em `globals.css`: saltar o desenho de uma caixa cuja altura
@@ -1105,8 +1127,48 @@ function Celula({
  */
 const DISTANCIA_DO_GESTO = 48;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CONTA DO VOO — o que leva uma caixa exactamente a outra
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Escreve no elemento as três variáveis que os fotogramas da `lupa-nasce`
+ * lêem, e devolve se conseguiu. Devolver `false` não é uma falha: é a decisão
+ * de NÃO voar — e o que se vê então é a lupa a aparecer, como aparecia antes
+ * disto existir. Nunca um salto.
+ *
+ * ── `max` E NÃO `min`, E A RAZÃO É O RECORTE ──────────────────────────────
+ *
+ * A miniatura da grelha é `object-cover`: está recortada. A escala que TAPA a
+ * caixa dela é a que faz as duas imagens coincidirem — com `min` sobrava papel
+ * à volta e via-se a fotografia a saltar de tamanho no primeiro fotograma.
+ *
+ * ── E PORQUE É QUE UMA MINIATURA FORA DO ECRÃ NÃO SERVE ───────────────────
+ *
+ * Porque as setas andam DENTRO do board sem a página rolar: ao fim de três
+ * setas, a miniatura da fotografia aberta pode estar dois ecrãs abaixo. Uma
+ * fotografia a nascer de um sítio que ninguém vê não se lê como «é aquela» —
+ * lê-se como um erro.
+ */
+function marcarVoo(el: HTMLElement, miniatura: DOMRect, noEcra: DOMRect): boolean {
+  if (miniatura.width <= 0 || noEcra.width <= 0) return false;
+  if (miniatura.bottom <= 0 || miniatura.top >= window.innerHeight) return false;
+  const s = Math.max(miniatura.width / noEcra.width, miniatura.height / noEcra.height);
+  el.style.setProperty(
+    "--lupa-dx",
+    `${miniatura.left + (miniatura.width - noEcra.width * s) / 2 - noEcra.left}px`,
+  );
+  el.style.setProperty(
+    "--lupa-dy",
+    `${miniatura.top + (miniatura.height - noEcra.height * s) / 2 - noEcra.top}px`,
+  );
+  el.style.setProperty("--lupa-s", `${s}`);
+  return true;
+}
+
 function Lupa({
   foto,
+  chaveDoAlvo,
   rotulo,
   temAnterior,
   temSeguinte,
@@ -1115,6 +1177,11 @@ function Lupa({
   aoAndar,
 }: {
   foto?: FotoDaProposta;
+  /**
+   * O nome da fotografia ABERTA na página — não o da que abriu a lupa. Depois
+   * de duas setas, nascer da primeira miniatura era nascer do sítio errado.
+   */
+  chaveDoAlvo: string;
   rotulo: string;
   temAnterior: boolean;
   temSeguinte: boolean;
@@ -1126,6 +1193,30 @@ function Lupa({
   const botaoFechar = useRef<HTMLButtonElement>(null);
   const toque = useRef<{ x: number; y: number } | null>(null);
   const [carregou, setCarregou] = useState(false);
+  /**
+   * A MOLDURA — a caixa com a forma da fotografia.
+   *
+   * Existe por uma razão que é toda da quinta com 4G: numa rede má o original
+   * chega segundos depois de a lupa abrir. Se o que crescesse fosse o `<img>`,
+   * ele mediria zero por zero no fotograma da abertura e a coreografia tocava
+   * para uma sala vazia — ou, pior, começava tarde e a fotografia dava um
+   * salto de tamanho a meio.
+   *
+   * Com o `aspect-ratio` declarado, a caixa é a do `object-contain` desde o
+   * primeiro fotograma, e as duas imagens (o borrão e o original) ocupam-na
+   * inteira — portanto estão sempre registadas uma sobre a outra.
+   */
+  const moldura = useRef<HTMLDivElement>(null);
+  /**
+   * Sem medida guardada não há moldura, e sem moldura não há voo.
+   *
+   * As fotografias anteriores às colunas de dimensão não têm forma conhecida.
+   * A GRELHA reserva-lhes três por dois e recorta; aqui isso não serve — a
+   * lupa é `object-contain`, e a caixa de uma forma inventada é a caixa
+   * errada: a fotografia cresceria para um sítio e saltaria para outro quando
+   * chegasse. Nessas, a lupa faz o que sempre fez.
+   */
+  const forma = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : null;
 
   // AQUI o original é a primeira escolha e a miniatura é o plano B: é o único
   // sítio da página em que os pixéis todos valem os bytes.
@@ -1181,6 +1272,37 @@ function Lupa({
 
   useEffect(() => {
     botaoFechar.current?.focus();
+  }, []);
+
+  /**
+   * ── O VOO DE ENTRADA — MEDIDO PRIMEIRO, POSTO DEPOIS ────────────────────
+   *
+   * A classe NÃO vai no JSX, e a diferença importa. Posta no desenho, a
+   * animação arrancava com as variáveis por omissão e via-as mudar a meio —
+   * um salto. Posta aqui, o browser vê as três variáveis e a classe na mesma
+   * volta, antes de pintar seja o que for.
+   *
+   * `useLayoutEffect` e não `useEffect`: as duas caixas têm de ser medidas na
+   * MESMA volta de layout em que a lupa monta, e antes da pintura. Com
+   * `useEffect` já havia um fotograma pintado com a fotografia no sítio final,
+   * e o voo começava do fim.
+   *
+   * E é a regra da casa por outra porta: se isto não correr — um erro, uma
+   * miniatura que já saiu do ecrã, um browser sem `matchMedia` — não se
+   * acrescenta classe nenhuma e a lupa está lá, no sítio, inteira. O estado
+   * escondido continua a não existir sem JavaScript.
+   *
+   * Só à MONTAGEM: as setas mudam a fotografia sem remontar a lupa, e uma
+   * fotografia a nascer da miniatura a cada seta seria uma discoteca.
+   */
+  useLayoutEffect(() => {
+    const caixa = moldura.current;
+    const daGrelha = document.querySelector<HTMLElement>(`[data-lupa="${chaveDoAlvo}"]`);
+    if (!caixa || !daGrelha) return;
+    if (!marcarVoo(caixa, daGrelha.getBoundingClientRect(), caixa.getBoundingClientRect())) return;
+    caixa.classList.add("lupa-nasce");
+    // A chave não muda enquanto esta lupa vive, e o voo é o da ABERTURA.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Enquanto a lupa está aberta, a página por baixo não rola.
@@ -1260,7 +1382,13 @@ function Lupa({
       role="dialog"
       aria-modal="true"
       aria-label={rotulo}
-      className="fixed inset-0 z-50 flex flex-col bg-black/94"
+      /* O fundo saiu daqui e passou a ser um filho: é ele que se esbate, e o
+         diálogo fica SEM animação nenhuma. Uma animação de `transform` no
+         diálogo faria dele bloco de contenção de tudo o que lá vier a estar —
+         é a armadilha que já custou uma lupa que não tapava o ecrã. E uma de
+         `opacity` esbateria a fotografia junto com o fundo, que é o contrário
+         do que se quer: o mundo escurece, a fotografia cresce. */
+      className="fixed inset-0 z-50 flex flex-col"
       onClick={(e) => {
         if (e.target === e.currentTarget) aoFechar();
       }}
@@ -1280,7 +1408,11 @@ function Lupa({
         aoAndar(dx < 0 ? 1 : -1);
       }}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      {/* O véu. `pointer-events-none` para o toque continuar a chegar ao
+          diálogo, que é quem fecha ao toque fora da fotografia. */}
+      <div aria-hidden className="lupa-veu pointer-events-none absolute inset-0 bg-black/94" />
+
+      <div className="lupa-pecas relative flex items-center gap-3 px-4 py-3">
         <span className="text-xs tabular-nums text-white/70">{rotulo}</span>
         <button
           ref={botaoFechar}
@@ -1310,18 +1442,6 @@ function Lupa({
           </button>
         )}
 
-        {/* A miniatura por baixo enquanto o original não chega — há sempre
-            fotografia no ecrã, em vez de um rectângulo preto. */}
-        {!carregou && !desistiu && foto?.miniatura && alvo !== foto.miniatura && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={foto.miniatura}
-            alt=""
-            aria-hidden
-            className="absolute max-h-full max-w-full object-contain blur-sm"
-          />
-        )}
-
         {desistiu || !alvo ? (
           <div className="max-w-xs text-center">
             <p className="text-sm leading-relaxed text-white/80">{textos.fotoFalhou}</p>
@@ -1334,17 +1454,53 @@ function Lupa({
             </button>
           </div>
         ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            key={alvo}
-            src={alvo}
-            alt=""
-            onLoad={() => setCarregou(true)}
-            onError={aoFalhar}
-            className={`max-h-full max-w-full object-contain motion-safe:transition-opacity ${
-              carregou ? "opacity-100" : "opacity-0"
-            }`}
-          />
+          /*
+           * ── A MOLDURA ─────────────────────────────────────────────────
+           *
+           * A caixa que cresce. Tem a FORMA da fotografia, portanto é do
+           * tamanho exacto a que o `object-contain` a vai desenhar — antes de
+           * o original ter chegado. As duas imagens são filhas dela e ocupam-na
+           * inteira, logo o borrão e a fotografia final estão sempre registados
+           * um sobre o outro: não há troca de tamanho quando o grande chega.
+           *
+           * Sem forma conhecida não há moldura — e o `contents` faz-a
+           * desaparecer da disposição, devolvendo as duas imagens ao que eram.
+           */
+          <div
+            ref={moldura}
+            className={`relative m-auto h-auto max-h-full w-full max-w-full${forma ? "" : " contents"}`}
+            style={forma ? { aspectRatio: forma } : undefined}
+          >
+            {/* A miniatura por baixo enquanto o original não chega — há sempre
+                fotografia no ecrã, em vez de um rectângulo preto. E é ela que
+                CRESCE numa ligação lenta: é a única que existe no fotograma da
+                abertura, e está na cache, porque é a mesma que está na grelha
+                (ver `cache-das-fotos.ts`, um ano de validade). */}
+            {!carregou && !desistiu && foto?.miniatura && alvo !== foto.miniatura && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={foto.miniatura}
+                alt=""
+                aria-hidden
+                className={
+                  forma
+                    ? "absolute inset-0 h-full w-full object-contain blur-sm"
+                    : "absolute max-h-full max-w-full object-contain blur-sm"
+                }
+              />
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={alvo}
+              src={alvo}
+              alt=""
+              onLoad={() => setCarregou(true)}
+              onError={aoFalhar}
+              className={`object-contain motion-safe:transition-opacity ${
+                forma ? "absolute inset-0 h-full w-full" : "max-h-full max-w-full"
+              } ${carregou ? "opacity-100" : "opacity-0"}`}
+            />
+          </div>
         )}
 
         {temSeguinte && (

@@ -4002,6 +4002,80 @@ body:has(.barra-consentimento) footer {
 [data-sobe="total"].por-subir {
   transform: translateY(20px);
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   A LUPA NASCE DAQUELA MINIATURA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela: «quero animações pela web pdf de forma espetacular, para
+   ficar uma experiência espetacular para os clientes».
+
+   A lupa aparecia. O que se lê num aparecimento é «apareceu uma coisa»; o que
+   se lê numa fotografia que CRESCE da miniatura em que se tocou é «é aquela,
+   em grande». É a diferença entre um corte e um travelling — e é ela que faz
+   uma galeria parecer um estúdio em vez de um visualizador.
+
+   ── AS VARIÁVEIS SÃO A CONTA, E VÊM DE FORA ───────────────────────────────
+
+   `--lupa-dx/dy/s` são o que leva a caixa FINAL da fotografia exactamente à
+   caixa da miniatura em que se tocou. Quem as mede é o `Inspiracao.tsx`, no
+   fotograma em que a lupa monta, e mede as duas na MESMA volta de layout —
+   senão comparava caixas de momentos diferentes.
+
+   Os valores por omissão (0, 0, 0,92) não são decoração: são a rede. Se a
+   miniatura já não estiver à vista, ou se a medição falhar, o que se vê é uma
+   aproximação suave em vez de um salto.
+
+   ── PORQUE É QUE ISTO FUNCIONA NUMA QUINTA COM 4G ─────────────────────────
+
+   Porque o que cresce não é o `<img>` do original — que numa rede má ainda
+   vem a caminho e mediria zero por zero — é uma MOLDURA com a forma da
+   fotografia, que tem a caixa certa desde o primeiro fotograma. E a miniatura
+   que ela mostra está mesmo na cache: as fotografias são gravadas com um ano
+   de validade (ver `cache-das-fotos.ts`), portanto é a mesma imagem que já
+   está na grelha.
+
+   ── E O REPOUSO É SEMPRE VISÍVEL ──────────────────────────────────────────
+
+   Todas acabam em `transform: none` e `opacity: 1`. Sem elas — movimento
+   reduzido, um browser que as ignore, um erro no guião — a lupa está lá,
+   inteira, no sítio final. É a regra que manda em tudo neste ficheiro.
+
+   ── E CUIDADO COM O QUE ISTO CONTÉM ───────────────────────────────────────
+
+   A `lupa-nasce` toca em `transform`, e portanto faz do elemento o BLOCO DE
+   CONTENÇÃO de qualquer `position: fixed` lá dentro. Vai na MOLDURA da
+   fotografia, e dentro dela não há nada fixo. NÃO se põe no diálogo. */
+@media (prefers-reduced-motion: no-preference) {
+  .lupa-nasce {
+    animation: lupa-nasce 380ms var(--ease-out) backwards;
+    transform-origin: 0 0;
+  }
+  .lupa-veu {
+    animation: lupa-aparece 200ms linear backwards;
+  }
+  /* As peças de interface entram DEPOIS de a fotografia começar a crescer: o
+     que o casal foi ver é a fotografia, e não o botão de fechar. */
+  .lupa-pecas {
+    animation: lupa-aparece 220ms linear 140ms backwards;
+  }
+}
+@keyframes lupa-nasce {
+  from {
+    transform: translate(var(--lupa-dx, 0px), var(--lupa-dy, 0px)) scale(var(--lupa-s, 0.92));
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes lupa-aparece {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 [data-sobe].por-subir.subiu {
   transform: none;
   transition: transform 620ms var(--ease-out);
