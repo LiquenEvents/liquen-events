@@ -98,4 +98,41 @@ describe("NotasInternas", () => {
     expect(caixa.querySelector("label")?.getAttribute("for")).toBe(idDoServidor);
     caixa.remove();
   });
+  /**
+   * ── O RÓTULO NUMA CAIXA ESTREITA ──────────────────────────────────────────
+   *
+   * Fotografia dela do estúdio: o «Só para» do rótulo desta nota escrito na
+   * vertical, uma letra por linha. MEDIDO num Chromium, no painel que abre a
+   * partir do cartão de um cliente: com a janela a 1440 este rótulo tinha SEIS
+   * píxeis de largura.
+   *
+   * A causa de fundo — a coluna do estúdio colapsada — corrige-se noutro sítio.
+   * O que se prende aqui é a rede por baixo: uma frase que não cabe QUEBRA DE
+   * LINHA; não se espreme até uma letra. É uma fila `flex`, e uma fila `flex`
+   * sem `flex-wrap` não tem para onde quebrar.
+   */
+  it("o rótulo quebra de linha em vez de se espremer numa caixa estreita", () => {
+    render(<NotasInternas valor="" onChange={() => {}} />);
+    const campo = screen.getByLabelText(/Notas internas/) as HTMLTextAreaElement;
+    const rotulo = campo.labels?.[0];
+    expect(rotulo).toBeTruthy();
+    const classes = (rotulo as HTMLElement).className.split(/\s+/);
+
+    // Controlo positivo: é mesmo uma fila `flex` — se deixar de ser, este
+    // teste passa a garantir uma coisa que já não existe.
+    expect(classes).toContain("flex");
+    expect(classes).toContain("flex-wrap");
+  });
+
+  /**
+   * A segunda metade do mesmo defeito: um filho `flex` sem `min-w-0` recusa-se
+   * a encolher abaixo do seu conteúdo e empurra os irmãos para zero. O título
+   * é o filho que tem texto longo («Nota sobre as capas»), e é ele que tem de
+   * poder encolher.
+   */
+  it("o título pode encolher sem empurrar o resto do rótulo", () => {
+    render(<NotasInternas valor="" onChange={() => {}} titulo="Nota sobre as capas" />);
+    const titulo = screen.getByText("Nota sobre as capas");
+    expect(titulo.className.split(/\s+/)).toContain("min-w-0");
+  });
 });
