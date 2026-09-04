@@ -8563,11 +8563,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             está, e a grelha diz o mesmo que ela.
                                             Sem isto, uma coluna de 15 rem ficava
                                             aberta e vazia. */}
+                                          {/* ── E A SEGUNDA COLUNA PERGUNTA AO
+                                              CARTÃO, NÃO À JANELA ──────────
+                                              Era `lg:grid-cols-…`: 1024 DE
+                                              JANELA, para decidir se cabem duas
+                                              colunas DENTRO deste cartão. É o
+                                              mesmo defeito da fila, um nível
+                                              abaixo, e errava para os dois
+                                              lados.
+
+                                              MEDIDO num Chromium, a largura
+                                              interior deste cartão (a mesma que
+                                              o `ProposalStudio.test.tsx` usa,
+                                              refeita a partir do DOM):
+
+                                                  janela 1023   cartão 747 px
+                                                  janela 1024   cartão 472 px
+                                                  janela 1440   cartão 528 px
+
+                                              A 1023 havia 747 px e o `lg:` dizia
+                                              UMA coluna; a 1024 havia 472 e
+                                              dizia duas. A janela cresceu 1 px e
+                                              o cartão perdeu 275 — porque é aí
+                                              que o índice das páginas passa a
+                                              coluna.
+
+                                              O número: a segunda coluna é um
+                                              `15rem` fixo (240 px) mais o
+                                              `gap-4` (16). `@min-[30rem]` (480)
+                                              é o degrau logo acima dos 472 a que
+                                              o `lg:` já dividia — a mesma
+                                              decisão, feita onde ela se resolve.
+                                              Sobram 224 px para o selector, que
+                                              é `flex-wrap` com peças de 5,75rem:
+                                              duas por linha, como já era. */}
                                           <div
                                             className={`mt-2 grid gap-4 ${
                                               painelLateralCabe
                                                 ? ""
-                                                : "lg:grid-cols-[minmax(0,1fr)_15rem]"
+                                                : "@min-[30rem]:grid-cols-[minmax(0,1fr)_15rem]"
                                             }`}
                                           >
                                             <div className="min-w-0">
@@ -8604,8 +8638,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                              * conta o que isso custou quando era
                                              * ele a fazê-lo.
                                              */}
+                                            {/* A folga alinha a miniatura com o
+                                                selector ao lado — e por isso segue
+                                                o MESMO degrau que decide se estão
+                                                lado a lado. Era `lg:`, a mesma
+                                                janela do grid aqui em cima. */}
                                             {!painelLateralCabe && (
-                                              <div className="lg:pt-6">
+                                              <div className="@min-[30rem]:pt-6">
                                                 <PreviaDaPagina
                                                   layout={layoutDoBoard}
                                                   aspectos={aspectos}
