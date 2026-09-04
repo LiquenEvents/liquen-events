@@ -59,6 +59,64 @@ function montar({ calmo = false, semObservador = false } = {}) {
   return { acima, abaixo, observados, disparar: () => disparar };
 }
 
+/**
+ * O MESMO DOCUMENTO, MAS NO BURACO — antes de o React revelar o jacto que
+ * traz a proposta. É o estado real de uma primeira visita: as peças já estão
+ * no DOM e não têm forma nenhuma, porque um antepassado está em
+ * `display: none`. Todas as caixas são zeros.
+ *
+ * `revelar()` põe a página com a forma que ela tem depois; `fotograma()`
+ * corre um fotograma de animação, que é onde o guião volta a tentar.
+ */
+function montarEscondido() {
+  document.body.innerHTML = `
+    <div id="acima" data-sobe style="--sobe:14px"></div>
+    <div id="abaixo" data-sobe style="--sobe:12px"></div>`;
+  const acima = document.getElementById("acima")!;
+  const abaixo = document.getElementById("abaixo")!;
+  const escondido = () => ({ top: 0, height: 0 }) as DOMRect;
+  acima.getBoundingClientRect = escondido;
+  abaixo.getBoundingClientRect = escondido;
+
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  const observados: Element[] = [];
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor() {}
+      observe(el: Element) {
+        observados.push(el);
+      }
+      unobserve() {}
+    },
+  );
+  let porCorrer: FrameRequestCallback[] = [];
+  let pedidos = 0;
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    pedidos += 1;
+    porCorrer.push(cb);
+    return pedidos;
+  });
+  Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+  new Function(GUIAO_DO_MOVIMENTO)();
+
+  return {
+    acima,
+    abaixo,
+    observados,
+    quantosPedidos: () => pedidos,
+    revelar() {
+      acima.getBoundingClientRect = () => ({ top: 10, height: 120 }) as DOMRect;
+      abaixo.getBoundingClientRect = () => ({ top: 5000, height: 300 }) as DOMRect;
+    },
+    fotograma() {
+      const fila = porCorrer;
+      porCorrer = [];
+      for (const cb of fila) cb(0);
+    },
+  };
+}
+
 beforeEach(() => {
   Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
 });
@@ -130,6 +188,70 @@ describe("o movimento da proposta", () => {
      * apanhada — mas quem a tirar não parte nada, e é justo dizê-lo.
      */
     const { acima, abaixo } = montar({ semObservador: true });
+    expect(acima.classList.contains("por-subir")).toBe(false);
+    expect(abaixo.classList.contains("por-subir")).toBe(false);
+  });
+
+  it("mede DEPOIS de a página ter forma — e não no buraco em que ela ainda não tem", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O DEFEITO QUE FEZ COM QUE NUNCA HOUVESSE MOVIMENTO NENHUM
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Palavras dela, a olhar para uma proposta verdadeira: «não há animações
+     * nenhumas na proposta online».
+     *
+     * Não era a régua ser pequena. O guião corria uma vez, no
+     * `DOMContentLoaded`, e nesse instante o documento do casal AINDA NÃO
+     * ESTÁ NA PÁGINA — vem num jacto posterior ao do layout (está escrito no
+     * cabeçalho do `(privado)/layout.tsx`), aterra dentro de um `<div>` com
+     * `display: none` e só depois é revelado.
+     *
+     * MEDIDO num Chromium a 390×844, contra o servidor de PRODUÇÃO, com uma
+     * proposta real de 24 fotografias:
+     *
+     *     no instante em que o guião mede   altura 779 px    tops: 0,0,0,0,0…
+     *     depois de a página ser revelada   altura 13 009 px tops: 498,1350,1444…
+     *
+     * Com toda a gente em `top: 0`, ninguém está abaixo da dobra: armavam-se
+     * ZERO de 34 elementos. E o guião não voltava a correr. Nem uma foto, nem
+     * um título, nem o total a pagar — em desenvolvimento e em produção, em
+     * todas as visitas.
+     *
+     * A correcção não muda regra nenhuma do desenho: continua a armar só o
+     * que está abaixo da dobra, continua a ler tudo antes de escrever. Só
+     * espera pelo fotograma em que há alguma coisa para medir.
+     */
+    const { acima, abaixo, observados, revelar, fotograma } = montarEscondido();
+
+    // No buraco: as peças existem, mas o documento está escondido e ninguém
+    // tem forma. Não se arma nada — e sobretudo não se arma ERRADO.
+    expect(acima.classList.contains("por-subir"), "nada se arma sem forma").toBe(false);
+    expect(abaixo.classList.contains("por-subir"), "nada se arma sem forma").toBe(false);
+    expect(observados).toEqual([]);
+
+    // O documento é revelado. É aqui que o guião tem de acordar.
+    revelar();
+    fotograma();
+
+    expect(abaixo.classList.contains("por-subir"), "o que está abaixo da dobra tinha de armar").toBe(
+      true,
+    );
+    expect(acima.classList.contains("por-subir"), "o que já se via continua quieto").toBe(false);
+    expect(observados).toEqual([abaixo]);
+  });
+
+  it("desiste ao fim de um tempo, e desistir deixa a proposta inteira", () => {
+    /**
+     * Uma página que nunca chega a ter forma (um erro no servidor a meio do
+     * jacto) não pode deixar um ciclo de fotogramas a rodar para sempre no
+     * telemóvel de quem está a ler. Desiste — e desistir é seguro por
+     * construção: o estado escondido só existe quando o guião o põe, portanto
+     * um guião que desiste deixa o documento exactamente como veio.
+     */
+    const { acima, abaixo, fotograma, quantosPedidos } = montarEscondido();
+    for (let i = 0; i < 400; i++) fotograma();
+    expect(quantosPedidos(), "ficou a pedir fotogramas para sempre").toBeLessThan(400);
     expect(acima.classList.contains("por-subir")).toBe(false);
     expect(abaixo.classList.contains("por-subir")).toBe(false);
   });
