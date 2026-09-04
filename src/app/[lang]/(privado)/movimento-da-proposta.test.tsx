@@ -117,6 +117,51 @@ function montarEscondido() {
   };
 }
 
+/**
+ * UM LOTE DO OBSERVADOR — várias peças a cruzar a linha no mesmo instante,
+ * que é o que acontece numa fila de um mood board. O `left` de cada uma é o
+ * que o observador traz no `boundingClientRect` da entrada, e é por ele que a
+ * cascata se ordena.
+ */
+function montarUmLote(pecas: readonly { papel: string; left: number }[]) {
+  document.body.innerHTML = pecas
+    .map((p, i) => `<div id="p${i}" data-sobe="${p.papel}"></div>`)
+    .join("");
+  const els = pecas.map((_, i) => document.getElementById(`p${i}`)!);
+  // Todas abaixo da dobra, e com forma — para serem armadas.
+  els.forEach((el) => {
+    el.getBoundingClientRect = () => ({ top: 5000, height: 300 }) as DOMRect;
+  });
+
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  let disparar: ((es: unknown[]) => void) | null = null;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(cb: (es: unknown[]) => void) {
+        disparar = cb;
+      }
+      observe() {}
+      unobserve() {}
+    },
+  );
+  Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
+  new Function(GUIAO_DO_MOVIMENTO)();
+
+  return {
+    foto: (i: number) => els[i],
+    largar() {
+      disparar!(
+        pecas.map((p, i) => ({
+          isIntersecting: true,
+          target: els[i],
+          boundingClientRect: { left: p.left },
+        })),
+      );
+    },
+  };
+}
+
 beforeEach(() => {
   Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
 });
@@ -254,6 +299,63 @@ describe("o movimento da proposta", () => {
     expect(quantosPedidos(), "ficou a pedir fotogramas para sempre").toBeLessThan(400);
     expect(acima.classList.contains("por-subir")).toBe(false);
     expect(abaixo.classList.contains("por-subir")).toBe(false);
+  });
+
+  it("as fotografias que chegam juntas aterram uma a seguir à outra, da esquerda para a direita", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * A CASCATA
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Numa fila de um mood board várias fotografias cruzam a linha no MESMO
+     * instante, e o observador entrega-as no mesmo lote. Sem mais nada, subiam
+     * as 28 px todas ao mesmo tempo — um bloco a mexer-se em peça única lê-se
+     * como a página a saltar.
+     *
+     * A ordem é a do ECRÃ e não a do documento: as colunas de um mood board
+     * são empacotadas por altura (`arrumarPorColunas`), portanto a ordem no
+     * HTML não é a ordem em que se vêem. Daí o `left` — que vem no próprio
+     * lote do observador, sem se ler nada ao DOM.
+     */
+    const { largar, foto } = montarUmLote([
+      { papel: "foto", left: 200 },
+      { papel: "foto", left: 0 },
+      { papel: "foto", left: 100 },
+    ]);
+    largar();
+    // Da esquerda para a direita: 0ms, 80ms, 160ms.
+    expect(foto(1).style.transitionDelay, "a da esquerda é a primeira").toBe("");
+    expect(foto(2).style.transitionDelay).toBe("80ms");
+    expect(foto(0).style.transitionDelay, "a da direita é a última").toBe("160ms");
+    for (const i of [0, 1, 2]) expect(foto(i).classList.contains("subiu")).toBe(true);
+  });
+
+  it("e o passo pára ao quarto — a última de uma fila larga não espera meio segundo", () => {
+    const { largar, foto } = montarUmLote(
+      [0, 1, 2, 3, 4, 5].map((n) => ({ papel: "foto", left: n * 100 })),
+    );
+    largar();
+    expect(foto(3).style.transitionDelay).toBe("240ms");
+    expect(foto(4).style.transitionDelay, "o tecto são 240ms").toBe("240ms");
+    expect(foto(5).style.transitionDelay, "o tecto são 240ms").toBe("240ms");
+  });
+
+  it("mas o que se LÊ nunca espera pela vez", () => {
+    /**
+     * Um título ou o total a pagar atrasado de propósito é uma linha que
+     * alguém quer ler a chegar tarde. Esses são largados no instante em que
+     * chegam, mesmo que venham no mesmo lote que uma fotografia.
+     */
+    const { largar, foto } = montarUmLote([
+      { papel: "foto", left: 0 },
+      { papel: "titulo", left: 100 },
+      { papel: "total", left: 200 },
+    ]);
+    largar();
+    expect(foto(1).style.transitionDelay, "um título ficou à espera da vez").toBe("");
+    expect(foto(2).style.transitionDelay, "o total a pagar ficou à espera da vez").toBe("");
+    expect(foto(1).classList.contains("subiu")).toBe(true);
+    expect(foto(2).classList.contains("subiu")).toBe(true);
   });
 
   it("uma avaria no guião não derruba a página", () => {
