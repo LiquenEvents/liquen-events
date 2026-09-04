@@ -4017,9 +4017,34 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     if (!el || typeof ResizeObserver === "undefined") return;
     const medir = () => {
       const r = el.getBoundingClientRect();
-      // `innerHeight - r.bottom` é o que sobra por baixo da barra quando ela
-      // está encostada — os 56 px da navegação, mais a área segura do iPhone.
-      const porBaixo = Math.max(0, window.innerHeight - r.bottom);
+      /**
+       * ── O QUE SOBRA POR BAIXO DA BARRA É O `bottom` DELA, E NÃO A DISTÂNCIA
+       *    AO FUNDO DA JANELA ────────────────────────────────────────────────
+       *
+       * Isto era `Math.max(0, window.innerHeight - r.bottom)`, e a intenção
+       * está escrita duas linhas acima: «a distância a que ela está do fundo do
+       * ecrã (o `bottom-[calc(56px+…)]` que a levanta por cima da navegação do
+       * telemóvel)». Ou seja — o `bottom` do `sticky`. A conta pela janela dá
+       * esse número só quando quem rola É a janela.
+       *
+       * MEDIDO num Chromium, no painel que abre a partir do cartão de um
+       * cliente, onde quem rola é o painel e não a janela: o fundo da barra
+       * ficava a 384 px e o fundo da caixa que rola a 876 — quase 500 px de
+       * diferença que entravam na conta como se fossem folga a reservar.
+       *
+       *     folga reservada    893 a 962 px
+       *     folga necessária   ~569 px
+       *
+       * E realimentava-se: mais folga faz a coluna mais alta, a barra sobe na
+       * janela, a distância ao fundo cresce, a folga cresce outra vez. Daí os
+       * valores a saltar entre larguras (420, 962, 421, 913, 893) e o vazio de
+       * quase mil píxeis no fim do passo 1.
+       *
+       * O `bottom` calculado é a mesma resposta sem depender de quem rola: é o
+       * que o `sticky` reserva por baixo, resolvido em píxeis, com o
+       * `env(safe-area-inset-bottom)` já dentro.
+       */
+      const porBaixo = Math.max(0, Number.parseFloat(getComputedStyle(el).bottom) || 0);
       setFolgaDaBarra(Math.ceil(r.height + porBaixo + 12));
       // ── E A MESMA MEDIDA SERVE A QUEM FLUTUA POR CIMA ──────────────────
       // O aviso do `Toast.tsx` põe-se a uma distância fixa do fundo — a altura
