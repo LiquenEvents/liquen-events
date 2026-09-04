@@ -1139,7 +1139,10 @@ function Celula({
             loading={ansiosa ? "eager" : "lazy"}
             decoding="async"
             onError={aoFalhar}
-            className="relative block h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
+            /* `foto-deriva`: a fotografia move-se dentro da moldura enquanto
+               PASSA, e não só quando chega. O porquê e o custo estão na regra,
+               em `globals.css`. */
+            className="foto-deriva relative block h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
           />
         </picture>
       </button>

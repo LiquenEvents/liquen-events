@@ -4077,6 +4077,131 @@ body:has(.barra-consentimento) footer {
    mais contida do que a da fotografia de grelha (0,965 contra 0,955) por uma
    razão de proporção — a mesma percentagem numa caixa três vezes mais larga
    são três vezes mais píxeis, e aos 0,955 a sangria inteira dava um salto. */
+/* ══════════════════════════════════════════════════════════════════════════
+   A FOTOGRAFIA MOVE-SE ENQUANTO PASSA — E NÃO SÓ QUANDO CHEGA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela, com a proposta publicada à frente: «queria uma experiência
+   espetacular em animações pelas fotos, à medida que ela ia andando para
+   baixo».
+
+   O gesto de chegada dura 860 ms e acaba. Os mood boards são 5 900 px de
+   scroll: durante a esmagadora maioria desse percurso a página está parada.
+   Uma deriva lenta dentro da moldura é a única coisa que trabalha o tempo
+   todo — e é o que transforma uma lista de fotografias num percurso.
+
+   ── PORQUE É QUE ISTO PODE USAR A LINHA DE TEMPO DO SCROLL E A ENTRADA NÃO ─
+
+   A `prop-chega` foi retirada por três razões medidas (ver o epitáfio dela
+   mais acima). Duas NÃO se aplicam aqui, e é por isso que isto volta:
+
+     1. «Somava-se aos degraus de dentro» — era um problema de ANINHAMENTO: a
+        animação estava na secção e os degraus nas peças dela. Aqui está na
+        `<img>`, que não tem descendente nenhum com degrau.
+
+     2. «Não assentava» — uma animação presa ao scroll fica onde o scroll a
+        deixou. Isso é fatal para TEXTO QUE SE LÊ, que tem um sítio certo, e
+        foi o que fazia os links do índice aterrarem 13 px fora do alvo. Uma
+        deriva não tem sítio certo: onde ela para é onde ela deve estar.
+
+     3. «Não corre em toda a parte» — esta continua de pé, e é por isso que o
+        `@supports` fica. Onde a linha de tempo do scroll não existe, a
+        fotografia fica quieta e a proposta lê-se na mesma. Uma decoração que
+        falta não é um defeito; um texto escondido seria.
+
+   ── O QUE ISTO CUSTA, DITO ────────────────────────────────────────────────
+
+   A folga para derivar vem de uma escala permanente de 1,04 — ou seja, cada
+   fotografia fica 4% ampliada e perde ~2% de cada lado. Numa página onde ela
+   escolheu cada enquadramento, isso não é de graça, e fica escrito. A deriva
+   é de ±1,3%, metade da do sítio (`.parallax-drift`, ±2,4% com escala 1,06):
+   ali é uma capa a toda a largura, aqui são dezenas de células pequenas, e o
+   mesmo valor lia-se como tremor.
+
+   ── E É `view()`, NÃO `scroll(root block)` ────────────────────────────────
+
+   O `.parallax-drift` do sítio anda com a página inteira e só no primeiro
+   ecrã. Aqui cada fotografia tem de andar com a SUA passagem — `view()` mede
+   a travessia daquele elemento pelo ecrã, que é exactamente o gesto pedido.
+
+   Só `transform`. E dentro do `motion-safe`, porque quem pediu menos
+   movimento não leva deriva nenhuma. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* ── A LINHA DE TEMPO NASCE NA MOLDURA, E NÃO NA FOTOGRAFIA ──────────
+       `animation-timeline: view()` na própria `<img>` NÃO FUNCIONA aqui, e a
+       razão levou três ensaios a aparecer. MEDIDO: o progresso ficava cravado
+       em 0,500 em toda a travessia e a deriva era de 0,00 px.
+
+       Não era o `content-visibility` (desliguei-o e ficou igual) nem a duração
+       do atalho (forcei `auto` e ficou igual). É o `overflow: hidden` do botão
+       que emoldura a fotografia: isso faz dele um CONTENTOR DE SCROLL, o
+       `view()` mede a travessia dentro do contentor mais próximo, e dentro da
+       moldura a fotografia não se move nunca.
+
+       A saída é declarar a linha de tempo na `<figure>`, que está fora da
+       moldura e atravessa mesmo o ecrã, e deixar a `<img>` consumi-la pelo
+       nome — um nome é visível aos descendentes de quem o declara. */
+    .foto-inteira {
+      view-timeline-name: --foto-passa;
+    }
+    /* ── E A DERIVA NÃO PODE VIVER NO `transform` ────────────────────────
+       A fotografia já tem um zoom ao passar o rato, escrito em `transform`
+       pela classe da grelha. Uma ANIMAÇÃO sobre a mesma propriedade passa-lhe
+       à frente, e sem dar erro nenhum: MEDIDO, com a deriva em `transform`, o
+       rato fazia a fotografia crescer 1,4 px onde devia crescer ~10.
+
+       A folga e a deriva passam para `scale` e `translate` — as propriedades
+       individuais, que compõem com o `transform` em vez de o disputarem. O
+       zoom do rato volta a ser dele, e as duas coisas somam-se como devem. */
+    .foto-deriva {
+      /* A folga vai em `transform` e a deriva em `translate`. Não é ao
+         contrário por uma razão medida: o zoom do rato desta grelha é a
+         utilidade `group-hover:scale-[1.02]`, que escreve na propriedade
+         `scale` — e uma folga escrita ali passa-lhe por cima. MEDIDO com a
+         folga em `scale`: com rato, `scale` continuava em 1.04 e a fotografia
+         crescia 1,4 px onde devia crescer ~10. Assim as três compõem-se:
+         `transform` dá a folga, `translate` deriva, e `scale` fica para o
+         rato. */
+      transform: scale(1.04);
+      animation: foto-deriva-kf linear both;
+      animation-timeline: --foto-passa;
+      /* A travessia inteira: entra por baixo, sai por cima. */
+      animation-range: cover 0% cover 100%;
+    }
+    /* ── A CAPA MEDE-SE PELA PÁGINA, E NÃO PELA SUA PRÓPRIA TRAVESSIA ───
+       A capa está no topo: quando o casal abre a proposta, ela JÁ está no
+       ecrã, e a travessia dela começou antes de haver alguém a olhar.
+
+       MEDIDO com a capa a usar `view()` como as outras: em `scrollY 0` o
+       progresso já ia em 0,599, chegava a 1,000 aos 300 px, e a deriva visível
+       era de 2,44 px — menos de metade do gesto.
+
+       Para uma peça que nasce no ecrã, a linha de tempo certa é a da PÁGINA:
+       arranca em zero quando a página arranca em zero. É a mesma que o sítio
+       já usa na capa dele (`.parallax-drift`), e o primeiro ecrã de rolagem é
+       exactamente onde a capa vive. */
+    .foto-deriva--topo {
+      /* A animação inteira, e SEM `transform`: na capa a folga vem do
+         `.hero-settle`, que é quem abre a fotografia quando o pano sobe. Dois
+         `transform` estáticos na mesma fotografia disputavam-se em silêncio, e
+         quem ganhava era a ordem do ficheiro. Aqui a deriva só escreve em
+         `translate`, portanto compõe-se com ele em vez de o disputar. */
+      animation: foto-deriva-kf linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 100vh;
+    }
+    @keyframes foto-deriva-kf {
+      from {
+        translate: 0 -1.3%;
+      }
+      to {
+        translate: 0 1.3%;
+      }
+    }
+  }
+}
+
 [data-sobe="respiro"].por-subir {
   transform: translateY(36px) scale(0.965);
 }
