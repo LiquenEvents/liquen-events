@@ -67,8 +67,7 @@ import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
 import PainelDoEstudio from "./PainelDoEstudio";
-import { useMedida } from "./useMedida";
-import { CORTES } from "./ui/adaptativo";
+import { useLarguraDaZona } from "./useMedida";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import AEnviarAProposta from "./AEnviarAProposta";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
@@ -218,14 +217,52 @@ import {
 type StudioDoc = Parameters<typeof withProposalDefaults>[0];
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
  * O painel «O que vai sair» aparece a partir daqui.
  *
- * É o MESMO número do `PainelDoEstudio` e lê-se do mesmo sítio (`CORTES.largo`,
- * 1440): dois sítios a responder à mesma pergunta com números diferentes foi
- * exactamente o defeito que deixou a miniatura da página e o painel a
- * aparecerem os dois entre 1440 e 1535.
+ * A PERGUNTA MUDOU: NÃO É QUE LARGURA TEM A JANELA, É QUE LARGURA TEM A FILA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era `(min-width: CORTES.largo)` — uma consulta à JANELA. A regra que
+ * aqui estava escrita continua de pé, e é a que evita o defeito que já custou
+ * uma vez (a miniatura da página e o painel a aparecerem os DOIS entre 1440 e
+ * 1535): há UM número só, e um só sítio a respondê-lo — aqui, com o
+ * `PainelDoEstudio` a receber a resposta em vez de a repetir. O número estava
+ * certo; a PERGUNTA é que estava errada.
+ *
+ * Palavras dela, com uma captura do estúdio: «isto no back office está tudo com
+ * bugs e todo desformatado».
+ *
+ * MEDIDO num Chromium, no painel que abre a partir do cartão de um cliente —
+ * que é por onde ela lá chega:
+ *
+ *     janela 1366   a coluna onde ela escreve tem 368 px   legível
+ *     janela 1440   a coluna onde ela escreve tem  82 px   ← alargar PIOROU
+ *     janela 1600   ...............................136 px
+ *     janela 2000   ...............................136 px
+ *
+ * A conta: o painel de detalhe tem um tecto próprio (`max-w-3xl`) que corta a
+ * fila a 712 px, por mais largo que seja o ecrã. As duas colunas laterais são
+ * `shrink-0` e pedem, sem negociar, 192 + 24 + 336 + 24 = 576. Sobram 136 para
+ * a coluna onde se escreve — e o `min-w-0` dela, que existe para um filho longo
+ * não rebentar a caixa, deixa-a descer até lá sem se queixar.
+ *
+ * A 1440 é ainda pior (82 px) porque é exactamente aí que o painel entra: a
+ * janela cresce 74 px e a coluna perde 286.
+ *
+ * ── O NÚMERO, E DE ONDE VEM ───────────────────────────────────────────────
+ *
+ * A fila precisa de caber as duas colunas que não encolhem (192 + 336), as
+ * duas folgas (24 + 24) e uma coluna de escrita que se leia. O `@min-[26rem]`
+ * é o degrau que as grelhas desta coluna usam para passarem a duas colunas —
+ * portanto 26rem (416 px) é a largura abaixo da qual ela deixa de fazer o que
+ * foi desenhada para fazer. 576 + 416 = 992.
+ *
+ * Abaixo disso o painel não se monta, e a coluna de escrita fica com a fila
+ * inteira. É a mesma decisão de sempre — «quando o painel é desenhado é porque
+ * cabe» — mas agora medida onde ele aterra.
  */
-const MEDIDA_DO_PAINEL_LATERAL = `(min-width: ${CORTES.largo}px)`;
+const LARGURA_MINIMA_DA_FILA = 992;
 
 // ── Shared styling (matches ProposalBuilder / PaymentsPanel) ──
 /**
@@ -3994,7 +4031,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * dos dois: quem tem ecrã largo perde uma miniatura que já tinha ao lado,
    * quem não tem nunca fica sem ela.
    */
-  const painelLateralCabe = useMedida(MEDIDA_DO_PAINEL_LATERAL);
+  /**
+   * A fila das três colunas, para ela poder perguntar quanto mede a SI PRÓPRIA
+   * em vez de perguntar à janela. É a correcção de fundo — ver
+   * `LARGURA_MINIMA_DA_FILA`, e o `PainelDoEstudio`, que deixou de decidir.
+   *
+   * UM nome só para a resposta, e é este: o comentário aqui em cima conta o que
+   * custou haver dois sítios a responder à mesma pergunta com números
+   * diferentes. Continua a ser um número só; mudou a pergunta.
+   *
+   * Zero é a resposta do servidor e do primeiro fotograma, e quer dizer «ainda
+   * não sei» — aí o painel NÃO se monta. O caminho estreito nunca pode depender
+   * de haver espaço, que é a mesma regra do `useMedida`.
+   */
+  const filaDasColunas = useRef<HTMLDivElement | null>(null);
+  const painelLateralCabe = useLarguraDaZona(filaDasColunas) >= LARGURA_MINIMA_DA_FILA;
 
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -7264,18 +7315,34 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           O `min-w-0 flex-1` do irmão fica inerte fora de um contexto flex, e o
           `@container` dele continua a ser um contentor válido nas duas
           larguras — `container-type: inline-size` não pede flex nenhum. */}
-      <div
-        hidden={step !== "conteudo"}
-        className="lg:flex lg:gap-6"
-        style={{ paddingBottom: folgaDaBarra }}
-      >
-        <NavEstudio
-          seccoes={seccoes}
-          faltas={faltas}
-          onSeccaoActual={anotarSeccao}
-          porTraduzir={traducoesPorSeccao}
-        />
-        {/* ── QUEM MANDA É A COLUNA ONDE ELA ESCREVE, NÃO A JANELA ─────────
+      {/* ── O CONTENTOR VEM POR FORA, E TEM DE VIR ─────────────────────────
+          A fila abaixo pergunta «tenho largura para três colunas?». Um elemento
+          NÃO PODE consultar-se a si próprio — uma consulta de contentor responde
+          sempre sobre um antepassado —, portanto o contentor é esta caixa e a
+          pergunta é feita de dentro dela.
+
+          Era `lg:flex`: 1024 DE JANELA. MEDIDO num Chromium, no painel que abre
+          a partir do cartão de um cliente: a janela tinha 1280 e esta zona tinha
+          498 px. A fila montava-se na mesma, o índice levava 192 dos 498 (38%) e
+          a coluna onde ela escreve ficava com 282. A janela dizia que havia
+          espaço; aqui dentro não havia. */}
+      <div className="@container/estudio" hidden={step !== "conteudo"}>
+        <div
+          ref={filaDasColunas}
+          /* 40rem (640 px) é o mínimo para uma fila fazer sentido: o índice pede
+           12rem e o que sobra tem de dar uma coluna de escrita que se leia.
+           Abaixo disso o índice volta a ser a tira que já existe para o
+           telemóvel — e a coluna de escrita fica com a largura toda. */
+          className="@min-[40rem]/estudio:flex @min-[40rem]/estudio:gap-6"
+          style={{ paddingBottom: folgaDaBarra }}
+        >
+          <NavEstudio
+            seccoes={seccoes}
+            faltas={faltas}
+            onSeccaoActual={anotarSeccao}
+            porTraduzir={traducoesPorSeccao}
+          />
+          {/* ── QUEM MANDA É A COLUNA ONDE ELA ESCREVE, NÃO A JANELA ─────────
             Esta coluna vive dentro de três outras: a barra lateral do back
             office (`w-64`, a partir de 1024), o índice do estúdio (`NavEstudio`,
             `w-48`, a partir de 1024) e o painel «O que vai sair» (`w-[21rem]`,
@@ -7300,8 +7367,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             fila de campos com colunas fixas. O método está escrito por extenso
             em `ProposalBuilder.tsx:973-1009`; aqui é a mesma conta noutra
             caixa. */}
-        <div className="@container min-w-0 flex-1">
-          {/* ══════════════════════════════════════════════════════════════
+          <div className="@container min-w-0 flex-1">
+            {/* ══════════════════════════════════════════════════════════════
               O TRABALHO QUE ESTA GRAVAÇÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
               ══════════════════════════════════════════════════════════════
 
@@ -7317,43 +7384,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               As duas saídas estão à vista e nenhuma esconde a outra: repor, ou
               dispensar. Dispensar não apaga nada no servidor — só tira o
               lembrete —, e é isso que o botão diz pelo nome. */}
-          {sobreposto && (
-            <div
-              className="border-[var(--bo-hairline-strong)] bg-[var(--bo-surface-sunken)] mb-4 rounded-xl border p-3"
-              aria-live="polite"
-            >
-              <p className="text-[var(--bo-text)] mb-1 text-sm font-medium">
-                {sobreposto.quem
-                  ? `A versão de ${sobreposto.quem} ficou guardada.`
-                  : "A versão que estava aqui ficou guardada."}
-              </p>
-              <p className="text-[var(--bo-text-muted)] mb-3 text-xs leading-relaxed">
-                Gravaste por cima de trabalho que tinha sido feito noutro sítio
-                {sobreposto.quando ? ` às ${quandoGravado(sobreposto.quando)}` : ""}. Ficou a tua
-                versão, e a outra não se perdeu.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" loading={aRepor} onClick={reporSobreposto}>
-                  Repor essa versão
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setSobreposto(null)}>
-                  Dispensar o aviso
-                </Button>
+            {sobreposto && (
+              <div
+                className="border-[var(--bo-hairline-strong)] bg-[var(--bo-surface-sunken)] mb-4 rounded-xl border p-3"
+                aria-live="polite"
+              >
+                <p className="text-[var(--bo-text)] mb-1 text-sm font-medium">
+                  {sobreposto.quem
+                    ? `A versão de ${sobreposto.quem} ficou guardada.`
+                    : "A versão que estava aqui ficou guardada."}
+                </p>
+                <p className="text-[var(--bo-text-muted)] mb-3 text-xs leading-relaxed">
+                  Gravaste por cima de trabalho que tinha sido feito noutro sítio
+                  {sobreposto.quando ? ` às ${quandoGravado(sobreposto.quando)}` : ""}. Ficou a tua
+                  versão, e a outra não se perdeu.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" loading={aRepor} onClick={reporSobreposto}>
+                    Repor essa versão
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSobreposto(null)}>
+                    Dispensar o aviso
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-          {/* Template selector */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <Segmented
-              ariaLabel="Modelo da proposta"
-              value={isDeco ? "decoracao" : "organizacao"}
-              onChange={setTemplate}
-              options={[
-                { value: "decoracao", label: "Decoração" },
-                { value: "organizacao", label: "Organização" },
-              ]}
-            />
-            {/* ══════════════════════════════════════════════════════════════
+            )}
+            {/* Template selector */}
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <Segmented
+                ariaLabel="Modelo da proposta"
+                value={isDeco ? "decoracao" : "organizacao"}
+                onChange={setTemplate}
+                options={[
+                  { value: "decoracao", label: "Decoração" },
+                  { value: "organizacao", label: "Organização" },
+                ]}
+              />
+              {/* ══════════════════════════════════════════════════════════════
                 PROPOSTA BILINGUE — O INTERRUPTOR
                 ══════════════════════════════════════════════════════════════
 
@@ -7367,23 +7434,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 Não é derivado do «Idioma do PDF»: esse vive no passo SEGUINTE
                 ao da escrita, e escolher «Inglês» só para tirar uma prova
                 acendia as caixas todas de repente. */}
-            <button
-              type="button"
-              onClick={() => setBilingue((v) => !v)}
-              aria-pressed={bilingue}
-              className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                bilingue
-                  ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
-                  : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
-              }`}
-              title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
-            >
-              <span aria-hidden="true">{bilingue ? "✓" : "+"}</span>
-              Proposta bilingue (PT + EN)
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setBilingue((v) => !v)}
+                aria-pressed={bilingue}
+                className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  bilingue
+                    ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
+                    : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
+                }`}
+                title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
+              >
+                <span aria-hidden="true">{bilingue ? "✓" : "+"}</span>
+                Proposta bilingue (PT + EN)
+              </button>
+            </div>
 
-          {/* ══════════════════════════════════════════════════════════════════
+            {/* ══════════════════════════════════════════════════════════════════
               TRADUZIR PARA INGLÊS — O BOTÃO, E O MOTOR QUE AINDA NÃO EXISTE
               ══════════════════════════════════════════════════════════════════
 
@@ -7404,46 +7471,46 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
               Só aparece com o bilingue ligado: é onde as caixas que ele
               preenche estão à vista. */}
-          {bilingue && (
-            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              {/* ── ENQUANTO A TRADUÇÃO VEM A CAMINHO ─────────────────────
+            {bilingue && (
+              <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                {/* ── ENQUANTO A TRADUÇÃO VEM A CAMINHO ─────────────────────
                   O botão dizia «A traduzir…» e mais nada, durante uma ida à
                   rede que numa proposta cheia são vários segundos — e a única
                   coisa que aparecia a seguir era um toast. A caixa fica no
                   lugar do botão, que é onde o estado já vivia. Quantos campos
                   vão é do que o código sabe, e por isso é dito; quantos já
                   voltaram, não — ver `esperaDaTraducao`. */}
-              {aTraduzir ? (
-                (() => {
-                  // Os mesmos campos que o `traduzirParaIngles` vai buscar: os
-                  // vazios e os que ficaram para trás do português.
-                  const campos = camposPorRever(doc as ProposalDoc).length;
-                  return (
-                    <EmCurso
-                      className="max-w-xs"
-                      titulo="A traduzir para inglês…"
-                      estimadoMs={esperaDaTraducao(campos)}
-                      nota={
-                        campos === 1
-                          ? "Vai 1 campo ao serviço de tradução. O que já escreveste fica como está."
-                          : `Vão ${campos} campos ao serviço de tradução. O que já escreveste fica como está.`
-                      }
-                      notaDemorada="O serviço está a demorar. As caixas «EN» preenchem-se assim que a resposta chegar."
-                    />
-                  );
-                })()
-              ) : (
-                <button
-                  type="button"
-                  disabled={!traducaoLigada}
-                  onClick={() => void traduzirTudo()}
-                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <span aria-hidden="true">⇄</span>
-                  Traduzir para inglês
-                </button>
-              )}
-              {/* ── AS TRÊS FRASES, E PORQUE É QUE NÃO SÃO DUAS ─────────────
+                {aTraduzir ? (
+                  (() => {
+                    // Os mesmos campos que o `traduzirParaIngles` vai buscar: os
+                    // vazios e os que ficaram para trás do português.
+                    const campos = camposPorRever(doc as ProposalDoc).length;
+                    return (
+                      <EmCurso
+                        className="max-w-xs"
+                        titulo="A traduzir para inglês…"
+                        estimadoMs={esperaDaTraducao(campos)}
+                        nota={
+                          campos === 1
+                            ? "Vai 1 campo ao serviço de tradução. O que já escreveste fica como está."
+                            : `Vão ${campos} campos ao serviço de tradução. O que já escreveste fica como está.`
+                        }
+                        notaDemorada="O serviço está a demorar. As caixas «EN» preenchem-se assim que a resposta chegar."
+                      />
+                    );
+                  })()
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!traducaoLigada}
+                    onClick={() => void traduzirTudo()}
+                    className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span aria-hidden="true">⇄</span>
+                    Traduzir para inglês
+                  </button>
+                )}
+                {/* ── AS TRÊS FRASES, E PORQUE É QUE NÃO SÃO DUAS ─────────────
                   O botão fica desligado nos dois casos maus, e isso está certo.
                   A frase é que não pode ser a mesma: «ainda não está ligada
                   neste servidor» é uma afirmação sobre a CONFIGURAÇÃO, e quem a
@@ -7451,170 +7518,170 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Dita sobre uma sessão caducada ou uma rede que caiu, manda-a
                   resolver um problema que não existe enquanto o verdadeiro se
                   cura recarregando a página. */}
-              {traducao === "ligada" ? (
-                <p className="text-[11px] leading-snug text-foreground/50">
-                  Preenche as caixas «EN» que ainda estão vazias. O que já escreveste fica como está
-                  — e vale a pena passar os olhos pelo que sair.
-                </p>
-              ) : traducao === "desligada" ? (
-                <p className="text-[11px] leading-snug text-foreground/50">
-                  A tradução automática ainda não está ligada neste servidor. Até lá, as caixas «EN»
-                  escrevem-se à mão, e o que ficar em branco sai em português.
-                </p>
-              ) : (
-                <p className="text-[11px] leading-snug text-foreground/50">
-                  Não deu para saber se a tradução automática está ligada — o servidor não
-                  respondeu. Recarrega a página; se continuar assim, entretanto as caixas «EN»
-                  escrevem-se à mão e o que ficar em branco sai em português.
-                </p>
-              )}
-            </div>
-          )}
+                {traducao === "ligada" ? (
+                  <p className="text-[11px] leading-snug text-foreground/50">
+                    Preenche as caixas «EN» que ainda estão vazias. O que já escreveste fica como
+                    está — e vale a pena passar os olhos pelo que sair.
+                  </p>
+                ) : traducao === "desligada" ? (
+                  <p className="text-[11px] leading-snug text-foreground/50">
+                    A tradução automática ainda não está ligada neste servidor. Até lá, as caixas
+                    «EN» escrevem-se à mão, e o que ficar em branco sai em português.
+                  </p>
+                ) : (
+                  <p className="text-[11px] leading-snug text-foreground/50">
+                    Não deu para saber se a tradução automática está ligada — o servidor não
+                    respondeu. Recarrega a página; se continuar assim, entretanto as caixas «EN»
+                    escrevem-se à mão e o que ficar em branco sai em português.
+                  </p>
+                )}
+              </div>
+            )}
 
-          {/* Event fields */}
-          <Section title="Evento" id="evento">
-            <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
-              <Field
-                label="Clientes"
-                value={doc.clientNames}
-                onChange={(e) => {
-                  confirmado("clientNames");
-                  patch({ clientNames: e.target.value });
-                }}
-                containerClassName={realce("clientNames")}
-                data-campo="clientNames"
-                placeholder="Maria & Zé"
-              />
-              <Field
-                label="Tipo de evento"
-                value={doc.eventType}
-                onChange={(e) => {
-                  confirmado("eventType");
-                  patch({ eventType: e.target.value });
-                }}
-                containerClassName={realce("eventType")}
-                data-campo="eventType"
-                placeholder="Casamento"
-              />
-              <Field
-                label="Data"
-                value={doc.eventDate}
-                onChange={(e) => {
-                  confirmado("eventDate");
-                  patch({ eventDate: e.target.value });
-                }}
-                containerClassName={realce("eventDate")}
-                data-campo="eventDate"
-                placeholder="12 de setembro de 2026"
-              />
-              <Field
-                label="Local"
-                list="sug-locais"
-                value={doc.location}
-                onChange={(e) => {
-                  confirmado("location");
-                  patch({ location: e.target.value });
-                }}
-                containerClassName={realce("location")}
-                data-campo="location"
-                placeholder="Monte da Oliveirinha"
-              />
-              <Field
-                label="Convidados"
-                value={doc.guests}
-                onChange={(e) => {
-                  confirmado("guests");
-                  patch({ guests: e.target.value });
-                }}
-                containerClassName={realce("guests")}
-                data-campo="guests"
-                placeholder="150 pax"
-              />
-              {isDeco && (
-                <>
-                  {/* ── ESTES TRÊS NÃO TINHAM ANEL NENHUM ────────────────
+            {/* Event fields */}
+            <Section title="Evento" id="evento">
+              <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
+                <Field
+                  label="Clientes"
+                  value={doc.clientNames}
+                  onChange={(e) => {
+                    confirmado("clientNames");
+                    patch({ clientNames: e.target.value });
+                  }}
+                  containerClassName={realce("clientNames")}
+                  data-campo="clientNames"
+                  placeholder="Maria & Zé"
+                />
+                <Field
+                  label="Tipo de evento"
+                  value={doc.eventType}
+                  onChange={(e) => {
+                    confirmado("eventType");
+                    patch({ eventType: e.target.value });
+                  }}
+                  containerClassName={realce("eventType")}
+                  data-campo="eventType"
+                  placeholder="Casamento"
+                />
+                <Field
+                  label="Data"
+                  value={doc.eventDate}
+                  onChange={(e) => {
+                    confirmado("eventDate");
+                    patch({ eventDate: e.target.value });
+                  }}
+                  containerClassName={realce("eventDate")}
+                  data-campo="eventDate"
+                  placeholder="12 de setembro de 2026"
+                />
+                <Field
+                  label="Local"
+                  list="sug-locais"
+                  value={doc.location}
+                  onChange={(e) => {
+                    confirmado("location");
+                    patch({ location: e.target.value });
+                  }}
+                  containerClassName={realce("location")}
+                  data-campo="location"
+                  placeholder="Monte da Oliveirinha"
+                />
+                <Field
+                  label="Convidados"
+                  value={doc.guests}
+                  onChange={(e) => {
+                    confirmado("guests");
+                    patch({ guests: e.target.value });
+                  }}
+                  containerClassName={realce("guests")}
+                  data-campo="guests"
+                  placeholder="150 pax"
+                />
+                {isDeco && (
+                  <>
+                    {/* ── ESTES TRÊS NÃO TINHAM ANEL NENHUM ────────────────
                       A cerimónia vem do que o casal escolheu no formulário e a
                       hora vem, quando vem, de uma proposta copiada — texto de
                       outra pessoa, exactamente como os quatro de cima. Eram os
                       únicos campos do Evento onde a marca não acendia, e por
                       isso os únicos onde um valor de terceiros se lia como um
                       valor escrito. */}
-                  <Field
-                    label="Cerimónia"
-                    value={doc.ceremony ?? ""}
-                    onChange={(e) => {
-                      confirmado("ceremony");
-                      patch({ ceremony: e.target.value });
-                    }}
-                    containerClassName={realce("ceremony")}
-                    data-campo="ceremony"
-                    placeholder="Civil, simbólica"
-                  />
-                  <Field
-                    label="Hora"
-                    value={doc.time ?? ""}
-                    onChange={(e) => {
-                      confirmado("time");
-                      patch({ time: e.target.value });
-                    }}
-                    containerClassName={realce("time")}
-                    data-campo="time"
-                    placeholder="A definir"
-                  />
-                </>
-              )}
-            </div>
+                    <Field
+                      label="Cerimónia"
+                      value={doc.ceremony ?? ""}
+                      onChange={(e) => {
+                        confirmado("ceremony");
+                        patch({ ceremony: e.target.value });
+                      }}
+                      containerClassName={realce("ceremony")}
+                      data-campo="ceremony"
+                      placeholder="Civil, simbólica"
+                    />
+                    <Field
+                      label="Hora"
+                      value={doc.time ?? ""}
+                      onChange={(e) => {
+                        confirmado("time");
+                        patch({ time: e.target.value });
+                      }}
+                      containerClassName={realce("time")}
+                      data-campo="time"
+                      placeholder="A definir"
+                    />
+                  </>
+                )}
+              </div>
 
-            {/* O que já está marcado à volta da data que ESTÁ ESCRITA AQUI —
+              {/* O que já está marcado à volta da data que ESTÁ ESCRITA AQUI —
                 ver `pedidoComADataDoDoc`. O mesmo cartão do ecrã de escolher o
                 cliente, com a mesma leitura de distância por estrada. */}
-            {pedidoComADataDoDoc && (
-              <div className="mt-4">
-                <AvisoDataOcupada
-                  quote={pedidoComADataDoDoc}
-                  quotes={quotes ?? []}
-                  motivo="Não impede nada — a decisão é tua. Esta é a data que escreveste na proposta, e não a do pedido."
-                />
-              </div>
-            )}
-
-            {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
-                escrever um espaço novo — a lista ajuda, não fecha a porta. */}
-            <datalist id="sug-locais">
-              {sugestoes.locais.map((v) => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
-
-            {/* Reference (advanced) */}
-            <div className="mt-4">
-              {refEdited && (
-                <div className="mb-1.5 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRefEdited(false);
-                      setDoc((d) => ({ ...d, ref: buildRef(d) }));
-                    }}
-                    className={ADD_BTN}
-                  >
-                    ↺ Automática
-                  </button>
+              {pedidoComADataDoDoc && (
+                <div className="mt-4">
+                  <AvisoDataOcupada
+                    quote={pedidoComADataDoDoc}
+                    quotes={quotes ?? []}
+                    motivo="Não impede nada — a decisão é tua. Esta é a data que escreveste na proposta, e não a do pedido."
+                  />
                 </div>
               )}
-              <Field
-                label="Título interno (opcional)"
-                value={doc.ref}
-                onChange={(e) => {
-                  setRefEdited(true);
-                  patch({ ref: e.target.value });
-                }}
-                data-campo="ref"
-                hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
-              />
-            </div>
 
-            {/* ── O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE ────────────────
+              {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
+                escrever um espaço novo — a lista ajuda, não fecha a porta. */}
+              <datalist id="sug-locais">
+                {sugestoes.locais.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
+
+              {/* Reference (advanced) */}
+              <div className="mt-4">
+                {refEdited && (
+                  <div className="mb-1.5 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRefEdited(false);
+                        setDoc((d) => ({ ...d, ref: buildRef(d) }));
+                      }}
+                      className={ADD_BTN}
+                    >
+                      ↺ Automática
+                    </button>
+                  </div>
+                )}
+                <Field
+                  label="Título interno (opcional)"
+                  value={doc.ref}
+                  onChange={(e) => {
+                    setRefEdited(true);
+                    patch({ ref: e.target.value });
+                  }}
+                  data-campo="ref"
+                  hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+                />
+              </div>
+
+              {/* ── O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE ────────────────
                 «Quer ficar por baixo dos 8.000 €.» «Quem decide é a mãe.»
                 Frases que hoje vivem na cabeça de quem escreveu a proposta e
                 que se perdem quando é outra pessoa a pegar nela — ou quando são
@@ -7628,178 +7695,192 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 com um campo que sai na proposta; o teste
                 (`notas-internas-ficam-em-casa.test.ts`) garante que não sai
                 mesmo. */}
-            <NotasInternas
-              valor={doc.notasInternas ?? ""}
-              onChange={(v) => patch({ notasInternas: v })}
-            />
-          </Section>
+              <NotasInternas
+                valor={doc.notasInternas ?? ""}
+                onChange={(v) => patch({ notasInternas: v })}
+              />
+            </Section>
 
-          {/* Cover images */}
-          <Section
-            title="Imagens de capa (2)"
-            id="capas"
-            rodape={notaDaSeccao("capas", "Nota sobre as capas")}
-          >
-            <div className="grid grid-cols-2 gap-3">
-              {[0, 1].map((idx) => {
-                const path = doc.coverImages?.[idx];
-                /**
-                 * ── O ÚNICO SÍTIO ONDE O RECORTE NÃO SE PODE EVITAR ─────────
-                 *
-                 * As tiras da capa correm de topo a fundo da página e têm
-                 * aspecto 0,467:1 — quase 1:2. Nenhuma fotografia normal tem
-                 * essa forma, e dar-lhe a forma da foto deixaria uma barra de
-                 * fundo entre ela e a aresta da folha, que é pior.
-                 *
-                 * O que se pode fazer é DIZER o número antes: uma fotografia ao
-                 * alto perde ali ~30%, uma deitada ~69%. Com o número à frente,
-                 * escolher uma vertical para a capa deixa de ser sorte — e ela
-                 * deixa de descobrir o corte com o PDF já feito.
-                 */
-                /*
-                 * ── O NÚMERO É DESTA FOTOGRAFIA, OU NÃO HÁ NÚMERO ───────────
-                 *
-                 * Palavras dela: «o mesmo texto aparece por baixo das duas
-                 * imagens de capa, embora uma seja vertical e a outra
-                 * horizontal — logo, perdem áreas diferentes».
-                 *
-                 * A conta já era por fotografia. O que não era é o DADO: a
-                 * forma só se sabe depois de a miniatura carregar e o `Thumb`
-                 * a medir, e até lá caía-se na forma por omissão — a mesma
-                 * para as duas. Duas fotografias diferentes, uma forma
-                 * inventada, o mesmo 69% debaixo de ambas, e a frase a dizer
-                 * «ESTA fotografia perde» sobre um número que não é dela.
-                 *
-                 * Sem medida não há aviso. É a regra da casa em todo o lado
-                 * onde isto aparece: não saber é não saber, e um número errado
-                 * dito com confiança é pior do que nenhum — sobretudo este,
-                 * que existe para ela ESCOLHER a fotografia.
-                 */
-                const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
-                const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
-                return (
-                  <div key={idx}>
-                    {path ? (
-                      <>
-                        <Thumb
-                          url={assetUrls[path]}
-                          // A cascata, do mais leve para o mais pesado. Ver
-                          // `assetMedias`: o degrau do meio poupa ~900 KB por
-                          // célula sempre que a miniatura falha.
-                          planoB={[assetMedias[path], assetOriginais[path]]}
-                          estadoDosUrls={estadoDosUrls}
-                          aoTentarDeNovo={() => void tentarBuscarFotos()}
-                          aoMorrer={marcarUrlMorto}
-                          // As capas são duas e estão no topo do passo: nunca
-                          // esperam pela fila das fotos que estão fora do ecrã.
-                          priority
-                          onRemove={() => removeCoverAt(idx)}
-                          // A forma REAL da tira de capa, e não um 4:3 que o
-                          // documento nunca desenha. Ver `aspeto` em `Thumb`.
-                          aspeto={aspetoDaCapa()}
-                          // Medir aqui é o que dá o número do aviso de baixo —
-                          // a mesma medida que os mood boards já faziam, na
-                          // célula que já está no ecrã e sem pedir nada ao
-                          // servidor.
-                          onMedida={(a) => registarAspeto(path, a)}
-                          pendente={isPendingImage(path)}
-                          onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
-                          refDoc={path}
-                        />
-                        {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                          <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
-                            A tira da capa é quase duas vezes mais alta do que larga:{" "}
-                            <strong className="font-medium">
-                              esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
-                            </strong>
-                            . Uma fotografia ao alto perde menos.
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <UploadArea
-                          // O lado é fixo: a posição 0 imprime à esquerda do
-                          // painel do logótipo, a 1 à direita.
-                          label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                          progresso={uploading[`cover-${idx}`]}
-                          multiple={false}
-                          curto
-                          onFiles={(files) =>
-                            handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
-                              setCoverAt(idx, paths[0]),
-                            )
-                          }
-                        />
-                        <button
-                          type="button"
-                          className={`${ADD_BTN} mt-1.5`}
-                          onClick={() => setPicker({ kind: "cover", idx })}
-                          // Ao passar o rato já se vai buscar o que o diálogo
-                          // precisa. Quando ela carrega, está lá. `focus` para
-                          // quem navega por teclado, e `touchstart` para o
-                          // telemóvel, onde não há hover nenhum — é o instante
-                          // entre pousar o dedo e o levantar.
-                          onPointerEnter={aquecerBiblioteca}
-                          onFocus={aquecerBiblioteca}
-                          onTouchStart={aquecerBiblioteca}
-                        >
-                          Da biblioteca de temas
-                        </button>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </Section>
-
-          {/* Service groups */}
-          <Section
-            title="Serviços"
-            id="servicos"
-            rodape={notaDaSeccao("servicos", "Nota sobre os serviços")}
-          >
-            {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
-            <ServicesEditor
-              groups={doc.serviceGroups}
-              onGroupsChange={setServiceGroups}
-              showDesc={!isDeco}
-              // O Ctrl/Cmd+Enter dos Serviços é o MESMO gesto do botão
-              // «Guardar agora» — e por isso a mesma função, não uma segunda
-              // gravação com outras regras e outras palavras.
-              onSave={guardarAgora}
-              // As caixas inglesas dos grupos e das linhas. O editor não sabe
-              // o que é uma proposta bilingue: recebe o interruptor e desenha
-              // uma caixa a mais por campo, com a mesma pega e o mesmo rótulo
-              // do resto da casa.
-              bilingue={bilingue}
-            />
-          </Section>
-
-          {/* Mood boards — decoracao only */}
-          {isDeco && (
+            {/* Cover images */}
             <Section
-              title="Mood boards"
-              id="moodboards"
-              nota={contagemDosBoards}
-              rodape={notaDaSeccao("moodboards", "Nota sobre os mood boards")}
+              title="Imagens de capa (2)"
+              id="capas"
+              rodape={notaDaSeccao("capas", "Nota sobre as capas")}
             >
-              <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
-                grupos de imagens de inspiração para o cliente
-              </p>
-              <AvisoDeOrdem
-                mostrar={ordemSugerida}
-                onde="As páginas de inspiração"
-                onFixar={fixarOrdem}
+              {/* ── DUAS COLUNAS SÓ QUANDO DUAS COLUNAS CABEM ────────────────
+                Era `grid-cols-2` fixo, sem degrau nenhum — a única grelha desta
+                coluna sem guarda de contentor (as vizinhas usam
+                `@min-[26rem]:grid-cols-2`).
+
+                MEDIDO num Chromium, no painel que abre a partir do cartão de um
+                cliente: com a coluna a 136 px, cada célula ficava com 37 px, e é
+                aí que «esta fotografia perde 49% da área» e «Capa esquerda /
+                arraste ou clique» quebram letra a letra. A 1440 as duas células
+                chegavam a sobrepor-se — lia-se «CapaCapa esquerdadireita».
+
+                A causa de fundo está corrigida acima; isto é a rede por baixo:
+                mesmo que a coluna volte a apertar, as capas empilham em vez de
+                se espremerem. */}
+            <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
+                {[0, 1].map((idx) => {
+                  const path = doc.coverImages?.[idx];
+                  /**
+                   * ── O ÚNICO SÍTIO ONDE O RECORTE NÃO SE PODE EVITAR ─────────
+                   *
+                   * As tiras da capa correm de topo a fundo da página e têm
+                   * aspecto 0,467:1 — quase 1:2. Nenhuma fotografia normal tem
+                   * essa forma, e dar-lhe a forma da foto deixaria uma barra de
+                   * fundo entre ela e a aresta da folha, que é pior.
+                   *
+                   * O que se pode fazer é DIZER o número antes: uma fotografia ao
+                   * alto perde ali ~30%, uma deitada ~69%. Com o número à frente,
+                   * escolher uma vertical para a capa deixa de ser sorte — e ela
+                   * deixa de descobrir o corte com o PDF já feito.
+                   */
+                  /*
+                   * ── O NÚMERO É DESTA FOTOGRAFIA, OU NÃO HÁ NÚMERO ───────────
+                   *
+                   * Palavras dela: «o mesmo texto aparece por baixo das duas
+                   * imagens de capa, embora uma seja vertical e a outra
+                   * horizontal — logo, perdem áreas diferentes».
+                   *
+                   * A conta já era por fotografia. O que não era é o DADO: a
+                   * forma só se sabe depois de a miniatura carregar e o `Thumb`
+                   * a medir, e até lá caía-se na forma por omissão — a mesma
+                   * para as duas. Duas fotografias diferentes, uma forma
+                   * inventada, o mesmo 69% debaixo de ambas, e a frase a dizer
+                   * «ESTA fotografia perde» sobre um número que não é dela.
+                   *
+                   * Sem medida não há aviso. É a regra da casa em todo o lado
+                   * onde isto aparece: não saber é não saber, e um número errado
+                   * dito com confiança é pior do que nenhum — sobretudo este,
+                   * que existe para ela ESCOLHER a fotografia.
+                   */
+                  const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
+                  const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
+                  return (
+                    <div key={idx}>
+                      {path ? (
+                        <>
+                          <Thumb
+                            url={assetUrls[path]}
+                            // A cascata, do mais leve para o mais pesado. Ver
+                            // `assetMedias`: o degrau do meio poupa ~900 KB por
+                            // célula sempre que a miniatura falha.
+                            planoB={[assetMedias[path], assetOriginais[path]]}
+                            estadoDosUrls={estadoDosUrls}
+                            aoTentarDeNovo={() => void tentarBuscarFotos()}
+                            aoMorrer={marcarUrlMorto}
+                            // As capas são duas e estão no topo do passo: nunca
+                            // esperam pela fila das fotos que estão fora do ecrã.
+                            priority
+                            onRemove={() => removeCoverAt(idx)}
+                            // A forma REAL da tira de capa, e não um 4:3 que o
+                            // documento nunca desenha. Ver `aspeto` em `Thumb`.
+                            aspeto={aspetoDaCapa()}
+                            // Medir aqui é o que dá o número do aviso de baixo —
+                            // a mesma medida que os mood boards já faziam, na
+                            // célula que já está no ecrã e sem pedir nada ao
+                            // servidor.
+                            onMedida={(a) => registarAspeto(path, a)}
+                            pendente={isPendingImage(path)}
+                            onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
+                            refDoc={path}
+                          />
+                          {perdaDaCapa > PERDA_QUE_SE_AVISA && (
+                            <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                              A tira da capa é quase duas vezes mais alta do que larga:{" "}
+                              <strong className="font-medium">
+                                esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
+                              </strong>
+                              . Uma fotografia ao alto perde menos.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <UploadArea
+                            // O lado é fixo: a posição 0 imprime à esquerda do
+                            // painel do logótipo, a 1 à direita.
+                            label={idx === 0 ? "Capa esquerda" : "Capa direita"}
+                            progresso={uploading[`cover-${idx}`]}
+                            multiple={false}
+                            curto
+                            onFiles={(files) =>
+                              handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                                setCoverAt(idx, paths[0]),
+                              )
+                            }
+                          />
+                          <button
+                            type="button"
+                            className={`${ADD_BTN} mt-1.5`}
+                            onClick={() => setPicker({ kind: "cover", idx })}
+                            // Ao passar o rato já se vai buscar o que o diálogo
+                            // precisa. Quando ela carrega, está lá. `focus` para
+                            // quem navega por teclado, e `touchstart` para o
+                            // telemóvel, onde não há hover nenhum — é o instante
+                            // entre pousar o dedo e o levantar.
+                            onPointerEnter={aquecerBiblioteca}
+                            onFocus={aquecerBiblioteca}
+                            onTouchStart={aquecerBiblioteca}
+                          >
+                            Da biblioteca de temas
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+
+            {/* Service groups */}
+            <Section
+              title="Serviços"
+              id="servicos"
+              rodape={notaDaSeccao("servicos", "Nota sobre os serviços")}
+            >
+              {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
+              <ServicesEditor
+                groups={doc.serviceGroups}
+                onGroupsChange={setServiceGroups}
+                showDesc={!isDeco}
+                // O Ctrl/Cmd+Enter dos Serviços é o MESMO gesto do botão
+                // «Guardar agora» — e por isso a mesma função, não uma segunda
+                // gravação com outras regras e outras palavras.
+                onSave={guardarAgora}
+                // As caixas inglesas dos grupos e das linhas. O editor não sabe
+                // o que é uma proposta bilingue: recebe o interruptor e desenha
+                // uma caixa a mais por campo, com a mesma pega e o mesmo rótulo
+                // do resto da casa.
+                bilingue={bilingue}
               />
-              <BarraDaSeleccao
-                quantas={seleccionadas.size}
-                boards={doc.moodBoards}
-                onMover={moverSeleccaoParaBoard}
-                onLimpar={() => setSeleccionadas(new Set())}
-              />
-              {/* ── O ÍNDICE ─────────────────────────────────────────────
+            </Section>
+
+            {/* Mood boards — decoracao only */}
+            {isDeco && (
+              <Section
+                title="Mood boards"
+                id="moodboards"
+                nota={contagemDosBoards}
+                rodape={notaDaSeccao("moodboards", "Nota sobre os mood boards")}
+              >
+                <p className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+                  grupos de imagens de inspiração para o cliente
+                </p>
+                <AvisoDeOrdem
+                  mostrar={ordemSugerida}
+                  onde="As páginas de inspiração"
+                  onFixar={fixarOrdem}
+                />
+                <BarraDaSeleccao
+                  quantas={seleccionadas.size}
+                  boards={doc.moodBoards}
+                  onMover={moverSeleccaoParaBoard}
+                  onLimpar={() => setSeleccionadas(new Set())}
+                />
+                {/* ── O ÍNDICE ─────────────────────────────────────────────
                   Onde a caixa dá, é uma coluna fixa ao lado; onde não dá, uma
                   tira que se percorre por cima da lista — a 390 px, uma coluna
                   lateral roubava metade da grelha das fotos.
@@ -7836,263 +7917,265 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   defeito que o `useMedida.ts:16-21` conta por extenso. Aqui
                   seria uma tira de `overflow-x-auto` espremida em 176 px de um
                   lado, e um índice vertical à largura toda do outro. */}
-              <div className="@min-[40rem]:grid @min-[40rem]:grid-cols-[11rem_minmax(0,1fr)] @min-[40rem]:gap-5">
-                <MoodBoardIndice
-                  boards={doc.moodBoards}
-                  ordem={ordemDosBoards}
-                  bloqueados={doc.moodBoards.map((b) => !!b.bloqueado)}
-                  // A MESMA acção dos cartões e da vista de conjunto: três
-                  // sítios onde se reordena, uma só maneira de reordenar.
-                  onMover={(de, para) => moverBoardParaPosicao(de, para)}
-                  onSaltar={(bi) => {
-                    // Abrir a dobra ANTES de saltar: saltar para um board
-                    // fechado deixava-a a olhar para uma linha de miniaturas
-                    // sem perceber porque é que o board «não abriu».
-                    const id = doc.moodBoards[bi]?.id;
-                    if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                    document
-                      .getElementById(`mood-board-${bi}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                />
-                <div className="min-w-0">
-                  <ArrastoDosMoodBoards
-                    ordemDosBoards={ordemDosBoards}
-                    aArrastar={aArrastar}
-                    onArrastoComeca={setAArrastar}
-                    fantasma={<FantasmaDaFoto id={aArrastar} doc={doc} urls={assetUrls} />}
-                    onLargarBoard={(de, para) => moverBoardParaPosicao(de, para)}
-                    onLargarFoto={aoLargarFoto}
-                  >
-                    <ListaDeBoards ordem={ordemDosBoards} className="flex flex-col gap-3">
-                      {/* Pela ordem que as páginas vão sair — ver `ordemDosBoards`. */}
-                      {ordemDosBoards.map((bi, pos) => {
-                        const b = doc.moodBoards[bi];
-                        /**
-                         * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
-                         *
-                         * As medidas vêm das miniaturas que já estão no ecrã (ver
-                         * `aspetosDasFotos`); o que ainda não se mediu entra com a
-                         * omissão, que é a mesma do gerador. Daqui saem as duas
-                         * coisas que têm de concordar: os diagramas do selector e a
-                         * forma de cada célula da grelha. Antes a célula usava o
-                         * arranjo único e antigo, e mostrava um recorte que a página
-                         * já não fazia — a mesma fotografia, cortada noutro sítio.
-                         */
-                        /**
-                         * A ORDEM POR QUE A PÁGINA DESENHA — a mesma função do
-                         * gerador (`ordemDasFotos`). Com uma foto marcada como
-                         * principal, ela troca para a caixa grande.
-                         *
-                         * Vem ANTES dos aspectos porque são os aspectos POR ESTA
-                         * ORDEM que dão as caixas: medir numa ordem e desenhar
-                         * noutra daria à foto marcada a forma da caixa da vizinha.
-                         */
-                        const ordemDeDesenho = ordemDasFotos(b);
-                        const aspectos = ordemDeDesenho
-                          .slice(0, MOOD_BOARD_MAX_IMAGES)
-                          .map((i) => aspetosDasFotos[b.images[i]] ?? ASPETO_POR_OMISSAO);
-                        /**
-                         * A escolha desta página: as caixas tomam a FORMA das
-                         * fotografias em vez de as recortarem. Viaja daqui para as
-                         * três coisas que têm de concordar — a forma de cada célula
-                         * da grelha, os diagramas do selector, e a página do PDF.
-                         * Se uma delas ficasse para trás, ela escolhia por um
-                         * desenho e recebia outro.
-                         */
-                        /*
-                         * ── O QUE ESTA PÁGINA FAZ, OU O QUE A PROPOSTA FAZ ──
-                         *
-                         * A página primeiro, a proposta a seguir, e a sugestão
-                         * do número de fotografias em último. É esta ordem que
-                         * permite decidir uma vez para as sete páginas e ainda
-                         * assim uma delas discordar — ver `layoutPorOmissao`,
-                         * em `proposal-doc.ts`.
-                         */
-                        const semRecorte =
-                          (b.enquadramento ?? doc.enquadramentoPorOmissao) === "forma-da-foto";
-                        const layoutDoBoard =
-                          b.layout ?? doc.layoutPorOmissao ?? layoutSugerido(aspectos.length);
-                        /**
-                         * A ALTURA QUE A LEGENDA ROUBA ÀS FOTOS.
-                         *
-                         * A página reserva altura para a descrição, e reserva
-                         * MAIS quanto mais linhas ela tiver: com cinco linhas
-                         * são 87 pontos, 15% da folha. Aqui deixava-se a omissão
-                         * de 8 pt — a de quem não tem legenda nenhuma —, e as
-                         * caixas saíam mais altas do que a página as desenha.
-                         * A grelha mostrava um recorte que a folha não faz e o
-                         * aviso «esta foto perde X%» disparava (ou calava-se)
-                         * pelas razões erradas, com dez pontos percentuais de
-                         * diferença. A `PreviaDaPagina`, desenhada no MESMO
-                         * cartão, já contava a legenda: as duas metades do
-                         * cartão discordavam uma da outra.
-                         */
-                        const alturaLegenda = alturaDaLegenda(linhasDaLegendaAprox(b.annotation));
-                        const caixas = caixasDoMoodboard(
-                          layoutDoBoard,
-                          aspectos,
-                          alturaLegenda,
-                          semRecorte,
-                        );
-                        const comDestaque = temLugarDeDestaque(layoutDoBoard);
-                        /** Esta página está fechada a alterações? */
-                        const fechado = !!b.bloqueado;
-                        /** E dobrada, que é só uma questão de espaço no ecrã? */
-                        const dobrado = !!(b.id && dobrados[b.id]);
-                        /**
-                         * Quanto é que cada fotografia perde, uma a uma.
-                         *
-                         * Por fotografia e não por disposição: na mesma página, uma
-                         * panorâmica perde 5% e uma vertical 69%. Um aviso por página
-                         * obrigava-a a adivinhar qual é que era o problema — e a
-                         * resposta a «qual delas?» é a única coisa que torna o aviso
-                         * accionável (trocar aquela foto, ou ligar o interruptor).
-                         */
-                        const cortadas = semRecorte
-                          ? []
-                          : // Com a MESMA altura de legenda das caixas aqui em
-                            // cima: uma perda medida noutra geometria é uma
-                            // percentagem sobre uma página que não existe.
-                            perdasDoMoodboard(layoutDoBoard, aspectos, alturaLegenda)
-                              .map((perda, i) => ({ perda, i }))
-                              .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
-                        return (
-                          <CartaoDeBoard
-                            key={bi}
-                            bi={bi}
-                            // Qual é a página que ela está a editar — para o
-                            // painel da direita mostrar ESSA. No foco e não no
-                            // rato: o rato atravessa cartões a caminho de
-                            // outro sítio, e o painel piscava.
-                            onFocusCapture={() => setBoardActivo(bi)}
-                            // O `id` é o alvo do índice lateral. Pelo ÍNDICE REAL:
-                            // a ordem desenhada pode mudar debaixo do salto.
-                            ancora={`mood-board-${bi}`}
-                            // `@container`: a grelha das fotografias aqui
-                            // dentro pergunta pela largura DESTE cartão, e não
-                            // pela da janela — ver o comentário na grelha.
-                            className={`@container rounded-2xl border p-4 ${
-                              fechado
-                                ? "border-[#4d6350]/35 bg-[#4d6350]/[0.04]"
-                                : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
-                            }`}
-                          >
-                            {(pega) => (
-                              <>
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                  {/* A PEGA DO CARTÃO. Alvo próprio, sempre visível ao
+                <div className="@min-[40rem]:grid @min-[40rem]:grid-cols-[11rem_minmax(0,1fr)] @min-[40rem]:gap-5">
+                  <MoodBoardIndice
+                    boards={doc.moodBoards}
+                    ordem={ordemDosBoards}
+                    bloqueados={doc.moodBoards.map((b) => !!b.bloqueado)}
+                    // A MESMA acção dos cartões e da vista de conjunto: três
+                    // sítios onde se reordena, uma só maneira de reordenar.
+                    onMover={(de, para) => moverBoardParaPosicao(de, para)}
+                    onSaltar={(bi) => {
+                      // Abrir a dobra ANTES de saltar: saltar para um board
+                      // fechado deixava-a a olhar para uma linha de miniaturas
+                      // sem perceber porque é que o board «não abriu».
+                      const id = doc.moodBoards[bi]?.id;
+                      if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+                      document
+                        .getElementById(`mood-board-${bi}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <ArrastoDosMoodBoards
+                      ordemDosBoards={ordemDosBoards}
+                      aArrastar={aArrastar}
+                      onArrastoComeca={setAArrastar}
+                      fantasma={<FantasmaDaFoto id={aArrastar} doc={doc} urls={assetUrls} />}
+                      onLargarBoard={(de, para) => moverBoardParaPosicao(de, para)}
+                      onLargarFoto={aoLargarFoto}
+                    >
+                      <ListaDeBoards ordem={ordemDosBoards} className="flex flex-col gap-3">
+                        {/* Pela ordem que as páginas vão sair — ver `ordemDosBoards`. */}
+                        {ordemDosBoards.map((bi, pos) => {
+                          const b = doc.moodBoards[bi];
+                          /**
+                           * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
+                           *
+                           * As medidas vêm das miniaturas que já estão no ecrã (ver
+                           * `aspetosDasFotos`); o que ainda não se mediu entra com a
+                           * omissão, que é a mesma do gerador. Daqui saem as duas
+                           * coisas que têm de concordar: os diagramas do selector e a
+                           * forma de cada célula da grelha. Antes a célula usava o
+                           * arranjo único e antigo, e mostrava um recorte que a página
+                           * já não fazia — a mesma fotografia, cortada noutro sítio.
+                           */
+                          /**
+                           * A ORDEM POR QUE A PÁGINA DESENHA — a mesma função do
+                           * gerador (`ordemDasFotos`). Com uma foto marcada como
+                           * principal, ela troca para a caixa grande.
+                           *
+                           * Vem ANTES dos aspectos porque são os aspectos POR ESTA
+                           * ORDEM que dão as caixas: medir numa ordem e desenhar
+                           * noutra daria à foto marcada a forma da caixa da vizinha.
+                           */
+                          const ordemDeDesenho = ordemDasFotos(b);
+                          const aspectos = ordemDeDesenho
+                            .slice(0, MOOD_BOARD_MAX_IMAGES)
+                            .map((i) => aspetosDasFotos[b.images[i]] ?? ASPETO_POR_OMISSAO);
+                          /**
+                           * A escolha desta página: as caixas tomam a FORMA das
+                           * fotografias em vez de as recortarem. Viaja daqui para as
+                           * três coisas que têm de concordar — a forma de cada célula
+                           * da grelha, os diagramas do selector, e a página do PDF.
+                           * Se uma delas ficasse para trás, ela escolhia por um
+                           * desenho e recebia outro.
+                           */
+                          /*
+                           * ── O QUE ESTA PÁGINA FAZ, OU O QUE A PROPOSTA FAZ ──
+                           *
+                           * A página primeiro, a proposta a seguir, e a sugestão
+                           * do número de fotografias em último. É esta ordem que
+                           * permite decidir uma vez para as sete páginas e ainda
+                           * assim uma delas discordar — ver `layoutPorOmissao`,
+                           * em `proposal-doc.ts`.
+                           */
+                          const semRecorte =
+                            (b.enquadramento ?? doc.enquadramentoPorOmissao) === "forma-da-foto";
+                          const layoutDoBoard =
+                            b.layout ?? doc.layoutPorOmissao ?? layoutSugerido(aspectos.length);
+                          /**
+                           * A ALTURA QUE A LEGENDA ROUBA ÀS FOTOS.
+                           *
+                           * A página reserva altura para a descrição, e reserva
+                           * MAIS quanto mais linhas ela tiver: com cinco linhas
+                           * são 87 pontos, 15% da folha. Aqui deixava-se a omissão
+                           * de 8 pt — a de quem não tem legenda nenhuma —, e as
+                           * caixas saíam mais altas do que a página as desenha.
+                           * A grelha mostrava um recorte que a folha não faz e o
+                           * aviso «esta foto perde X%» disparava (ou calava-se)
+                           * pelas razões erradas, com dez pontos percentuais de
+                           * diferença. A `PreviaDaPagina`, desenhada no MESMO
+                           * cartão, já contava a legenda: as duas metades do
+                           * cartão discordavam uma da outra.
+                           */
+                          const alturaLegenda = alturaDaLegenda(linhasDaLegendaAprox(b.annotation));
+                          const caixas = caixasDoMoodboard(
+                            layoutDoBoard,
+                            aspectos,
+                            alturaLegenda,
+                            semRecorte,
+                          );
+                          const comDestaque = temLugarDeDestaque(layoutDoBoard);
+                          /** Esta página está fechada a alterações? */
+                          const fechado = !!b.bloqueado;
+                          /** E dobrada, que é só uma questão de espaço no ecrã? */
+                          const dobrado = !!(b.id && dobrados[b.id]);
+                          /**
+                           * Quanto é que cada fotografia perde, uma a uma.
+                           *
+                           * Por fotografia e não por disposição: na mesma página, uma
+                           * panorâmica perde 5% e uma vertical 69%. Um aviso por página
+                           * obrigava-a a adivinhar qual é que era o problema — e a
+                           * resposta a «qual delas?» é a única coisa que torna o aviso
+                           * accionável (trocar aquela foto, ou ligar o interruptor).
+                           */
+                          const cortadas = semRecorte
+                            ? []
+                            : // Com a MESMA altura de legenda das caixas aqui em
+                              // cima: uma perda medida noutra geometria é uma
+                              // percentagem sobre uma página que não existe.
+                              perdasDoMoodboard(layoutDoBoard, aspectos, alturaLegenda)
+                                .map((perda, i) => ({ perda, i }))
+                                .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
+                          return (
+                            <CartaoDeBoard
+                              key={bi}
+                              bi={bi}
+                              // Qual é a página que ela está a editar — para o
+                              // painel da direita mostrar ESSA. No foco e não no
+                              // rato: o rato atravessa cartões a caminho de
+                              // outro sítio, e o painel piscava.
+                              onFocusCapture={() => setBoardActivo(bi)}
+                              // O `id` é o alvo do índice lateral. Pelo ÍNDICE REAL:
+                              // a ordem desenhada pode mudar debaixo do salto.
+                              ancora={`mood-board-${bi}`}
+                              // `@container`: a grelha das fotografias aqui
+                              // dentro pergunta pela largura DESTE cartão, e não
+                              // pela da janela — ver o comentário na grelha.
+                              className={`@container rounded-2xl border p-4 ${
+                                fechado
+                                  ? "border-[#4d6350]/35 bg-[#4d6350]/[0.04]"
+                                  : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
+                              }`}
+                            >
+                              {(pega) => (
+                                <>
+                                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    {/* A PEGA DO CARTÃO. Alvo próprio, sempre visível ao
                             toque: com oito boards, levar o último ao topo eram
                             sete cliques nas setas. */}
-                                  <button
-                                    type="button"
-                                    {...pega}
-                                    aria-label={`Arrastar o mood board ${pos + 1}`}
-                                    className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:cursor-grabbing"
-                                  >
-                                    <span aria-hidden="true">⠿</span>
-                                  </button>
-                                  {/* ── A DOBRA ──────────────────────────────────
+                                    <button
+                                      type="button"
+                                      {...pega}
+                                      aria-label={`Arrastar o mood board ${pos + 1}`}
+                                      className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:cursor-grabbing"
+                                    >
+                                      <span aria-hidden="true">⠿</span>
+                                    </button>
+                                    {/* ── A DOBRA ──────────────────────────────────
                                   Um board terminado ocupa um ecrã inteiro de
                                   altura. Fechado fica com o que basta para o
                                   reconhecer: título, subtítulo, quantas fotos
                                   tem e uma tira de miniaturas. */}
-                                  <button
-                                    type="button"
-                                    onClick={() => b.id && alternarDobra(b.id)}
-                                    aria-expanded={!dobrado}
-                                    aria-label={
-                                      dobrado
-                                        ? `Abrir o mood board ${pos + 1}`
-                                        : `Fechar o mood board ${pos + 1}`
-                                    }
-                                    className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
-                                  >
-                                    <span aria-hidden="true">{dobrado ? "▸" : "▾"}</span>
-                                  </button>
-                                  <input
-                                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
-                                    value={b.title}
-                                    onChange={(e) => updateBoard(bi, { title: e.target.value })}
-                                    // A pega do aviso de ortografia: é por ela
-                                    // que o «Ver no campo» encontra este
-                                    // controlo (ver `chaveDoCampo`).
-                                    data-campo={`boardTitulo:${bi}`}
-                                    placeholder="Decoração Cerimónia"
-                                    aria-label="Título do mood board"
-                                    readOnly={fechado}
-                                  />
-                                  {/* A segunda caixa fica AO LADO em ecrã largo
+                                    <button
+                                      type="button"
+                                      onClick={() => b.id && alternarDobra(b.id)}
+                                      aria-expanded={!dobrado}
+                                      aria-label={
+                                        dobrado
+                                          ? `Abrir o mood board ${pos + 1}`
+                                          : `Fechar o mood board ${pos + 1}`
+                                      }
+                                      className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                    >
+                                      <span aria-hidden="true">{dobrado ? "▸" : "▾"}</span>
+                                    </button>
+                                    <input
+                                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                                      value={b.title}
+                                      onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                                      // A pega do aviso de ortografia: é por ela
+                                      // que o «Ver no campo» encontra este
+                                      // controlo (ver `chaveDoCampo`).
+                                      data-campo={`boardTitulo:${bi}`}
+                                      placeholder="Decoração Cerimónia"
+                                      aria-label="Título do mood board"
+                                      readOnly={fechado}
+                                    />
+                                    {/* A segunda caixa fica AO LADO em ecrã largo
                                       e por baixo abaixo de `xl` — ver `aoLado`,
                                       em `CaixaInglesa`. Só de leitura quando a
                                       página está fechada, como a portuguesa: um
                                       board terminado é terminado nas duas
                                       línguas. */}
-                                  {caixaDeIngles(
-                                    { tipo: "boardTitulo", bi },
-                                    "Título do mood board",
-                                    {
-                                      className:
-                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
-                                      readOnly: fechado,
-                                      placeholder: "Ceremony Decoration",
-                                    },
-                                  )}
-                                  {/* O SEGUNDO andar do cabeçalho da página.
+                                    {caixaDeIngles(
+                                      { tipo: "boardTitulo", bi },
+                                      "Título do mood board",
+                                      {
+                                        className:
+                                          "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                        readOnly: fechado,
+                                        placeholder: "Ceremony Decoration",
+                                      },
+                                    )}
+                                    {/* O SEGUNDO andar do cabeçalho da página.
                             A proposta feita à mão tem «Complementos dos Noivos»
                             e, por baixo, «Ramo de Noiva (a definir com a
                             Noiva)»: o primeiro diz o capítulo, o segundo diz o
                             que aquelas fotos são e o que ainda está por
                             decidir. Sem campo, ou se perdia a segunda frase ou
                             se enfiava tudo num título com parênteses. */}
-                                  <input
-                                    className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
-                                    value={b.subtitulo ?? ""}
-                                    onChange={(e) => updateBoard(bi, { subtitulo: e.target.value })}
-                                    data-campo={`boardSubtitulo:${bi}`}
-                                    placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
-                                    aria-label="Subtítulo do mood board"
-                                    readOnly={fechado}
-                                  />
-                                  {caixaDeIngles(
-                                    { tipo: "boardSubtitulo", bi },
-                                    "Subtítulo do mood board",
-                                    {
-                                      className:
-                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
-                                      readOnly: fechado,
-                                    },
-                                  )}
-                                  {/* A POSIÇÃO NO ECRÃ, não o índice do array: ver
+                                    <input
+                                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                                      value={b.subtitulo ?? ""}
+                                      onChange={(e) =>
+                                        updateBoard(bi, { subtitulo: e.target.value })
+                                      }
+                                      data-campo={`boardSubtitulo:${bi}`}
+                                      placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
+                                      aria-label="Subtítulo do mood board"
+                                      readOnly={fechado}
+                                    />
+                                    {caixaDeIngles(
+                                      { tipo: "boardSubtitulo", bi },
+                                      "Subtítulo do mood board",
+                                      {
+                                        className:
+                                          "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                        readOnly: fechado,
+                                      },
+                                    )}
+                                    {/* A POSIÇÃO NO ECRÃ, não o índice do array: ver
                             `moveBoard`. */}
-                                  <MoveBtns
-                                    onUp={() => moveBoard(pos, -1)}
-                                    onDown={() => moveBoard(pos, 1)}
-                                    disUp={pos === 0}
-                                    disDown={pos === doc.moodBoards.length - 1}
-                                  />
-                                  {/* ── FECHAR A PÁGINA ──────────────────────────
+                                    <MoveBtns
+                                      onUp={() => moveBoard(pos, -1)}
+                                      onDown={() => moveBoard(pos, 1)}
+                                      disUp={pos === 0}
+                                      disDown={pos === doc.moodBoards.length - 1}
+                                    />
+                                    {/* ── FECHAR A PÁGINA ──────────────────────────
                                   Marcada como terminada, fica só de leitura e
                                   muda de cor. Reabrir é um clique — e não uma
                                   pergunta a que se responde sem ler. */}
-                                  <button
-                                    type="button"
-                                    onClick={() => alternarBloqueio(bi)}
-                                    aria-pressed={fechado}
-                                    aria-label={
-                                      fechado
-                                        ? `Reabrir o mood board ${pos + 1} a alterações`
-                                        : `Marcar o mood board ${pos + 1} como terminado`
-                                    }
-                                    className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs transition-colors ${
-                                      fechado
-                                        ? "bg-[#4d6350]/15 text-[#4d6350]"
-                                        : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
-                                    }`}
-                                  >
-                                    <span aria-hidden="true">{fechado ? "🔒" : "🔓"}</span>
-                                  </button>
-                                  {/* ── ARRUMAR POR COR ──────────────────────
+                                    <button
+                                      type="button"
+                                      onClick={() => alternarBloqueio(bi)}
+                                      aria-pressed={fechado}
+                                      aria-label={
+                                        fechado
+                                          ? `Reabrir o mood board ${pos + 1} a alterações`
+                                          : `Marcar o mood board ${pos + 1} como terminado`
+                                      }
+                                      className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs transition-colors ${
+                                        fechado
+                                          ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                          : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                      }`}
+                                    >
+                                      <span aria-hidden="true">{fechado ? "🔒" : "🔓"}</span>
+                                    </button>
+                                    {/* ── ARRUMAR POR COR ──────────────────────
                                       Só aparece quando há mesmo o que arrumar:
                                       três fotos com cor conhecida. Com menos, o
                                       botão não teria nada para fazer e seria só
@@ -8100,105 +8183,105 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       escondido — e não desactivado — porque um
                                       botão desactivado que nunca se explica é
                                       pior do que um botão que não está lá. */}
-                                  {b.images.filter((p) => assetCores[p]).length >= 3 && (
+                                    {b.images.filter((p) => assetCores[p]).length >= 3 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => arrumarPorCor(bi)}
+                                        aria-label={`Arrumar por cor as fotografias do mood board ${pos + 1}`}
+                                        title="Arrumar as fotografias por cor"
+                                        disabled={fechado}
+                                        className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:opacity-40"
+                                      >
+                                        <span aria-hidden="true">◑</span>
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
-                                      onClick={() => arrumarPorCor(bi)}
-                                      aria-label={`Arrumar por cor as fotografias do mood board ${pos + 1}`}
-                                      title="Arrumar as fotografias por cor"
-                                      disabled={fechado}
-                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:opacity-40"
+                                      onClick={() => duplicarBoard(bi)}
+                                      aria-label={`Duplicar o mood board ${pos + 1}`}
+                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
                                     >
-                                      <span aria-hidden="true">◑</span>
+                                      <span aria-hidden="true">⧉</span>
                                     </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => duplicarBoard(bi)}
-                                    aria-label={`Duplicar o mood board ${pos + 1}`}
-                                    className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
-                                  >
-                                    <span aria-hidden="true">⧉</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={REMOVE_BTN}
-                                    onClick={() => removeBoard(bi)}
-                                    aria-label="Remover mood board"
-                                    disabled={fechado}
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                                {/* A pergunta fica DENTRO do cartão, logo por
+                                    <button
+                                      type="button"
+                                      className={REMOVE_BTN}
+                                      onClick={() => removeBoard(bi)}
+                                      aria-label="Remover mood board"
+                                      disabled={fechado}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                  {/* A pergunta fica DENTRO do cartão, logo por
                                     baixo da barra que a levantou — e antes da
                                     tira de miniaturas, para se ver ao mesmo
                                     tempo a frase e as fotografias que ela
                                     conta. Ver `aRemover`. */}
-                                {perguntaDeRemocao(`board:${bi}`, "Remover a página")}
-                                {/* ── O QUE SE VÊ COM O BOARD FECHADO ───────────
+                                  {perguntaDeRemocao(`board:${bi}`, "Remover a página")}
+                                  {/* ── O QUE SE VÊ COM O BOARD FECHADO ───────────
                                 Título e subtítulo já estão no cabeçalho; falta
                                 o que diz se está pronto: quantas fotos, e quais.
                                 Sem a tira, «Decoração Cerimónia · 6 fotos» podia
                                 ser qualquer página. */}
-                                {dobrado ? (
-                                  <div className="flex items-center gap-2">
-                                    <p className="shrink-0 text-[11px] text-foreground/45">
-                                      {b.images.length === 0
-                                        ? "sem fotos"
-                                        : b.images.length === 1
-                                          ? "1 foto"
-                                          : `${b.images.length} fotos`}
-                                    </p>
-                                    <div className="flex min-w-0 gap-1 overflow-hidden">
-                                      {b.images.slice(0, 8).map((path, ii) => (
-                                        <span
-                                          key={ii}
-                                          className="h-9 w-9 shrink-0 overflow-hidden rounded border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
-                                        >
-                                          {assetUrls[path] ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img
-                                              src={assetUrls[path]}
-                                              alt=""
-                                              loading="lazy"
-                                              className="h-full w-full object-cover"
-                                            />
-                                          ) : null}
-                                        </span>
-                                      ))}
+                                  {dobrado ? (
+                                    <div className="flex items-center gap-2">
+                                      <p className="shrink-0 text-[11px] text-foreground/45">
+                                        {b.images.length === 0
+                                          ? "sem fotos"
+                                          : b.images.length === 1
+                                            ? "1 foto"
+                                            : `${b.images.length} fotos`}
+                                      </p>
+                                      <div className="flex min-w-0 gap-1 overflow-hidden">
+                                        {b.images.slice(0, 8).map((path, ii) => (
+                                          <span
+                                            key={ii}
+                                            className="h-9 w-9 shrink-0 overflow-hidden rounded border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
+                                          >
+                                            {assetUrls[path] ? (
+                                              // eslint-disable-next-line @next/next/no-img-element
+                                              <img
+                                                src={assetUrls[path]}
+                                                alt=""
+                                                loading="lazy"
+                                                className="h-full w-full object-cover"
+                                              />
+                                            ) : null}
+                                          </span>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    {/* Cresce com o texto — ver `DescricaoQueCresce`.
+                                  ) : (
+                                    <>
+                                      {/* Cresce com o texto — ver `DescricaoQueCresce`.
                                         Uma altura fixa de duas linhas escondia
                                         154 px dos 224 desta descrição, medidos a
                                         390 px. */}
-                                    <DescricaoQueCresce
-                                      className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
-                                      valor={b.annotation ?? ""}
-                                      onChange={(e) =>
-                                        updateBoard(bi, { annotation: e.target.value })
-                                      }
-                                      data-campo={`boardNota:${bi}`}
-                                      placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
-                                      aria-label="Descrição do mood board"
-                                    />
-                                    {caixaDeIngles(
-                                      { tipo: "boardNota", bi },
-                                      "Descrição do mood board",
-                                      {
-                                        className: `${INPUT_SM} mb-2 w-full resize-none leading-relaxed`,
-                                        as: "textarea",
-                                        // A inglesa cresce com a portuguesa: são
-                                        // «a mesma caixa em duas línguas», e uma
-                                        // delas a esconder 206 px deixava de o
-                                        // ser. A `CaixaInglesa` já sabia fazê-lo.
-                                        cresce: true,
-                                      },
-                                    )}
-                                    {/* ── DUAS PÁGINAS COM O MESMO NOME ───────
+                                      <DescricaoQueCresce
+                                        className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                                        valor={b.annotation ?? ""}
+                                        onChange={(e) =>
+                                          updateBoard(bi, { annotation: e.target.value })
+                                        }
+                                        data-campo={`boardNota:${bi}`}
+                                        placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                                        aria-label="Descrição do mood board"
+                                      />
+                                      {caixaDeIngles(
+                                        { tipo: "boardNota", bi },
+                                        "Descrição do mood board",
+                                        {
+                                          className: `${INPUT_SM} mb-2 w-full resize-none leading-relaxed`,
+                                          as: "textarea",
+                                          // A inglesa cresce com a portuguesa: são
+                                          // «a mesma caixa em duas línguas», e uma
+                                          // delas a esconder 206 px deixava de o
+                                          // ser. A `CaixaInglesa` já sabia fazê-lo.
+                                          cresce: true,
+                                        },
+                                      )}
+                                      {/* ── DUAS PÁGINAS COM O MESMO NOME ───────
                                         «"Complementos Dos Noivos" e
                                         "Complementos Noivos". Uma é bouquet,
                                         outra lapelas — mas na proposta aparecem
@@ -8211,40 +8294,40 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         escolha legítima ensina-se a ignorar. Diz
                                         o que viu, cita o outro título, e deixa-a
                                         decidir. */}
-                                    {avisosDeTitulo[bi] && (
-                                      <p className={`${AVISO_DO_BOARD} text-[#8a6420]`}>
-                                        {avisosDeTitulo[bi]}
-                                      </p>
-                                    )}
-                                    {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
+                                      {avisosDeTitulo[bi] && (
+                                        <p className={`${AVISO_DO_BOARD} text-[#8a6420]`}>
+                                          {avisosDeTitulo[bi]}
+                                        </p>
+                                      )}
+                                      {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
                                         Discreto, e antes do limite: às oito
                                         fotos a página ainda sai inteira, mas
                                         cada uma já é pequena. O aviso vermelho
                                         fica para quando alguma deixa mesmo de
                                         ser impressa. */}
-                                    {b.images.length >= FOTOS_QUE_ENCHEM_A_PAGINA &&
-                                      b.images.length <= MOOD_BOARD_MAX_IMAGES && (
-                                        <p className={`${AVISO_DO_BOARD} text-foreground/45`}>
-                                          {b.images.length} fotos numa página: cada uma fica
-                                          pequena. Duas páginas com metade lêem-se melhor do que uma
-                                          cheia.
-                                        </p>
-                                      )}
-                                    {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
+                                      {b.images.length >= FOTOS_QUE_ENCHEM_A_PAGINA &&
+                                        b.images.length <= MOOD_BOARD_MAX_IMAGES && (
+                                          <p className={`${AVISO_DO_BOARD} text-foreground/45`}>
+                                            {b.images.length} fotos numa página: cada uma fica
+                                            pequena. Duas páginas com metade lêem-se melhor do que
+                                            uma cheia.
+                                          </p>
+                                        )}
+                                      {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
                           fotos. As que passam disso ficam marcadas — e ditas por
                           extenso a seguir — em vez de desaparecerem caladas no
                           PDF. */}
-                                    {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                                      <p className={`${AVISO_DO_BOARD} text-[#8a2a22]`}>
-                                        A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES}{" "}
-                                        fotos:{" "}
-                                        {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
-                                          ? "a última, marcada «fora do PDF», não é impressa"
-                                          : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                                        . Remove fotos ou cria outro mood board.
-                                      </p>
-                                    )}
-                                    {/* ── A FOTO QUE DESTOA DA PALETA ────────────
+                                      {b.images.length > MOOD_BOARD_MAX_IMAGES && (
+                                        <p className={`${AVISO_DO_BOARD} text-[#8a2a22]`}>
+                                          A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES}{" "}
+                                          fotos:{" "}
+                                          {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
+                                            ? "a última, marcada «fora do PDF», não é impressa"
+                                            : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
+                                          . Remove fotos ou cria outro mood board.
+                                        </p>
+                                      )}
+                                      {/* ── A FOTO QUE DESTOA DA PALETA ────────────
                                         Não é um erro, e por isso não é vermelho:
                                         uma fotografia de cor diferente pode ser
                                         exactamente o que se quer. É uma coisa que
@@ -8256,27 +8339,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         Cala-se sozinho quando não há cores que
                                         cheguem: as fotos carregadas antes de a
                                         cor existir não entram na conta. */}
-                                    {(() => {
-                                      const fora = fotosQueDestoam(
-                                        b.images.map((p) => assetCores[p]),
-                                      );
-                                      if (fora.length === 0) return null;
-                                      const quais = fora
-                                        .slice(0, 3)
-                                        .sort((x, y) => x - y)
-                                        .map((i) => `${i + 1}.ª`);
-                                      return (
-                                        <p className="mb-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
-                                          <span aria-hidden="true">◐ </span>
-                                          {fora.length === 1
-                                            ? `A ${quais[0]} fotografia destoa da paleta desta página.`
-                                            : `A ${quais.slice(0, -1).join(", a ")} e a ${quais[quais.length - 1]} fotografias destoam da paleta desta página.`}{" "}
-                                          Pode ser de propósito — se não for, troca-a ou arruma a
-                                          página por cor.
-                                        </p>
-                                      );
-                                    })()}
-                                    {/* ── O ECRÃ GRANDE DAVA MINIATURAS MAIS
+                                      {(() => {
+                                        const fora = fotosQueDestoam(
+                                          b.images.map((p) => assetCores[p]),
+                                        );
+                                        if (fora.length === 0) return null;
+                                        const quais = fora
+                                          .slice(0, 3)
+                                          .sort((x, y) => x - y)
+                                          .map((i) => `${i + 1}.ª`);
+                                        return (
+                                          <p className="mb-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                                            <span aria-hidden="true">◐ </span>
+                                            {fora.length === 1
+                                              ? `A ${quais[0]} fotografia destoa da paleta desta página.`
+                                              : `A ${quais.slice(0, -1).join(", a ")} e a ${quais[quais.length - 1]} fotografias destoam da paleta desta página.`}{" "}
+                                            Pode ser de propósito — se não for, troca-a ou arruma a
+                                            página por cor.
+                                          </p>
+                                        );
+                                      })()}
+                                      {/* ── O ECRÃ GRANDE DAVA MINIATURAS MAIS
                                         PEQUENAS DO QUE O TELEMÓVEL ──────────
                                         `sm:grid-cols-4` dispara aos 640 de
                                         JANELA e nunca mais volta atrás. Aos
@@ -8296,105 +8379,105 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         ~101 aos 375 e ~126 entre 640 e 1023 —
                                         nunca mais uma miniatura mais pequena
                                         num ecrã maior. */}
-                                    <GrelhaDeFotos
-                                      bi={bi}
-                                      quantas={b.images.length}
-                                      className="grid grid-cols-3 @min-[24rem]:grid-cols-4 gap-2"
-                                    >
-                                      {b.images.map((path, ii) => (
-                                        <CelulaDeFoto
-                                          // A chave é a POSIÇÃO, não o caminho: quando o
-                                          // marcador provisório dá lugar ao caminho definitivo,
-                                          // uma chave com o caminho faria o React desmontar a
-                                          // célula e a foto piscava a meio da troca.
-                                          key={ii}
-                                          bi={bi}
-                                          ii={ii}
-                                          principal={comDestaque && fotoPrincipalDe(b) === ii}
-                                          seleccionada={seleccionadas.has(`${bi}:${ii}`)}
-                                          // Fechado, a foto vê-se mas não se mexe: é
-                                          // isso que «terminado» quer dizer.
-                                          bloqueada={fechado}
-                                          // A tira e o texto do rato — ver
-                                          // `repeticaoNestaProposta` logo por
-                                          // cima, e porque é que só uma das
-                                          // três perguntas acende.
-                                          historia={repeticaoNestaProposta(path)}
-                                          origem={passadoDaFoto(path)}
-                                          accoes={
-                                            fechado ? null : (
-                                              <AccoesDaFoto
-                                                nome={`Fotografia ${ii + 1} de «${b.title || "mood board sem título"}»`}
-                                                podeRecuar={ii > 0}
-                                                podeAvancar={ii < b.images.length - 1}
-                                                seleccionada={seleccionadas.has(`${bi}:${ii}`)}
-                                                principal={
-                                                  comDestaque
-                                                    ? fotoPrincipalDe(b) === ii
-                                                    : undefined
-                                                }
-                                                onRecuar={() => reordenarFotos(bi, ii, ii - 1)}
-                                                onAvancar={() => reordenarFotos(bi, ii, ii + 1)}
-                                                onAmpliar={() => setLupa({ bi, ii })}
-                                                onSubstituir={() =>
-                                                  setPicker({ kind: "board", bi, substituir: ii })
-                                                }
-                                                onPrincipal={() => marcarPrincipal(bi, ii)}
-                                                onSeleccionar={() => alternarSeleccao(bi, ii)}
-                                                onRemover={() => removeBoardImageAt(bi, ii)}
-                                              />
-                                            )
-                                          }
-                                        >
-                                          <Thumb
-                                            url={assetUrls[path]}
-                                            // Do mais leve para o mais pesado —
-                                            // ver `assetMedias`. É esta grelha
-                                            // que tem 24 células e é aqui que a
-                                            // queda de 20 KB para 1099 doía.
-                                            planoB={[assetMedias[path], assetOriginais[path]]}
-                                            estadoDosUrls={estadoDosUrls}
-                                            aoTentarDeNovo={() => void tentarBuscarFotos()}
-                                            aoMorrer={marcarUrlMorto}
-                                            // A PRIMEIRA DOBRA do primeiro
-                                            // board. Medido: sem prioridade
-                                            // nenhuma, as 24 células repartiam
-                                            // o canal e a primeira fotografia
-                                            // só aparecia aos 34,0 s. Estas
-                                            // quatro são as que ela está mesmo
-                                            // a olhar quando desce às fotos.
-                                            priority={bi === 0 && ii < 4}
-                                            onde="mood-board"
-                                            refDoc={path}
-                                            // A remoção mudou-se para a barra de acções, que
-                                            // é visível ao toque — o × só aparecia em hover, e
-                                            // num telemóvel isso é um botão que não existe.
-                                            semRemover
-                                            onRemove={() => removeBoardImageAt(bi, ii)}
-                                            onMedida={(a) => registarAspeto(path, a)}
-                                            // A forma da célula que ESTA foto vai ocupar na
-                                            // página — sai da caixa que a disposição escolhida
-                                            // lhe dá, e muda com ela e com o número de fotos.
-                                            // Nenhuma delas é quadrada. As que já não são
-                                            // impressas ficam quadradas: não têm caixa nenhuma.
-                                            //
-                                            // Pela ORDEM DE DESENHO e não pela posição no
-                                            // array: com uma foto marcada como principal, a
-                                            // página troca-a para a caixa grande, e a célula
-                                            // tem de mostrar a forma dessa caixa (ver
-                                            // `ordemDasFotos`).
-                                            aspeto={aspetoDaCaixa(
-                                              caixas[ordemDeDesenho.indexOf(ii)],
-                                            )}
-                                            foraDoPdf={
-                                              ordemDeDesenho.indexOf(ii) >= MOOD_BOARD_MAX_IMAGES
+                                      <GrelhaDeFotos
+                                        bi={bi}
+                                        quantas={b.images.length}
+                                        className="grid grid-cols-3 @min-[24rem]:grid-cols-4 gap-2"
+                                      >
+                                        {b.images.map((path, ii) => (
+                                          <CelulaDeFoto
+                                            // A chave é a POSIÇÃO, não o caminho: quando o
+                                            // marcador provisório dá lugar ao caminho definitivo,
+                                            // uma chave com o caminho faria o React desmontar a
+                                            // célula e a foto piscava a meio da troca.
+                                            key={ii}
+                                            bi={bi}
+                                            ii={ii}
+                                            principal={comDestaque && fotoPrincipalDe(b) === ii}
+                                            seleccionada={seleccionadas.has(`${bi}:${ii}`)}
+                                            // Fechado, a foto vê-se mas não se mexe: é
+                                            // isso que «terminado» quer dizer.
+                                            bloqueada={fechado}
+                                            // A tira e o texto do rato — ver
+                                            // `repeticaoNestaProposta` logo por
+                                            // cima, e porque é que só uma das
+                                            // três perguntas acende.
+                                            historia={repeticaoNestaProposta(path)}
+                                            origem={passadoDaFoto(path)}
+                                            accoes={
+                                              fechado ? null : (
+                                                <AccoesDaFoto
+                                                  nome={`Fotografia ${ii + 1} de «${b.title || "mood board sem título"}»`}
+                                                  podeRecuar={ii > 0}
+                                                  podeAvancar={ii < b.images.length - 1}
+                                                  seleccionada={seleccionadas.has(`${bi}:${ii}`)}
+                                                  principal={
+                                                    comDestaque
+                                                      ? fotoPrincipalDe(b) === ii
+                                                      : undefined
+                                                  }
+                                                  onRecuar={() => reordenarFotos(bi, ii, ii - 1)}
+                                                  onAvancar={() => reordenarFotos(bi, ii, ii + 1)}
+                                                  onAmpliar={() => setLupa({ bi, ii })}
+                                                  onSubstituir={() =>
+                                                    setPicker({ kind: "board", bi, substituir: ii })
+                                                  }
+                                                  onPrincipal={() => marcarPrincipal(bi, ii)}
+                                                  onSeleccionar={() => alternarSeleccao(bi, ii)}
+                                                  onRemover={() => removeBoardImageAt(bi, ii)}
+                                                />
+                                              )
                                             }
-                                            pendente={isPendingImage(path)}
-                                          />
-                                        </CelulaDeFoto>
-                                      ))}
-                                    </GrelhaDeFotos>
-                                    {/* ── A CAIXA DE ACRESCENTAR, FORA DA GRELHA ────────
+                                          >
+                                            <Thumb
+                                              url={assetUrls[path]}
+                                              // Do mais leve para o mais pesado —
+                                              // ver `assetMedias`. É esta grelha
+                                              // que tem 24 células e é aqui que a
+                                              // queda de 20 KB para 1099 doía.
+                                              planoB={[assetMedias[path], assetOriginais[path]]}
+                                              estadoDosUrls={estadoDosUrls}
+                                              aoTentarDeNovo={() => void tentarBuscarFotos()}
+                                              aoMorrer={marcarUrlMorto}
+                                              // A PRIMEIRA DOBRA do primeiro
+                                              // board. Medido: sem prioridade
+                                              // nenhuma, as 24 células repartiam
+                                              // o canal e a primeira fotografia
+                                              // só aparecia aos 34,0 s. Estas
+                                              // quatro são as que ela está mesmo
+                                              // a olhar quando desce às fotos.
+                                              priority={bi === 0 && ii < 4}
+                                              onde="mood-board"
+                                              refDoc={path}
+                                              // A remoção mudou-se para a barra de acções, que
+                                              // é visível ao toque — o × só aparecia em hover, e
+                                              // num telemóvel isso é um botão que não existe.
+                                              semRemover
+                                              onRemove={() => removeBoardImageAt(bi, ii)}
+                                              onMedida={(a) => registarAspeto(path, a)}
+                                              // A forma da célula que ESTA foto vai ocupar na
+                                              // página — sai da caixa que a disposição escolhida
+                                              // lhe dá, e muda com ela e com o número de fotos.
+                                              // Nenhuma delas é quadrada. As que já não são
+                                              // impressas ficam quadradas: não têm caixa nenhuma.
+                                              //
+                                              // Pela ORDEM DE DESENHO e não pela posição no
+                                              // array: com uma foto marcada como principal, a
+                                              // página troca-a para a caixa grande, e a célula
+                                              // tem de mostrar a forma dessa caixa (ver
+                                              // `ordemDasFotos`).
+                                              aspeto={aspetoDaCaixa(
+                                                caixas[ordemDeDesenho.indexOf(ii)],
+                                              )}
+                                              foraDoPdf={
+                                                ordemDeDesenho.indexOf(ii) >= MOOD_BOARD_MAX_IMAGES
+                                              }
+                                              pendente={isPendingImage(path)}
+                                            />
+                                          </CelulaDeFoto>
+                                        ))}
+                                      </GrelhaDeFotos>
+                                      {/* ── A CAIXA DE ACRESCENTAR, FORA DA GRELHA ────────
                                         Estava DENTRO da grelha, como se fosse
                                         mais uma fotografia — uma célula quadrada
                                         tracejada entre fotos que têm a forma da
@@ -8413,65 +8496,65 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         Num board fechado não existe: o gesto de
                                         largar uma foto é exactamente o engano
                                         contra o qual o fecho existe. */}
-                                    {!fechado && (
-                                      <div className="mt-2">
-                                        <UploadArea
-                                          label="+ Imagens"
-                                          progresso={uploading[`board-${bi}`]}
-                                          multiple
-                                          faixa
-                                          onFiles={(files) =>
-                                            handleUpload(`board-${bi}`, files, (paths) =>
-                                              addBoardImages(bi, paths),
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                    )}
-                                    {/* Sem fotos não há disposição nenhuma para escolher — o
+                                      {!fechado && (
+                                        <div className="mt-2">
+                                          <UploadArea
+                                            label="+ Imagens"
+                                            progresso={uploading[`board-${bi}`]}
+                                            multiple
+                                            faixa
+                                            onFiles={(files) =>
+                                              handleUpload(`board-${bi}`, files, (paths) =>
+                                                addBoardImages(bi, paths),
+                                              )
+                                            }
+                                          />
+                                        </div>
+                                      )}
+                                      {/* Sem fotos não há disposição nenhuma para escolher — o
                         selector aparece com a primeira foto, que é quando a
                         pergunta passa a ter resposta. */}
-                                    {/* ── VER ANTES DE GERAR ───────────────────
+                                      {/* ── VER ANTES DE GERAR ───────────────────
                                         A página com as fotos no sítio, ao lado
                                         das opções. Os diagramas dizem a FORMA
                                         das caixas; isto diz que fotografia
                                         fica em qual. */}
-                                    {aspectos.length > 0 && (
-                                      /*
-                                       * ── SEIS DIAGRAMAS VEZES SETE PÁGINAS ──
-                                       *
-                                       * Palavras dela: «o bloco de seis layouts
-                                       * repete-se sete vezes, a ocupar altura».
-                                       *
-                                       * Passa a estar dobrado, com a escolha
-                                       * ACTUAL escrita no fecho — que é a única
-                                       * coisa que se precisa de saber quando não
-                                       * se está a mexer nela. Abre-se com um
-                                       * clique e fica aberto enquanto ela lá
-                                       * estiver.
-                                       *
-                                       * `details` e não um estado nosso: sete
-                                       * dobras guardadas num objecto era mais
-                                       * uma coisa a manter, para o navegador
-                                       * fazer melhor de graça.
-                                       */
-                                      <details className="group mt-1">
-                                        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
-                                          <span
-                                            aria-hidden
-                                            className="text-[10px] text-foreground/35 motion-safe:transition-transform group-open:rotate-90"
-                                          >
-                                            ▸
-                                          </span>
-                                          Disposição:{" "}
-                                          <strong className="font-medium text-[var(--bo-tinta-72)]">
-                                            {NOME_DO_LAYOUT[layoutDoBoard]}
-                                          </strong>
-                                          <span className="text-foreground/35">
-                                            · {semRecorte ? "sem recorte" : "recorta"}
-                                          </span>
-                                        </summary>
-                                        {/* A segunda coluna abre-se quando há
+                                      {aspectos.length > 0 && (
+                                        /*
+                                         * ── SEIS DIAGRAMAS VEZES SETE PÁGINAS ──
+                                         *
+                                         * Palavras dela: «o bloco de seis layouts
+                                         * repete-se sete vezes, a ocupar altura».
+                                         *
+                                         * Passa a estar dobrado, com a escolha
+                                         * ACTUAL escrita no fecho — que é a única
+                                         * coisa que se precisa de saber quando não
+                                         * se está a mexer nela. Abre-se com um
+                                         * clique e fica aberto enquanto ela lá
+                                         * estiver.
+                                         *
+                                         * `details` e não um estado nosso: sete
+                                         * dobras guardadas num objecto era mais
+                                         * uma coisa a manter, para o navegador
+                                         * fazer melhor de graça.
+                                         */
+                                        <details className="group mt-1">
+                                          <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+                                            <span
+                                              aria-hidden
+                                              className="text-[10px] text-foreground/35 motion-safe:transition-transform group-open:rotate-90"
+                                            >
+                                              ▸
+                                            </span>
+                                            Disposição:{" "}
+                                            <strong className="font-medium text-[var(--bo-tinta-72)]">
+                                              {NOME_DO_LAYOUT[layoutDoBoard]}
+                                            </strong>
+                                            <span className="text-foreground/35">
+                                              · {semRecorte ? "sem recorte" : "recorta"}
+                                            </span>
+                                          </summary>
+                                          {/* A segunda coluna abre-se quando há
                                             mesmo uma segunda coluna. Era
                                             `2xl:grid-cols-1` a desfazê-la com
                                             CSS por cima de uma miniatura que
@@ -8480,81 +8563,81 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             está, e a grelha diz o mesmo que ela.
                                             Sem isto, uma coluna de 15 rem ficava
                                             aberta e vazia. */}
-                                        <div
-                                          className={`mt-2 grid gap-4 ${
-                                            painelLateralCabe
-                                              ? ""
-                                              : "lg:grid-cols-[minmax(0,1fr)_15rem]"
-                                          }`}
-                                        >
-                                          <div className="min-w-0">
-                                            <SelectorDeLayout
-                                              valor={b.layout}
-                                              aspectos={aspectos}
-                                              semRecorte={semRecorte}
-                                              // `undefined` APAGA o campo: um mood board sem
-                                              // layout gravado continua sem ele, e uma proposta
-                                              // já enviada não muda de aspecto por causa disto.
-                                              onEscolher={(layout) => updateBoard(bi, { layout })}
-                                            />
-                                          </div>
-                                          {/*
-                                           * ── A MINIATURA REPETIDA SETE VEZES
-                                           *
-                                           * «Minúscula e repetida sete vezes.»
-                                           * Onde o painel da direita cabe, ele
-                                           * mostra a MESMA página, grande, e
-                                           * duas cópias da mesma coisa no mesmo
-                                           * ecrã são uma a mais. Abaixo disso
-                                           * fica, porque abaixo disso o painel
-                                           * não cabe — e tirá-la aí era tirar a
-                                           * pré-visualização a quem trabalha
-                                           * num portátil.
-                                           *
-                                           * MONTAGEM CONDICIONAL, e não
-                                           * `2xl:hidden`: escondida por CSS ela
-                                           * continuava a ser DESENHADA, sete
-                                           * vezes, com as URLs de todas as
-                                           * fotografias. Ver `painelLateralCabe`
-                                           * lá em cima, e o
-                                           * `PainelDoEstudio.tsx:52-57`, que
-                                           * conta o que isso custou quando era
-                                           * ele a fazê-lo.
-                                           */}
-                                          {!painelLateralCabe && (
-                                            <div className="lg:pt-6">
-                                              <PreviaDaPagina
-                                                layout={layoutDoBoard}
+                                          <div
+                                            className={`mt-2 grid gap-4 ${
+                                              painelLateralCabe
+                                                ? ""
+                                                : "lg:grid-cols-[minmax(0,1fr)_15rem]"
+                                            }`}
+                                          >
+                                            <div className="min-w-0">
+                                              <SelectorDeLayout
+                                                valor={b.layout}
                                                 aspectos={aspectos}
-                                                // Pela ordem de DESENHO, com a principal à frente
-                                                // — a mesma que a página vai usar.
-                                                urls={ordemDeDesenho
-                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                  .map((i) => assetUrls[b.images[i]])}
-                                                // O plano B, o mesmo da grelha aqui
-                                                // ao lado: uma miniatura que não
-                                                // existe cai para o original em vez
-                                                // de dar o ícone de imagem partida.
-                                                originais={ordemDeDesenho
-                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                  .map((i) => assetOriginais[b.images[i]])}
                                                 semRecorte={semRecorte}
-                                                titulo={b.title}
-                                                subtitulo={b.subtitulo}
-                                                legenda={b.annotation}
-                                                // Aqui o rótulo ainda diz alguma
-                                                // coisa: é a única miniatura do
-                                                // cartão, e sem ele lê-se como
-                                                // mais uma fotografia. Ver
-                                                // `comRotulo`.
-                                                comRotulo
+                                                // `undefined` APAGA o campo: um mood board sem
+                                                // layout gravado continua sem ele, e uma proposta
+                                                // já enviada não muda de aspecto por causa disto.
+                                                onEscolher={(layout) => updateBoard(bi, { layout })}
                                               />
                                             </div>
-                                          )}
-                                        </div>
-                                      </details>
-                                    )}
-                                    {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
+                                            {/*
+                                             * ── A MINIATURA REPETIDA SETE VEZES
+                                             *
+                                             * «Minúscula e repetida sete vezes.»
+                                             * Onde o painel da direita cabe, ele
+                                             * mostra a MESMA página, grande, e
+                                             * duas cópias da mesma coisa no mesmo
+                                             * ecrã são uma a mais. Abaixo disso
+                                             * fica, porque abaixo disso o painel
+                                             * não cabe — e tirá-la aí era tirar a
+                                             * pré-visualização a quem trabalha
+                                             * num portátil.
+                                             *
+                                             * MONTAGEM CONDICIONAL, e não
+                                             * `2xl:hidden`: escondida por CSS ela
+                                             * continuava a ser DESENHADA, sete
+                                             * vezes, com as URLs de todas as
+                                             * fotografias. Ver `painelLateralCabe`
+                                             * lá em cima, e o
+                                             * `PainelDoEstudio.tsx:52-57`, que
+                                             * conta o que isso custou quando era
+                                             * ele a fazê-lo.
+                                             */}
+                                            {!painelLateralCabe && (
+                                              <div className="lg:pt-6">
+                                                <PreviaDaPagina
+                                                  layout={layoutDoBoard}
+                                                  aspectos={aspectos}
+                                                  // Pela ordem de DESENHO, com a principal à frente
+                                                  // — a mesma que a página vai usar.
+                                                  urls={ordemDeDesenho
+                                                    .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                    .map((i) => assetUrls[b.images[i]])}
+                                                  // O plano B, o mesmo da grelha aqui
+                                                  // ao lado: uma miniatura que não
+                                                  // existe cai para o original em vez
+                                                  // de dar o ícone de imagem partida.
+                                                  originais={ordemDeDesenho
+                                                    .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                    .map((i) => assetOriginais[b.images[i]])}
+                                                  semRecorte={semRecorte}
+                                                  titulo={b.title}
+                                                  subtitulo={b.subtitulo}
+                                                  legenda={b.annotation}
+                                                  // Aqui o rótulo ainda diz alguma
+                                                  // coisa: é a única miniatura do
+                                                  // cartão, e sem ele lê-se como
+                                                  // mais uma fotografia. Ver
+                                                  // `comRotulo`.
+                                                  comRotulo
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </details>
+                                      )}
+                                      {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
                           Está aqui, por baixo dos diagramas, porque é com eles
                           que se percebe o que ele faz: liga-se e as caixas
                           mudam de forma à frente dela.
@@ -8563,96 +8646,96 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           mood board que nunca teve a escolha tem de continuar
                           sem ela, para uma proposta já enviada sair como
                           sempre saiu. */}
-                                    <div className="mt-2 flex items-center gap-1.5">
-                                      <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
-                                        <input
-                                          type="checkbox"
-                                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
-                                          checked={semRecorte}
-                                          onChange={(e) =>
-                                            updateBoard(bi, {
-                                              enquadramento: e.target.checked
-                                                ? "forma-da-foto"
-                                                : undefined,
-                                            })
-                                          }
-                                        />
-                                        <span>Manter a forma de cada fotografia (não corta)</span>
-                                      </label>
-                                      {/* FORA do `<label>`, e é por uma razão: um
+                                      <div className="mt-2 flex items-center gap-1.5">
+                                        <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                                          <input
+                                            type="checkbox"
+                                            className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                                            checked={semRecorte}
+                                            onChange={(e) =>
+                                              updateBoard(bi, {
+                                                enquadramento: e.target.checked
+                                                  ? "forma-da-foto"
+                                                  : undefined,
+                                              })
+                                            }
+                                          />
+                                          <span>Manter a forma de cada fotografia (não corta)</span>
+                                        </label>
+                                        {/* FORA do `<label>`, e é por uma razão: um
                                           botão lá dentro ligava e desligava a
                                           opção ao ser carregado.
 
                                           O que ele explica é a consequência de
                                           DESLIGAR — a parte que ninguém precisa
                                           de reler à quinquagésima página. */}
-                                      <Ajuda sobre="o que muda ao manter a forma das fotografias">
-                                        Desligado, as fotografias são recortadas para encher as
-                                        caixas da disposição — como saía antes. Ligado, cada uma
-                                        entra inteira e as caixas é que se ajustam à forma dela.
-                                      </Ajuda>
-                                    </div>
-                                    {/* ── A ÚLTIMA FILA ────────────────────────
+                                        <Ajuda sobre="o que muda ao manter a forma das fotografias">
+                                          Desligado, as fotografias são recortadas para encher as
+                                          caixas da disposição — como saía antes. Ligado, cada uma
+                                          entra inteira e as caixas é que se ajustam à forma dela.
+                                        </Ajuda>
+                                      </div>
+                                      {/* ── A ÚLTIMA FILA ────────────────────────
                                         Uma última fila com uma foto, quando as
                                         de cima têm três ou quatro, lê-se como
                                         um esquecimento. Medido nas caixas que a
                                         página vai mesmo desenhar. */}
-                                    {(() => {
-                                      const fila = filaDesequilibrada(caixas);
-                                      if (!fila) return null;
-                                      const fotos = (n: number) =>
-                                        n === 1 ? "uma foto" : `${n} fotos`;
-                                      // Os dois remédios, com o mais barato à
-                                      // frente: quatro em cima e uma em baixo
-                                      // pede que se tire uma, não que se
-                                      // acrescentem três.
-                                      const acrescentar = `com mais ${fotos(fila.aAcrescentar)}`;
-                                      const remover = `tirando ${fila.aRemover === 1 ? "a que lá está" : `as ${fila.aRemover} que lá estão`}`;
-                                      return (
-                                        <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
-                                          A última fila desta página fica com{" "}
-                                          {fila.naUltima === 1
-                                            ? "uma foto só"
-                                            : `${fila.naUltima} fotos`}
-                                          , contra {fila.nasOutras} nas de cima. A página fecha
-                                          certa{" "}
-                                          {fila.sugestao === "remover"
-                                            ? `${remover} — ou ${acrescentar}`
-                                            : `${acrescentar} — ou ${remover}`}
-                                          .
+                                      {(() => {
+                                        const fila = filaDesequilibrada(caixas);
+                                        if (!fila) return null;
+                                        const fotos = (n: number) =>
+                                          n === 1 ? "uma foto" : `${n} fotos`;
+                                        // Os dois remédios, com o mais barato à
+                                        // frente: quatro em cima e uma em baixo
+                                        // pede que se tire uma, não que se
+                                        // acrescentem três.
+                                        const acrescentar = `com mais ${fotos(fila.aAcrescentar)}`;
+                                        const remover = `tirando ${fila.aRemover === 1 ? "a que lá está" : `as ${fila.aRemover} que lá estão`}`;
+                                        return (
+                                          <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
+                                            A última fila desta página fica com{" "}
+                                            {fila.naUltima === 1
+                                              ? "uma foto só"
+                                              : `${fila.naUltima} fotos`}
+                                            , contra {fila.nasOutras} nas de cima. A página fecha
+                                            certa{" "}
+                                            {fila.sugestao === "remover"
+                                              ? `${remover} — ou ${acrescentar}`
+                                              : `${acrescentar} — ou ${remover}`}
+                                            .
+                                          </p>
+                                        );
+                                      })()}
+                                      {cortadas.length > 0 && (
+                                        <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                                          Nesta disposição{" "}
+                                          {cortadas.length === 1
+                                            ? "1 fotografia é cortada"
+                                            : `${cortadas.length} fotografias são cortadas`}
+                                          :{" "}
+                                          {cortadas
+                                            .map(
+                                              ({ perda, i }) =>
+                                                `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`,
+                                            )
+                                            .join(", ")}
+                                          . Liga «Manter a forma de cada fotografia» para não perder
+                                          nada.
                                         </p>
-                                      );
-                                    })()}
-                                    {cortadas.length > 0 && (
-                                      <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
-                                        Nesta disposição{" "}
-                                        {cortadas.length === 1
-                                          ? "1 fotografia é cortada"
-                                          : `${cortadas.length} fotografias são cortadas`}
-                                        :{" "}
-                                        {cortadas
-                                          .map(
-                                            ({ perda, i }) =>
-                                              `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`,
-                                          )
-                                          .join(", ")}
-                                        . Liga «Manter a forma de cada fotografia» para não perder
-                                        nada.
-                                      </p>
-                                    )}
-                                    <div className="mt-2 flex flex-wrap items-center gap-4">
-                                      <button
-                                        type="button"
-                                        className={ADD_BTN}
-                                        onClick={() => setPicker({ kind: "board", bi })}
-                                        disabled={fechado}
-                                        onPointerEnter={aquecerBiblioteca}
-                                        onFocus={aquecerBiblioteca}
-                                        onTouchStart={aquecerBiblioteca}
-                                      >
-                                        Escolher da biblioteca de temas
-                                      </button>
-                                      {/* GUARDAR ESTE, e não «o primeiro com título».
+                                      )}
+                                      <div className="mt-2 flex flex-wrap items-center gap-4">
+                                        <button
+                                          type="button"
+                                          className={ADD_BTN}
+                                          onClick={() => setPicker({ kind: "board", bi })}
+                                          disabled={fechado}
+                                          onPointerEnter={aquecerBiblioteca}
+                                          onFocus={aquecerBiblioteca}
+                                          onTouchStart={aquecerBiblioteca}
+                                        >
+                                          Escolher da biblioteca de temas
+                                        </button>
+                                        {/* GUARDAR ESTE, e não «o primeiro com título».
                           O controlo era único para a secção inteira e recebia
                           `doc.moodBoards.find(…)` — portanto guardava sempre o
                           PRIMEIRO mood board com título. Ela montava o
@@ -8661,242 +8744,246 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           maneira nenhuma. Agora o botão vive ao lado do bloco
                           a que se refere, que é a única forma de a pergunta
                           "qual deles?" não ter de ser respondida por adivinha. */}
-                                      {(b.title ?? "").trim() && (
-                                        <ModelosParciais
-                                          tipo="moodboard"
-                                          mostrar="guardar"
-                                          toast={toast}
-                                          paraGuardar={b}
-                                          nomeSugerido={b.title}
-                                        />
-                                      )}
-                                    </div>
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </CartaoDeBoard>
-                        );
-                      })}
-                    </ListaDeBoards>
-                  </ArrastoDosMoodBoards>
-                  <div className="mt-3 flex flex-wrap items-center gap-4">
-                    <button type="button" className={ADD_BTN} onClick={addBoard}>
-                      + Adicionar mood board
-                    </button>
-                    {/* Fechar tudo é o gesto de quem acabou uma proposta e quer ver
+                                        {(b.title ?? "").trim() && (
+                                          <ModelosParciais
+                                            tipo="moodboard"
+                                            mostrar="guardar"
+                                            toast={toast}
+                                            paraGuardar={b}
+                                            nomeSugerido={b.title}
+                                          />
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </CartaoDeBoard>
+                          );
+                        })}
+                      </ListaDeBoards>
+                    </ArrastoDosMoodBoards>
+                    <div className="mt-3 flex flex-wrap items-center gap-4">
+                      <button type="button" className={ADD_BTN} onClick={addBoard}>
+                        + Adicionar mood board
+                      </button>
+                      {/* Fechar tudo é o gesto de quem acabou uma proposta e quer ver
                     a forma dela; abrir tudo, o de quem vai rever. Dois botões e
                     não um interruptor: o estado de cada board é seu, e um
                     interruptor teria de mentir sobre o conjunto. */}
-                    {doc.moodBoards.length > 1 && (
-                      <>
-                        <button type="button" className={ADD_BTN} onClick={() => dobrarTodos(true)}>
-                          Fechar todos
-                        </button>
+                      {doc.moodBoards.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            className={ADD_BTN}
+                            onClick={() => dobrarTodos(true)}
+                          >
+                            Fechar todos
+                          </button>
+                          <button
+                            type="button"
+                            className={ADD_BTN}
+                            onClick={() => dobrarTodos(false)}
+                          >
+                            Abrir todos
+                          </button>
+                        </>
+                      )}
+                      {/*
+                       * ── O QUE ESTA PROPOSTA FAZ, DECIDIDO UMA VEZ ──────────
+                       *
+                       * Palavras dela: «"Manter a forma de cada fotografia" hoje
+                       * está desligada no primeiro board e ligada no terceiro,
+                       * sem razão». É o que acontece quando a escolha só existe
+                       * por página: sete páginas, sete decisões, tomadas em sete
+                       * momentos diferentes de uma tarde. O resultado não é
+                       * variedade — é uma proposta que parece montada por duas
+                       * pessoas.
+                       *
+                       * Isto vale para as páginas que não disserem outra coisa. A
+                       * que discordar continua a ganhar, e é por isso que o botão
+                       * de aplicar a todas existe ao lado: é o gesto de quem quer
+                       * mesmo pôr as sete de acordo, e escreve a escolha em cada
+                       * uma em vez de a adivinhar.
+                       */}
+                      {doc.moodBoards.length > 1 && (
+                        <label className="flex items-center gap-2 text-xs text-[var(--bo-text-muted)]">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 shrink-0 accent-[#4d6350]"
+                            checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
+                            onChange={(e) =>
+                              patch({
+                                // Ausente e não `false`: ausente quer dizer
+                                // «ninguém escolheu», e uma proposta já enviada
+                                // tem de continuar a sair como sempre saiu.
+                                enquadramentoPorOmissao: e.target.checked
+                                  ? "forma-da-foto"
+                                  : undefined,
+                              })
+                            }
+                          />
+                          <span>Manter a forma das fotografias em toda a proposta</span>
+                        </label>
+                      )}
+                      {doc.moodBoards.length > 1 && (
                         <button
                           type="button"
                           className={ADD_BTN}
-                          onClick={() => dobrarTodos(false)}
-                        >
-                          Abrir todos
-                        </button>
-                      </>
-                    )}
-                    {/*
-                     * ── O QUE ESTA PROPOSTA FAZ, DECIDIDO UMA VEZ ──────────
-                     *
-                     * Palavras dela: «"Manter a forma de cada fotografia" hoje
-                     * está desligada no primeiro board e ligada no terceiro,
-                     * sem razão». É o que acontece quando a escolha só existe
-                     * por página: sete páginas, sete decisões, tomadas em sete
-                     * momentos diferentes de uma tarde. O resultado não é
-                     * variedade — é uma proposta que parece montada por duas
-                     * pessoas.
-                     *
-                     * Isto vale para as páginas que não disserem outra coisa. A
-                     * que discordar continua a ganhar, e é por isso que o botão
-                     * de aplicar a todas existe ao lado: é o gesto de quem quer
-                     * mesmo pôr as sete de acordo, e escreve a escolha em cada
-                     * uma em vez de a adivinhar.
-                     */}
-                    {doc.moodBoards.length > 1 && (
-                      <label className="flex items-center gap-2 text-xs text-[var(--bo-text-muted)]">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 shrink-0 accent-[#4d6350]"
-                          checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
-                          onChange={(e) =>
+                          onClick={() => {
+                            const enq = doc.enquadramentoPorOmissao;
                             patch({
-                              // Ausente e não `false`: ausente quer dizer
-                              // «ninguém escolheu», e uma proposta já enviada
-                              // tem de continuar a sair como sempre saiu.
-                              enquadramentoPorOmissao: e.target.checked
-                                ? "forma-da-foto"
-                                : undefined,
-                            })
-                          }
-                        />
-                        <span>Manter a forma das fotografias em toda a proposta</span>
-                      </label>
-                    )}
-                    {doc.moodBoards.length > 1 && (
-                      <button
-                        type="button"
-                        className={ADD_BTN}
-                        onClick={() => {
-                          const enq = doc.enquadramentoPorOmissao;
-                          patch({
-                            moodBoards: doc.moodBoards.map((b) => ({
-                              ...b,
-                              ...(enq ? { enquadramento: enq } : { enquadramento: undefined }),
-                            })),
-                          });
-                          toast(
-                            enq
-                              ? "As páginas passam todas a manter a forma das fotografias."
-                              : "As páginas passam todas a recortar as fotografias.",
-                            "info",
-                          );
-                        }}
-                      >
-                        Aplicar a todas as páginas
-                      </button>
-                    )}
-                    <ModelosParciais
-                      tipo="moodboard"
-                      mostrar="inserir"
-                      toast={toast}
-                      onInserir={(b) => void inserirMoodBoardDeModelo(b as MoodBoard)}
-                    />
-                    {/* ── AS FOTOS DO MODELO A CHEGAR ────────────────────
+                              moodBoards: doc.moodBoards.map((b) => ({
+                                ...b,
+                                ...(enq ? { enquadramento: enq } : { enquadramento: undefined }),
+                              })),
+                            });
+                            toast(
+                              enq
+                                ? "As páginas passam todas a manter a forma das fotografias."
+                                : "As páginas passam todas a recortar as fotografias.",
+                              "info",
+                            );
+                          }}
+                        >
+                          Aplicar a todas as páginas
+                        </button>
+                      )}
+                      <ModelosParciais
+                        tipo="moodboard"
+                        mostrar="inserir"
+                        toast={toast}
+                        onInserir={(b) => void inserirMoodBoardDeModelo(b as MoodBoard)}
+                      />
+                      {/* ── AS FOTOS DO MODELO A CHEGAR ────────────────────
                         Ao lado do botão que as pediu, e não em cima do bloco:
                         o bloco já está na lista com as fotografias à vista (é
                         o caminho de origem que ainda lá está), e uma caixa
                         entre os cartões empurrava a grelha para baixo a meio
                         do gesto seguinte. Sai sozinha quando a cópia acaba. */}
-                    {fotosACopiar > 0 && (
-                      <EmCurso
-                        className="max-w-xs"
-                        titulo={
-                          fotosACopiar === 1
-                            ? "A copiar 1 foto do modelo…"
-                            : `A copiar ${fotosACopiar} fotos do modelo…`
-                        }
-                        estimadoMs={esperaDaCopiaDeFotos(fotosACopiar)}
-                        nota="O bloco já está na proposta; as fotografias estão a passar para a pasta deste pedido."
-                        notaDemorada="A cópia está a demorar. O bloco fica na proposta de qualquer maneira."
-                      />
-                    )}
+                      {fotosACopiar > 0 && (
+                        <EmCurso
+                          className="max-w-xs"
+                          titulo={
+                            fotosACopiar === 1
+                              ? "A copiar 1 foto do modelo…"
+                              : `A copiar ${fotosACopiar} fotos do modelo…`
+                          }
+                          estimadoMs={esperaDaCopiaDeFotos(fotosACopiar)}
+                          nota="O bloco já está na proposta; as fotografias estão a passar para a pasta deste pedido."
+                          notaDemorada="A cópia está a demorar. O bloco fica na proposta de qualquer maneira."
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* ── AS ALTERNATIVAS QUE O CASAL ESCOLHE (Fase 3) ───────────
+                {/* ── AS ALTERNATIVAS QUE O CASAL ESCOLHE (Fase 3) ───────────
                   Vive aqui dentro, e não numa secção própria: as alternativas
                   são visuais e as fotografias que as explicam já estão nestas
                   páginas. A razão longa está no cabeçalho do editor. */}
-              <EditorDeEscolhas
-                escolhas={doc.escolhas}
-                fotos={fotosParaEscolhas}
-                bilingue={bilingue}
-                onChange={(escolhas) => patch({ escolhas })}
-              />
-            </Section>
-          )}
+                <EditorDeEscolhas
+                  escolhas={doc.escolhas}
+                  fotos={fotosParaEscolhas}
+                  bilingue={bilingue}
+                  onChange={(escolhas) => patch({ escolhas })}
+                />
+              </Section>
+            )}
 
-          {/* Cronograma — organizacao only */}
-          {!isDeco && (
-            <Section
-              title="Cronograma de Organização"
-              id="cronograma"
-              rodape={notaDaSeccao("cronograma", "Nota sobre o cronograma")}
-            >
-              <div className="flex flex-col gap-3">
-                {(doc.cronograma ?? []).map((ph, pi) => (
-                  <div
-                    key={pi}
-                    className="rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <input
-                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
-                        value={ph.title}
-                        onChange={(e) => updatePhase(pi, { title: e.target.value })}
-                        placeholder="6-12 meses antes do casamento"
-                        aria-label="Título da fase"
-                        /* O salto das gralhas encontra o campo por aqui. Ver
+            {/* Cronograma — organizacao only */}
+            {!isDeco && (
+              <Section
+                title="Cronograma de Organização"
+                id="cronograma"
+                rodape={notaDaSeccao("cronograma", "Nota sobre o cronograma")}
+              >
+                <div className="flex flex-col gap-3">
+                  {(doc.cronograma ?? []).map((ph, pi) => (
+                    <div
+                      key={pi}
+                      className="rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <input
+                          className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                          value={ph.title}
+                          onChange={(e) => updatePhase(pi, { title: e.target.value })}
+                          placeholder="6-12 meses antes do casamento"
+                          aria-label="Título da fase"
+                          /* O salto das gralhas encontra o campo por aqui. Ver
                            `chaveDoCampo` — o cronograma entrou na varredura
                            depois de se medir que era texto dela a sair
                            publicado sem passar por corrector nenhum. */
-                        data-campo={chaveDoCampo({ tipo: "cronogramaTitulo", pi })}
-                      />
-                      <MoveBtns
-                        onUp={() => movePhase(pi, -1)}
-                        onDown={() => movePhase(pi, 1)}
-                        disUp={pi === 0}
-                        disDown={pi === (doc.cronograma?.length ?? 0) - 1}
-                      />
-                      <button
-                        type="button"
-                        className={REMOVE_BTN}
-                        onClick={() => removePhase(pi)}
-                        aria-label="Remover fase"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    {/* Entre o título da fase e a lista de tarefas: a frase
+                          data-campo={chaveDoCampo({ tipo: "cronogramaTitulo", pi })}
+                        />
+                        <MoveBtns
+                          onUp={() => movePhase(pi, -1)}
+                          onDown={() => movePhase(pi, 1)}
+                          disUp={pi === 0}
+                          disDown={pi === (doc.cronograma?.length ?? 0) - 1}
+                        />
+                        <button
+                          type="button"
+                          className={REMOVE_BTN}
+                          onClick={() => removePhase(pi)}
+                          aria-label="Remover fase"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      {/* Entre o título da fase e a lista de tarefas: a frase
                         conta-as, e elas estão logo por baixo. Ver `aRemover`. */}
-                    {perguntaDeRemocao(`fase:${pi}`, "Remover a fase")}
-                    <div className="flex flex-col gap-2 pl-1">
-                      {ph.items.map((it, ii) => (
-                        <div key={ii} className="flex items-center gap-2">
-                          <input
-                            className={INPUT_SM}
-                            value={it}
-                            onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
-                            placeholder="Definição do conceito"
-                            aria-label="Tarefa"
-                            data-campo={chaveDoCampo({ tipo: "cronogramaItem", pi, ii })}
-                          />
-                          <button
-                            type="button"
-                            className={REMOVE_BTN}
-                            onClick={() => removePhaseItem(pi, ii)}
-                            aria-label="Remover tarefa"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                      <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
-                        + Adicionar tarefa
-                      </button>
+                      {perguntaDeRemocao(`fase:${pi}`, "Remover a fase")}
+                      <div className="flex flex-col gap-2 pl-1">
+                        {ph.items.map((it, ii) => (
+                          <div key={ii} className="flex items-center gap-2">
+                            <input
+                              className={INPUT_SM}
+                              value={it}
+                              onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
+                              placeholder="Definição do conceito"
+                              aria-label="Tarefa"
+                              data-campo={chaveDoCampo({ tipo: "cronogramaItem", pi, ii })}
+                            />
+                            <button
+                              type="button"
+                              className={REMOVE_BTN}
+                              onClick={() => removePhaseItem(pi, ii)}
+                              aria-label="Remover tarefa"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
+                          + Adicionar tarefa
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
-                + Adicionar fase
-              </button>
-            </Section>
-          )}
+                  ))}
+                </div>
+                <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
+                  + Adicionar fase
+                </button>
+              </Section>
+            )}
 
-          {/* Budget */}
-          <Section
-            title="Orçamento Proposto"
-            id="orcamento"
-            rodape={notaDaSeccao("orcamento", "Nota sobre o orçamento")}
-          >
-            {isDeco ? (
-              <>
-                <AvisoDeOrdem
-                  mostrar={ordemSugerida}
-                  onde="As linhas do orçamento"
-                  onFixar={fixarOrdem}
-                />
-                <div className="@container flex flex-col gap-2 mb-3">
-                  {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
+            {/* Budget */}
+            <Section
+              title="Orçamento Proposto"
+              id="orcamento"
+              rodape={notaDaSeccao("orcamento", "Nota sobre o orçamento")}
+            >
+              {isDeco ? (
+                <>
+                  <AvisoDeOrdem
+                    mostrar={ordemSugerida}
+                    onde="As linhas do orçamento"
+                    onFixar={fixarOrdem}
+                  />
+                  <div className="@container flex flex-col gap-2 mb-3">
+                    {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
                       A caixa do fim não tinha nome nenhum: uma quadrícula com a
                       palavra «extra» ao lado, sem cabeçalho e sem uma frase que
                       dissesse o que faz. Palavras dela: «a caixa "extra" não
@@ -8927,48 +9014,50 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       sobre esta fila — este cabeçalho, a palavra «extra» e o
                       «?» — partilham-no, porque separá-los é como um cabeçalho
                       volta a mentir. */}
-                  <div className="hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:flex">
-                    <span className="flex-1">Item</span>
-                    <span className="w-32 shrink-0">Como escala</span>
-                    <span className="flex w-28 shrink-0 items-center justify-end gap-1">
-                      Preço (sem IVA)
-                      <Ajuda sobre="para que servem os preços por linha">
-                        Os preços por linha são{" "}
-                        <strong className="font-semibold text-[var(--bo-text)]">só para ti</strong>:
-                        servem para somar e para avisar quando o total já não bate certo. O PDF
-                        continua a mostrar as linhas sem preço e um «
-                        {doc.totalLabel || "Valor Total"}» único, como nas tuas propostas.
-                      </Ajuda>
-                    </span>
-                    {/* ── A EXPLICAÇÃO, AO PÉ DO CABEÇALHO E A PEDIDO ──────
+                    <div className="hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:flex">
+                      <span className="flex-1">Item</span>
+                      <span className="w-32 shrink-0">Como escala</span>
+                      <span className="flex w-28 shrink-0 items-center justify-end gap-1">
+                        Preço (sem IVA)
+                        <Ajuda sobre="para que servem os preços por linha">
+                          Os preços por linha são{" "}
+                          <strong className="font-semibold text-[var(--bo-text)]">
+                            só para ti
+                          </strong>
+                          : servem para somar e para avisar quando o total já não bate certo. O PDF
+                          continua a mostrar as linhas sem preço e um «
+                          {doc.totalLabel || "Valor Total"}» único, como nas tuas propostas.
+                        </Ajuda>
+                      </span>
+                      {/* ── A EXPLICAÇÃO, AO PÉ DO CABEÇALHO E A PEDIDO ──────
                         Eram três linhas sempre visíveis por baixo das linhas do
                         orçamento. Palavras dela: «ocupa três linhas sempre
                         visíveis». Úteis na primeira vez, ruído a partir da
                         segunda — e a ocupar o espaço onde deviam estar as
                         linhas. Agora está onde a pergunta se faz: em cima da
                         coluna, atrás de um «?». */}
-                    <span className="flex w-16 shrink-0 items-center justify-center gap-1">
-                      Extra
-                      <Ajuda sobre="o que faz a caixa Extra">
-                        <strong className="font-semibold text-[var(--bo-text)]">Extra</strong> marca
-                        uma linha como opcional: ela sai assinalada no quadro do PDF e, por baixo do
-                        total, a proposta passa a mostrar também o valor <em>sem</em> essa linha.
-                        Uma proposta só, com as duas versões lá dentro — em vez de dois documentos a
-                        divergir.
-                      </Ajuda>
-                    </span>
-                    <span className="w-5 shrink-0" />
-                  </div>
-                  {/* Pela ordem que vai SAIR — ver `ordemDoOrcamento`. O `i`
+                      <span className="flex w-16 shrink-0 items-center justify-center gap-1">
+                        Extra
+                        <Ajuda sobre="o que faz a caixa Extra">
+                          <strong className="font-semibold text-[var(--bo-text)]">Extra</strong>{" "}
+                          marca uma linha como opcional: ela sai assinalada no quadro do PDF e, por
+                          baixo do total, a proposta passa a mostrar também o valor <em>sem</em>{" "}
+                          essa linha. Uma proposta só, com as duas versões lá dentro — em vez de
+                          dois documentos a divergir.
+                        </Ajuda>
+                      </span>
+                      <span className="w-5 shrink-0" />
+                    </div>
+                    {/* Pela ordem que vai SAIR — ver `ordemDoOrcamento`. O `i`
                       continua a ser o índice do array, que é o que os campos
                       escrevem; só a ordem de desenho muda. */}
-                  {ordemDoOrcamento.map((i) => {
-                    const l = linhasDoOrcamento[i];
-                    const escala = escalasDoDoc[i];
-                    const semPreco = l.preco === null;
-                    return (
-                      <div key={i} className="flex flex-wrap items-center gap-2">
-                        {/* ── O NOME DA LINHA NÃO ENCOLHE ABAIXO DE 12 REM ────
+                    {ordemDoOrcamento.map((i) => {
+                      const l = linhasDoOrcamento[i];
+                      const escala = escalasDoDoc[i];
+                      const semPreco = l.preco === null;
+                      return (
+                        <div key={i} className="flex flex-wrap items-center gap-2">
+                          {/* ── O NOME DA LINHA NÃO ENCOLHE ABAIXO DE 12 REM ────
                             Do registo do audit, e é um dos oito bloqueios: «a
                             caixa do nome da linha do orçamento tem 62 px — 27
                             com a proposta bilingue ligada».
@@ -8990,31 +9079,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             numa fila inteira e a escala, o preço e o «Extra»
                             descem para a de baixo. Acima de 520 px nada muda —
                             aí já cabia. */}
-                        <input
-                          className={`${INPUT_SM} min-w-[12rem] flex-1`}
-                          value={l.item}
-                          onChange={(e) => updateBudgetItem(i, e.target.value)}
-                          // A pega do salto. Faltava: o «Ver no campo» das
-                          // gralhas caía na secção porque nenhuma rubrica a
-                          // tinha, e o painel «Por traduzir» precisa dela para
-                          // chegar à caixa ao lado.
-                          data-campo={`linhaDeOrcamento:${i}`}
-                          placeholder="Decor Cerimónia"
-                          aria-label="Item de orçamento"
-                        />
-                        {/* A inglesa com o mesmo mínimo: com o bilingue ligado
+                          <input
+                            className={`${INPUT_SM} min-w-[12rem] flex-1`}
+                            value={l.item}
+                            onChange={(e) => updateBudgetItem(i, e.target.value)}
+                            // A pega do salto. Faltava: o «Ver no campo» das
+                            // gralhas caía na secção porque nenhuma rubrica a
+                            // tinha, e o painel «Por traduzir» precisa dela para
+                            // chegar à caixa ao lado.
+                            data-campo={`linhaDeOrcamento:${i}`}
+                            placeholder="Decor Cerimónia"
+                            aria-label="Item de orçamento"
+                          />
+                          {/* A inglesa com o mesmo mínimo: com o bilingue ligado
                             eram os dois a repartir os mesmos 54 px, 27 para
                             cada. */}
-                        {caixaDeIngles({ tipo: "linhaDeOrcamento", i }, "Item de orçamento", {
-                          className: `${INPUT_SM} min-w-[12rem] flex-1`,
-                          placeholder: "Ceremony Decor",
-                        })}
-                        {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
+                          {caixaDeIngles({ tipo: "linhaDeOrcamento", i }, "Item de orçamento", {
+                            className: `${INPUT_SM} min-w-[12rem] flex-1`,
+                            placeholder: "Ceremony Decor",
+                          })}
+                          {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
                           orçamento de casamento não é um preço, é uma
                           multiplicação — e quando os convidados mudam, refazer
                           essas contas à mão é onde entra o erro que ninguém vê,
                           porque o resultado continua a parecer um preço. */}
-                        {/* ── O RÓTULO NÃO DESAPARECE SEM SUBSTITUTO ────────
+                          {/* ── O RÓTULO NÃO DESAPARECE SEM SUBSTITUTO ────────
                             Sem o cabeçalho, «Como escala» não voltava em lado
                             nenhum: ficava um `<select>` com três opções e
                             nenhuma palavra visível a dizer o que ele decide. O
@@ -9029,41 +9118,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             impede haver um instante com ambos ou com nenhum.
                             `aria-hidden` porque o `aria-label` já o diz — dois
                             nomes seguidos era o leitor de ecrã a repetir-se. */}
-                        <label className="flex w-32 shrink-0 flex-col gap-1">
-                          <span
-                            aria-hidden="true"
-                            className="text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:hidden"
-                          >
-                            Como escala
-                          </span>
-                          <select
-                            value={escala?.tipo ?? "fixa"}
-                            onChange={(e) => definirEscala(i, e.target.value as TipoDeEscala)}
-                            aria-label={`Como escala ${l.item || "a linha sem nome"}`}
-                            className="bo-input w-full px-2 py-2 text-xs"
-                          >
-                            <option value="fixa">Valor fixo</option>
-                            <option value="por-convidado">Por convidado</option>
-                            <option value="por-mesa">Por mesa</option>
-                          </select>
-                        </label>
-                        {/* A largura vai no invólucro e não no campo: `.bo-input`
+                          <label className="flex w-32 shrink-0 flex-col gap-1">
+                            <span
+                              aria-hidden="true"
+                              className="text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:hidden"
+                            >
+                              Como escala
+                            </span>
+                            <select
+                              value={escala?.tipo ?? "fixa"}
+                              onChange={(e) => definirEscala(i, e.target.value as TipoDeEscala)}
+                              aria-label={`Como escala ${l.item || "a linha sem nome"}`}
+                              className="bo-input w-full px-2 py-2 text-xs"
+                            >
+                              <option value="fixa">Valor fixo</option>
+                              <option value="por-convidado">Por convidado</option>
+                              <option value="por-mesa">Por mesa</option>
+                            </select>
+                          </label>
+                          {/* A largura vai no invólucro e não no campo: `.bo-input`
                         tem `width: 100%` escrito em CSS, que ganha a um
                         `w-28` do Tailwind. Sem isto o preço comia a linha
                         toda e o nome ficava numa caixa de trinta pixels — foi
                         o que a captura de ecrã mostrou. */}
-                        {/* A largura continua no invólucro e não no campo, pela
+                          {/* A largura continua no invólucro e não no campo, pela
                             razão escrita aqui em cima; o invólucro é que passou
                             a ser um `<label>`, para o rótulo desta coluna voltar
                             quando a fila quebra — ver o `<select>` ao lado. */}
-                        <label className="flex w-28 shrink-0 flex-col gap-1">
-                          <span
-                            aria-hidden="true"
-                            className="text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:hidden"
-                          >
-                            Preço (sem IVA)
-                          </span>
-                          {/* ── PREENCHIDO E POR PREENCHER, INCONFUNDÍVEIS ──
+                          <label className="flex w-28 shrink-0 flex-col gap-1">
+                            <span
+                              aria-hidden="true"
+                              className="text-[9px] uppercase tracking-[0.2em] text-foreground/25 @min-[36rem]:hidden"
+                            >
+                              Preço (sem IVA)
+                            </span>
+                            {/* ── PREENCHIDO E POR PREENCHER, INCONFUNDÍVEIS ──
                               Tinha aqui `placeholder="900"`. Palavras dela: «um
                               número redondo e plausível como placeholder num
                               campo de preço é perigoso — mais cedo ou mais
@@ -9076,64 +9165,64 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               preço é sólida e escura, a que não tem é
                               tracejada, lavada, e diz «sem preço» — três
                               palavras que ninguém confunde com euros. */}
-                          <input
-                            /**
-                             * ── A CHAVE TRAZ O PREÇO GRAVADO DE VOLTA AO CAMPO ──
-                             * A linha é desenhada com `key={i}`, e o `i` é a
-                             * POSIÇÃO: ao apagar a do meio, o React reaproveita
-                             * o nó que sobrevive na posição e um `defaultValue`
-                             * não se volta a aplicar a um nó que já existia. O
-                             * campo ficava a mostrar o preço da linha ANTERIOR
-                             * ao lado do nome da linha nova — e o `blur`
-                             * seguinte GRAVAVA esse número por cima do
-                             * verdadeiro. Com [Alfa, Beta, Gama] a 100/200/300,
-                             * apagar a Beta e tocar no campo da Gama punha a
-                             * Gama a valer 200 €, e daí ia para o PDF, para o
-                             * sinal e para a factura. O mesmo acontecia no
-                             * arrumar, no Cmd+Z, no anular a limpeza e no repor
-                             * uma versão: o que estava no campo deixava de ser
-                             * o que estava no documento.
-                             *
-                             * Pôr o valor gravado na chave resolve-o pela raiz —
-                             * é o mesmo remédio que os valores adicionais já
-                             * usam aqui em baixo. A chave só muda quando o
-                             * DOCUMENTO muda, nunca a cada tecla: continua a
-                             * poder escrever-se «1.500,50» sem o campo se
-                             * reformatar a meio da escrita.
-                             */
-                            key={`preco:${i}:${l.preco}`}
-                            className={`bo-input px-2.5 py-2 text-right text-xs ${
-                              semPreco
-                                ? "border-dashed bg-[var(--bo-tinta-3)] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
-                                : "font-medium text-[var(--bo-text)]"
-                            }`}
-                            defaultValue={l.preco === null ? "" : String(l.preco)}
-                            // `onBlur` e não `onChange`: normalizar a cada tecla
-                            // apagava o que ela estava a escrever a meio ("1." vira
-                            // 1, e o "500" seguinte já não tinha onde entrar).
-                            onBlur={(e) => updateBudgetPrice(i, e.target.value)}
-                            placeholder="sem preço"
-                            inputMode="decimal"
-                            aria-label={`Preço de ${l.item || "linha sem nome"}`}
-                          />
-                        </label>
-                        {/* EXTRA OU NÃO. Uma caixa e não um menu: a pergunta é
+                            <input
+                              /**
+                               * ── A CHAVE TRAZ O PREÇO GRAVADO DE VOLTA AO CAMPO ──
+                               * A linha é desenhada com `key={i}`, e o `i` é a
+                               * POSIÇÃO: ao apagar a do meio, o React reaproveita
+                               * o nó que sobrevive na posição e um `defaultValue`
+                               * não se volta a aplicar a um nó que já existia. O
+                               * campo ficava a mostrar o preço da linha ANTERIOR
+                               * ao lado do nome da linha nova — e o `blur`
+                               * seguinte GRAVAVA esse número por cima do
+                               * verdadeiro. Com [Alfa, Beta, Gama] a 100/200/300,
+                               * apagar a Beta e tocar no campo da Gama punha a
+                               * Gama a valer 200 €, e daí ia para o PDF, para o
+                               * sinal e para a factura. O mesmo acontecia no
+                               * arrumar, no Cmd+Z, no anular a limpeza e no repor
+                               * uma versão: o que estava no campo deixava de ser
+                               * o que estava no documento.
+                               *
+                               * Pôr o valor gravado na chave resolve-o pela raiz —
+                               * é o mesmo remédio que os valores adicionais já
+                               * usam aqui em baixo. A chave só muda quando o
+                               * DOCUMENTO muda, nunca a cada tecla: continua a
+                               * poder escrever-se «1.500,50» sem o campo se
+                               * reformatar a meio da escrita.
+                               */
+                              key={`preco:${i}:${l.preco}`}
+                              className={`bo-input px-2.5 py-2 text-right text-xs ${
+                                semPreco
+                                  ? "border-dashed bg-[var(--bo-tinta-3)] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
+                                  : "font-medium text-[var(--bo-text)]"
+                              }`}
+                              defaultValue={l.preco === null ? "" : String(l.preco)}
+                              // `onBlur` e não `onChange`: normalizar a cada tecla
+                              // apagava o que ela estava a escrever a meio ("1." vira
+                              // 1, e o "500" seguinte já não tinha onde entrar).
+                              onBlur={(e) => updateBudgetPrice(i, e.target.value)}
+                              placeholder="sem preço"
+                              inputMode="decimal"
+                              aria-label={`Preço de ${l.item || "linha sem nome"}`}
+                            />
+                          </label>
+                          {/* EXTRA OU NÃO. Uma caixa e não um menu: a pergunta é
                           de sim ou não, e um menu de duas entradas custa duas
                           carregadas para responder a uma pergunta de uma.
                           A palavra «extra» some onde o cabeçalho da coluna já a
                           diz, e fica onde não há cabeçalho nenhum — pelo MESMO
                           limiar de contentor que o cabeçalho usa, que é o que
                           impede a palavra e o cabeçalho de se cruzarem. */}
-                        <label className="alvo-toque flex w-16 shrink-0 items-center justify-center gap-1.5 text-[11px] text-foreground/50">
-                          <input
-                            type="checkbox"
-                            checked={extrasDoDoc[i] ?? false}
-                            onChange={(e) => updateBudgetExtraFlag(i, e.target.checked)}
-                            aria-label={`${l.item || "Linha sem nome"} é um extra opcional`}
-                          />
-                          <span className="@min-[36rem]:hidden">extra</span>
-                        </label>
-                        {/* Onde a fila quebra não há cabeçalho de coluna, e
+                          <label className="alvo-toque flex w-16 shrink-0 items-center justify-center gap-1.5 text-[11px] text-foreground/50">
+                            <input
+                              type="checkbox"
+                              checked={extrasDoDoc[i] ?? false}
+                              onChange={(e) => updateBudgetExtraFlag(i, e.target.checked)}
+                              aria-label={`${l.item || "Linha sem nome"} é um extra opcional`}
+                            />
+                            <span className="@min-[36rem]:hidden">extra</span>
+                          </label>
+                          {/* Onde a fila quebra não há cabeçalho de coluna, e
                             portanto não há onde pendurar o «?» — o mesmo limiar
                             de contentor, pela mesma razão. Fica na PRIMEIRA linha,
                             que é o equivalente móvel do cabeçalho — e só nela:
@@ -9142,69 +9231,69 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                             Fora do `<label>`: um botão lá dentro carregaria a
                             quadrícula ao ser carregado. */}
-                        {ordemDoOrcamento[0] === i && (
-                          <Ajuda className="@min-[36rem]:hidden" sobre="o que faz a caixa Extra">
-                            <strong className="font-semibold text-[var(--bo-text)]">Extra</strong>{" "}
-                            marca uma linha como opcional: ela sai assinalada no quadro do PDF e,
-                            por baixo do total, a proposta passa a mostrar também o valor{" "}
-                            <em>sem</em> essa linha. Uma proposta só, com as duas versões lá dentro
-                            — em vez de dois documentos a divergir.
-                          </Ajuda>
-                        )}
-                        <button
-                          type="button"
-                          className={REMOVE_BTN}
-                          onClick={() => removeBudgetItem(i)}
-                          aria-label="Remover item"
-                        >
-                          ×
-                        </button>
-                        {/* A fórmula ao lado do número: um total que muda sozinho
+                          {ordemDoOrcamento[0] === i && (
+                            <Ajuda className="@min-[36rem]:hidden" sobre="o que faz a caixa Extra">
+                              <strong className="font-semibold text-[var(--bo-text)]">Extra</strong>{" "}
+                              marca uma linha como opcional: ela sai assinalada no quadro do PDF e,
+                              por baixo do total, a proposta passa a mostrar também o valor{" "}
+                              <em>sem</em> essa linha. Uma proposta só, com as duas versões lá
+                              dentro — em vez de dois documentos a divergir.
+                            </Ajuda>
+                          )}
+                          <button
+                            type="button"
+                            className={REMOVE_BTN}
+                            onClick={() => removeBudgetItem(i)}
+                            aria-label="Remover item"
+                          >
+                            ×
+                          </button>
+                          {/* A fórmula ao lado do número: um total que muda sozinho
                           e não explica porquê é um total em que se deixa de
                           confiar à primeira surpresa. E o preço UNITÁRIO ao pé
                           dela, que é a única coisa da fórmula que se edita. */}
-                        {escala && (
-                          <div className="flex w-full flex-wrap items-center gap-2 pl-1">
-                            <span className="w-24 shrink-0">
-                              <input
-                                // A mesma chave do preço, e pela mesma razão: o
-                                // unitário é um `defaultValue` num nó que a
-                                // remoção de uma linha reaproveita, e sem isto
-                                // ficava a mostrar o unitário da linha anterior
-                                // — com a fórmula ao lado a explicar uma conta
-                                // que já não era a desta linha.
-                                key={`unitario:${i}:${escala.unitario}`}
-                                className="bo-input px-2.5 py-2 text-right text-xs text-[var(--bo-tinta-72)]"
-                                defaultValue={String(escala.unitario)}
-                                onBlur={(e) => definirUnitario(i, e.target.value)}
-                                placeholder="45"
-                                inputMode="decimal"
-                                aria-label={`Preço por ${escala.tipo === "por-mesa" ? "mesa" : "convidado"} de ${l.item || "linha sem nome"}`}
-                              />
-                            </span>
-                            <span className="text-[10px] text-foreground/40">
-                              {`${formulaDaLinha(
-                                escala,
-                                convidados,
-                                doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
-                              )} = ${eur(
-                                totalDaLinha(
+                          {escala && (
+                            <div className="flex w-full flex-wrap items-center gap-2 pl-1">
+                              <span className="w-24 shrink-0">
+                                <input
+                                  // A mesma chave do preço, e pela mesma razão: o
+                                  // unitário é um `defaultValue` num nó que a
+                                  // remoção de uma linha reaproveita, e sem isto
+                                  // ficava a mostrar o unitário da linha anterior
+                                  // — com a fórmula ao lado a explicar uma conta
+                                  // que já não era a desta linha.
+                                  key={`unitario:${i}:${escala.unitario}`}
+                                  className="bo-input px-2.5 py-2 text-right text-xs text-[var(--bo-tinta-72)]"
+                                  defaultValue={String(escala.unitario)}
+                                  onBlur={(e) => definirUnitario(i, e.target.value)}
+                                  placeholder="45"
+                                  inputMode="decimal"
+                                  aria-label={`Preço por ${escala.tipo === "por-mesa" ? "mesa" : "convidado"} de ${l.item || "linha sem nome"}`}
+                                />
+                              </span>
+                              <span className="text-[10px] text-foreground/40">
+                                {`${formulaDaLinha(
                                   escala,
                                   convidados,
                                   doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
-                                ) ?? 0,
-                              )}`}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
-                      + Adicionar item
-                    </button>
-                    {/* O CONTADOR, no lugar onde estava «Soma das linhas».
+                                )} = ${eur(
+                                  totalDaLinha(
+                                    escala,
+                                    convidados,
+                                    doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
+                                  ) ?? 0,
+                                )}`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
+                        + Adicionar item
+                      </button>
+                      {/* O CONTADOR, no lugar onde estava «Soma das linhas».
                         A soma mudou-se para o bloco de totais (que a mostra
                         pela ordem do PDF); aqui fica a única coisa que este
                         sítio pode responder melhor do que ele — quantas destas
@@ -9225,77 +9314,77 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         também não diz nada que se aproveite. O contador fica
                         para o caso em que ele responde mesmo a alguma coisa —
                         quando há preços por linha para contar. */}
-                    {contagem.total > 0 &&
-                      (contagem.comPreco === 0 && parseMoneyText(totalInput) > 0 ? (
-                        <span className="text-xs text-[var(--bo-text-muted)]">
-                          Preço definido no total — as linhas não levam valor
-                        </span>
-                      ) : contagem.comPreco > 0 ? (
-                        <span className="text-xs text-[var(--bo-text-muted)]">
-                          {contagem.frase}
-                        </span>
-                      ) : null)}
-                  </div>
-                  {/* ── UMAS COM PREÇO, OUTRAS SEM: A SOMA ESTÁ INCOMPLETA ──
+                      {contagem.total > 0 &&
+                        (contagem.comPreco === 0 && parseMoneyText(totalInput) > 0 ? (
+                          <span className="text-xs text-[var(--bo-text-muted)]">
+                            Preço definido no total — as linhas não levam valor
+                          </span>
+                        ) : contagem.comPreco > 0 ? (
+                          <span className="text-xs text-[var(--bo-text-muted)]">
+                            {contagem.frase}
+                          </span>
+                        ) : null)}
+                    </div>
+                    {/* ── UMAS COM PREÇO, OUTRAS SEM: A SOMA ESTÁ INCOMPLETA ──
                       É o caso que mente sem parecer. Nenhuma linha com preço é
                       «ainda não orçamentei» e não soma nada; TODAS com preço é
                       uma soma verdadeira. O meio dá um número plausível que
                       está errado por baixo — e é a partir dele que o aviso de
                       desalinhamento e o botão que arruma o total falam. */}
-                  {contagem.incompleta && (
-                    <p className="flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
-                      <span aria-hidden="true">⚠</span>
-                      <span>
-                        {contagem.semPreco === 1
-                          ? "1 linha ainda não tem preço"
-                          : `${contagem.semPreco} linhas ainda não têm preço`}
-                        , por isso a soma dos serviços está incompleta — o que aparece nos totais
-                        conta só as {contagem.comPreco} que têm.
-                      </span>
-                    </p>
-                  )}
+                    {contagem.incompleta && (
+                      <p className="flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                        <span aria-hidden="true">⚠</span>
+                        <span>
+                          {contagem.semPreco === 1
+                            ? "1 linha ainda não tem preço"
+                            : `${contagem.semPreco} linhas ainda não têm preço`}
+                          , por isso a soma dos serviços está incompleta — o que aparece nos totais
+                          conta só as {contagem.comPreco} que têm.
+                        </span>
+                      </p>
+                    )}
 
-                  {/* ── AS DUAS VERSÕES, SEM SEREM DUAS PROPOSTAS ──────────
+                    {/* ── AS DUAS VERSÕES, SEM SEREM DUAS PROPOSTAS ──────────
                       Assim que uma linha é marcada como extra, esta proposta
                       passa a responder ao "e sem isso, quanto fica?" — e o PDF
                       leva os dois números. É de propósito que só o total com
                       extras é escrito à mão: o outro é a subtracção, e dois
                       números escritos podiam discordar no dia em que ela
                       corrigisse só um. */}
-                  {(() => {
-                    // Sem segundo argumento: a base sai do próprio documento, e é a
-                    // mesma leitura que o PDF faz. Passar `totalAmount` cru dava a
-                    // base em «acrescer» e o BRUTO em «IVA incluído» — o ecrã e o
-                    // documento a discordarem sobre o mesmo casamento.
-                    const v = totaisDasVersoes(doc as ProposalDoc);
-                    if (!v) return null;
-                    return (
-                      <div className="mt-1 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2.5">
-                        {/* O IMPACTO, na frase que ela pediu: quantos estão
+                    {(() => {
+                      // Sem segundo argumento: a base sai do próprio documento, e é a
+                      // mesma leitura que o PDF faz. Passar `totalAmount` cru dava a
+                      // base em «acrescer» e o BRUTO em «IVA incluído» — o ecrã e o
+                      // documento a discordarem sobre o mesmo casamento.
+                      const v = totaisDasVersoes(doc as ProposalDoc);
+                      if (!v) return null;
+                      return (
+                        <div className="mt-1 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2.5">
+                          {/* O IMPACTO, na frase que ela pediu: quantos estão
                             marcados, e quanto vale a proposta com eles. */}
-                        <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
-                          {`${v.linhasExtra} ${v.linhasExtra === 1 ? "item marcado" : "itens marcados"} como extra · versão com extras: `}
-                          <strong className="font-semibold text-[var(--bo-text)]">
-                            {eur(v.comoOTotal.comExtras)}
-                          </strong>
-                          {" · versão base: "}
-                          <strong className="font-semibold text-[var(--bo-text)]">
-                            {eur(v.comoOTotal.base)}
-                          </strong>
-                        </p>
-                        {v.extrasSemPreco > 0 && (
-                          <p className="mt-0.5 text-[11px] leading-relaxed text-[#8a6420]">
-                            {v.extrasSemPreco === 1
-                              ? "Um dos extras não tem preço, por isso não desce da versão base — e enquanto assim for o PDF não mostra o segundo valor."
-                              : `${v.extrasSemPreco} extras não têm preço, por isso não descem da versão base — e enquanto assim for o PDF não mostra o segundo valor.`}
+                          <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                            {`${v.linhasExtra} ${v.linhasExtra === 1 ? "item marcado" : "itens marcados"} como extra · versão com extras: `}
+                            <strong className="font-semibold text-[var(--bo-text)]">
+                              {eur(v.comoOTotal.comExtras)}
+                            </strong>
+                            {" · versão base: "}
+                            <strong className="font-semibold text-[var(--bo-text)]">
+                              {eur(v.comoOTotal.base)}
+                            </strong>
                           </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
-                  {/* ── «LADO A LADO» É UMA PERGUNTA DE CONTENTOR ───────────
+                          {v.extrasSemPreco > 0 && (
+                            <p className="mt-0.5 text-[11px] leading-relaxed text-[#8a6420]">
+                              {v.extrasSemPreco === 1
+                                ? "Um dos extras não tem preço, por isso não desce da versão base — e enquanto assim for o PDF não mostra o segundo valor."
+                                : `${v.extrasSemPreco} extras não têm preço, por isso não descem da versão base — e enquanto assim for o PDF não mostra o segundo valor.`}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
+                    {/* ── «LADO A LADO» É UMA PERGUNTA DE CONTENTOR ───────────
                       Era `xl:` — 1280 de JANELA —, e a janela não sabe nada
                       desta caixa: ela é METADE da coluna de conteúdo, ou seja
                       ~245 px aos 1024 e ~280 aos 1440. Duas colunas de 240 px
@@ -9309,50 +9398,50 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       que é a primeira das respostas que o
                       `Cortes.contrato.test.ts` manda dar quando a pergunta é
                       sobre o contentor. */}
-                  <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-                    <Field
-                      containerClassName="min-w-0 grow basis-[14rem]"
-                      label="Rótulo do total"
-                      value={doc.totalLabel}
-                      onChange={(e) => patch({ totalLabel: e.target.value })}
-                      data-campo="totalLabel"
-                      placeholder="Valor Total Decoração"
-                    />
-                    {/* «Valor Total Decoração» já sai «Decoration Total» por
+                    <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+                      <Field
+                        containerClassName="min-w-0 grow basis-[14rem]"
+                        label="Rótulo do total"
+                        value={doc.totalLabel}
+                        onChange={(e) => patch({ totalLabel: e.target.value })}
+                        data-campo="totalLabel"
+                        placeholder="Valor Total Decoração"
+                      />
+                      {/* «Valor Total Decoração» já sai «Decoration Total» por
                         reconhecimento; um rótulo reescrito à mão deixa de ser
                         reconhecido, e é para esse que a caixa existe. */}
-                    {caixaDeIngles({ tipo: "totalLabel" }, "Rótulo do total", {
-                      className: "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
-                      placeholder: "Decoration Total",
-                    })}
+                      {caixaDeIngles({ tipo: "totalLabel" }, "Rótulo do total", {
+                        className: "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                        placeholder: "Decoration Total",
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* Valores adicionais — linhas do orçamento que entram no total
+                  {/* Valores adicionais — linhas do orçamento que entram no total
                   (Deslocação, Wedding Coordinator, Tecidos, Mobiliário opção A/B, …).
                   Escrever um valor aqui SOMA-O ao total: ver `definirExtras`. */}
-                <div className="mt-5">
-                  <span className="bo-eyebrow">Valores adicionais</span>
-                  <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
-                    Linhas mostradas na proposta antes do total (ex.: deslocação, coordenação,
-                    tecidos). Entram no sinal e no que o casal paga.
-                  </p>
-                  {/**
-                   * A ESCOLHA QUE VALE DINHEIRO, FEITA À VISTA.
-                   *
-                   * Palavras dela, sobre uma proposta já enviada: «aparece
-                   * "Subtotal dos serviços 2.860" e depois "+140 de
-                   * deslocação". Está mal, porque nós tínhamos dito três mil
-                   * MAIS cento e quarenta, e depois mais o IVA.»
-                   *
-                   * As duas leituras são legítimas e a diferença é o que o
-                   * casal paga, por isso escolhe-se aqui, por proposta, e a
-                   * frase por baixo diz o que cada uma faz aos números que
-                   * estão neste ecrã. Uma proposta antiga não muda: nasceu
-                   * sem este campo e continua a ler-se como foi enviada.
-                   */}
-                  <div className="mb-3 flex flex-col gap-1.5">
-                    {/* ── A EXPLICAÇÃO SAIU DE DENTRO DO `<option>` ─────────
+                  <div className="mt-5">
+                    <span className="bo-eyebrow">Valores adicionais</span>
+                    <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
+                      Linhas mostradas na proposta antes do total (ex.: deslocação, coordenação,
+                      tecidos). Entram no sinal e no que o casal paga.
+                    </p>
+                    {/**
+                     * A ESCOLHA QUE VALE DINHEIRO, FEITA À VISTA.
+                     *
+                     * Palavras dela, sobre uma proposta já enviada: «aparece
+                     * "Subtotal dos serviços 2.860" e depois "+140 de
+                     * deslocação". Está mal, porque nós tínhamos dito três mil
+                     * MAIS cento e quarenta, e depois mais o IVA.»
+                     *
+                     * As duas leituras são legítimas e a diferença é o que o
+                     * casal paga, por isso escolhe-se aqui, por proposta, e a
+                     * frase por baixo diz o que cada uma faz aos números que
+                     * estão neste ecrã. Uma proposta antiga não muda: nasceu
+                     * sem este campo e continua a ler-se como foi enviada.
+                     */}
+                    <div className="mb-3 flex flex-col gap-1.5">
+                      {/* ── A EXPLICAÇÃO SAIU DE DENTRO DO `<option>` ─────────
                         MEDIDO a 375 px: a opção mais comprida — «é só dos
                         serviços, estas linhas somam-se» — precisa de 231 px de
                         letra numa caixa cujo texto tem 261 px de largura útil,
@@ -9377,43 +9466,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         causa disso. A frase de apoio aqui em baixo pode
                         dizê-las — é um `<p>`, e `findByLabelText` não lê
                         parágrafos. */}
-                    <span
-                      aria-hidden="true"
-                      className="text-[9px] tracking-[0.2em] uppercase text-foreground/25"
-                    >
-                      Como contam no preço final
-                    </span>
-                    <select
-                      id="adicionais-modo"
-                      aria-label="Como contam os valores adicionais no preço final"
-                      className="bo-input alvo-toque px-2.5 py-2 text-xs"
-                      value={doc.budgetExtrasSomam ? "somam" : "dentro"}
-                      onChange={(e) => trocarModoDosAdicionais(e.target.value === "somam")}
-                    >
-                      <option value="dentro">Já incluídas no valor</option>
-                      <option value="somam">Somam ao valor</option>
-                    </select>
-                    <p className="text-xs leading-relaxed text-foreground/45">
-                      {doc.budgetExtrasSomam ? (
-                        <>
-                          O valor que escreveste em «Valor (sem IVA)» é só dos serviços, e estas
-                          linhas somam-se a ele. Subtotal dos serviços{" "}
-                          <strong className="font-semibold">{eur(totais.servicos)}</strong>, mais{" "}
-                          {eur(totais.adicionais)} destas linhas, dá {eur(totais.total)} sem IVA e{" "}
-                          {eur(totais.aPagar)} a pagar.
-                        </>
-                      ) : (
-                        <>
-                          O valor que escreveste em «Valor (sem IVA)» já inclui estas linhas: o
-                          subtotal dos serviços fica{" "}
-                          <strong className="font-semibold">{eur(totais.servicos)}</strong> e o
-                          total sem IVA continua {eur(totais.total)}.
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="@container flex flex-col gap-2">
-                    {/* Os rótulos das colunas escondem-se onde as colunas não
+                      <span
+                        aria-hidden="true"
+                        className="text-[9px] tracking-[0.2em] uppercase text-foreground/25"
+                      >
+                        Como contam no preço final
+                      </span>
+                      <select
+                        id="adicionais-modo"
+                        aria-label="Como contam os valores adicionais no preço final"
+                        className="bo-input alvo-toque px-2.5 py-2 text-xs"
+                        value={doc.budgetExtrasSomam ? "somam" : "dentro"}
+                        onChange={(e) => trocarModoDosAdicionais(e.target.value === "somam")}
+                      >
+                        <option value="dentro">Já incluídas no valor</option>
+                        <option value="somam">Somam ao valor</option>
+                      </select>
+                      <p className="text-xs leading-relaxed text-foreground/45">
+                        {doc.budgetExtrasSomam ? (
+                          <>
+                            O valor que escreveste em «Valor (sem IVA)» é só dos serviços, e estas
+                            linhas somam-se a ele. Subtotal dos serviços{" "}
+                            <strong className="font-semibold">{eur(totais.servicos)}</strong>, mais{" "}
+                            {eur(totais.adicionais)} destas linhas, dá {eur(totais.total)} sem IVA e{" "}
+                            {eur(totais.aPagar)} a pagar.
+                          </>
+                        ) : (
+                          <>
+                            O valor que escreveste em «Valor (sem IVA)» já inclui estas linhas: o
+                            subtotal dos serviços fica{" "}
+                            <strong className="font-semibold">{eur(totais.servicos)}</strong> e o
+                            total sem IVA continua {eur(totais.total)}.
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <div className="@container flex flex-col gap-2">
+                      {/* Os rótulos das colunas escondem-se onde as colunas não
                         existem: abaixo do limiar a linha passa a ser duas filas,
                         e um cabeçalho de quatro colunas por cima disso seria
                         uma legenda para uma grelha que não está lá.
@@ -9426,66 +9515,67 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         (7 rem + 9 rem) e do botão. O cabeçalho e a linha lêem o
                         MESMO limiar: separá-los é o que dá parágrafos a meia
                         largura numa grelha de uma coluna. */}
-                    <div className="hidden @min-[26rem]:grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                      <span>Descrição</span>
-                      <span className="text-right">Valor (€)</span>
-                      <span>IVA da linha</span>
-                      <span className="w-5" />
-                    </div>
-                    {(doc.budgetExtras ?? []).map((ex, i) => {
-                      const modo = modoDoAdicional(
-                        ex.valueText ?? "",
-                        doc.vatRate ?? DEFAULT_VAT_RATE,
-                      );
-                      const numero = normalizarValor(ex.valueText);
-                      return (
-                        <div
-                          key={i}
-                          /**
-                           * ── A CAIXA DA DESCRIÇÃO COM 22 px ────────────────
-                           *
-                           * Medido a 375 px: as duas colunas fixas (7rem do
-                           * valor + 9rem do IVA) mais a coluna do botão comem
-                           * a largura toda, e ao `minmax(0,1fr)` da descrição
-                           * sobravam 22 px, uma caixa onde não cabe uma
-                           * palavra, no campo que dá nome à linha que o casal
-                           * vai ler.
-                           *
-                           * Abaixo de 26 rem DE LISTA (e não de janela) a linha
-                           * passa a duas filas: a descrição sozinha em cima, e o
-                           * valor, o IVA e o botão de apagar por baixo. Acima
-                           * disso fica exactamente como estava.
-                           */
-                          className="grid grid-cols-[minmax(0,1fr)_auto] @min-[26rem]:grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
-                        >
-                          {/* Um invólucro só para as duas caixas ficarem uma por
+                      <div className="hidden @min-[26rem]:grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                        <span>Descrição</span>
+                        <span className="text-right">Valor (€)</span>
+                        <span>IVA da linha</span>
+                        <span className="w-5" />
+                      </div>
+                      {(doc.budgetExtras ?? []).map((ex, i) => {
+                        const modo = modoDoAdicional(
+                          ex.valueText ?? "",
+                          doc.vatRate ?? DEFAULT_VAT_RATE,
+                        );
+                        const numero = normalizarValor(ex.valueText);
+                        return (
+                          <div
+                            key={i}
+                            /**
+                             * ── A CAIXA DA DESCRIÇÃO COM 22 px ────────────────
+                             *
+                             * Medido a 375 px: as duas colunas fixas (7rem do
+                             * valor + 9rem do IVA) mais a coluna do botão comem
+                             * a largura toda, e ao `minmax(0,1fr)` da descrição
+                             * sobravam 22 px, uma caixa onde não cabe uma
+                             * palavra, no campo que dá nome à linha que o casal
+                             * vai ler.
+                             *
+                             * Abaixo de 26 rem DE LISTA (e não de janela) a linha
+                             * passa a duas filas: a descrição sozinha em cima, e o
+                             * valor, o IVA e o botão de apagar por baixo. Acima
+                             * disso fica exactamente como estava.
+                             */
+                            className="grid grid-cols-[minmax(0,1fr)_auto] @min-[26rem]:grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
+                          >
+                            {/* Um invólucro só para as duas caixas ficarem uma por
                               cima da outra DENTRO da primeira coluna — a linha é
                               uma grelha, e um filho solto abriria uma coluna
                               nova em vez de descer. */}
-                          <div className="col-span-2 min-w-0 @min-[26rem]:col-span-1">
-                            <input
-                              className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
-                              value={ex.label}
-                              onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
-                              data-campo={`extraRotulo:${i}`}
-                              placeholder="Deslocação da equipa Líquen"
-                              aria-label="Descrição da linha adicional"
-                            />
-                            {caixaDeIngles(
-                              { tipo: "extraRotulo", i },
-                              "Descrição da linha adicional",
-                              {
-                                className: "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
-                                placeholder: "Líquen team travel",
-                                // EMPILHADA: esta já vive numa célula estreita
-                                // de uma grelha de dois (o rótulo à esquerda, o
-                                // valor à direita). Parti-la outra vez ao meio
-                                // dava duas caixas onde não cabe «Deslocação».
-                                empilhada: true,
-                              },
-                            )}
-                          </div>
-                          {/* ── UM CAMPO DE DINHEIRO, NÃO UM CAMPO DE TEXTO ──
+                            <div className="col-span-2 min-w-0 @min-[26rem]:col-span-1">
+                              <input
+                                className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+                                value={ex.label}
+                                onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                                data-campo={`extraRotulo:${i}`}
+                                placeholder="Deslocação da equipa Líquen"
+                                aria-label="Descrição da linha adicional"
+                              />
+                              {caixaDeIngles(
+                                { tipo: "extraRotulo", i },
+                                "Descrição da linha adicional",
+                                {
+                                  className:
+                                    "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                  placeholder: "Líquen team travel",
+                                  // EMPILHADA: esta já vive numa célula estreita
+                                  // de uma grelha de dois (o rótulo à esquerda, o
+                                  // valor à direita). Parti-la outra vez ao meio
+                                  // dava duas caixas onde não cabe «Deslocação».
+                                  empilhada: true,
+                                },
+                              )}
+                            </div>
+                            {/* ── UM CAMPO DE DINHEIRO, NÃO UM CAMPO DE TEXTO ──
                               Chamava-se «Valor (texto)» e aceitava o que lhe
                               escrevessem — que é o que se pede a um campo cujo
                               conteúdo é impresso no PDF tal e qual. O preço
@@ -9504,76 +9594,76 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               escrever a meio. O `key` traz o valor gravado de
                               volta ao campo quando ele muda por outra via (o
                               selector do IVA, a deslocação calculada, o anular). */}
-                          <input
-                            key={`${i}:${ex.valueText}`}
-                            className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] text-right"
-                            defaultValue={numero === null ? (ex.valueText ?? "") : String(numero)}
-                            onBlur={(e) => definirValorDoAdicional(i, e.target.value)}
-                            placeholder="896"
-                            inputMode="decimal"
-                            aria-label={`Valor de ${ex.label?.trim() || "linha adicional sem nome"}`}
-                          />
-                          <select
-                            className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
-                            value={modo}
-                            onChange={(e) =>
-                              definirIvaDoAdicional(i, e.target.value as ModoDeIvaDoAdicional)
-                            }
-                            aria-label={`IVA de ${ex.label?.trim() || "linha adicional sem nome"}`}
-                          >
-                            <option value="documento">Como o total</option>
-                            <option value="acrescer">+ IVA</option>
-                            <option value="incluido">IVA incluído</option>
-                          </select>
-                          <button
-                            type="button"
-                            className={REMOVE_BTN}
-                            onClick={() => removeBudgetExtra(i)}
-                            aria-label="Remover linha adicional"
-                          >
-                            ×
-                          </button>
-                          {/* O que fica escrito na proposta, à letra. É a única
+                            <input
+                              key={`${i}:${ex.valueText}`}
+                              className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] text-right"
+                              defaultValue={numero === null ? (ex.valueText ?? "") : String(numero)}
+                              onBlur={(e) => definirValorDoAdicional(i, e.target.value)}
+                              placeholder="896"
+                              inputMode="decimal"
+                              aria-label={`Valor de ${ex.label?.trim() || "linha adicional sem nome"}`}
+                            />
+                            <select
+                              className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
+                              value={modo}
+                              onChange={(e) =>
+                                definirIvaDoAdicional(i, e.target.value as ModoDeIvaDoAdicional)
+                              }
+                              aria-label={`IVA de ${ex.label?.trim() || "linha adicional sem nome"}`}
+                            >
+                              <option value="documento">Como o total</option>
+                              <option value="acrescer">+ IVA</option>
+                              <option value="incluido">IVA incluído</option>
+                            </select>
+                            <button
+                              type="button"
+                              className={REMOVE_BTN}
+                              onClick={() => removeBudgetExtra(i)}
+                              aria-label="Remover linha adicional"
+                            >
+                              ×
+                            </button>
+                            {/* O que fica escrito na proposta, à letra. É a única
                               forma de ela ver que «1500» e «+ IVA» viram
                               «1 500,00 € + IVA» no papel — e de um texto livre
                               antigo («a definir») se ver que continua lá. */}
-                          {(ex.valueText ?? "").trim() !== "" && (
-                            <span className="col-span-full pl-1 text-[10px] text-foreground/35">
-                              {`No PDF: ${ex.valueText}`}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
-                      + Adicionar valor adicional
-                    </button>
-                    {/* O «Somado ao total: X» que aqui estava saiu para o bloco
+                            {(ex.valueText ?? "").trim() !== "" && (
+                              <span className="col-span-full pl-1 text-[10px] text-foreground/35">
+                                {`No PDF: ${ex.valueText}`}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
+                        + Adicionar valor adicional
+                      </button>
+                      {/* O «Somado ao total: X» que aqui estava saiu para o bloco
                         de totais, onde é a linha «Valores adicionais». A conta
                         continua à vista — deixou é de ser a terceira soma
                         diferente no mesmo ecrã. */}
+                    </div>
                   </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="@container flex flex-col gap-2 mb-3">
-                  {/* Os cabeçalhos só a partir das 26 rem DESTA lista: abaixo
+                </>
+              ) : (
+                <>
+                  <div className="@container flex flex-col gap-2 mb-3">
+                    {/* Os cabeçalhos só a partir das 26 rem DESTA lista: abaixo
                       disso a linha passa a duas filas, e três títulos por cima
                       de duas filas nomeiam colunas que ali não existem.
 
                       Era `sm:` — 640 de JANELA —, e a fila quebra por CAIXA:
                       aos 1024 a coluna de conteúdo tem 504 px e não 975. O
                       cabeçalho e a linha partilham o limiar de propósito. */}
-                  <div className="hidden grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 @min-[26rem]:grid">
-                    <span>Item</span>
-                    <span className="text-right">Valor</span>
-                    <span className="w-5" />
-                  </div>
-                  {(doc.budgetRows ?? []).map((r, i) => (
-                    <div
-                      key={i}
-                      /* ── A DESCRIÇÃO SOZINHA EM CIMA, NO TELEMÓVEL ──────────
+                    <div className="hidden grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 @min-[26rem]:grid">
+                      <span>Item</span>
+                      <span className="text-right">Valor</span>
+                      <span className="w-5" />
+                    </div>
+                    {(doc.budgetRows ?? []).map((r, i) => (
+                      <div
+                        key={i}
+                        /* ── A DESCRIÇÃO SOZINHA EM CIMA, NO TELEMÓVEL ──────────
                          Do registo do audit: «a descrição da linha fica com 122
                          px numa grelha que não tem variante de telemóvel».
 
@@ -9587,38 +9677,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          fazem: a descrição a ocupar a fila toda, e o valor mais
                          o botão de apagar por baixo. Acima das 26 rem de lista
                          fica exactamente como estava. */
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[26rem]:grid-cols-[minmax(0,1fr)_10rem_auto]"
-                    >
-                      <input
-                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] @min-[26rem]:col-span-1"
-                        value={r.item}
-                        onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
-                        placeholder="Coordenação do dia"
-                        aria-label="Item"
-                        data-campo={chaveDoCampo({ tipo: "linhaEstimada", i })}
-                      />
-                      <input
-                        className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] text-right"
-                        value={r.price}
-                        onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
-                        placeholder="1.500,00 €"
-                        aria-label="Valor"
-                      />
-                      <button
-                        type="button"
-                        className={REMOVE_BTN}
-                        onClick={() => removeBudgetRow(i)}
-                        aria-label="Remover linha"
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[26rem]:grid-cols-[minmax(0,1fr)_10rem_auto]"
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
-                    + Adicionar linha
-                  </button>
-                </div>
-                {/* O par PT/EN numa linha só quando as duas caixas cabem — ver
+                        <input
+                          className="bo-input col-span-2 px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] @min-[26rem]:col-span-1"
+                          value={r.item}
+                          onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
+                          placeholder="Coordenação do dia"
+                          aria-label="Item"
+                          data-campo={chaveDoCampo({ tipo: "linhaEstimada", i })}
+                        />
+                        <input
+                          className="bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)] text-right"
+                          value={r.price}
+                          onChange={(e) => updateBudgetRow(i, { price: e.target.value })}
+                          placeholder="1.500,00 €"
+                          aria-label="Valor"
+                        />
+                        <button
+                          type="button"
+                          className={REMOVE_BTN}
+                          onClick={() => removeBudgetRow(i)}
+                          aria-label="Remover linha"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
+                      + Adicionar linha
+                    </button>
+                  </div>
+                  {/* O par PT/EN numa linha só quando as duas caixas cabem — ver
                     `aoLado`, em `CaixaInglesa`.
 
                     Era `xl:` (1280 de JANELA) e o que manda é a largura desta
@@ -9627,249 +9717,249 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     de 274 px não é «lado a lado». Sem ponto de corte nenhum:
                     20 rem de base para a portuguesa (é um `textarea` de prosa),
                     as 12 rem que a inglesa já pede, e o `flex-wrap` decide. */}
-                <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-                  <Field
-                    containerClassName="min-w-0 grow basis-[20rem]"
-                    as="textarea"
-                    label="Nota do orçamento"
-                    rows={2}
-                    className="resize-none"
-                    value={doc.budgetNote ?? ""}
-                    onChange={(e) => patch({ budgetNote: e.target.value })}
-                    data-campo="budgetNote"
-                    placeholder="Os valores são estimativas e podem ser ajustados…"
-                  />
-                  {caixaDeIngles({ tipo: "budgetNote" }, "Nota do orçamento", {
-                    className: `${INPUT_SM} w-full resize-none leading-relaxed`,
-                    as: "textarea",
-                    rows: 2,
-                  })}
-                </div>
-              </>
-            )}
-          </Section>
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
+                    <Field
+                      containerClassName="min-w-0 grow basis-[20rem]"
+                      as="textarea"
+                      label="Nota do orçamento"
+                      rows={2}
+                      className="resize-none"
+                      value={doc.budgetNote ?? ""}
+                      onChange={(e) => patch({ budgetNote: e.target.value })}
+                      data-campo="budgetNote"
+                      placeholder="Os valores são estimativas e podem ser ajustados…"
+                    />
+                    {caixaDeIngles({ tipo: "budgetNote" }, "Nota do orçamento", {
+                      className: `${INPUT_SM} w-full resize-none leading-relaxed`,
+                      as: "textarea",
+                      rows: 2,
+                    })}
+                  </div>
+                </>
+              )}
+            </Section>
 
-          {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
+            {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
-          {/* ── O painel que o cliente nunca vê ────────────────────────────
+            {/* ── O painel que o cliente nunca vê ────────────────────────────
               Custos, margem, deslocação calculada e o aviso de valor fora do
               habitual. Vive AQUI, no fim do orçamento, porque é aqui que os
               números que ele comenta acabam de ser escritos. */}
-          <PainelInterno
-            doc={doc as ProposalDoc}
-            quote={quote}
-            quotes={quotes}
-            totalBruto={money.gross}
-            onCusto={(i, custo) =>
-              setDoc((d) => ({
-                ...d,
-                // O array dos custos acompanha sempre o das linhas — se ficasse
-                // mais curto, o índice 3 passava a ser o custo da linha 4.
-                budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
-              }))
-            }
-            /**
-             * Os quilómetros até ao local ficam no DOCUMENTO, não num estado
-             * do ecrã: é isso que os torna o número desta proposta e que
-             * impede que mudar a sede ou o preço do gasóleo lhes toque depois.
-             *
-             * `null` apaga o campo — «não decidi», e a tabela volta a sugerir.
-             * Escrever 0 aqui seria dizer «é em casa», que é outra coisa.
-             */
-            onKm={(km) =>
-              setDoc((d) => {
-                if (km === null) {
-                  const { kmDeslocacao: _fora, ...resto } = d;
-                  void _fora;
-                  return resto;
-                }
-                return { ...d, kmDeslocacao: km };
-              })
-            }
-            onDeslocacao={(label, valueText) => {
-              // Se já lá está uma linha de deslocação, actualiza-se essa em
-              // vez de acrescentar uma segunda — duas linhas de deslocação
-              // numa proposta são uma pergunta do cliente ao telefone.
-              //
-              // Passa por `definirExtras` como todas as outras: aceitar a
-              // deslocação calculada tem de somar ao total, ou volta a haver
-              // um valor na proposta que não está no que se cobra.
-              const extras = [...(doc.budgetExtras ?? [])];
-              const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
-              if (i >= 0) extras[i] = { ...extras[i], label, valueText };
-              else extras.push({ label, valueText });
-              /**
-               * ── E PERGUNTA-SE, COM OS DOIS NÚMEROS À VISTA ────────────────
-               * «Pôr nos valores adicionais» é a segunda acção do editor que
-               * muda o preço final de uma só carregada: a deslocação calculada
-               * SOMA-SE ao total, e portanto ao sinal e à fatura. Levava
-               * nenhuma pergunta e nenhuma volta atrás — o mesmo desenho do
-               * «Usar X €», e por isso o mesmo tratamento.
-               */
-              const contexto = { mode: vatMode, vatRate: doc.vatRate };
-              const antes = parseMoneyText(totalInput);
-              const depois = Math.max(
-                0,
-                Math.round(
-                  (antes +
-                    somaDosExtrasSemIva(extras, contexto) -
-                    somaDosExtrasSemIva(doc.budgetExtras ?? [], contexto)) *
-                    100,
-                ) / 100,
-              );
-              // Sem diferença nenhuma no dinheiro (a mesma deslocação outra
-              // vez) não há nada a confirmar: aplica-se e cala-se.
-              if (Math.abs(depois - antes) <= 0.01) {
-                definirExtras(extras);
-                return;
+            <PainelInterno
+              doc={doc as ProposalDoc}
+              quote={quote}
+              quotes={quotes}
+              totalBruto={money.gross}
+              onCusto={(i, custo) =>
+                setDoc((d) => ({
+                  ...d,
+                  // O array dos custos acompanha sempre o das linhas — se ficasse
+                  // mais curto, o índice 3 passava a ser o custo da linha 4.
+                  budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
+                }))
               }
-              pedirConfirmacaoDeDinheiro({
-                oQue: "o total",
-                de: antes,
-                para: depois,
-                registo: `Deslocação calculada (${valueText}) posta nos valores adicionais no estúdio: preço final de ${eur(antes)} para ${eur(depois)}.`,
-                motivo: "Deslocação posta nos valores adicionais.",
-                aplicar: () => definirExtras(extras),
-              });
-            }}
-          />
+              /**
+               * Os quilómetros até ao local ficam no DOCUMENTO, não num estado
+               * do ecrã: é isso que os torna o número desta proposta e que
+               * impede que mudar a sede ou o preço do gasóleo lhes toque depois.
+               *
+               * `null` apaga o campo — «não decidi», e a tabela volta a sugerir.
+               * Escrever 0 aqui seria dizer «é em casa», que é outra coisa.
+               */
+              onKm={(km) =>
+                setDoc((d) => {
+                  if (km === null) {
+                    const { kmDeslocacao: _fora, ...resto } = d;
+                    void _fora;
+                    return resto;
+                  }
+                  return { ...d, kmDeslocacao: km };
+                })
+              }
+              onDeslocacao={(label, valueText) => {
+                // Se já lá está uma linha de deslocação, actualiza-se essa em
+                // vez de acrescentar uma segunda — duas linhas de deslocação
+                // numa proposta são uma pergunta do cliente ao telefone.
+                //
+                // Passa por `definirExtras` como todas as outras: aceitar a
+                // deslocação calculada tem de somar ao total, ou volta a haver
+                // um valor na proposta que não está no que se cobra.
+                const extras = [...(doc.budgetExtras ?? [])];
+                const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
+                if (i >= 0) extras[i] = { ...extras[i], label, valueText };
+                else extras.push({ label, valueText });
+                /**
+                 * ── E PERGUNTA-SE, COM OS DOIS NÚMEROS À VISTA ────────────────
+                 * «Pôr nos valores adicionais» é a segunda acção do editor que
+                 * muda o preço final de uma só carregada: a deslocação calculada
+                 * SOMA-SE ao total, e portanto ao sinal e à fatura. Levava
+                 * nenhuma pergunta e nenhuma volta atrás — o mesmo desenho do
+                 * «Usar X €», e por isso o mesmo tratamento.
+                 */
+                const contexto = { mode: vatMode, vatRate: doc.vatRate };
+                const antes = parseMoneyText(totalInput);
+                const depois = Math.max(
+                  0,
+                  Math.round(
+                    (antes +
+                      somaDosExtrasSemIva(extras, contexto) -
+                      somaDosExtrasSemIva(doc.budgetExtras ?? [], contexto)) *
+                      100,
+                  ) / 100,
+                );
+                // Sem diferença nenhuma no dinheiro (a mesma deslocação outra
+                // vez) não há nada a confirmar: aplica-se e cala-se.
+                if (Math.abs(depois - antes) <= 0.01) {
+                  definirExtras(extras);
+                  return;
+                }
+                pedirConfirmacaoDeDinheiro({
+                  oQue: "o total",
+                  de: antes,
+                  para: depois,
+                  registo: `Deslocação calculada (${valueText}) posta nos valores adicionais no estúdio: preço final de ${eur(antes)} para ${eur(depois)}.`,
+                  motivo: "Deslocação posta nos valores adicionais.",
+                  aplicar: () => definirExtras(extras),
+                });
+              }}
+            />
 
-          <Section
-            title="Total, IVA e validade"
-            id="total"
-            rodape={notaDaSeccao("total", "Nota sobre o total")}
-          >
-            <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
-              {/**
-               * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
-               *
-               * Palavras dela: «sempre que vou à proposta os valores estão
-               * diferentes; não estão iguais àquilo que nós colocamos».
-               *
-               * Estava aqui. Esta frase prometia que este campo e o «Preço
-               * final» do pedido eram o mesmo número — e não são, sempre que
-               * há adicionais a somar. O pedido guarda o que o casal PAGA
-               * (serviços + deslocação); este campo é só os SERVIÇOS, porque a
-               * deslocação tem linha própria logo abaixo e somá-la aqui era
-               * contá-la duas vezes na mesma folha.
-               *
-               * Ela escrevia 3.000 na Gestão do pedido e o estúdio mostrava
-               * 2.860. Escrevia 3.000 aqui e a Gestão mostrava 3.140. Os dois
-               * números estavam certos; o ecrã é que jurava que eram um só.
-               *
-               * A aritmética não muda — mudaria o significado de um campo de
-               * dinheiro de que saem o sinal, a factura e o PDF. O que muda é
-               * o ecrã passar a dizer a verdade, com os DOIS números à vista
-               * para ela poder conferir num relance.
-               */}
-              {(() => {
-                const degrau = degrauDosAdicionais(doc as unknown as ContextoDoPreco);
-                if (!(degrau > 0)) {
+            <Section
+              title="Total, IVA e validade"
+              id="total"
+              rodape={notaDaSeccao("total", "Nota sobre o total")}
+            >
+              <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
+                {/**
+                 * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
+                 *
+                 * Palavras dela: «sempre que vou à proposta os valores estão
+                 * diferentes; não estão iguais àquilo que nós colocamos».
+                 *
+                 * Estava aqui. Esta frase prometia que este campo e o «Preço
+                 * final» do pedido eram o mesmo número — e não são, sempre que
+                 * há adicionais a somar. O pedido guarda o que o casal PAGA
+                 * (serviços + deslocação); este campo é só os SERVIÇOS, porque a
+                 * deslocação tem linha própria logo abaixo e somá-la aqui era
+                 * contá-la duas vezes na mesma folha.
+                 *
+                 * Ela escrevia 3.000 na Gestão do pedido e o estúdio mostrava
+                 * 2.860. Escrevia 3.000 aqui e a Gestão mostrava 3.140. Os dois
+                 * números estavam certos; o ecrã é que jurava que eram um só.
+                 *
+                 * A aritmética não muda — mudaria o significado de um campo de
+                 * dinheiro de que saem o sinal, a factura e o PDF. O que muda é
+                 * o ecrã passar a dizer a verdade, com os DOIS números à vista
+                 * para ela poder conferir num relance.
+                 */}
+                {(() => {
+                  const degrau = degrauDosAdicionais(doc as unknown as ContextoDoPreco);
+                  if (!(degrau > 0)) {
+                    return (
+                      <p className="text-xs leading-relaxed text-foreground/50 @min-[26rem]:col-span-2">
+                        É o mesmo valor do <strong className="font-semibold">Preço final</strong> do
+                        pedido — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um
+                        número só.
+                      </p>
+                    );
+                  }
+                  // `money.base` já traz os adicionais somados (ver
+                  // `dinheiroDaProposta`) — é o EFECTIVO, o que o pedido guarda.
+                  // A parte dos serviços é a do resolvedor cru. Escrever aqui
+                  // `money.base` somava a deslocação uma segunda vez e a nota
+                  // dizia 3140 + 140 = 3280 a alguém que tem 3000 de serviços.
+                  const efectivo = money.base;
+                  const servicos = round2(efectivo - degrau);
                   return (
-                    <p className="text-xs leading-relaxed text-foreground/50 @min-[26rem]:col-span-2">
-                      É o mesmo valor do <strong className="font-semibold">Preço final</strong> do
-                      pedido — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número
-                      só.
+                    <p className="text-xs leading-relaxed text-[var(--bo-text-muted)] @min-[26rem]:col-span-2">
+                      Este campo é <strong className="font-semibold">só os serviços</strong>. O{" "}
+                      <strong className="font-semibold">Preço final</strong> do pedido mostra outro
+                      número, porque leva também os adicionais:{" "}
+                      <strong className="font-semibold tabular-nums">{eur(servicos)}</strong> +{" "}
+                      <span className="tabular-nums">{eur(degrau)}</span> de adicionais ={" "}
+                      <strong className="font-semibold tabular-nums">{eur(efectivo)}</strong>.
+                      Escrever aqui altera-o lá, e alterá-lo lá aparece aqui — mas os dois ecrãs
+                      mostram números diferentes, e é assim de propósito.
                     </p>
                   );
-                }
-                // `money.base` já traz os adicionais somados (ver
-                // `dinheiroDaProposta`) — é o EFECTIVO, o que o pedido guarda.
-                // A parte dos serviços é a do resolvedor cru. Escrever aqui
-                // `money.base` somava a deslocação uma segunda vez e a nota
-                // dizia 3140 + 140 = 3280 a alguém que tem 3000 de serviços.
-                const efectivo = money.base;
-                const servicos = round2(efectivo - degrau);
-                return (
-                  <p className="text-xs leading-relaxed text-[var(--bo-text-muted)] @min-[26rem]:col-span-2">
-                    Este campo é <strong className="font-semibold">só os serviços</strong>. O{" "}
-                    <strong className="font-semibold">Preço final</strong> do pedido mostra outro
-                    número, porque leva também os adicionais:{" "}
-                    <strong className="font-semibold tabular-nums">{eur(servicos)}</strong> +{" "}
-                    <span className="tabular-nums">{eur(degrau)}</span> de adicionais ={" "}
-                    <strong className="font-semibold tabular-nums">{eur(efectivo)}</strong>.
-                    Escrever aqui altera-o lá, e alterá-lo lá aparece aqui — mas os dois ecrãs
-                    mostram números diferentes, e é assim de propósito.
-                  </p>
-                );
-              })()}
-              <Field
-                // Sempre a base: é o que o pedido guarda, e é o que o rótulo
-                // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
-                // que o cliente vê, não o significado deste campo.
-                label="Valor (sem IVA)"
-                inputMode="decimal"
-                value={totalInput}
-                onChange={(e) => {
-                  confirmado("totalAmount");
-                  onTotalInput(e.target.value);
-                }}
-                placeholder="3000"
-                data-campo="totalAmount"
-                containerClassName={realce("totalAmount")}
-                hint={
-                  desvio
-                    ? `Escrito à mão — a soma dos serviços com preço é ${eur(desvio.soma)}`
-                    : contagem.comPreco > 0
-                      ? "Bate certo com a soma dos serviços com preço."
-                      : undefined
-                }
-              />
-              {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
+                })()}
+                <Field
+                  // Sempre a base: é o que o pedido guarda, e é o que o rótulo
+                  // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o
+                  // que o cliente vê, não o significado deste campo.
+                  label="Valor (sem IVA)"
+                  inputMode="decimal"
+                  value={totalInput}
+                  onChange={(e) => {
+                    confirmado("totalAmount");
+                    onTotalInput(e.target.value);
+                  }}
+                  placeholder="3000"
+                  data-campo="totalAmount"
+                  containerClassName={realce("totalAmount")}
+                  hint={
+                    desvio
+                      ? `Escrito à mão — a soma dos serviços com preço é ${eur(desvio.soma)}`
+                      : contagem.comPreco > 0
+                        ? "Bate certo com a soma dos serviços com preço."
+                        : undefined
+                  }
+                />
+                {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
                 errado sem dar o gesto que o arruma é meio trabalho. */}
-              {desvio && (
-                <div className="@min-[26rem]:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
-                  <span className="text-xs text-[var(--bo-tinta-72)]">
-                    O total está escrito à mão e difere da soma das linhas em{" "}
-                    <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
-                  </span>
-                  {/**
-                   * O BOTÃO ESCREVE A SOMA COM OS ADICIONAIS, e não a soma das
-                   * linhas que está escrita ao lado.
-                   *
-                   * O campo onde ele escreve é o TOTAL, e o total desta casa
-                   * inclui os valores adicionais — é o que o `definirExtras`
-                   * faz quando se acrescenta uma deslocação, e é o que o PDF
-                   * confirma ao subtrai-los para imprimir a linha «Valor
-                   * Total». Escrever aqui a soma dos serviços apagava a
-                   * deslocação do preço final e, com ela, do sinal e da
-                   * factura que sai a seguir.
-                   *
-                   * E por isso o rótulo mostra o número que vai mesmo ser
-                   * escrito: um botão que diz 75 € e escreve 2460 € é pior do
-                   * que não haver botão nenhum.
-                   *
-                   * ── E PERGUNTA ANTES DE ESCREVER ─────────────────────────
-                   * Palavras dela: «é um botão perigoso». Escrevia o número
-                   * novo por cima do preço final — o valor de que saem a
-                   * fatura, o sinal e o saldo — sem mostrar o que ia
-                   * desaparecer. A pergunta traz OS DOIS, e depois de aplicada
-                   * ficam dez segundos para a anular. Ver
-                   * `pedirConfirmacaoDeDinheiro`.
-                   */}
-                  <button
-                    type="button"
-                    className="alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
-                    onClick={() =>
-                      pedirConfirmacaoDeDinheiro({
-                        oQue: "o total",
-                        de: escrito.base,
-                        para: desvio.sugerido,
-                        registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(escrito.base)} para ${eur(desvio.sugerido)}.`,
-                        motivo: "Total alinhado com a soma das linhas.",
-                        aplicar: () => {
-                          confirmado("totalAmount");
-                          onTotalInput(textoDoTotal(desvio.sugerido));
-                        },
-                      })
-                    }
-                  >
-                    Usar {eur(desvio.sugerido)}
-                  </button>
-                </div>
-              )}
-              {/* ══════════════════════════════════════════════════════════════
+                {desvio && (
+                  <div className="@min-[26rem]:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+                    <span className="text-xs text-[var(--bo-tinta-72)]">
+                      O total está escrito à mão e difere da soma das linhas em{" "}
+                      <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
+                    </span>
+                    {/**
+                     * O BOTÃO ESCREVE A SOMA COM OS ADICIONAIS, e não a soma das
+                     * linhas que está escrita ao lado.
+                     *
+                     * O campo onde ele escreve é o TOTAL, e o total desta casa
+                     * inclui os valores adicionais — é o que o `definirExtras`
+                     * faz quando se acrescenta uma deslocação, e é o que o PDF
+                     * confirma ao subtrai-los para imprimir a linha «Valor
+                     * Total». Escrever aqui a soma dos serviços apagava a
+                     * deslocação do preço final e, com ela, do sinal e da
+                     * factura que sai a seguir.
+                     *
+                     * E por isso o rótulo mostra o número que vai mesmo ser
+                     * escrito: um botão que diz 75 € e escreve 2460 € é pior do
+                     * que não haver botão nenhum.
+                     *
+                     * ── E PERGUNTA ANTES DE ESCREVER ─────────────────────────
+                     * Palavras dela: «é um botão perigoso». Escrevia o número
+                     * novo por cima do preço final — o valor de que saem a
+                     * fatura, o sinal e o saldo — sem mostrar o que ia
+                     * desaparecer. A pergunta traz OS DOIS, e depois de aplicada
+                     * ficam dez segundos para a anular. Ver
+                     * `pedirConfirmacaoDeDinheiro`.
+                     */}
+                    <button
+                      type="button"
+                      className="alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                      onClick={() =>
+                        pedirConfirmacaoDeDinheiro({
+                          oQue: "o total",
+                          de: escrito.base,
+                          para: desvio.sugerido,
+                          registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(escrito.base)} para ${eur(desvio.sugerido)}.`,
+                          motivo: "Total alinhado com a soma das linhas.",
+                          aplicar: () => {
+                            confirmado("totalAmount");
+                            onTotalInput(textoDoTotal(desvio.sugerido));
+                          },
+                        })
+                      }
+                    >
+                      Usar {eur(desvio.sugerido)}
+                    </button>
+                  </div>
+                )}
+                {/* ══════════════════════════════════════════════════════════════
                   SÓ HÁ UMA MANEIRA DE CONTAR O IVA: ACRESCE
                   ══════════════════════════════════════════════════════════════
 
@@ -9894,92 +9984,92 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Fica a LEITURA, que continua a valer — é onde ela confere que
                   o IVA e o total a pagar são os que espera. O que saiu foi o
                   controlo, não a informação. */}
-              <div className="@container flex flex-col gap-1.5">
-                <span className="bo-eyebrow">IVA</span>
-                <div className="rounded-xl border border-[var(--bo-hairline-strong)] px-3 py-2.5 text-[11px]">
-                  {/* A leitura é do modo DESTE documento, não do que a casa faz
+                <div className="@container flex flex-col gap-1.5">
+                  <span className="bo-eyebrow">IVA</span>
+                  <div className="rounded-xl border border-[var(--bo-hairline-strong)] px-3 py-2.5 text-[11px]">
+                    {/* A leitura é do modo DESTE documento, não do que a casa faz
                       hoje. Uma proposta antiga gravada em «IVA incluído» tem o
                       bruto no `totalAmount`; mostrar-lhe a leitura de «acresce»
                       dizia base 3280 e IVA 754,40 sobre um documento que vale
                       2666,67 e 613,33. Um quadro que mente sobre o dinheiro é
                       pior do que um quadro a menos. */}
-                  <span className="block font-medium text-[var(--bo-tinta-72)]">
-                    {vatMode === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
-                  </span>
-                  {money.base > 0 && (
-                    <>
-                      <span className="mt-0.5 block text-[var(--bo-text-muted)]">
-                        base {eur(duasFormas[vatMode].base)} · IVA {eur(duasFormas[vatMode].iva)}
-                      </span>
-                      <span className="block text-[var(--bo-text-muted)]">
-                        o cliente paga{" "}
-                        <strong className="font-semibold text-[var(--bo-text)]">
-                          {eur(duasFormas[vatMode].total)}
-                        </strong>
-                      </span>
-                    </>
-                  )}
-                </div>
-                <p className="text-xs leading-relaxed text-foreground/45">
-                  {vatMode === "acrescer" ? (
-                    "O valor acima é sempre sem IVA, e o PDF mostra-o com o IVA a somar por cima."
-                  ) : (
-                    /* E não se converte por ela: mudar o modo muda o TEXTO que
+                    <span className="block font-medium text-[var(--bo-tinta-72)]">
+                      {vatMode === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
+                    </span>
+                    {money.base > 0 && (
+                      <>
+                        <span className="mt-0.5 block text-[var(--bo-text-muted)]">
+                          base {eur(duasFormas[vatMode].base)} · IVA {eur(duasFormas[vatMode].iva)}
+                        </span>
+                        <span className="block text-[var(--bo-text-muted)]">
+                          o cliente paga{" "}
+                          <strong className="font-semibold text-[var(--bo-text)]">
+                            {eur(duasFormas[vatMode].total)}
+                          </strong>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs leading-relaxed text-foreground/45">
+                    {vatMode === "acrescer" ? (
+                      "O valor acima é sempre sem IVA, e o PDF mostra-o com o IVA a somar por cima."
+                    ) : (
+                      /* E não se converte por ela: mudar o modo muda o TEXTO que
                        sai no PDF («3.280,00 €» passa a «2.666,67 € + IVA»).
                        Numa proposta que já seguiu, isso é o documento do casal
                        a deixar de bater certo com o que ele tem em mãos. */
-                    <>
-                      Esta proposta foi escrita com o IVA já dentro do valor. As novas são todas
-                      «sem IVA + IVA acresce»; esta fica como seguiu, para o documento continuar
-                      igual ao que o cliente tem.
-                    </>
-                  )}
-                </p>
-              </div>
-              <Field
-                label="Validade (dias)"
-                type="number"
-                min={1}
-                value={doc.validUntilDays ?? ""}
-                onChange={(e) => {
-                  const n = Number.parseInt(e.target.value, 10);
-                  patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
-                }}
-                placeholder={String(DEFAULT_VALID_DAYS)}
-                aria-label="Dias de validade"
-                // ── O ÚLTIMO CAMPO DO PASSO, LOGO ACIMA DA BARRA FIXA ───────
-                // MEDIDO num iPhone SE (375×667), a fechar este campo com o
-                // teclado aberto (~260 px): o teclado mais a barra de acção
-                // fixa tapavam-lhe uma fatia. O `scroll-margin-bottom` sozinho
-                // não resolve — só entra em jogo se ALGUÉM pedir um scroll, e
-                // um toque para abrir o teclado não pede nenhum. Por isso o
-                // `onFocus`: ao ganhar foco (é aí que o teclado nasce), o
-                // campo centra-se a si próprio no que sobra de ecrã — que já
-                // é o ecrã COM o teclado, porque o foco só chega depois de o
-                // sistema o ter aberto. `scroll-mb-72` (18 px a mais do que os
-                // 260 do teclado) é o cinto e as calças: cobre também quem lá
-                // chega por um caminho que não é este foco (uma hiperligação
-                // com âncora, um leitor de ecrã a saltar directamente).
-                onFocus={(e) => e.currentTarget.scrollIntoView({ block: "center" })}
-                containerClassName="scroll-mb-72"
-                hint={
-                  doc.validUntilDays ? (
-                    <button
-                      type="button"
-                      /* `alvo-toque` + `py-2`: media 18 px de altura. Foi o CI
+                      <>
+                        Esta proposta foi escrita com o IVA já dentro do valor. As novas são todas
+                        «sem IVA + IVA acresce»; esta fica como seguiu, para o documento continuar
+                        igual ao que o cliente tem.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Field
+                  label="Validade (dias)"
+                  type="number"
+                  min={1}
+                  value={doc.validUntilDays ?? ""}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
+                  }}
+                  placeholder={String(DEFAULT_VALID_DAYS)}
+                  aria-label="Dias de validade"
+                  // ── O ÚLTIMO CAMPO DO PASSO, LOGO ACIMA DA BARRA FIXA ───────
+                  // MEDIDO num iPhone SE (375×667), a fechar este campo com o
+                  // teclado aberto (~260 px): o teclado mais a barra de acção
+                  // fixa tapavam-lhe uma fatia. O `scroll-margin-bottom` sozinho
+                  // não resolve — só entra em jogo se ALGUÉM pedir um scroll, e
+                  // um toque para abrir o teclado não pede nenhum. Por isso o
+                  // `onFocus`: ao ganhar foco (é aí que o teclado nasce), o
+                  // campo centra-se a si próprio no que sobra de ecrã — que já
+                  // é o ecrã COM o teclado, porque o foco só chega depois de o
+                  // sistema o ter aberto. `scroll-mb-72` (18 px a mais do que os
+                  // 260 do teclado) é o cinto e as calças: cobre também quem lá
+                  // chega por um caminho que não é este foco (uma hiperligação
+                  // com âncora, um leitor de ecrã a saltar directamente).
+                  onFocus={(e) => e.currentTarget.scrollIntoView({ block: "center" })}
+                  containerClassName="scroll-mb-72"
+                  hint={
+                    doc.validUntilDays ? (
+                      <button
+                        type="button"
+                        /* `alvo-toque` + `py-2`: media 18 px de altura. Foi o CI
                          a apanhá-lo e não a máquina de quem escreveu — só
                          aparece quando a proposta tem uma validade diferente da
                          preferida, e os dados locais não a tinham. */
-                      className="alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
-                      onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
-                    >
-                      Passar a usar {doc.validUntilDays} dias em todas as propostas novas
-                    </button>
-                  ) : undefined
-                }
-              />
-            </div>
-            {/* ══════════════════════════════════════════════════════════════
+                        className="alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
+                        onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
+                      >
+                        Passar a usar {doc.validUntilDays} dias em todas as propostas novas
+                      </button>
+                    ) : undefined
+                  }
+                />
+              </div>
+              {/* ══════════════════════════════════════════════════════════════
                 O BLOCO DE TOTAIS — UM SÓ, PELA ORDEM DO PAPEL
                 ══════════════════════════════════════════════════════════════
 
@@ -9994,77 +10084,77 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 `proposal-doc-pdf.ts` faz. É essa a razão de este bloco existir
                 assim: enquanto o ecrã tivesse a sua conta e o gerador a dele,
                 divergiam, e já divergiram (ver `proposal-budget.ts`). */}
-            {money.gross > 0 && (
-              <div className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
-                <span className="bo-eyebrow">Totais</span>
-                <dl className="mt-2.5 flex flex-col gap-1.5 text-xs">
-                  <LinhaDeTotal rotulo="Subtotal dos serviços" valor={eur(totais.servicos)} />
-                  <LinhaDeTotal rotulo="Valores adicionais" valor={eur(totais.adicionais)} />
-                  {/* A régua separa as parcelas dos resultados: é a mesma
+              {money.gross > 0 && (
+                <div className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
+                  <span className="bo-eyebrow">Totais</span>
+                  <dl className="mt-2.5 flex flex-col gap-1.5 text-xs">
+                    <LinhaDeTotal rotulo="Subtotal dos serviços" valor={eur(totais.servicos)} />
+                    <LinhaDeTotal rotulo="Valores adicionais" valor={eur(totais.adicionais)} />
+                    {/* A régua separa as parcelas dos resultados: é a mesma
                       leitura que a folha em papel dá, e sem ela as seis linhas
                       lêem-se como uma lista em que tudo tem o mesmo peso. */}
-                  <LinhaDeTotal rotulo="Total sem IVA" valor={eur(totais.total)} forte regua />
-                  <LinhaDeTotal
-                    rotulo={`IVA (${Math.round(totais.taxa * 100)}%)`}
-                    valor={eur(totais.iva)}
-                  />
-                  <LinhaDeTotal rotulo="Total a pagar" valor={eur(totais.aPagar)} forte />
-                  <LinhaDeTotal
-                    regua
-                    rotulo={
-                      <span className="inline-flex items-center gap-1">
-                        Sinal
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={pctSinal}
-                          onChange={(e) => {
-                            const n = Number.parseInt(e.target.value, 10);
-                            patch({ depositPercent: Number.isFinite(n) ? n : undefined });
-                          }}
-                          aria-label="Percentagem do sinal"
-                          className="bo-input w-16 px-1.5 py-0.5 text-center text-xs"
-                        />
-                        %
-                      </span>
-                    }
-                    valor={eur(totais.sinal)}
-                  />
-                  <LinhaDeTotal rotulo={`Saldo ${100 - pctSinal}%`} valor={eur(totais.saldo)} />
-                </dl>
-                {/* ── A BASE, DITA AQUI TAMBÉM ──────────────────────────────
+                    <LinhaDeTotal rotulo="Total sem IVA" valor={eur(totais.total)} forte regua />
+                    <LinhaDeTotal
+                      rotulo={`IVA (${Math.round(totais.taxa * 100)}%)`}
+                      valor={eur(totais.iva)}
+                    />
+                    <LinhaDeTotal rotulo="Total a pagar" valor={eur(totais.aPagar)} forte />
+                    <LinhaDeTotal
+                      regua
+                      rotulo={
+                        <span className="inline-flex items-center gap-1">
+                          Sinal
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={pctSinal}
+                            onChange={(e) => {
+                              const n = Number.parseInt(e.target.value, 10);
+                              patch({ depositPercent: Number.isFinite(n) ? n : undefined });
+                            }}
+                            aria-label="Percentagem do sinal"
+                            className="bo-input w-16 px-1.5 py-0.5 text-center text-xs"
+                          />
+                          %
+                        </span>
+                      }
+                      valor={eur(totais.sinal)}
+                    />
+                    <LinhaDeTotal rotulo={`Saldo ${100 - pctSinal}%`} valor={eur(totais.saldo)} />
+                  </dl>
+                  {/* ── A BASE, DITA AQUI TAMBÉM ──────────────────────────────
                     A mesma frase que o PDF imprime no faseamento. Está aqui
                     porque é aqui que ela mexe na percentagem: com o cursor
                     dentro da caixa, «30%» de que é a pergunta óbvia, e a
                     resposta não pode obrigar a abrir o PDF para a confirmar. */}
-                <p className="mt-2.5 text-[11px] leading-relaxed text-foreground/45">
-                  Sinal e saldo são calculados sobre o total a pagar ({eur(totais.aPagar)}), com IVA
-                  incluído — é essa a base que a factura usa.
-                </p>
-                {/* ── SÓ PARA SI ────────────────────────────────────────────
+                  <p className="mt-2.5 text-[11px] leading-relaxed text-foreground/45">
+                    Sinal e saldo são calculados sobre o total a pagar ({eur(totais.aPagar)}), com
+                    IVA incluído — é essa a base que a factura usa.
+                  </p>
+                  {/* ── SÓ PARA SI ────────────────────────────────────────────
                     O número que falta para decidir com noção. Os custos
                     escrevem-se no painel interno, aqui em cima; a decisão de
                     baixar (ou não) o preço toma-se AQUI, com o total à frente
                     — e era o único sítio onde a margem não estava. */}
-                <MargemDoNegocio doc={doc as ProposalDoc} />
-                {/* ── QUANDO AS SOMAS NÃO FECHAM ────────────────────────────
+                  <MargemDoNegocio doc={doc as ProposalDoc} />
+                  {/* ── QUANDO AS SOMAS NÃO FECHAM ────────────────────────────
                     Por construção fecham sempre. Este aviso é a rede para o dia
                     em que deixarem de fechar — e nesse dia tem de se ver antes
                     de o PDF sair, não depois de o casal perguntar. As frases
                     vêm feitas de `totaisDaProposta`. */}
-                {!totais.fecha && (
-                  <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]">
-                    {totais.porQueNaoFecha.map((porque) => (
-                      <li key={porque}>⚠ As contas não fecham: {porque}.</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </Section>
+                  {!totais.fecha && (
+                    <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]">
+                      {totais.porQueNaoFecha.map((porque) => (
+                        <li key={porque}>⚠ As contas não fecham: {porque}.</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </Section>
 
-          {/* ══════════════════════════════════════════════════════════════
+            {/* ══════════════════════════════════════════════════════════════
               AS PÁGINAS LADO A LADO — NO FIM, E SEM SE PEDIR
               ══════════════════════════════════════════════════════════════
 
@@ -10102,50 +10192,52 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
               Fica sem optimização nenhuma, que é o estado honesto: se algum dia
               pesar, mede-se primeiro. */}
-          <div className="mt-6">
-            <VistaDeConjunto
-              doc={doc as ProposalDoc}
-              ordem={ordemDosBoards}
-              idioma={idiomaDoPdf}
-              urls={assetUrls}
-              originais={assetOriginais}
-              aspetos={aspetosDasFotos}
-              onMover={(de, para) => moverBoardParaPosicao(de, para)}
-              onSaltar={(bi) => {
-                const id = doc.moodBoards[bi]?.id;
-                if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                document
-                  .getElementById(`mood-board-${bi}`)
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              // O salto de uma folha de texto usa o MESMO caminho da
-              // Conferência: abre a secção se estiver dobrada e só então
-              // leva a vista. Uma segunda maneira de saltar era uma segunda
-              // maneira de falhar a abertura da dobra.
-              onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
-            />
+            <div className="mt-6">
+              <VistaDeConjunto
+                doc={doc as ProposalDoc}
+                ordem={ordemDosBoards}
+                idioma={idiomaDoPdf}
+                urls={assetUrls}
+                originais={assetOriginais}
+                aspetos={aspetosDasFotos}
+                onMover={(de, para) => moverBoardParaPosicao(de, para)}
+                onSaltar={(bi) => {
+                  const id = doc.moodBoards[bi]?.id;
+                  if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+                  document
+                    .getElementById(`mood-board-${bi}`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                // O salto de uma folha de texto usa o MESMO caminho da
+                // Conferência: abre a secção se estiver dobrada e só então
+                // leva a vista. Uma segunda maneira de saltar era uma segunda
+                // maneira de falhar a abertura da dobra.
+                onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
+              />
+            </div>
           </div>
+          {/*
+           * ── A TERCEIRA ZONA ──────────────────────────────────────────────
+           *
+           * «Uma pré-visualização grande e fixa à direita, no espaço hoje
+           * vazio.» O índice diz onde estou, a coluna do meio é o que escrevo, e
+           * isto é o que vai sair. Ver `PainelDoEstudio` para o resto das razões
+           * — em particular por que é um painel só e por que só aparece muito
+           * largo.
+           */}
+          <PainelDoEstudio
+            cabe={painelLateralCabe}
+            paginas={paginasParaOPainel}
+            activa={boardActivo ?? undefined}
+            urls={assetUrls}
+            originais={assetOriginais}
+            aspetos={aspetosDasFotos}
+            layoutPorOmissao={doc.layoutPorOmissao}
+            enquadramentoPorOmissao={doc.enquadramentoPorOmissao}
+            onSaltar={(bi) => irParaAFalta("moodboards", `boardTitulo:${bi}`)}
+            onEscolherFotos={(bi) => setPicker({ kind: "board", bi })}
+          />
         </div>
-        {/*
-         * ── A TERCEIRA ZONA ──────────────────────────────────────────────
-         *
-         * «Uma pré-visualização grande e fixa à direita, no espaço hoje
-         * vazio.» O índice diz onde estou, a coluna do meio é o que escrevo, e
-         * isto é o que vai sair. Ver `PainelDoEstudio` para o resto das razões
-         * — em particular por que é um painel só e por que só aparece muito
-         * largo.
-         */}
-        <PainelDoEstudio
-          paginas={paginasParaOPainel}
-          activa={boardActivo ?? undefined}
-          urls={assetUrls}
-          originais={assetOriginais}
-          aspetos={aspetosDasFotos}
-          layoutPorOmissao={doc.layoutPorOmissao}
-          enquadramentoPorOmissao={doc.enquadramentoPorOmissao}
-          onSaltar={(bi) => irParaAFalta("moodboards", `boardTitulo:${bi}`)}
-          onEscolherFotos={(bi) => setPicker({ kind: "board", bi })}
-        />
       </div>
       {/* ══════════ /PASSO 1 ══════════ */}
 

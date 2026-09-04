@@ -167,9 +167,18 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
          Era `xl:block` (1280), depois `hidden … lg:block` (1024). Abaixo de
          1024 não existia de todo — e o que faltava a 375 px não era conforto:
          era saber em que secção se está e quais já foram preenchidas, numa
-         página com cinco ecrãs e meio de rolo. `lg:` continua a ser o corte
-         de «há espaço para uma coluna AO LADO»; o que mudou é que abaixo dele
-         a resposta deixou de ser «nada» e passou a ser a tira.
+         página com cinco ecrãs e meio de rolo. Abaixo do corte a resposta
+         deixou de ser «nada» e passou a ser a tira.
+
+         ── E O CORTE DEIXOU DE SER O DA JANELA ──────────────────────────
+         Era `lg:` — 1024 DE JANELA. MEDIDO num Chromium, no painel que abre a
+         partir do cartão de um cliente: a janela tinha 1280 e a fila onde este
+         índice vive tinha 498 px. Ele montava-se como coluna e levava 192 dos
+         498 (38%), deixando 282 para a coluna onde ela escreve.
+
+         Passa a `@min-[40rem]/estudio:` — a mesma pergunta, feita à zona. O
+         contentor chama-se `estudio` e é declarado por fora da fila, no
+         `ProposalStudio`: um elemento não pode consultar-se a si próprio.
 
          Sem `hidden`: a mesma árvore, desenhada de duas maneiras. A altura
          que a tira custa está paga em `mb-2` + `pb-1` e mais nada — não é
@@ -178,20 +187,20 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
          TECTO, só em `lg`: aí é `sticky`, e uma lista mais alta do que o ecrã
          ficava com o fim inalcançável, porque a coluna não acompanha o rolo
          da página. Na tira não há altura para limitar. */
-      className="mb-2 lg:sticky lg:top-4 lg:mb-0 lg:max-h-[calc(100vh-2rem)] lg:w-48 lg:shrink-0 lg:self-start lg:overflow-y-auto"
+      className="mb-2 @min-[40rem]/estudio:sticky @min-[40rem]/estudio:top-4 @min-[40rem]/estudio:mb-0 @min-[40rem]/estudio:max-h-[calc(100vh-2rem)] @min-[40rem]/estudio:w-48 @min-[40rem]/estudio:shrink-0 @min-[40rem]/estudio:self-start @min-[40rem]/estudio:overflow-y-auto"
     >
       {/* A tira rola de lado; a coluna empilha. Uma classe de cada lado do
           corte, e o mesmo `<ul>` nos dois. */}
       <ul
         ref={listaRef}
-        className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0"
+        className="flex gap-1.5 overflow-x-auto pb-1 @min-[40rem]/estudio:flex-col @min-[40rem]/estudio:gap-0.5 @min-[40rem]/estudio:overflow-visible @min-[40rem]/estudio:pb-0"
       >
         {seccoes.map((s) => {
           const aqui = atual === s.id;
           const porFazer = porTraduzir?.[s.id] ?? 0;
           const frase = fraseDasTraducoes(porFazer);
           return (
-            <li key={s.id} className="shrink-0 lg:shrink">
+            <li key={s.id} className="shrink-0 @min-[40rem]/estudio:shrink">
               <button
                 type="button"
                 onClick={() => saltarPara(s.id)}
@@ -206,7 +215,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
                   aqui
                     ? "bg-[#4d6350]/[0.08]"
-                    : "bg-[var(--bo-tinta-6)] hover:bg-[var(--bo-tinta-6)] lg:bg-transparent lg:hover:bg-[var(--bo-tinta-6)]"
+                    : "bg-[var(--bo-tinta-6)] hover:bg-[var(--bo-tinta-6)] @min-[40rem]/estudio:bg-transparent @min-[40rem]/estudio:hover:bg-[var(--bo-tinta-6)]"
                 }`}
               >
                 <span
@@ -224,7 +233,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                   {/* O resumo é contexto, e contexto não cabe num chip: na tira
                       dobrava a largura de cada entrada para dizer o que a
                       secção já diz quando se lá chega. Fica na coluna. */}
-                  <span className="hidden truncate text-[10px] text-foreground/40 lg:block">
+                  <span className="hidden truncate text-[10px] text-foreground/40 @min-[40rem]/estudio:block">
                     {s.resumo}
                   </span>
                   {/* ── O QUE FALTA TRADUZIR, AQUI ─────────────────────────
@@ -234,7 +243,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                       não interessa. E cor própria, a mesma do que está por
                       rever: é uma falta, não uma descrição. */}
                   {porFazer > 0 && (
-                    <span className="hidden truncate text-[10px] text-[#8a6420] lg:block">
+                    <span className="hidden truncate text-[10px] text-[#8a6420] @min-[40rem]/estudio:block">
                       {frase}
                     </span>
                   )}
@@ -256,7 +265,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                     role="img"
                     aria-label={frase}
                     title={frase}
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#c98a2e] lg:hidden"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#c98a2e] @min-[40rem]/estudio:hidden"
                   />
                 )}
               </button>
@@ -275,7 +284,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
           permanente no ecrã mais apertado da casa para dizer, mais longe do
           botão, o que já está dito ao lado dele. */}
       {faltas.length > 0 && (
-        <div className="mt-4 hidden border-t border-[var(--bo-hairline-strong)] pt-3 lg:block">
+        <div className="mt-4 hidden border-t border-[var(--bo-hairline-strong)] pt-3 @min-[40rem]/estudio:block">
           {/*
            * ── «TALVEZ QUEIRA» NÃO QUERIA DIZER NADA ──────────────────────
            *

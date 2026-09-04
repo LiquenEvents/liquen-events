@@ -5043,7 +5043,7 @@ describe("ver as páginas lado a lado", () => {
     seedDoisBoards();
     renderStudio();
     const vista = await screen.findByText("Vista de conjunto");
-    const fila = document.querySelector('[class*="lg:flex"][class*="lg:gap-6"]');
+    const fila = document.querySelector('[class*="estudio:flex"][class*="estudio:gap-6"]');
     expect(fila).toBeTruthy();
     expect(fila!.contains(vista)).toBe(true);
     // Nenhum dos filhos directos da fila É a vista.
@@ -8584,10 +8584,30 @@ describe("o estúdio numa coluna, e não numa janela", () => {
     janela: number;
     /** A largura do CONTENTOR mais próximo — é o que `@min-[…]:` mede. */
     caixa: number;
+    /**
+     * A largura da FILA das três colunas — é o que `@min-[…]/estudio:` mede.
+     *
+     * Passou a haver um segundo contentor, com nome, e a razão está medida: o
+     * índice e a própria fila perguntavam `lg:`, ou seja à JANELA. No painel que
+     * abre a partir do cartão de um cliente a janela tinha 1280 e a fila tinha
+     * 498 px — a fila montava-se na mesma e a coluna onde ela escreve ficava com
+     * 282. Agora perguntam à zona, e este resolvedor tem de saber responder por
+     * ela.
+     */
+    fila: number;
   };
 
-  /** Em cada janela, a coluna de conteúdo é o contentor de topo. */
-  const naColuna = (janela: number): Contexto => ({ janela, caixa: COLUNA[janela] });
+  /**
+   * Em cada janela, a coluna de conteúdo é o contentor de topo — e a fila é ela
+   * mais o índice ao lado (12rem) e a folga (1,5rem). É uma aproximação, e
+   * chega: o que estes casos decidem é bloco contra fila, e as duas pontas
+   * ficam do lado certo em qualquer estimativa razoável.
+   */
+  const naColuna = (janela: number): Contexto => ({
+    janela,
+    caixa: COLUNA[janela],
+    fila: COLUNA[janela] + 192 + 24,
+  });
 
   /**
    * Separa `@min-[36rem]:hidden` em `["@min-[36rem]", "hidden"]` — sem partir
@@ -8618,6 +8638,9 @@ describe("o estúdio numa coluna, e não numa janela", () => {
     if (variante === "lg") return ctx.janela >= 1024;
 
     const emPixeis = (v: string, u: string) => Number(v) * (u === "rem" ? 16 : 1);
+
+    const daFila = /^@min-\[(\d+(?:\.\d+)?)(px|rem)\]\/estudio$/.exec(variante);
+    if (daFila) return ctx.fila >= emPixeis(daFila[1], daFila[2]);
 
     const doContentor = /^@min-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
     if (doContentor) return ctx.caixa >= emPixeis(doContentor[1], doContentor[2]);
@@ -8751,7 +8774,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
    * não há classe nenhuma que desfaça uma fila, e um teste ao índice passaria
    * por acidente — como passava enquanto ele estava `hidden`.
    */
-  it("a 375 px o índice não fica ao lado da coluna: a fila só existe a partir de `lg`", async () => {
+  it("numa zona estreita o índice não fica ao lado da coluna: a fila só existe quando cabe", async () => {
     seedDraft(1);
     renderStudio();
     await screen.findByRole("textbox", { name: "Clientes" });
@@ -8760,9 +8783,12 @@ describe("o estúdio numa coluna, e não numa janela", () => {
     const involucro = coluna.parentElement!;
     expect(involucro.contains(indice), "o índice e a coluna são irmãos").toBe(true);
 
-    // A 375 o invólucro é um bloco: o índice empilha por cima do conteúdo.
+    // Numa zona estreita o invólucro é um bloco: o índice empilha por cima do
+    // conteúdo. A pergunta é à ZONA e não à janela — a razão está medida no
+    // `LARGURA_MINIMA_DA_FILA`: com a janela a 1280, esta zona tinha 498 px, o
+    // `lg:` dizia que sim, e a coluna onde ela escreve ficava com 282.
     expect(efectivas(classesDe(involucro), naColuna(375)).has("flex")).toBe(false);
-    // A partir de `lg` é a fila de sempre, com o mesmo intervalo.
+    // Com zona que chegue é a fila de sempre, com o mesmo intervalo.
     const noPortatil = efectivas(classesDe(involucro), naColuna(1024));
     expect(noPortatil.has("flex")).toBe(true);
     expect(noPortatil.has("gap-6")).toBe(true);
@@ -8797,17 +8823,29 @@ describe("o estúdio numa coluna, e não numa janela", () => {
    */
   describe("a pré-visualização da página só se monta onde se vê", () => {
     /** Faz o `useMedida` responder «sim» a tudo — o ecrã largo. */
+    /**
+     * ── ALARGAR A FILA, E JÁ NÃO A JANELA ──────────────────────────────────
+     *
+     * Isto alargava a JANELA (`matchMedia`), porque era à janela que o painel
+     * perguntava. Era essa a avaria: MEDIDO num Chromium, no painel que abre a
+     * partir do cartão de um cliente, a janela tinha 2000 px e a fila onde o
+     * painel aterra tinha 712 — a coluna onde ela escreve ficava com 136 px.
+     *
+     * Agora quem responde é a fila, medida. Aqui dá-se-lhe uma largura que
+     * chegue, que é o que o produto passou a perguntar.
+     */
     function ecraLargo() {
-      vi.stubGlobal(
-        "matchMedia",
-        (consulta: string) =>
-          ({
-            matches: true,
-            media: consulta,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-          }) as unknown as MediaQueryList,
-      );
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+        width: 1400,
+        height: 0,
+        top: 0,
+        left: 0,
+        right: 1400,
+        bottom: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
     }
 
     it("sem espaço para o painel da direita, a miniatura está lá", async () => {
@@ -8862,6 +8900,19 @@ describe("o estúdio numa coluna, e não numa janela", () => {
      */
     const CARTAO: Record<number, number> = { 375: 319, 640: 560, 1023: 747, 1024: 472, 1440: 528 };
 
+    /**
+     * O contexto de uma classe escrita NO CARTÃO: a janela, o cartão como
+     * contentor mais próximo, e a fila do estúdio — que este bloco não decide,
+     * mas de que o resolvedor precisa para responder por `@min-[…]/estudio:`.
+     * A fila é a mesma estimativa do `naColuna`: a coluna mais o índice (12rem)
+     * e a folga (1,5rem).
+     */
+    const noCartao = (janela: number): Contexto => ({
+      janela,
+      caixa: CARTAO[janela],
+      fila: COLUNA[janela] + 192 + 24,
+    });
+
     async function grelha() {
       seedDraft(4);
       renderStudio();
@@ -8882,7 +8933,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
 
     it("a 375 px são três colunas, porque em 319 px quatro não cabem", async () => {
       const el = await grelha();
-      const cols = efectivas(classesDe(el), { janela: 375, caixa: CARTAO[375] });
+      const cols = efectivas(classesDe(el), noCartao(375));
       expect(cols.has("grid-cols-4")).toBe(false);
       expect(cols.has("grid-cols-3")).toBe(true);
     });
@@ -8896,7 +8947,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
     it("um cartão mais estreito nunca leva mais colunas do que um mais largo", async () => {
       const el = await grelha();
       const colunas = (janela: number) =>
-        efectivas(classesDe(el), { janela, caixa: CARTAO[janela] }).has("grid-cols-4") ? 4 : 3;
+        efectivas(classesDe(el), noCartao(janela)).has("grid-cols-4") ? 4 : 3;
 
       const janelas = [375, 640, 1023, 1024, 1440];
       for (const a of janelas) {
@@ -8915,7 +8966,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
     it("a miniatura em cada uma das cinco larguras", async () => {
       const el = await grelha();
       const miniatura = (janela: number) => {
-        const n = efectivas(classesDe(el), { janela, caixa: CARTAO[janela] }).has("grid-cols-4")
+        const n = efectivas(classesDe(el), noCartao(janela)).has("grid-cols-4")
           ? 4
           : 3;
         return Math.floor((CARTAO[janela] - (n - 1) * 8) / n);
@@ -9004,7 +9055,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
         return COLUNA[janela] - (comColuna ? 176 + 20 : 0) - 32;
       };
       const miniatura = (janela: number) => {
-        const n = efectivas(classesDe(foto), { janela, caixa: cartao(janela) }).has("grid-cols-4")
+        const n = efectivas(classesDe(foto), { ...naColuna(janela), caixa: cartao(janela) }).has("grid-cols-4")
           ? 4
           : 3;
         return Math.floor((cartao(janela) - (n - 1) * 8) / n);

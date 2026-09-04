@@ -77,11 +77,33 @@ export interface PaginaParaOPainel {
  * é precisamente o que este ficheiro existe para NÃO fazer. Com a montagem
  * condicional, quando o `<aside>` é desenhado é porque cabe.
  */
-const MEDIDA_DO_PAINEL = `(min-width: ${CORTES.largo}px)`;
-
-const useLarguraQueChega = () => useMedida(MEDIDA_DO_PAINEL);
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DECISÃO DEIXOU DE SER DAQUI — E A RAZÃO É QUE ESTE FICHEIRO NÃO A SABE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era `useMedida("(min-width: 1440px)")`: uma pergunta à JANELA. E o
+ * comentário acima prometia, em letra de lei, «quando o `<aside>` é desenhado é
+ * porque cabe».
+ *
+ * A promessa era falsa, e MEDIDA num Chromium: no painel que abre a partir do
+ * cartão de um cliente — que é por onde ela chega ao estúdio — a fila das três
+ * colunas tem 712 px, por mais largo que seja o ecrã. Este `<aside>` de 21rem
+ * mais o índice de 12rem pedem 576 sem negociar, e a coluna onde ela escreve
+ * ficava com 136 px. A 1440, com 82.
+ *
+ * A janela tinha 2000. A caixa onde este painel aterra tinha 712. Este ficheiro
+ * não tem como saber isso — só quem desenha a fila sabe. Por isso a resposta
+ * passa a vir de fora, já medida onde importa (ver `LARGURA_MINIMA_DA_FILA`, no
+ * `ProposalStudio.tsx`).
+ *
+ * O que NÃO mudou: continua a ser montagem condicional e não `hidden`. Esconder
+ * por CSS deixa dois painéis montados, cada um com o seu estado — é isso que
+ * este ficheiro existe para não fazer, e continua a não fazer.
+ */
 
 export default function PainelDoEstudio({
+  cabe,
   paginas,
   activa,
   urls,
@@ -118,9 +140,14 @@ export default function PainelDoEstudio({
    * mudá-lo de sítio.
    */
   onEscolherFotos?: (bi: number) => void;
+  /**
+   * Se há espaço para este painel — decidido por quem desenha a fila, que é o
+   * único que sabe quanto ela mede. Sem isto, este ficheiro perguntava à janela
+   * e aterrava numa caixa três vezes mais pequena.
+   */
+  cabe: boolean;
 }) {
   const [vista, setVista] = useState<"pagina" | "documento">("pagina");
-  const cabe = useLarguraQueChega();
 
   const daPagina = (p: PaginaParaOPainel) => {
     const caminhos = (p.board.images ?? []).slice(0, MOOD_BOARD_MAX_IMAGES);
