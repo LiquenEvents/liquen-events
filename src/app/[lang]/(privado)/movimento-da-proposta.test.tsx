@@ -178,7 +178,7 @@ describe("o movimento da proposta", () => {
      * tinha: num dia em que o JavaScript não corra, isto continua a acontecer.
      */
     expect(BLOCO, "a entrada deixou de esperar pelo instante da subida").toMatch(
-      /\.prop-folha \{[\s\S]*?var\(--cortina-sobe\)/,
+      /\.prop-abertura \{[\s\S]*?var\(--cortina-sobe\)/,
     );
     expect(
       BLOCO.replace(/\/\*[\s\S]*?\*\//g, ""),

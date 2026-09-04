@@ -116,7 +116,29 @@ export default async function LayoutPrivado({
         ecrã e para quem pediu menos movimento.
       */}
       <Cortina locale={normalizeLocale(lang)} />
-      {children}
+      {/*
+        ── O RELÓGIO DA ABERTURA VIVE AQUI, AO PÉ DA CORTINA ──────────────
+
+        A entrada do documento estava declarada na `page.tsx`. Parece
+        arrumação; não é. Um `animation-delay` conta-se a partir do instante
+        em que o ELEMENTO existe — e a `page.tsx` é `force-dynamic` com
+        `loading.tsx`, portanto sai num jacto POSTERIOR ao deste layout.
+
+        Os dois relógios não eram o mesmo, e afastavam-se por tanto tempo
+        quanto o servidor demorasse a ir buscar a proposta. Numa rede lenta: o
+        pano sai, a proposta fica à vista fora do sítio, e só depois — com o
+        casal já a ler — é que ela desliza para o lugar. Uma coisa a mexer-se
+        debaixo do polegar de quem lê é exactamente o que o briefing proíbe.
+
+        Aqui o invólucro sai no MESMO jacto que a cortina. Quando o documento
+        chega tarde, a animação já acabou e ele aparece simplesmente no sítio.
+
+        `backwards` e NUNCA `forwards`: isto é agora o pai de tudo o que está
+        no ramo privado, e um `transform` pendurado no fim faria dele o bloco
+        de contenção de qualquer `position: fixed` lá dentro — a lupa das
+        fotografias, medida a 3202 px num ecrã de 780 quando isso aconteceu.
+      */}
+      <div className="prop-abertura">{children}</div>
       {/*
         O guião que põe o documento a mexer. Depois dos filhos, de propósito:
         quando ele corre, o que há para medir já está no documento.

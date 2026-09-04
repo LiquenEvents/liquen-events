@@ -87,7 +87,7 @@ describe("a saída não depende de ninguém", () => {
 
     for (const [quem, regra] of [
       ["o zoom da capa", /html:not\(\[data-navigated\]\) \.hero-settle \{[\s\S]*?\n {2}\}/],
-      ["a folha da proposta", /\.prop-folha \{[\s\S]*?\n {2}\}/],
+      ["a abertura da proposta", /\.prop-abertura \{[\s\S]*?\n {2}\}/],
     ] as const) {
       const m = regra.exec(CSS)?.[0];
       expect(m, `desapareceu ${quem}`).toBeDefined();

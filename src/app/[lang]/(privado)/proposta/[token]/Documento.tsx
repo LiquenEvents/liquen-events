@@ -179,7 +179,7 @@ function Titulo({
   titulo: string;
 }) {
   return (
-    <header id={id} className="scroll-mt-6">
+    <header id={id} className="scroll-mt-6" data-sobe="titulo">
       {sobretitulo && (
         <p className="text-foreground/70 mb-2 text-[10px] tracking-[0.4em] uppercase">
           {sobretitulo}
@@ -257,22 +257,27 @@ function Momento({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * ── `prop-chega`: a secção sobe ao entrar no ecrã ─────────────────────────
+ * ── A SECÇÃO NÃO SE MOVE. QUEM SE MOVE SÃO AS PEÇAS DELA ──────────────────
  *
- * A regra vive no `globals.css`, com as três leis de movimento desta casa
- * escritas por extenso. As duas que decidem esta linha:
+ * Isto levou `prop-chega` — uma animação que fazia a secção INTEIRA subir ao
+ * entrar no ecrã. Saiu, e a razão está medida por extenso no `globals.css`.
+ * Em três linhas:
  *
- *  · a opacidade NUNCA desce no repouso — se a animação não vier, a secção
- *    está lá na mesma, direita e legível;
- *  · não leva JavaScript nenhum — é o browser a segui-la fora do fio
- *    principal, o que importa numa página onde ela se queixou de travar.
+ *  · SOMAVA-SE. Um `transform` no pai desloca o filho também, e os degraus
+ *    dos blocos de dentro passavam a andar a soma dos dois. Medido: o grupo
+ *    de serviços, declarado a 8 px, andava 21,0; o TOTAL A PAGAR, declarado a
+ *    20, andava 32,1 — o maior movimento do documento, no número que alguém
+ *    confere com o dedo.
+ *  · NÃO ASSENTAVA. Presa ao scroll, não ao tempo: se o dedo parasse a meio
+ *    da entrada, a secção ficava torta indefinidamente (13,56 px, medidos, e
+ *    os mesmos 13,56 dois segundos depois).
+ *  · E era um gesto só para um capítulo inteiro. Agora cada peça chega por
+ *    si — o título primeiro, os momentos do dia atrás dele.
+ *
+ * A moldura fica: as margens são dela. O movimento é dos filhos.
  */
 function Seccao({ children, larga = false }: { children: React.ReactNode; larga?: boolean }) {
-  return (
-    <section className={`prop-chega mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>
-      {children}
-    </section>
-  );
+  return <section className={`mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>{children}</section>;
 }
 
 /**
@@ -915,7 +920,7 @@ export default function Documento({
       )}
 
       {/* ── APRESENTAÇÃO ─────────────────────────────────────────────────── */}
-      <div className="max-w-2xl" data-sobe="seccao">
+      <div className="max-w-2xl">
         <Titulo
           sobretitulo={t.sobretituloApresentacao}
           titulo={numerada("apresentacao", doc.headerTitle || t.tituloApresentacao)}
