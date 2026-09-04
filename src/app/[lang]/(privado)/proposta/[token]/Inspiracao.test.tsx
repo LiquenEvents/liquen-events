@@ -921,3 +921,34 @@ describe("a fotografia move-se enquanto passa", () => {
     );
   });
 });
+
+describe("a capa mede-se pela página, e não pela sua travessia", () => {
+  /**
+   * A capa está no topo: quando o casal abre a proposta, ela JÁ está no ecrã,
+   * e a travessia dela começou antes de haver alguém a olhar.
+   *
+   * MEDIDO com a capa a usar `view()` como as outras, num iPhone 13:
+   *
+   *     scrollY   0   progresso 0,599   (já ia em 60% do gesto)
+   *     scrollY 300   progresso 1,000
+   *     deriva visível ... 2,44 px — menos de metade
+   *
+   * Com a linha de tempo da PÁGINA, que arranca em zero quando a página
+   * arranca em zero:
+   *
+   *     scrollY   0   progresso 0,000
+   *     scrollY 600   progresso 0,904
+   *     deriva ........... 5,48 px
+   */
+  const CSS = readFileSync("src/app/globals.css", "utf8");
+  const BLOCO = CSS.slice(CSS.indexOf("A FOTOGRAFIA MOVE-SE ENQUANTO PASSA"), CSS.indexOf("[data-sobe=\"respiro\"]"));
+
+  it("a capa tem a linha de tempo da página; as do meio do documento a sua", () => {
+    const capa = /\.foto-deriva--topo \{([^}]*)\}/.exec(BLOCO)?.[1] ?? "";
+    expect(capa, "a capa ficou sem linha de tempo própria").toContain("scroll(root block)");
+    expect(capa, "a capa deixou de arrancar no princípio da página").toMatch(/animation-range:\s*0 100vh/);
+    expect(BLOCO, "as fotografias do meio deixaram de se medir pela sua travessia").toMatch(
+      /\.foto-deriva \{[^}]*animation-timeline:\s*--foto-passa/,
+    );
+  });
+});

@@ -817,6 +817,9 @@ export default function Documento({
            * capa vertical de ocupar a página inteira antes de uma palavra). O
            * que faltava era dizer o que fazer com o espaço que sobra: centrar.
            */
+          /* `foto-inteira` só pela linha de tempo que ela declara: é o que
+             deixa a fotografia derivar dentro desta moldura enquanto a capa
+             atravessa o ecrã. A regra e o custo estão em `globals.css`. */
           className="relative mx-auto mb-12 overflow-hidden rounded-sm"
           style={{
             // 21:9 no telemóvel seria uma nesga; 3:2 numa janela larga seria
@@ -913,7 +916,22 @@ export default function Documento({
                * muda é só onde ela é descodificada.
                */
               decoding="async"
-              className="relative block h-full w-full object-cover"
+              /* ── A CAPA ABRE-SE COMO A DO SÍTIO ────────────────────────
+                 Palavras dela: «a capa, quando se carrega em ver proposta
+                 online, não está igual à do site online, e eu quero que
+                 esteja».
+
+                 Tinha razão: no sítio a capa faz um zoom lento de 2,2 s que
+                 arranca no instante em que o pano sobe — `.hero-settle`, de
+                 1,14 para 1,06. Na proposta não fazia nada. É a MESMA classe,
+                 e não uma cópia: o dia em que uma for afinada, as duas mudam
+                 juntas.
+
+                 `foto-deriva--topo` acrescenta a deriva lenta ao longo do
+                 primeiro ecrã de rolagem. As duas convivem porque escrevem em
+                 propriedades diferentes: o `hero-settle` em `transform`, a
+                 deriva em `translate`. */
+              className="hero-settle foto-deriva--topo relative block h-full w-full object-cover"
             />
           </picture>
         </div>

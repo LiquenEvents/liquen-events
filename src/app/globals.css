@@ -4169,6 +4169,28 @@ body:has(.barra-consentimento) footer {
       /* A travessia inteira: entra por baixo, sai por cima. */
       animation-range: cover 0% cover 100%;
     }
+    /* ── A CAPA MEDE-SE PELA PÁGINA, E NÃO PELA SUA PRÓPRIA TRAVESSIA ───
+       A capa está no topo: quando o casal abre a proposta, ela JÁ está no
+       ecrã, e a travessia dela começou antes de haver alguém a olhar.
+
+       MEDIDO com a capa a usar `view()` como as outras: em `scrollY 0` o
+       progresso já ia em 0,599, chegava a 1,000 aos 300 px, e a deriva visível
+       era de 2,44 px — menos de metade do gesto.
+
+       Para uma peça que nasce no ecrã, a linha de tempo certa é a da PÁGINA:
+       arranca em zero quando a página arranca em zero. É a mesma que o sítio
+       já usa na capa dele (`.parallax-drift`), e o primeiro ecrã de rolagem é
+       exactamente onde a capa vive. */
+    .foto-deriva--topo {
+      /* A animação inteira, e SEM `transform`: na capa a folga vem do
+         `.hero-settle`, que é quem abre a fotografia quando o pano sobe. Dois
+         `transform` estáticos na mesma fotografia disputavam-se em silêncio, e
+         quem ganhava era a ordem do ficheiro. Aqui a deriva só escreve em
+         `translate`, portanto compõe-se com ele em vez de o disputar. */
+      animation: foto-deriva-kf linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 100vh;
+    }
     @keyframes foto-deriva-kf {
       from {
         translate: 0 -1.3%;
