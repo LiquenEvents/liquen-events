@@ -3982,8 +3982,47 @@ body:has(.barra-consentimento) footer {
 [data-sobe="titulo"].por-subir {
   transform: translateY(10px);
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   AS FOTOGRAFIAS SAEM DA ESCADA DE LEITURA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela, a olhar para uma proposta publicada: «queria que houvesse
+   uma experiência espetacular em animações pelas fotos, à medida que ela ia
+   andando para baixo».
+
+   Até aqui uma fotografia subia 12 px — entre o título de um capítulo (10) e
+   uma secção (14). Ou seja: o mesmo gesto que um parágrafo. A regra que o
+   mandava fazer assim está escrita acima e continua a valer para tudo o que
+   se LÊ: «a distância diz a importância, e é sempre pequena», «isto é para se
+   sentir, não para se ver». Um degrau grande debaixo de uma linha que alguém
+   está a seguir com o dedo rouba-lhe a linha.
+
+   Só que uma fotografia não é uma linha. É o trabalho — a razão pela qual
+   este documento existe em ecrã inteiro em vez de num A4. Não se lê: olha-se.
+   Por isso os dois papéis fotográficos saem da escada e passam a ter gesto
+   próprio, com três diferenças em relação ao texto:
+
+     · sobem mais (28 px a fotografia, 36 o respiro, contra os 8–20 do texto);
+     · CHEGAM A CRESCER até ao seu lugar, e é a escala que se vê mesmo — 12 px
+       de subida num telemóvel são quase nada, 4,5% de crescimento não são;
+     · demoram mais (860 ms contra 620), porque um gesto maior feito depressa
+       lê-se como um salto.
+
+   ── E CRESCE, NUNCA ENCOLHE PARA DENTRO DO SEU LUGAR ─────────────────────
+   `scale()` abaixo de 1 e nunca acima: assim a fotografia nunca é, nem por um
+   fotograma, maior do que a casa que lhe está reservada — não passa por cima
+   da vizinha do lado numa grelha de mood board, nem sai pela margem do
+   telemóvel. Uma escala acima de 1 fazia as duas coisas.
+
+   ── CONTINUA A SER SÓ `transform` ────────────────────────────────────────
+   Nem uma rampa de opacidade. A razão está no cabeçalho do
+   `MovimentoDaProposta.tsx` e não mudou: por baixo de cada fotografia está o
+   borrão de pré-visualização, que é a CHEGADA dela — esbater por cima
+   esconderia exactamente o que ele existe para mostrar. E é a mesma
+   propriedade que corre no compositor, que é o que segura os 60 fps num
+   iPhone em 4G. */
 [data-sobe="foto"].por-subir {
-  transform: translateY(12px);
+  transform: translateY(28px) scale(0.955);
 }
 [data-sobe="seccao"].por-subir {
   transform: translateY(14px);
@@ -3996,8 +4035,13 @@ body:has(.barra-consentimento) footer {
    fotografias, que levam 12 — e um `transform` no pai desloca o filho, portanto
    cada fotografia andava 20. Desaninhado, o board não se move e o anúncio
    passou para quem o faz. */
+/* O respiro é a fotografia a toda a largura que abre cada mood board, e é o
+   separador mais forte da página: leva o maior gesto do documento. A escala é
+   mais contida do que a da fotografia de grelha (0,965 contra 0,955) por uma
+   razão de proporção — a mesma percentagem numa caixa três vezes mais larga
+   são três vezes mais píxeis, e aos 0,955 a sangria inteira dava um salto. */
 [data-sobe="respiro"].por-subir {
-  transform: translateY(16px);
+  transform: translateY(36px) scale(0.965);
 }
 [data-sobe="total"].por-subir {
   transform: translateY(20px);
@@ -4119,6 +4163,14 @@ body:has(.barra-consentimento) footer {
 [data-sobe].por-subir.subiu {
   transform: none;
   transition: transform 620ms var(--ease-out);
+}
+/* Os dois papéis fotográficos demoram mais. Vem DEPOIS da regra de cima de
+   propósito: a especificidade é a mesma (um atributo e duas classes nas duas),
+   portanto quem ganha é a ordem, e uma destas linhas mudada de sítio deixava
+   de valer sem dar erro nenhum. */
+[data-sobe="foto"].por-subir.subiu,
+[data-sobe="respiro"].por-subir.subiu {
+  transition-duration: 860ms;
 }
 
 /* ── A ENTRADA DO DOCUMENTO, COLADA À SAÍDA DA CORTINA ────────────────────
