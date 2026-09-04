@@ -573,6 +573,22 @@ test.describe("Back office — mobile", () => {
     ).toBeVisible();
     await cartoes.first().tap();
 
+    /**
+     * ── E DAÍ AO PAINEL, QUE MUDOU DE PORTA ──────────────────────────────
+     *
+     * Carregar num cliente na lista deixou de abrir o painel: leva ao ecrã de
+     * fazer a proposta, na página toda (palavras dela: «não apenas ali de
+     * lado» — ver `irFazerAProposta` no `AdminClient.tsx`). O painel — que é o
+     * que este passo mede, com os separadores Produção e Financeiro — ficou a
+     * uma tecla, no «Abrir o pedido» desse ecrã.
+     */
+    const paraOPedido = page.getByRole("button", { name: /^Abrir o pedido$/ });
+    await expect(
+      paraOPedido,
+      "O ecrã de fazer proposta perdeu a porta de volta ao pedido.",
+    ).toHaveCount(1);
+    await paraOPedido.tap();
+
     // O painel abriu quando a barra de gravação do pedido existe — é o pé do
     // painel, e só é desenhado com um pedido adoptado.
     const painel = page.getByRole("heading", { level: 2 }).first();
