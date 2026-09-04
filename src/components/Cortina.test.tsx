@@ -167,7 +167,22 @@ describe("o mote", () => {
   it("entra, PÁRA para se ler, e sai — é a paragem que faz disto uma frase", () => {
     const quadro = /@keyframes cortina-grupo \{[\s\S]*?\n\}/.exec(BLOCO)?.[0] ?? "";
     expect(quadro, "desapareceu o `cortina-grupo`").not.toBe("");
-    expect(quadro, "deixou de haver paragem — voltou a ser um efeito").toMatch(/35%,\s*65%/);
+    /**
+     * Guardava os números à letra — `/35%,\s*65%/`. A intenção não é essa: é
+     * que HAJA paragem. Quando a paragem passou a acabar aos 88% (para a frase
+     * sair com o pano em vez de se apagar antes dele), este caso falhou sem que
+     * nada do que ele defende se tivesse perdido. Passa a guardar a paragem, e
+     * não dois números.
+     */
+    const marcas = [...quadro.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+    const paragem = marcas.filter((n) => n > 0 && n < 100).sort((a, b) => a - b);
+    expect(paragem.length, "deixou de haver paragem — voltou a ser um efeito").toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(
+      paragem[paragem.length - 1] - paragem[0],
+      "a paragem encolheu a ponto de já não se ler a frase",
+    ).toBeGreaterThan(25);
     expect(quadro).toMatch(/0% \{[\s\S]*?opacity: 0/);
     expect(quadro).toMatch(/100% \{[\s\S]*?opacity: 0/);
   });
@@ -447,5 +462,62 @@ describe("a mesma cortina em toda a casa", () => {
         /minimo|duracao|atraso|total/i,
       );
     }
+  });
+});
+
+describe("a frase sai COM o pano — e não antes dele", () => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UM TERÇO DA CORTINA ERA ECRÃ VAZIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * MEDIDO num Chromium a 390×844, 45 corridas em cada página, mediana:
+   *
+   *     frase de facto legível ................... 889 ms
+   *     verde SEM FRASE, até o pano sair ......... 776 ms
+   *
+   * A paragem da frase ia dos 35% aos 65% de 2000 ms — acabava aos 1300 —, e o
+   * pano só começa a subir aos 1980. Entre uma coisa e outra ficava um
+   * rectângulo verde liso, sem nada escrito, nas duas páginas e em todas as
+   * visitas.
+   *
+   * É um candidato directo ao que ela descreveu: «às vezes é mais rápido». A
+   * parte que se LÊ acabava muito antes da parte que se VÊ, portanto a peça
+   * parecia mais curta do que é.
+   */
+  const grupo = () => /@keyframes cortina-grupo \{([\s\S]*?)\n\}/.exec(BLOCO)?.[1] ?? "";
+  const pano = () => /@keyframes cortina-segurar \{([\s\S]*?)\n\}/.exec(BLOCO)?.[1] ?? "";
+  const paragemDe = (corpo: string) => {
+    const m = [...corpo.matchAll(/(\d+)%/g)].map((x) => Number(x[1]));
+    return m.length ? Math.max(...m.filter((n) => n < 100)) : NaN;
+  };
+
+  it("a paragem da frase acaba no MESMO instante em que o pano começa a subir", () => {
+    expect(
+      paragemDe(grupo()),
+      "a frase voltou a apagar-se antes de o pano se mexer — o verde mudo está de volta",
+    ).toBe(paragemDe(pano()));
+  });
+
+  it("e os dois correm no mesmo relógio, escrito uma vez só", () => {
+    /**
+     * Estava `2000ms` à mão contra `var(--cortina-total)` do pano. Qualquer
+     * afinação de um desencontrava-o do outro sem dar erro nenhum — e uma
+     * animação desencontrada não deixa rasto, só fica feia.
+     */
+    expect(
+      BLOCO,
+      "a frase voltou a ter relógio próprio",
+    ).toMatch(/\.cortina__grupo \{[\s\S]*?animation: cortina-grupo var\(--cortina-total\)/);
+  });
+
+  it("e continua a haver tempo para LER — a paragem é mais de metade da peça", () => {
+    // É a paragem que faz disto uma frase e não um efeito; foi ela própria que
+    // o escreveu assim. Com a entrada aos 30% e a saída aos 88%, a frase está
+    // legível 58% da cortina — contra os 30% de antes.
+    const corpo = grupo();
+    const entrada = Number(/(\d+)%,/.exec(corpo)?.[1]);
+    const legivel = paragemDe(corpo) - entrada;
+    expect(legivel, `a frase só está legível ${legivel}% da peça`).toBeGreaterThan(50);
   });
 });

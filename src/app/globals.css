@@ -3641,13 +3641,46 @@ body:has(.barra-consentimento) footer {
    saem, os grupos entram.
 
    Só `transform` e `opacity`, que é a regra dos 60 fps num iPhone em 4G. */
+/* ── A FRASE SAI COM O PANO, E NÃO ANTES DELE ────────────────────────────
+   A paragem ia dos 35% aos 65% de 2000 ms e o pano só começa a subir aos
+   1980. Ou seja: a frase apagava-se e ficava um rectângulo verde liso, sem
+   nada escrito, à espera de subir.
+
+   MEDIDO num Chromium a 390×844, 45 corridas em cada página, mediana:
+
+       frase de facto legível .................... 889 ms
+       verde SEM FRASE, até o pano sair .......... 776 ms
+
+   Um terço da cortina era ecrã vazio — nas duas páginas, em todas as visitas.
+   É um forte candidato ao «às vezes é mais rápido» dela: a parte que se LÊ
+   acabava muito antes da parte que se VÊ, portanto a peça parecia mais curta
+   do que era.
+
+   Agora os dois relógios são um só. A paragem acaba aos 88%, que é
+   exactamente o instante em que o pano começa a subir (`--cortina-sobe` é 88%
+   de `--cortina-total`), e a saída da frase é a subida do pano: as palavras
+   sobem COM ele, num gesto só, que é como ela descreveu a peça de origem.
+
+   MEDIDO depois, no mesmo Chromium, três corridas com o mesmo resultado:
+
+       frase legível ............................ 1082 ms  (era 889)
+       verde sem frase, até o pano subir ........... 67 ms  (era 776)
+
+   Os 67 ms que sobram são o fim do esbatimento a cruzar-se com o arranque da
+   subida — não são ecrã vazio, são a frase a sair com o pano. (A conta pelos
+   fotogramas dava 1305 ms de legibilidade; o medido é 1082, porque a curva
+   leva algum tempo a chegar aos 0,9 de opacidade e a sair deles. Fica o
+   número medido, que é o que o olho vê.)
+
+   A entrada encurta de 35% para 30% pela mesma razão: o que se ganha é tempo
+   de leitura, e é a leitura que faz disto uma frase e não um efeito. */
 @keyframes cortina-grupo {
   0% {
     opacity: 0;
     transform: translateY(var(--dy, 10px));
   }
-  35%,
-  65% {
+  30%,
+  88% {
     opacity: 1;
     transform: none;
   }
@@ -3757,7 +3790,11 @@ body:has(.barra-consentimento) footer {
   /* Nasce invisível e é a animação que o traz. Sem `forwards` ele voltava ao
      estado inicial no fim — invisível, no meio do pano ainda a subir. */
   opacity: 0;
-  animation: cortina-grupo 2000ms cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+  /* O MESMO relógio do pano, e não um seu. Escrito 2000ms à mão, a frase
+     acabava 250 ms antes de o pano começar a subir e deixava o tal verde
+     mudo — e qualquer afinação de `--cortina-total` voltava a desencontrá-los
+     sem dar erro nenhum. */
+  animation: cortina-grupo var(--cortina-total) cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
 }
 
 /* ── ESCONDER DE VEZ, SEM SAIR DO DOCUMENTO ──────────────────────────────
