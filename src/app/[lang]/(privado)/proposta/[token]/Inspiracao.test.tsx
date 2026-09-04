@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import { textosDaPagina } from "./textos-da-pagina";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -844,5 +844,80 @@ describe("a oferta em AVIF das fotografias grandes", () => {
       />,
     );
     expect(document.querySelectorAll('source[type="image/avif"]')).toHaveLength(0);
+  });
+});
+
+describe("a fotografia move-se enquanto passa", () => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «ANIMAÇÕES PELAS FOTOS, À MEDIDA QUE ELA IA ANDANDO PARA BAIXO»
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O gesto de chegada dura 860 ms e acaba. Os mood boards são 5 900 px de
+   * rolagem em que, até aqui, nada se movia. A deriva é a única coisa que
+   * trabalha o percurso todo.
+   *
+   * O que este ficheiro guarda são as TRÊS decisões que custaram a encontrar,
+   * cada uma medida num Chromium verdadeiro. Nenhuma é de gosto.
+   */
+  const CSS = readFileSync("src/app/globals.css", "utf8");
+  const BLOCO = CSS.slice(CSS.indexOf("A FOTOGRAFIA MOVE-SE ENQUANTO PASSA"), CSS.indexOf("[data-sobe=\"respiro\"]"));
+
+  it("a linha de tempo nasce na MOLDURA, e não na fotografia", () => {
+    /**
+     * `animation-timeline: view()` na própria `<img>` media ZERO. MEDIDO: o
+     * progresso ficava cravado em 0,500 em toda a travessia e a deriva era de
+     * 0,00 px.
+     *
+     * Não era o `content-visibility` (desliguei-o num ensaio e ficou igual)
+     * nem a duração do atalho (forcei `auto` e ficou igual). É o
+     * `overflow: hidden` da moldura: isso faz dela um CONTENTOR DE SCROLL, e o
+     * `view()` mede a travessia dentro do contentor mais próximo — dentro da
+     * moldura, a fotografia não se move nunca.
+     *
+     * Com o nome declarado na `<figure>`, que atravessa mesmo o ecrã: o
+     * progresso passou a 0,000 → 0,764 e a deriva a 6,18 px.
+     */
+    expect(BLOCO, "a moldura deixou de declarar a linha de tempo").toMatch(
+      /\.foto-inteira \{[^}]*view-timeline-name:\s*--foto-passa/,
+    );
+    expect(BLOCO, "a fotografia voltou a medir a travessia dentro da moldura").not.toMatch(
+      /\.foto-deriva \{[^}]*animation-timeline:\s*view\(\)/,
+    );
+    expect(BLOCO).toMatch(/\.foto-deriva \{[^}]*animation-timeline:\s*--foto-passa/);
+  });
+
+  it("a folga vai em `transform` e a deriva em `translate` — o `scale` fica livre", () => {
+    /**
+     * O zoom ao passar o rato desta grelha é a utilidade
+     * `group-hover:scale-[1.02]`, que escreve na propriedade `scale`. Uma
+     * folga escrita ali passa-lhe por cima sem dar erro nenhum.
+     *
+     * As três propriedades são independentes e compõem-se: `transform` dá a
+     * folga, `translate` deriva, `scale` fica para o rato.
+     */
+    const regra = /\.foto-deriva \{([^}]*)\}/.exec(BLOCO)?.[1] ?? "";
+    expect(regra, "a folga desapareceu").toContain("transform: scale(");
+    expect(regra, "a folga voltou a escrever na propriedade do zoom do rato").not.toMatch(
+      /(^|;|\s)scale:/,
+    );
+    const quadros = /@keyframes foto-deriva-kf \{([\s\S]*?)\n {4}\}/.exec(BLOCO)?.[1] ?? "";
+    expect(quadros, "a deriva voltou para cima do `transform`").not.toContain("transform");
+    expect(quadros).toContain("translate:");
+  });
+
+  it("e não corre onde não pode, nem para quem pediu menos movimento", () => {
+    /**
+     * A terceira razão por que a `prop-chega` foi retirada continua de pé:
+     * onde a linha de tempo do scroll não existe, não há movimento nenhum.
+     * Numa DECORAÇÃO isso é aceitável — a fotografia fica quieta e a proposta
+     * lê-se na mesma. Num texto escondido seria uma proposta em branco.
+     */
+    expect(BLOCO, "a deriva deixou de estar atrás do `@supports`").toMatch(
+      /@supports \(animation-timeline: view\(\)\)/,
+    );
+    expect(BLOCO, "a deriva deixou de respeitar quem pediu menos movimento").toMatch(
+      /@media \(prefers-reduced-motion: no-preference\)/,
+    );
   });
 });
