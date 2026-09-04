@@ -25,6 +25,39 @@ vi.mock("./lazy", () => {
     return C;
   };
   return {
+    /**
+     * ── O ECRÃ DE FAZER PROPOSTA, EM DUPLO ────────────────────────────────
+     *
+     * A lista de Pedidos deixou de abrir o painel de detalhe: leva ao ecrã de
+     * fazer a proposta, na página toda (palavras dela: «não apenas ali de
+     * lado» — ver `irFazerAProposta` no `AdminClient.tsx`). O painel ficou a
+     * uma tecla, no «Abrir o pedido» desse ecrã.
+     *
+     * Estes casos medem o PAINEL, não esse ecrã — por isso ele entra aqui em
+     * duplo, com a única porta de que precisam. O ecrã a sério é medido no
+     * `FazerProposta.*.test.tsx` e no passeio `fazer-proposta-cliente.spec.ts`.
+     */
+    FazerProposta: ({
+      quotes,
+      selectedId,
+      onAbrirPedido,
+    }: {
+      quotes: Quote[];
+      selectedId: string | null;
+      onAbrirPedido: (q: Quote) => void;
+    }) => (
+      <div data-testid="view-fazer-proposta">
+        <button
+          type="button"
+          onClick={() => {
+            const q = quotes.find((x) => x.id === selectedId);
+            if (q) onAbrirPedido(q);
+          }}
+        >
+          Abrir o pedido
+        </button>
+      </div>
+    ),
     Overview: stub("overview"),
     Kanban: stub("kanban"),
     Clientes: stub("clientes"),
@@ -53,6 +86,19 @@ vi.mock("./lazy", () => {
     EventTasks: stub("event-tasks"),
   };
 });
+
+/**
+ * ABRIR O PAINEL DO PEDIDO — pelo caminho que ela faz.
+ *
+ * Carregar num cliente na lista de Pedidos leva ao ecrã de fazer a proposta
+ * (ver `irFazerAProposta` no `AdminClient.tsx`); o painel — Produção,
+ * Financeiro, mensagens — abre-se daí, no «Abrir o pedido». O duplo desse ecrã
+ * está no `vi.mock("./lazy")` aqui em cima.
+ */
+function abrirOPainelDoPedido(nome: string) {
+  fireEvent.click(screen.getByText(nome));
+  fireEvent.click(screen.getByRole("button", { name: /^Abrir o pedido$/ }));
+}
 
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -243,7 +289,7 @@ describe("o painel do pedido", () => {
     // Fechado, a pergunta existe uma vez: no cartão da lista.
     expect(screen.getAllByRole("button", { name: /^ganho$/i })).toHaveLength(1);
 
-    fireEvent.click(screen.getByText("Ana e Rui"));
+    abrirOPainelDoPedido("Ana e Rui");
     await screen.findByRole("button", { name: "Fechar" });
 
     // Aberto, existe DUAS: o cartão continua na lista (no computador o painel
@@ -265,7 +311,7 @@ describe("o painel do pedido", () => {
       makeQuote({ id: "LQ-200", name: "Voltaram Atrás", status: "rejeitado", quotedPrice: 4600 }),
     ]);
     navTo(/Pedidos/);
-    fireEvent.click(screen.getByText("Voltaram Atrás"));
+    abrirOPainelDoPedido("Voltaram Atrás");
     await screen.findByRole("button", { name: "Fechar" });
 
     await user.selectOptions(screen.getByLabelText("Estado"), "aceite");
@@ -278,7 +324,7 @@ describe("o painel do pedido", () => {
   it("um pedido já ganho não é interrogado no painel — corrige-se no estado", async () => {
     renderAdmin([makeQuote({ id: "LQ-101", name: "Já Ganho", status: "aceite" })]);
     navTo(/Pedidos/);
-    fireEvent.click(screen.getByText("Já Ganho"));
+    abrirOPainelDoPedido("Já Ganho");
     await screen.findByRole("button", { name: "Fechar" });
 
     expect(screen.queryByRole("button", { name: /^ganho$/i })).toBeNull();

@@ -2515,8 +2515,31 @@ export default function AdminClient({
    * quem chamou avisa. Uma falha visível é melhor do que um painel que parece
    * completo e não está.
    */
+  /**
+   * ── DUAS PORTAS PARA O MESMO PEDIDO NÃO PAGAM DUAS VIAGENS ────────────────
+   *
+   * O `completos` só sabe do que JÁ CHEGOU. Enquanto a leitura está a caminho
+   * não sabe nada — e desde que a lista de Pedidos leva ao ecrã da proposta
+   * (que lê o pedido por trás) há um segundo gesto possível antes de a primeira
+   * resposta chegar: o «Abrir o pedido». Duas leituras iguais do mesmo pedido,
+   * a mesma resposta duas vezes, no 4G dela.
+   *
+   * Quem pede um pedido que já vai a caminho recebe A MESMA promessa.
+   */
+  const leiturasEmCurso = useRef(new Map<string, Promise<LeituraDoPedido>>());
+
   async function comPedidoInteiro(q: Quote): Promise<LeituraDoPedido> {
     if (completos.current.has(q.id)) return { ok: true, quote: q };
+    const aCaminho = leiturasEmCurso.current.get(q.id);
+    if (aCaminho) return aCaminho;
+    const leitura = lerPedidoInteiro(q).finally(() => {
+      leiturasEmCurso.current.delete(q.id);
+    });
+    leiturasEmCurso.current.set(q.id, leitura);
+    return leitura;
+  }
+
+  async function lerPedidoInteiro(q: Quote): Promise<LeituraDoPedido> {
     const oQue = `abrir o pedido de ${q.name || "este cliente"}`;
     let res: Response;
     try {
@@ -2575,8 +2598,98 @@ export default function AdminClient({
     const actual = quotes.find((q) => q.id === id);
     if (!actual) return;
     completos.current.delete(id);
+    // E a que vai a caminho: é dela que o `comPedidoInteiro` se serviria, e é
+    // exactamente a versão desactualizada que isto existe para deitar fora.
+    leiturasEmCurso.current.delete(id);
     const r = await comPedidoInteiro(actual);
     if (r.ok) absorverDoServidor(r.quote);
+  }
+
+  /**
+   * «Vistos recentemente», escrito num sítio só.
+   *
+   * Havia UMA porta para abrir um pedido e agora há duas — o painel de detalhe
+   * e a página inteira da proposta. Duas cópias desta escrita divergiam no dia
+   * em que uma delas ganhasse um campo, e o que se perde é a lista por onde ela
+   * volta a encontrar o que estava a fazer.
+   */
+  function lembrarRecente(q: Quote) {
+    try {
+      const entry: RecentQuote = { id: q.id, name: q.name, email: q.email, status: q.status };
+      const prev: RecentQuote[] = JSON.parse(localStorage.getItem("liquen-recent-quotes") ?? "[]");
+      const next = [entry, ...prev.filter((r) => r.id !== q.id)].slice(0, 6);
+      localStorage.setItem("liquen-recent-quotes", JSON.stringify(next));
+      setRecentQuotes(next);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * CARREGAR NUM CLIENTE DA LISTA É IR FAZER-LHE A PROPOSTA — NO ECRÃ TODO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «quando se carrega na página dos pedidos e depois num
+   * cliente vai para a parte de fazer a proposta, mas eu quero que […] coloque
+   * apenas a página para fazer a proposta do cliente em que se carregou na
+   * página toda e não apenas ali de lado, como está na página de fazer
+   * propostas».
+   *
+   * Tinha razão, e o número diz porquê. O painel de detalhe abre-se ao lado da
+   * lista e tem tecto próprio (`max-w-3xl`): MEDIDO num Chromium, com a janela
+   * a 1440, o estúdio lá dentro tem 712 px de fila. A página inteira dá-lhe os
+   * 1600 do `VIEW_WRAP`. É o mesmo estúdio, com mais do dobro do sítio para a
+   * coluna onde ela escreve.
+   *
+   * ── E PORQUE É QUE ISTO NÃO ESTÁ NO `openQuote` ───────────────────────────
+   *
+   * Há seis portas para abrir um pedido — a lista, o Kanban, o Calendário, os
+   * Clientes, o Acompanhamento e a Visão Geral. Só UMA delas é «vou trabalhar
+   * nesta proposta»: a lista de Pedidos, que é onde ela escolhe o cliente
+   * seguinte. Quem carrega num dia do Calendário quer ver o pedido daquele dia,
+   * não ser levado para dentro de um editor — por isso o `openQuote` fica como
+   * está, e é só o caminho da lista que muda.
+   *
+   * O painel continua a uma tecla de distância: a página tem «Abrir o pedido»
+   * ao lado de «Trocar de cliente», e leva ao painel com Produção, Financeiro e
+   * as mensagens.
+   */
+  async function irFazerAProposta(pedido: Quote) {
+    if (!discardGuard()) return;
+    /**
+     * ── A PÁGINA ENTRA JÁ, E O PEDIDO INTEIRO CHEGA POR TRÁS ────────────────
+     *
+     * A primeira versão disto esperava pelo `comPedidoInteiro` antes de mudar
+     * de ecrã, como faz o painel. MEDIDO num Chromium, do clique ao cabeçalho:
+     * **1609 ms**. Mil e seiscentos milissegundos a olhar para a lista antes de
+     * a animação sequer começar — e nenhuma animação salva uma espera dessas.
+     * A regra dela é essa mesma: nenhuma animação pode atrasar uma tarefa.
+     *
+     * E não é preciso esperar. O ecrã «Fazer proposta» SEMPRE abriu o estúdio
+     * sobre o pedido que está na lista — é o que faz desde que existe, pela
+     * porta da barra lateral. O que o `comPedidoInteiro` traz a mais são as
+     * colecções pesadas (convidados, material) que o PAINEL mostra e o estúdio
+     * não. Por isso aqui entra-se já, e a versão completa entra a seguir, sem
+     * ninguém à espera dela.
+     *
+     * ── E A VERSÃO COMPLETA ENTRA SOZINHA ──────────────────────────────────
+     *
+     * Não é preciso escrevê-la aqui: o `comPedidoInteiro` já põe o pedido
+     * inteiro na lista quando chega (`setQuotes`), e o ecrã lê a lista. Uma
+     * segunda escrita aqui seria uma segunda verdade sobre o mesmo pedido.
+     *
+     * Uma leitura que falhe não diz nada, e não é omissão: o ecrã está a
+     * funcionar com o pedido da lista, não há nada que ela possa fazer com o
+     * aviso, e é o mesmo «melhor esforço» do `recarregarPedido` aqui em cima.
+     * Se ela for ao painel, o «Abrir o pedido» tenta outra vez — e aí, sim,
+     * uma falha é dita, porque aí o painel PRECISA do pedido inteiro.
+     */
+    lembrarRecente(pedido);
+    setPropostaPara(pedido.id);
+    setView("fazer-proposta");
+
+    void comPedidoInteiro(pedido);
   }
 
   async function openQuote(pedido: Quote) {
@@ -2618,16 +2731,7 @@ export default function AdminClient({
     }
     const q = r.quote;
     setSelected(q);
-    // Track in recently-viewed list (localStorage)
-    try {
-      const entry: RecentQuote = { id: q.id, name: q.name, email: q.email, status: q.status };
-      const prev: RecentQuote[] = JSON.parse(localStorage.getItem("liquen-recent-quotes") ?? "[]");
-      const next = [entry, ...prev.filter((r) => r.id !== q.id)].slice(0, 6);
-      localStorage.setItem("liquen-recent-quotes", JSON.stringify(next));
-      setRecentQuotes(next);
-    } catch {
-      /* ignore */
-    }
+    lembrarRecente(q);
     setEditPrice(textoDoPreco(q));
     setEditNotes(q.adminNotes ?? "");
     setEditStatus(q.status);
@@ -2664,19 +2768,22 @@ export default function AdminClient({
     const target = detailNextAction(q).tab;
     abrirPrimeiroDetailTab(target === "gestao" ? "comunicacao" : target);
   }
-  // Stable identity for the memoised QuoteCard's onOpen prop. openQuote is a
-  // plain function (closes over discardGuard and many setters), so its reference
-  // changes every render — passing it directly would defeat QuoteCard's memo.
-  // A ref that always points at the latest openQuote keeps behaviour identical
+  // Stable identity for the memoised QuoteCard's onOpen prop. `irFazerAProposta`
+  // is a plain function (closes over discardGuard and many setters), so its
+  // reference changes every render — passing it directly would defeat QuoteCard's
+  // memo. A ref that always points at the latest one keeps behaviour identical
   // while giving the row a callback whose identity never changes.
-  const openQuoteRef = useRef(openQuote);
-  // Keep the ref pointing at the latest openQuote (updated in an effect, not
+  //
+  // O que está aqui dentro mudou de `openQuote` para `irFazerAProposta`: é ESTA
+  // a porta da lista de Pedidos, e as outras cinco continuam a abrir o painel.
+  const abrirDaListaRef = useRef(irFazerAProposta);
+  // Keep the ref pointing at the latest closure (updated in an effect, not
   // during render). onOpen fires from a click, which is always after commit, so
   // it reads the current closure.
   useEffect(() => {
-    openQuoteRef.current = openQuote;
+    abrirDaListaRef.current = irFazerAProposta;
   });
-  const openQuoteStable = useCallback((q: Quote) => openQuoteRef.current(q), []);
+  const abrirDaLista = useCallback((q: Quote) => abrirDaListaRef.current(q), []);
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
   // The date is intentionally left blank — it's a new event to schedule.
@@ -4626,6 +4733,10 @@ export default function AdminClient({
                 quotes={activeQuotes}
                 selectedId={propostaPara}
                 onSelect={setPropostaPara}
+                // Volta ao painel do pedido — que é onde vivem a Produção, o
+                // Financeiro e as mensagens. O `openQuote` já muda a vista para
+                // Pedidos e trata da espera com nome.
+                onAbrirPedido={openQuote}
                 onNovoPedido={() => setNewQuoteOpen(true)}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
@@ -5250,12 +5361,12 @@ export default function AdminClient({
                         isSelected={selectedIds.has(q.id)}
                         todayStr={todayStr}
                         userName={userName}
-                        onOpen={openQuoteStable}
+                        onOpen={abrirDaLista}
                         onToggle={toggleSelect}
                         onDesfecho={marcarDesfecho}
                       />
                     )}
-                    aoAbrir={openQuoteStable}
+                    aoAbrir={abrirDaLista}
                     colunas={COLUNAS_DE_PEDIDOS({
                       selectedIds,
                       toggleSelect,

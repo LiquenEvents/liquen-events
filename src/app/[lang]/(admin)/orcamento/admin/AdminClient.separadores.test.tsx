@@ -42,6 +42,39 @@ vi.mock("./lazy", () => {
     return C;
   };
   return {
+    /**
+     * ── O ECRÃ DE FAZER PROPOSTA, EM DUPLO ────────────────────────────────
+     *
+     * A lista de Pedidos deixou de abrir o painel de detalhe: leva ao ecrã de
+     * fazer a proposta, na página toda (palavras dela: «não apenas ali de
+     * lado» — ver `irFazerAProposta` no `AdminClient.tsx`). O painel ficou a
+     * uma tecla, no «Abrir o pedido» desse ecrã.
+     *
+     * Estes casos medem o PAINEL, não esse ecrã — por isso ele entra aqui em
+     * duplo, com a única porta de que precisam. O ecrã a sério é medido no
+     * `FazerProposta.*.test.tsx` e no passeio `fazer-proposta-cliente.spec.ts`.
+     */
+    FazerProposta: ({
+      quotes,
+      selectedId,
+      onAbrirPedido,
+    }: {
+      quotes: Quote[];
+      selectedId: string | null;
+      onAbrirPedido: (q: Quote) => void;
+    }) => (
+      <div data-testid="view-fazer-proposta">
+        <button
+          type="button"
+          onClick={() => {
+            const q = quotes.find((x) => x.id === selectedId);
+            if (q) onAbrirPedido(q);
+          }}
+        >
+          Abrir o pedido
+        </button>
+      </div>
+    ),
     Overview: stub("overview"),
     Kanban: stub("kanban"),
     Clientes: stub("clientes"),
@@ -167,6 +200,11 @@ async function abrirPedido(nome = "Ana Marques") {
   fireEvent.click(within(sidebar).getByRole("button", { name: /Pedidos/ }));
   await act(async () => {
     fireEvent.click(screen.getByText(nome));
+  });
+  // Carregar no cliente leva ao ecrã de fazer a proposta; o painel abre-se daí.
+  // Ver o duplo do `FazerProposta` no topo deste ficheiro.
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /^Abrir o pedido$/ }));
   });
 }
 

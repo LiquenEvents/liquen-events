@@ -115,6 +115,15 @@ interface Props {
   /** O valor mudou no estúdio, que o grava no pedido — o pai actualiza a sua
    *  cópia para o cartão do cliente aqui em cima mostrar o mesmo. */
   onQuoteUpdated: (quote: Quote) => void;
+  /**
+   * Abrir o pedido deste cliente no painel de detalhe (Produção, Financeiro,
+   * mensagens).
+   *
+   * Existe porque carregar num cliente na lista de Pedidos passou a trazer para
+   * aqui: sem esta porta, as outras três ferramentas do pedido ficavam a duas
+   * voltas de distância para quem entrou por ali.
+   */
+  onAbrirPedido: (quote: Quote) => void;
 }
 
 export default function FazerProposta({
@@ -124,6 +133,7 @@ export default function FazerProposta({
   onNovoPedido,
   onSent,
   onQuoteUpdated,
+  onAbrirPedido,
 }: Props) {
   const [procura, setProcura] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("activos");
@@ -231,9 +241,16 @@ export default function FazerProposta({
                 {escolhido.name}
               </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
-              Trocar de cliente
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* O pedido inteiro — Produção, Financeiro, mensagens — a UMA
+                  tecla. Ver `onAbrirPedido`. */}
+              <Button variant="secondary" size="sm" onClick={() => onAbrirPedido(escolhido)}>
+                Abrir o pedido
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
+                Trocar de cliente
+              </Button>
+            </div>
           </div>
         </Card>
 

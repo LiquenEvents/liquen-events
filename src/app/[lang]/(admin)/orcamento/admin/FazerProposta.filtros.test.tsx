@@ -66,6 +66,7 @@ function desenhar(quotes: Quote[]) {
       onNovoPedido={() => {}}
       onSent={() => {}}
       onQuoteUpdated={() => {}}
+      onAbrirPedido={() => {}}
     />,
   );
 }
