@@ -309,7 +309,7 @@ describe("o movimento da proposta", () => {
   });
 });
 
-describe("a escada das distâncias", () => {
+describe("a escada das distâncias — a do que se LÊ", () => {
   /**
    * ════════════════════════════════════════════════════════════════════════
    * O TEXTO DESCREVIA QUATRO DEGRAUS E O CÓDIGO TINHA UM
@@ -320,16 +320,24 @@ describe("a escada das distâncias", () => {
    * uma regra só, `translateY(var(--sobe, 12px))`, e o `--sobe` NUNCA foi
    * declarado em lado nenhum. Ou seja: tudo subia 12 px, e o texto mentia.
    *
-   * Perdeu-se numa correcção — os degraus estavam escritos em linha no TSX e o
-   * teste do portão do AVIF apanhou-os por engano, porque uma cadeia como
-   * «8px» tem a forma de uma fatia de `sizes`. Tirei-os de lá e não os voltei a
-   * pôr no CSS.
-   *
    * Não se perde outra vez: o que este caso guarda não são os números, é a
-   * ESCADA — que os quatro papéis existem, que são distintos, e que a ordem é
-   * a que o desenho diz. Mudar um número passa aqui; apagar um degrau não.
+   * ESCADA — que os papéis existem, que são distintos, e que a ordem é a que
+   * o desenho diz. Mudar um número passa aqui; apagar um degrau não.
+   *
+   * ── PORQUE É QUE A FOTOGRAFIA SAIU DESTA LISTA ───────────────────────────
+   *
+   * Estava aqui, entre o bloco e a secção, e este caso exigia-lhe ≤ 14 px. Foi
+   * uma decisão dela, com a proposta publicada à frente: «queria que houvesse
+   * uma experiência espetacular em animações pelas fotos». Um gesto de 12 px
+   * sem escala nenhuma não se vê num telemóvel — e ela tem razão, porque quem
+   * abre isto não vem ler um documento, vem ver o trabalho.
+   *
+   * A regra que esta lista guarda NÃO foi revogada: continua a valer, inteira,
+   * para tudo o que se lê. O que mudou é o alcance dela. Os dois papéis
+   * fotográficos têm agora o seu próprio caso, já a seguir, com o seu próprio
+   * tecto — não é «sem regra», é outra regra.
    */
-  const DEGRAUS = ["bloco", "foto", "seccao", "total"] as const;
+  const DEGRAUS = ["bloco", "titulo", "seccao", "total"] as const;
 
   /** A distância de cada papel, lida do CSS. */
   function degraus(): Map<string, number> {
@@ -365,7 +373,7 @@ describe("a escada das distâncias", () => {
       ).toBeGreaterThan(ordem[i - 1]);
     }
     expect(d.get("total"), "o total a pagar deixou de ser o único acima de 14").toBeGreaterThan(14);
-    for (const papel of ["bloco", "foto", "seccao"] as const) {
+    for (const papel of ["bloco", "titulo", "seccao"] as const) {
       expect(
         d.get(papel),
         `«${papel}» passou os 14 px — a escada perdeu o topo`,
@@ -384,119 +392,100 @@ describe("a escada das distâncias", () => {
       ).toBeLessThanOrEqual(24);
     }
   });
+
+  it("e NENHUM papel de leitura cresce — a escala é dos dois papéis fotográficos", () => {
+    /**
+     * Se um parágrafo ou o total a pagar começasse a crescer para o seu
+     * lugar, a distinção que este ficheiro acabou de fazer desaparecia — e um
+     * número que alguém confere com o dedo a mudar de tamanho é a última coisa
+     * que este documento pode fazer.
+     */
+    for (const papel of DEGRAUS) {
+      const m = new RegExp(`\\[data-sobe="${papel}"\\]\\.por-subir \\{([^}]*)\\}`).exec(BLOCO);
+      expect(m?.[1] ?? "", `«${papel}» ganhou escala e é um papel de leitura`).not.toContain(
+        "scale(",
+      );
+    }
+  });
 });
 
-describe("o arranque não obriga o browser a recalcular a página a cada volta", () => {
+describe("as fotografias, que saíram da escada", () => {
   /**
    * ════════════════════════════════════════════════════════════════════════
-   * MEDIR UM, ARMAR UM, MEDIR O SEGUINTE
+   * «UMA EXPERIÊNCIA ESPETACULAR EM ANIMAÇÕES PELAS FOTOS»
    * ════════════════════════════════════════════════════════════════════════
    *
-   * `getBoundingClientRect()` é uma LEITURA de geometria; `classList.add` é
-   * uma ESCRITA que invalida o estilo. Alternadas, cada leitura obriga o
-   * browser a recalcular estilo e disposição antes de responder — uma paragem
-   * síncrona por elemento, no arranque, no fio principal, que é justamente o
-   * momento em que ele está mais ocupado.
-   *
-   * CONTADO: com os 57 elementos que o documento marca hoje, 50 paragens
-   * forçadas; com os 65 a que os grupos de serviços e as fases do cronograma
-   * o levam, 58. Com duas voltas, zero.
-   *
-   * O que este caso guarda não é a FORMA do ciclo — é a PROPRIEDADE: depois da
-   * primeira escrita, não se volta a ler. Quem o reescrever de outra maneira
-   * passa aqui à mesma, desde que a mantenha.
+   * São dois papéis: a `foto` (uma célula da grelha de um mood board) e o
+   * `respiro` (a fotografia a toda a largura que abre cada board). O que se
+   * guarda aqui é que eles se distinguem do texto e que não passam do ponto —
+   * os números exactos podem afinar-se, a forma não.
    */
-  function ordemDasChamadas(quantos: number, acimaDaDobra: number) {
-    document.body.innerHTML = "";
-    const ordem: string[] = [];
-    const original = DOMTokenList.prototype.add;
-    const espia = vi.spyOn(DOMTokenList.prototype, "add").mockImplementation(function (
-      this: DOMTokenList,
-      ...classes: string[]
-    ) {
-      ordem.push("escreve");
-      return original.apply(this, classes);
-    });
+  const FOTOGRAFICOS = ["foto", "respiro"] as const;
 
-    for (let i = 0; i < quantos; i++) {
-      const el = document.createElement("div");
-      el.setAttribute("data-sobe", "bloco");
-      const top = i < acimaDaDobra ? 40 * i : 900 + 300 * i;
-      el.getBoundingClientRect = () => {
-        ordem.push("lê");
-        return { top } as DOMRect;
-      };
-      document.body.appendChild(el);
-    }
-
-    vi.stubGlobal("matchMedia", () => ({ matches: false }));
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        observe() {}
-        unobserve() {}
-      },
-    );
-    Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
-    new Function(GUIAO_DO_MOVIMENTO)();
-    espia.mockRestore();
-    return ordem;
+  function gesto(papel: string) {
+    const m = new RegExp(`\\[data-sobe="${papel}"\\]\\.por-subir \\{([^}]*)\\}`).exec(BLOCO);
+    const corpo = m?.[1] ?? "";
+    const sobe = /translateY\((\d+)px\)/.exec(corpo);
+    const escala = /scale\(([\d.]+)\)/.exec(corpo);
+    return { corpo, sobe: sobe ? Number(sobe[1]) : 0, escala: escala ? Number(escala[1]) : null };
   }
 
-  it("lê a página toda ANTES de escrever a primeira classe", () => {
-    const ordem = ordemDasChamadas(57, 6);
-    expect(ordem.filter((o) => o === "lê").length, "não chegou a medir todos").toBe(57);
-
-    let paragens = 0;
-    for (let i = 1; i < ordem.length; i++) {
-      if (ordem[i] === "lê" && ordem[i - 1] === "escreve") paragens++;
+  it("cada um sobe mais do que qualquer coisa que se leia", () => {
+    // O topo da escada de leitura é o total a pagar, aos 20 px.
+    for (const papel of FOTOGRAFICOS) {
+      expect(
+        gesto(papel).sobe,
+        `«${papel}» voltou ao gesto de um parágrafo — era isto que não se via`,
+      ).toBeGreaterThan(20);
     }
-    expect(
-      paragens,
-      `voltou a ler a geometria depois de escrever, ${paragens} vezes — cada ` +
-        "uma dessas é o browser a recalcular a página inteira, no arranque",
-    ).toBe(0);
   });
 
-  it("e continua a armar exactamente os mesmos elementos, pela mesma ordem", () => {
-    /**
-     * A prova de que as duas voltas não mudam o resultado — e a razão de ser
-     * seguro: o que se escreve é `transform`, que não mexe na disposição de
-     * ninguém, portanto nenhum `top` medido na primeira volta pode ser
-     * alterado pelo que a segunda escreve.
-     */
-    document.body.innerHTML = "";
-    const tops = [10, 40, 5000, 80, 6000, 7000];
-    const els = tops.map((top) => {
-      const el = document.createElement("div");
-      el.setAttribute("data-sobe", "bloco");
-      el.getBoundingClientRect = () => ({ top }) as DOMRect;
-      document.body.appendChild(el);
-      return el;
-    });
-    const observados: Element[] = [];
-    vi.stubGlobal("matchMedia", () => ({ matches: false }));
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        observe(el: Element) {
-          observados.push(el);
-        }
-        unobserve() {}
-      },
-    );
-    Object.defineProperty(document, "readyState", { value: "complete", configurable: true });
-    new Function(GUIAO_DO_MOVIMENTO)();
+  it("e CRESCE até ao seu lugar — é a escala que se vê, não os píxeis", () => {
+    for (const papel of FOTOGRAFICOS) {
+      const { escala } = gesto(papel);
+      expect(escala, `«${papel}» ficou sem escala`).not.toBeNull();
+      expect(
+        escala!,
+        `«${papel}» começa a ${escala} — acima de 1 passa por cima da vizinha do lado`,
+      ).toBeLessThan(1);
+      expect(escala!, `«${papel}» a ${escala} já é um salto, não uma chegada`).toBeGreaterThanOrEqual(
+        0.9,
+      );
+    }
+  });
 
-    // dobra = 768 × 0,9 = 691,2 no jsdom
-    expect(els.map((e) => e.classList.contains("por-subir"))).toEqual([
-      false,
-      false,
-      true,
-      false,
-      true,
-      true,
-    ]);
-    expect(observados, "a ordem de observação mudou").toEqual([els[2], els[4], els[5]]);
+  it("o respiro é o maior gesto do documento, e a escala dele é a mais contida", () => {
+    // A mesma percentagem numa caixa três vezes mais larga são três vezes mais
+    // píxeis: a sangria inteira precisa de menos escala, não de mais.
+    const f = gesto("foto");
+    const r = gesto("respiro");
+    expect(r.sobe, "o respiro deixou de ser o separador mais forte").toBeGreaterThan(f.sobe);
+    expect(r.escala!, "a sangria inteira a crescer tanto como uma célula dá um salto").toBeGreaterThan(
+      f.escala!,
+    );
+  });
+
+  it("e demoram mais do que o texto — a regra vem DEPOIS da largada, ou não vale", () => {
+    /**
+     * Empate de especificidade: `[data-sobe]` + duas classes de um lado,
+     * `[data-sobe="foto"]` + duas classes do outro. Quem ganha é a ordem no
+     * ficheiro. Esta linha mudada de sítio deixava de valer sem dar erro
+     * nenhum — a fotografia voltava aos 620 ms e ninguém dava por isso.
+     */
+    const largada = BLOCO.indexOf("[data-sobe].por-subir.subiu");
+    const propria = BLOCO.indexOf('[data-sobe="foto"].por-subir.subiu');
+    expect(largada, "a regra da largada desapareceu").toBeGreaterThan(-1);
+    expect(propria, "os papéis fotográficos ficaram sem duração própria").toBeGreaterThan(-1);
+    expect(propria, "a duração própria subiu para antes da largada e deixou de valer").toBeGreaterThan(
+      largada,
+    );
+
+    const curta = /\[data-sobe\]\.por-subir\.subiu \{[^}]*?transition: transform (\d+)ms/.exec(BLOCO);
+    const longa = /\[data-sobe="foto"\]\.por-subir\.subiu[^{]*\{[^}]*?transition-duration: (\d+)ms/.exec(
+      BLOCO,
+    );
+    expect(Number(longa?.[1]), "um gesto maior feito no mesmo tempo lê-se como um salto").toBeGreaterThan(
+      Number(curta?.[1]),
+    );
   });
 });
