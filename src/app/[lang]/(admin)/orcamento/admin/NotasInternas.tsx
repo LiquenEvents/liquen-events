@@ -73,12 +73,30 @@ export default function NotasInternas({
         compacta ? "mt-3 p-3" : "mt-4 p-4"
       }`}
     >
+      {/* ── O RÓTULO QUEBRA DE LINHA EM VEZ DE SE ESPREMER ────────────────
+          Era uma fila sem `flex-wrap`: três filhos lado a lado, sem chão, sem
+          quebra. Numa caixa estreita não há para onde ir e o texto parte-se
+          letra a letra.
+
+          MEDIDO num Chromium, no painel do estúdio que abre a partir do cartão
+          de um cliente: com a janela a 1440, este rótulo tinha SEIS PÍXEIS — é
+          o «S / ó / p / a / r / a» na vertical da fotografia que ela mandou. A
+          2000 tinha 60, e dava os quatro degraus «Nota / sobre / as / capas».
+
+          `flex-wrap` deixa a segunda metade da frase cair para a linha de
+          baixo, que é o que uma frase faz quando não cabe; `min-w-0` no título
+          deixa-o encolher sem empurrar; e `items-baseline` mantém o lápis
+          alinhado com a letra quando há duas linhas.
+
+          A causa de fundo — a coluna colapsada — está corrigida no
+          `ProposalStudio`. Isto é a rede por baixo: mesmo que uma caixa volte a
+          apertar, isto lê-se. */}
       <label
         htmlFor={id}
-        className="flex items-center gap-1.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[#7a6420]"
+        className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[#7a6420]"
       >
         <span aria-hidden="true">✎</span>
-        {titulo}
+        <span className="min-w-0">{titulo}</span>
         <span className="font-normal normal-case tracking-normal text-[#7a6420]/70">
           — só para ti, nunca sai na proposta
         </span>

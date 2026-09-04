@@ -43,7 +43,21 @@ const aJanelaTem = (px: number) =>
     };
   });
 
-/** O ecrã é largo — ou não é. Em píxeis, à volta do corte da casa. */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PERGUNTA MUDOU DE SÍTIO, E ESTE FICHEIRO COM ELA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estes casos mediam a JANELA (`matchMedia`), porque era à janela que o painel
+ * perguntava. Era essa a avaria: MEDIDO num Chromium, no painel que abre a
+ * partir do cartão de um cliente, a janela tinha 2000 px e a caixa onde este
+ * `<aside>` aterra tinha 712 — a coluna onde ela escreve ficava com 136 px.
+ *
+ * A decisão passou para quem desenha a fila, que é o único que sabe quanto ela
+ * mede, e chega aqui já respondida na propriedade `cabe`. Os casos ficam, com a
+ * mesma intenção: o que se guarda é que, quando NÃO cabe, não se desenha NADA —
+ * nem escondido.
+ */
 const largura = (cabe: boolean) => aJanelaTem(cabe ? CORTES.largo : CORTES.largo - 1);
 
 const board = (over: Partial<MoodBoard> = {}): MoodBoard =>
@@ -57,6 +71,10 @@ const paginas: PaginaParaOPainel[] = [
 const desenhar = (over: Partial<React.ComponentProps<typeof PainelDoEstudio>> = {}) =>
   render(
     <PainelDoEstudio
+      /* A decisão deixou de ser deste ficheiro: quem desenha a fila é que sabe
+         quanto ela mede. Aqui diz-se «cabe» porque é o caso que se quer ver
+         desenhado; o caso do «não cabe» tem o seu próprio teste no estúdio. */
+      cabe
       paginas={paginas}
       urls={{ "p/a.jpg": "u/a", "p/b.jpg": "u/b" }}
       originais={{}}
@@ -74,14 +92,12 @@ describe("o painel só existe onde cabe", () => {
     // Um `hidden 2xl:block` esconde com CSS e o React desenha na mesma. Medido:
     // numa proposta no tecto do gerador isso chegou para o estúdio deixar de
     // responder. Quem trabalha num portátil não pode pagar o painel que não tem.
-    largura(false);
-    const { container } = desenhar();
+    const { container } = desenhar({ cabe: false });
     expect(container.firstChild).toBeNull();
   });
 
-  it("num ecrã largo, desenha", () => {
-    largura(true);
-    desenhar();
+  it("quando cabe, desenha", () => {
+    desenhar({ cabe: true });
     expect(screen.getByRole("complementary", { name: /o que vai sair/i })).toBeTruthy();
   });
 
@@ -93,15 +109,16 @@ describe("o painel só existe onde cabe", () => {
    * o painel montava-se (pagava-se o desenho das páginas) e ficava escondido
    * por CSS: o pior dos dois mundos.
    */
-  it("aparece exactamente no corte da casa (1440), nem um píxel depois", () => {
-    aJanelaTem(CORTES.largo);
-    desenhar();
+  it("aparece quando quem desenha a fila diz que cabe", () => {
+    desenhar({ cabe: true });
     expect(screen.getByRole("complementary", { name: /o que vai sair/i })).toBeTruthy();
   });
 
-  it("um píxel abaixo do corte não desenha NADA — nem escondido", () => {
-    aJanelaTem(CORTES.largo - 1);
-    const { container } = desenhar();
+  it("e um píxel abaixo do limiar não desenha NADA — nem escondido", () => {
+    /* O limiar deixou de viver aqui: é `LARGURA_MINIMA_DA_FILA`, no
+       `ProposalStudio`, medido na FILA e não na janela. O caso que este ficheiro
+       guarda é o que continua a ser dele: com um «não cabe», não sai nada. */
+    const { container } = desenhar({ cabe: false });
     expect(container.firstChild).toBeNull();
   });
 
@@ -109,18 +126,19 @@ describe("o painel só existe onde cabe", () => {
     // Um `hidden … 2xl:block` no `<aside>` era a segunda resposta à mesma
     // pergunta, e a errada: esconder por CSS é o que este ficheiro existe para
     // NÃO fazer. Quando o painel é desenhado, é porque cabe.
-    aJanelaTem(CORTES.largo);
-    desenhar();
+    desenhar({ cabe: true });
     const painel = screen.getByRole("complementary", { name: /o que vai sair/i });
     expect(painel.className.split(/\s+/)).not.toContain("hidden");
     expect(painel.className).not.toMatch(/\b(sm|md|lg|xl|2xl):/);
   });
 
-  it("sem `matchMedia` nenhum, não rebenta — não desenha", () => {
+  it("sem resposta nenhuma sobre a largura, não rebenta — não desenha", () => {
     // Acontece no servidor e em ambientes de teste. Um painel que rebentasse
-    // por não saber a largura era pior do que não haver painel.
+    // por não saber a largura era pior do que não haver painel. O `cabe` por
+    // omissão do lado de quem desenha a fila é `false` enquanto não houver
+    // medida — «ainda não sei» lê-se como «não cabe», que é o lado seguro.
     vi.stubGlobal("matchMedia", undefined);
-    const { container } = desenhar();
+    const { container } = desenhar({ cabe: false });
     expect(container.firstChild).toBeNull();
   });
 });

@@ -116,7 +116,25 @@ function separar(classe: string): string[] {
   return partes;
 }
 
+/**
+ * ── E AGORA A PERGUNTA É À ZONA ──────────────────────────────────────────
+ *
+ * O índice deixou de perguntar `lg:` (1024 DE JANELA) e passou a perguntar
+ * `@min-[40rem]/estudio:` — a mesma pergunta, feita à fila onde ele vive.
+ *
+ * A razão está medida: no painel que abre a partir do cartão de um cliente, a
+ * janela tinha 1280 e a fila tinha 498 px. O `lg:` dizia que sim, o índice
+ * montava-se como coluna, levava 192 dos 498 e deixava 282 para a coluna onde
+ * ela escreve.
+ *
+ * Para este resolvedor a diferença é só qual é o número e como se escreve o
+ * prefixo — a `largura` que ele recebe passa a ser a da ZONA, não a da janela.
+ */
+const consultaDeContentor = /^@min-\[(\d+(?:\.\d+)?)rem\](?:\/[a-z-]+)?$/;
+
 function ligada(variante: string, largura: number): boolean {
+  const contentor = consultaDeContentor.exec(variante);
+  if (contentor) return largura >= Number(contentor[1]) * 16;
   if (variante in CORTES_DA_CASA) return largura >= CORTES_DA_CASA[variante];
   const ate = /^max-([a-z0-9]+)$/.exec(variante);
   if (ate && ate[1] in CORTES_DA_CASA) return largura < CORTES_DA_CASA[ate[1]];
@@ -129,7 +147,7 @@ function ligada(variante: string, largura: number): boolean {
     return true;
   }
   throw new Error(
-    `variante \`${variante}:\` desconhecida — este back office só usa \`sm:\` e \`lg:\``,
+    `variante \`${variante}:\` desconhecida — este back office usa \`sm:\`, \`lg:\` e as consultas de contentor \`@min-[…rem]/…:\``,
   );
 }
 
@@ -159,14 +177,18 @@ function visivel(el: Element, largura: number, raiz: Element): boolean {
   return true;
 }
 
-/** As larguras que interessam: as duas pontas de cada corte, e o telemóvel. */
-const LARGURAS = [375, 639, 640, 1023, 1024, 1440];
+/**
+ * As larguras que interessam — e são as da ZONA onde o índice vive, não as da
+ * janela. As duas pontas de cada corte, mais o telemóvel e a fila apertada de
+ * 498 px que o painel de detalhe dá num ecrã de 1280 (foi ali que isto partiu).
+ */
+const LARGURAS = [375, 498, 639, 640, 1023, 1024, 1440];
 
 describe("o resolvedor (senão isto passava por vacuidade)", () => {
   it("liga e desliga o que a casa usa, e rebenta com o resto", () => {
-    expect(aparece("hidden lg:block", 1023)).toBe(false);
-    expect(aparece("hidden lg:block", 1024)).toBe(true);
-    expect(aparece("flex lg:flex-col", 375)).toBe(true);
+    expect(aparece("hidden @min-[40rem]/estudio:block", 639)).toBe(false);
+    expect(aparece("hidden @min-[40rem]/estudio:block", 640)).toBe(true);
+    expect(aparece("flex @min-[40rem]/estudio:flex-col", 375)).toBe(true);
     expect(() => efectivas("xl:block", 1300)).toThrow(/xl:/);
     expect(() => efectivas("md:hidden", 800)).toThrow(/md:/);
   });
@@ -175,7 +197,7 @@ describe("o resolvedor (senão isto passava por vacuidade)", () => {
 describe("a 375 px o índice existe e é navegável", () => {
   const desenhar = () => render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
 
-  it("a coluna deixou de ser `hidden` abaixo de 1024 — está lá nas seis larguras", () => {
+  it("a coluna deixou de ser `hidden` nas zonas estreitas — está lá em todas as larguras", () => {
     const { container } = desenhar();
     const indice = container.querySelector("nav")!;
     for (const largura of LARGURAS) {
@@ -191,7 +213,7 @@ describe("a 375 px o índice existe e é navegável", () => {
     }
   });
 
-  it("é uma TIRA que rola de lado, e uma COLUNA a partir de 1024", () => {
+  it("é uma TIRA que rola de lado, e uma COLUNA quando a ZONA tem 40rem", () => {
     // A diferença entre «existe» e «serve»: a 375 px uma coluna de 192 px ao
     // lado roubava metade da largura ao trabalho. O que a torna utilizável é
     // rolar na horizontal — e é isso, e não a ortografia da classe, que se
@@ -202,7 +224,7 @@ describe("a 375 px o índice existe e é navegável", () => {
     expect(tira.has("flex") && !tira.has("flex-col")).toBe(true);
     expect(tira.has("overflow-x-auto")).toBe(true);
 
-    const coluna = efectivas(lista.className, 1024);
+    const coluna = efectivas(lista.className, 640);
     expect(coluna.has("flex-col")).toBe(true);
   });
 
@@ -296,7 +318,7 @@ describe("o que a tira deixa de fora, deixa-o de propósito", () => {
     { id: "servicos", seccao: "servicos", texto: "Nenhum grupo de serviços", trava: true },
   ] as Impedimento[];
 
-  it("a lista do que trava o envio fica em `lg` — quem a diz a 375 é o botão de enviar", () => {
+  it("a lista do que trava o envio fica na COLUNA — numa zona estreita quem a diz é o botão de enviar", () => {
     // Não é «não cabe»: é «já existe». O `PorqueNaoDaParaEnviar` põe as mesmas
     // faltas encostadas ao botão, com o mesmo salto para o campo. Repeti-las
     // aqui gastava altura permanente para dizer duas vezes o mesmo, e a segunda
@@ -304,15 +326,15 @@ describe("o que a tira deixa de fora, deixa-o de propósito", () => {
     const { container } = render(<NavEstudio seccoes={seccoes} faltas={trava} />);
     const linha = screen.getByRole("button", { name: "Nenhum grupo de serviços" });
     expect(visivel(linha, 375, container)).toBe(false);
-    expect(visivel(linha, 1023, container)).toBe(false);
-    expect(visivel(linha, 1024, container)).toBe(true);
+    expect(visivel(linha, 639, container)).toBe(false);
+    expect(visivel(linha, 640, container)).toBe(true);
   });
 
   it("o resumo também — mas o NOME da secção nunca, que é por ele que se salta", () => {
     const { container } = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
     const resumo = screen.getByText("Ana e Rui");
     expect(visivel(resumo, 375, container)).toBe(false);
-    expect(visivel(resumo, 1024, container)).toBe(true);
+    expect(visivel(resumo, 640, container)).toBe(true);
     expect(visivel(screen.getByText("Evento"), 375, container)).toBe(true);
   });
 });

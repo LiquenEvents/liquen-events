@@ -114,3 +114,49 @@ describe("a barra de destinos do telemóvel", () => {
     expect(bloco).toMatch(/min-h-\[var\(--bo-barra-inferior\)\]/);
   });
 });
+
+describe("a folga por baixo da barra do estúdio mede o `sticky`, e não a janela", () => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * QUASE MIL PÍXEIS DE VAZIO NO FIM DO PASSO 1
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A folga reservada por baixo da barra era `window.innerHeight - r.bottom` —
+   * a distância ao fundo da JANELA. A intenção, escrita ao lado, era outra: «a
+   * distância a que ela está do fundo do ecrã (o `bottom-[calc(56px+…)]` que a
+   * levanta por cima da navegação do telemóvel)», ou seja o `bottom` do
+   * `sticky`. Os dois números só coincidem quando quem rola É a janela.
+   *
+   * MEDIDO num Chromium, no painel que abre a partir do cartão de um cliente —
+   * onde quem rola é o painel:
+   *
+   *     fundo da barra ................ 384 px
+   *     fundo da caixa que rola ....... 876 px
+   *     folga reservada ......... 893 a 962 px
+   *     folga necessária .............. ~569 px
+   *
+   * E realimentava-se: mais folga faz a coluna mais alta, a barra sobe na
+   * janela, a distância ao fundo cresce, a folga cresce outra vez — daí os
+   * valores a saltar entre larguras (420, 962, 421, 913, 893).
+   *
+   * O que este caso guarda é a PERGUNTA, que é onde estava o erro. O `bottom`
+   * calculado responde certo em qualquer caixa; a altura da janela responde
+   * certo só numa.
+   */
+  const ESTUDIO = readFileSync(join(RAIZ, "ProposalStudio.tsx"), "utf8");
+  const medicao = /const porBaixo = [^;]+;/.exec(ESTUDIO)?.[0] ?? "";
+
+  it("lê o `bottom` do próprio elemento", () => {
+    expect(medicao, "a medição da folga desapareceu").not.toBe("");
+    expect(medicao).toContain("getComputedStyle");
+    expect(medicao).toContain(".bottom");
+  });
+
+  it("e NUNCA a altura da janela — foi essa a avaria", () => {
+    expect(
+      medicao,
+      "voltou a medir a distância ao fundo da janela: no painel de detalhe isso " +
+        "reserva quase mil píxeis de vazio, e realimenta-se",
+    ).not.toContain("innerHeight");
+  });
+});

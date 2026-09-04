@@ -52,6 +52,15 @@ const IPAD_AO_ALTO = 768;
 const PORTATIL = 1024;
 const ANTES_DO_PORTATIL = 1023;
 
+/**
+ * O índice do estúdio deixou de perguntar à JANELA e passou a perguntar à FILA
+ * onde vive (`@min-[40rem]/estudio:`). Estas são as duas pontas desse corte, em
+ * largura de FILA — e a de baixo é a que importa: 498 px é o que o painel de
+ * detalhe dá numa janela de 1280, e foi ali que isto partiu.
+ */
+const FILA_APERTADA = 498;
+const FILA_COM_ESPACO = 640;
+
 type Contexto = {
   /** A largura da JANELA — é o que `sm:` e `lg:` medem. */
   largura: number;
@@ -98,6 +107,20 @@ function ligada(variante: string, ctx: Contexto): boolean {
 
   const daJanela = /^min-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
   if (daJanela) return ctx.largura >= emPixeis(daJanela[1], daJanela[2]);
+
+  /**
+   * A consulta de contentor NOMEADA do estúdio: `@min-[40rem]/estudio:`.
+   *
+   * O índice do estúdio perguntava `lg:` — 1024 DE JANELA. MEDIDO num Chromium,
+   * no painel que abre a partir do cartão de um cliente: a janela tinha 1280 e a
+   * fila onde o índice vive tinha 498 px. Ele montava-se como coluna, levava 192
+   * dos 498 e deixava 282 para a coluna onde ela escreve. Passou a perguntar à
+   * FILA, e aqui a `largura` do contexto lê-se como a largura dela.
+   */
+  const daFilaDoEstudio = /^@min-\[(\d+(?:\.\d+)?)(px|rem)\]\/estudio$/.exec(variante);
+  if (daFilaDoEstudio) {
+    return ctx.largura >= emPixeis(daFilaDoEstudio[1], daFilaDoEstudio[2]);
+  }
 
   const doContentor = /^@\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(variante);
   if (doContentor) {
@@ -465,31 +488,31 @@ describe("índice do estúdio: existe em todas as larguras", () => {
     { id: "servicos", texto: "Nenhum grupo de serviços", trava: true } as Impedimento,
   ];
 
-  it("a 1023 já há índice — e é a tira, não a coluna", () => {
+  it("numa fila estreita já há índice — e é a tira, não a coluna", () => {
     const { container } = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
     const indice = container.querySelector("nav")!;
     expect(aparece(indice.className, { largura: 375 })).toBe(true);
-    expect(aparece(indice.className, { largura: ANTES_DO_PORTATIL })).toBe(true);
-    expect(aparece(indice.className, { largura: PORTATIL })).toBe(true);
+    expect(aparece(indice.className, { largura: FILA_APERTADA })).toBe(true);
+    expect(aparece(indice.className, { largura: FILA_COM_ESPACO })).toBe(true);
 
     // Tira de um lado do corte, coluna do outro — e é a lista que muda de
     // direcção, não uma segunda árvore a aparecer.
     const lista = container.querySelector("nav ul")!.className;
-    expect(efectivas(lista, { largura: ANTES_DO_PORTATIL }).has("flex-col")).toBe(false);
-    expect(efectivas(lista, { largura: ANTES_DO_PORTATIL }).has("overflow-x-auto")).toBe(true);
-    expect(efectivas(lista, { largura: PORTATIL }).has("flex-col")).toBe(true);
+    expect(efectivas(lista, { largura: FILA_APERTADA }).has("flex-col")).toBe(false);
+    expect(efectivas(lista, { largura: FILA_APERTADA }).has("overflow-x-auto")).toBe(true);
+    expect(efectivas(lista, { largura: FILA_COM_ESPACO }).has("flex-col")).toBe(true);
 
     expect(indice.textContent).toContain("Serviços");
   });
 
-  it("a lista do que trava o envio continua a ser coisa de `lg`", () => {
+  it("a lista do que trava o envio continua a ser coisa da COLUNA", () => {
     // A 375 não desaparece do documento: fica `hidden`, porque quem responde à
     // pergunta «porque é que não envia?» nessa largura é o painel que vive
     // encostado ao próprio botão.
     const { container } = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
     const aviso = screen.getByText("Nenhum grupo de serviços").closest("div")!;
-    expect(aparece(aviso.className, { largura: ANTES_DO_PORTATIL })).toBe(false);
-    expect(aparece(aviso.className, { largura: PORTATIL })).toBe(true);
+    expect(aparece(aviso.className, { largura: FILA_APERTADA })).toBe(false);
+    expect(aparece(aviso.className, { largura: FILA_COM_ESPACO })).toBe(true);
     expect(container.textContent).toContain("Nenhum grupo de serviços");
   });
 });
