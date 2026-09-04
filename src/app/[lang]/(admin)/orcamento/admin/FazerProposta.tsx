@@ -223,8 +223,32 @@ export default function FazerProposta({
   // ── Com cliente escolhido: o ecrã é o estúdio ────────────────────────────
   if (escolhido) {
     return (
+      /**
+       * ── A PÁGINA APRESENTA-SE, E EM DOIS TEMPOS ──────────────────────────
+       *
+       * Palavras dela: «que haja uma animação super fluida que coloca a página
+       * para fazer a proposta na página toda».
+       *
+       * A escada é a da casa (`.bo-cena`, 600 ms, degraus de 20 ms, no máximo
+       * seis) e não uma cópia nova: primeiro chega o «Proposta para ‹nome›» —
+       * a resposta a «para quem é isto» —, e logo a seguir o estúdio. É a
+       * ordem por que se lê, e é a mesma escada da Visão Geral e das Propostas.
+       *
+       * O que NÃO se fez, e porquê: um `document.startViewTransition` a
+       * transformar a linha da lista no cabeçalho desta página. A casa já mediu
+       * essa via e desligou-a («o snapshot da página inteira colidia com a nova
+       * rota a hidratar, e a transição gaguejava» — `PageTransition.tsx`); o
+       * estúdio é a superfície mais pesada do back office, e é exactamente onde
+       * isso voltaria a acontecer. Uma animação que trava é o contrário de
+       * fluida.
+       *
+       * Só `opacity` e `transform`, com `backwards` — não fica transform
+       * nenhum depois, que é o que quebraria o `position: fixed` de uma folha
+       * aberta aqui dentro. E `prefers-reduced-motion` desliga-a no
+       * `globals.css`.
+       */
       <div className="flex flex-col gap-4">
-        <Card padding="md">
+        <Card padding="md" className="bo-cena">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               {/* O EVENTO, A DATA E O LOCAL SAÍRAM DAQUI.
@@ -256,18 +280,22 @@ export default function FazerProposta({
 
         {/* ANTES do estúdio, de propósito. Saber que o dia já está ocupado
             depois de escrever a proposta toda é saber tarde de mais. */}
-        <AvisoDataOcupada quote={escolhido} quotes={quotes} onAbrir={onSelect} />
+        <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena empty:hidden">
+          <AvisoDataOcupada quote={escolhido} quotes={quotes} onAbrir={onSelect} />
+        </div>
 
         {/* `key` pelo id: trocar de cliente TEM de recomeçar o estúdio do zero.
             Sem isto o React reaproveitava a instância e o rascunho de um casal
             aparecia no ecrã do seguinte. */}
-        <ProposalStudio
-          key={`fazer-proposta-${escolhido.id}`}
-          quote={escolhido}
-          quotes={quotes}
-          onQuoteUpdated={onQuoteUpdated}
-          onSent={() => onSent(escolhido)}
-        />
+        <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
+          <ProposalStudio
+            key={`fazer-proposta-${escolhido.id}`}
+            quote={escolhido}
+            quotes={quotes}
+            onQuoteUpdated={onQuoteUpdated}
+            onSent={() => onSent(escolhido)}
+          />
+        </div>
       </div>
     );
   }
