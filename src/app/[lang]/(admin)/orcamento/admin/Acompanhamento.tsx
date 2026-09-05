@@ -372,7 +372,20 @@ export default function Acompanhamento({
   }
 
   return (
-    <div className="@container flex flex-col gap-4">
+    /* ── O ESQUELETO DÁ LUGAR AO CONTEÚDO, EM VEZ DE SALTAR PARA ELE ────────
+       Enquanto as propostas não chegam mostra-se um `SkeletonList` (aqui em
+       cima); quando chegam, esta árvore monta de raiz e o esqueleto desaparece
+       — e até aqui isso era um salto de um fotograma para o outro.
+
+       `.bo-cena` (600 ms, doze píxeis): a banda de apresentação, porque isto é
+       o sistema a apresentar um ecrã e não uma troca de estado. Uma vez só, no
+       contentor — as linhas lá dentro não têm degrau próprio, que é a regra
+       desta casa para listas de dados.
+
+       A animação corre exactamente quando a espera acaba, sem código nenhum a
+       coordenar as duas coisas: o `return` de cima devolve o esqueleto, este
+       devolve o conteúdo, e o que monta anima. */
+    <div className="bo-cena @container flex flex-col gap-4">
       {/*
         ── O resumo: as duas perguntas de segunda-feira de manhã ──────────
 

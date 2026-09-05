@@ -397,7 +397,10 @@ export default function EventTasks({ quote, userName }: Props) {
           action={{ label: "Adicionar tarefa", onClick: () => setAdding(true) }}
         />
       ) : (
-        <div className="flex flex-col gap-2">
+        /* O esqueleto dá lugar à lista: `.bo-cena` (600 ms) no contentor, uma
+           vez só. As linhas lá dentro não têm degrau próprio — a escada é por
+           bloco, nunca por linha, e uma lista de tarefas não tem tecto. */
+        <div className="bo-cena flex flex-col gap-2">
           {[...todo, ...done].map((task) => (
             <div
               key={task.id}

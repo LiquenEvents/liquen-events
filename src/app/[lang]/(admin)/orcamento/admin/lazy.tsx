@@ -17,6 +17,11 @@ function ViewLoading() {
 }
 
 // Detail-panel tools — a shimmering eyebrow+bar holds the layout while loading.
+//
+// O esqueleto NÃO leva entrada, de propósito: um esqueleto é a espera, não uma
+// apresentação, e uma entrada aqui somava-se aos 300 ms que o React já segura
+// um fallback pintado. Quem se apresenta é a ferramenta que chega — e essa
+// entra pela `.bo-cena` que cada uma traz.
 const PanelLoading = () => (
   <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
     <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />
