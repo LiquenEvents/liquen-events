@@ -4453,7 +4453,21 @@ export default function AdminClient({
                   </svg>
                 </button>
               )}
-              <div className="min-w-0">
+              {/* ── O CABEÇALHO ACOMPANHA A TROCA DE VISTA ───────────────
+                  O corpo da vista entra com a `.view-in` desde sempre, e o
+                  título e o subtítulo trocavam no sítio, secos. Lia-se como se
+                  só metade do ecrã tivesse mudado.
+
+                  `.bo-entrada` (240 ms, quatro píxeis, `cubic-bezier(0, 0,
+                  0.2, 1)`): quatro e não oito, porque é a distância que a casa
+                  reserva a um rótulo — o cromado não sai do sítio, muda o nome
+                  que ele traz.
+
+                  Aqui o `key` PODE remontar, ao contrário dos passos do
+                  estúdio e dos separadores do painel: isto é texto e mais
+                  nada, não há estado nenhum para perder. É o que faz a
+                  animação voltar a correr a cada troca. */}
+              <div key={view} className="bo-entrada min-w-0">
                 {/* O SUBTÍTULO NÃO VAI PARA O TELEMÓVEL.
                     "Pedidos de orçamento recebidos" por cima de "Pedidos" diz,
                     com 9 px e um espaçamento de 0.35em, o que o título já diz —
