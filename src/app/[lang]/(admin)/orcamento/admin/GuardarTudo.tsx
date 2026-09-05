@@ -119,11 +119,24 @@ export default function BotaoGuardarTudo() {
         // com «botão, 2».
         aria-label={rotulo}
         title={titulo}
-        className={
+        /* ── E A FORMA MUDA COM A COR, EM VEZ DE SALTAR ────────────────────
+           Este botão passa de pílula verde («Guardar tudo (2)») a caixa
+           cinzenta com canto diferente («Tudo guardado»), no cabeçalho, várias
+           vezes por hora. É o salto mais visto do back office.
+
+           O `ESTADO` já dava a transição às cores — mas a lista dele é fechada
+           de propósito e NÃO tem `border-radius`. Resultado: as cores
+           deslizavam e o canto saltava, no mesmo elemento e no mesmo instante.
+
+           Os 120 ms são os mesmos do `ESTADO`, para as duas coisas chegarem
+           juntas. `border-radius` é pintura, não disposição — não remede nada
+           à volta, e é a excepção pontual que a lista fechada admite quando o
+           que muda é mesmo a forma. */
+        className={`motion-safe:transition-[border-radius] motion-safe:duration-[120ms] ${
           quantos > 0
             ? `alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
             : `alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11`
-        }
+        }`}
       >
         {accao.aGravar ? (
           <svg

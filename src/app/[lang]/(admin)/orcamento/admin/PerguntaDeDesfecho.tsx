@@ -232,7 +232,18 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
       onClick={(e) => e.stopPropagation()}
     >
       {fase.tipo === "marcado" ? (
-        <div className="flex flex-col gap-2">
+        /* ── O RECIBO APARECE DE ALGUM SÍTIO ──────────────────────────────
+           «Marcado como ganho — 4.600 €» é o fim de um percurso que começou
+           num pedido de orçamento e passou por uma proposta inteira. Aparecia
+           num fotograma, no lugar onde estavam os botões.
+
+           `.bo-entrada` — 240 ms, quatro píxeis, a distância de um rótulo. Não
+           é uma apresentação de 600: o cartão não mudou, mudou o que ele diz.
+
+           E só o RECIBO leva entrada. O painel do valor, que aparece antes
+           deste, tem `autoFocus` no campo — uma entrada ali arrastava o campo
+           quatro píxeis debaixo do cursor que já lá está. */
+        <div className="bo-entrada flex flex-col gap-2">
           <p className={`text-[#4d6350] ${compacto ? "text-[11px]" : "text-sm"} font-medium`}>
             {fase.desfecho === "ganho"
               ? `Marcado como ganho${fase.valor != null ? ` — ${eur(fase.valor)}` : ""}.`
