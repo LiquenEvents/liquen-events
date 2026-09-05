@@ -283,7 +283,7 @@ export default function SessaoExpirada() {
        * a pessoa a escrever para o vazio — que é exactamente o que aconteceu da
        * primeira vez.
        */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         ref={dialogRef}
         role="dialog"

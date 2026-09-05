@@ -4209,7 +4209,7 @@ export default function AdminClient({
         {/* Backdrop (mobile nav drawer) */}
         {navOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
+            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
             onClick={() => setNavOpen(false)}
           />
         )}
@@ -5392,7 +5392,10 @@ export default function AdminClient({
               {/* Detail — in-grid sticky panel on desktop, slide-over drawer on mobile */}
               {selected ? (
                 <>
-                  <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={closeDetail} />
+                  <div
+                    className="bo-entrada bo-entrada-fundo fixed inset-0 z-40 bg-black/50 xl:hidden"
+                    onClick={closeDetail}
+                  />
                   <div
                     ref={drawerRef}
                     role={isDetailOverlay ? "dialog" : undefined}

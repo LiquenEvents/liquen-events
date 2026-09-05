@@ -273,7 +273,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         ref={dialogRef}
         role="dialog"

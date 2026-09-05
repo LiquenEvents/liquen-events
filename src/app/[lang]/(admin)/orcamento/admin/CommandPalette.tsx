@@ -155,7 +155,7 @@ export default function CommandPalette({
       className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12dvh]"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
+      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
       <div
         ref={dialogRef}
         role="dialog"
