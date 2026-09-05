@@ -12,6 +12,7 @@ import { opcionaisDe } from "@/lib/orcamento/versoes-da-proposta";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
@@ -485,7 +486,7 @@ export default function Acompanhamento({
                         },
                       )
                     }
-                    className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] transition-colors hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] disabled:opacity-50"
+                    className={`alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
                   >
                     {v.label}
                   </button>
@@ -671,7 +672,7 @@ function LinhaCartao({
               aria-pressed={activo}
               title={e.ajuda}
               onClick={() => (e.id === "rejeitada" ? onRecusar() : onEstado(e.id))}
-              className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors disabled:opacity-50 ${
+              className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase disabled:opacity-50 ${ESTADO} ${PRESSAO} ${
                 activo
                   ? "border-[#4d6350] bg-[#4d6350] text-white"
                   : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)]"
@@ -685,7 +686,7 @@ function LinhaCartao({
           type="button"
           onClick={() => setSeguimentoAberto((v) => !v)}
           aria-expanded={seguimentoAberto}
-          className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
+          className={`alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
         >
           {p.followUpAt ? "Mudar seguimento" : "Marcar seguimento"}
         </button>
@@ -761,7 +762,7 @@ function LinhaCartao({
                 type="button"
                 aria-pressed={motivo === m.id}
                 onClick={() => setMotivo(m.id)}
-                className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors ${
+                className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase ${ESTADO} ${PRESSAO} ${
                   motivo === m.id
                     ? "border-foreground/40 bg-[var(--bo-tinta-10)] text-[var(--bo-text)]"
                     : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30"

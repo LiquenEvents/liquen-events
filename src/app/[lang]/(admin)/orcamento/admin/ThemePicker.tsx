@@ -23,6 +23,7 @@ import { MEDIDA_LG, MEDIDA_SM, useMedida } from "./useMedida";
 import { Ajuda, Button, FolhaOuDialogo } from "./ui";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { CuradoriaDeFotos } from "./CuradoriaDeFotos";
 import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
 import {
@@ -1026,8 +1027,14 @@ function ImportChip({ job }: { job: ImportJob }) {
           aria-valuenow={done + failed}
           className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
         >
+          {/* Era `duration-elemento`: PEDE 250 ms e não gera regra nenhuma —
+              o Tailwind v4 lê `--transition-duration-*` para os utilitários
+              `duration-*` e a casa declarou `--duration-*` (ponto 3 de
+              `ui/movimento.ts`). Na prática a barra corria nos 150 ms de
+              omissão. O `PROGRESSO` escreve os mesmos 250 ms numa classe que
+              o Tailwind compila mesmo. */}
           <div
-            className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+            className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
             style={{ transform: `scaleX(${Math.round(((done + failed) / total) * 100) / 100})` }}
           />
         </div>
@@ -2690,7 +2697,7 @@ export default function ThemePicker({
                              quadrado agora é o INVÓLUCRO (ver `celula-saltavel`
                              em globals.css) — é isso que deixa o browser saltar
                              a célula sem ela colapsar. */
-                                className={`relative block h-full w-full overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-all ${
+                                className={`relative block h-full w-full overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO} ${
                                   failed
                                     ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
                                     : on
@@ -2758,7 +2765,7 @@ export default function ThemePicker({
 
                              Fica também mais discreto: um disco a 45% em vez de
                              55%, e mais pequeno, porque a foto é que interessa. */
-                                className="alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                                className={`alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${ESTADO} ${PRESSAO}`}
                               >
                                 <svg
                                   width="13"

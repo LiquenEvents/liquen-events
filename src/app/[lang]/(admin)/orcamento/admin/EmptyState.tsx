@@ -1,4 +1,9 @@
 "use client";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * A friendly empty state: a soft icon, a short headline and (optionally) a
@@ -48,7 +53,7 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
          */
         <button
           onClick={action.onClick}
-          className="alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-full bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors "
+          className={`alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-full bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] ${ESTADO} ${PRESSAO}`}
         >
           {action.label}
         </button>

@@ -20,6 +20,7 @@ import {
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -485,7 +486,7 @@ function PdfDoContrato({ id }: { id: string }) {
       href={`/api/contratos/${id}/pdf`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+      className={`inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
       title="Descarregar contrato em PDF"
     >
       PDF

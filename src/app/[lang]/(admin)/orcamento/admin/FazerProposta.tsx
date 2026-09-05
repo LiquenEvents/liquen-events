@@ -4,6 +4,10 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { Button, Card, EmptyState } from "./ui";
+// `ESTADO` já é, neste ficheiro, a tabela de estados do PEDIDO (Novo, Ganho,
+// Perdido…). O primitivo de movimento entra com apelido para os dois poderem
+// viver lado a lado sem que nenhum tenha de mudar de nome.
+import { ESTADO as MOV_ESTADO, PRESSAO } from "./ui/movimento";
 import { ProposalStudio } from "./lazy";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
@@ -363,7 +367,7 @@ export default function FazerProposta({
               type="button"
               onClick={() => setFiltro(f.id)}
               aria-pressed={filtro === f.id}
-              className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
+              className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] ${MOV_ESTADO} ${PRESSAO} ${
                 filtro === f.id
                   ? "bg-[#1b2119] text-white "
                   : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"
@@ -413,7 +417,7 @@ export default function FazerProposta({
                 <button
                   type="button"
                   onClick={() => onSelect(q.id)}
-                  className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left motion-safe:transition-colors ${
+                  className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left ${MOV_ESTADO} ${PRESSAO} ${
                     espera
                       ? "border-[var(--bo-hairline)] bg-white hover:border-[#4d6350]/40"
                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"

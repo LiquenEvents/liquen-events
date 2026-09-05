@@ -7,6 +7,7 @@ import { printRunSheet } from "./export";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 interface Props {
@@ -288,7 +289,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
               aria-label="Imprimir guião do dia"
               // 27×27 medidos a 375 px — um botão de ícone sem rótulo, que é
               // a classe de alvo mais fácil de falhar com o polegar.
-              className="alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] motion-safe:transition-colors"
+              className={`alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
             >
               <svg
                 width="15"
@@ -470,7 +471,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(i.id)}
-                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
+                  className={`alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 com-rato:group-hover:opacity-100 ${ESTADO} ${PRESSAO}`}
                   aria-label={`Remover ${i.time} ${i.title}`}
                 >
                   <svg

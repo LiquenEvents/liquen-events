@@ -13,6 +13,7 @@ import {
   buildProductionPlanItems,
 } from "@/lib/production-templates";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 
 interface Props {
   quote: Quote;
@@ -381,8 +382,12 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   </span>
                 </div>
                 <div className="h-1 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden mb-2">
+                  {/* 250 ms e não 500 — o degrau `elemento` da casa para
+                      «uma coisa a mover-se» (`PROGRESSO`, `ui/movimento.ts`).
+                      Os 500 não vinham de nota nenhuma, e esta barra é irmã
+                      da do `EventChecklist`: tinham de andar ao mesmo tempo. */}
                   <div
-                    className="h-full w-full origin-left bg-[#4d6350] rounded-full motion-safe:transition-transform motion-safe:duration-500"
+                    className={`h-full w-full origin-left bg-[#4d6350] rounded-full ${PROGRESSO}`}
                     style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
                   />
                 </div>
@@ -402,7 +407,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         className="alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55"
                       >
                         <span
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
+                          className={`w-4 h-4 rounded border flex items-center justify-center ${ESTADO} ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
                         >
                           {i.done && (
                             <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
@@ -435,7 +440,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => removeItem(i.id)}
                         aria-label="Remover tarefa"
-                        className="alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className={`alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                       >
                         ×
                       </button>

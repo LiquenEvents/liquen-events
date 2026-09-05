@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ONDE ESTOU E O QUE FALTA — a coluna lateral do estúdio.
@@ -212,7 +217,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                    O fundo próprio existe só na tira: sem ele, chips separados
                    por 6 px não se leem como coisas distintas. Em `lg` volta a
                    ser transparente — a coluna é a de sempre, ao pixel. */
-                className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
+                className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${ESTADO} ${PRESSAO} ${
                   aqui
                     ? "bg-[#4d6350]/[0.08]"
                     : "bg-[var(--bo-tinta-6)] hover:bg-[var(--bo-tinta-6)] @min-[40rem]/estudio:bg-transparent @min-[40rem]/estudio:hover:bg-[var(--bo-tinta-6)]"

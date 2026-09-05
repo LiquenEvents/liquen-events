@@ -9,6 +9,7 @@ import { layoutDoBoard, ordemDasFotos } from "@/lib/proposal-moodboard";
 import { folhasAproximadas, paginasDaProposta } from "@/lib/proposal-paginas";
 import FolhaDaProposta from "./FolhaDaProposta";
 import PreviaDaPagina from "./PreviaDaPagina";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -111,7 +112,7 @@ export default function VistaDeConjunto({
           <button
             type="button"
             onClick={onFechar}
-            className="alvo-toque text-[11px] font-medium text-[var(--bo-text-muted)] transition-colors hover:text-[var(--bo-text)]"
+            className={`alvo-toque text-[11px] font-medium text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
           >
             Fechar
           </button>
@@ -196,7 +197,7 @@ export default function VistaDeConjunto({
                       onClick={() => onMover(pos, paraTras)}
                       disabled={paraTras < 0}
                       aria-label={`Mover a página ${i + 1} para trás`}
-                      className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-[var(--bo-tinta-6)] disabled:opacity-30"
+                      className={`alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 hover:bg-[var(--bo-tinta-6)] disabled:opacity-30 ${ESTADO} ${PRESSAO}`}
                     >
                       <span aria-hidden="true">←</span>
                     </button>
@@ -205,7 +206,7 @@ export default function VistaDeConjunto({
                       onClick={() => onMover(pos, paraAFrente)}
                       disabled={paraAFrente < 0}
                       aria-label={`Mover a página ${i + 1} para a frente`}
-                      className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-[var(--bo-tinta-6)] disabled:opacity-30"
+                      className={`alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 hover:bg-[var(--bo-tinta-6)] disabled:opacity-30 ${ESTADO} ${PRESSAO}`}
                     >
                       <span aria-hidden="true">→</span>
                     </button>

@@ -8,6 +8,7 @@ import {
   type Escolha,
   type OpcaoDeEscolha,
 } from "@/lib/proposta-escolhas";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -85,7 +86,8 @@ export interface FotoDisponivel {
 const CAIXA =
   "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-[#4d6350] focus:outline-none";
 const BOTAO_MAGRO =
-  "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)]";
+  "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] " +
+  `text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`;
 
 export default function EditorDeEscolhas({
   escolhas,
@@ -342,7 +344,7 @@ export default function EditorDeEscolhas({
                     // À VISTA no telemóvel — é a regra desta casa desde o «×»
                     // das fotos: um botão que apaga não pode ser invisível e
                     // continuar a apanhar o dedo.
-                    className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-muted)] transition-colors hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8"
+                    className={`alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-muted)] hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8 ${ESTADO} ${PRESSAO}`}
                     onClick={() => pedirParaApagarEscolha(i)}
                   >
                     ×
@@ -501,7 +503,7 @@ export default function EditorDeEscolhas({
                                         mudarOpcao(i, j, { imagem: f.caminho });
                                         setAEscolherFoto(null);
                                       }}
-                                      className={`h-14 w-14 overflow-hidden rounded-md border transition-colors ${
+                                      className={`h-14 w-14 overflow-hidden rounded-md border ${ESTADO} ${PRESSAO} ${
                                         opcao.imagem === f.caminho
                                           ? "border-[#4d6350]"
                                           : "border-[var(--bo-hairline)] hover:border-[#4d6350]/60"

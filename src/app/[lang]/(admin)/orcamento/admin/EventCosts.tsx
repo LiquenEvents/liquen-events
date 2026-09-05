@@ -8,6 +8,7 @@ import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { Button, Field, EmptyState } from "./ui";
 import { metaFor } from "./status-meta";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
@@ -466,7 +467,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                     divisão das caixas de marcar deste dossier. */}
                 <button
                   onClick={() => cycleStatus(it)}
-                  className="alvo-toque shrink-0 motion-safe:transition-opacity hover:opacity-80"
+                  className={`alvo-toque shrink-0 hover:opacity-80 ${ESTADO} ${PRESSAO}`}
                   title="Clica para mudar o estado"
                 >
                   <span
@@ -489,7 +490,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(it.id)}
-                  className="alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                  className={`alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] ${ESTADO} ${PRESSAO}`}
                   aria-label="Remover"
                 >
                   <svg

@@ -20,6 +20,7 @@ import {
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import ModoDeCarga from "./ModoDeCarga";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /* Os dois ícones da linha, escritos uma vez: servem os botões soltos da tabela
@@ -1038,14 +1039,14 @@ export default function Inventario() {
                         <span className="hidden com-rato:flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(i)}
-                            className="alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className={`alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 rounded-md p-1 ${ESTADO} ${PRESSAO}`}
                             aria-label="Editar"
                           >
                             {LapisIcon}
                           </button>
                           <button
                             onClick={() => perguntarSeRemove(i)}
-                            className="alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className={`alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 rounded-md p-1 ${ESTADO} ${PRESSAO}`}
                             aria-label="Remover"
                           >
                             {CruzIcon}

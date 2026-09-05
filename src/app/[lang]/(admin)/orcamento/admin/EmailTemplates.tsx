@@ -5,6 +5,7 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import EmailTemplatesBilingue from "./EmailTemplatesBilingue";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -744,7 +745,7 @@ function EditorClassico() {
               <button
                 key={t.key}
                 onClick={() => trocarDeModelo(t)}
-                className={`w-full text-left px-4 py-3 transition-colors ${
+                className={`w-full text-left px-4 py-3 ${ESTADO} ${PRESSAO} ${
                   active ? "bg-[#4d6350]/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
@@ -855,7 +856,7 @@ function EditorClassico() {
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMerge(f.key)}
                   title={f.hint}
-                  className="px-2.5 py-1 rounded-md text-[11px] bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/20 transition-colors"
+                  className={`px-2.5 py-1 rounded-md text-[11px] bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/20 ${ESTADO} ${PRESSAO}`}
                 >
                   {f.label}
                 </button>
@@ -1024,7 +1025,7 @@ export default function EmailTemplates() {
       role="tab"
       aria-selected={vista === chave}
       onClick={() => setVista(chave)}
-      className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+      className={`px-3 py-1.5 rounded-md text-xs ${ESTADO} ${PRESSAO} ${
         vista === chave
           ? "bg-[#5F7C66] text-white"
           : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"

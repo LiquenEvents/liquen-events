@@ -10,6 +10,7 @@ import { eur0 as eur } from "@/lib/money";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import AnalisePropostas from "./AnalisePropostas";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
+import { ESTADO, PROGRESSO } from "./ui/movimento";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
 // the back office (Overview, Kanban): Novo / Aguardar resposta / Proposta enviada /
@@ -115,7 +116,7 @@ function VBars({
                conjunto de barras sem um único valor à vista, e o `title` do
                contentor também só serve o rato. À vista no dedo, escondido
                até ao hover só onde há rato — o par da casa (globals.css:98). */
-              className="text-foreground/45 text-[10px] tabular-nums opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 transition-opacity motion-reduce:transition-none"
+              className={`text-foreground/45 text-[10px] tabular-nums opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 ${ESTADO}`}
             >
               {valueLabel}
             </span>
@@ -125,8 +126,18 @@ function VBars({
               role="img"
               aria-label={`${d.label}: ${valueLabel}`}
             >
+              {/* 250 ms e não 500: uma coluna a crescer é «uma coisa a
+                  mover-se», e o degrau da casa para isso é o `elemento`
+                  (`PROGRESSO_MS`, em `ui/movimento.ts`). Os 500 eram o dobro e
+                  não vinham de decisão escrita nenhuma.
+
+                  A lista fica escrita à mão em vez de usar o `PROGRESSO`: aqui
+                  a MESMA barra também acende de cor ao passar o rato, e o
+                  `PROGRESSO` só cobre `transform` — deixá-lo sozinho punha a
+                  cor a mudar num corte seco. `motion-safe:` porque não havia
+                  rede nenhuma para quem pede menos movimento. */}
               <div
-                className="absolute inset-0 origin-bottom bg-moss/70 group-hover:bg-moss rounded-sm transition-[transform,background-color] duration-500 motion-reduce:transition-[background-color]"
+                className="absolute inset-0 origin-bottom bg-moss/70 group-hover:bg-moss rounded-sm motion-safe:transition-[transform,background-color] motion-safe:duration-[250ms] motion-safe:ease-out"
                 style={{ transform: `scaleY(${fraccaoDaBarra(d.value, max)})` }}
               />
             </div>
@@ -153,7 +164,7 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
           </div>
           <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
             <div
-              className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+              className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
               style={{
                 transform: `scaleX(${fraccaoDaBarra(d.value, max)})`,
                 background: d.color ?? "#7c854b",
@@ -193,8 +204,12 @@ function Section({
           </span>
           {hint && <p className="mt-1 text-[11px] text-foreground/35 leading-snug">{hint}</p>}
         </div>
+        {/* 200 ms e `cubic-bezier(0, 0, 0.2, 1)`: é o que a `.bo-mais-seta`
+            do `globals.css` já escolheu para esta mesma seta a rodar. Sem
+            duração escrita, esta caía nos 150 ms de omissão do Tailwind — duas
+            setas iguais no mesmo back office a rodar a tempos diferentes. */}
         <svg
-          className="shrink-0 text-foreground/30 motion-safe:transition-transform group-open:rotate-180"
+          className="shrink-0 text-foreground/30 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] group-open:rotate-180"
           width="16"
           height="16"
           viewBox="0 0 24 24"
@@ -695,13 +710,13 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                 <div>
                   <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
                     <div
-                      className="absolute inset-0 origin-left bg-moss motion-safe:transition-transform motion-safe:duration-700"
+                      className={`absolute inset-0 origin-left bg-moss ${PROGRESSO}`}
                       style={{
                         transform: `scaleX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding)})`,
                       }}
                     />
                     <div
-                      className="absolute inset-0 origin-left bg-[#b5894a]/70 motion-safe:transition-transform motion-safe:duration-700"
+                      className={`absolute inset-0 origin-left bg-[#b5894a]/70 ${PROGRESSO}`}
                       style={{
                         transform: `translateX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding) * 100}%) scaleX(${fraccaoDaBarra(stats.outstanding, stats.received + stats.outstanding)})`,
                       }}
@@ -816,7 +831,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         </div>
                         <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                           <div
-                            className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+                            className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
                             style={{
                               transform: `scaleX(${fraccaoDaBarra(row.margin, maxMargin)})`,
                               background: color,
@@ -890,7 +905,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                   </div>
                   <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                     <div
-                      className="h-full w-full origin-left rounded-full bg-[#8a8a82]/60 motion-safe:transition-transform motion-safe:duration-700"
+                      className={`h-full w-full origin-left rounded-full bg-[#8a8a82]/60 ${PROGRESSO}`}
                       style={{
                         transform: `scaleX(${fraccaoDaBarra(row.value, stats.lostReasonRows[0].value)})`,
                       }}
@@ -932,7 +947,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                 </div>
                 <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                   <div
-                    className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+                    className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
                     style={{
                       transform: `scaleX(${fraccaoDaBarra(row.rate, 100)})`,
                       background:

@@ -118,8 +118,17 @@ const KanbanCard = memo(function KanbanCard({
         }
       }}
       /* `transition-all` obrigava o browser a considerar TODAS as propriedades
-         animáveis do cartão a cada realce; só a sombra e a moldura mudam. */
-      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,transform] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+         animáveis do cartão a cada realce; só a sombra e a moldura mudam.
+
+         A lista fica escrita à mão e não usa o `ESTADO` de `ui/movimento.ts`:
+         o `transform` tem de continuar cá dentro (é ele que dá o `rotate-1` ao
+         cartão apanhado), e o `ESTADO` deixa-o de fora de propósito. O que
+         faltava era a DURAÇÃO: sem ela, isto caía nos 150 ms de omissão do
+         Tailwind — um número que ninguém escolheu. Passa aos 120 ms do
+         `ESTADO_MS`, que é o degrau de estado desta casa. Escrito por extenso
+         (e não interpolado da constante) porque o Tailwind só gera a regra
+         para classes que encontra LITERAIS na fonte. */
+      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,transform] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
         dragging ? "opacity-40 motion-safe:rotate-1" : ""
       }`}
     >

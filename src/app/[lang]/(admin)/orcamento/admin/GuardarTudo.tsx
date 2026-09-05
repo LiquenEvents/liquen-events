@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import {
   enumerarNomes,
   frasesDaResposta,
@@ -116,8 +121,8 @@ export default function BotaoGuardarTudo() {
         title={titulo}
         className={
           quantos > 0
-            ? "alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
-            : "alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] transition-colors hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11"
+            ? `alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
+            : `alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11`
         }
       >
         {accao.aGravar ? (

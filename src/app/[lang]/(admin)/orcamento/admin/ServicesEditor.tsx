@@ -30,6 +30,7 @@ import {
 import BibliotecaServicos, { guardarNaBiblioteca } from "./BibliotecaServicos";
 import CaixaInglesa from "./CaixaInglesa";
 import { useToast } from "./Toast";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * A secção «Serviços» do estúdio de propostas — grupos (a, b, c…) e as suas
@@ -81,16 +82,17 @@ export interface ServicesEditorProps {
 const ROW_INPUT =
   "min-w-0 rounded-md border border-[var(--bo-control-border,rgba(42,38,32,0.5))] " +
   "bg-[var(--bo-surface,#ffffff)] px-2 py-1.5 text-xs leading-5 text-[var(--bo-text)] " +
-  "transition-colors focus:border-[var(--bo-accent,#4c6350)] focus:outline-none";
+  `focus:border-[var(--bo-accent,#4c6350)] focus:outline-none ${ESTADO}`;
 /** `alvo-toque`: 44 px no dedo, sem mexer no aspeto com rato (ver globals.css).
  *  `!justify-start` porque a classe centra o conteúdo e este botão é uma linha
  *  de texto que tem de ficar alinhada à esquerda com o resto da coluna. */
 const ADD_BTN =
-  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors inline-flex items-center";
+  "alvo-toque !justify-start gap-1 text-xs font-medium inline-flex items-center " +
+  `text-[#4d6350] hover:text-[#415440] ${ESTADO} ${PRESSAO}`;
 /** Ações da linha: presentes SEMPRE no layout (nunca há salto), visíveis só em
  *  hover/foco — e sempre visíveis onde não há hover nenhum (tablet). */
 const ROW_ACTIONS =
-  "flex items-center gap-0.5 shrink-0 opacity-0 transition-opacity " +
+  `flex items-center gap-0.5 shrink-0 opacity-0 ${ESTADO} ` +
   "group-hover/row:opacity-100 group-focus-within/row:opacity-100 " +
   "[@media(hover:none)]:opacity-100";
 /** 24 px com rato — a densidade calma que este editor quer — e 44 px no dedo,
@@ -99,7 +101,7 @@ const ROW_ACTIONS =
 const ICON_BTN =
   "alvo-toque inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--bo-text-muted)] " +
   "hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] disabled:opacity-30 " +
-  "disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors";
+  `disabled:hover:bg-transparent disabled:cursor-not-allowed ${ESTADO} ${PRESSAO}`;
 
 /** Os campos onde se escreve: o marcador continua a ser um `<input>` («a)» tem
  *  três caracteres e nunca cresce), o resto passou a `<textarea>`. */
@@ -1208,7 +1210,7 @@ function DragHandle({
       {...rest}
       aria-label={`${label} (ou usa as setas)`}
       title="Arrastar para reordenar"
-      className="[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-[var(--bo-text)] focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
+      className={`[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 hover:text-[var(--bo-text)] focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100 ${ESTADO}`}
     >
       <span aria-hidden="true" className="text-[13px] leading-none">
         ⠿

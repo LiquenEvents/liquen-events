@@ -19,6 +19,7 @@ import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { eur0 as eur } from "@/lib/money";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { metaFor } from "./status-meta";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 // Unified status vocabulary (Novo / Aguardar resposta / Proposta enviada / Ganho / Perdido).
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
@@ -295,7 +296,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               // outra — assim os dois sobem juntos e não voltam a divergir.
               // Com rato ficam ambos em 36 px, que é a densidade calma que
               // esta barra quer no portátil.
-              className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
+              className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium ${ESTADO} ${PRESSAO} ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#8a6420] "
                   : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
@@ -494,7 +495,7 @@ function Dinheiro({ c }: { c: Client }) {
 function Chevron({ aberto }: { aberto: boolean }) {
   return (
     <span
-      className={`text-foreground/25 motion-safe:transition-transform ${aberto ? "rotate-180" : ""}`}
+      className={`text-foreground/25 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] ${aberto ? "rotate-180" : ""}`}
       aria-hidden="true"
     >
       <svg
@@ -546,7 +547,7 @@ function CartaoDeCliente({
       <button
         onClick={onAlternar}
         aria-expanded={aberto}
-        className="w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
+        className={`w-full text-left px-4 py-3.5 flex items-start gap-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
       >
         <Avatar c={c} />
 
@@ -739,7 +740,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
         {c.phone && (
           <a
             href={`tel:${c.phone}`}
-            className="alvo-toque text-foreground/45 hover:text-[#4d6350] transition-colors flex items-center gap-1"
+            className={`alvo-toque text-foreground/45 hover:text-[#4d6350] flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="11"
@@ -758,7 +759,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
         {c.email && (
           <a
             href={`mailto:${c.email}`}
-            className="alvo-toque text-[#4d6350]/80 hover:text-[#4d6350] transition-colors flex items-center gap-1"
+            className={`alvo-toque text-[#4d6350]/80 hover:text-[#4d6350] flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="11"
@@ -780,7 +781,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
             href={`https://wa.me/${waPhone.replace("+", "")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="alvo-toque text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 transition-opacity flex items-center gap-1"
+            className={`alvo-toque text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
@@ -807,7 +808,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
             <button
               key={q.id}
               onClick={() => onOpen(q)}
-              className="w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors flex items-center justify-between gap-3"
+              className={`w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] flex items-center justify-between gap-3 ${ESTADO} ${PRESSAO}`}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">

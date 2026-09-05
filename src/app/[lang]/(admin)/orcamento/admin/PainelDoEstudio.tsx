@@ -7,6 +7,7 @@ import { ASPETO_POR_OMISSAO, type LayoutDeMoodboard } from "@/lib/proposal-geome
 import { layoutDoBoard as layoutEfectivo, ordemDasFotos } from "@/lib/proposal-moodboard";
 import PreviaDaPagina from "./PreviaDaPagina";
 import { CORTES } from "./ui/adaptativo";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { useMedida } from "./useMedida";
 
 /**
@@ -236,7 +237,7 @@ export default function PainelDoEstudio({
                   role="tab"
                   aria-selected={vista === id}
                   onClick={() => setVista(id)}
-                  className={`flex-1 rounded-[6px] px-2 py-1.5 text-[11px] motion-safe:transition-colors ${
+                  className={`flex-1 rounded-[6px] px-2 py-1.5 text-[11px] ${ESTADO} ${PRESSAO} ${
                     vista === id
                       ? "bg-white text-[var(--bo-text)] "
                       : "text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
@@ -263,7 +264,7 @@ export default function PainelDoEstudio({
                     <button
                       type="button"
                       onClick={() => onEscolherFotos(aVer.bi)}
-                      className="mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] motion-safe:transition-colors hover:border-[#4d6350]/40 hover:text-[var(--bo-text)]"
+                      className={`mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                     >
                       Escolher fotografias para esta página
                     </button>
@@ -284,7 +285,7 @@ export default function PainelDoEstudio({
                       key={p.board.id ?? p.bi}
                       type="button"
                       onClick={() => onSaltar(p.bi)}
-                      className={`rounded-[3px] text-left motion-safe:transition-opacity hover:opacity-100 ${
+                      className={`rounded-[3px] text-left hover:opacity-100 ${ESTADO} ${PRESSAO} ${
                         p.bi === activa ? "opacity-100" : "opacity-75"
                       }`}
                       aria-label={`Ir para a página ${i + 1}${p.board.title ? `: ${p.board.title}` : ""}`}

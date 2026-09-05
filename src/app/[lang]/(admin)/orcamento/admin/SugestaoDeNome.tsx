@@ -1,6 +1,11 @@
 "use client";
 
 import { arrumarNomeDeTema, nomePrecisaDeArrumo } from "@/lib/tema-nome";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -59,7 +64,7 @@ export function SugestaoDeNome({
          */
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => onAceitar(arrumado)}
-        className="font-medium text-[#4d6350] underline decoration-[#4d6350]/35 underline-offset-2 transition-colors hover:decoration-[#4d6350] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm"
+        className={`font-medium text-[#4d6350] underline decoration-[#4d6350]/35 underline-offset-2 ${ESTADO} ${PRESSAO} hover:decoration-[#4d6350] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
       >
         «{arrumado}»
       </button>

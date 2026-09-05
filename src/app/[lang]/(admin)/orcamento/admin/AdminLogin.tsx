@@ -13,6 +13,11 @@ import {
   suportaPasskeys,
 } from "@/lib/passkeys-cliente";
 import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import {
   PARAM_DESTINO,
   consumirMarcaDeSaida,
@@ -560,7 +565,7 @@ export default function AdminLogin() {
                 onClick={() => setMostrarSenha((v) => !v)}
                 /* 40 px com rato, 44 no dedo — o mínimo das HIG, o mesmo que o
                    `ui/Button` usa. */
-                className="absolute bottom-0 right-0.5 flex h-10 w-10 items-center justify-center rounded-lg text-foreground/40 transition-colors hover:text-[var(--bo-tinta-72)] pointer-coarse:h-11 pointer-coarse:w-11"
+                className={`absolute bottom-0 right-0.5 flex h-10 w-10 items-center justify-center rounded-lg text-foreground/40 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-tinta-72)] pointer-coarse:h-11 pointer-coarse:w-11`}
                 aria-label={mostrarSenha ? "Ocultar a palavra-passe" : "Mostrar a palavra-passe"}
                 aria-pressed={mostrarSenha}
                 /* Fora da ordem de tabulação: quem anda de campo em campo com o
@@ -762,7 +767,9 @@ export default function AdminLogin() {
                   telemóvel. A classe põe-lhe os 44 px do dedo (e só no dedo:
                   `(pointer: coarse)`, ver globals.css), sem mexer na letra nem
                   no sublinhado. Passa a 232×44. */}
-              <summary className="alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
+              <summary
+                className={`alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
+              >
                 Mudaste de telemóvel ou de computador?
               </summary>
               <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">

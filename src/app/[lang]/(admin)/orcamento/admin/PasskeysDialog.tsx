@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Button, Field, FolhaOuDialogo } from "./ui";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { mensagemDeErro, registarDispositivo, suportaPasskeys } from "@/lib/passkeys-cliente";
 
 /**
@@ -306,13 +311,13 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                         <div className="flex shrink-0 items-center gap-1">
                           <button
                             onClick={() => setARenomear({ id: d.id, nome: d.deviceLabel })}
-                            className="alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+                            className={`alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]`}
                           >
                             Mudar nome
                           </button>
                           <button
                             onClick={() => remover(d)}
-                            className="alvo-toque rounded-md px-2 py-1 text-xs text-[#8a2a22] transition-colors hover:bg-[#fdf1ef]"
+                            className={`alvo-toque rounded-md px-2 py-1 text-xs text-[#8a2a22] ${ESTADO} ${PRESSAO} hover:bg-[#fdf1ef]`}
                           >
                             Remover
                           </button>

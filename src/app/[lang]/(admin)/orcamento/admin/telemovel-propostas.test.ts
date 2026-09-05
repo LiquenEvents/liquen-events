@@ -95,7 +95,22 @@ describe("as linhas de pagamento no telemóvel", () => {
   });
 
   it("dá 44 × 44 ao botão de remover um pagamento", () => {
-    expect(PAGAMENTOS).toMatch(/className="alvo-toque text-foreground\/45 hover:text-\[#8a2a22\]/);
+    /**
+     * ── PORQUE É QUE ISTO ACEITA AS DUAS FORMAS DE ESCREVER A CLASSE ───────
+     *
+     * Era `className="…"` à seca. Passou a ser uma crase, porque a lista de
+     * classes ganhou as constantes de movimento da casa (`ESTADO`, `PRESSAO`)
+     * e essas entram por interpolação.
+     *
+     * O que este caso mede é o ALVO — que o botão que apaga dinheiro do
+     * registo continua a ter os 44 px do `alvo-toque` —, e isso não depende de
+     * a classe estar entre aspas ou entre crases. Prender a forma de escrita
+     * era prender o que não interessa: foi exactamente assim que este caso
+     * ficou vermelho por uma alteração que não lhe tocou no tamanho.
+     */
+    expect(PAGAMENTOS).toMatch(
+      /className=(?:"|\{`)alvo-toque text-foreground\/45 hover:text-\[#8a2a22\]/,
+    );
   });
 });
 

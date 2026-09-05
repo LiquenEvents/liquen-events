@@ -3,6 +3,11 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "./ui";
+/* A escala de movimento da casa — ver `ui/movimento.ts`. O `motion-safe:` já
+   aqui estava; o que faltava era a DURAÇÃO: uma `transition-*` sem duração cai
+   nos 150 ms do `--default-transition-duration` do Tailwind, que não é degrau
+   nenhum desta casa. `ESTADO` são os 120 ms do `micro`, `PRESSAO` o toque. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * A small, accessible "⋯ Mais" overflow menu for secondary/print actions.
@@ -153,7 +158,7 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
                 triggerRef.current?.focus();
                 item.onClick();
               }}
-              className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--bo-tinta-72)] motion-safe:transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+              className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]`}
             >
               {item.icon && (
                 <span className="mt-0.5 shrink-0 text-foreground/45" aria-hidden="true">

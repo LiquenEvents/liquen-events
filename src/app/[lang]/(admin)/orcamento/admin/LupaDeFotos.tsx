@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -76,7 +77,23 @@ export default function LupaDeFotos({
       role="dialog"
       aria-modal="true"
       aria-label={`Fotografia ${indice + 1} de ${total} — ${titulo || "mood board"}`}
-      className="fixed inset-0 z-[80] flex flex-col bg-black/85 backdrop-blur-sm"
+      // ── A LUPA ENTRA, EM VEZ DE APARECER ────────────────────────────
+      // Isto abria num fotograma: a página estava lá e, no seguinte, um véu
+      // preto por cima dela inteira. Era o corte mais brusco do back office —
+      // e o pior sítio possível para um, porque é a superfície que cobre o
+      // ecrã TODO.
+      //
+      // A `.bo-entrada` do `globals.css` é a entrada da casa: 240 ms, quatro
+      // píxeis e `cubic-bezier(0, 0, 0.2, 1)`, só `opacity` e `transform`, e
+      // calada dentro de `prefers-reduced-motion`. Não atrasa nada — a lupa
+      // está no sítio e responde ao teclado desde o primeiro fotograma.
+      //
+      // E vai SÓ a `.bo-entrada`, sem a `.bo-entrada-fundo`: aqui o véu e a
+      // caixa são o mesmo elemento (a tinta escura não está por trás de nada,
+      // É o visualizador), que é exactamente a razão por que o
+      // `entrada-dos-fundos.test.ts` já isenta este ficheiro da regra dos
+      // véus. A variante do fundo tiraria a deslocação a tudo.
+      className="bo-entrada fixed inset-0 z-[80] flex flex-col bg-black/85 backdrop-blur-sm"
       // Largar o rato no fundo fecha. O clique na própria fotografia não:
       // ampliar para comparar e fechar por engano ao apontar é o género de
       // coisa que faz voltar a abrir tudo outra vez.
@@ -92,7 +109,7 @@ export default function LupaDeFotos({
           type="button"
           onClick={onFechar}
           aria-label="Fechar"
-          className="alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white transition-colors hover:bg-white/20"
+          className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 ${ESTADO} ${PRESSAO}`}
         >
           ×
         </button>
@@ -104,7 +121,7 @@ export default function LupaDeFotos({
             type="button"
             onClick={() => onMudar((indice - 1 + total) % total)}
             aria-label="Fotografia anterior"
-            className="alvo-toque absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/25"
+            className={`alvo-toque absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 ${ESTADO} ${PRESSAO}`}
           >
             <span aria-hidden="true">‹</span>
           </button>
@@ -124,7 +141,7 @@ export default function LupaDeFotos({
             type="button"
             onClick={() => onMudar((indice + 1) % total)}
             aria-label="Fotografia seguinte"
-            className="alvo-toque absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/25"
+            className={`alvo-toque absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 ${ESTADO} ${PRESSAO}`}
           >
             <span aria-hidden="true">›</span>
           </button>

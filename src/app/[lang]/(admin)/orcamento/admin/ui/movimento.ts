@@ -53,12 +53,23 @@ import { DUR_MICRO_MS, DUR_ELEMENTO_MS } from "@/lib/motion/tokens";
  *
  *     Compilado o `globals.css` desta casa a sério: as três variáveis chegam
  *     ao `:root` (estão lá, com os valores certos) e as regras `.duration-micro`,
- *     `.duration-elemento` e `.duration-vista` são **zero**. É esse o ponto —
- *     o token não está errado, está no espaço de nomes errado, e por isso é
- *     legível para um humano e invisível para o Tailwind. As treze classes
- *     `duration-elemento` / `-micro` / `-vista` do back office caem todas nos
- *     mesmos 150 ms por omissão. (As outras doze estão fora desta pasta —
- *     ficam relatadas, não tocadas.)
+ *     `.duration-elemento` e `.duration-vista` eram **zero**. É esse o ponto —
+ *     o token não estava errado, estava no espaço de nomes errado, e por isso
+ *     era legível para um humano e invisível para o Tailwind.
+ *
+ *     ── E ESTA JÁ ESTÁ CORRIGIDA, o que muda como se lê o resto ────────────
+ *
+ *     Os tokens mudaram-se para o espaço certo: o `tema.css` declara hoje
+ *     `--transition-duration-micro: 120ms`, `--transition-duration-elemento:
+ *     250ms` e `--transition-duration-vista: 350ms`, e o comentário lá conta a
+ *     mesma história com a compilação que a provou. Ou seja: `duration-elemento`
+ *     GERA regra e corre mesmo a 250 ms.
+ *
+ *     Fica escrito aqui porque este parágrafo, tal como estava, já enganou
+ *     quem veio a seguir — mandou procurar uma avaria que já não existe e
+ *     mandou «corrigir» sítios que estavam certos. Um censo que se lê como
+ *     presente depois de resolvido é pior do que não existir. As avarias 1 e 2
+ *     continuam vivas fora desta pasta; esta não.
  *
  * ── A ESCALA ────────────────────────────────────────────────────────────────
  *
