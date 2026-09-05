@@ -11,6 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { quandoGravado } from "@/lib/quando-gravado";
+import { rolarAteVer } from "@/lib/motion/rolar";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -5446,7 +5447,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const alvo =
       document.querySelector<HTMLElement>(`[data-campo="${chave}"]`) ??
       document.getElementById(seccaoDoCampo(campoAVisitar.campo));
-    alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
+    rolarAteVer(alvo, { block: "center" });
     if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement) {
       alvo.focus({ preventScroll: true });
       alvo.select();
@@ -5470,7 +5471,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const espera = setTimeout(() => {
       const alvo =
         (campo && document.querySelector<HTMLElement>(`[data-campo="${campo}"]`)) || cartao;
-      alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
+      rolarAteVer(alvo, { block: "center" });
       if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement) {
         alvo.focus({ preventScroll: true });
         alvo.select();
@@ -7750,7 +7751,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 A causa de fundo está corrigida acima; isto é a rede por baixo:
                 mesmo que a coluna volte a apertar, as capas empilham em vez de
                 se espremerem. */}
-            <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
                 {[0, 1].map((idx) => {
                   const path = doc.coverImages?.[idx];
                   /**
@@ -7960,9 +7961,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       // sem perceber porque é que o board «não abriu».
                       const id = doc.moodBoards[bi]?.id;
                       if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                      document
-                        .getElementById(`mood-board-${bi}`)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      rolarAteVer(document.getElementById(`mood-board-${bi}`), {
+                        block: "start",
+                      });
                     }}
                   />
                   <div className="min-w-0">
@@ -10272,9 +10273,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 onSaltar={(bi) => {
                   const id = doc.moodBoards[bi]?.id;
                   if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                  document
-                    .getElementById(`mood-board-${bi}`)
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  rolarAteVer(document.getElementById(`mood-board-${bi}`), { block: "start" });
                 }}
                 // O salto de uma folha de texto usa o MESMO caminho da
                 // Conferência: abre a secção se estiver dobrada e só então
@@ -10355,7 +10354,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                Passa a ser o mesmo dos dois lados — ela vê o que o casal vê. */
             <div className="bo-cena flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
               <p className="flex items-center gap-2 font-display text-base text-[#4d6350]">
-                <svg viewBox="0 0 52 52" className="h-5 w-5 shrink-0" fill="none" aria-hidden="true">
+                <svg
+                  viewBox="0 0 52 52"
+                  className="h-5 w-5 shrink-0"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <circle
                     className="confirm-ring"
                     cx="26"

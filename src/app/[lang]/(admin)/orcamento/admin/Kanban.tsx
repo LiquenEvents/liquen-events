@@ -50,6 +50,16 @@ interface CardProps {
   colLabel: string;
   colIndex: number;
   dragging: boolean;
+  /**
+   * Este é o cartão que acabou de mudar de coluna — e por isso tem de aterrar.
+   *
+   * É um booleano e não um contador porque o cartão MONTA-SE de novo ao mudar
+   * de coluna (muda de pai na árvore), e uma animação de montagem não precisa
+   * de ser reiniciada: basta a classe estar lá no primeiro fotograma.
+   */
+  aterrar: boolean;
+  /** A aterragem acabou; o quadro pode esquecer qual foi o cartão. */
+  aoAterrar: () => void;
   todayKey: string;
   onOpen: (q: Quote) => void;
   onDragStart: (id: string) => void;
@@ -80,6 +90,8 @@ const KanbanCard = memo(function KanbanCard({
   colLabel,
   colIndex,
   dragging,
+  aterrar,
+  aoAterrar,
   todayKey,
   onOpen,
   onDragStart,
@@ -104,6 +116,7 @@ const KanbanCard = memo(function KanbanCard({
       aria-label={`${q.name}, ${eventTypeLabel(q)}, ${q.guests} pessoas. Coluna ${colLabel}. Enter para abrir; setas esquerda/direita para mover de coluna.`}
       onDragStart={() => onDragStart(q.id)}
       onDragEnd={onDragEnd}
+      onAnimationEnd={aterrar ? aoAterrar : undefined}
       onClick={() => onOpen(q)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -120,17 +133,32 @@ const KanbanCard = memo(function KanbanCard({
       /* `transition-all` obrigava o browser a considerar TODAS as propriedades
          animáveis do cartão a cada realce; só a sombra e a moldura mudam.
 
-         A lista fica escrita à mão e não usa o `ESTADO` de `ui/movimento.ts`:
-         o `transform` tem de continuar cá dentro (é ele que dá o `rotate-1` ao
-         cartão apanhado), e o `ESTADO` deixa-o de fora de propósito. O que
-         faltava era a DURAÇÃO: sem ela, isto caía nos 150 ms de omissão do
-         Tailwind — um número que ninguém escolheu. Passa aos 120 ms do
-         `ESTADO_MS`, que é o degrau de estado desta casa. Escrito por extenso
-         (e não interpolado da constante) porque o Tailwind só gera a regra
-         para classes que encontra LITERAIS na fonte. */
-      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,transform] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
-        dragging ? "opacity-40 motion-safe:rotate-1" : ""
-      }`}
+         A lista fica escrita à mão e não usa o `ESTADO` de `ui/movimento.ts`,
+         porque o cartão apanhado inclina-se e o `ESTADO` não cobre inclinação
+         nenhuma. A DURAÇÃO é a de lá: 120 ms, o degrau de estado desta casa —
+         sem ela isto caía nos 150 ms de omissão do Tailwind, um número que
+         ninguém escolheu. Escrita por extenso (e não interpolada da constante)
+         porque o Tailwind só gera a regra para classes que encontra LITERAIS
+         na fonte.
+
+         ── `rotate`, E NÃO `transform` ────────────────────────────────────
+         A lista dizia `transform`, e o comentário que aqui estava garantia que
+         era ele «que dá o `rotate-1` ao cartão apanhado». Não é, e é o mesmo
+         engano que o `ui/movimento.ts` já conta sobre o `scale-[0.98]` do
+         `Button`: no Tailwind v4 estas classes emitem a PROPRIEDADE AUTÓNOMA,
+         não a composta. Compilado nesta casa (Tailwind 4.3.0) para ter a
+         certeza: `.rotate-1 { rotate: 1deg }` — e `transform` não cobre
+         `rotate`.
+
+         Resultado medido no CSS: o cartão apagava-se para 40% ao longo de
+         120 ms e a inclinação entrava a CORTE SECO, 0 ms, no mesmo gesto. Duas
+         velocidades no mesmo cartão, uma delas escolhida e a outra não. O
+         `transform` sai da lista porque não havia mais nada a usá-lo — vigiá-lo
+         era pedir ao browser que olhasse para uma propriedade que este cartão
+         nunca muda. */
+      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,rotate] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+        aterrar ? "bo-entrada " : ""
+      }${dragging ? "opacity-40 motion-safe:rotate-1" : ""}`}
     >
       <div className="flex items-start gap-2">
         <span className="mt-1 w-1 h-8 rounded-full shrink-0" style={{ background: colColor }} />
@@ -325,6 +353,60 @@ export default function Kanban({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<QuoteStatus | null>(null);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O CARTÃO ATERRAVA SEM ATERRAR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Um cartão que muda de coluna MONTA-SE DE NOVO: as colunas são cinco listas
+   * irmãs, e mudar de coluna é mudar de pai na árvore. React desmonta o cartão
+   * de uma e monta-o na outra — e uma `transition` não anima uma montagem.
+   * Resultado, com estes olhos: o cartão desaparecia de uma coluna e aparecia
+   * na outra, a 100% de opacidade, no mesmo fotograma. Teleporte.
+   *
+   * Isto lê-se pior do que parece, porque o gesto é optimista: quando o
+   * servidor recusa, o cartão volta — e volta exactamente da mesma maneira. Um
+   * salto e um regresso indistinguíveis um do outro, os dois sem movimento
+   * nenhum, num quadro onde o resto (o realce da coluna, a opacidade de quem
+   * vai a voar) se move.
+   *
+   * ── PORQUE É QUE SÓ UM CARTÃO ATERRA ──────────────────────────────────────
+   *
+   * Guarda-se o ID de UM cartão e não uma classe na lista toda, e a razão é a
+   * regra da escada: cinquenta cartões a chegar um a um é lentidão, não
+   * elegância. Aqui não há sequer cascata para tectar — há um cartão, o que a
+   * pessoa acabou de mover, e mais nenhum. No primeiro desenho do quadro isto é
+   * `null`, portanto os trezentos cartões continuam a aparecer de uma vez.
+   *
+   * ── E PORQUE É QUE NÃO É A MOLA ───────────────────────────────────────────
+   *
+   * A casa tem uma (`lib/motion/mola.ts`) e ela não serve aqui. Uma mola come
+   * um DESLOCAMENTO e uma VELOCIDADE, e é isso que a distingue de uma duração
+   * fixa. Este gesto não tem nem uma nem outra: o arrasto é a API do HTML5, que
+   * desenha o seu próprio fantasma, não dá coordenadas de largada úteis e não
+   * dá velocidade nenhuma; e o sítio onde o cartão assenta é decidido pela
+   * disposição da coluna de destino, não pelo dedo. Uma mola a partir de um
+   * deslocamento inventado com velocidade zero é uma curva lenta com um ciclo
+   * de `requestAnimationFrame` a pagá-la — o custo da física sem a física. A
+   * mola tem sítio, e é onde há mesmo um dedo a largar: a `CuradoriaDeFotos`.
+   *
+   * O que serve aqui é o que a casa usa para o que APRESENTA: a `.bo-entrada`
+   * do `globals.css` — 240 ms, `cubic-bezier(0, 0, 0.2, 1)` (só desacelera),
+   * quatro píxeis, só `transform` e `opacity`, e desligada por
+   * `prefers-reduced-motion` na própria regra. Quatro píxeis e não doze: o
+   * cartão já está no sítio e clicável desde o primeiro fotograma — isto é uma
+   * aterragem, não uma chegada de longe. E é o mesmo número do resto do back
+   * office, em vez de um quinto número parecido.
+   *
+   * Nota sobre o `transform` da animação: a `.bo-entrada` não tem
+   * `animation-fill-mode`, portanto larga o elemento no fim e não deixa
+   * `transform` pendurado — que criaria um bloco contentor e partiria qualquer
+   * `position: fixed` cá dentro. Não há nenhum hoje; é para continuar a não
+   * haver problema quando houver.
+   */
+  const [aterrouId, setAterrouId] = useState<string | null>(null);
+  const esqueceAterragem = useCallback(() => setAterrouId(null), []);
+
   // O `AdminClient` passa `onOpen`/`onStatusChange` recriados a cada render
   // dele. Guardá-los numa ref e expor callbacks estáveis é o que permite ao
   // `memo()` dos cartões acertar — sem isso, cada render do pai desfazia-o.
@@ -370,12 +452,18 @@ export default function Kanban({
       const { onStatusChange, userName } = latest.current;
       if (q.status === status) return;
       onStatusChange(q.id, status); // optimistic
+      setAterrouId(q.id);
       const fromLabel = COLUMNS.find((c) => c.id === q.status)?.label ?? q.status;
       const toLabel = COLUMNS.find((c) => c.id === status)?.label ?? status;
       const oQue = `mover «${q.name}» para «${toLabel}»`;
       /** Repõe a coluna de origem e conta as duas coisas na mesma frase. */
       const reverter = (falha: Falha) => {
         onStatusChange(q.id, q.status); // revert
+        // O regresso aterra como a ida. Uma fotografia que salta de volta
+        // parece um erro do ecrã; uma que regressa parece uma recusa — e é
+        // esse o movimento que acompanha a frase do aviso, em vez de a
+        // desmentir.
+        setAterrouId(q.id);
         toast(`${falha.mensagem} O cartão voltou para «${fromLabel}».`, "error");
       };
       const entry: ActivityEntry = {
@@ -638,6 +726,8 @@ export default function Kanban({
                     colLabel={col.label}
                     colIndex={colIndex}
                     dragging={dragId === q.id}
+                    aterrar={aterrouId === q.id}
+                    aoAterrar={esqueceAterragem}
                     todayKey={chaveDeHoje}
                     onOpen={handleOpen}
                     onDragStart={handleDragStart}

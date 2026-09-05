@@ -20,8 +20,32 @@ function ViewLoading() {
 //
 // O esqueleto NÃO leva entrada, de propósito: um esqueleto é a espera, não uma
 // apresentação, e uma entrada aqui somava-se aos 300 ms que o React já segura
-// um fallback pintado. Quem se apresenta é a ferramenta que chega — e essa
-// entra pela `.bo-cena` que cada uma traz.
+// um fallback pintado. Isto continua verdade e não se mexe.
+//
+// ── E A FRASE QUE VINHA A SEGUIR ERA FALSA ────────────────────────────────
+//
+// Dizia que quem se apresenta é a ferramenta que chega, e que cada uma delas
+// traz a sua própria entrada de apresentação. CONTADO nas catorze ferramentas
+// desta lista, no dia em que isto se escreveu: duas trazem `.bo-cena`
+// (`EventTasks` e `ProposalStudio`); as outras doze — `ProposalBuilder`, `ClientMessenger`,
+// `EventChecklist`, `EventMaterial`, `ProductionPlan`, `EventTimeline`,
+// `PaymentsPanel`, `EventCosts`, `GuestList`, `ActivityLog`, `TagsField` e
+// `FollowUpField` — não trazem nada. Onde o esqueleto sai, o painel assenta
+// num fotograma.
+//
+// Fica escrito porque a frase, como estava, mandava a pessoa seguinte concluir
+// que a metade da CHEGADA já estava feita e ir tratar da outra — a do
+// esqueleto —, que é precisamente a que não se pode tocar. As duas metades são
+// coisas diferentes: a saída do esqueleto é a espera a acabar, a chegada da
+// ferramenta é o sistema a apresentar-se.
+//
+// Não se resolveu aqui de propósito, e a razão vive neste ficheiro para quem
+// vier a seguir a poder pesar: estas doze ferramentas são desenhadas DENTRO de
+// um separador que já entra com a `.view-in` (240 ms), cada uma com o seu
+// próprio limite `<Suspense>` — chegam desencontradas —, e várias são
+// remontadas por `key={…-${selected.id}}` a cada pedido que se abre. Pôr doze
+// apresentações de 600 ms lá dentro é uma decisão de desenho sobre quanto
+// movimento cabe num separador, e não uma linha que falte.
 const PanelLoading = () => (
   <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
     <div className="bo-skeleton h-2.5 w-40 mb-4" aria-hidden />

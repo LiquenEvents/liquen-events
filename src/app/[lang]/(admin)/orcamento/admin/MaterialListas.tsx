@@ -391,7 +391,15 @@ export default function MaterialListas() {
   }
 
   return (
-    <div>
+    /* ── O «A CARREGAR…» DÁ LUGAR ÀS LISTAS, EM VEZ DE SALTAR PARA ELAS ─────
+       A espera aqui é uma linha de texto e não um esqueleto (a forma das listas
+       não se sabe de antemão); o que ela tem em comum com um esqueleto é o
+       fim — desaparecia, e o ecrã inteiro aparecia no fotograma seguinte.
+
+       `.bo-cena`: 600 ms, doze píxeis, `cubic-bezier(0, 0, 0.2, 1)` — a banda
+       de apresentação, uma vez só e no contentor. A linha de espera continua
+       sem entrada nenhuma: é a espera, não uma apresentação. */
+    <div className="bo-cena">
       <div className="flex flex-wrap items-end gap-3">
         {/* O `Field` desenha o próprio controlo — dar-lhe um `<input>` por
             dentro rebentava o ecrã ao montar. Ver `ui/Field`. */}

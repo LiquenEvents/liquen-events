@@ -58,6 +58,7 @@ export default defineConfig({
     "**/biblioteca-temas.spec.ts",
     "**/carregamento-movel.spec.ts",
     "**/fazer-proposta-cliente.spec.ts",
+    "**/nav-estudio-marca.spec.ts",
     "**/proposta-rascunho.spec.ts",
     "**/temas.spec.ts",
     "**/caca/a02-editor-stress.spec.ts",

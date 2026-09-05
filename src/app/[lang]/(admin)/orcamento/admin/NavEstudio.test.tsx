@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+/* As medidas que o jsdom não tem — o mesmo duplo que o
+   `ui/useMarcaQueAnda.test.tsx` usa. O caminho é relativo porque o `@/` desta
+   casa aponta para `src/`. */
+import { fingirDisposicao, reporDisposicao } from "../../../../../../test/disposicao-fingida";
 import NavEstudio from "./NavEstudio";
 import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
 
@@ -336,5 +340,167 @@ describe("o que a tira deixa de fora, deixa-o de propósito", () => {
     expect(visivel(resumo, 375, container)).toBe(false);
     expect(visivel(resumo, 640, container)).toBe(true);
     expect(visivel(screen.getByText("Evento"), 375, container)).toBe(true);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A SECÇÃO ACTUAL MARCA-SE COM UM FILETE QUE ANDA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O índice fazia o trabalho da barra lateral e trocava de sítio A CORTE SECO: o
+ * fundo do chip acendia num sítio e apagava-se noutro, ao mesmo tempo, e nada
+ * dizia que se veio de uma secção e se foi para outra. Passa a haver o mesmo
+ * filete de 3 px que desliza, com a mesma constante (`MARCA`, 250 ms) — e não
+ * um segundo tempo escrito outra vez.
+ *
+ * ── O QUE SE PROVA AQUI E O QUE SE PROVA NUM BROWSER ──────────────────────
+ *
+ * Aqui: que o filete EXISTE quando há secção actual, que é UM só, que vive
+ * dentro da lista que rola (e não pendurado no `<nav>`, onde ficaria parado
+ * enquanto os chips passam por baixo), e que o gesto usa a constante da casa.
+ *
+ * Onde ele PÁRA mede-se num browser — `e2e/nav-estudio-marca.spec.ts`. As
+ * medidas daqui são FINGIDAS (ver `test/disposicao-fingida.ts`): o jsdom não
+ * tem disposição, e o filete da barra lateral já teve um teste de unidade que
+ * morreu por isso.
+ */
+describe("a secção actual marca-se com um filete que anda", () => {
+  /** Um `IntersectionObserver` que diz «esta secção está à vista», e mais nada. */
+  function fingirQueSeEstaEm(seccao: string) {
+    class Espia {
+      constructor(private aoVer: IntersectionObserverCallback) {}
+      observe(el: Element) {
+        if (el.id !== `seccao-${seccao}`) return;
+        this.aoVer(
+          [
+            {
+              target: el,
+              isIntersecting: true,
+              boundingClientRect: { top: 0 },
+            } as unknown as IntersectionObserverEntry,
+          ],
+          this as unknown as IntersectionObserver,
+        );
+      }
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal("IntersectionObserver", Espia);
+  }
+
+  /** As secções que o observador vai encontrar. */
+  function semearSeccoes() {
+    for (const s of seccoes) {
+      const el = document.createElement("div");
+      el.id = `seccao-${s.id}`;
+      document.body.appendChild(el);
+    }
+  }
+
+  /**
+   * Um `ResizeObserver` que se pode mandar disparar.
+   *
+   * O do `vitest.setup.ts` é INERTE de propósito — sem disposição não há
+   * redimensionamento nenhum para observar. Mas é ele que manda o filete
+   * remedir-se quando a lista muda de forma (a tira que passa a coluna, um chip
+   * que fica com outro nome), e sem o poder disparar não havia como pôr as
+   * medidas fingidas nos chips ANTES da medida. Um duplo que se controla prova,
+   * de passagem, que a ligação ao observador existe: apagá-la põe isto vermelho.
+   */
+  const remedir: Array<() => void> = [];
+  function fingirObservadorDeTamanho() {
+    remedir.length = 0;
+    class ObservadorDeTamanho {
+      constructor(private aoMudar: ResizeObserverCallback) {
+        remedir.push(() => this.aoMudar([], this as unknown as ResizeObserver));
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", ObservadorDeTamanho);
+  }
+
+  async function desenharEm(seccao: string) {
+    semearSeccoes();
+    fingirQueSeEstaEm(seccao);
+    fingirObservadorDeTamanho();
+    fingirDisposicao();
+    const vista = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
+    // As medidas de cada chip, declaradas depois de ele existir. É a tira: os
+    // chips lado a lado, todos com o mesmo topo e larguras diferentes.
+    const chips = vista.container.querySelectorAll<HTMLElement>("[data-seccao] button");
+    let x = 0;
+    chips.forEach((b, i) => {
+      b.dataset.x = String(x);
+      b.dataset.y = "0";
+      b.dataset.w = String(90 + i * 12);
+      b.dataset.h = "44";
+      x += 96 + i * 12;
+    });
+    // E agora manda-se remedir: é o que o browser faria sozinho no instante em
+    // que a lista assentou com estas larguras.
+    await act(async () => {
+      for (const f of remedir) f();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    return vista;
+  }
+
+  afterEach(() => {
+    reporDisposicao();
+    vi.unstubAllGlobals();
+    document.querySelectorAll('[id^="seccao-"]').forEach((el) => el.remove());
+  });
+
+  it("há um filete, e está onde o chip da secção actual está", async () => {
+    const { container } = await desenharEm("servicos");
+    const filetes = container.querySelectorAll<HTMLElement>('ul > [aria-hidden="true"]');
+    expect(filetes, "o índice não marca a secção actual com filete nenhum").toHaveLength(1);
+
+    const chip = container.querySelector<HTMLElement>('[data-seccao="servicos"] button')!;
+    expect(filetes[0].style.translate).toBe(`${chip.dataset.x}px 0px`);
+    expect(filetes[0].style.height).toBe(`${chip.dataset.h}px`);
+  });
+
+  it("e ANDA — não troca de sítio a corte seco", async () => {
+    // O gesto é a constante da casa, não um tempo escrito outra vez: `MARCA`
+    // traz `motion-safe:` nas duas classes, portanto quem pediu para não animar
+    // vê-o mudar de sítio de um fotograma para o outro.
+    const { container } = await desenharEm("evento");
+    const filete = container.querySelector<HTMLElement>('ul > [aria-hidden="true"]')!;
+    // O primeiro fotograma não anda (senão o filete deslizava do canto ao abrir
+    // o estúdio); o seguinte já.
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const classes = filete.className.split(/\s+/);
+    expect(classes).toContain("motion-safe:transition-[translate,width]");
+    expect(classes).toContain("motion-safe:duration-[250ms]");
+  });
+
+  it("vive DENTRO da lista que rola de lado, e não pendurado no `<nav>`", async () => {
+    // Na tira é a `<ul>` que rola. Um filete pendurado no `<nav>` ficava parado
+    // enquanto os chips passavam por baixo dele — a marca a apontar para o
+    // vizinho a cada rolo lateral.
+    const { container } = await desenharEm("orcamento");
+    const filete = container.querySelector<HTMLElement>(
+      '[aria-hidden="true"][style*="translate"]',
+    )!;
+    expect(filete.parentElement?.tagName).toBe("UL");
+    expect(container.querySelector("nav > ul")!.className).toContain("relative");
+  });
+
+  it("sem secção à vista não há marca pousada em sítio nenhum", async () => {
+    // Antes de o observador dizer alguma coisa (e em qualquer ecrã sem
+    // `IntersectionObserver`), o índice continua a servir para saltar — mas não
+    // inventa um «onde estou».
+    fingirDisposicao();
+    const { container } = render(<NavEstudio seccoes={seccoes} faltas={faltas} />);
+    expect(container.querySelectorAll('ul > [aria-hidden="true"]')).toHaveLength(0);
+    // CONTROLO POSITIVO: o índice está mesmo desenhado.
+    expect(screen.getByText("Serviços")).toBeTruthy();
   });
 });

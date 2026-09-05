@@ -445,7 +445,20 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+        /* ── O ESQUELETO DÁ LUGAR ÀS FOTOS, EM VEZ DE SALTAR PARA ELAS ──────
+           O ramo `carregando` desenha doze quadrados `bo-skeleton` na MESMA
+           grelha (mesmas colunas, mesmo `aspect-square`), de propósito: as
+           silhuetas não saem do sítio quando as fotos chegam. O que faltava era
+           a segunda metade — as fotos assentavam num fotograma.
+
+           `.bo-cena`: 600 ms, doze píxeis, só a desacelerar. Uma vez só, na
+           GRELHA e não em cada célula: com cem fotos, um degrau por célula era
+           a grelha a aparecer aos poucos durante segundos.
+
+           Cada foto tem ainda a sua passagem de opacidade sobre o borrão
+           (`ImagemComPlanoB`), que é outra coisa e continua igual: esta trata
+           da grelha a chegar, aquela do pixel de cada fotografia. */
+        <div className="bo-cena grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
           {fotos.map((f) => {
             const escolhida = seleccionadas.has(f.path);
             return (

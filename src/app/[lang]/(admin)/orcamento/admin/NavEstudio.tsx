@@ -6,7 +6,9 @@ import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
    motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
    propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
    As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
-import { ESTADO, PRESSAO } from "./ui/movimento";
+import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+import { rolarAteVer } from "@/lib/motion/rolar";
+import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 
 /**
  * ONDE ESTOU E O QUE FALTA — a coluna lateral do estúdio.
@@ -131,6 +133,25 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
     return () => observador.disconnect();
   }, [seccoes, onSeccaoActual]);
 
+  /**
+   * ── A MARCA DO DESTINO ACTIVO ANDA, EM VEZ DE PISCAR NOUTRO SÍTIO ────────
+   *
+   * Este índice fazia o trabalho da barra lateral e trocava de sítio a corte
+   * seco: o fundo acendia num chip e apagava-se noutro, ao mesmo tempo, e nada
+   * dizia que se veio de uma secção e se foi para outra. Passa a haver o mesmo
+   * filete que desliza, com os mesmos 250 ms (`MARCA`) — a mesma constante, e
+   * não um segundo tempo escrito outra vez.
+   *
+   * `useMarcaQueAnda` é a medida da barra lateral extraída, com o eixo `x` a
+   * mais. Aqui os dois eixos são precisos porque esta lista muda de eixo: abaixo
+   * de 40rem é uma TIRA horizontal (os chips lado a lado, o `y` sempre 0), a
+   * partir daí uma COLUNA (empilhados, o `x` sempre 0). Um `translate` com os
+   * dois números serve as duas formas com um elemento só — nenhuma classe
+   * precisa de perguntar em que largura está, o que é a mesma receita de «duas
+   * formas, um só componente» que o resto do ficheiro segue.
+   */
+  const { marca, podeAndar } = useMarcaQueAnda(listaRef, '[aria-current="true"]', atual);
+
   // ── A tira segue a leitura ─────────────────────────────────────────────
   // Marcar o chip da secção actual não serve de nada se ele estiver fora da
   // tira: a 375 px cabem dois ou três, e à quinta secção a marca vive num sítio
@@ -143,8 +164,13 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
   useEffect(() => {
     const ul = listaRef.current;
     if (!ul || ul.scrollWidth <= ul.clientWidth) return;
-    const i = seccoes.findIndex((s) => s.id === atual);
-    const chip = i >= 0 ? (ul.children[i] as HTMLElement | undefined) : undefined;
+    // `data-seccao` e não `ul.children[i]`: o filete que anda vive dentro desta
+    // mesma lista (tem de ser, para acompanhar o rolo lateral em vez de ficar
+    // parado por cima dele), e a partir do momento em que a lista tem um filho
+    // que não é um chip, contar por índice aponta para o vizinho.
+    const chip = atual
+      ? ul.querySelector<HTMLElement>(`[data-seccao="${CSS.escape(atual)}"]`)
+      : null;
     if (!chip) return;
     const dele = chip.getBoundingClientRect();
     const dela = ul.getBoundingClientRect();
@@ -155,7 +181,14 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
   function saltarPara(id: string) {
     const el = document.getElementById(`seccao-${id}`);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // `rolarAteVer` e não um comportamento suave escrito à mão: o rolo de uma
+    // página inteira é, de toda a gramática de movimento da casa, o gesto que
+    // pior cai a quem tem enjoo de movimento — e um `behavior` posto em
+    // JavaScript passa por cima do `scroll-behavior` que o `globals.css` já
+    // desliga para ela. (A varredura que guarda esta regra lê linhas e não
+    // distingue comentários, de propósito: prefere um falso positivo num
+    // comentário a um falso negativo numa chamada.)
+    rolarAteVer(el, { block: "start" });
     // Levar o FOCO e não só a vista: quem navega por teclado ficava com o
     // foco no botão da coluna e o Tab seguinte voltava ao princípio da lista.
     const primeiro = el.querySelector<HTMLElement>("input, textarea, select, button");
@@ -198,14 +231,36 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
           corte, e o mesmo `<ul>` nos dois. */}
       <ul
         ref={listaRef}
-        className="flex gap-1.5 overflow-x-auto pb-1 @min-[40rem]/estudio:flex-col @min-[40rem]/estudio:gap-0.5 @min-[40rem]/estudio:overflow-visible @min-[40rem]/estudio:pb-0"
+        /* `relative` porque é ESTA lista o `offsetParent` do filete: as medidas
+           que o `useMarcaQueAnda` devolve são relativas a ela, e na tira é ela
+           que rola de lado — um filete pendurado no `<nav>` ficava parado
+           enquanto os chips passavam por baixo. */
+        className="relative flex gap-1.5 overflow-x-auto pb-1 @min-[40rem]/estudio:flex-col @min-[40rem]/estudio:gap-0.5 @min-[40rem]/estudio:overflow-visible @min-[40rem]/estudio:pb-0"
       >
+        {/* O filete que anda. `aria-hidden` porque não diz nada que o
+            `aria-current` de cada chip não diga melhor — é desenho, não
+            informação. É um `<li>` e não um `<span>` porque o único filho que
+            um `<ul>` aceita é um `<li>`; sai da fila do flex por ser
+            `absolute`, portanto não ocupa lugar nenhum entre os chips.
+
+            `MARCA` traz `motion-safe:` nas duas classes: quem pediu para não
+            animar vê-o mudar de sítio de um fotograma para o outro, que é o
+            que ela pediu. */}
+        {marca && (
+          <li
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-0 top-0 w-[3px] rounded-full bg-[#4d6350] ${
+              podeAndar ? MARCA : ""
+            }`}
+            style={{ translate: `${marca.x}px ${marca.y}px`, height: marca.altura }}
+          />
+        )}
         {seccoes.map((s) => {
           const aqui = atual === s.id;
           const porFazer = porTraduzir?.[s.id] ?? 0;
           const frase = fraseDasTraducoes(porFazer);
           return (
-            <li key={s.id} className="shrink-0 @min-[40rem]/estudio:shrink">
+            <li key={s.id} data-seccao={s.id} className="shrink-0 @min-[40rem]/estudio:shrink">
               <button
                 type="button"
                 onClick={() => saltarPara(s.id)}
