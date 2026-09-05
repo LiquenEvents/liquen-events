@@ -823,7 +823,16 @@ export default function Inventario() {
            768 px do `md:` — que este back office não usa e que é exactamente a
            largura de um iPad em retrato, onde estas seis colunas não cabem.
            Ver `ui/adaptativo.ts:53-60`. */
-        <Card padding="none">
+        /* ── E O ESQUELETO DÁ LUGAR À TABELA, EM VEZ DE SALTAR PARA ELA ─────
+           O ramo `loading` desenha cinco barras `bo-skeleton` com a altura das
+           linhas; quando o inventário chega, este cartão monta de raiz e o
+           esqueleto sai. Era uma troca seca de um fotograma para o outro.
+
+           `.bo-cena`: 600 ms e doze píxeis, a banda de apresentação. Uma vez
+           só, no CARTÃO — as linhas da tabela não levam degrau próprio, que é a
+           regra da casa para listas de dados. E o esqueleto continua sem
+           entrada: um esqueleto é a espera, não uma apresentação. */
+        <Card padding="none" className="bo-cena">
           <div className="p-3 sm:p-4">
             <TabelaOuCartoes
               itens={filtered}

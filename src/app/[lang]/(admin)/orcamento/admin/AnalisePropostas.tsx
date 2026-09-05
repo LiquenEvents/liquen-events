@@ -156,7 +156,16 @@ export default function AnalisePropostas() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    /* ── O «A LER AS PROPOSTAS…» DÁ LUGAR ÀS CONTAS, E NÃO SALTA PARA ELAS ──
+       A espera desta análise é uma linha `role="status"` (aqui em cima); quando
+       as propostas chegam, este painel monta de raiz e a linha sai. Era uma
+       troca de um fotograma para o outro, e num painel que é quase só números
+       o salto lê-se como um piscar.
+
+       `.bo-cena`: 600 ms e doze píxeis, a banda de apresentação — uma vez só,
+       no contentor, com os números todos a chegar juntos. A linha de espera
+       continua sem entrada: é a espera, não uma apresentação. */
+    <div className="bo-cena flex flex-col gap-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Numero valor={String(a.enviadas)} rotulo="Propostas enviadas" />
         <Numero

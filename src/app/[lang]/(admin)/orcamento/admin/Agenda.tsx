@@ -314,66 +314,81 @@ export default function Agenda({ quotes, onOpen }: Props) {
             />
           )
         ) : (
-          days.map((key) => (
-            <div key={key} className="border-b border-[var(--bo-hairline)] last:border-0">
-              <p
-                className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-[#4d6350]" : "text-foreground/40"}`}
-              >
-                {dayLabel(key)}
-              </p>
-              <div className="pb-2">
-                {byDay.get(key)!.map((it, i) => {
-                  const Wrap = it.onClick ? "button" : "div";
-                  return (
-                    /* ── O ATALHO É IRMÃO DA LINHA, E NÃO FILHO ──────────────
+          /* ── O ESQUELETO DÁ LUGAR À AGENDA, EM VEZ DE SALTAR PARA ELA ─────
+             O ramo `aLer` desenha três `SkeletonRow`; quando as três leituras
+             voltam, os dias montam de raiz e o esqueleto sai. Era uma troca de
+             um fotograma para o outro, e é a espera que ela vê primeiro ao
+             abrir a Visão Geral de manhã.
+
+             `.bo-cena`: 600 ms, doze píxeis, só a desacelerar — a banda de
+             apresentação. Uma vez só, num invólucro que embrulha os dias
+             todos: um degrau por dia seria a agenda a montar-se aos bocados.
+
+             O invólucro é um `div` sem estilo nenhum — as molduras dos dias
+             continuam a ser as de cada dia (`border-b … last:border-0`),
+             portanto o desenho não muda. E o esqueleto continua sem entrada. */
+          <div className="bo-cena">
+            {days.map((key) => (
+              <div key={key} className="border-b border-[var(--bo-hairline)] last:border-0">
+                <p
+                  className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-[#4d6350]" : "text-foreground/40"}`}
+                >
+                  {dayLabel(key)}
+                </p>
+                <div className="pb-2">
+                  {byDay.get(key)!.map((it, i) => {
+                    const Wrap = it.onClick ? "button" : "div";
+                    return (
+                      /* ── O ATALHO É IRMÃO DA LINHA, E NÃO FILHO ──────────────
                        A linha inteira já é um botão que abre o pedido, e um
                        link dentro de um botão é HTML inválido — o toque fica
                        entregue ao navegador e cada um decide o que quer. Fica
                        ao lado, sobreposto à direita: a linha mantém o realce
                        de ponta a ponta e o alvo do atalho é só dele. */
-                    <div key={i} className="relative">
-                      <Wrap
-                        onClick={it.onClick}
-                        className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? `hover:bg-[var(--bo-tinta-3)] cursor-pointer ${ESTADO} ${PRESSAO}` : ""}`}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: it.color }}
-                        />
-                        {it.time && (
-                          <span className="text-foreground/45 text-[11px] tabular-nums shrink-0 w-10">
-                            {it.time}
-                          </span>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[var(--bo-tinta-72)] text-sm truncate">{it.title}</p>
-                          {it.sub && (
-                            <p className="text-foreground/40 text-[11px] truncate capitalize">
-                              {it.sub}
-                            </p>
+                      <div key={i} className="relative">
+                        <Wrap
+                          onClick={it.onClick}
+                          className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? `hover:bg-[var(--bo-tinta-3)] cursor-pointer ${ESTADO} ${PRESSAO}` : ""}`}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: it.color }}
+                          />
+                          {it.time && (
+                            <span className="text-foreground/45 text-[11px] tabular-nums shrink-0 w-10">
+                              {it.time}
+                            </span>
                           )}
-                        </div>
-                        <span
-                          className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
-                          style={{ background: `${it.color}1f`, color: it.color }}
-                        >
-                          {KIND_LABEL[it.kind]}
-                        </span>
-                      </Wrap>
-                      {it.atalho && (
-                        <a
-                          href={it.atalho.href}
-                          className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] hover:bg-[#4d6350]/[0.06] ${ESTADO} ${PRESSAO}`}
-                        >
-                          {it.atalho.rotulo}
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[var(--bo-tinta-72)] text-sm truncate">{it.title}</p>
+                            {it.sub && (
+                              <p className="text-foreground/40 text-[11px] truncate capitalize">
+                                {it.sub}
+                              </p>
+                            )}
+                          </div>
+                          <span
+                            className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
+                            style={{ background: `${it.color}1f`, color: it.color }}
+                          >
+                            {KIND_LABEL[it.kind]}
+                          </span>
+                        </Wrap>
+                        {it.atalho && (
+                          <a
+                            href={it.atalho.href}
+                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] hover:bg-[#4d6350]/[0.06] ${ESTADO} ${PRESSAO}`}
+                          >
+                            {it.atalho.rotulo}
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </Card>

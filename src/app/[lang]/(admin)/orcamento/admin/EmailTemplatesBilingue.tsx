@@ -538,7 +538,15 @@ export default function EmailTemplatesBilingue() {
   const ladoVazio = !!modelo && !modelo[idioma].subject.trim() && !modelo[idioma].body.trim();
 
   return (
-    <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
+    /* ── O ESQUELETO DÁ LUGAR AOS MODELOS, EM VEZ DE SALTAR PARA ELES ───────
+       O mesmo que no `EmailTemplates`, e pela mesma razão: enquanto
+       `aCarregar`, um `SkeletonList` de quatro linhas; quando os modelos
+       chegam, estas duas colunas montam de raiz e o esqueleto sai — até aqui,
+       num só fotograma.
+
+       `.bo-cena`: 600 ms e doze píxeis, a banda de apresentação, uma vez só no
+       contentor. O esqueleto continua sem entrada. */
+    <div className="bo-cena max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
       {/* ── A lista ── */}
       <div className="bo-card overflow-hidden self-start">
         <div className="px-4 py-3 border-b border-[var(--bo-hairline)]">

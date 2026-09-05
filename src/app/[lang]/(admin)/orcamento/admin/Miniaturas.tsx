@@ -378,7 +378,17 @@ export default function Miniaturas() {
       )}
 
       {contagem && !aGerar && (
-        <div className="mt-4 space-y-1.5 text-xs">
+        /* ── A CONTAGEM DÁ LUGAR AO RESULTADO, EM VEZ DE SALTAR PARA ELE ────
+           A espera aqui é o próprio botão («A contar…», com o `loading` do
+           `Button`) e pode durar dezenas de segundos — o servidor percorre a
+           biblioteca inteira. Quando a conta volta, este bloco montava num
+           fotograma, e um parágrafo que aparece de repente por baixo de um
+           botão lê-se mal: não se sabe se é a resposta ou um aviso.
+
+           `.bo-cena`: 600 ms, doze píxeis, a banda de apresentação. Só
+           `transform` e `opacity`, portanto nada aqui remede a página — o que
+           importa num bloco que aparece por baixo de outros. */
+        <div className="bo-cena mt-4 space-y-1.5 text-xs">
           {contagem.emFalta === 0 ? (
             <p className="text-[var(--bo-tinta-72)]">
               Nada em falta — as {contagem.fotos} fotografias têm todas miniatura e versão leve.{" "}

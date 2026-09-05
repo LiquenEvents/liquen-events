@@ -99,6 +99,20 @@ export default function ImagemComPlanoB({
       alt=""
       loading="lazy"
       decoding="async"
+      /* ── A REDE QUE FALTAVA: UMA IMAGEM DA CACHE NÃO DISPARA `onLoad` ─────
+         Uma fotografia que já está em cache pode chegar COMPLETA antes de o
+         React ligar o `onLoad` — e aí o evento nunca acontece. Enquanto a
+         opacidade final dependia só do `lqip`, isto passava despercebido nas
+         fotos sem borrão (ficavam sempre a 100). Nas outras não: a célula
+         ficava em `opacity-0` para sempre, com a fotografia descarregada e
+         invisível, e só o borrão à mostra.
+
+         É a mesma rede que o `Thumb` do `ProposalStudio` já documenta, e passa
+         a ser obrigatória aqui a partir do momento em que a passagem deixa de
+         ser condicional. */
+      ref={(img) => {
+        if (img?.complete && img.naturalWidth > 0) setPintada(true);
+      }}
       onLoad={() => setPintada(true)}
       onError={() => {
         if (planoB && actual !== planoB) setActual(planoB);
@@ -119,8 +133,25 @@ export default function ImagemComPlanoB({
             }
           : undefined
       }
+      /* ── E A FOTOGRAFIA ASSENTA SEMPRE, TENHA OU NÃO BORRÃO ──────────────
+         Era `pintada || !lqip`: sem `lqip` a célula nascia a 100 e a fotografia
+         APARECIA num fotograma, por cima do fundo neutro. Com borrão havia
+         passagem; sem borrão havia um estalo — e são precisamente as fotos
+         anteriores à migração, as mais pesadas, as que ficam mais tempo por
+         chegar e as que mais se notam a aparecer de repente.
+
+         A espera é a mesma nos dois casos (o borrão, ou o fundo neutro da
+         célula); o que muda é só o ponto de partida da opacidade. Passa a ser
+         `pintada` e mais nada: quem espera, espera, e o que chega assenta.
+
+         250 ms (`duration-elemento`), dentro da banda dos ESTADOS — isto é um
+         pixel a substituir outro na mesma caixa, não um ecrã a apresentar-se. E
+         só `opacity`: a célula já tem a sua medida antes de a fotografia
+         chegar, portanto nada aqui remede a grelha. `motion-safe:` desliga a
+         passagem para quem pediu para não animar — e aí a imagem salta de
+         `opacity-0` para `opacity-100` sem transição, que é o que se quer. */
       className={`${className ?? ""} ${
-        pintada || !lqip ? "opacity-100" : "opacity-0"
+        pintada ? "opacity-100" : "opacity-0"
       } motion-safe:transition-opacity motion-safe:duration-elemento`}
     />
   );

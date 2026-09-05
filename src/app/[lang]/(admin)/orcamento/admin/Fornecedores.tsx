@@ -561,7 +561,18 @@ export default function Fornecedores() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        /* ── O ESQUELETO DÁ LUGAR AOS CARTÕES, EM VEZ DE SALTAR PARA ELES ───
+           O ramo de cima desenha seis `SkeletonCard` na MESMA grelha; quando os
+           fornecedores chegam, esta grelha monta de raiz e o esqueleto sai. Era
+           uma troca seca de um fotograma para o outro.
+
+           `.bo-cena`: 600 ms, doze píxeis, só a desacelerar — a banda de
+           apresentação, que é o que isto é. Uma vez só, na GRELHA e não em cada
+           cartão: com dezenas de fornecedores, um degrau por cartão seria a
+           lentidão que o tecto do sexto degrau existe para evitar.
+
+           O esqueleto continua sem entrada, de propósito. */
+        <div className="bo-cena grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((s) => (
             <Card key={s.id} padding="sm" className="group">
               {editingId === s.id ? (

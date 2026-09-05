@@ -154,7 +154,21 @@ export default function Servicos() {
   if (servicos === null) return <SkeletonList rows={4} />;
 
   return (
-    <div className="flex flex-col gap-4">
+    /* ── O ESQUELETO DÁ LUGAR À BIBLIOTECA, EM VEZ DE SALTAR PARA ELA ──────
+       Enquanto `servicos` é `null` mostra-se o `SkeletonList` (aqui em cima);
+       quando a lista chega, esta árvore monta de raiz e o esqueleto sai. Era
+       uma troca de um fotograma para o outro.
+
+       `.bo-cena` (600 ms, doze píxeis, `cubic-bezier(0, 0, 0.2, 1)`): a banda
+       de APRESENTAÇÃO, porque quem se está a mostrar é o sistema. Uma vez só e
+       no contentor — os serviços lá dentro não levam degrau próprio, que é a
+       regra da casa para listas de dados.
+
+       Não é preciso código nenhum a coordenar as duas metades: o `return` de
+       cima devolve a espera, este devolve o conteúdo, e o que monta anima. O
+       esqueleto continua sem entrada — um esqueleto é a espera, não uma
+       apresentação. */
+    <div className="bo-cena flex flex-col gap-4">
       <Card padding="md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

@@ -732,7 +732,19 @@ function EditorClassico() {
   const showSaved = !dirty && !saving && savedKey === selectedKey;
 
   return (
-    <div className="max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
+    /* ── O ESQUELETO DÁ LUGAR AOS MODELOS, EM VEZ DE SALTAR PARA ELES ───────
+       Enquanto `loading`, mostra-se um `SkeletonList` de quatro linhas (lá em
+       cima); quando os modelos chegam, estas duas colunas montam de raiz e o
+       esqueleto sai. Era uma troca de um fotograma para o outro.
+
+       `.bo-cena`: 600 ms, doze píxeis, `cubic-bezier(0, 0, 0.2, 1)` — a banda
+       de apresentação, uma vez só e no contentor.
+
+       Nada de `key` por baixo disto: o editor de modelos guarda rascunhos por
+       publicar (`dirty`, `rascunhos`), e uma animação que remontasse a árvore
+       deitava-os fora. A entrada vem da CLASSE do elemento que monta, e a
+       montagem é a que já acontecia quando a espera acaba. */
+    <div className="bo-cena max-w-6xl grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
       {/* Left: template list */}
       <div className="bo-card overflow-hidden self-start">
         <div className="px-4 py-3 border-b border-[var(--bo-hairline)]">
