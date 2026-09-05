@@ -7326,7 +7326,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           498 px. A fila montava-se na mesma, o índice levava 192 dos 498 (38%) e
           a coluna onde ela escreve ficava com 282. A janela dizia que havia
           espaço; aqui dentro não havia. */}
-      <div className="@container/estudio" hidden={step !== "conteudo"}>
+      {/* ── O PASSO QUE CHEGA APRESENTA-SE ────────────────────────────────
+          Palavras dela: «imagina, estamos na fazer proposta, passamos para a
+          parte seguinte — o que é que metes de animação aí?».
+
+          Até aqui, nada: os três passos trocavam com `hidden`, e o conteúdo
+          seguinte aparecia no mesmo fotograma em que o anterior desaparecia.
+          Passa a ser a `.view-in` da casa — 240 ms, oito píxeis,
+          `cubic-bezier(0, 0, 0.2, 1)` —, que é a classe escrita para
+          exactamente isto: «o cromado não sai do sítio, muda o conteúdo dentro
+          dele».
+
+          ── PORQUE É A CLASSE A ENTRAR E A SAIR, E NÃO UM `key` ────────────
+
+          Um `key` remonta. E estes dois passos NÃO podem remontar: ficam
+          montados de propósito (só `hidden`), porque o passo 1 guarda o
+          formulário inteiro e o passo 3 guarda o estado do envio. Remontá-los
+          a cada troca perdia o foco, o rolo e o trabalho a meio.
+
+          Tirar e voltar a pôr a classe dá o mesmo efeito sem tocar na árvore:
+          quando o passo sai, a classe sai com ele; quando volta, a animação
+          recomeça. Sem JavaScript, sem temporizador, sem remontagem.
+
+          A `.view-in` acaba em `transform: none` e usa `backwards` — não fica
+          transform pendurado, que é o que quebraria o `position: fixed` de uma
+          folha aberta aqui dentro. A barra `sticky` do fundo é IRMÃ destes
+          três e não está lá dentro, portanto não a apanha. */}
+      <div
+        className={`@container/estudio ${step === "conteudo" ? "view-in" : ""}`}
+        hidden={step !== "conteudo"}
+      >
         <div
           ref={filaDasColunas}
           /* 40rem (640 px) é o mínimo para uma fila fazer sentido: o índice pede
@@ -10286,7 +10315,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           group + budget line re-ran on EVERY keystroke in the content step —
           the main source of typing lag on large proposals. */}
       {step === "prever" && (
-        <div>
+        // Este monta de raiz (ver o comentário aqui em cima), portanto a
+        // `.view-in` corre sozinha na montagem — não precisa de sair e voltar.
+        <div className="view-in">
           <PreviewSummary
             doc={doc}
             assetUrls={assetUrls}
@@ -10305,7 +10336,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       )}
 
       {/* ══════════ PASSO 3 · Enviar ══════════ */}
-      <div hidden={step !== "enviar"}>
+      <div className={step === "enviar" ? "view-in" : undefined} hidden={step !== "enviar"}>
         <Section title="Enviar ao cliente">
           {sent ? (
             <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
