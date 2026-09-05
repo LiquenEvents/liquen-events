@@ -327,8 +327,29 @@ export default function PainelInterno({
         </span>
       </button>
 
+      {/* ── O PAINEL ABRE DE ONDE SE CARREGOU ──────────────────────────────
+          «Só para ti» nasce fechado de propósito — são custos e margem, e não
+          é o que se quer aberto quando alguém está a espreitar por cima do
+          ombro. O que faltava era a outra metade: ao abrir, o painel inteiro
+          aparecia num fotograma por baixo do botão, e o resto da página saltava
+          para dar-lhe lugar.
+
+          `.bo-entrada` — 240 ms e QUATRO píxeis, a distância de um rótulo. É a
+          medida certa e não os oito de uma folha: este painel não vem de fora
+          do ecrã, sai do interruptor logo acima e fica preso a ele. Quatro
+          píxeis é o que diz «desdobrei-me daqui» sem parecer que voou.
+
+          NADA DE `key`. As caixas de custo aqui dentro guardam números que ela
+          escreveu e ainda não gravou; um `key` remontava-as e deitava-os fora.
+          A entrada vem da CLASSE do elemento que monta — e ele já montava, é o
+          `{aberto && …}` de sempre. Fechar continua a seco: fechar é ela a
+          arrumar o que já viu, e não há nada a apresentar.
+
+          A classe não deixa `transform` pendurado (usa o preenchimento por
+          omissão, não `forwards`), portanto não cria bloco de contenção para
+          nada que aqui dentro seja `fixed` ou `sticky`. */}
       {aberto && (
-        <div className="border-t border-[var(--bo-hairline)] p-4">
+        <div className="bo-entrada border-t border-[var(--bo-hairline)] p-4">
           {/* ── Custo e margem por linha ──────────────────────────────── */}
           {(doc.budgetItems ?? []).length === 0 ? (
             <p className="text-xs text-foreground/45">
