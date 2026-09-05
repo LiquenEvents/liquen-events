@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect, useRef, memo } from "react";
+import { Children, useCallback, useMemo, useState, useEffect, useRef, memo } from "react";
 import { quandoGravado } from "@/lib/quando-gravado";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
@@ -12,6 +12,7 @@ import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
 import { useEntradaAoChegar } from "./ui/useEntradaAoChegar";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
+import { useGaveta } from "./ui/gaveta";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
@@ -464,6 +465,22 @@ function LinhaEstado({
 }) {
   if (estado.tipo === "erro") {
     const texto = estado.texto;
+    /* ── E ESTA NÃO ENTRA. É A ÚNICA ────────────────────────────────────────
+       As outras mensagens de `role="alert"` da casa entram com a `.bo-entrada`
+       — quatro píxeis, distância de rótulo, porque aparecem uma vez por baixo
+       do campo que as provocou (ver o `AvisoDeRecusa` do `AdminLogin.tsx`).
+
+       Esta vive noutro sítio: é a legenda de estado de uma nota que está a ser
+       ESCRITA, e a gravação é automática. Enquanto o servidor não responder,
+       cada tentativa repõe este mesmo ramo — «a guardar…», erro, «a guardar…»,
+       erro — e uma entrada a cada passagem não é uma entrada, é um pisca-pisca
+       por cima do texto que ela está a escrever. O movimento indica direcção e
+       origem; aqui não havia direcção nenhuma a indicar, e a origem é a mesma
+       de há dez segundos.
+
+       Fica escrito para não voltar a ser lido como um esquecimento: é uma
+       decisão, e o dia em que a gravação deixar de ser automática é o dia em
+       que ela se revê. */
     return (
       <span role="alert" className="text-[#8a2a22] text-[10px] leading-snug">
         Não foi possível guardar — o texto está só neste ecrã. {estado.mensagem}{" "}
@@ -1087,6 +1104,22 @@ const CHAVE_DO_MAIS = "liquen-visao-geral-mais";
 
 function MaisDoPainel({ children }: { children: React.ReactNode }) {
   const [aberto, setAberto] = useState(false);
+  /**
+   * ── A CASCATA DOS NOVE, E PORQUE É QUE ELA NÃO CORRE À CHEGADA ───────────
+   *
+   * Este é o único dos sete `<details>` destes ficheiros cujo corpo são VÁRIOS
+   * blocos, e é literalmente o caso para que a `.bo-cena` foi escrita: nove
+   * coisas a aparecer ao mesmo tempo, sem ordem de leitura nenhuma.
+   *
+   * O que a peça (`ui/gaveta.ts`) traz, e que aqui é obrigatório: **só anima o
+   * que ela abriu, com o gesto, agora.** A escolha fica guardada no
+   * `localStorage` — quem abre a gaveta encontra-a aberta da próxima vez —, e
+   * sem esta regra apanhava, todas as manhãs, estes blocos a entrar por cima
+   * dos QUATRO da vista, que já têm a sua própria cascata (`--cena` 0 a 3,
+   * aqui em baixo). Dois movimentos ao mesmo tempo no mesmo ecrã lêem-se como
+   * um defeito, não como uma apresentação.
+   */
+  const gaveta = useGaveta();
 
   useEffect(() => {
     try {
@@ -1103,6 +1136,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
       open={aberto}
       onToggle={(e) => {
         const agora = (e.currentTarget as HTMLDetailsElement).open;
+        gaveta.aoAlternar(e);
         setAberto(agora);
         try {
           localStorage.setItem(CHAVE_DO_MAIS, agora ? "1" : "0");
@@ -1112,6 +1146,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
       }}
     >
       <summary
+        onClick={gaveta.aoTocarNoResumo}
         className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-tinta-3)] ${FOCUS_RING}`}
       >
         <span className="min-w-0 flex-1">
@@ -1123,6 +1158,12 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
             recebido, o que precisa de atenção e a atividade recente.
           </span>
         </span>
+        {/* A seta fica na `.bo-mais-seta` do `globals.css` e NÃO passa para a
+            `SETA_DA_GAVETA`: esta é a única das sete que roda por `transform`
+            escrito à mão em CSS, com os mesmos 200 ms e a mesma curva. Passá-la
+            para a classe do Tailwind deixava a regra do `globals.css` órfã, e
+            esse ficheiro não se mexe daqui. Os dois lados estão presos um ao
+            outro pelo `gaveta-que-abre.test.tsx`. */}
         <svg
           className="bo-mais-seta mt-1 shrink-0 text-foreground/40"
           width="16"
@@ -1136,8 +1177,21 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
           <path d="M6 9l6 6 6-6" />
         </svg>
       </summary>
+      {/* ── UM INVÓLUCRO POR BLOCO, E ELE EXISTE SEMPRE ────────────────────
+          A escada é POR BLOCO: o `--cena` tem de ser escrito em cada um, senão
+          o `min()` do `globals.css` lê zero e os nove entram todos ao mesmo
+          tempo — que é o estado de que se vem. Três destes blocos são
+          componentes (`PainelEquipa`, `MemoReminders`, `MemoAgenda`) e não
+          recebem `className`, portanto quem leva a classe é um invólucro.
+
+          O invólucro está cá SEMPRE, aberta ou fechada, e é de propósito: uma
+          camada que aparecesse ao abrir remontava o que está lá dentro, e o
+          `PainelEquipa` guarda notas por gravar. O que muda entre fechada e
+          aberta é só a classe e o `style` — nunca a identidade dos nós. */}
       <div className="mt-[var(--bo-gap-vista)] flex flex-col gap-[var(--bo-gap-vista)]">
-        {children}
+        {Children.map(children, (bloco, ordem) => (
+          <div {...gaveta.bloco(ordem)}>{bloco}</div>
+        ))}
       </div>
     </details>
   );

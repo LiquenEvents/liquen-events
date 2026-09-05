@@ -11,6 +11,7 @@ import { MARCADOR_DA_LIGACAO, temLigacaoDaProposta } from "@/lib/email-ligacao-r
 import { MAXIMO_CORPO_ESCRITO } from "@/lib/email-limites";
 import { tamanhoEmPalavras } from "@/lib/custo-do-pdf";
 import { Button, Field } from "./ui";
+import { useGaveta } from "./ui/gaveta";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -118,6 +119,8 @@ export default function EmailDoEnvio({
   bytesMedidos,
   onNomeDoFicheiro,
 }: EmailDoEnvioProps) {
+  /** «Ver como o cliente o recebe». Ver `ui/gaveta.ts`. */
+  const gaveta = useGaveta();
   const [modelo, setModelo] = useState("");
   const [modelos, setModelos] = useState<ModeloDaLista[]>([]);
   const [remetente, setRemetente] = useState("");
@@ -492,11 +495,20 @@ export default function EmailDoEnvio({
           preenchidas» — é ver a FORMA: os parágrafos, o assunto por cima e o
           fecho da casa que entra sozinho. Fechado por omissão porque o caminho
           curto é enviar, e aberto num toque para quem quiser confirmar. */}
-      <details className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60">
-        <summary className="cursor-pointer list-none px-3 py-2 text-xs text-[var(--bo-text-muted)]">
+      <details
+        className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60"
+        onToggle={gaveta.aoAlternar}
+      >
+        <summary
+          onClick={gaveta.aoTocarNoResumo}
+          className="cursor-pointer list-none px-3 py-2 text-xs text-[var(--bo-text-muted)]"
+        >
           <span aria-hidden="true">▸ </span>Ver como o cliente o recebe
         </summary>
-        <div className="border-t border-[var(--bo-hairline-strong)] px-3 py-3">
+        {/* A pré-visualização inteira é UM bloco: o assunto, os parágrafos e a
+            nota do fecho lêem-se como uma folha de papel, e uma folha não entra
+            aos bocados. Os 240 ms e os quatro píxeis da `.bo-entrada`. */}
+        <div className={`border-t border-[var(--bo-hairline-strong)] px-3 py-3 ${gaveta.corpo}`}>
           <p className="text-xs text-foreground/50">Assunto</p>
           <p className="text-sm text-[var(--bo-text)]">{assunto || "—"}</p>
           <div className="mt-3 border-t border-[var(--bo-hairline-strong)] pt-3">
