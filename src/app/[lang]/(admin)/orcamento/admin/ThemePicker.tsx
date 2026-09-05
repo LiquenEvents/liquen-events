@@ -24,6 +24,7 @@ import { Ajuda, Button, FolhaOuDialogo } from "./ui";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
+import { rolarAteVer } from "@/lib/motion/rolar";
 import { CuradoriaDeFotos } from "./CuradoriaDeFotos";
 import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
 import {
@@ -117,19 +118,6 @@ const LAST_THEME_KEY = "liquen-tema-recente";
  * grelha, onde estão as medidas.
  */
 const GRELHA_DE_FOTOS = "grid-cols-2 @min-[26rem]:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]";
-
-/** Quem pediu ao sistema para não haver animações. */
-function movimentoReduzido(): boolean {
-  try {
-    return (
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  } catch {
-    return false;
-  }
-}
 
 /** A partir de quantas fotos o rodapé passa a contar "X de 40": a meio do
  *  caminho, cedo o suficiente para o teto não aparecer de surpresa. */
@@ -1767,12 +1755,12 @@ export default function ThemePicker({
    * abrir. `block: "nearest"` não mexe em nada quando já está visível.
    */
   useEffect(() => {
-    const activo = listaRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (!activo || typeof activo.scrollIntoView !== "function") return;
-    activo.scrollIntoView({
+    // O ajudante partilhado trata das duas guardas que aqui estavam à mão: o
+    // jsdom não implementa `scrollIntoView`, e o `behavior` só é `"smooth"`
+    // para quem não pediu para não animar.
+    rolarAteVer(listaRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]'), {
       block: "nearest",
       inline: "nearest",
-      behavior: movimentoReduzido() ? "auto" : "smooth",
     });
   }, [themeId, temasVisiveis.length]);
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
-import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
+import { rolarAteVer } from "@/lib/motion/rolar";
 import type { Quote, ActivityEntry } from "@/lib/orcamento/types";
 import {
   deriveStage,
@@ -151,16 +151,10 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
   }, [recusadas, aTentar, gravarEntradas]);
 
   const scrollTo = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    // A peça partilhada, e não um `matchMedia` à mão: era a ÚNICA leitura da
-    // preferência de movimento em todo o back office, e estava escrita de novo
-    // aqui. Treze componentes do sítio público já liam pela mesma função — a
-    // que guarda a `MediaQueryList` em vez de a criar a cada chamada.
-    el.scrollIntoView({
-      behavior: prefersReducedMotion() ? "auto" : "smooth",
-      block: "start",
-    });
+    // O ajudante partilhado, e não um `behavior` escrito à mão: a leitura da
+    // preferência de movimento vive num sítio só (`lib/motion/rolar.ts`), e há
+    // um teste a varrer o back office atrás de quem a esqueça.
+    rolarAteVer(document.getElementById(id), { block: "start" });
   }, []);
 
   return (

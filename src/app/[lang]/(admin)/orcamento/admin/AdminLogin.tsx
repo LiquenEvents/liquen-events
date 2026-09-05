@@ -18,6 +18,7 @@ import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
    propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
    As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { rolarAJanela } from "@/lib/motion/rolar";
 import {
   PARAM_DESTINO,
   consumirMarcaDeSaida,
@@ -977,7 +978,7 @@ function seguirOTeclado(alvo: HTMLElement) {
       accao: botao?.getBoundingClientRect() ?? null,
       alturaVisivel: janelaVisual?.height ?? window.innerHeight,
     });
-    if (Math.abs(deslocamento) > 1) window.scrollBy({ top: deslocamento, behavior: "smooth" });
+    if (Math.abs(deslocamento) > 1) rolarAJanela({ top: deslocamento });
   };
   window.setTimeout(ajustar, 300);
   if (!janelaVisual) return;

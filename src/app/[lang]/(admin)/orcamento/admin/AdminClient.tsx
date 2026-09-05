@@ -1,6 +1,7 @@
 "use client";
 
 import { resumoDoEnvio } from "./envio-da-mensagem";
+import { rolarAteVer } from "@/lib/motion/rolar";
 
 import {
   useState,
@@ -5934,16 +5935,10 @@ export default function AdminClient({
                                   if (na.tab === "gestao") {
                                     // O próximo passo é uma edição no formulário —
                                     // levar o utilizador até lá.
-                                    gestaoRef.current?.scrollIntoView({
-                                      behavior: "smooth",
-                                      block: "start",
-                                    });
+                                    rolarAteVer(gestaoRef.current, { block: "start" });
                                   } else {
                                     abrirDetailTab(na.tab);
-                                    toolsRef.current?.scrollIntoView({
-                                      behavior: "smooth",
-                                      block: "start",
-                                    });
+                                    rolarAteVer(toolsRef.current, { block: "start" });
                                   }
                                 }}
                                 className={`flex w-full items-center gap-3 rounded-full bg-[#4d6350] px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
