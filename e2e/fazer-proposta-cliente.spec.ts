@@ -34,6 +34,22 @@ const IGNORED_CONSOLE = [
   /favicon/i,
   /Failed to load resource: the server responded with a status of 404/i,
   /net::ERR_(TUNNEL_CONNECTION_FAILED|CONNECTION_|NAME_NOT_RESOLVED|PROXY_)/i,
+  /**
+   * O SINO DAS NOTIFICAÇÕES, NUM AMBIENTE SEM PUSH.
+   *
+   * O `NotificationBell` sonda o servidor de tempos a tempos. Sem chaves VAPID
+   * — que é o caso no CI e em qualquer ambiente de teste — essa sondagem falha,
+   * e ele DIZ que falhou, que é o comportamento certo. As duas linhas são o
+   * mesmo acontecimento: a mensagem dele e o erro em cru por baixo.
+   *
+   * Passou a aparecer aqui porque este passeio ficou mais longo do que o do
+   * lado (lista → estúdio em página inteira → painel) e chega a viver o
+   * suficiente para apanhar uma sondagem. Não é defeito do produto nem desta
+   * mudança: é o ambiente a não ter push, como os 404 e os erros de rede que
+   * já estão nesta lista.
+   */
+  /push: não consegui perguntar ao servidor pelas notificações/i,
+  /TypeError: Failed to fetch/i,
 ];
 
 function isIgnored(text: string): boolean {
