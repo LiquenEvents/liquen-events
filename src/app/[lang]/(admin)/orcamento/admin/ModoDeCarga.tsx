@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { Button } from "./ui";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
+/* A escala de movimento da casa — ver `ui/movimento.ts`. `ESTADO` são os 120 ms
+   do degrau `micro`; `PRESSAO` o toque a 20 ms; `PROGRESSO` os 250 ms do degrau
+   `elemento`, que é o degrau de «uma coisa a mover-se» e não de um estado a
+   mudar. As três trazem `motion-safe:` — o `globals.css` não tem rede global. */
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 
 /**
  * MODO DE CARGA — o inventário para quem está de pé numa quinta a encher a
@@ -150,8 +155,13 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
         {/* Barra de progresso: ao sol, um número pequeno lê-se mal; uma barra
             cheia vê-se de relance. */}
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bo-tinta-10)]">
+          {/* 250 ms, e não os 200 que aqui estavam: 200 não é degrau nenhum desta
+              casa — era um número solto. Uma barra a encher não é um estado a
+              mudar, é uma coisa a mover-se, e por isso pede o degrau `elemento`
+              (250 ms) e não os 120 do `micro`. É agora o mesmo tempo da barra de
+              cópia de fotografias do estúdio. */}
           <div
-            className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-200"
+            className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
             style={{ transform: `scaleX(${fraccaoDaBarra(feitos, total)})` }}
           />
         </div>
@@ -176,7 +186,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                 type="button"
                 onClick={() => alternar(i.id)}
                 aria-pressed={feito}
-                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors ${
+                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left ${ESTADO} ${PRESSAO} ${
                   feito
                     ? "border-[#4d6350]/40 bg-[#e7efe4]"
                     : "border-[var(--bo-hairline-strong)] bg-white active:bg-[var(--bo-tinta-6)]"

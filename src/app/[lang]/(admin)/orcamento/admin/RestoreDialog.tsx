@@ -10,6 +10,11 @@ import {
 } from "@/lib/backup-restore-types";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { Button } from "./ui";
 
 /**
@@ -273,7 +278,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         ref={dialogRef}
         role="dialog"
@@ -298,7 +303,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
           <button
             onClick={onClose}
             disabled={fase === "a-repor"}
-            className="alvo-toque text-lg leading-none text-foreground/30 transition-colors hover:text-[var(--bo-text-muted)] disabled:opacity-30"
+            className={`alvo-toque text-lg leading-none text-foreground/30 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text-muted)] disabled:opacity-30`}
             aria-label="Fechar"
           >
             ×

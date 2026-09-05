@@ -17,6 +17,7 @@ import {
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { corDeTexto, metaFor } from "./status-meta";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -107,7 +108,9 @@ const TaskRow = memo(function TaskRow({
          linha 2 · prioridade, editar e eliminar, todos com o tamanho da casa.
        No computador nada muda: tudo cabe numa fila e o título volta a cortar
        (`sm:truncate`), que é o que mantém a densidade da lista. */
-    <div className="group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors">
+    <div
+      className={`group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO}`}
+    >
       <button
         onClick={() => onToggle(t)}
         // Sem nome acessível, isto era «botão» — dezasseis vezes, e é o que
@@ -127,7 +130,7 @@ const TaskRow = memo(function TaskRow({
         className="alvo-toque -m-2 flex shrink-0 items-center justify-center p-2"
       >
         <span
-          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 group-hover:border-[#4d6350]/60"}`}
+          className={`w-5 h-5 rounded-md border flex items-center justify-center ${ESTADO} ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 group-hover:border-[#4d6350]/60"}`}
         >
           {t.done && (
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -242,7 +245,7 @@ const TaskRow = memo(function TaskRow({
                  desenho de 13 para 25 px SEM crescer a linha (a coluna do título
                  já mede 34) e sem margens negativas, que era o que voltaria a
                  encostar os dois um ao outro. O ícone continua com 13 px. */
-              className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+              className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
               aria-label="Editar tarefa"
             >
               {LapisIcon}
@@ -252,7 +255,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
             aria-label="Eliminar"
           >
             {CaixoteIcon}
@@ -749,10 +752,18 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
 
   return (
     <div className="max-w-4xl">
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Três blocos, pela ordem de leitura: escrever uma tarefa (0), escolher
+          de quem são as tarefas (1) e as listas (2). A escada é a da casa
+          (`.bo-cena` no `globals.css`): 600 ms, degraus de 20 ms, tecto ao
+          sexto, desligada em `prefers-reduced-motion`.
+
+          O `SkeletonList` da espera não leva degrau — um esqueleto é a espera,
+          não uma apresentação. */}
       {/* Add task — a single, obvious primary action; the optional detail fields
           (responsável, área, prioridade, prazo) collapse behind a disclosure so
           the daily "add a to-do" flow stays a title + one button. */}
-      <Card className="mb-6">
+      <Card style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena mb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Field
             containerClassName="flex-1"
@@ -796,7 +807,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="motion-safe:transition-transform group-open:rotate-90"
+              className="motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] group-open:rotate-90"
               aria-hidden="true"
             >
               <path d="m9 18 6-6-6-6" />
@@ -860,8 +871,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       </Card>
 
       {/* Filter by person */}
+      {/* Segundo degrau, e um só para a fila toda: são as pessoas da equipa,
+          não uma lista de dados — quinze botões a chegar um a um seria o
+          tremor que o tecto do sexto degrau existe para evitar. */}
       {people.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className="bo-cena flex flex-wrap gap-2 mb-5"
+        >
           {defaultAssignee && people.includes(defaultAssignee) && (
             <Button
               size="sm"
@@ -908,7 +925,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       {loading ? (
         <SkeletonList rows={5} />
       ) : (
-        <>
+        /* Terceiro degrau no CONTENTOR das listas, e não em cada linha: uma
+           lista de cinquenta tarefas a entrar linha a linha lê-se como
+           lentidão. O degrau está aqui dentro, no ramo já carregado, para o
+           esqueleto de cima ficar de fora. */
+        <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
           <Card padding="none" className="overflow-hidden">
             <div className="px-5 sm:px-6 py-3.5 border-b border-[var(--bo-hairline)] flex items-center justify-between">
               <p className="bo-eyebrow">A fazer ({open.length})</p>
@@ -963,7 +984,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               )}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────

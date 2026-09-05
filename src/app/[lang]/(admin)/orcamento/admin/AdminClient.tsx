@@ -100,6 +100,15 @@ import {
   TabelaOuCartoes,
   type Coluna,
 } from "./ui";
+/* ── A ESCALA DE MOVIMENTO DA CASA ─────────────────────────────────────────
+   Ver `ui/movimento.ts` para o censo que a motivou. Duas velocidades e só
+   duas: `ESTADO` são os 120 ms do degrau `micro` (passar o rato, focar, mudar
+   de cor/contorno/sombra) numa lista FECHADA de propriedades — nenhuma delas
+   força *layout* —, e `PRESSAO` é o toque a 20 ms para tudo aquilo em que se
+   carrega. As duas trazem `motion-safe:` porque o `globals.css` não tem rede
+   global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
+   três sítios muito concretos, e nenhum deles é este ficheiro. */
+import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
@@ -666,8 +675,14 @@ const QuoteCard = memo(function QuoteCard({
        dentro de outro é HTML inválido), o gesto ficava a flutuar por baixo do
        cartão, em cima do fundo da página, como se pertencesse ao pedido
        seguinte. A moldura sobe um nível e passa a abraçar os dois. */
+    /* 120 ms e não 200: 200 não era degrau nenhum desta casa, e o que aqui
+       muda é cor de moldura e de fundo — um ESTADO, ou seja o degrau `micro`.
+       E sai o `transition-all`: o `all` põe o browser a considerar `width`,
+       `height` e `margin` a cada fotograma, numa lista que pode ter dezenas de
+       cartões. O `ESTADO` traz uma lista fechada, e o `motion-safe:` dele faz
+       o mesmo trabalho que o `motion-reduce:transition-none` que aqui estava. */
     <div
-      className={`relative rounded-xl border transition-all duration-200 motion-reduce:transition-none ${
+      className={`relative rounded-xl border ${ESTADO} ${
         isCurrent
           ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
           : isSelected
@@ -1347,6 +1362,71 @@ export default function AdminClient({
   const [propostaPara, setPropostaPara] = useState<string | null>(null);
   // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
   const [moreNavOpen, setMoreNavOpen] = useState(false);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A MARCA DO DESTINO ACTIVO ANDA, EM VEZ DE PISCAR NOUTRO SÍTIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «quero animações em tudo o que seja para ir de uma coisa à
+   * outra, quando se carrega numa coisa e vai-se para outra coisa».
+   *
+   * Trocar de destino na barra lateral é o gesto que ela faz mais vezes por
+   * dia, e era o menos visível: o fundo acendia num item e apagava-se noutro,
+   * ao mesmo tempo. Nada dizia que se veio de um sítio e se foi para outro.
+   *
+   * Este é o mesmo gesto que o `Segmented` já faz há muito, e a razão está
+   * escrita lá: «numa barra de filtros o segmento activo não muda de cor de
+   * repente; há um indicador que ANDA». Aqui a barra é vertical, portanto o
+   * indicador é um filete que desliza pela esquerda — e é o `translate` que
+   * anda, composto na GPU, sem remedir nada à volta (o filete é `absolute`).
+   *
+   * ── PORQUE É QUE ISTO MEDE, EM VEZ DE CALCULAR ────────────────────────────
+   *
+   * A lista não tem altura fixa: o grupo «Mais» abre e fecha, quatro destinos
+   * escondem-se no computador e aparecem no telemóvel (`BARRA_INFERIOR`), e a
+   * coluna rola quando não cabe. Um número calculado a partir do índice ficava
+   * errado em todas essas situações. O `ResizeObserver` é o mesmo instrumento
+   * que o `Segmented` usa, e pela mesma razão.
+   *
+   * ── E PORQUE É QUE NÃO ANDA NO PRIMEIRO DESENHO ───────────────────────────
+   *
+   * `podeAndar` só passa a verdadeiro no fotograma seguinte ao da primeira
+   * medida. Sem isso, ao abrir o back office o filete deslizava do topo até ao
+   * destino activo — um movimento que ninguém provocou, a dizer uma transição
+   * que não houve. Também é o que o `Segmented` faz.
+   */
+  const colunaDosDestinos = useRef<HTMLElement | null>(null);
+  const [marcaDoDestino, setMarcaDoDestino] = useState<{ y: number; h: number } | null>(null);
+  const [marcaPodeAndar, setMarcaPodeAndar] = useState(false);
+
+  useEffect(() => {
+    const coluna = colunaDosDestinos.current;
+    if (!coluna) return;
+    const medir = () => {
+      const activo = coluna.querySelector<HTMLElement>('[aria-current="page"]');
+      // `offsetParent` nulo quer dizer escondido (o `hidden lg:flex` dos quatro
+      // que vivem na barra de baixo, ou o grupo «Mais» fechado). Sem destino à
+      // vista não há marca — melhor nenhuma do que uma pousada no sítio errado.
+      if (!activo || activo.offsetParent === null) {
+        setMarcaDoDestino(null);
+        return;
+      }
+      setMarcaDoDestino({ y: activo.offsetTop, h: activo.offsetHeight });
+    };
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const observador = new ResizeObserver(medir);
+    observador.observe(coluna);
+    for (const b of coluna.querySelectorAll("button")) observador.observe(b);
+    return () => observador.disconnect();
+  }, [view, moreNavOpen, navOpen]);
+
+  useEffect(() => {
+    if (!marcaDoDestino || marcaPodeAndar) return;
+    const id = requestAnimationFrame(() => setMarcaPodeAndar(true));
+    return () => cancelAnimationFrame(id);
+  }, [marcaDoDestino, marcaPodeAndar]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -2515,8 +2595,31 @@ export default function AdminClient({
    * quem chamou avisa. Uma falha visível é melhor do que um painel que parece
    * completo e não está.
    */
+  /**
+   * ── DUAS PORTAS PARA O MESMO PEDIDO NÃO PAGAM DUAS VIAGENS ────────────────
+   *
+   * O `completos` só sabe do que JÁ CHEGOU. Enquanto a leitura está a caminho
+   * não sabe nada — e desde que a lista de Pedidos leva ao ecrã da proposta
+   * (que lê o pedido por trás) há um segundo gesto possível antes de a primeira
+   * resposta chegar: o «Abrir o pedido». Duas leituras iguais do mesmo pedido,
+   * a mesma resposta duas vezes, no 4G dela.
+   *
+   * Quem pede um pedido que já vai a caminho recebe A MESMA promessa.
+   */
+  const leiturasEmCurso = useRef(new Map<string, Promise<LeituraDoPedido>>());
+
   async function comPedidoInteiro(q: Quote): Promise<LeituraDoPedido> {
     if (completos.current.has(q.id)) return { ok: true, quote: q };
+    const aCaminho = leiturasEmCurso.current.get(q.id);
+    if (aCaminho) return aCaminho;
+    const leitura = lerPedidoInteiro(q).finally(() => {
+      leiturasEmCurso.current.delete(q.id);
+    });
+    leiturasEmCurso.current.set(q.id, leitura);
+    return leitura;
+  }
+
+  async function lerPedidoInteiro(q: Quote): Promise<LeituraDoPedido> {
     const oQue = `abrir o pedido de ${q.name || "este cliente"}`;
     let res: Response;
     try {
@@ -2575,8 +2678,98 @@ export default function AdminClient({
     const actual = quotes.find((q) => q.id === id);
     if (!actual) return;
     completos.current.delete(id);
+    // E a que vai a caminho: é dela que o `comPedidoInteiro` se serviria, e é
+    // exactamente a versão desactualizada que isto existe para deitar fora.
+    leiturasEmCurso.current.delete(id);
     const r = await comPedidoInteiro(actual);
     if (r.ok) absorverDoServidor(r.quote);
+  }
+
+  /**
+   * «Vistos recentemente», escrito num sítio só.
+   *
+   * Havia UMA porta para abrir um pedido e agora há duas — o painel de detalhe
+   * e a página inteira da proposta. Duas cópias desta escrita divergiam no dia
+   * em que uma delas ganhasse um campo, e o que se perde é a lista por onde ela
+   * volta a encontrar o que estava a fazer.
+   */
+  function lembrarRecente(q: Quote) {
+    try {
+      const entry: RecentQuote = { id: q.id, name: q.name, email: q.email, status: q.status };
+      const prev: RecentQuote[] = JSON.parse(localStorage.getItem("liquen-recent-quotes") ?? "[]");
+      const next = [entry, ...prev.filter((r) => r.id !== q.id)].slice(0, 6);
+      localStorage.setItem("liquen-recent-quotes", JSON.stringify(next));
+      setRecentQuotes(next);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * CARREGAR NUM CLIENTE DA LISTA É IR FAZER-LHE A PROPOSTA — NO ECRÃ TODO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «quando se carrega na página dos pedidos e depois num
+   * cliente vai para a parte de fazer a proposta, mas eu quero que […] coloque
+   * apenas a página para fazer a proposta do cliente em que se carregou na
+   * página toda e não apenas ali de lado, como está na página de fazer
+   * propostas».
+   *
+   * Tinha razão, e o número diz porquê. O painel de detalhe abre-se ao lado da
+   * lista e tem tecto próprio (`max-w-3xl`): MEDIDO num Chromium, com a janela
+   * a 1440, o estúdio lá dentro tem 712 px de fila. A página inteira dá-lhe os
+   * 1600 do `VIEW_WRAP`. É o mesmo estúdio, com mais do dobro do sítio para a
+   * coluna onde ela escreve.
+   *
+   * ── E PORQUE É QUE ISTO NÃO ESTÁ NO `openQuote` ───────────────────────────
+   *
+   * Há seis portas para abrir um pedido — a lista, o Kanban, o Calendário, os
+   * Clientes, o Acompanhamento e a Visão Geral. Só UMA delas é «vou trabalhar
+   * nesta proposta»: a lista de Pedidos, que é onde ela escolhe o cliente
+   * seguinte. Quem carrega num dia do Calendário quer ver o pedido daquele dia,
+   * não ser levado para dentro de um editor — por isso o `openQuote` fica como
+   * está, e é só o caminho da lista que muda.
+   *
+   * O painel continua a uma tecla de distância: a página tem «Abrir o pedido»
+   * ao lado de «Trocar de cliente», e leva ao painel com Produção, Financeiro e
+   * as mensagens.
+   */
+  async function irFazerAProposta(pedido: Quote) {
+    if (!discardGuard()) return;
+    /**
+     * ── A PÁGINA ENTRA JÁ, E O PEDIDO INTEIRO CHEGA POR TRÁS ────────────────
+     *
+     * A primeira versão disto esperava pelo `comPedidoInteiro` antes de mudar
+     * de ecrã, como faz o painel. MEDIDO num Chromium, do clique ao cabeçalho:
+     * **1609 ms**. Mil e seiscentos milissegundos a olhar para a lista antes de
+     * a animação sequer começar — e nenhuma animação salva uma espera dessas.
+     * A regra dela é essa mesma: nenhuma animação pode atrasar uma tarefa.
+     *
+     * E não é preciso esperar. O ecrã «Fazer proposta» SEMPRE abriu o estúdio
+     * sobre o pedido que está na lista — é o que faz desde que existe, pela
+     * porta da barra lateral. O que o `comPedidoInteiro` traz a mais são as
+     * colecções pesadas (convidados, material) que o PAINEL mostra e o estúdio
+     * não. Por isso aqui entra-se já, e a versão completa entra a seguir, sem
+     * ninguém à espera dela.
+     *
+     * ── E A VERSÃO COMPLETA ENTRA SOZINHA ──────────────────────────────────
+     *
+     * Não é preciso escrevê-la aqui: o `comPedidoInteiro` já põe o pedido
+     * inteiro na lista quando chega (`setQuotes`), e o ecrã lê a lista. Uma
+     * segunda escrita aqui seria uma segunda verdade sobre o mesmo pedido.
+     *
+     * Uma leitura que falhe não diz nada, e não é omissão: o ecrã está a
+     * funcionar com o pedido da lista, não há nada que ela possa fazer com o
+     * aviso, e é o mesmo «melhor esforço» do `recarregarPedido` aqui em cima.
+     * Se ela for ao painel, o «Abrir o pedido» tenta outra vez — e aí, sim,
+     * uma falha é dita, porque aí o painel PRECISA do pedido inteiro.
+     */
+    lembrarRecente(pedido);
+    setPropostaPara(pedido.id);
+    setView("fazer-proposta");
+
+    void comPedidoInteiro(pedido);
   }
 
   async function openQuote(pedido: Quote) {
@@ -2618,16 +2811,7 @@ export default function AdminClient({
     }
     const q = r.quote;
     setSelected(q);
-    // Track in recently-viewed list (localStorage)
-    try {
-      const entry: RecentQuote = { id: q.id, name: q.name, email: q.email, status: q.status };
-      const prev: RecentQuote[] = JSON.parse(localStorage.getItem("liquen-recent-quotes") ?? "[]");
-      const next = [entry, ...prev.filter((r) => r.id !== q.id)].slice(0, 6);
-      localStorage.setItem("liquen-recent-quotes", JSON.stringify(next));
-      setRecentQuotes(next);
-    } catch {
-      /* ignore */
-    }
+    lembrarRecente(q);
     setEditPrice(textoDoPreco(q));
     setEditNotes(q.adminNotes ?? "");
     setEditStatus(q.status);
@@ -2664,19 +2848,22 @@ export default function AdminClient({
     const target = detailNextAction(q).tab;
     abrirPrimeiroDetailTab(target === "gestao" ? "comunicacao" : target);
   }
-  // Stable identity for the memoised QuoteCard's onOpen prop. openQuote is a
-  // plain function (closes over discardGuard and many setters), so its reference
-  // changes every render — passing it directly would defeat QuoteCard's memo.
-  // A ref that always points at the latest openQuote keeps behaviour identical
+  // Stable identity for the memoised QuoteCard's onOpen prop. `irFazerAProposta`
+  // is a plain function (closes over discardGuard and many setters), so its
+  // reference changes every render — passing it directly would defeat QuoteCard's
+  // memo. A ref that always points at the latest one keeps behaviour identical
   // while giving the row a callback whose identity never changes.
-  const openQuoteRef = useRef(openQuote);
-  // Keep the ref pointing at the latest openQuote (updated in an effect, not
+  //
+  // O que está aqui dentro mudou de `openQuote` para `irFazerAProposta`: é ESTA
+  // a porta da lista de Pedidos, e as outras cinco continuam a abrir o painel.
+  const abrirDaListaRef = useRef(irFazerAProposta);
+  // Keep the ref pointing at the latest closure (updated in an effect, not
   // during render). onOpen fires from a click, which is always after commit, so
   // it reads the current closure.
   useEffect(() => {
-    openQuoteRef.current = openQuote;
+    abrirDaListaRef.current = irFazerAProposta;
   });
-  const openQuoteStable = useCallback((q: Quote) => openQuoteRef.current(q), []);
+  const abrirDaLista = useCallback((q: Quote) => abrirDaListaRef.current(q), []);
 
   // Clone an event's details into a fresh quote (e.g. a returning client).
   // The date is intentionally left blank — it's a new event to schedule.
@@ -3556,14 +3743,18 @@ export default function AdminClient({
           setNavOpen(false);
         }}
         aria-current={active ? "page" : undefined}
-        className={`alvo-toque !justify-start group ${soNoComputador} items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] motion-safe:transition-colors duration-150 ${
+        /* 120 ms e não 150: os 150 que aqui estavam escritos eram, à letra, o
+           `--default-transition-duration` do Tailwind copiado à mão — o número
+           que sai quando ninguém escolhe. O degrau da casa para passar o rato e
+           focar é o `micro`, 120. E `PRESSAO` porque num item de menu carrega-se. */
+        className={`alvo-toque !justify-start group ${soNoComputador} items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] ${ESTADO} ${PRESSAO} ${
           active
             ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
             : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
         }`}
       >
         <span
-          className={`shrink-0 motion-safe:transition-colors duration-150 ${
+          className={`shrink-0 ${ESTADO} ${
             active
               ? "text-[var(--bo-text)]"
               : "text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
@@ -3813,7 +4004,7 @@ export default function AdminClient({
                 COLUNA (um estado que fica). Por isso são dois botões, cada um
                 visível exactamente onde o seu estado existe. */}
             <button
-              className="hidden lg:flex absolute top-3 right-3 w-11 h-11 items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
+              className={`hidden lg:flex absolute top-3 right-3 w-11 h-11 items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
               onClick={() => setMenuRecolhido(true)}
               aria-label="Recolher o menu"
               title="Recolher o menu"
@@ -3831,7 +4022,7 @@ export default function AdminClient({
             </button>
             {/* Mobile close */}
             <button
-              className="lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
+              className={`lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
               onClick={() => setNavOpen(false)}
               aria-label="Fechar menu"
             >
@@ -3875,9 +4066,22 @@ export default function AdminClient({
               sees few things at once. The group auto-opens when a "Mais" view is
               active, so the current item (and its aria-current) is never hidden. */}
             <nav
+              ref={colunaDosDestinos}
               aria-label="Navegação do back office"
-              className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
+              className="relative flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
             >
+              {/* O filete que anda. `aria-hidden` porque não diz nada que o
+                  `aria-current="page"` de cada destino não diga melhor — é
+                  desenho, não informação. Ver `marcaDoDestino` lá em cima. */}
+              {marcaDoDestino && (
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute left-1 top-0 w-[3px] rounded-full bg-[#4d6350] ${
+                    marcaPodeAndar ? MARCA : ""
+                  }`}
+                  style={{ translate: `0 ${marcaDoDestino.y}px`, height: marcaDoDestino.h }}
+                />
+              )}
               {CORE_NAV.map((id) => renderNavItem(id))}
 
               {/* "Mais" — secondary destinations, collapsed by default.
@@ -3897,7 +4101,7 @@ export default function AdminClient({
                       type="button"
                       onClick={() => setMoreNavOpen((o) => !o)}
                       aria-expanded={expanded}
-                      className="alvo-toque !justify-start group hidden lg:flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                      className={`alvo-toque !justify-start group hidden lg:flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                     >
                       <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
                         <svg
@@ -3954,7 +4158,7 @@ export default function AdminClient({
                 logo debaixo de quem está com a sessão aberta. */}
               <button
                 onClick={() => setPasskeysOpen(true)}
-                className="alvo-toque w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className={`alvo-toque w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                 title="Entrar sem palavra-passe neste aparelho"
               >
                 <svg
@@ -3978,7 +4182,7 @@ export default function AdminClient({
                 vista. No computador continua no topo, onde há espaço. */}
               <button
                 onClick={() => setAjudaOpen(true)}
-                className="alvo-toque lg:hidden w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                className={`alvo-toque lg:hidden w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
               >
                 <svg
                   width="11"
@@ -4006,7 +4210,7 @@ export default function AdminClient({
                   continua lá no computador. */}
                 <button
                   onClick={() => setShortcutsOpen(true)}
-                  className="alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  className={`alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Atalhos de teclado"
                 >
                   <svg
@@ -4030,7 +4234,7 @@ export default function AdminClient({
                 {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a
                   href="/api/backup"
-                  className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  className={`alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Exportar backup"
                 >
                   <svg
@@ -4054,7 +4258,7 @@ export default function AdminClient({
                   uma cópia sem forma de a repor nunca foi uma cópia. */}
                 <button
                   onClick={() => setRestoreOpen(true)}
-                  className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  className={`alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Repor cópia de segurança"
                 >
                   <svg
@@ -4075,7 +4279,7 @@ export default function AdminClient({
                 </button>
                 <button
                   onClick={pedirParaSair}
-                  className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  className={`alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Terminar sessão"
                 >
                   <svg
@@ -4102,7 +4306,7 @@ export default function AdminClient({
         {/* Backdrop (mobile nav drawer) */}
         {navOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
+            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
             onClick={() => setNavOpen(false)}
           />
         )}
@@ -4144,18 +4348,19 @@ export default function AdminClient({
                 <button
                   key={id}
                   onClick={() => setView(id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] transition-colors ${
+                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] ${ESTADO} ${PRESSAO} ${
                     isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
                   }`}
                 >
                   {id === "pedidos" && pendingCount > 0 && (
                     <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
                   )}
-                  <span
-                    className={`motion-safe:transition-transform motion-safe:duration-150 ${isActive ? "scale-110" : ""}`}
-                  >
-                    {navItem.icon}
-                  </span>
+                  {/* 120 ms e não 150 — e é o `ESTADO` que serve, apesar de aqui só
+                      mudar a escala: no Tailwind v4 a classe `scale-110` emite a
+                      propriedade autónoma `scale`, e `scale` está de propósito na
+                      lista do `ESTADO` (ver `ui/movimento.ts`). Um degrau a menos
+                      para a casa manter. */}
+                  <span className={`${ESTADO} ${isActive ? "scale-110" : ""}`}>{navItem.icon}</span>
                   {/* `text-center` e `leading-tight`: com cinco células cada
                       uma fica com 75 px, e "Fazer proposta" precisa de partir
                       em duas linhas em vez de ser cortado a meio. 75 px continua
@@ -4178,7 +4383,7 @@ export default function AdminClient({
             <button
               onClick={() => setNavOpen(true)}
               aria-label="Mais destinos"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] transition-colors ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] ${ESTADO} ${PRESSAO} ${
                 !BARRA_INFERIOR.includes(view)
                   ? "text-[var(--bo-accent)]"
                   : "text-[var(--bo-text-faint)]"
@@ -4257,6 +4462,15 @@ export default function AdminClient({
               tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
               novo. */}
           <header
+            /* O FIO DO CABEÇALHO FICA COMO ESTAVA, E NÃO É DESCUIDO.
+               Devia ser `ESTADO` como o resto: `motion-safe:transition-colors`
+               sem duração cai nos 150 ms de omissão do Tailwind, que não é
+               degrau nenhum desta casa (o `duration-150` ao lado é esse mesmo
+               número copiado à mão). Só que o `fio-do-cabecalho.test.ts`
+               prende aqui, letra por letra, a classe `motion-safe:transition-colors`
+               — e esse ficheiro não é deste lote. A guarda de movimento
+               reduzido, que é o que aquele teste diz querer, está cumprida; o
+               que falta é a duração, e muda-se quando se puder mexer no teste. */
             className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors duration-150 ${
               desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
             }`}
@@ -4285,7 +4499,7 @@ export default function AdminClient({
                   onClick={() => setMenuRecolhido(false)}
                   aria-label="Mostrar o menu"
                   title="Mostrar o menu"
-                  className="hidden lg:flex -ml-1 h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
+                  className={`hidden lg:flex -ml-1 h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                 >
                   <svg
                     width="20"
@@ -4303,7 +4517,7 @@ export default function AdminClient({
                 <button
                   onClick={() => setNavOpen(true)}
                   aria-label="Abrir menu"
-                  className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] transition-colors"
+                  className={`lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                 >
                   <svg
                     width="20"
@@ -4317,7 +4531,21 @@ export default function AdminClient({
                   </svg>
                 </button>
               )}
-              <div className="min-w-0">
+              {/* ── O CABEÇALHO ACOMPANHA A TROCA DE VISTA ───────────────
+                  O corpo da vista entra com a `.view-in` desde sempre, e o
+                  título e o subtítulo trocavam no sítio, secos. Lia-se como se
+                  só metade do ecrã tivesse mudado.
+
+                  `.bo-entrada` (240 ms, quatro píxeis, `cubic-bezier(0, 0,
+                  0.2, 1)`): quatro e não oito, porque é a distância que a casa
+                  reserva a um rótulo — o cromado não sai do sítio, muda o nome
+                  que ele traz.
+
+                  Aqui o `key` PODE remontar, ao contrário dos passos do
+                  estúdio e dos separadores do painel: isto é texto e mais
+                  nada, não há estado nenhum para perder. É o que faz a
+                  animação voltar a correr a cada troca. */}
+              <div key={view} className="bo-entrada min-w-0">
                 {/* O SUBTÍTULO NÃO VAI PARA O TELEMÓVEL.
                     "Pedidos de orçamento recebidos" por cima de "Pedidos" diz,
                     com 9 px e um espaçamento de 0.35em, o que o título já diz —
@@ -4366,7 +4594,7 @@ export default function AdminClient({
                   // No telemóvel vive na gaveta (ver lá o porquê): aqui os
                   // 50 px que ocupava eram quase metade do que sobrava para o
                   // título da vista.
-                  className="alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)] transition-colors"
+                  className={`alvo-toque hidden lg:flex w-10 h-10 items-center justify-center text-foreground/30 rounded-lg hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
                 >
                   <svg
                     width="16"
@@ -4413,7 +4641,7 @@ export default function AdminClient({
                     // `min-w-11` a par do `min-h-11`: sem rótulo (abaixo de
                     // `md`) o botão fica só com a lupa de 12 px e media 38 px
                     // de largura — alto que chegue e estreito de mais.
-                    className="flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] transition-colors"
+                    className={`flex items-center gap-2 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center border border-[var(--bo-hairline)] text-[var(--bo-text-faint)] text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
                     // Sem isto, abaixo de `md` (onde o rótulo está escondido) o
                     // botão é uma lupa sem nome nenhum para o VoiceOver. O
                     // `title` não serve: num telemóvel nunca chega a aparecer.
@@ -4443,7 +4671,7 @@ export default function AdminClient({
                   <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
-                    className="alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] transition-colors "
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] ${ESTADO} ${PRESSAO} `}
                     title="Criar pedido manualmente"
                   >
                     <svg
@@ -4626,6 +4854,10 @@ export default function AdminClient({
                 quotes={activeQuotes}
                 selectedId={propostaPara}
                 onSelect={setPropostaPara}
+                // Volta ao painel do pedido — que é onde vivem a Produção, o
+                // Financeiro e as mensagens. O `openQuote` já muda a vista para
+                // Pedidos e trata da espera com nome.
+                onAbrirPedido={openQuote}
                 onNovoPedido={() => setNewQuoteOpen(true)}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
@@ -4800,7 +5032,7 @@ export default function AdminClient({
                        se pode procurar continua dito por inteiro no
                        `aria-label`, que é quem serve o leitor de ecrã. */
                     placeholder="Procurar pedidos…"
-                    className="w-full bg-white border border-[var(--bo-hairline)] rounded-xl pl-10 pr-3 py-2.5 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22 focus:outline-none focus:border-foreground/25 transition-colors"
+                    className={`w-full bg-white border border-[var(--bo-hairline)] rounded-xl pl-10 pr-3 py-2.5 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22 focus:outline-none focus:border-foreground/25 ${ESTADO}`}
                   />
                   <kbd className="pointer-coarse:hidden absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] text-[var(--bo-text-faint)] lg:block">
                     /
@@ -4813,7 +5045,7 @@ export default function AdminClient({
                   onClick={() => setFiltrosAbertos((v) => !v)}
                   aria-expanded={filtrosAbertos}
                   aria-controls="painel-filtros-pedidos"
-                  className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium transition-colors ${
+                  className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium ${ESTADO} ${PRESSAO} ${
                     filtrosActivos > 0
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
                       : "bg-white border-[var(--bo-hairline)] text-[var(--bo-text-muted)]"
@@ -4849,7 +5081,7 @@ export default function AdminClient({
                 <button
                   onClick={() => setMineOnly((v) => !v)}
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
-                  className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border transition-all ${
+                  className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border ${ESTADO} ${PRESSAO} ${
                     mineOnly
                       ? "bg-[#4d6350] border-[#4d6350] text-white"
                       : "bg-white border-[var(--bo-hairline)] text-foreground/45 hover:text-[var(--bo-text-muted)]"
@@ -4965,7 +5197,7 @@ export default function AdminClient({
                   // Media 85x38 e passava despercebido porque, a 375 px, ficava
                   // fora da margem — os filtros novos mudaram a dobra da barra
                   // e trouxeram-no para dentro do ecrã, onde a régua o apanhou.
-                  className="alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-[var(--bo-hairline)] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-[var(--bo-text-muted)] transition-colors whitespace-nowrap"
+                  className={`alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-[var(--bo-hairline)] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO} whitespace-nowrap`}
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
@@ -5005,11 +5237,17 @@ export default function AdminClient({
               style={{ "--cena": 1 } as React.CSSProperties}
               className="bo-cena flex flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible gap-1.5 py-1 mb-3 sm:mb-5 lg:mb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
+              {/* AS PASTILHAS DE FILTRO: 120 ms, e sem `all`.
+                  Estavam em `transition-all duration-150` — as quatro. Os 150 são
+                  o valor de omissão do Tailwind escrito à mão, e o `all` obriga a
+                  considerar `width` e `height` numa tira que rola na horizontal
+                  com o dedo. O que aqui muda ao carregar é fundo e cor de letra:
+                  o degrau `micro` (120 ms) e a lista fechada do `ESTADO`. */}
               {!showArchived && (
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -5019,7 +5257,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -5033,7 +5271,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-6)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-6)]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -5059,7 +5297,7 @@ export default function AdminClient({
                   <button
                     key={t}
                     onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
-                    className={`alvo-toque px-3 py-1 rounded-full text-[10px] font-medium tracking-wide transition-all duration-150 ${
+                    className={`alvo-toque px-3 py-1 rounded-full text-[10px] font-medium tracking-wide ${ESTADO} ${PRESSAO} ${
                       tagFilter === t
                         ? "bg-[#4d6350] text-white "
                         : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"
@@ -5071,7 +5309,7 @@ export default function AdminClient({
                 {tagFilter && (
                   <button
                     onClick={() => setTagFilter(null)}
-                    className="text-foreground/35 text-[10px] hover:text-[var(--bo-text-muted)] transition-colors ml-1"
+                    className={`text-foreground/35 text-[10px] hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO} ml-1`}
                   >
                     Limpar
                   </button>
@@ -5089,7 +5327,7 @@ export default function AdminClient({
                 {seleccionadosAVista.length < filtered.length && (
                   <button
                     onClick={() => setSelectedIds(new Set(filtered.map((q) => q.id)))}
-                    className="text-foreground/40 text-xs hover:text-[#4d6350] transition-colors"
+                    className={`text-foreground/40 text-xs hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
                   >
                     Selecionar todos ({filtered.length})
                   </button>
@@ -5128,7 +5366,7 @@ export default function AdminClient({
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] ${ESTADO} ${PRESSAO} `}
                 >
                   Exportar seleção
                 </button>
@@ -5140,7 +5378,7 @@ export default function AdminClient({
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] transition-colors "
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] ${ESTADO} ${PRESSAO} `}
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -5152,13 +5390,13 @@ export default function AdminClient({
                 <button
                   onClick={() => deleteSelected(seleccionadosAVista)}
                   disabled={bulkBusy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#8a2a22]/25 text-[#8a2a22]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] transition-colors disabled:opacity-50"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#8a2a22]/25 text-[#8a2a22]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] ${ESTADO} ${PRESSAO} disabled:opacity-50`}
                 >
                   Apagar ({seleccionadosAVista.length})
                 </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
-                  className="ml-auto text-foreground/40 text-xs hover:text-[var(--bo-tinta-72)] transition-colors"
+                  className={`ml-auto text-foreground/40 text-xs hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
                 >
                   Limpar
                 </button>
@@ -5250,12 +5488,12 @@ export default function AdminClient({
                         isSelected={selectedIds.has(q.id)}
                         todayStr={todayStr}
                         userName={userName}
-                        onOpen={openQuoteStable}
+                        onOpen={abrirDaLista}
                         onToggle={toggleSelect}
                         onDesfecho={marcarDesfecho}
                       />
                     )}
-                    aoAbrir={openQuoteStable}
+                    aoAbrir={abrirDaLista}
                     colunas={COLUNAS_DE_PEDIDOS({
                       selectedIds,
                       toggleSelect,
@@ -5270,7 +5508,7 @@ export default function AdminClient({
                   <button
                     type="button"
                     onClick={() => setVisibleCount((c) => c + LIST_PAGE_SIZE)}
-                    className="w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-[var(--bo-tinta-72)] bg-white border border-[var(--bo-hairline)] rounded-xl hover:border-foreground/20 transition-colors"
+                    className={`w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-[var(--bo-tinta-72)] bg-white border border-[var(--bo-hairline)] rounded-xl hover:border-foreground/20 ${ESTADO} ${PRESSAO}`}
                   >
                     Mostrar mais ({filtered.length - visibleCount} restante
                     {filtered.length - visibleCount !== 1 ? "s" : ""})
@@ -5281,7 +5519,10 @@ export default function AdminClient({
               {/* Detail — in-grid sticky panel on desktop, slide-over drawer on mobile */}
               {selected ? (
                 <>
-                  <div className="fixed inset-0 z-40 bg-black/50 xl:hidden" onClick={closeDetail} />
+                  <div
+                    className="bo-entrada bo-entrada-fundo fixed inset-0 z-40 bg-black/50 xl:hidden"
+                    onClick={closeDetail}
+                  />
                   <div
                     ref={drawerRef}
                     role={isDetailOverlay ? "dialog" : undefined}
@@ -5346,7 +5587,7 @@ export default function AdminClient({
                               unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
                               href={localizeHref(`/orcamento/admin/evento/${selected.id}`, locale)}
-                              className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
+                              className={`alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] ${ESTADO} ${PRESSAO} hover:bg-[#4d6350]/[0.16] inline-flex items-center`}
                               title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                             >
                               <svg
@@ -5705,7 +5946,7 @@ export default function AdminClient({
                                     });
                                   }
                                 }}
-                                className="flex w-full items-center gap-3 rounded-full bg-[#4d6350] px-5 py-4 text-left text-white motion-safe:transition-colors hover:bg-[#415440]"
+                                className={`flex w-full items-center gap-3 rounded-full bg-[#4d6350] px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
@@ -6216,7 +6457,7 @@ export default function AdminClient({
                                   navigator.clipboard?.writeText(selected.email);
                                   toast("Email copiado", "success");
                                 }}
-                                className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-[var(--bo-text-muted)]"
+                                className={`alvo-toque shrink-0 text-foreground/25 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text-muted)]`}
                                 title="Copiar email"
                                 aria-label="Copiar email"
                               >
@@ -6245,7 +6486,7 @@ export default function AdminClient({
                                   href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80 inline-flex items-center"
+                                  className={`alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] ${ESTADO} ${PRESSAO} hover:opacity-80 inline-flex items-center`}
                                   title="Abrir conversa no WhatsApp"
                                 >
                                   <svg
@@ -6358,7 +6599,7 @@ export default function AdminClient({
                                       );
                                     tabs?.[nextIdx]?.focus();
                                   }}
-                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
                                       ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
                                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] "
@@ -6366,7 +6607,7 @@ export default function AdminClient({
                                 >
                                   <span
                                     aria-hidden
-                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ESTADO} ${
                                       active
                                         ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
                                         : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
@@ -6412,13 +6653,29 @@ export default function AdminClient({
                               escondido (`hidden`), para nunca se perder trabalho a
                               meio (mensagem por enviar, proposta em edição) ao trocar
                               de separador. */}
+                            {/* ── O SEPARADOR QUE CHEGA APRESENTA-SE ──────
+                                Os três painéis trocavam com `hidden`: o que
+                                sai desaparece e o que entra aparece no mesmo
+                                fotograma. É a `.view-in` da casa — 240 ms,
+                                oito píxeis —, que é a classe escrita para
+                                «o cromado não sai do sítio, muda o conteúdo
+                                dentro dele».
+
+                                A classe entra e sai com o separador, e não vem
+                                de um `key`: um `key` remontaria as ferramentas
+                                todas a cada troca, e elas ficam montadas de
+                                propósito (ver `detailTabsVisitados`) para o
+                                rascunho de uma mensagem sobreviver a uma ida à
+                                Produção e volta. */}
                             <div
                               role="tabpanel"
                               id="detail-panel-producao"
                               aria-labelledby="detail-tab-producao"
                               tabIndex={0}
                               hidden={detailTab !== "producao"}
-                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
+                              className={`flex flex-col gap-4 focus:outline-none sm:gap-6 ${
+                                detailTab === "producao" ? "view-in" : ""
+                              }`}
                             >
                               {detailTabsVisitados.has("producao") && (
                                 <>
@@ -6543,7 +6800,9 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-financeiro"
                               tabIndex={0}
                               hidden={detailTab !== "financeiro"}
-                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
+                              className={`flex flex-col gap-4 focus:outline-none sm:gap-6 ${
+                                detailTab === "financeiro" ? "view-in" : ""
+                              }`}
                             >
                               {detailTabsVisitados.has("financeiro") && (
                                 <>
@@ -6600,7 +6859,9 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-comunicacao"
                               tabIndex={0}
                               hidden={detailTab !== "comunicacao"}
-                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
+                              className={`flex flex-col gap-4 focus:outline-none sm:gap-6 ${
+                                detailTab === "comunicacao" ? "view-in" : ""
+                              }`}
                             >
                               {detailTabsVisitados.has("comunicacao") && (
                                 <>

@@ -8,6 +8,7 @@ import { isDateKey, todayKey } from "./util";
 import { Button, Card, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -160,7 +161,7 @@ function AddEventModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         role="dialog"
         aria-modal="true"
@@ -176,7 +177,7 @@ function AddEventModal({
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-[var(--bo-text-muted)] motion-safe:transition-colors"
+            className={`alvo-toque text-foreground/35 text-xl leading-none -mt-1 hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
           >
             ×
           </button>
@@ -191,7 +192,7 @@ function AddEventModal({
                 type="button"
                 aria-pressed={form.kind === k}
                 onClick={() => setForm((f) => ({ ...f, kind: k }))}
-                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border motion-safe:transition-colors ${form.kind === k ? "text-cream" : "text-foreground/50 border-[var(--bo-hairline-strong)] hover:border-foreground/30"}`}
+                className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border ${ESTADO} ${PRESSAO} ${form.kind === k ? "text-cream" : "text-foreground/50 border-[var(--bo-hairline-strong)] hover:border-foreground/30"}`}
                 style={
                   form.kind === k
                     ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
@@ -748,7 +749,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       else openAdd(key);
                     }
                   }}
-                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer motion-safe:transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${
+                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${
                     isSelected
                       ? "ring-1 ring-inset ring-[#4d6350]/45 bg-[#4d6350]/[0.04]"
                       : isToday
@@ -784,7 +785,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                          `size-6` é só a CAIXA que recebe o clique: o «+» fica
                          com o mesmo `text-sm`, centrado, e como a célula tem
                          `min-h-[80px]` a linha do topo não empurra nada. */
-                      className="hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none motion-safe:transition-colors"
+                      className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none ${ESTADO} ${PRESSAO}`}
                     >
                       +
                     </button>
@@ -801,7 +802,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
                         title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] motion-safe:transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -819,7 +820,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className="flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] motion-safe:transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60"
+                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -902,7 +903,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   <button
                     key={q.id}
                     onClick={() => onOpen(q)}
-                    className="w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
+                    className={`w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
                   >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
@@ -943,7 +944,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     <button
                       onClick={() => pedirParaRemover(ev.id, ev.title)}
                       aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
-                      className="text-foreground/35 hover:text-[#8a2a22] text-[9px] tracking-[0.15em] uppercase shrink-0 motion-safe:transition-colors"
+                      className={`text-foreground/35 hover:text-[#8a2a22] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
                     >
                       Remover
                     </button>
@@ -990,7 +991,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               <button
                 key={q.id}
                 onClick={() => onOpen(q)}
-                className="w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors"
+                className={`w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
               >
                 <div className="flex items-center gap-3">
                   <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">

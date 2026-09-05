@@ -42,6 +42,39 @@ vi.mock("./lazy", () => {
     return C;
   };
   return {
+    /**
+     * ── O ECRÃ DE FAZER PROPOSTA, EM DUPLO ────────────────────────────────
+     *
+     * A lista de Pedidos deixou de abrir o painel de detalhe: leva ao ecrã de
+     * fazer a proposta, na página toda (palavras dela: «não apenas ali de
+     * lado» — ver `irFazerAProposta` no `AdminClient.tsx`). O painel ficou a
+     * uma tecla, no «Abrir o pedido» desse ecrã.
+     *
+     * Estes casos medem o PAINEL, não esse ecrã — por isso ele entra aqui em
+     * duplo, com a única porta de que precisam. O ecrã a sério é medido no
+     * `FazerProposta.*.test.tsx` e no passeio `fazer-proposta-cliente.spec.ts`.
+     */
+    FazerProposta: ({
+      quotes,
+      selectedId,
+      onAbrirPedido,
+    }: {
+      quotes: Quote[];
+      selectedId: string | null;
+      onAbrirPedido: (q: Quote) => void;
+    }) => (
+      <div data-testid="view-fazer-proposta">
+        <button
+          type="button"
+          onClick={() => {
+            const q = quotes.find((x) => x.id === selectedId);
+            if (q) onAbrirPedido(q);
+          }}
+        >
+          Abrir o pedido
+        </button>
+      </div>
+    ),
     Overview: stub("overview"),
     Kanban: stub("kanban"),
     Clientes: stub("clientes"),
@@ -168,6 +201,11 @@ async function abrirPedido(nome = "Ana Marques") {
   await act(async () => {
     fireEvent.click(screen.getByText(nome));
   });
+  // Carregar no cliente leva ao ecrã de fazer a proposta; o painel abre-se daí.
+  // Ver o duplo do `FazerProposta` no topo deste ficheiro.
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /^Abrir o pedido$/ }));
+  });
 }
 
 beforeEach(() => {
@@ -239,5 +277,43 @@ describe("trocar de separador não perde o que se estava a escrever", () => {
     expect((screen.getByLabelText("Rascunho da mensagem") as HTMLInputElement).value).toBe(
       "Olá, sobre o vosso casamento...",
     );
+  });
+  /**
+   * ── O SEPARADOR QUE CHEGA APRESENTA-SE ────────────────────────────────────
+   *
+   * Palavras dela: «quero animações em tudo o que seja para ir de uma coisa à
+   * outra». Trocar de separador dentro do painel do pedido era um corte seco: o
+   * painel que sai desaparece e o que entra aparece no mesmo fotograma.
+   *
+   * O que se prende aqui é o MECANISMO, e é a parte que se pode partir sem
+   * ninguém dar por isso: a classe entra e sai COM o separador, em vez de vir
+   * de um `key`. Um `key` remontava as ferramentas todas a cada troca — e o
+   * caso aqui em cima («um rascunho de mensagem sobrevive a ir a Produção e
+   * voltar») passaria a falhar, mas só esse: o ecrã continuava a animar.
+   */
+  it("só o separador à vista traz a entrada, e ela volta quando ele volta", async () => {
+    montar(makeQuote());
+    await abrirPedido();
+
+    const painel = (id: string) => document.getElementById(`detail-panel-${id}`) as HTMLElement;
+
+    // Controlo positivo: o pedido novo abre em «Fazer proposta».
+    expect(painel("comunicacao").hidden).toBe(false);
+    expect(painel("comunicacao").className).toContain("view-in");
+    expect(painel("producao").className).not.toContain("view-in");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Produção/ }));
+    });
+
+    // A classe mudou de painel — e o que saiu ficou SEM ela, que é o que faz a
+    // animação recomeçar quando ele voltar.
+    expect(painel("producao").className).toContain("view-in");
+    expect(painel("comunicacao").className).not.toContain("view-in");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Fazer proposta/ }));
+    });
+    expect(painel("comunicacao").className).toContain("view-in");
   });
 });

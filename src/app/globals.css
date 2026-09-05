@@ -2606,6 +2606,27 @@ body[data-menu-open] .whatsapp-fixed {
 .bo-entrada-folha {
   --bo-entrada-y: 8px;
 }
+/* ── E O FUNDO VEM COM A CAIXA ────────────────────────────────────────────
+   Cinco superfícies desta casa escurecem o ecrã por trás do que se abriu — o
+   fundo da gaveta do pedido, o de todos os diálogos e folhas, o da paleta de
+   comandos, o de repor a cópia e o da sessão expirada. As caixas entram todas
+   com a `.bo-entrada`; os fundos apareciam de UMA VEZ, com a opacidade final
+   no primeiro fotograma.
+
+   Vê-se, e lê-se mal: a caixa desliza devagar por cima de um ecrã que já
+   escureceu de repente. O escurecer é a parte que cobre o ecrã todo, portanto
+   é a que mais se nota.
+
+   Zero de deslocação, de propósito: um fundo não vem de sítio nenhum — está
+   por todo o lado. O que ele faz é acender, nos mesmos 240 ms e na mesma
+   curva da caixa que traz, para os dois lerem como um gesto só.
+
+   E fica em `opacity`: o `backdrop-filter` que alguns destes fundos usam NÃO
+   entra na animação — um desfoque em transição repinta o ecrã inteiro a cada
+   fotograma, que é o oposto do que esta casa promete no telemóvel dela. */
+.bo-entrada-fundo {
+  --bo-entrada-y: 0px;
+}
 @media (prefers-reduced-motion: reduce) {
   .bo-entrada {
     animation: none;

@@ -12,6 +12,7 @@ import { opcionaisDe } from "@/lib/orcamento/versoes-da-proposta";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
@@ -371,7 +372,20 @@ export default function Acompanhamento({
   }
 
   return (
-    <div className="@container flex flex-col gap-4">
+    /* ── O ESQUELETO DÁ LUGAR AO CONTEÚDO, EM VEZ DE SALTAR PARA ELE ────────
+       Enquanto as propostas não chegam mostra-se um `SkeletonList` (aqui em
+       cima); quando chegam, esta árvore monta de raiz e o esqueleto desaparece
+       — e até aqui isso era um salto de um fotograma para o outro.
+
+       `.bo-cena` (600 ms, doze píxeis): a banda de apresentação, porque isto é
+       o sistema a apresentar um ecrã e não uma troca de estado. Uma vez só, no
+       contentor — as linhas lá dentro não têm degrau próprio, que é a regra
+       desta casa para listas de dados.
+
+       A animação corre exactamente quando a espera acaba, sem código nenhum a
+       coordenar as duas coisas: o `return` de cima devolve o esqueleto, este
+       devolve o conteúdo, e o que monta anima. */
+    <div className="bo-cena @container flex flex-col gap-4">
       {/*
         ── O resumo: as duas perguntas de segunda-feira de manhã ──────────
 
@@ -485,7 +499,7 @@ export default function Acompanhamento({
                         },
                       )
                     }
-                    className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] transition-colors hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] disabled:opacity-50"
+                    className={`alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
                   >
                     {v.label}
                   </button>
@@ -671,7 +685,7 @@ function LinhaCartao({
               aria-pressed={activo}
               title={e.ajuda}
               onClick={() => (e.id === "rejeitada" ? onRecusar() : onEstado(e.id))}
-              className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors disabled:opacity-50 ${
+              className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase disabled:opacity-50 ${ESTADO} ${PRESSAO} ${
                 activo
                   ? "border-[#4d6350] bg-[#4d6350] text-white"
                   : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)]"
@@ -685,7 +699,7 @@ function LinhaCartao({
           type="button"
           onClick={() => setSeguimentoAberto((v) => !v)}
           aria-expanded={seguimentoAberto}
-          className="alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
+          className={`alvo-toque rounded-full border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
         >
           {p.followUpAt ? "Mudar seguimento" : "Marcar seguimento"}
         </button>
@@ -761,7 +775,7 @@ function LinhaCartao({
                 type="button"
                 aria-pressed={motivo === m.id}
                 onClick={() => setMotivo(m.id)}
-                className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors ${
+                className={`alvo-toque rounded-full border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase ${ESTADO} ${PRESSAO} ${
                   motivo === m.id
                     ? "border-foreground/40 bg-[var(--bo-tinta-10)] text-[var(--bo-text)]"
                     : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30"

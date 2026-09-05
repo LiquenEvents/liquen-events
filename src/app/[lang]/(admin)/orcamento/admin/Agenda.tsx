@@ -9,6 +9,7 @@ import { Button, Card, EmptyState } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { SkeletonRow } from "./Skeleton";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 const DAYS_AHEAD = 14;
 
@@ -333,7 +334,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                     <div key={i} className="relative">
                       <Wrap
                         onClick={it.onClick}
-                        className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? "hover:bg-[var(--bo-tinta-3)] motion-safe:transition-colors cursor-pointer" : ""}`}
+                        className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? `hover:bg-[var(--bo-tinta-3)] cursor-pointer ${ESTADO} ${PRESSAO}` : ""}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -362,7 +363,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                       {it.atalho && (
                         <a
                           href={it.atalho.href}
-                          className="alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] transition-colors hover:bg-[#4d6350]/[0.06]"
+                          className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] hover:bg-[#4d6350]/[0.06] ${ESTADO} ${PRESSAO}`}
                         >
                           {it.atalho.rotulo}
                         </a>

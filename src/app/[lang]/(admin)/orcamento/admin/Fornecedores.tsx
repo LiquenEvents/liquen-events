@@ -18,6 +18,7 @@ import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { useToast } from "./Toast";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 const CATEGORIES = [
   "Catering",
@@ -571,7 +572,7 @@ export default function Fornecedores() {
                     <button
                       onClick={() => setEditingId(null)}
                       aria-label="Fechar edição"
-                      className="text-sm text-foreground/30 transition-colors hover:text-[var(--bo-text-muted)]"
+                      className={`text-sm text-foreground/30 hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
                     >
                       ×
                     </button>
@@ -699,21 +700,21 @@ export default function Fornecedores() {
                             { preferred: !s.preferred },
                           )
                         }
-                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-muted)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
+                        className={`alvo-toque p-1.5 ${ESTADO} ${PRESSAO} ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-muted)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
                         {EstrelaIcon(!!s.preferred)}
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                         aria-label="Editar"
                       >
                         {LapisIcon}
                       </button>
                       <button
                         onClick={() => pedirParaRemover(s.id)}
-                        className="alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
+                        className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                         aria-label="Remover"
                       >
                         ×
@@ -750,7 +751,7 @@ export default function Fornecedores() {
                            44px só no dedo; o `gap-2` (8px, também só no dedo)
                            separa uma caixa de 44 da vizinha, senão continuavam
                            coladas mesmo maiores. */
-                        className="alvo-toque transition-colors focus:outline-none"
+                        className={`alvo-toque focus:outline-none ${ESTADO} ${PRESSAO}`}
                         aria-label={`${star} estrela${star !== 1 ? "s" : ""}`}
                       >
                         <svg
@@ -782,7 +783,7 @@ export default function Fornecedores() {
                         // dá-lhe 44px de altura só no dedo (`justify-start`
                         // porque, ao contrário dos botões de ícone, este texto
                         // não deve ficar centrado).
-                        className="alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] transition-colors"
+                        className={`alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
                       >
                         {s.phone}
                       </a>
@@ -795,7 +796,7 @@ export default function Fornecedores() {
                         // trás, na mesma coluna e à distância de um dedo.
                         // `truncate` fica — os emails destes fornecedores
                         // passam da largura da coluna.
-                        className="alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] transition-colors truncate"
+                        className={`alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] truncate ${ESTADO} ${PRESSAO}`}
                       >
                         {s.email}
                       </a>

@@ -25,6 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -325,7 +326,7 @@ export function GrelhaDeFotos({
     <SortableContext items={ids} strategy={rectSortingStrategy}>
       <div
         ref={setNodeRef}
-        className={`rounded-xl transition-shadow ${
+        className={`rounded-xl ${ESTADO} ${
           isOver ? "ring-2 ring-[#4d6350]/50 ring-offset-2 ring-offset-transparent" : ""
         } ${className}`}
       >
@@ -504,7 +505,7 @@ export function CelulaDeFoto({
           {...attributes}
           {...listeners}
           aria-label={`Arrastar a fotografia ${ii + 1}`}
-          className="alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-100 transition-opacity com-rato:opacity-0 com-rato:group-hover/foto:opacity-100 com-rato:focus-visible:opacity-100 active:cursor-grabbing"
+          className={`alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover/foto:opacity-100 com-rato:focus-visible:opacity-100 active:cursor-grabbing ${ESTADO}`}
         >
           <span aria-hidden="true">⠿</span>
         </button>

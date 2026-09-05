@@ -4,6 +4,11 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
+/* A escala de movimento da casa — ver `ui/movimento.ts`. O `motion-safe:` já
+   aqui estava; o que faltava era a DURAÇÃO: uma `transition-*` sem duração cai
+   nos 150 ms do `--default-transition-duration` do Tailwind, que não é degrau
+   nenhum desta casa. `ESTADO` são os 120 ms do `micro`, `PRESSAO` o toque. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 export interface Command {
   id: string;
@@ -155,7 +160,7 @@ export default function CommandPalette({
       className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12dvh]"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
+      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
       <div
         ref={dialogRef}
         role="dialog"
@@ -257,7 +262,7 @@ export default function CommandPalette({
                         c.run();
                         onClose();
                       }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left motion-safe:transition-colors ${
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ${ESTADO} ${PRESSAO} ${
                         isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-[var(--bo-tinta-6)]"
                       }`}
                     >

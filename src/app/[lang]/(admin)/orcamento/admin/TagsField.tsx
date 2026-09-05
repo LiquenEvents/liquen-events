@@ -4,6 +4,11 @@ import { useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 interface Props {
   quote: Quote;
@@ -130,7 +135,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
             {t}
             <button
               onClick={() => remove(t)}
-              className="text-[#4d6350]/50 hover:text-[#4d6350] transition-colors leading-none"
+              className={`text-[#4d6350]/50 hover:text-[#4d6350] ${ESTADO} ${PRESSAO} leading-none`}
               aria-label={`Remover etiqueta ${t}`}
             >
               ×
@@ -159,7 +164,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
             <button
               key={s}
               onClick={() => add(s)}
-              className="px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] transition-colors"
+              className={`px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
             >
               + {s}
             </button>

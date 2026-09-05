@@ -2,6 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { idUnico } from "@/lib/id-unico";
+/* A escala de movimento da casa — ver `ui/movimento.ts`. Aqui só o botão de
+   fechar é um estado de interacção; a ENTRADA da caixa tem escala própria,
+   logo abaixo, porque não é um estado a mudar — é o sistema a apresentar. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 type ToastKind = "success" | "error" | "info";
 interface Toast {
@@ -36,6 +40,71 @@ const TOAST_DURATION = 4000;
  * de carregar, e o velho já teve os seus segundos.
  */
 const MAX_TOASTS = 4;
+
+/**
+ * ── A ENTRADA DE UM AVISO: 240 ms, E A CURVA DE QUEM APRESENTA ──────────────
+ *
+ * Estava `transition-all duration-300`, sem `motion-safe:`. Três desvios num
+ * sítio só, e nenhum deles escolhido:
+ *
+ *  1. **300 ms.** A casa fixou 240 para tudo o que APARECE por cima da página
+ *     — é o número da `.bo-entrada` e da `.view-in` do `globals.css`, e é o que
+ *     os outros nove sítios do back office que se apresentam já usam. Trezentos
+ *     não era um degrau: era um número solto a discordar dos vizinhos em
+ *     silêncio, num aviso que nasce ao lado deles.
+ *
+ *  2. **A curva.** Sem `ease-*`, uma `transition-*` desta casa sai com o
+ *     `--default-transition-timing-function`, que é a curva de ASSINATURA
+ *     (`cubic-bezier(0.16, 1, 0.3, 1)`). Essa é para o que o utilizador
+ *     provoca. Um aviso não é provocado — chega quando o sistema tem alguma
+ *     coisa a dizer —, e o que o sistema apresenta entra na curva que SÓ
+ *     DESACELERA, `cubic-bezier(0, 0, 0.2, 1)`. É a mesma da `.bo-entrada`, e
+ *     o `duracoes-da-casa.test.ts` prende este literal ao do `globals.css`
+ *     para as duas pontas não poderem afinar-se sozinhas.
+ *
+ *  3. **`transition-all`, e sem `motion-safe:`.** O `all` obriga o browser a
+ *     considerar `width`, `height` e `margin` em cada fotograma — layout, no
+ *     elemento que aparece precisamente quando alguma coisa já correu mal. A
+ *     lista aqui é fechada: `opacity` e `translate` (no Tailwind v4 o
+ *     `translate-y-2` emite a propriedade AUTÓNOMA `translate`, não
+ *     `transform` — compilado para confirmar), as duas compostas na GPU. E o
+ *     `motion-safe:` porque o `globals.css` não tem rede global nenhuma: só
+ *     desliga transições dentro de `prefers-reduced-motion` em três sítios
+ *     concretos, e este não é nenhum deles.
+ *
+ * ── PORQUE É QUE NÃO É A CLASSE `.bo-entrada` ───────────────────────────────
+ *
+ * Seria o caminho mais curto — traz o número, a curva e a guarda de movimento
+ * reduzido de graça. Mas a `.bo-entrada` é uma ANIMAÇÃO à montagem, e o
+ * `entrada-do-que-aparece.test.ts` (que não é meu) prende, letra por letra, o
+ * gesto que este aviso faz hoje: `"opacity-0 translate-y-2"`. Trocá-lo por
+ * `.bo-entrada` punha esse teste vermelho num ficheiro que não me cabe
+ * corrigir. Fica igual em tudo o que se vê — os mesmos 8 px, os mesmos 240 ms,
+ * a mesma curva —, e a mudança da mecânica fica para quem for dono do teste.
+ */
+const ENTRADA_DO_AVISO =
+  "motion-safe:transition-[opacity,translate] " +
+  "motion-safe:duration-[240ms] " +
+  "motion-safe:ease-[cubic-bezier(0,0,0.2,1)]";
+
+/**
+ * ── E A SAÍDA? NÃO A HÁ, E É UMA DECISÃO ────────────────────────────────────
+ *
+ * Quando um aviso se apaga, sai da lista no mesmo fotograma e os de baixo
+ * saltam para o lugar dele. Ficou por fazer, de propósito, e por duas razões:
+ *
+ *  · Uma saída em `opacity` não corrige o salto — só o adia 240 ms. Corrigir o
+ *    salto a sério é animar a ALTURA da caixa que sai, e altura é *layout* a
+ *    cada fotograma: exactamente o que o `transition-all` daqui de cima estava
+ *    a fazer de errado, e o que a promessa dos 60 fps no telemóvel proíbe.
+ *  · E há um perigo concreto: esta pilha pousa em cima da barra de acção do
+ *    estúdio (ver o comentário do `bottom-[calc(…)]` mais abaixo). Um aviso a
+ *    desvanecer-se por cima dessa barra continua a apanhar o toque enquanto
+ *    não desaparecer — ou seja, a saída teria de largar `pointer-events` no
+ *    PRIMEIRO fotograma, antes de qualquer opacidade. Enquanto isso não
+ *    estiver escrito e testado, é mais seguro o aviso sair de repente do que
+ *    sair bonito a comer cliques do botão «Gerar e enviar».
+ */
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -166,7 +235,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       onMouseLeave={resume}
       onFocus={pause}
       onBlur={resume}
-      className={`pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm bg-white border border-[var(--bo-hairline-strong)] rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)] transition-all duration-300 ${
+      className={`pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-sm bg-white border border-[var(--bo-hairline-strong)] rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)] ${ENTRADA_DO_AVISO} ${
         shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
       }`}
     >
@@ -189,7 +258,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           para o texto não encolher por causa disto. */}
       <button
         onClick={onClose}
-        className="alvo-toque pointer-coarse:-mr-1.5 text-foreground/40 hover:text-[var(--bo-tinta-72)] transition-colors text-sm leading-none shrink-0"
+        className={`alvo-toque pointer-coarse:-mr-1.5 text-foreground/40 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO} text-sm leading-none shrink-0`}
         aria-label="Fechar"
       >
         ×

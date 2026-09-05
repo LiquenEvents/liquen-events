@@ -8,6 +8,11 @@ import { Button, EmCurso } from "./ui";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { ModeloProposta } from "@/lib/proposal-templates";
 import { fotosDoDocumento, type CampoAMudar } from "@/lib/proposal-copy";
+/* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
+   motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
+   propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
+   As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * CRIAR A PARTIR DE… — escolher a proposta (ou o modelo) de onde partir.
@@ -336,7 +341,7 @@ export default function CriarAPartirDe({
                     onMouseEnter={() => setAtivo(i)}
                     disabled={!!aCopiar}
                     aria-current={i === ativo}
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
+                    className={`w-full rounded-xl border px-4 py-3 text-left ${ESTADO} ${PRESSAO} disabled:opacity-50 ${
                       i === ativo
                         ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
                         : "border-transparent hover:border-[var(--bo-hairline-strong)]"

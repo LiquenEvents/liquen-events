@@ -4,6 +4,10 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { Button, Card, EmptyState } from "./ui";
+// `ESTADO` já é, neste ficheiro, a tabela de estados do PEDIDO (Novo, Ganho,
+// Perdido…). O primitivo de movimento entra com apelido para os dois poderem
+// viver lado a lado sem que nenhum tenha de mudar de nome.
+import { ESTADO as MOV_ESTADO, PRESSAO } from "./ui/movimento";
 import { ProposalStudio } from "./lazy";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
@@ -115,6 +119,15 @@ interface Props {
   /** O valor mudou no estúdio, que o grava no pedido — o pai actualiza a sua
    *  cópia para o cartão do cliente aqui em cima mostrar o mesmo. */
   onQuoteUpdated: (quote: Quote) => void;
+  /**
+   * Abrir o pedido deste cliente no painel de detalhe (Produção, Financeiro,
+   * mensagens).
+   *
+   * Existe porque carregar num cliente na lista de Pedidos passou a trazer para
+   * aqui: sem esta porta, as outras três ferramentas do pedido ficavam a duas
+   * voltas de distância para quem entrou por ali.
+   */
+  onAbrirPedido: (quote: Quote) => void;
 }
 
 export default function FazerProposta({
@@ -124,6 +137,7 @@ export default function FazerProposta({
   onNovoPedido,
   onSent,
   onQuoteUpdated,
+  onAbrirPedido,
 }: Props) {
   const [procura, setProcura] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("activos");
@@ -213,8 +227,32 @@ export default function FazerProposta({
   // ── Com cliente escolhido: o ecrã é o estúdio ────────────────────────────
   if (escolhido) {
     return (
+      /**
+       * ── A PÁGINA APRESENTA-SE, E EM DOIS TEMPOS ──────────────────────────
+       *
+       * Palavras dela: «que haja uma animação super fluida que coloca a página
+       * para fazer a proposta na página toda».
+       *
+       * A escada é a da casa (`.bo-cena`, 600 ms, degraus de 20 ms, no máximo
+       * seis) e não uma cópia nova: primeiro chega o «Proposta para ‹nome›» —
+       * a resposta a «para quem é isto» —, e logo a seguir o estúdio. É a
+       * ordem por que se lê, e é a mesma escada da Visão Geral e das Propostas.
+       *
+       * O que NÃO se fez, e porquê: um `document.startViewTransition` a
+       * transformar a linha da lista no cabeçalho desta página. A casa já mediu
+       * essa via e desligou-a («o snapshot da página inteira colidia com a nova
+       * rota a hidratar, e a transição gaguejava» — `PageTransition.tsx`); o
+       * estúdio é a superfície mais pesada do back office, e é exactamente onde
+       * isso voltaria a acontecer. Uma animação que trava é o contrário de
+       * fluida.
+       *
+       * Só `opacity` e `transform`, com `backwards` — não fica transform
+       * nenhum depois, que é o que quebraria o `position: fixed` de uma folha
+       * aberta aqui dentro. E `prefers-reduced-motion` desliga-a no
+       * `globals.css`.
+       */
       <div className="flex flex-col gap-4">
-        <Card padding="md">
+        <Card padding="md" className="bo-cena">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               {/* O EVENTO, A DATA E O LOCAL SAÍRAM DAQUI.
@@ -231,26 +269,37 @@ export default function FazerProposta({
                 {escolhido.name}
               </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
-              Trocar de cliente
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* O pedido inteiro — Produção, Financeiro, mensagens — a UMA
+                  tecla. Ver `onAbrirPedido`. */}
+              <Button variant="secondary" size="sm" onClick={() => onAbrirPedido(escolhido)}>
+                Abrir o pedido
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => onSelect(null)}>
+                Trocar de cliente
+              </Button>
+            </div>
           </div>
         </Card>
 
         {/* ANTES do estúdio, de propósito. Saber que o dia já está ocupado
             depois de escrever a proposta toda é saber tarde de mais. */}
-        <AvisoDataOcupada quote={escolhido} quotes={quotes} onAbrir={onSelect} />
+        <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena empty:hidden">
+          <AvisoDataOcupada quote={escolhido} quotes={quotes} onAbrir={onSelect} />
+        </div>
 
         {/* `key` pelo id: trocar de cliente TEM de recomeçar o estúdio do zero.
             Sem isto o React reaproveitava a instância e o rascunho de um casal
             aparecia no ecrã do seguinte. */}
-        <ProposalStudio
-          key={`fazer-proposta-${escolhido.id}`}
-          quote={escolhido}
-          quotes={quotes}
-          onQuoteUpdated={onQuoteUpdated}
-          onSent={() => onSent(escolhido)}
-        />
+        <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
+          <ProposalStudio
+            key={`fazer-proposta-${escolhido.id}`}
+            quote={escolhido}
+            quotes={quotes}
+            onQuoteUpdated={onQuoteUpdated}
+            onSent={() => onSent(escolhido)}
+          />
+        </div>
       </div>
     );
   }
@@ -318,7 +367,7 @@ export default function FazerProposta({
               type="button"
               onClick={() => setFiltro(f.id)}
               aria-pressed={filtro === f.id}
-              className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
+              className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] ${MOV_ESTADO} ${PRESSAO} ${
                 filtro === f.id
                   ? "bg-[#1b2119] text-white "
                   : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"
@@ -368,7 +417,7 @@ export default function FazerProposta({
                 <button
                   type="button"
                   onClick={() => onSelect(q.id)}
-                  className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left motion-safe:transition-colors ${
+                  className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left ${MOV_ESTADO} ${PRESSAO} ${
                     espera
                       ? "border-[var(--bo-hairline)] bg-white hover:border-[#4d6350]/40"
                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"

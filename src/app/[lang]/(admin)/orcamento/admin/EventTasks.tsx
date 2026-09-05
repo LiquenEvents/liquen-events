@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useCachedList } from "./useCachedList";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
@@ -396,11 +397,14 @@ export default function EventTasks({ quote, userName }: Props) {
           action={{ label: "Adicionar tarefa", onClick: () => setAdding(true) }}
         />
       ) : (
-        <div className="flex flex-col gap-2">
+        /* O esqueleto dá lugar à lista: `.bo-cena` (600 ms) no contentor, uma
+           vez só. As linhas lá dentro não têm degrau próprio — a escada é por
+           bloco, nunca por linha, e uma lista de tarefas não tem tecto. */
+        <div className="bo-cena flex flex-col gap-2">
           {[...todo, ...done].map((task) => (
             <div
               key={task.id}
-              className={`group flex items-start gap-3 rounded-xl border p-3 motion-safe:transition-all ${
+              className={`group flex items-start gap-3 rounded-xl border p-3 ${ESTADO} ${
                 task.done
                   ? "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] opacity-60"
                   : "border-[var(--bo-hairline)] bg-white hover:shadow"
@@ -421,7 +425,7 @@ export default function EventTasks({ quote, userName }: Props) {
                 aria-label={task.done ? "Marcar como pendente" : "Marcar como concluída"}
               >
                 <span
-                  className="flex h-[18px] w-[18px] items-center justify-center rounded-md border-[1.5px] motion-safe:transition-colors"
+                  className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border-[1.5px] ${ESTADO}`}
                   style={{
                     borderColor: task.done ? "#4d6350" : PRIORITY_COLOR[task.priority],
                     background: task.done ? "#4d635014" : "transparent",
@@ -493,7 +497,7 @@ export default function EventTasks({ quote, userName }: Props) {
                   aparecia, media 13×13 px contra os 44 da casa. */}
               <button
                 onClick={() => perguntarSeElimina(task)}
-                className="alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                className={`alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] ${ESTADO} ${PRESSAO}`}
                 aria-label="Remover tarefa"
               >
                 <svg

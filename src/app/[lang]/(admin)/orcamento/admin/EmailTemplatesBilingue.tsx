@@ -5,6 +5,7 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { insertToken } from "@/lib/email-template-format";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { renderizarAssunto, renderizarCorpo, validarModelo } from "@/lib/email-template-engine";
@@ -551,7 +552,7 @@ export default function EmailTemplatesBilingue() {
               <button
                 key={m.chave}
                 onClick={() => abrir(m, idioma)}
-                className={`w-full text-left px-4 py-3 transition-colors ${
+                className={`w-full text-left px-4 py-3 ${ESTADO} ${PRESSAO} ${
                   activo ? "bg-[#5F7C66]/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
@@ -625,7 +626,7 @@ export default function EmailTemplatesBilingue() {
                     role="tab"
                     aria-selected={activo}
                     onClick={() => abrir(modelo, l)}
-                    className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+                    className={`px-3 py-1.5 rounded-md text-xs ${ESTADO} ${PRESSAO} ${
                       activo
                         ? "bg-[#5F7C66] text-white"
                         : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
@@ -678,7 +679,7 @@ export default function EmailTemplatesBilingue() {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => inserir(`{{${v.chave}}}`)}
                         title={v.dica}
-                        className={`px-2.5 py-1 rounded-md text-[11px] transition-colors ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] ${ESTADO} ${PRESSAO} ${
                           grupo.grupo === "remetente"
                             ? "bg-[#8a5d13]/10 text-[#8a5d13] hover:bg-[#8a5d13]/20"
                             : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
@@ -703,7 +704,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(false)}
-                className="px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 transition-colors"
+                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
               >
                 só se houver data
               </button>
@@ -711,7 +712,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(true)}
-                className="px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 transition-colors"
+                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
               >
                 só se NÃO houver data
               </button>

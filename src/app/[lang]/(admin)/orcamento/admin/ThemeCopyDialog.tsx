@@ -9,6 +9,11 @@ import {
   type ThemeSummary,
 } from "@/lib/theme-types";
 import { Button, FolhaOuDialogo } from "./ui";
+/* A escala de movimento da casa — ver `ui/movimento.ts`. `ESTADO` são os 120 ms
+   do degrau `micro`; `PRESSAO` o toque a 20 ms; `PROGRESSO` os 250 ms do degrau
+   `elemento`, que é o degrau de «uma coisa a mover-se» e não de um estado a
+   mudar. As três trazem `motion-safe:` — o `globals.css` não tem rede global. */
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 
 /**
  * LEVAR AS FOTOS SELECIONADAS PARA OUTRO TEMA — copiar ou mover.
@@ -301,8 +306,15 @@ export default function ThemeCopyDialog({
                 aria-valuenow={progress.done}
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
+                {/* 250 ms, e antes eram 150 sem ninguém os ter escolhido: estava aqui
+                    `motion-safe:duration-elemento`, e essa classe não gera regra
+                    NENHUMA — o Tailwind v4 lê os `duration-*` do espaço
+                    `--transition-duration-*` e o token da casa vivia em
+                    `--duration-*`. A barra caía no `--default-transition-duration`.
+                    O `PROGRESSO` é o mesmo tempo pretendido (o degrau `elemento`),
+                    só que agora escrito num literal que o Tailwind compila mesmo. */}
                 <div
-                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
                   style={{ transform: `scaleX(${pct / 100})` }}
                 />
               </div>
@@ -375,7 +387,7 @@ export default function ThemeCopyDialog({
                 aria-checked={on}
                 disabled={running}
                 onClick={() => setDestId(t.id)}
-                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${ESTADO} ${PRESSAO} disabled:opacity-50 ${
                   on
                     ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
                     : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/40"

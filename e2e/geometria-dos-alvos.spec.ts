@@ -137,6 +137,24 @@ async function rolarOPainel(page: Page, fracao: number) {
 }
 
 // ═══════════════════════════════════════════════════════════════════ D1 ═════
+/**
+ * ── ABRIR O PAINEL DO PEDIDO, PELA PORTA QUE PASSOU A EXISTIR ───────────────
+ *
+ * Carregar num cliente na lista de Pedidos deixou de abrir o painel de
+ * detalhe: leva ao ecrã de fazer a proposta, na página toda (palavras dela:
+ * «não apenas ali de lado» — ver `irFazerAProposta` no `AdminClient.tsx`). O
+ * painel — que é onde a barra de gravação vive, e é ela que estes casos medem
+ * — ficou a uma tecla, no «Abrir o pedido» desse ecrã.
+ */
+async function abrirOPainelDoPedido(page: Page) {
+  const porta = page.getByRole("button", { name: /^Abrir o pedido$/ });
+  await expect(
+    porta,
+    "O ecrã de fazer proposta perdeu a porta de volta ao pedido.",
+  ).toHaveCount(1);
+  await porta.click();
+}
+
 test.describe("D1 · a barra de gravação do pedido", () => {
   // A medida mais comum de portátil, e aquela em que isto foi medido.
   test.use({ viewport: { width: 1440, height: 900 } });
@@ -148,6 +166,7 @@ test.describe("D1 · a barra de gravação do pedido", () => {
 
     // Abrir o primeiro pedido da lista.
     await page.locator("table tbody tr").first().click();
+    await abrirOPainelDoPedido(page);
 
     // A barra só existe quando há alguma coisa por guardar — é essa a regra do
     // painel. Escrever no Local é a alteração mais barata que a acorda.
@@ -178,6 +197,7 @@ test.describe("D1 · a barra de gravação do pedido", () => {
     await garantirPedido(page);
     await irPara(page, /^Pedidos/);
     await page.locator("table tbody tr").first().click();
+    await abrirOPainelDoPedido(page);
     const local = page.locator('input[placeholder="Local do evento…"]');
     await expect(local).toBeVisible();
     await local.fill("Herdade da Medição II");
@@ -216,6 +236,7 @@ test.describe("D1 · e ninguém se põe por cima dela", () => {
     await garantirPedido(page);
     await irPara(page, /^Pedidos/);
     await page.locator("table tbody tr").first().click();
+    await abrirOPainelDoPedido(page);
     const local = page.locator('input[placeholder="Local do evento…"]');
     await expect(local).toBeVisible();
     await local.fill("Herdade da Medição III");
@@ -250,6 +271,7 @@ test.describe("D1 · e no telemóvel continua bem", () => {
       .getByRole("button", { name: "Pedidos", exact: true })
       .click();
     await page.locator("li button, article button").first().click();
+    await abrirOPainelDoPedido(page);
     const local = page.locator('input[placeholder="Local do evento…"]');
     await expect(local).toBeVisible();
     await local.fill("Herdade da Medição Móvel");

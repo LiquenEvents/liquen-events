@@ -35,6 +35,7 @@ import {
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
@@ -1267,8 +1268,14 @@ export default function Temas() {
         </Card>
       )}
 
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Três blocos, pela ordem de leitura: os controlos (0), o aviso dos
+          nomes por arrumar (1) e a grelha dos temas (2). A escada é a da casa
+          (`.bo-cena` no `globals.css`) — 600 ms, degraus de 20 ms, tecto ao
+          sexto, desligada em `prefers-reduced-motion`. */}
       <Toolbar
-        className="mb-6"
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena mb-6"
         start={
           searchable ? (
             /* ── O RESUMO DEIXA DE SER FILHO DO CAMPO ────────────────────
@@ -1387,7 +1394,7 @@ export default function Temas() {
                         setDensidade(valor);
                         guardarDensidade(valor);
                       }}
-                      className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                      className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
                         densidade === valor
                           ? "bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
                           : "text-foreground/40 hover:text-[var(--bo-text-muted)]"
@@ -1411,7 +1418,7 @@ export default function Temas() {
                 type="button"
                 aria-pressed={verArquivados}
                 onClick={() => setVerArquivados((v) => !v)}
-                className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
                   verArquivados
                     ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
                     : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-[var(--bo-text-muted)]"
@@ -1452,7 +1459,12 @@ export default function Temas() {
 
           Aparece só quando há alguma coisa a arrumar; com a biblioteca em ordem
           não se vê nada. */}
-      <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
+      {/* Segundo degrau numa caixa à volta: a `NomesPorArrumar` devolve `null`
+          quando não há nada a arrumar, e o `empty:hidden` faz esta caixa
+          desaparecer com ela em vez de ficar um degrau a animar o vazio. */}
+      <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena empty:hidden">
+        <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
+      </div>
 
       {adding && (
         <Card padding="sm" className="@container mb-6">
@@ -1500,6 +1512,8 @@ export default function Temas() {
       )}
 
       {loading ? (
+        // Os esqueletos da espera NÃO levam degrau: um esqueleto é a espera, e
+        // não a apresentação do que chegou.
         <div className={`grid ${COLUNAS[densidade]}`}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bo-skeleton aspect-[4/3] rounded-2xl" aria-hidden />
@@ -1537,7 +1551,13 @@ export default function Temas() {
           </p>
         </Card>
       ) : (
-        <div className={`grid ${COLUNAS[densidade]}`}>
+        /* Terceiro degrau na GRELHA e não em cada cartão: vinte e cinco temas a
+           entrar um a um seria a lentidão que o tecto do sexto degrau existe
+           para evitar. A grelha chega inteira. */
+        <div
+          style={{ "--cena": 2 } as React.CSSProperties}
+          className={`bo-cena grid ${COLUNAS[densidade]}`}
+        >
           {visible.map((t) => (
             /* As acções são IRMÃS do botão do cartão, não filhas: um botão
                dentro de outro botão é HTML inválido, e o resultado prático é
@@ -1590,7 +1610,7 @@ export default function Temas() {
                          `opacity-100` em toda a parte. Os outros escondem-se só
                          onde há rato, que é onde o `group-hover` os pode trazer
                          de volta. */
-                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm motion-safe:transition-opacity motion-safe:duration-micro ${
+                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm ${ESTADO} ${PRESSAO} ${
                         fixar && t.favorito
                           ? "text-[#8a6d2f]"
                           : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
@@ -1628,7 +1648,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className="block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left motion-safe:transition-colors hover:border-[#4d6350]/40"
+                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left hover:border-[#4d6350]/40 ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -3530,8 +3550,14 @@ function ThemeFolder({
             aria-valuenow={progress.done}
             className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
           >
+            {/* Era `duration-elemento`, que PEDE 250 ms e não gera regra
+                nenhuma: o espaço de nomes que o Tailwind v4 lê para os
+                utilitários `duration-*` é `--transition-duration-*`, e a casa
+                declarou `--duration-*` (ponto 3 de `ui/movimento.ts`). A barra
+                corria, na prática, nos 150 ms de omissão. O `PROGRESSO` escreve
+                os mesmos 250 ms num utilitário que compila mesmo. */}
             <div
-              className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+              className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
               style={{ transform: `scaleX(${pct / 100})` }}
             />
           </div>
@@ -3568,7 +3594,7 @@ function ThemeFolder({
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
-                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
                   style={{ transform: `scaleX(${thumbPct / 100})` }}
                 />
               </div>
@@ -3864,7 +3890,7 @@ function ThemeFolder({
         // dela não acompanha a da janela a partir de `lg`, onde a navegação
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
         // `GRELHA_DE_FOTOS`.
-        className={`@container rounded-2xl border border-dashed p-4 motion-safe:transition-colors ${
+        className={`@container rounded-2xl border border-dashed p-4 ${ESTADO} ${
           drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-[var(--bo-hairline-strong)]"
         }`}
       >
@@ -3963,7 +3989,7 @@ function ThemeFolder({
                     // nem descodifica esta célula. A altura não depende disso
                     // (é `aspect-square` numa coluna de largura fixa), por
                     // isso a barra de deslocamento não mexe. Ver globals.css.
-                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-[opacity,box-shadow] ${
+                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
                       isSelected
                         ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
                         : "border-[var(--bo-hairline-strong)]"
@@ -4011,7 +4037,7 @@ function ThemeFolder({
                     >
                       <span
                         aria-hidden
-                        className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] leading-none motion-safe:transition-opacity ${
+                        className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] leading-none ${ESTADO} ${
                           isSelected
                             ? "border-[#4d6350] bg-[#4d6350] text-white opacity-100"
                             : "border-white/70 bg-black/35 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
@@ -4056,7 +4082,7 @@ function ThemeFolder({
                         onClick={() => moveTo(i, 0)}
                         aria-label={`Mover a foto ${i + 1} para o início`}
                         title="Mover para o início"
-                        className="alvo-toque absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 motion-safe:transition-opacity com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100"
+                        className={`alvo-toque absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                       >
                         ↑
                       </button>
@@ -4072,7 +4098,7 @@ function ThemeFolder({
                       }}
                       aria-label={`Ver a foto ${i + 1} em grande`}
                       title="Ver em grande"
-                      className="alvo-toque absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-100 motion-safe:transition-opacity com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100"
+                      className={`alvo-toque absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                     >
                       ⤢
                     </button>
@@ -4082,7 +4108,7 @@ function ThemeFolder({
                       aria-label={`Remover foto ${i + 1} de ${images.length}`}
                       // Num ecrã tátil não há "passar o rato": aí o × está sempre
                       // visível, senão a foto não se conseguia remover de todo.
-                      className="alvo-toque absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 motion-safe:transition-opacity com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100"
+                      className={`alvo-toque absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                     >
                       ×
                     </button>

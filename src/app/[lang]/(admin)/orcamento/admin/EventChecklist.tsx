@@ -9,6 +9,7 @@ import { checklistTemplate } from "@/lib/checklist-templates";
 import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -397,8 +398,13 @@ export default function EventChecklist({ quote, onChange }: Props) {
             aria-valuemax={100}
             aria-label="Progresso da checklist"
           >
+            {/* 250 ms e não 500: uma barra a encher é «uma coisa a
+                mover-se», e o degrau da casa para isso é o `elemento`
+                (`PROGRESSO`, em `ui/movimento.ts`). Os 500 eram o dobro e não
+                vinham de nota escrita nenhuma; riscar um item da lista é um
+                gesto rápido, e a barra chegava sempre atrasada a ele. */}
             <div
-              className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-500"
+              className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
               style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
             />
           </div>
@@ -412,7 +418,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 type="button"
                 onClick={markAll}
                 disabled={doneCount === items.length}
-                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors"
+                className={`alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:pointer-events-none disabled:opacity-40 ${ESTADO} ${PRESSAO}`}
               >
                 Marcar todas
               </button>
@@ -420,7 +426,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 <button
                   type="button"
                   onClick={clearCompleted}
-                  className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] motion-safe:transition-colors"
+                  className={`alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
                 >
                   Limpar concluídas
                 </button>
@@ -430,7 +436,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
               <button
                 type="button"
                 onClick={addTemplateItems}
-                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] motion-safe:transition-colors"
+                className={`alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
               >
                 Adicionar itens do modelo ({missingFromTemplate.length})
               </button>
@@ -478,7 +484,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                   className="alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55"
                 >
                   <span
-                    className={`flex h-5 w-5 items-center justify-center rounded-md border motion-safe:transition-colors ${
+                    className={`flex h-5 w-5 items-center justify-center rounded-md border ${ESTADO} ${
                       i.done
                         ? "border-[#4d6350] bg-[#4d6350]"
                         : "border-foreground/30 hover:border-[#4d6350]/60"
@@ -547,7 +553,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(i.id)}
-                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
+                  className={`alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 com-rato:group-hover:opacity-100 ${ESTADO} ${PRESSAO}`}
                   aria-label={`Remover ${i.label}`}
                 >
                   <svg

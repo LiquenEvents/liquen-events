@@ -20,6 +20,11 @@
  */
 import type { Quote } from "@/lib/orcamento/types";
 import { deriveStage, type EventStage } from "@/lib/orcamento/dossier";
+/* Só `ESTADO`, e sem `PRESSAO`: a escada é um INDICADOR, não um comando —
+   nada aqui recebe um toque (os passos vivem dentro de um `<div>`, não de um
+   botão), e um `active:scale` num sítio onde não se carrega seria movimento
+   que ninguém provocou. Ver `ui/movimento.ts`. */
+import { ESTADO } from "./ui/movimento";
 
 type StageId = "pedido" | "proposta" | "contrato" | "pagamento" | "evento";
 type StageState = "feito" | "atual" | "por_fazer";
@@ -125,7 +130,7 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
               title={`${step.label} · ${STATE_HINT[state]}`}
             >
               <span
-                className={`flex items-center justify-center w-4 h-4 rounded-full border transition-colors text-white ${
+                className={`flex items-center justify-center w-4 h-4 rounded-full border ${ESTADO} text-white ${
                   state === "atual"
                     ? "bg-[#4d6350] border-[#4d6350] ring-4 ring-[#4d6350]/15"
                     : state === "feito"
@@ -140,7 +145,7 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
                 ) : null}
               </span>
               <span
-                className={`text-[9px] tracking-[0.08em] uppercase whitespace-nowrap transition-colors ${
+                className={`text-[9px] tracking-[0.08em] uppercase whitespace-nowrap ${ESTADO} ${
                   state === "atual"
                     ? "text-[var(--bo-text)] font-semibold"
                     : state === "feito"

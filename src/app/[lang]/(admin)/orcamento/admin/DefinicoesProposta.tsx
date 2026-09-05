@@ -406,7 +406,15 @@ export default function DefinicoesProposta() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card padding="md">
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Três blocos, pela ordem de leitura: a deslocação (0), a margem mínima
+          (1) e as ferramentas que olham para a base inteira (2). A escada é a
+          da casa (`.bo-cena` no `globals.css`) — 600 ms, degraus de 20 ms,
+          tecto ao sexto degrau, desligada em `prefers-reduced-motion`.
+
+          O primeiro degrau é o painel da deslocação porque é o que ela vem cá
+          confirmar: o preço do gasóleo muda todas as semanas. */}
+      <Card padding="md" style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-[var(--bo-text)]">Deslocação</h2>
           <span
@@ -576,7 +584,10 @@ export default function DefinicoesProposta() {
         </div>
       </Card>
 
-      <Card padding="md">
+      {/* Segundo degrau, e o degrau vai no CARTÃO: lá dentro há um número que
+          ela lê para decidir, e um número não chega separado da frase que o
+          explica. */}
+      <Card padding="md" style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-[var(--bo-text)]">Margem mínima</h2>
           <span className="text-[11px] text-foreground/45">{idade(p.definidoEm.margem)}</span>
@@ -605,26 +616,33 @@ export default function DefinicoesProposta() {
         </div>
       </Card>
 
-      {/*
-        MANUTENÇÃO DAS FOTOGRAFIAS.
+      {/* ── TERCEIRO E ÚLTIMO DEGRAU: AS FERRAMENTAS DA BASE INTEIRA ───────
+          As três entram juntas, numa caixa só, porque são o mesmo bloco — três
+          leituras sobre o conjunto, e não três assuntos. Dar um degrau a cada
+          uma seria partir o ecrã em pedaços só para haver escada. A caixa
+          repete o `flex flex-col gap-4` do pai para o espaçamento não mudar. */}
+      <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena flex flex-col gap-4">
+        {/*
+          MANUTENÇÃO DAS FOTOGRAFIAS.
 
-        Aqui e não nos Temas porque não é uma acção sobre UM tema: percorre a
-        biblioteca inteira e também as pastas das propostas. E vive dentro deste
-        componente, e não no `AdminClient`, para viajar no mesmo pedaço de
-        código que já é carregado só quando esta vista abre.
-      */}
-      <Miniaturas />
+          Aqui e não nos Temas porque não é uma acção sobre UM tema: percorre a
+          biblioteca inteira e também as pastas das propostas. E vive dentro deste
+          componente, e não no `AdminClient`, para viajar no mesmo pedaço de
+          código que já é carregado só quando esta vista abre.
+        */}
+        <Miniaturas />
 
-      {/*
-        A AUDITORIA DOS VALORES INCHADOS.
+        {/*
+          A AUDITORIA DOS VALORES INCHADOS.
 
-        Ao lado da manutenção das fotografias e pela mesma razão: é uma leitura
-        sobre a base inteira, não é uma acção sobre UMA proposta, e não tem
-        lugar nenhum dentro do estúdio — quem a corre está a olhar para o
-        conjunto, e não para um casamento.
-      */}
-      <ValoresSuspeitos />
-      <ValorEnviado />
+          Ao lado da manutenção das fotografias e pela mesma razão: é uma leitura
+          sobre a base inteira, não é uma acção sobre UMA proposta, e não tem
+          lugar nenhum dentro do estúdio — quem a corre está a olhar para o
+          conjunto, e não para um casamento.
+        */}
+        <ValoresSuspeitos />
+        <ValorEnviado />
+      </div>
     </div>
   );
 }

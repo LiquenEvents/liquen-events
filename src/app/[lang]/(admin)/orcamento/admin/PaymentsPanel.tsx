@@ -9,6 +9,7 @@ import { useToast } from "./Toast";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 import { splitSinal } from "@/lib/money";
 import { usePercentagemDoSinal } from "./percentagem-do-sinal";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { computeEventMetrics, paidTotal, type DossierData } from "@/lib/orcamento/dossier";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -574,7 +575,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
   const chip =
     "alvo-toque rounded-full border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-2.5 py-1 " +
     "text-[11px] tabular-nums text-[var(--bo-text-muted)] hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
-    "motion-safe:transition-colors";
+    `${ESTADO} ${PRESSAO}`;
   const ghostFailed = Boolean(failed?.ghost && !payments.some((p) => p.id === failed.id));
 
   return (
@@ -954,7 +955,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           return (
             <div
               key={p.id}
-              className={`group ${GRID} rounded-lg px-2 py-1.5 motion-safe:transition-colors ${
+              className={`group ${GRID} rounded-lg px-2 py-1.5 ${ESTADO} ${
                 isFailed
                   ? "border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06]"
                   : "border border-transparent hover:bg-[var(--bo-tinta-3)]"
@@ -1031,7 +1032,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 // Media 137,5 × 23,2 px no telemóvel. É o interruptor de
                 // "Pago/Pendente" — o gesto que muda o Recebido lá em cima — e
                 // fica encostado ao × de remover.
-                className={`rounded-md px-1.5 py-0.5 pointer-coarse:min-h-11 text-[9px] tracking-[0.1em] uppercase text-center motion-safe:transition-colors ${
+                className={`rounded-md px-1.5 py-0.5 pointer-coarse:min-h-11 text-[9px] tracking-[0.1em] uppercase text-center ${ESTADO} ${PRESSAO} ${
                   p.paid
                     ? "bg-[#4d6350]/15 text-[#4d6350] hover:bg-[#4d6350]/25"
                     : "bg-[var(--bo-tinta-6)] text-foreground/50 hover:bg-[var(--bo-tinta-10)]"
@@ -1067,7 +1068,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                       // apagar dinheiro do registo, e é o alvo mais pequeno da
                       // linha — aqui a centragem do `alvo-toque` é a certa,
                       // porque o conteúdo é um símbolo.
-                      className="alvo-toque text-foreground/45 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all p-1"
+                      className={`alvo-toque text-foreground/45 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 p-1 ${ESTADO} ${PRESSAO}`}
                       aria-label={`Remover ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
                     >
                       ×

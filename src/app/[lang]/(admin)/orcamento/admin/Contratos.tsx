@@ -20,6 +20,7 @@ import {
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -258,15 +259,27 @@ export default function Contratos() {
 
   return (
     <div>
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Quatro blocos, pela ordem por que se lêem: a linha que diz o que isto
+          é (0), os controlos de procura e exportação (1), o filtro de estado
+          (2) e o livro dos contratos (3). É a mesma escada do `Overview` e do
+          `Propostas` — 600 ms, degraus de 20 ms, e pára ao sexto (`globals.css`).
+
+          O esqueleto de carregamento acima NÃO leva degrau: um esqueleto é a
+          espera, não uma apresentação. */}
       {/* One calm line saying what this screen is for */}
-      <p className="mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+      <p
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]"
+      >
         Cada contrato é a prova de que o cliente aceitou a proposta. Aparecem aqui automaticamente,
         com a data e o nome de quem aceitou.
       </p>
 
       {/* Toolbar */}
       <Toolbar
-        className="mb-6"
+        style={{ "--cena": 1 } as React.CSSProperties}
+        className="bo-cena mb-6"
         start={
           <div className="relative w-full max-w-md sm:w-80">
             <svg
@@ -306,7 +319,12 @@ export default function Contratos() {
       />
 
       {/* Status filter */}
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      {/* O filtro chega a seguir aos controlos porque é a seguir que se lê —
+          e é UM degrau para a fila inteira, nunca um por pastilha. */}
+      <div
+        style={{ "--cena": 2 } as React.CSSProperties}
+        className="bo-cena mb-5 flex flex-wrap items-center gap-2"
+      >
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
           <Button
             size="sm"
@@ -340,7 +358,14 @@ export default function Contratos() {
       </div>
 
       {/* Ledger */}
-      <Card padding="none" className="overflow-hidden">
+      {/* O último degrau, e é o CONTENTOR do livro: as linhas de contrato são
+          uma coluna de datas e referências que alguém confere — chegam com a
+          tabela, todas ao mesmo tempo, e nunca uma a uma. */}
+      <Card
+        padding="none"
+        style={{ "--cena": 3 } as React.CSSProperties}
+        className="bo-cena overflow-hidden"
+      >
         {filtered.length === 0 ? (
           <EmptyState
             icon={
@@ -485,7 +510,7 @@ function PdfDoContrato({ id }: { id: string }) {
       href={`/api/contratos/${id}/pdf`}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+      className={`inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
       title="Descarregar contrato em PDF"
     >
       PDF

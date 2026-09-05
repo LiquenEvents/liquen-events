@@ -11,6 +11,7 @@ import { corDeTexto, metaFor } from "./status-meta";
 import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
 import { useEntradaAoChegar } from "./ui/useEntradaAoChegar";
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
@@ -567,7 +568,7 @@ const MetaReceita = memo(function MetaReceita({
             // que é o mesmo defeito de legibilidade noutro sítio. O título é
             // uma legenda e quebra bem; o rótulo do botão são duas palavras
             // que se lêem de uma vez.
-            className={`alvo-toque shrink-0 text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+            className={`alvo-toque shrink-0 text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
           >
             {goal > 0 ? "Editar meta" : "Definir meta"}
           </button>
@@ -595,13 +596,13 @@ const MetaReceita = memo(function MetaReceita({
             <button
               onClick={() => void saveGoal()}
               disabled={estado.tipo === "a-guardar"}
-              className="px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] transition-colors whitespace-nowrap disabled:opacity-50"
+              className={`px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] whitespace-nowrap disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
             >
               {estado.tipo === "a-guardar" ? "A guardar…" : "Guardar"}
             </button>
             <button
               onClick={() => setEditingGoal(false)}
-              className="text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-[var(--bo-text-muted)] transition-colors px-1"
+              className={`text-foreground/35 text-[10px] uppercase tracking-[0.1em] hover:text-[var(--bo-text-muted)] px-1 ${ESTADO} ${PRESSAO}`}
               aria-label="Fechar"
             >
               ×
@@ -640,8 +641,13 @@ const MetaReceita = memo(function MetaReceita({
             </span>
           </div>
           <div className="h-2.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
+            {/* 250 ms e não 700: o degrau `elemento` da casa (`PROGRESSO`, em
+                `ui/movimento.ts`) é o tempo de «uma coisa a mover-se». A 700 ms
+                a barra ainda estava a encher depois de já se ter lido a
+                percentagem escrita ao lado — o número dizia uma coisa e o
+                desenho outra. Os 700 não vinham de decisão nenhuma escrita. */}
             <div
-              className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+              className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
               style={{
                 transform: `scaleX(${fraccaoDaBarra(wonThisMonth, goal)})`,
                 background: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
@@ -788,7 +794,7 @@ const NotasEquipa = memo(function NotasEquipa({
         {!editingNotes && carga !== "erro" && (
           <button
             onClick={() => setEditingNotes(true)}
-            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
           >
             {teamNotes ? "Editar" : "Adicionar nota"}
           </button>
@@ -818,7 +824,7 @@ const NotasEquipa = memo(function NotasEquipa({
             />
             <button
               onClick={fechar}
-              className="text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 transition-opacity shrink-0"
+              className={`text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 shrink-0 ${ESTADO} ${PRESSAO}`}
             >
               Fechar
             </button>
@@ -1106,7 +1112,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
       }}
     >
       <summary
-        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 transition-colors motion-reduce:transition-none hover:bg-[var(--bo-tinta-3)] ${FOCUS_RING}`}
+        className={`alvo-toque -mx-1 flex items-start gap-3 rounded-lg px-1 py-3 ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-tinta-3)] ${FOCUS_RING}`}
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold text-[var(--bo-text)]">
@@ -1533,7 +1539,7 @@ export default function Overview({
                    de 44 px do dedo: media 37 px de altura, e é o único caminho
                    para sair de um ecrã que não tem mais nada. Só cresce com
                    dedo — com rato fica exactamente como está desenhado. */
-                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] transition-colors motion-reduce:transition-none mb-3 ${FOCUS_RING}`}
+                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] ${ESTADO} ${PRESSAO} mb-3 ${FOCUS_RING}`}
               >
                 <svg
                   width="13"
@@ -1552,7 +1558,7 @@ export default function Overview({
               onClick={onNew}
               /* `alvo-toque` pela mesma razão do botão acima — e para os dois
                  ficarem da mesma altura quando aparecem juntos. */
-              className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium transition-colors motion-reduce:transition-none ${
+              className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium ${ESTADO} ${PRESSAO} ${
                 tudoArquivado && onVerArquivados
                   ? "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
                   : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
@@ -1640,7 +1646,7 @@ export default function Overview({
             <button
               key={a.label}
               onClick={a.onClick}
-              className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
+              className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium ${ESTADO} ${PRESSAO} ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
                   : "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
@@ -1667,7 +1673,7 @@ export default function Overview({
         <button
           onClick={() => onOpen(data.nextEvent!)}
           style={{ "--cena": 1 } as React.CSSProperties}
-          className={`bo-cena w-full text-left rounded-2xl p-5 border transition-all motion-reduce:transition-none ${FOCUS_RING} ${
+          className={`bo-cena w-full text-left rounded-2xl p-5 border ${ESTADO} ${PRESSAO} ${FOCUS_RING} ${
             data.nextEventDays <= 3
               ? "bg-[#8a2a22]/[0.07] border-[#8a2a22]/25 hover:border-[#8a2a22]/40"
               : data.nextEventDays <= 7
@@ -1865,7 +1871,7 @@ export default function Overview({
                A partir de 640 tudo volta a `block`, e a ordem do DOM — número,
                rótulo, frase — é a que se vê. A ordem do DOM não muda em lado
                nenhum, portanto quem ouve a página ouve sempre o mesmo. */
-            className={`foco-largo flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            className={`foco-largo flex flex-wrap items-baseline gap-x-3 p-4 text-left ${ESTADO} ${PRESSAO} sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
             <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
@@ -1948,7 +1954,7 @@ export default function Overview({
               key={k.l}
               onClick={k.go}
               aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-              className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+              className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left ${ESTADO} ${PRESSAO} sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
             >
               <p
                 className="order-2 ml-auto font-light leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
@@ -1988,7 +1994,7 @@ export default function Overview({
               <h3 className="bo-eyebrow">Fases dos pedidos</h3>
               <button
                 onClick={() => onGo("kanban")}
-                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
               >
                 Abrir →
               </button>
@@ -2010,7 +2016,7 @@ export default function Overview({
                     </div>
                     <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                       <div
-                        className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+                        className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
                         style={{
                           transform: `scaleX(${fraccaoDaBarra(count, data.funnelMax)})`,
                           background: STATUS_META[f.id].color,
@@ -2040,7 +2046,7 @@ export default function Overview({
               <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
               <button
                 onClick={onGoStats}
-                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
               >
                 Ver tudo →
               </button>
@@ -2071,11 +2077,11 @@ export default function Overview({
               <>
                 <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
                   <div
-                    className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
+                    className={`absolute inset-0 origin-left bg-[#4d6350] ${PROGRESSO}`}
                     style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
                   />
                   <div
-                    className="absolute inset-0 origin-left bg-[#c0a060]/70 motion-safe:transition-transform motion-safe:duration-700"
+                    className={`absolute inset-0 origin-left bg-[#c0a060]/70 ${PROGRESSO}`}
                     style={{
                       transform: `translateX(${fraccaoDaBarra(data.received, data.billed) * 100}%) scaleX(${fraccaoDaBarra(data.outstanding, data.billed)})`,
                     }}
@@ -2142,7 +2148,7 @@ export default function Overview({
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`w-full text-left px-5 py-3.5 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`w-full text-left px-5 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO} flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
                   <div className="min-w-0">
                     <p className="text-[var(--bo-tinta-72)] text-sm truncate font-medium">
@@ -2188,7 +2194,7 @@ export default function Overview({
                 <button
                   key={q.id}
                   onClick={() => onOpen(q)}
-                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
+                  className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO} flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
                 >
                   <span className="text-[var(--bo-text-muted)] text-xs truncate font-medium">
                     {q.name}
@@ -2226,7 +2232,7 @@ export default function Overview({
                   </p>
                   <button
                     onClick={onNew}
-                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] ${ESTADO} ${PRESSAO} ${FOCUS_RING}`}
                   >
                     <svg
                       width="12"

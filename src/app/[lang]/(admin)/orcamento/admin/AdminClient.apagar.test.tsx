@@ -6,6 +6,18 @@ import AdminClient from "./AdminClient";
 import type { Quote } from "@/lib/orcamento/types";
 
 /**
+ * O ORÇAMENTO DE TEMPO DOS CASOS QUE PASSAM PELO ECRÃ DA PROPOSTA.
+ *
+ * A lista de Pedidos deixou de abrir o painel de detalhe: leva ao ecrã de fazer
+ * a proposta, na página toda (`irFazerAProposta`, no `AdminClient.tsx`). O
+ * painel ficou a uma tecla, no «Abrir o pedido» desse ecrã — e esse ecrã é
+ * preguiçoso (`./lazy`). Em jsdom o `import()` a resolver não cabe nos 5 s por
+ * omissão.
+ */
+vi.setConfig({ testTimeout: 20_000 });
+
+
+/**
  * ════════════════════════════════════════════════════════════════════════════
  * «TENS A CERTEZA?» NÃO É UMA PERGUNTA
  * ════════════════════════════════════════════════════════════════════════════
@@ -68,11 +80,23 @@ function servidor() {
   });
 }
 
-/** Abre o pedido e o menu de acções do detalhe («Mais»). */
-async function abrirMenuDoPedido(pedido: Quote = PEDIDO) {
+/**
+ * Abre o pedido e o menu de acções («Mais»).
+ *
+ * `noPainel` leva-o até ao menu do PAINEL DE DETALHE, que é outro sítio: a
+ * lista leva agora ao ecrã de fazer a proposta, e o painel abre-se de lá, no
+ * «Abrir o pedido».
+ */
+async function abrirMenuDoPedido(pedido: Quote = PEDIDO, noPainel = false) {
   render(<AdminClient initialQuotes={[pedido]} userName="Catarina" />);
   const alvos = await screen.findAllByText(pedido.name);
   await userEvent.click(alvos[0]);
+  if (noPainel) {
+    // O ecrã da proposta é preguiçoso; espera-se por ele antes de lhe tocar.
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Abrir o pedido$/ }, { timeout: 10_000 }),
+    );
+  }
   await waitFor(() => expect(screen.queryByText(/a abrir o pedido de/i)).toBeNull());
   // Há mais do que um «Mais» no ecrã (a lista tem o seu); o do painel de
   // detalhe é o último a ser desenhado.
@@ -93,7 +117,7 @@ afterEach(() => {
 
 describe("AdminClient — apagar um pedido", () => {
   it("a pergunta nomeia o pedido e enumera o que vai atrás dele", async () => {
-    await abrirMenuDoPedido();
+    await abrirMenuDoPedido(PEDIDO, true);
     const apagar = await screen.findByText(/^Apagar pedido$/i);
     await userEvent.click(apagar);
 

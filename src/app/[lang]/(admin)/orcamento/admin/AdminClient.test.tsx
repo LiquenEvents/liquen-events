@@ -26,6 +26,39 @@ vi.mock("./lazy", () => {
     return C;
   };
   return {
+    /**
+     * ── O ECRÃ DE FAZER PROPOSTA, EM DUPLO ────────────────────────────────
+     *
+     * A lista de Pedidos deixou de abrir o painel de detalhe: leva ao ecrã de
+     * fazer a proposta, na página toda (palavras dela: «não apenas ali de
+     * lado» — ver `irFazerAProposta` no `AdminClient.tsx`). O painel ficou a
+     * uma tecla, no «Abrir o pedido» desse ecrã.
+     *
+     * Estes casos medem o PAINEL, não esse ecrã — por isso ele entra aqui em
+     * duplo, com a única porta de que precisam. O ecrã a sério é medido no
+     * `FazerProposta.*.test.tsx` e no passeio `fazer-proposta-cliente.spec.ts`.
+     */
+    FazerProposta: ({
+      quotes,
+      selectedId,
+      onAbrirPedido,
+    }: {
+      quotes: Quote[];
+      selectedId: string | null;
+      onAbrirPedido: (q: Quote) => void;
+    }) => (
+      <div data-testid="view-fazer-proposta">
+        <button
+          type="button"
+          onClick={() => {
+            const q = quotes.find((x) => x.id === selectedId);
+            if (q) onAbrirPedido(q);
+          }}
+        >
+          Abrir o pedido
+        </button>
+      </div>
+    ),
     Overview: stub("overview"),
     Kanban: stub("kanban"),
     Clientes: stub("clientes"),
@@ -69,6 +102,19 @@ vi.mock("./lazy", () => {
 });
 
 // next/image renders a plain <img> in jsdom; strip framework-only props.
+/**
+ * ABRIR O PAINEL DO PEDIDO — pelo caminho que ela faz.
+ *
+ * Carregar num cliente na lista de Pedidos leva ao ecrã de fazer a proposta
+ * (ver `irFazerAProposta` no `AdminClient.tsx`); o painel — Produção,
+ * Financeiro, mensagens — abre-se daí, no «Abrir o pedido». O duplo desse ecrã
+ * está no `vi.mock("./lazy")` aqui em cima.
+ */
+function abrirOPainelDoPedido(nome: string) {
+  fireEvent.click(screen.getByText(nome));
+  fireEvent.click(screen.getByRole("button", { name: /^Abrir o pedido$/ }));
+}
+
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
     // eslint-disable-next-line @next/next/no-img-element
@@ -252,7 +298,7 @@ describe("AdminClient shell", () => {
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
 
     // The list row is a button labelled by the client's name.
-    fireEvent.click(screen.getByText("Carla Nunes"));
+    abrirOPainelDoPedido("Carla Nunes");
 
     // The detail drawer is now open: its close control exists and the id is
     // echoed a second time inside the panel header. Abre depois de o pedido
@@ -285,7 +331,7 @@ describe("AdminClient shell", () => {
   it("abre com a versão inteira do servidor, não com o resumo da lista", async () => {
     renderAdmin([makeQuote({ id: "LQ-777", name: "Sara Lopes" })]);
     navTo(/Pedidos/);
-    fireEvent.click(screen.getByText("Sara Lopes"));
+    abrirOPainelDoPedido("Sara Lopes");
     await screen.findByRole("button", { name: "Fechar" });
     expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/orcamento/LQ-777", expect.anything());
   });
@@ -300,9 +346,9 @@ describe("AdminClient shell", () => {
     const idas = () =>
       vi.mocked(fetch).mock.calls.filter(([url]) => String(url) === "/api/orcamento/LQ-777").length;
 
-    fireEvent.click(screen.getByText("Sara Lopes"));
+    abrirOPainelDoPedido("Sara Lopes");
     fireEvent.click(await screen.findByRole("button", { name: "Fechar" }));
-    fireEvent.click(screen.getByText("Sara Lopes"));
+    abrirOPainelDoPedido("Sara Lopes");
     await screen.findByRole("button", { name: "Fechar" });
     expect(idas()).toBe(1);
   });
@@ -316,7 +362,7 @@ describe("AdminClient shell", () => {
       json: () => Promise.resolve({ error: "Erro interno" }),
     } as never);
 
-    fireEvent.click(screen.getByText("Sara Lopes"));
+    abrirOPainelDoPedido("Sara Lopes");
     // A falha é DITA, e NOMEIA o pedido: «Não foi possível abrir o pedido» era
     // a mesma frase para quatro avarias com respostas diferentes, e nenhuma
     // delas dizia de que pedido se tratava.
@@ -352,7 +398,7 @@ describe("AdminClient shell", () => {
       json: () => Promise.resolve({ id: "LQ-777", status: "novo", eventType: "Casamento" }),
     } as never);
 
-    fireEvent.click(screen.getByText("Sara Lopes"));
+    abrirOPainelDoPedido("Sara Lopes");
 
     // E aqui a frase certa é OUTRA: isto não é uma falha de ligação, é a
     // sessão caída — e mandar «verificar a ligação» era mandar fazer a única
@@ -542,7 +588,7 @@ describe("os contactos do pedido", () => {
     const quote = makeQuote({ id: "LQ-900", name: "Rui Costa", email: "", phone: "", ...over });
     renderAdmin([quote]);
     navTo(/Pedidos/);
-    fireEvent.click(screen.getByText("Rui Costa"));
+    abrirOPainelDoPedido("Rui Costa");
     await screen.findByRole("button", { name: "Fechar" });
     return quote;
   };
@@ -596,7 +642,7 @@ describe("o painel do pedido e as «alterações por guardar»", () => {
     const quote = makeQuote({ id: "LQ-800", name: "Rita Nunes", ...over });
     renderAdmin([quote]);
     navTo(/Pedidos/);
-    fireEvent.click(screen.getByText("Rita Nunes"));
+    abrirOPainelDoPedido("Rita Nunes");
     await screen.findByRole("button", { name: "Fechar" });
   };
 
@@ -805,7 +851,7 @@ describe("o preço que volta do estúdio de propostas", () => {
   it("um total de zero enche o campo com 0, e não deixa o painel sujo", async () => {
     renderAdmin([makeQuote({ id: "LQ-700", name: "Inês Prado", quotedPrice: 5000 })]);
     navTo(/Pedidos/);
-    fireEvent.click(screen.getByText("Inês Prado"));
+    abrirOPainelDoPedido("Inês Prado");
     await screen.findByRole("button", { name: "Fechar" });
     expect(screen.queryByText(/Alterações por guardar/)).not.toBeInTheDocument();
 

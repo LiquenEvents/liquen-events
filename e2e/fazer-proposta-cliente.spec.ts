@@ -34,6 +34,22 @@ const IGNORED_CONSOLE = [
   /favicon/i,
   /Failed to load resource: the server responded with a status of 404/i,
   /net::ERR_(TUNNEL_CONNECTION_FAILED|CONNECTION_|NAME_NOT_RESOLVED|PROXY_)/i,
+  /**
+   * O SINO DAS NOTIFICAÇÕES, NUM AMBIENTE SEM PUSH.
+   *
+   * O `NotificationBell` sonda o servidor de tempos a tempos. Sem chaves VAPID
+   * — que é o caso no CI e em qualquer ambiente de teste — essa sondagem falha,
+   * e ele DIZ que falhou, que é o comportamento certo. As duas linhas são o
+   * mesmo acontecimento: a mensagem dele e o erro em cru por baixo.
+   *
+   * Passou a aparecer aqui porque este passeio ficou mais longo do que o do
+   * lado (lista → estúdio em página inteira → painel) e chega a viver o
+   * suficiente para apanhar uma sondagem. Não é defeito do produto nem desta
+   * mudança: é o ambiente a não ter push, como os 404 e os erros de rede que
+   * já estão nesta lista.
+   */
+  /push: não consegui perguntar ao servidor pelas notificações/i,
+  /TypeError: Failed to fetch/i,
 ];
 
 function isIgnored(text: string): boolean {
@@ -86,6 +102,68 @@ test.describe("Back office — fazer proposta", () => {
     // E dá para trocar de cliente sem sair do ecrã.
     await page.getByRole("button", { name: /Trocar de cliente/ }).click();
     await expect(page.getByText(/Passo 1 de 2/)).toBeVisible();
+
+    expect(errors, `Erros inesperados:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  /**
+   * ── E A OUTRA PORTA: A LISTA DE PEDIDOS ───────────────────────────────────
+   *
+   * Palavras dela: «quando se carrega na página dos pedidos e depois num
+   * cliente vai para a parte de fazer a proposta, mas eu quero que […] coloque
+   * apenas a página para fazer a proposta do cliente em que se carregou na
+   * página toda e não apenas ali de lado».
+   *
+   * Antes, carregar num cliente abria o painel de detalhe — o estúdio ao lado
+   * da lista, com 712 px de fila. Agora leva ao mesmo ecrã do passeio de cima,
+   * com o cliente já escolhido.
+   *
+   * O que este passeio prende: que o estúdio abre, que abre PARA AQUELE
+   * cliente, e que o painel de detalhe NÃO se abriu.
+   */
+  test("carregar num cliente na lista de Pedidos abre o estúdio em página inteira", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const errors = collectErrors(page);
+    exigirLogin(await entrarNoBackOffice(page));
+    await garantirPedido(page);
+
+    // O `?v=` é uma porta de entrada documentada (favorito, link, separador
+    // novo) — e evita depender do rótulo do botão da barra, que traz a
+    // contagem colada («Pedidos, 55 por responder»).
+    await page.goto("/orcamento/admin?v=pedidos", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // A primeira linha da lista, e o nome que lá está escrito — é esse que tem
+    // de aparecer no cabeçalho do ecrã seguinte.
+    const linha = page.getByRole("row").filter({ hasText: /@/ }).first();
+    await expect(linha).toBeVisible({ timeout: 20_000 });
+    // A primeira célula é a caixa de selecção — o nome está na primeira célula
+    // COM texto.
+    const celulas = await linha.locator("td").allInnerTexts();
+    const nome = celulas
+      .flatMap((c) => c.split("\n"))
+      .map((t) => t.trim())
+      .filter(Boolean)[0];
+    expect(nome, "a linha da lista tem um nome escrito").toBeTruthy();
+    await linha.click();
+
+    // O ecrã inteiro de fazer proposta, para AQUELE cliente.
+    await expect(page.getByText(/Proposta para/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(nome, { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Pré-visualizar/ }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // E o painel de detalhe NÃO se abriu: os separadores dele não existem.
+    await expect(page.locator("#detail-tab-comunicacao")).toHaveCount(0);
+
+    // A volta ao pedido continua a uma tecla.
+    await page.getByRole("button", { name: /^Abrir o pedido$/ }).click();
+    await expect(page.locator("#detail-tab-comunicacao")).toBeVisible({ timeout: 30_000 });
 
     expect(errors, `Erros inesperados:\n${errors.join("\n")}`).toEqual([]);
   });

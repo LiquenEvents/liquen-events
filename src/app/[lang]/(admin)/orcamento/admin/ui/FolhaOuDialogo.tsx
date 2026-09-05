@@ -224,7 +224,10 @@ export function FolhaOuDialogo({
         if (e.target === e.currentTarget) pedirFecho();
       }}
     >
-      <div className="absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]" aria-hidden />
+      <div
+        className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]"
+        aria-hidden
+      />
 
       <div
         ref={caixaRef}

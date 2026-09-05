@@ -659,7 +659,17 @@ function Catalogo() {
 
   return (
     <>
-      <Toolbar>
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Dois blocos, que são os dois que esta vista tem: os controlos (0) e o
+          catálogo (1). A escada é a da casa (`.bo-cena` no `globals.css`) — 600
+          ms, degraus de 20 ms, tecto ao sexto degrau, desligada em
+          `prefers-reduced-motion`.
+
+          Não há um terceiro: os painéis do meio (o ensaio da importação, a
+          gravação em curso, o formulário de adicionar) aparecem por um gesto
+          dela e não à chegada da vista, e partir o ecrã em pedaços só para
+          haver mais degraus é o que faz uma vista ficar agitada. */}
+      <Toolbar style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena">
         <input
           className="bo-input max-w-xs"
           value={search}
@@ -826,65 +836,76 @@ function Catalogo() {
           aoTentarDeNovo={refresh}
         />
       ) : loading && items.length === 0 ? (
+        // A espera NÃO leva degrau: um ecrã a dizer «A carregar…» é a espera,
+        // não uma apresentação.
         <p className="bo-text-muted mt-6 text-sm">A carregar…</p>
-      ) : visiveis.length === 0 ? (
-        <EmptyState
-          title={items.length === 0 ? "Catálogo vazio" : "Nada com estes filtros"}
-          description={
-            items.length === 0
-              ? "Adiciona o material à mão, ou importa o inventário de uma vez a partir de um CSV."
-              : "Experimenta outra categoria, outro tipo, ou limpa a pesquisa."
-          }
-        />
       ) : (
-        <ul className="mt-4 divide-y divide-[var(--bo-hairline)]">
-          {visiveis.map((i) =>
-            editingId === i.id ? (
-              <li key={i.id} className="py-4">
-                {campos(editForm, setEditForm)}
-                <div className="mt-3 flex items-center gap-2">
-                  <Button size="sm" onClick={() => saveEdit(i.id)} disabled={saving}>
-                    Guardar
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                    Cancelar
-                  </Button>
-                </div>
-              </li>
-            ) : (
-              <li key={i.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-                <span className="font-medium">{i.name}</span>
-                <KindChip kind={i.kind} />
-                <span className="bo-text-muted text-xs">{i.category}</span>
-                <span className="text-sm">
-                  {i.stock}
-                  {i.unit ? ` ${i.unit}` : ""}
-                </span>
-                {abaixoDoMinimo(i) && (
-                  <span className="rounded-md bg-[#f6e6df] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[#8a2a22] uppercase">
-                    Repor (mín. {i.minStock})
-                  </span>
-                )}
-                {i.notes && <span className="bo-text-muted text-xs">{i.notes}</span>}
-                <span className="ml-auto flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditingId(i.id);
-                      setEditForm(fromItem(i));
-                    }}
-                  >
-                    Editar
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => perguntarSeRemove(i)}>
-                    Remover
-                  </Button>
-                </span>
-              </li>
-            ),
+        /* Segundo degrau, e vai no CONTENTOR do catálogo — o que está aqui
+           dentro é uma coluna de quantidades e mínimos que ela confere com o
+           dedo, e uma coluna a chegar linha a linha é uma coluna que não se
+           confere. Envolve o catálogo E o estado vazio porque são o mesmo
+           bloco visto de duas maneiras. */
+        <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena">
+          {visiveis.length === 0 ? (
+            <EmptyState
+              title={items.length === 0 ? "Catálogo vazio" : "Nada com estes filtros"}
+              description={
+                items.length === 0
+                  ? "Adiciona o material à mão, ou importa o inventário de uma vez a partir de um CSV."
+                  : "Experimenta outra categoria, outro tipo, ou limpa a pesquisa."
+              }
+            />
+          ) : (
+            <ul className="mt-4 divide-y divide-[var(--bo-hairline)]">
+              {visiveis.map((i) =>
+                editingId === i.id ? (
+                  <li key={i.id} className="py-4">
+                    {campos(editForm, setEditForm)}
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button size="sm" onClick={() => saveEdit(i.id)} disabled={saving}>
+                        Guardar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </li>
+                ) : (
+                  <li key={i.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                    <span className="font-medium">{i.name}</span>
+                    <KindChip kind={i.kind} />
+                    <span className="bo-text-muted text-xs">{i.category}</span>
+                    <span className="text-sm">
+                      {i.stock}
+                      {i.unit ? ` ${i.unit}` : ""}
+                    </span>
+                    {abaixoDoMinimo(i) && (
+                      <span className="rounded-md bg-[#f6e6df] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[#8a2a22] uppercase">
+                        Repor (mín. {i.minStock})
+                      </span>
+                    )}
+                    {i.notes && <span className="bo-text-muted text-xs">{i.notes}</span>}
+                    <span className="ml-auto flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingId(i.id);
+                          setEditForm(fromItem(i));
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => perguntarSeRemove(i)}>
+                        Remover
+                      </Button>
+                    </span>
+                  </li>
+                ),
+              )}
+            </ul>
           )}
-        </ul>
+        </div>
       )}
 
       {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────

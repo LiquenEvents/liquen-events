@@ -6,6 +6,35 @@ import AdminClient from "./AdminClient";
 import type { Quote } from "@/lib/orcamento/types";
 
 /**
+ * O ORÇAMENTO DE TEMPO DOS CASOS QUE PASSAM PELO ECRÃ DA PROPOSTA.
+ *
+ * A lista de Pedidos deixou de abrir o painel de detalhe: leva ao ecrã de fazer
+ * a proposta, na página toda (`irFazerAProposta`, no `AdminClient.tsx`). O
+ * painel ficou a uma tecla, no «Abrir o pedido» desse ecrã — e esse ecrã é
+ * preguiçoso (`./lazy`). Em jsdom o `import()` a resolver não cabe nos 5 s por
+ * omissão.
+ */
+vi.setConfig({ testTimeout: 20_000 });
+
+/**
+ * O ESTÚDIO FICA DE FORA.
+ *
+ * O caminho até ao painel passa agora pelo ecrã de fazer a proposta, e esse
+ * ecrã monta o estúdio — que lê o rascunho da proposta em
+ * `/api/orcamento/<id>/proposta-rascunho`. Neste ficheiro o servidor é falso e
+ * responde às avarias por `id`, portanto essa leitura apanha a MESMA avaria que
+ * o caso está a montar, e o que se mede deixa de ser o que se queria medir.
+ *
+ * O que estes casos medem é como o PAINEL diz que não conseguiu abrir. O
+ * estúdio não entra nisso.
+ */
+vi.mock("./lazy", async (original) => ({
+  ...(await original<typeof import("./lazy")>()),
+  ProposalStudio: () => null,
+}));
+
+
+/**
  * ════════════════════════════════════════════════════════════════════════════
  * ABRIR UM PEDIDO ERA MUDO — SEIS VEZES
  * ════════════════════════════════════════════════════════════════════════════
@@ -66,6 +95,25 @@ async function abrir() {
   // interessa é tocar num deles.
   const alvos = await screen.findAllByText("Ana Marques");
   await userEvent.click(alvos[0]);
+  /**
+   * ── A LISTA JÁ NÃO ESPERA; QUEM ESPERA É O PAINEL ────────────────────────
+   *
+   * Carregar num cliente na lista leva ao ecrã de fazer a proposta e não espera
+   * por nada: o estúdio trabalha sobre o pedido que já está na lista, e a
+   * versão completa entra por trás (`irFazerAProposta`). A espera COM NOME — e
+   * as quatro avarias que este ficheiro distingue — passaram a ser as do
+   * PAINEL, atrás do «Abrir o pedido».
+   *
+   * O clique de cima pode cair em qualquer uma das portas: o nome do cliente
+   * aparece na lista E nos «vistos recentemente», e essa segunda abre o painel
+   * directamente. Por isso a passagem pelo ecrã da proposta é CONDICIONAL —
+   * dá-se o passo só quando ele existe. O que este ajudante promete é uma
+   * coisa só: no fim, é o painel que está aberto.
+   */
+  const pelaProposta = await screen
+    .findByRole("button", { name: /^Abrir o pedido$/ }, { timeout: 3_000 })
+    .catch(() => null);
+  if (pelaProposta) await userEvent.click(pelaProposta);
 }
 
 beforeEach(() => {

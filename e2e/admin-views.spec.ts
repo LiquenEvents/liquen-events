@@ -83,6 +83,74 @@ const SECONDARY_VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
 ];
 
+test.describe("Back office — a marca do destino activo", () => {
+  /**
+   * ── O FILETE ANDA, E É PRECISO UM BROWSER PARA O VER ──────────────────────
+   *
+   * Palavras dela: «quero animações em tudo o que seja para ir de uma coisa à
+   * outra, quando se carrega numa coisa e vai-se para outra coisa».
+   *
+   * Trocar de destino na barra lateral era o gesto mais repetido do dia e o
+   * menos visível: o fundo acendia num item e apagava-se noutro, ao mesmo
+   * tempo. Passou a haver um filete que DESLIZA de um destino para o outro —
+   * o mesmo gesto que o `Segmented` já fazia, numa barra vertical.
+   *
+   * ── PORQUE É QUE ISTO É UM PASSEIO E NÃO UM TESTE DE UNIDADE ──────────────
+   *
+   * O filete mede-se: pergunta ao destino activo onde ele está
+   * (`offsetTop`/`offsetHeight`) e desliza para lá. Em jsdom não há disposição
+   * nenhuma — `offsetParent` é sempre nulo e as medidas são zero —, portanto um
+   * teste de unidade não conseguia distinguir «não há filete» de «há filete e
+   * está no sítio». Escrevi um, vi-o a falhar por essa razão, e mudei-o para
+   * aqui. Um browser tem disposição; é o instrumento certo.
+   */
+  test("o filete muda de sítio ao trocar de destino, e é sempre o mesmo", async ({ page }) => {
+    const loggedIn = await login(page);
+    test.skip(
+      !loggedIn,
+      "Admin login unavailable here (production build without ADMIN_PASSWORD_HASH); CI sets a test hash.",
+    );
+
+    const coluna = page.getByRole("navigation", { name: /Navegação do back office/i });
+    const filete = coluna.locator('> span[aria-hidden="true"]');
+
+    await expect(filete, "a barra lateral perdeu a marca do destino activo").toHaveCount(1);
+    const antes = await filete.evaluate((el) => el.getBoundingClientRect().top);
+
+    await coluna.getByRole("button", { name: /^Pedidos/ }).first().click();
+    await expect(page.getByRole("heading", { level: 1, name: /^Pedidos$/ })).toBeVisible();
+
+    // Mudou de sítio…
+    await expect
+      .poll(() => filete.evaluate((el) => el.getBoundingClientRect().top))
+      .not.toBe(antes);
+
+    // …e é UM só. Um filete dentro de cada destino dava o mesmo desenho parado
+    // e nenhum percurso — é a maneira mais fácil de partir isto sem se notar.
+    await expect(filete).toHaveCount(1);
+
+    // E ASSENTA à altura do destino marcado como página actual.
+    //
+    // `poll` e não uma leitura só: o filete leva 250 ms a percorrer o caminho,
+    // e a primeira versão deste passo media-o A MEIO — dava 4,17 px de
+    // diferença e lia-se como desalinhamento quando era, afinal, a animação a
+    // funcionar. O que interessa é onde ele PÁRA.
+    const activo = coluna.locator('[aria-current="page"]');
+    await expect
+      .poll(
+        async () => {
+          const [topoFilete, topoActivo] = await Promise.all([
+            filete.evaluate((el) => el.getBoundingClientRect().top),
+            activo.first().evaluate((el) => el.getBoundingClientRect().top),
+          ]);
+          return Math.abs(topoFilete - topoActivo);
+        },
+        { message: "o filete parou fora do destino activo" },
+      )
+      .toBeLessThanOrEqual(2);
+  });
+});
+
 test.describe("Back office — secondary views", () => {
   test("walks the 'Mais' destinations and help without runtime errors", async ({ page }) => {
     const errors = collectErrors(page);
