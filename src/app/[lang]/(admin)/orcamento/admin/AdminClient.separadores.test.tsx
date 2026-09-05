@@ -278,4 +278,42 @@ describe("trocar de separador não perde o que se estava a escrever", () => {
       "Olá, sobre o vosso casamento...",
     );
   });
+  /**
+   * ── O SEPARADOR QUE CHEGA APRESENTA-SE ────────────────────────────────────
+   *
+   * Palavras dela: «quero animações em tudo o que seja para ir de uma coisa à
+   * outra». Trocar de separador dentro do painel do pedido era um corte seco: o
+   * painel que sai desaparece e o que entra aparece no mesmo fotograma.
+   *
+   * O que se prende aqui é o MECANISMO, e é a parte que se pode partir sem
+   * ninguém dar por isso: a classe entra e sai COM o separador, em vez de vir
+   * de um `key`. Um `key` remontava as ferramentas todas a cada troca — e o
+   * caso aqui em cima («um rascunho de mensagem sobrevive a ir a Produção e
+   * voltar») passaria a falhar, mas só esse: o ecrã continuava a animar.
+   */
+  it("só o separador à vista traz a entrada, e ela volta quando ele volta", async () => {
+    montar(makeQuote());
+    await abrirPedido();
+
+    const painel = (id: string) => document.getElementById(`detail-panel-${id}`) as HTMLElement;
+
+    // Controlo positivo: o pedido novo abre em «Fazer proposta».
+    expect(painel("comunicacao").hidden).toBe(false);
+    expect(painel("comunicacao").className).toContain("view-in");
+    expect(painel("producao").className).not.toContain("view-in");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Produção/ }));
+    });
+
+    // A classe mudou de painel — e o que saiu ficou SEM ela, que é o que faz a
+    // animação recomeçar quando ele voltar.
+    expect(painel("producao").className).toContain("view-in");
+    expect(painel("comunicacao").className).not.toContain("view-in");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Fazer proposta/ }));
+    });
+    expect(painel("comunicacao").className).toContain("view-in");
+  });
 });

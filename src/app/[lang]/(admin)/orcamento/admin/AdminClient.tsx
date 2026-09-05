@@ -6526,13 +6526,29 @@ export default function AdminClient({
                               escondido (`hidden`), para nunca se perder trabalho a
                               meio (mensagem por enviar, proposta em edição) ao trocar
                               de separador. */}
+                            {/* ── O SEPARADOR QUE CHEGA APRESENTA-SE ──────
+                                Os três painéis trocavam com `hidden`: o que
+                                sai desaparece e o que entra aparece no mesmo
+                                fotograma. É a `.view-in` da casa — 240 ms,
+                                oito píxeis —, que é a classe escrita para
+                                «o cromado não sai do sítio, muda o conteúdo
+                                dentro dele».
+
+                                A classe entra e sai com o separador, e não vem
+                                de um `key`: um `key` remontaria as ferramentas
+                                todas a cada troca, e elas ficam montadas de
+                                propósito (ver `detailTabsVisitados`) para o
+                                rascunho de uma mensagem sobreviver a uma ida à
+                                Produção e volta. */}
                             <div
                               role="tabpanel"
                               id="detail-panel-producao"
                               aria-labelledby="detail-tab-producao"
                               tabIndex={0}
                               hidden={detailTab !== "producao"}
-                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
+                              className={`flex flex-col gap-4 focus:outline-none sm:gap-6 ${
+                                detailTab === "producao" ? "view-in" : ""
+                              }`}
                             >
                               {detailTabsVisitados.has("producao") && (
                                 <>
@@ -6657,7 +6673,9 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-financeiro"
                               tabIndex={0}
                               hidden={detailTab !== "financeiro"}
-                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
+                              className={`flex flex-col gap-4 focus:outline-none sm:gap-6 ${
+                                detailTab === "financeiro" ? "view-in" : ""
+                              }`}
                             >
                               {detailTabsVisitados.has("financeiro") && (
                                 <>
@@ -6714,7 +6732,9 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-comunicacao"
                               tabIndex={0}
                               hidden={detailTab !== "comunicacao"}
-                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
+                              className={`flex flex-col gap-4 focus:outline-none sm:gap-6 ${
+                                detailTab === "comunicacao" ? "view-in" : ""
+                              }`}
                             >
                               {detailTabsVisitados.has("comunicacao") && (
                                 <>
