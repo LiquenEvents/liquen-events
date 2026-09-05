@@ -80,3 +80,48 @@ describe("o passo que chega apresenta-se", () => {
     );
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E O FIM DA JORNADA DESENHA-SE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Depois de uma barra a encher durante dezenas de segundos numa quinta com 4G,
+ * a proposta dava-se por enviada num fotograma: um `✓` de texto aparecia, e
+ * mais nada. É o único momento do estúdio que pertence à banda de apresentação
+ * (600–1500 ms) — e era o único sem nada.
+ *
+ * O gesto não é novo: é o mesmo que o CASAL vê ao pedir orçamento. Passar a
+ * usá-lo dos dois lados é uma decisão sobre a casa, não sobre esta tela — e é
+ * isso que este bloco prende, para ninguém os deixar divergir.
+ */
+describe("o fim da jornada desenha-se", () => {
+  it("a confirmação do envio usa o mesmo visto que o casal vê", () => {
+    // No estúdio.
+    expect(FONTE).toMatch(/className="confirm-ring"/);
+    expect(FONTE).toMatch(/className="confirm-check"/);
+    // Controlo positivo: e o ecrã do casal continua a usar o mesmo — se ele
+    // mudar de gesto, este caso avisa antes de os dois divergirem.
+    const doCasal = readFileSync(
+      "src/app/[lang]/(site)/orcamento/confirmacao/[id]/ConfirmacaoClient.tsx",
+      "utf8",
+    );
+    expect(doCasal).toMatch(/className="confirm-ring"/);
+    expect(doCasal).toMatch(/className="confirm-check"/);
+  });
+
+  it("o cartão da confirmação entra na banda de apresentação", () => {
+    // `bo-cena` (600 ms) e não `view-in` (240): isto é uma apresentação, não
+    // uma troca de estado.
+    expect(FONTE).toMatch(/<div className="bo-cena flex flex-col items-start gap-3 rounded-2xl/);
+  });
+
+  it("o visto desenha-se em traço, e fica desenhado com movimento reduzido", () => {
+    expect(CSS).toMatch(/\.confirm-ring\s*\{[^}]*animation:\s*confirm-draw\s+0\.7s/);
+    expect(CSS).toMatch(/\.confirm-check\s*\{[^}]*animation:\s*confirm-draw\s+0\.45s/);
+    // Com movimento reduzido não desaparece: aparece JÁ desenhado.
+    expect(CSS).toMatch(
+      /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.confirm-ring,\s*\.confirm-check\s*\{\s*animation:\s*none;\s*stroke-dashoffset:\s*0/,
+    );
+  });
+});

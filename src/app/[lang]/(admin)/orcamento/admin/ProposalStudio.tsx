@@ -10339,9 +10339,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       <div className={step === "enviar" ? "view-in" : undefined} hidden={step !== "enviar"}>
         <Section title="Enviar ao cliente">
           {sent ? (
-            <div className="flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
+            /* ── O FIM DA JORNADA MERECE SER VISTO ────────────────────────
+               Depois de uma barra a encher durante dezenas de segundos numa
+               quinta com 4G, a proposta dava-se por enviada num fotograma: um
+               `✓` de texto aparecia, e mais nada.
+
+               É o único momento do estúdio que pertence à banda de
+               apresentação (600–1500 ms), e é o único que não tinha nada. O
+               gesto já existe nesta casa e está a ser usado no ecrã que o
+               CASAL vê ao pedir orçamento (`ConfirmacaoClient.tsx`): o anel
+               desenha-se em 0,7 s e o traço do visto vem a seguir, em
+               `stroke-dashoffset` puro, sem JavaScript e com
+               `prefers-reduced-motion` já tratado no `globals.css`.
+
+               Passa a ser o mesmo dos dois lados — ela vê o que o casal vê. */
+            <div className="bo-cena flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
               <p className="flex items-center gap-2 font-display text-base text-[#4d6350]">
-                <span aria-hidden="true">✓</span> Proposta enviada
+                <svg viewBox="0 0 52 52" className="h-5 w-5 shrink-0" fill="none" aria-hidden="true">
+                  <circle
+                    className="confirm-ring"
+                    cx="26"
+                    cy="26"
+                    r="24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeOpacity="0.4"
+                  />
+                  <path
+                    className="confirm-check"
+                    d="M15 27l7.5 7.5L38 18"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>{" "}
+                Proposta enviada
               </p>
               <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
                 A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisas de
