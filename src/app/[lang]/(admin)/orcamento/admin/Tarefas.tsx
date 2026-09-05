@@ -752,10 +752,18 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
 
   return (
     <div className="max-w-4xl">
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Três blocos, pela ordem de leitura: escrever uma tarefa (0), escolher
+          de quem são as tarefas (1) e as listas (2). A escada é a da casa
+          (`.bo-cena` no `globals.css`): 600 ms, degraus de 20 ms, tecto ao
+          sexto, desligada em `prefers-reduced-motion`.
+
+          O `SkeletonList` da espera não leva degrau — um esqueleto é a espera,
+          não uma apresentação. */}
       {/* Add task — a single, obvious primary action; the optional detail fields
           (responsável, área, prioridade, prazo) collapse behind a disclosure so
           the daily "add a to-do" flow stays a title + one button. */}
-      <Card className="mb-6">
+      <Card style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena mb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Field
             containerClassName="flex-1"
@@ -863,8 +871,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       </Card>
 
       {/* Filter by person */}
+      {/* Segundo degrau, e um só para a fila toda: são as pessoas da equipa,
+          não uma lista de dados — quinze botões a chegar um a um seria o
+          tremor que o tecto do sexto degrau existe para evitar. */}
       {people.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className="bo-cena flex flex-wrap gap-2 mb-5"
+        >
           {defaultAssignee && people.includes(defaultAssignee) && (
             <Button
               size="sm"
@@ -911,7 +925,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       {loading ? (
         <SkeletonList rows={5} />
       ) : (
-        <>
+        /* Terceiro degrau no CONTENTOR das listas, e não em cada linha: uma
+           lista de cinquenta tarefas a entrar linha a linha lê-se como
+           lentidão. O degrau está aqui dentro, no ramo já carregado, para o
+           esqueleto de cima ficar de fora. */
+        <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
           <Card padding="none" className="overflow-hidden">
             <div className="px-5 sm:px-6 py-3.5 border-b border-[var(--bo-hairline)] flex items-center justify-between">
               <p className="bo-eyebrow">A fazer ({open.length})</p>
@@ -966,7 +984,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               )}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────

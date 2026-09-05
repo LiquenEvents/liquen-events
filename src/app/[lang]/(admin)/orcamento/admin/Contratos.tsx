@@ -259,15 +259,27 @@ export default function Contratos() {
 
   return (
     <div>
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Quatro blocos, pela ordem por que se lêem: a linha que diz o que isto
+          é (0), os controlos de procura e exportação (1), o filtro de estado
+          (2) e o livro dos contratos (3). É a mesma escada do `Overview` e do
+          `Propostas` — 600 ms, degraus de 20 ms, e pára ao sexto (`globals.css`).
+
+          O esqueleto de carregamento acima NÃO leva degrau: um esqueleto é a
+          espera, não uma apresentação. */}
       {/* One calm line saying what this screen is for */}
-      <p className="mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]">
+      <p
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]"
+      >
         Cada contrato é a prova de que o cliente aceitou a proposta. Aparecem aqui automaticamente,
         com a data e o nome de quem aceitou.
       </p>
 
       {/* Toolbar */}
       <Toolbar
-        className="mb-6"
+        style={{ "--cena": 1 } as React.CSSProperties}
+        className="bo-cena mb-6"
         start={
           <div className="relative w-full max-w-md sm:w-80">
             <svg
@@ -307,7 +319,12 @@ export default function Contratos() {
       />
 
       {/* Status filter */}
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      {/* O filtro chega a seguir aos controlos porque é a seguir que se lê —
+          e é UM degrau para a fila inteira, nunca um por pastilha. */}
+      <div
+        style={{ "--cena": 2 } as React.CSSProperties}
+        className="bo-cena mb-5 flex flex-wrap items-center gap-2"
+      >
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
           <Button
             size="sm"
@@ -341,7 +358,14 @@ export default function Contratos() {
       </div>
 
       {/* Ledger */}
-      <Card padding="none" className="overflow-hidden">
+      {/* O último degrau, e é o CONTENTOR do livro: as linhas de contrato são
+          uma coluna de datas e referências que alguém confere — chegam com a
+          tabela, todas ao mesmo tempo, e nunca uma a uma. */}
+      <Card
+        padding="none"
+        style={{ "--cena": 3 } as React.CSSProperties}
+        className="bo-cena overflow-hidden"
+      >
         {filtered.length === 0 ? (
           <EmptyState
             icon={

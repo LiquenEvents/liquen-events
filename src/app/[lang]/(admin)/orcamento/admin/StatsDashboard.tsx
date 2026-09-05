@@ -593,8 +593,17 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Três blocos, pela ordem de leitura: os controlos do período e das
+          exportações (0), os oito números do topo (1) e tudo o que se lê
+          depois deles (2). A escada é a da casa (`.bo-cena` no `globals.css`)
+          — 600 ms, degraus de 20 ms, tecto ao sexto degrau, desligada em
+          `prefers-reduced-motion`. */}
       {/* Toolbar: period filter (primary control) + quiet export actions */}
-      <div className="flex flex-wrap items-center gap-3 justify-between">
+      <div
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena flex flex-wrap items-center gap-3 justify-between"
+      >
         <Segmented
           ariaLabel="Período"
           size="sm"
@@ -649,7 +658,15 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           4×149 + 36 = 632 px de contentor. 40rem são 640, que é de propósito o
           mesmo número do `sm` da casa: um sistema de cortes, medido no sítio
           certo. */}
-      <div className="@container flex flex-col gap-6">
+      {/* ── UM DEGRAU PARA OS OITO NÚMEROS, NUNCA UM POR NÚMERO ────────────
+          Está escrito nesta casa (`Documento.test.tsx`): «uma coluna a chegar
+          linha a linha é uma coluna que não se confere». Estes oito quadrados
+          são dinheiro — recebido, a receber, ganho — e chegam todos ao mesmo
+          tempo, no CONTENTOR. */}
+      <div
+        style={{ "--cena": 1 } as React.CSSProperties}
+        className="bo-cena @container flex flex-col gap-6"
+      >
         {/* Headline numbers — the four that answer "how are we doing?" at a glance */}
         <div className="grid grid-cols-2 @[40rem]:grid-cols-4 gap-3">
           <Kpi value={String(stats.total)} label="Pedidos totais" accent />
@@ -675,291 +692,309 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         </div>
       </div>
 
-      {/* ── O QUE AS PROPOSTAS DIZEM ────────────────────────────────────
-          O painel de cima conta PEDIDOS: quantos entraram, quantos fecharam,
-          em que meses. Isto conta PROPOSTAS, e responde a outras perguntas —
-          a primeira das quais é a que fez o motivo de recusa ser uma lista
-          fechada em vez de texto livre: perdemos por preço quantas vezes? */}
-      <Section
-        title="Propostas"
-        hint="Fecho, motivos de recusa e o que os extras vendem."
-        defaultOpen
-      >
-        <AnalisePropostas />
-      </Section>
+      {/* ── O TERCEIRO DEGRAU: TUDO O QUE SE LÊ DEPOIS DOS NÚMEROS ─────────
+          Uma caixa à volta das secções de análise porque elas são UM bloco:
+          sete painéis a entrar um a um dariam sete degraus numa vista que já
+          tem dois, e a escada da casa pára ao sexto de propósito. A caixa
+          repete o `flex flex-col gap-6` do pai para o espaçamento ficar
+          exactamente o que era. */}
+      <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena flex flex-col gap-6">
+        {/* ── O QUE AS PROPOSTAS DIZEM ────────────────────────────────────
+            O painel de cima conta PEDIDOS: quantos entraram, quantos fecharam,
+            em que meses. Isto conta PROPOSTAS, e responde a outras perguntas —
+            a primeira das quais é a que fez o motivo de recusa ser uma lista
+            fechada em vez de texto livre: perdemos por preço quantas vezes? */}
+        <Section
+          title="Propostas"
+          hint="Fecho, motivos de recusa e o que os extras vendem."
+          defaultOpen
+        >
+          <AnalisePropostas />
+        </Section>
 
-      {/* Financeiro */}
-      {stats.hasPayments && (
-        <Section title="Dinheiro" hint="Pagamentos registados nos pedidos." defaultOpen>
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
-            <Sub title="Recebido e a receber">
-              <div className={`${QUADRADOS_DE_NUMERO} mb-5`}>
-                <Kpi value={eur(stats.received)} label="Recebido" accent />
-                <Kpi value={eur(stats.outstanding)} label="A receber" />
-                <Kpi value={eur(stats.avgTicket)} label="Ticket médio (com IVA)" />
-                {/* «Registado total», e já não «Faturado total». O número não
-                    mudou — sempre foi recebido + a receber, somado das linhas
-                    de pagamento (ver o cálculo acima), e nunca leu uma factura.
-                    O rótulo é que prometia uma coisa que esta aplicação já não
-                    faz: quem o lesse hoje procuraria o total facturado, que
-                    vive no programa de facturação e não aqui. */}
-                <Kpi value={eur(stats.received + stats.outstanding)} label="Registado total" />
-              </div>
-              {/* received vs outstanding bar */}
-              {stats.received + stats.outstanding > 0 && (
-                <div>
-                  <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
-                    <div
-                      className={`absolute inset-0 origin-left bg-moss ${PROGRESSO}`}
-                      style={{
-                        transform: `scaleX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding)})`,
-                      }}
-                    />
-                    <div
-                      className={`absolute inset-0 origin-left bg-[#b5894a]/70 ${PROGRESSO}`}
-                      style={{
-                        transform: `translateX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding) * 100}%) scaleX(${fraccaoDaBarra(stats.outstanding, stats.received + stats.outstanding)})`,
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-moss" /> Recebido
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#b5894a]/70" /> A receber
-                    </span>
-                  </div>
+        {/* Financeiro */}
+        {stats.hasPayments && (
+          <Section title="Dinheiro" hint="Pagamentos registados nos pedidos." defaultOpen>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
+              <Sub title="Recebido e a receber">
+                <div className={`${QUADRADOS_DE_NUMERO} mb-5`}>
+                  <Kpi value={eur(stats.received)} label="Recebido" accent />
+                  <Kpi value={eur(stats.outstanding)} label="A receber" />
+                  <Kpi value={eur(stats.avgTicket)} label="Ticket médio (com IVA)" />
+                  {/* «Registado total», e já não «Faturado total». O número não
+                      mudou — sempre foi recebido + a receber, somado das linhas
+                      de pagamento (ver o cálculo acima), e nunca leu uma factura.
+                      O rótulo é que prometia uma coisa que esta aplicação já não
+                      faz: quem o lesse hoje procuraria o total facturado, que
+                      vive no programa de facturação e não aqui. */}
+                  <Kpi value={eur(stats.received + stats.outstanding)} label="Registado total" />
                 </div>
+                {/* received vs outstanding bar */}
+                {stats.received + stats.outstanding > 0 && (
+                  <div>
+                    <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
+                      <div
+                        className={`absolute inset-0 origin-left bg-moss ${PROGRESSO}`}
+                        style={{
+                          transform: `scaleX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding)})`,
+                        }}
+                      />
+                      <div
+                        className={`absolute inset-0 origin-left bg-[#b5894a]/70 ${PROGRESSO}`}
+                        style={{
+                          transform: `translateX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding) * 100}%) scaleX(${fraccaoDaBarra(stats.outstanding, stats.received + stats.outstanding)})`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-moss" /> Recebido
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#b5894a]/70" /> A receber
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </Sub>
+
+              <Sub title="Próximos pagamentos (60 dias)">
+                {stats.upcoming.length === 0 ? (
+                  <p className="text-foreground/40 text-xs">
+                    Sem pagamentos previstos para os próximos 60 dias.
+                  </p>
+                ) : (
+                  <div className="flex flex-col divide-y divide-[var(--bo-hairline)]">
+                    {stats.upcoming.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-[var(--bo-text-muted)] text-sm truncate">{p.name}</p>
+                          <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <p className="text-moss text-sm font-medium tabular-nums">
+                            {eur(p.amount)}
+                          </p>
+                          <p className="text-foreground/30 text-[10px]">
+                            {new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT", {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Sub>
+            </div>
+          </Section>
+        )}
+
+        {/* Rentabilidade */}
+        <Section
+          title="Rentabilidade"
+          hint="Margem dos eventos ganhos (valores c/ IVA)."
+          defaultOpen
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
+            <Sub title="Eventos ganhos">
+              {stats.hasProfit ? (
+                <>
+                  <div className={QUADRADOS_DE_NUMERO}>
+                    <Kpi
+                      value={eur(stats.profitability.contracted)}
+                      label="Receita contratada"
+                      accent
+                    />
+                    <Kpi value={eur(stats.profitability.costs)} label="Custo fornecedores" />
+                    <Kpi value={eur(stats.profitability.margin)} label="Margem" accent />
+                    <Kpi
+                      value={`${Math.round(stats.profitability.avgMarginPct)}%`}
+                      label="Margem média"
+                    />
+                  </div>
+                  <p className="text-foreground/25 text-[10px] mt-4">
+                    Valores c/ IVA · {stats.profitability.count} evento
+                    {stats.profitability.count === 1 ? "" : "s"} ganho
+                    {stats.profitability.count === 1 ? "" : "s"} com valor contratado.
+                  </p>
+                </>
+              ) : (
+                <p className="text-foreground/40 text-xs">
+                  Ainda sem eventos ganhos com valor contratado. A margem aparece assim que fechar a
+                  primeira proposta.
+                </p>
               )}
             </Sub>
 
-            <Sub title="Próximos pagamentos (60 dias)">
-              {stats.upcoming.length === 0 ? (
-                <p className="text-foreground/40 text-xs">
-                  Sem pagamentos previstos para os próximos 60 dias.
-                </p>
-              ) : (
-                <div className="flex flex-col divide-y divide-[var(--bo-hairline)]">
-                  {stats.upcoming.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between py-2.5">
-                      <div className="min-w-0">
-                        <p className="text-[var(--bo-text-muted)] text-sm truncate">{p.name}</p>
-                        <p className="text-foreground/30 text-[10px] capitalize">{p.kind}</p>
-                      </div>
-                      <div className="text-right shrink-0 ml-3">
-                        <p className="text-moss text-sm font-medium tabular-nums">
-                          {eur(p.amount)}
-                        </p>
-                        <p className="text-foreground/30 text-[10px]">
-                          {new Date(p.date + "T12:00:00").toLocaleDateString("pt-PT", {
-                            day: "numeric",
-                            month: "short",
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+            <Sub title="Margem por tipo de evento">
+              {stats.hasProfit ? (
+                <div className="flex flex-col gap-3">
+                  {(() => {
+                    const maxMargin = Math.max(
+                      1,
+                      ...stats.profitability.byType.map((r) => r.margin),
+                    );
+                    return stats.profitability.byType.map((row) => {
+                      const pct = Math.round(row.marginPct);
+                      // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
+                      const color = corDeTexto(
+                        pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82",
+                      );
+                      return (
+                        <div key={row.label}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[45%]">
+                              {row.label}
+                            </span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-foreground/30 text-[10px] tabular-nums">
+                                {eur(row.margin)}
+                              </span>
+                              <span
+                                className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
+                                style={{ color }}
+                              >
+                                {pct}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
+                              style={{
+                                transform: `scaleX(${fraccaoDaBarra(row.margin, maxMargin)})`,
+                                background: color,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
+              ) : (
+                <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
               )}
             </Sub>
           </div>
         </Section>
-      )}
 
-      {/* Rentabilidade */}
-      <Section title="Rentabilidade" hint="Margem dos eventos ganhos (valores c/ IVA)." defaultOpen>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
-          <Sub title="Eventos ganhos">
-            {stats.hasProfit ? (
-              <>
-                <div className={QUADRADOS_DE_NUMERO}>
-                  <Kpi
-                    value={eur(stats.profitability.contracted)}
-                    label="Receita contratada"
-                    accent
-                  />
-                  <Kpi value={eur(stats.profitability.costs)} label="Custo fornecedores" />
-                  <Kpi value={eur(stats.profitability.margin)} label="Margem" accent />
-                  <Kpi
-                    value={`${Math.round(stats.profitability.avgMarginPct)}%`}
-                    label="Margem média"
-                  />
-                </div>
-                <p className="text-foreground/25 text-[10px] mt-4">
-                  Valores c/ IVA · {stats.profitability.count} evento
-                  {stats.profitability.count === 1 ? "" : "s"} ganho
-                  {stats.profitability.count === 1 ? "" : "s"} com valor contratado.
-                </p>
-              </>
-            ) : (
-              <p className="text-foreground/40 text-xs">
-                Ainda sem eventos ganhos com valor contratado. A margem aparece assim que fechar a
-                primeira proposta.
-              </p>
-            )}
-          </Sub>
+        {/* Trends */}
+        <Section title="Tendências" hint="Pedidos e receita ganha, mês a mês.">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Sub title="Pedidos por mês (últimos 8)">
+              <VBars data={stats.months.map((m) => ({ label: m.label, value: m.value }))} />
+            </Sub>
+            <Sub title="Receita ganha por mês (€, com IVA)">
+              {stats.hasRevenue ? (
+                <VBars
+                  data={stats.months.map((m) => ({ label: m.label, value: Math.round(m.revenue) }))}
+                  format={(n) => eur(n)}
+                />
+              ) : (
+                <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
+              )}
+            </Sub>
+          </div>
+        </Section>
 
-          <Sub title="Margem por tipo de evento">
-            {stats.hasProfit ? (
-              <div className="flex flex-col gap-3">
-                {(() => {
-                  const maxMargin = Math.max(1, ...stats.profitability.byType.map((r) => r.margin));
-                  return stats.profitability.byType.map((row) => {
-                    const pct = Math.round(row.marginPct);
-                    // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
-                    const color = corDeTexto(
-                      pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82",
-                    );
-                    return (
-                      <div key={row.label}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[45%]">
-                            {row.label}
-                          </span>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-foreground/30 text-[10px] tabular-nums">
-                              {eur(row.margin)}
-                            </span>
-                            <span
-                              className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
-                              style={{ color }}
-                            >
-                              {pct}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
-                          <div
-                            className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
-                            style={{
-                              transform: `scaleX(${fraccaoDaBarra(row.margin, maxMargin)})`,
-                              background: color,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            ) : (
-              <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
-            )}
-          </Sub>
-        </div>
-      </Section>
+        {/* Breakdowns */}
+        <Section title="Repartições" hint="Como se distribuem os pedidos.">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Sub title="Por estado">
+              <HBars data={stats.statusBars} />
+            </Sub>
+            <Sub title="Por categoria">
+              <HBars data={stats.categoryBars} />
+            </Sub>
+            <Sub title="Tipos de evento mais pedidos">
+              <HBars data={stats.eventTypeBars} />
+            </Sub>
+            <Sub title="Como nos conheceram">
+              <HBars data={stats.referralBars} />
+            </Sub>
+          </div>
+        </Section>
 
-      {/* Trends */}
-      <Section title="Tendências" hint="Pedidos e receita ganha, mês a mês.">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Sub title="Pedidos por mês (últimos 8)">
-            <VBars data={stats.months.map((m) => ({ label: m.label, value: m.value }))} />
-          </Sub>
-          <Sub title="Receita ganha por mês (€, com IVA)">
-            {stats.hasRevenue ? (
-              <VBars
-                data={stats.months.map((m) => ({ label: m.label, value: Math.round(m.revenue) }))}
-                format={(n) => eur(n)}
-              />
-            ) : (
-              <p className="text-foreground/40 text-xs">Sem propostas aceites ainda.</p>
-            )}
-          </Sub>
-        </div>
-      </Section>
+        {/* Lost reasons */}
+        {stats.lostReasonRows.length > 0 && (
+          <Section title="Motivos de perda">
+            <div className="flex flex-col gap-3">
+              {stats.lostReasonRows.map((row) => {
+                const total = stats.lostReasonRows.reduce((s, r) => s + r.value, 0);
+                return (
+                  <div key={row.label}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[70%]">
+                        {row.label}
+                      </span>
+                      <span className="text-foreground/35 text-[10px] tabular-nums shrink-0">
+                        {row.value}× · {Math.round((row.value / total) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full w-full origin-left rounded-full bg-[#8a8a82]/60 ${PROGRESSO}`}
+                        style={{
+                          transform: `scaleX(${fraccaoDaBarra(row.value, stats.lostReasonRows[0].value)})`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
 
-      {/* Breakdowns */}
-      <Section title="Repartições" hint="Como se distribuem os pedidos.">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Sub title="Por estado">
-            <HBars data={stats.statusBars} />
-          </Sub>
-          <Sub title="Por categoria">
-            <HBars data={stats.categoryBars} />
-          </Sub>
-          <Sub title="Tipos de evento mais pedidos">
-            <HBars data={stats.eventTypeBars} />
-          </Sub>
-          <Sub title="Como nos conheceram">
-            <HBars data={stats.referralBars} />
-          </Sub>
-        </div>
-      </Section>
-
-      {/* Lost reasons */}
-      {stats.lostReasonRows.length > 0 && (
-        <Section title="Motivos de perda">
-          <div className="flex flex-col gap-3">
-            {stats.lostReasonRows.map((row) => {
-              const total = stats.lostReasonRows.reduce((s, r) => s + r.value, 0);
-              return (
+        {/* Referral conversion */}
+        {stats.referralConvRows.length > 0 && (
+          <Section
+            title="Conversão por fonte"
+            hint="Leads que se tornaram evento ganho, por origem."
+          >
+            <div className="flex flex-col gap-3">
+              {stats.referralConvRows.map((row) => (
                 <div key={row.label}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[70%]">
+                    <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[55%]">
                       {row.label}
                     </span>
-                    <span className="text-foreground/35 text-[10px] tabular-nums shrink-0">
-                      {row.value}× · {Math.round((row.value / total) * 100)}%
-                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-foreground/30 text-[10px] tabular-nums">
+                        {row.accepted}/{row.total} leads
+                      </span>
+                      <span
+                        className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
+                        style={{
+                          // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
+                          color: corDeTexto(
+                            row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                          ),
+                        }}
+                      >
+                        {row.rate}%
+                      </span>
+                    </div>
                   </div>
                   <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                     <div
-                      className={`h-full w-full origin-left rounded-full bg-[#8a8a82]/60 ${PROGRESSO}`}
+                      className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
                       style={{
-                        transform: `scaleX(${fraccaoDaBarra(row.value, stats.lostReasonRows[0].value)})`,
+                        transform: `scaleX(${fraccaoDaBarra(row.rate, 100)})`,
+                        background:
+                          row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
                       }}
                     />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </Section>
-      )}
-
-      {/* Referral conversion */}
-      {stats.referralConvRows.length > 0 && (
-        <Section title="Conversão por fonte" hint="Leads que se tornaram evento ganho, por origem.">
-          <div className="flex flex-col gap-3">
-            {stats.referralConvRows.map((row) => (
-              <div key={row.label}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[55%]">
-                    {row.label}
-                  </span>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-foreground/30 text-[10px] tabular-nums">
-                      {row.accepted}/{row.total} leads
-                    </span>
-                    <span
-                      className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
-                      style={{
-                        // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
-                        color: corDeTexto(
-                          row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
-                        ),
-                      }}
-                    >
-                      {row.rate}%
-                    </span>
-                  </div>
-                </div>
-                <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
-                  <div
-                    className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
-                    style={{
-                      transform: `scaleX(${fraccaoDaBarra(row.rate, 100)})`,
-                      background:
-                        row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
+              ))}
+            </div>
+          </Section>
+        )}
+      </div>
     </div>
   );
 }

@@ -1268,8 +1268,14 @@ export default function Temas() {
         </Card>
       )}
 
+      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+          Três blocos, pela ordem de leitura: os controlos (0), o aviso dos
+          nomes por arrumar (1) e a grelha dos temas (2). A escada é a da casa
+          (`.bo-cena` no `globals.css`) — 600 ms, degraus de 20 ms, tecto ao
+          sexto, desligada em `prefers-reduced-motion`. */}
       <Toolbar
-        className="mb-6"
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena mb-6"
         start={
           searchable ? (
             /* ── O RESUMO DEIXA DE SER FILHO DO CAMPO ────────────────────
@@ -1453,7 +1459,12 @@ export default function Temas() {
 
           Aparece só quando há alguma coisa a arrumar; com a biblioteca em ordem
           não se vê nada. */}
-      <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
+      {/* Segundo degrau numa caixa à volta: a `NomesPorArrumar` devolve `null`
+          quando não há nada a arrumar, e o `empty:hidden` faz esta caixa
+          desaparecer com ela em vez de ficar um degrau a animar o vazio. */}
+      <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena empty:hidden">
+        <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
+      </div>
 
       {adding && (
         <Card padding="sm" className="@container mb-6">
@@ -1501,6 +1512,8 @@ export default function Temas() {
       )}
 
       {loading ? (
+        // Os esqueletos da espera NÃO levam degrau: um esqueleto é a espera, e
+        // não a apresentação do que chegou.
         <div className={`grid ${COLUNAS[densidade]}`}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bo-skeleton aspect-[4/3] rounded-2xl" aria-hidden />
@@ -1538,7 +1551,13 @@ export default function Temas() {
           </p>
         </Card>
       ) : (
-        <div className={`grid ${COLUNAS[densidade]}`}>
+        /* Terceiro degrau na GRELHA e não em cada cartão: vinte e cinco temas a
+           entrar um a um seria a lentidão que o tecto do sexto degrau existe
+           para evitar. A grelha chega inteira. */
+        <div
+          style={{ "--cena": 2 } as React.CSSProperties}
+          className={`bo-cena grid ${COLUNAS[densidade]}`}
+        >
           {visible.map((t) => (
             /* As acções são IRMÃS do botão do cartão, não filhas: um botão
                dentro de outro botão é HTML inválido, e o resultado prático é
