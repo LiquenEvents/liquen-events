@@ -2632,6 +2632,110 @@ body[data-menu-open] .whatsapp-fixed {
     animation: none;
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   E O QUE DESAPARECE, DESAPARECE PARA ALGUM SÍTIO — A SAÍDA
+   ══════════════════════════════════════════════════════════════════════════
+
+   O censo da `.bo-entrada`, aqui em cima, contou os nove sítios do back office
+   que APARECEM por cima da página e deu-lhes uma entrada. Ficou por contar a
+   outra metade, e a outra metade estava toda vazia: NENHUM deles tem saída.
+   O `Toast` entrava com 240 ms e saía num fotograma, com os avisos de baixo a
+   saltar para o lugar do que desapareceu; as folhas e os diálogos do
+   `ui/FolhaOuDialogo.tsx` entram com esta `.bo-entrada` e fecham a seco — o
+   pai desmonta e o ecrã volta. Não era um esquecimento pontual: era uma
+   palavra que faltava ao vocabulário.
+
+   É esta. Vale para tudo o que a `.bo-entrada` cobre, e o contrato de quem a
+   usa cabe em duas linhas:
+
+     1. **Segurar o nó montado durante `200ms`.** Um elemento que sai do array
+        (ou um `{aberto && …}` que passa a falso) desaparece ANTES de poder
+        animar seja o que for. Quem tem de o segurar é o dono do estado — há
+        um hook feito para isso em
+        `src/app/[lang]/(admin)/orcamento/admin/ui/saida.ts`.
+     2. **Desmontá-lo quando os `200ms` passarem.** O `forwards` aqui em baixo
+        é preciso para o elemento ficar apagado no fim em vez de piscar de
+        volta — mas deixa um `transform` pendurado, e um `transform`
+        pendurado cria um containing block que parte um `position: fixed` lá
+        dentro (é a razão por que as classes de entrada desta casa acabam em
+        `transform: none`). Aqui a rede não é o `backwards`: é o nó deixar de
+        existir no fotograma seguinte ao fim da animação.
+
+   ── DUZENTOS, E NÃO OS DUZENTOS E QUARENTA DA ENTRADA ────────────────────
+
+   Quem chega apresenta-se; quem se vai embora não. A entrada tem 240 ms
+   porque tem de ser vista — é o sistema a dizer que ali está uma coisa nova.
+   A saída só tem de ser LIDA como saída, e depois sair da frente: 200 ms é o
+   degrau mais curto da banda dos estados (200–320) e é o que a deixa mais
+   rápida do que a entrada sem cair no meio dos 120 ms de um toque, que se
+   leria como um corte.
+
+   ── E A CURVA É A OUTRA, A `--ease-in` ───────────────────────────────────
+
+   `cubic-bezier(0.4, 0, 1, 1)`, declarada no `:root` deste ficheiro e já
+   espelhada no `lib/motion/tokens.ts` — hesita no arranque, para se perceber
+   O QUE é que está a sair, e acelera a partir daí. A curva que só desacelera
+   (`cubic-bezier(0, 0, 0.2, 1)`) é de quem chega e assenta; usá-la para sair
+   lê-se como se a coisa ainda pudesse voltar atrás.
+
+   ── E SAI PELO SÍTIO POR ONDE ENTROU ─────────────────────────────────────
+
+   O `--bo-saida-y` espelha o `--bo-entrada-y`, valor a valor: quatro píxeis
+   para um menu, oito para uma folha ou um aviso, zero para um fundo — que não
+   vem de sítio nenhum e portanto também não vai para sítio nenhum. Não é
+   simetria por gosto: um elemento que entra de cima e sai por baixo lê-se
+   como dois elementos diferentes.
+
+   ── O `pointer-events` FAZ PARTE DA PALAVRA, E É O PONTO MAIS IMPORTANTE ──
+
+   Está DENTRO da classe, e não à responsabilidade de quem a usa. A pilha de
+   avisos pousa em cima da barra de acção do estúdio de propostas: um aviso a
+   desvanecer-se por cima do botão «Gerar e enviar» continua a ser o alvo do
+   toque enquanto lá estiver, ou seja o utilizador carrega e não acontece nada
+   — durante toda a animação, e sem sinal nenhum de porquê. Foi por causa
+   disto que a saída do `Toast` ficou por fazer da primeira vez, e é por isso
+   que a regra está aqui: quem ganhar a saída ganha a largada dos toques no
+   mesmo gesto, sem ter de se lembrar dela.
+
+   Nota para quem usa isto num nó que se segura montado: a classe entra na
+   MESMA renderização que marca o elemento como «a sair», ou seja o
+   `pointer-events` larga-se antes de o browser pintar o primeiro fotograma da
+   saída. Aplicá-la num `setTimeout` ou no fim da animação abre exactamente a
+   janela que ela existe para fechar. */
+@keyframes bo-saida {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--bo-saida-y, -4px));
+  }
+}
+.bo-saida {
+  animation: bo-saida 200ms var(--ease-in) forwards;
+  pointer-events: none;
+}
+/* Oito e não quatro: uma folha do telemóvel, ou um aviso. Espelha a
+   `.bo-entrada-folha`. */
+.bo-saida-folha {
+  --bo-saida-y: 8px;
+}
+/* Um fundo não vem de sítio nenhum nem vai para sítio nenhum — só apaga.
+   Espelha a `.bo-entrada-fundo`. */
+.bo-saida-fundo {
+  --bo-saida-y: 0px;
+}
+/* Quem pediu menos movimento não espera 200 ms por uma caixa a apagar-se: o
+   `opacity: 0` está aqui para que, mesmo que alguém esqueça a guarda em
+   JavaScript e segure o nó montado à mesma, o que fica não seja uma caixa
+   parada e viva em cima do botão que está por baixo. */
+@media (prefers-reduced-motion: reduce) {
+  .bo-saida {
+    animation: none;
+    opacity: 0;
+  }
+}
 
 /* ── Back-office: shared component primitives ──
    The admin tool standardises on white cards with a hairline border + soft
