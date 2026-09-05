@@ -446,11 +446,38 @@ export default function EventChecklist({ quote, onChange }: Props) {
               Por cima da lista, onde os olhos já estão quando a linha
               desaparece — e não num aviso no canto do ecrã, que num telemóvel
               fica atrás do teclado. `role="status"` para quem não vê o ecrã
-              ouvir o que aconteceu e que ainda dá para voltar atrás. */}
+              ouvir o que aconteceu e que ainda dá para voltar atrás.
+
+              ── E APARECE DE ALGUM SÍTIO: QUATRO PÍXEIS ────────────────────
+              Era montagem condicional e mais nada: a barra existia ou não
+              existia, e a diferença entre os dois estados era um fotograma.
+              Num sítio onde uma linha ACABOU DE DESAPARECER, uma caixa a
+              materializar-se por cima da lista lê-se como mais um salto — que
+              é exactamente o que a pessoa está a tentar perceber.
+
+              `.bo-entrada` sem variante: os quatro píxeis de um RÓTULO, e não
+              os oito de uma folha. Isto não é uma folha do telemóvel nem um
+              aviso no canto do ecrã — é uma tira que nasce dentro do painel,
+              encostada ao sítio de onde o item saiu.
+
+              ── E NÃO ATRASA O «ANULAR», QUE É O PONTO ────────────────────
+              Esta é a ÚNICA forma de desfazer, portanto «nenhuma animação pode
+              atrasar uma tarefa» é aqui uma condição e não um princípio.
+              Cumpre-se porque a `.bo-entrada` só mexe em `transform` e
+              `opacity`: o botão está no DOM, focável e clicável, no PRIMEIRO
+              fotograma — só lhe faltam quatro píxeis de percurso. Nenhum
+              `pointer-events`, nenhum atraso, nenhum estado intermédio. E com
+              `prefers-reduced-motion` o `globals.css` desliga-a por inteiro.
+
+              É por esta mesma conta que a barra NÃO ganha SAÍDA. A `.bo-saida`
+              larga os toques dentro da própria classe, durante 200 ms — o que
+              daria uma janela em que se VÊ «Anular» e não se consegue carregar
+              nele. Numa tira que se some sozinha ao fim de oito segundos, essa
+              janela cai precisamente no instante em que alguém se decide. */}
           {anular && (
             <div
               role="status"
-              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
+              className="bo-entrada mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
             >
               <span>{anular.texto}</span>
               <Button size="sm" variant="ghost" onClick={anular.repor}>

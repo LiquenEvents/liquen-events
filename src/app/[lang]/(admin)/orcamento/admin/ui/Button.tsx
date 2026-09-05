@@ -203,6 +203,40 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={cn(BASE, VARIANTS[variant], SIZES[size], fullWidth && "w-full", className)}
       {...rest}
     >
+      {/* ── O RODOPIO ENTRA A SECO, E FICA ASSIM DE PROPÓSITO ──────────────
+          Está aqui escrito porque parece um esquecimento e não é. A troca
+          `iconLeft` → `<Spinner/>` acontece num fotograma, sem transição
+          nenhuma, e foi considerada três vezes.
+
+          1. `loading` QUER DIZER QUE A PESSOA ESTÁ À ESPERA DA REDE. É o
+             único sítio deste vocabulário onde a regra da casa («nenhuma
+             animação pode atrasar uma tarefa») deixa de ser sobre o
+             movimento e passa a ser sobre a resposta: o rodopio é o
+             ACUSAR-DE-RECEBIDO do toque. Uma entrada de 120 ms atrasa em
+             120 ms o único sinal de que o pedido partiu — e é exactamente
+             nos primeiros décimos de segundo que alguém decide se carrega
+             outra vez. Pagar latência percebida para suavizar o sinal de que
+             não há latência é a troca ao contrário.
+
+          2. O RODOPIO JÁ É MOVIMENTO. Tem `motion-safe:animate-spin`. Uma
+             coisa que roda a desvanecer-se ao mesmo tempo são dois
+             movimentos sobrepostos no mesmo objecto de 16 px, e lê-se como
+             borrão, não como entrada.
+
+          3. E A SAÍDA DA ETIQUETA TAMBÉM NÃO. A alternativa séria era animar
+             o que SAI (o ícone) em vez do que entra, nos 120 ms do `ESTADO`.
+             Mas para o ícone sair enquanto o rodopio entra, os dois têm de
+             estar montados ao mesmo tempo — e aí o botão fica 120 ms mais
+             largo e volta a encolher. Um botão a mudar de largura debaixo do
+             dedo, no instante a seguir ao toque, é pior do que o corte seco
+             que se queria tirar. (O salto de largura quando não há `iconLeft`
+             nenhum é real e continua por resolver; resolve-se com espaço
+             reservado, que é layout e não animação — não se remenda com uma
+             transição.)
+
+          Ou seja: o certo aqui é NÃO MEXER. Quem vier a seguir com vontade de
+          «acabar o trabalho» neste sítio tem estas três razões para ler
+          primeiro. */}
       {loading ? <Spinner /> : iconLeft}
       {children}
       {!loading && iconRight}

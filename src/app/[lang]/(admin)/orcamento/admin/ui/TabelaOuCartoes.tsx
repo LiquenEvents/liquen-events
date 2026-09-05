@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAdaptativo } from "./adaptativo";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
+import { semMovimento } from "./saida";
 
 /**
  * A MESMA LISTA EM DUAS FORMAS — tabela densa no computador, cartões no
@@ -66,6 +67,121 @@ export interface TabelaOuCartoesProps<T> {
   semMoldura?: boolean;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ENTRADA DO BLOCO — o que se move quando a LISTA passa a ser outra
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta primitiva serve cinco vistas (Pedidos, Propostas, Contratos, Clientes,
+ * Inventário). Tudo o que aqui se escreve acontece cinco vezes, e é por isso
+ * que o que NÃO se anima está tão contado como o que se anima.
+ *
+ * ── O DEFEITO ──────────────────────────────────────────────────────────────
+ *
+ * Carregar num cabeçalho reordena a tabela (`setOrdem`, aqui em baixo). As
+ * linhas saltam para a posição nova ENTRE DOIS FOTOGRAMAS: as mesmas dez
+ * pessoas, noutra ordem, sem um único sinal de que foi a lista que se
+ * reordenou e não o conteúdo que foi substituído. É o caso em que o olho não
+ * tem por onde se guiar — e é exactamente para isso que o movimento serve
+ * («indica direcção e origem»).
+ *
+ * ── A PALAVRA É A DA CASA, E NÃO UMA NOVA ─────────────────────────────────
+ *
+ * `.view-in` — 240 ms, 8 px, `cubic-bezier(0, 0, 0.2, 1)`, e acaba em
+ * `transform: none` (o `backwards` do `globals.css` é load-bearing: sem ele
+ * ficava um `transform` pendurado a criar containing block, que é como o
+ * `.view-in` já partiu uma gaveta `position: fixed` uma vez). A prosa toda
+ * está lá; aqui não se declara duração, curva nem distância nenhuma.
+ *
+ * É a palavra certa porque é literalmente o que se passa: a moldura fica, o
+ * conteúdo dentro dela passa a ser outro. `.bo-cena` (600 ms) é a apresentação
+ * de um ecrã que chega — e quem apresenta o ecrã já é o ecrã, com o seu
+ * `--cena` próprio (ver `Contratos.tsx:366` e `AdminClient.tsx:5432`).
+ * Reordenar não é chegar.
+ *
+ * ── POR BLOCO, NUNCA POR LINHA ─────────────────────────────────────────────
+ *
+ * A classe entra no `<tbody>` (ou no `<ul>` do telemóvel), UMA vez. Nunca na
+ * linha: cinquenta linhas a chegar uma a uma é a lentidão que o tecto do sexto
+ * degrau existe para evitar, e está escrito em `EventTasks.tsx:400-402`. Como
+ * o `<thead>` fica de fora, o cabeçalho onde se acabou de carregar não se mexe
+ * — o que se move é a resposta, não o botão.
+ *
+ * ── E PORQUE É QUE O FILTRO NÃO ENTRA AQUI ────────────────────────────────
+ *
+ * O levantamento pedia entrada também «a cada novo filtro». Testei a ideia
+ * contra o teclado e não passa: a procura destas cinco vistas é um `<input>`
+ * que filtra a cada letra (com `useDeferredValue`, mas à mesma uma vez por
+ * tecla assente). A 5 teclas por segundo há uma entrada nova de 240 ms a cada
+ * 200 ms — a lista nunca chega à opacidade 1, fica permanentemente a meio e a
+ * saltar 8 px enquanto se escreve. Ou seja: a animação torna ilegível
+ * exactamente o ecrã que a pessoa está a tentar ler. Isso é movimento a chamar
+ * atenção, e é a regra da casa ao contrário.
+ *
+ * A regra que ficou distingue as duas coisas pelo CONTEÚDO, que é o que esta
+ * primitiva consegue ver de dentro:
+ *
+ *   · **a mesma gente noutra ordem** → animar. Ninguém saiu nem entrou, e sem
+ *     movimento não há como saber que foi a ORDEM que mudou.
+ *   · **outra gente** (filtrar, procurar) → não animar. A causa está à vista e
+ *     é a própria pessoa a escrevê-la; quem fica, fica no sítio.
+ *
+ * A troca com o ecrã vazio é o terceiro caso e tem regra própria, mais abaixo.
+ */
+const ENTRADA_DO_BLOCO = "view-in";
+
+/**
+ * Volta a correr a entrada do bloco NO MESMO NÓ.
+ *
+ * A tentação é o `key` — e o `key` REMONTA. Numa lista o `key` é identidade:
+ * mexer-lhe para animar deita fora o rolo, a selecção e o foco de quem estava
+ * a meio de uma leitura. Aqui não se toca em `key` nenhum; o que se faz é
+ * mandar o browser correr outra vez a animação que a classe já descreve.
+ *
+ * A leitura de `offsetWidth` no meio não é superstição: sem ela, as duas
+ * escritas caem no mesmo fotograma, o browser nunca vê o elemento sem a classe
+ * e a animação não reinicia. É o único sítio deste ficheiro que força layout, e
+ * corre num `useEffect` (depois de pintar) e só quando a ordem mudou mesmo —
+ * nunca no caminho de uma tecla.
+ *
+ * A classe fica no nó depois de acabar, de propósito: o `.view-in` não tem
+ * `forwards`, portanto uma animação terminada não pesa sobre nada — e assim o
+ * `className` que o JSX escreve continua a ser constante, que é o que garante
+ * que o React nunca o reescreve por cima disto.
+ */
+function reanimarBloco(bloco: HTMLElement | null): void {
+  // Quem pediu para não animar não leva reinício nenhum. O `globals.css`
+  // também desliga a `.view-in` no `prefers-reduced-motion`, mas a classe
+  // ficaria pendurada à mesma — mais vale nem lá chegar.
+  if (!bloco || semMovimento()) return;
+  bloco.classList.remove(ENTRADA_DO_BLOCO);
+  void bloco.offsetWidth;
+  bloco.classList.add(ENTRADA_DO_BLOCO);
+}
+
+/**
+ * As MESMAS chaves noutra ordem — e não outras chaves.
+ *
+ * Comprimentos iguais, pelo menos uma posição trocada, e nenhuma chave nova. É
+ * esta pergunta que separa «reordenei» de «filtrei», e é por isso que a
+ * comparação é sobre as chaves e não sobre os itens: `chaveDe` é o contrato de
+ * identidade desta lista (o mesmo que alimenta o `key`), e são únicas — se não
+ * fossem, o React já se estaria a queixar muito antes de isto importar.
+ */
+function mesmaGenteNoutraOrdem(antes: readonly string[], agora: readonly string[]): boolean {
+  if (antes.length === 0 || antes.length !== agora.length) return false;
+  let trocou = false;
+  for (let i = 0; i < agora.length; i++) {
+    if (agora[i] !== antes[i]) {
+      trocou = true;
+      break;
+    }
+  }
+  if (!trocou) return false;
+  const conjunto = new Set(antes);
+  return agora.every((chave) => conjunto.has(chave));
+}
+
 export function TabelaOuCartoes<T>({
   itens,
   chaveDe,
@@ -119,11 +235,104 @@ export function TabelaOuCartoes<T>({
     return [...itens].sort((a, b) => (ordem.ascendente ? cmp(a, b) : cmp(b, a)));
   }, [itens, colunas, ordem]);
 
-  if (itens.length === 0 && vazio) return <>{vazio}</>;
+  /**
+   * ── A TROCA COM O ECRÃ VAZIO É OUTRO ECRÃ, NÃO É UMA LISTA MAIS CURTA ────
+   *
+   * Escrever na procura até não sobrar nada troca a lista INTEIRA pelo estado
+   * vazio: uma árvore desmonta e a outra monta no lugar dela. Não é «menos
+   * linhas» — é outro ecrã dentro da mesma moldura, que é a definição da
+   * `.view-in`.
+   *
+   * E acontece nos dois sentidos, portanto a entrada também: apagar uma letra
+   * e a lista voltar é a mesma troca ao contrário.
+   *
+   * ── O FOCO NÃO SE PERDE, E ISSO FOI VERIFICADO ──────────────────────────
+   *
+   * Uma troca de árvore a meio de escrever seria inaceitável se o campo de
+   * procura vivesse cá dentro — perdia o foco a cada palavra que não desse
+   * resultados. Não vive: nas cinco vistas o campo está na barra de cima, IRMÃO
+   * desta primitiva e fora dela (`Clientes.tsx:275`, `Contratos.tsx:298`,
+   * `Inventario.tsx:593`, `AdminClient.tsx:5024`). E `vazio` só é passado por
+   * uma delas hoje (`Clientes.tsx:393`) — as outras tratam o caso vazio antes
+   * de chegar aqui.
+   *
+   * O `<div>` que embrulha existe só para haver um nó onde pousar a classe: um
+   * fragmento não tem caixa, e sem caixa não há `transform` nem `opacity`.
+   */
+  const estaVazio = itens.length === 0 && !!vazio;
 
-  // Antes de montar desenha-se a forma de TELEMÓVEL: os cartões são um único
-  // elemento por linha e cabem em qualquer largura, enquanto uma tabela a
-  // aparecer e desaparecer num ecrã pequeno salta à vista.
+  /**
+   * O bloco que leva a entrada — a `<ul>`, o `<tbody>` ou o embrulho do vazio.
+   * É um ref só porque só um deles está montado de cada vez, e o React já
+   * desliga o antigo antes de ligar o novo (os dois antes de os efeitos
+   * correrem), portanto quando isto se lê já aponta para o que ficou.
+   */
+  const bloco = useRef<HTMLElement | null>(null);
+  /** As chaves do desenho anterior. `undefined` = ainda não houve nenhum. */
+  const chavesAntes = useRef<readonly string[] | null | undefined>(undefined);
+
+  /**
+   * SEM LISTA DE DEPENDÊNCIAS, de propósito. O `colunas` das listas é
+   * construído em cada desenho (ver a nota do `ResizeObserver` lá em cima),
+   * portanto `ordenados` é um array novo a cada renderização e uma lista de
+   * dependências não pouparia nada — só daria a impressão de que poupava. O que
+   * decide é a comparação de chaves aqui dentro, e ela é O(n) contra o
+   * O(n log n) da ordenação que já corre por cima dela.
+   *
+   * E não corre na PRIMEIRA montagem: aí quem apresenta o bloco é o ecrã que o
+   * traz, com a `.bo-cena` e o seu degrau. Duas entradas encaixadas seriam
+   * 20 px de percurso e dois desvanecimentos — duas linguagens de movimento na
+   * mesma página, que é o defeito que o vocabulário da casa existe para não ter.
+   *
+   * É também o que deixa a troca de hidratação (telemóvel → computador, aqui em
+   * baixo) sem animação nenhuma sem precisar de a excepcionar: essa troca muda a
+   * ÁRVORE e não muda uma única chave, e esta regra só olha para as chaves.
+   */
+  useEffect(() => {
+    const chaves = estaVazio ? null : ordenados.map(chaveDe);
+    const antes = chavesAntes.current;
+    chavesAntes.current = chaves;
+    if (antes === undefined) return;
+    const trocouDeEcra = (antes === null) !== (chaves === null);
+    const reordenou = antes !== null && chaves !== null && mesmaGenteNoutraOrdem(antes, chaves);
+    if (trocouDeEcra || reordenou) reanimarBloco(bloco.current);
+  });
+
+  if (estaVazio) {
+    return (
+      <div
+        ref={(n) => {
+          bloco.current = n;
+        }}
+      >
+        {vazio}
+      </div>
+    );
+  }
+
+  /**
+   * ── ISTO NÃO SE ANIMA, E A RAZÃO FICA ESCRITA ─────────────────────────────
+   *
+   * `!montado` desenha a forma de TELEMÓVEL antes de o browser saber a largura
+   * (é o que impede o desencontro de hidratação — ver `adaptativo.ts`), e no
+   * computador troca-a pela tabela no fotograma a seguir. Há ali um salto, e é
+   * real.
+   *
+   * Mas é ARTEFACTO DE HIDRATAÇÃO, não navegação: ninguém pediu nada, ninguém
+   * está à espera de resposta nenhuma, e acontece uma vez por CARREGAMENTO de
+   * página. Animá-lo trocava um salto que se vê uma vez por carregamento por
+   * uma animação que se vê uma vez por carregamento — e uma animação vê-se
+   * durante 240 ms, o salto vê-se durante um fotograma. Ficava mais lento e
+   * mais notado, que é o contrário do que se quer.
+   *
+   * A regra de entrada aqui em cima já o deixa de fora sem o excepcionar: ela
+   * olha para as chaves, e nesta troca as chaves são exactamente as mesmas.
+   * Quem quiser «corrigir» isto tem de mexer nessa regra de propósito.
+   *
+   * Antes de montar desenha-se a forma de TELEMÓVEL: os cartões são um único
+   * elemento por linha e cabem em qualquer largura, enquanto uma tabela a
+   * aparecer e desaparecer num ecrã pequeno salta à vista.
+   */
   if (!montado || !desktop) {
     return (
       /**
@@ -151,6 +360,9 @@ export function TabelaOuCartoes<T>({
        * entre cada duas linhas.
        */
       <ul
+        ref={(n) => {
+          bloco.current = n;
+        }}
         className="flex flex-col divide-y divide-[var(--bo-hairline)] overflow-hidden rounded-xl border border-[var(--bo-hairline)] bg-white"
         aria-label={legenda}
       >
@@ -265,7 +477,14 @@ export function TabelaOuCartoes<T>({
             ))}
           </tr>
         </thead>
-        <tbody>
+        {/* O `<tbody>` e não a `<table>`: assim o `<thead>` fica quieto e o
+            cabeçalho onde se acabou de carregar não se mexe. O que entra é a
+            resposta, não o botão. */}
+        <tbody
+          ref={(n) => {
+            bloco.current = n;
+          }}
+        >
           {ordenados.map((item) => (
             <tr
               key={chaveDe(item)}

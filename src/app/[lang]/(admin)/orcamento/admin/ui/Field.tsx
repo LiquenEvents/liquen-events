@@ -177,8 +177,34 @@ export function Field(props: FieldProps) {
           {hint}
         </p>
       )}
+      {/* ── A LINHA DE ERRO APARECE DE ALGUM SÍTIO ────────────────────────
+          Montava de repente, no mesmo fotograma em que a dica desaparecia (a
+          dica é `hint && !error`: as duas trocam de lugar). Uma troca
+          instantânea onde estava outra coisa lê-se como um salto do
+          formulário, e não como uma resposta ao que se escreveu.
+
+          `.bo-entrada` sem variante: quatro píxeis, a distância de um RÓTULO.
+          Não é um aviso que chega de fora — nasce colada ao campo que a
+          explica, e é só isso que o movimento diz: veio dali.
+
+          ── E NÃO ATRASA NEM ESCONDE NADA ────────────────────────────────
+          A `.bo-entrada` mexe em `transform` e `opacity` e mais nada. O `<p>`
+          está no DOM com o seu `id` desde o primeiro fotograma, portanto o
+          `aria-describedby` do controlo (e o `aria-invalid`) apontam para ele
+          sem esperar pela animação: quem ouve o ecrã ouve o erro ao mesmo
+          tempo, anime-se ou não. E `prefers-reduced-motion` desliga-a no
+          `globals.css`.
+
+          ── VALE A PENA? UM CHAMADOR, MAS É O PRIMITIVO ───────────────────
+          Com franqueza: hoje vê-se num sítio só — `EmailDoEnvio.tsx:368` é o
+          único `error=` de toda a pasta. Não é o ganho do dia; é higiene do
+          primitivo, que é onde uma linha de CSS passa a render à medida que o
+          `error` for sendo usado, em vez de cada formulário inventar a sua. */}
       {error && (
-        <p id={errorId} className="flex items-start gap-1 text-xs leading-relaxed text-[#8a2a22]">
+        <p
+          id={errorId}
+          className="bo-entrada flex items-start gap-1 text-xs leading-relaxed text-[#8a2a22]"
+        >
           <span aria-hidden="true">⚠</span>
           <span>{error}</span>
         </p>
