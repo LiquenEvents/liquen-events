@@ -108,7 +108,7 @@ import {
    carrega. As duas trazem `motion-safe:` porque o `globals.css` não tem rede
    global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
    três sítios muito concretos, e nenhum deles é este ficheiro. */
-import { ESTADO, PRESSAO } from "./ui/movimento";
+import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
@@ -1362,6 +1362,71 @@ export default function AdminClient({
   const [propostaPara, setPropostaPara] = useState<string | null>(null);
   // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
   const [moreNavOpen, setMoreNavOpen] = useState(false);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A MARCA DO DESTINO ACTIVO ANDA, EM VEZ DE PISCAR NOUTRO SÍTIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «quero animações em tudo o que seja para ir de uma coisa à
+   * outra, quando se carrega numa coisa e vai-se para outra coisa».
+   *
+   * Trocar de destino na barra lateral é o gesto que ela faz mais vezes por
+   * dia, e era o menos visível: o fundo acendia num item e apagava-se noutro,
+   * ao mesmo tempo. Nada dizia que se veio de um sítio e se foi para outro.
+   *
+   * Este é o mesmo gesto que o `Segmented` já faz há muito, e a razão está
+   * escrita lá: «numa barra de filtros o segmento activo não muda de cor de
+   * repente; há um indicador que ANDA». Aqui a barra é vertical, portanto o
+   * indicador é um filete que desliza pela esquerda — e é o `translate` que
+   * anda, composto na GPU, sem remedir nada à volta (o filete é `absolute`).
+   *
+   * ── PORQUE É QUE ISTO MEDE, EM VEZ DE CALCULAR ────────────────────────────
+   *
+   * A lista não tem altura fixa: o grupo «Mais» abre e fecha, quatro destinos
+   * escondem-se no computador e aparecem no telemóvel (`BARRA_INFERIOR`), e a
+   * coluna rola quando não cabe. Um número calculado a partir do índice ficava
+   * errado em todas essas situações. O `ResizeObserver` é o mesmo instrumento
+   * que o `Segmented` usa, e pela mesma razão.
+   *
+   * ── E PORQUE É QUE NÃO ANDA NO PRIMEIRO DESENHO ───────────────────────────
+   *
+   * `podeAndar` só passa a verdadeiro no fotograma seguinte ao da primeira
+   * medida. Sem isso, ao abrir o back office o filete deslizava do topo até ao
+   * destino activo — um movimento que ninguém provocou, a dizer uma transição
+   * que não houve. Também é o que o `Segmented` faz.
+   */
+  const colunaDosDestinos = useRef<HTMLElement | null>(null);
+  const [marcaDoDestino, setMarcaDoDestino] = useState<{ y: number; h: number } | null>(null);
+  const [marcaPodeAndar, setMarcaPodeAndar] = useState(false);
+
+  useEffect(() => {
+    const coluna = colunaDosDestinos.current;
+    if (!coluna) return;
+    const medir = () => {
+      const activo = coluna.querySelector<HTMLElement>('[aria-current="page"]');
+      // `offsetParent` nulo quer dizer escondido (o `hidden lg:flex` dos quatro
+      // que vivem na barra de baixo, ou o grupo «Mais» fechado). Sem destino à
+      // vista não há marca — melhor nenhuma do que uma pousada no sítio errado.
+      if (!activo || activo.offsetParent === null) {
+        setMarcaDoDestino(null);
+        return;
+      }
+      setMarcaDoDestino({ y: activo.offsetTop, h: activo.offsetHeight });
+    };
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const observador = new ResizeObserver(medir);
+    observador.observe(coluna);
+    for (const b of coluna.querySelectorAll("button")) observador.observe(b);
+    return () => observador.disconnect();
+  }, [view, moreNavOpen, navOpen]);
+
+  useEffect(() => {
+    if (!marcaDoDestino || marcaPodeAndar) return;
+    const id = requestAnimationFrame(() => setMarcaPodeAndar(true));
+    return () => cancelAnimationFrame(id);
+  }, [marcaDoDestino, marcaPodeAndar]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -4001,9 +4066,22 @@ export default function AdminClient({
               sees few things at once. The group auto-opens when a "Mais" view is
               active, so the current item (and its aria-current) is never hidden. */}
             <nav
+              ref={colunaDosDestinos}
               aria-label="Navegação do back office"
-              className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
+              className="relative flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
             >
+              {/* O filete que anda. `aria-hidden` porque não diz nada que o
+                  `aria-current="page"` de cada destino não diga melhor — é
+                  desenho, não informação. Ver `marcaDoDestino` lá em cima. */}
+              {marcaDoDestino && (
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute left-1 top-0 w-[3px] rounded-full bg-[#4d6350] ${
+                    marcaPodeAndar ? MARCA : ""
+                  }`}
+                  style={{ translate: `0 ${marcaDoDestino.y}px`, height: marcaDoDestino.h }}
+                />
+              )}
               {CORE_NAV.map((id) => renderNavItem(id))}
 
               {/* "Mais" — secondary destinations, collapsed by default.
