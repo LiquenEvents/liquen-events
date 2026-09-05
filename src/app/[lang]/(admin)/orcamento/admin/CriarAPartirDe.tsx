@@ -279,7 +279,23 @@ export default function CriarAPartirDe({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[8vh] backdrop-blur-sm"
+      /* ── O VÉU ─────────────────────────────────────────────────────────
+         Aqui o véu e a caixa que ele traz são o MESMO elemento — a tinta
+         escura e o `flex items-start justify-center` que centra a caixa
+         vivem os dois nesta linha, e é por isso que o
+         `entrada-dos-fundos.test.ts` isenta este ficheiro da varredura dos
+         véus. Isenta-o da varredura, não da regra: escurecia o ecrã inteiro
+         num fotograma, por baixo de uma caixa que também aparecia de uma
+         vez. Este era o único sítio da pasta com os DOIS por tratar.
+
+         `bo-entrada-fundo` põe a deslocação a zero (`--bo-entrada-y: 0px`),
+         que é o que um fundo pede: um véu não vem de sítio nenhum, está por
+         todo o lado. O que ele faz é acender.
+
+         E o `backdrop-blur-sm` fica FORA da animação, como manda o
+         `globals.css`: um desfoque em transição repinta o ecrã inteiro a
+         cada fotograma. Só a opacidade se move. */
+      className="bo-entrada bo-entrada-fundo fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[8vh] backdrop-blur-sm"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -287,7 +303,20 @@ export default function CriarAPartirDe({
         role="dialog"
         aria-modal="true"
         aria-labelledby="cad-titulo"
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
+        /* ── E A CAIXA ──────────────────────────────────────────────────
+           Quatro píxeis, de cima, que é de onde ela vem: isto pousa a 8vh do
+           topo, como uma paleta de comandos. Mesmos 240 ms e mesma curva do
+           véu, para os dois lerem como um gesto só.
+
+           As duas opacidades compõem-se (a caixa está DENTRO do véu, e o véu
+           também está a acender), portanto a caixa chega um nada depois dele
+           e os dois assentam no mesmo instante. É a ordem certa: primeiro o
+           ecrã escurece, depois a caixa pousa.
+
+           Sem `fill-mode`, e é o que aqui interessa: o campo de procura leva
+           foco automático na montagem e a animação larga o elemento ao fim
+           dos 240 ms, sem deixar `transform` pendurado por cima da lista. */
+        className="bo-entrada flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
         onKeyDown={teclas}
       >
         <div className="border-b border-[var(--bo-hairline-strong)] px-5 py-4">

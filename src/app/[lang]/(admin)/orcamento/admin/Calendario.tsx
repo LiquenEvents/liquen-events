@@ -166,7 +166,15 @@ function AddEventModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Adicionar ao calendário — ${dateLabel}`}
-        className="relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
+        /* O véu acendia (`bo-entrada-fundo`, na linha de cima) e a caixa que
+           ele traz aparecia com a opacidade final no primeiro fotograma dele:
+           o ecrã escurecia devagar e o diálogo saltava para lá. Meio gesto.
+
+           Quatro píxeis e os mesmos 240 ms da casa. Não atrasa nada: o campo
+           do título leva `autoFocus` e recebe o que se escrever desde o
+           primeiro fotograma — a animação corre por cima disso, em `opacity`
+           e `transform`, sem tocar no layout. */
+        className="bo-entrada relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-5">
@@ -880,7 +888,20 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
           {/* ── Day peek: everything on the selected day, with real targets ── */}
           {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
-            <div className="mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
+            /* ── ESPREITAR O DIA ────────────────────────────────────────────
+               Montagem condicional: carregar num dia com marcações faz nascer
+               este painel por baixo da grelha, e ele empurra o que está a
+               seguir para baixo. Aparecia de um fotograma para o outro — a
+               página mudava de tamanho e um bloco novo estava simplesmente
+               lá.
+
+               `.bo-entrada`, como tudo o que aparece nesta casa: 240 ms,
+               quatro píxeis, e SÓ `opacity` e `transform`. A altura NÃO se
+               anima, de propósito — animar `height` é remedir a página a cada
+               fotograma, que é exactamente o que o telemóvel dela não tem
+               para dar. O painel toma o seu espaço de uma vez e é o conteúdo
+               que acende e assenta. */
+            <div className="bo-entrada mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
                 <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
                 <div className="flex items-center gap-1">

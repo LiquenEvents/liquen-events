@@ -7,6 +7,7 @@ import { useTrincoDeScroll } from "../useTrincoDeScroll";
 import { useAdaptativo } from "./adaptativo";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
+import { SAIDA, SAIDA_FOLHA, SAIDA_FUNDO, SAIDA_MS, useSaidaAdiada } from "./saida";
 
 /**
  * UMA CAIXA QUE MUDA DE FORMA — diálogo centrado no computador, folha inferior
@@ -129,6 +130,14 @@ const LARGURAS = {
  *  Curto de mais fecha sozinho ao rolar; longo de mais parece que não responde. */
 const FECHAR_A_PARTIR_DE = 80;
 
+/**
+ * A chave da saída. O `useSaidaAdiada` é indexado por chave porque nasceu numa
+ * PILHA (a dos avisos), onde há vários nós a sair ao mesmo tempo e cada um com
+ * o seu relógio. Aqui há um nó só, portanto a chave é uma constante e o resto
+ * ignora-se — está escrito no contrato do hook.
+ */
+const CHAVE = "caixa";
+
 export function FolhaOuDialogo({
   aberto,
   onFechar,
@@ -172,6 +181,82 @@ export function FolhaOuDialogo({
   const inicioY = useRef<number | null>(null);
   const idTitulo = useId();
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     E A CAIXA TAMBÉM SAI — a outra metade do gesto
+     ══════════════════════════════════════════════════════════════════════════
+
+     Isto entrava com a `.bo-entrada` e fechava A SECO: o pai punha o `aberto` a
+     falso, o nó desaparecia no fotograma seguinte e o ecrã voltava. Meio gesto,
+     e repetido em seis diálogos — é esta a porta por onde passam a
+     `PerguntaDestrutiva`, o `NewQuoteModal`, o `ShortcutsModal`, o
+     `PasskeysDialog`, o `ThemeCopyDialog` e o editor de e-mail.
+
+     ── PORQUE É QUE QUEM SEGURA O NÓ É ESTE COMPONENTE, E NÃO QUEM CHAMA ────
+
+     Porque o `onFechar` NÃO se atrasa. Ele continua a ser chamado no instante
+     do gesto — o pai fecha o que tem a fechar, a página destranca-se, o foco
+     volta ao botão que abriu isto, o trinco de scroll larga e a entrada de
+     história é retirada, tudo já. O que fica cá é uma IMAGEM a apagar-se, 200
+     ms, sem nome acessível, sem foco e sem apanhar um único toque. Uma saída
+     que adiasse o `onFechar` era uma animação a atrasar uma tarefa, que é a
+     única coisa que esta casa não deixa fazer a nenhuma.
+
+     Ou seja: o gatilho é a prop `aberto` a passar de verdadeira a falsa, seja
+     lá o que a fizer passar — o «×», o Escape, o fundo, o arrasto, o gesto de
+     voltar, ou o pai a fechar sozinho quando a operação acaba.
+
+     ── AJUSTADO DURANTE O DESENHO, E NÃO NUM EFEITO ─────────────────────────
+
+     Um `useEffect` corria DEPOIS de o React já ter desenhado o `return null`:
+     o nó era arrancado do DOM e o efeito montava um nó NOVO no lugar dele. Um
+     nó novo é um remonte — perde a posição do scroll de dentro da caixa, e uma
+     caixa a sair com o conteúdo saltado para o topo lê-se como outra caixa.
+     Este é o padrão do React para reagir a uma prop: ajusta-se o estado no
+     desenho, ele re-desenha sem pintar nada pelo meio, e o nó é o MESMO.
+
+     Com `prefers-reduced-motion` nada disto acontece: o `comecarSaida` chama o
+     fim no próprio instante e a caixa desaparece como sempre desapareceu. Quem
+     pediu menos movimento não espera 200 ms por uma caixa a apagar-se por cima
+     do botão em que quer carregar. */
+  /* ── O ARRASTO COM QUE A FOLHA SE FOI EMBORA ────────────────────────────
+     A pega põe o arrasto a zero ao largar, SEMPRE — é o que faz a folha voltar
+     ao sítio quando o gesto não pega (o `bloqueado` recusa o fecho, e há quem
+     passe um `onFechar` que não faz nada enquanto uma operação corre). O que
+     interessa guardar é outra coisa: quanto é que ela tinha andado quando o
+     dedo largou, para poder sair DE LÁ e não de zero.
+
+     Passa por uma referência e não por estado porque tem de ser lida no MESMO
+     lote de renderizações em que a prop `aberto` cai — e é logo a seguir
+     copiada para estado, que é o que dura os 200 ms da saída. */
+  const arrastoAoLargar = useRef(0);
+  const [arrastoDeSaida, setArrastoDeSaida] = useState(0);
+
+  /* E a referência vale para UM commit, o que vem logo a seguir ao dedo. Sem
+     esta linha, um gesto que pediu para fechar e não fechou deixava lá 200 px
+     à espera — e o fecho seguinte, esse pelo botão, saía a deslizar de uma
+     distância que ninguém tinha arrastado. */
+  useEffect(() => {
+    arrastoAoLargar.current = 0;
+  });
+
+  const { aSair, comecarSaida } = useSaidaAdiada(() => {
+    // Acabada a saída, esquece-se o arrasto com que ela se foi embora.
+    setArrastoDeSaida(0);
+  });
+  // `!aberto` na conta, e não só a marca: se o pai voltar a abrir isto a meio
+  // da saída, quem manda é a prop — a caixa volta a entrar em vez de continuar
+  // a apagar-se com o relógio antigo.
+  const aSairAgora = !aberto && aSair.includes(CHAVE);
+
+  const [abertoAntes, setAbertoAntes] = useState(aberto);
+  if (abertoAntes !== aberto) {
+    setAbertoAntes(aberto);
+    if (!aberto) {
+      setArrastoDeSaida(arrastoAoLargar.current);
+      comecarSaida(CHAVE);
+    }
+  }
+
   // Escape fecha, nos dois formatos. Um `keydown` no documento e não no
   // elemento: o foco pode estar num campo lá dentro.
   useEffect(() => {
@@ -189,12 +274,19 @@ export function FolhaOuDialogo({
     if (aberto) setArrasto(0);
   }, [aberto]);
 
-  if (!aberto) return null;
+  // Enquanto a saída corre o nó fica montado, e é a única coisa que o segura:
+  // o `aberto` já é falso e o `aSairAgora` cai sozinho ao fim dos 200 ms.
+  if (!aberto && !aSairAgora) return null;
 
   // Antes de montar não sabemos a largura real. Desenha-se a FOLHA, que é o
   // formato mais simples e o que menos estranha se aparecer por um instante num
   // ecrã grande — o contrário (um diálogo centrado a saltar para folha) vê-se.
   const comoFolha = telemovel || !montado;
+
+  /* A folha foi-se embora A MEIO DE UM ARRASTO — o dedo largou-a a 90 px do
+     sítio e ela sai de lá, e não de zero. É o único caso em que a saída não
+     pode ser a animação da casa; a razão está escrita no `style` da caixa. */
+  const folhaArrastada = aSairAgora && comoFolha && arrastoDeSaida > 0;
 
   const cabecalho = (
     // `pr-14` e não `pr-5`: o «×» é um alvo de 44 px encostado à direita, e sem
@@ -214,42 +306,130 @@ export function FolhaOuDialogo({
 
   return (
     <div
-      className="fixed inset-0 flex"
+      /* ── E É AQUI QUE A CAIXA A SAIR DEIXA DE APANHAR O TOQUE ────────────
+         A `.bo-saida` larga os `pointer-events` dentro da própria classe, mas
+         quem cobre o ecrã inteiro é ESTA moldura, e ela não leva classe
+         nenhuma. Sem esta linha, uma caixa a desvanecer-se continuava a comer
+         os toques do que está por baixo durante 200 ms: a pessoa carrega, não
+         acontece nada, e não há sinal nenhum de porquê. É o defeito mais caro
+         que uma saída pode trazer, e o teste que o guarda não avança um único
+         milissegundo depois do gesto. */
+      className={cn("fixed inset-0 flex", aSairAgora && "pointer-events-none")}
       style={{ zIndex: nivel }}
       role="presentation"
       // O fundo fecha — mas só quando o toque COMEÇOU nele. Sem esta condição,
       // arrastar de dentro para fora (a seleccionar texto, por exemplo) fechava
       // a caixa e perdia-se o que lá estava escrito.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) pedirFecho();
-      }}
+      onMouseDown={
+        aSairAgora
+          ? undefined
+          : (e) => {
+              if (e.target === e.currentTarget) pedirFecho();
+            }
+      }
     >
-      <div
-        className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]"
-        aria-hidden
-      />
+      {/* ── O VÉU ACENDE COM A CAIXA E APAGA-SE COM ELA ──────────────────
+          Zero de deslocação nos dois sentidos, que é o que um fundo pede: não
+          vem de sítio nenhum, logo também não vai para sítio nenhum. E o
+          `backdrop-filter` fica FORA das duas animações, como manda o
+          `globals.css` — um desfoque em transição repinta o ecrã todo a cada
+          fotograma.
+
+          ── E PORQUE É QUE SÃO DOIS RAMOS E NÃO UM `cn()` ──────────────────
+          Porque a varredura dos véus (`entrada-dos-fundos.test.ts`) LÊ o
+          ficheiro em vez de o correr: procura a lista de classes escrita por
+          extenso no atributo, e não sabe ler um `cn(…)` nem um ternário — nem
+          sequer salta os comentários, portanto nem isto aqui lhe pode ter a
+          forma de um. Um véu embrulhado ficava invisível para ela, e no dia em
+          que alguém lhe tirasse a entrada ninguém dava por isso. O véu ABERTO
+          fica portanto por extenso, e é o ramo da saída que leva o `cn`.
+
+          São dois ramos, mas não são dois nós: mesmo tipo e mesma posição, o
+          React reaproveita o elemento e troca-lhe as classes — a saída parte
+          da opacidade em que o véu está, e não de um nó novo. */}
+      {aSairAgora ? (
+        <div
+          className={cn(SAIDA_FUNDO, "absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]")}
+          aria-hidden
+        />
+      ) : (
+        <div
+          className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]"
+          aria-hidden
+        />
+      )}
 
       <div
         ref={caixaRef}
-        role="dialog"
-        aria-modal="true"
+        /* ── A CAIXA A SAIR JÁ NÃO É UMA CAIXA ──────────────────────────
+           Enquanto se apaga não tem `role`, não tem nome e não está no fio
+           do teclado: para quem ouve o ecrã e para quem anda de Tab, isto
+           acabou no instante do gesto — e acabou mesmo, porque o `onFechar`
+           já correu e o foco já voltou ao botão que a abriu. O que fica é
+           uma imagem. Deixá-la anunciada seria pior do que não animar
+           nada: um diálogo que ainda se ouve por cima do ecrã a que se
+           acabou de voltar. */
+        role={aSairAgora ? undefined : "dialog"}
+        aria-modal={aSairAgora ? undefined : "true"}
         // O nome vem do que está ESCRITO no cabeçalho, e não de uma cópia
         // paralela numa `aria-label`: com sobretítulo são as duas linhas, que
         // na leitura são uma frase só («Juntar “Itália” a 312 fotos»).
-        aria-labelledby={sobretitulo ? `${idTitulo}-sobre ${idTitulo}` : idTitulo}
-        style={comoFolha && arrasto ? { transform: `translateY(${arrasto}px)` } : undefined}
+        aria-labelledby={
+          aSairAgora ? undefined : sobretitulo ? `${idTitulo}-sobre ${idTitulo}` : idTitulo
+        }
+        aria-hidden={aSairAgora || undefined}
+        inert={aSairAgora}
+        style={
+          folhaArrastada
+            ? {
+                /* ── A FOLHA SAI DE ONDE O DEDO A DEIXOU ──────────────────
+                   Aqui a `.bo-saida` não serve, e a razão é mecânica: os
+                   fotogramas dela partem de `translateY(0)`, e uma animação
+                   ganha ao `transform` que o arrasto escreve no `style`. Uma
+                   folha puxada 90 px para baixo saltava de volta ao sítio
+                   ANTES de sair — o gesto lido ao contrário, no fotograma em
+                   que a pessoa levanta o dedo.
+
+                   Uma TRANSIÇÃO não tem esse problema: parte do valor que o
+                   elemento tem agora, que é exactamente onde o dedo o
+                   deixou. Os números continuam a ser os da casa e não são
+                   copiados — a duração é o `SAIDA_MS`, a curva é a
+                   `--ease-in` da saída, e a distância é o `--bo-saida-y` que
+                   a `.bo-saida-folha` (posta aqui só pela variável) declara
+                   em 8 px. É o «`--bo-saida-y` calculado»: o arrasto mais a
+                   distância da casa, somados no próprio CSS. */
+                transform: `translateY(calc(${arrastoDeSaida}px + var(--bo-saida-y)))`,
+                opacity: 0,
+                transition: `transform ${SAIDA_MS}ms var(--ease-in), opacity ${SAIDA_MS}ms var(--ease-in)`,
+              }
+            : comoFolha && arrasto
+              ? { transform: `translateY(${arrasto}px)` }
+              : undefined
+        }
         className={cn(
           "relative z-10 flex flex-col overflow-hidden bg-[var(--bo-surface,#ffffff)] shadow-[var(--bo-sombra-modal)]",
-          // ── DE ONDE ELA VEM ────────────────────────────────────────────
+          // ── DE ONDE ELA VEM, E PARA ONDE VAI ───────────────────────────
           // A folha sobe (8 px), o diálogo desce (4 px): cada um vem do lado
-          // onde vai ficar. A animação não tem `fill-mode`, portanto larga o
-          // elemento ao fim dos 240 ms e NÃO fica a disputar o `transform`
-          // que o arrasto da folha escreve em `style` — e o arrasto só começa
-          // depois de a folha estar parada.
-          "bo-entrada",
+          // onde vai ficar — e sai pelo mesmo, que é o que impede que se leia
+          // como dois elementos diferentes. A entrada não tem `fill-mode`,
+          // portanto larga o elemento ao fim dos 240 ms e NÃO fica a disputar
+          // o `transform` que o arrasto da folha escreve em `style`; a saída
+          // tem `forwards`, e a rede dela é o nó deixar de existir no
+          // fotograma a seguir aos 200 ms (senão ficava um `transform`
+          // pendurado a criar bloco de contenção).
+          aSairAgora
+            ? folhaArrastada
+              ? // Só a VARIANTE, sem a `.bo-saida`: aqui quem move é a
+                // transição do `style` aqui em cima, e o que se aproveita da
+                // classe é os 8 px de `--bo-saida-y`. O largar dos toques
+                // vem da moldura, que já os largou.
+                "bo-saida-folha pointer-events-none"
+              : comoFolha
+                ? SAIDA_FOLHA
+                : SAIDA
+            : cn("bo-entrada", comoFolha && "bo-entrada-folha"),
           comoFolha
             ? cn(
-                "bo-entrada-folha",
                 // `dvh` e não `vh`: com a barra do browser à vista, `100vh` é
                 // maior do que o que se vê, e o rodapé com as acções ficava
                 // debaixo dela.
@@ -278,6 +458,10 @@ export function FolhaOuDialogo({
             onPointerUp={() => {
               const passou = arrasto > FECHAR_A_PARTIR_DE;
               inicioY.current = null;
+              // Quanto é que ela tinha andado quando o dedo largou. Se este
+              // gesto fechar mesmo a folha, é daqui que ela sai — e se não
+              // fechar, a linha de baixo põe-na no sítio como sempre pôs.
+              arrastoAoLargar.current = passou ? arrasto : 0;
               setArrasto(0);
               if (passou) pedirFecho();
             }}

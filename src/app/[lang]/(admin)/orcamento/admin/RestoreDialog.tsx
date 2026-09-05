@@ -284,7 +284,15 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         role="dialog"
         aria-modal="true"
         aria-label="Repor cópia de segurança"
-        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
+        /* O véu já acendia (`bo-entrada-fundo`, na linha de cima) e a caixa
+           não: o ecrã escurecia em 240 ms e a caixa aparecia inteira no
+           primeiro fotograma deles. Quatro píxeis e os mesmos 240 ms põem os
+           dois no mesmo gesto.
+
+           Só `transform` e `opacity`, e sem `fill-mode`: no fim a animação
+           larga o elemento e não fica um `transform` pendurado a criar um
+           bloco de contenção por cima do que está cá dentro. */
+        className="bo-entrada relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
       >
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b border-[var(--bo-hairline)] px-6 py-4">

@@ -3003,7 +3003,20 @@ function Preview({
           onStep(1);
         }
       }}
-      className="absolute inset-0 z-10 flex flex-col bg-white"
+      /* ── UMA VISTA A SUBSTITUIR OUTRA DENTRO DO MESMO CROMADO ──────────
+         Carregar numa foto tapava a grelha de um fotograma para o outro: o
+         mosaico estava lá e, no seguinte, esta chapa branca por cima dele.
+         Não é uma caixa a APARECER por cima da página (essa é a
+         `.bo-entrada`) — o cromado do diálogo fica onde está e o que muda é
+         o conteúdo dentro dele, que é precisamente o que a `.view-in` da
+         casa diz: 240 ms, oito píxeis, a curva de quem apresenta.
+
+         E é `backwards` e não `both`, do lado do CSS, de propósito: não
+         deixa `transform` nenhum pendurado no fim. Um `transform`
+         persistente aqui criava um bloco de contenção e partia qualquer
+         `position: fixed` que viesse a nascer lá dentro — a mesma lição que
+         está escrita ao pé da regra no `globals.css`. */
+      className="view-in absolute inset-0 z-10 flex flex-col bg-white"
     >
       <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
         <p className="bo-text-muted text-xs">
