@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { MoodBoard } from "@/lib/proposal-doc";
 import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import { ASPETO_POR_OMISSAO, type LayoutDeMoodboard } from "@/lib/proposal-geometria";
 import { layoutDoBoard as layoutEfectivo, ordemDasFotos } from "@/lib/proposal-moodboard";
 import PreviaDaPagina from "./PreviaDaPagina";
 import { CORTES } from "./ui/adaptativo";
-import { ESTADO, PRESSAO } from "./ui/movimento";
+import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 import { useMedida } from "./useMedida";
 
 /**
@@ -150,6 +151,27 @@ export default function PainelDoEstudio({
 }) {
   const [vista, setVista] = useState<"pagina" | "documento">("pagina");
 
+  /**
+   * ── E ESTA BARRA TAMBÉM TEM UMA MARCA QUE ANDA ──────────────────────────
+   *
+   * Esta é a única barra de separadores do estúdio escrita à mão, fora do
+   * `ui/Segmented.tsx` — e por isso a única que ficou sem o gesto que ele já
+   * tem: o botão activo acendia num sítio e apagava-se no outro no mesmo
+   * fotograma, com os 120 ms do `ESTADO` a mudar-lhe só a cor.
+   *
+   * `useMarcaQueAnda` é a mesma medida do `NavEstudio` — a zona é a barra
+   * (`relative`), o marcado reconhece-se pelo `aria-selected` que estes botões
+   * já tinham, e a `chave` é a vista escolhida. O desenho fica aqui, porque é
+   * aqui que ele difere: a pílula do `Segmented` é `rounded-full` e branca
+   * numa calha de 1 px; esta é o `rounded-[6px]` que os botões já usavam.
+   *
+   * O tempo é o `MARCA` da casa (250 ms, o degrau «elemento»), e a assimetria
+   * é a que o `Segmented` explica: o texto acende nos 120 ms do `ESTADO` e a
+   * marca chega aos 250. Não se escreve aqui um segundo número.
+   */
+  const separadoresRef = useRef<HTMLDivElement>(null);
+  const { marca, podeAndar } = useMarcaQueAnda(separadoresRef, '[aria-selected="true"]', vista);
+
   const daPagina = (p: PaginaParaOPainel) => {
     const caminhos = (p.board.images ?? []).slice(0, MOOD_BOARD_MAX_IMAGES);
     const formas = caminhos.map((c) => aspetos[c] ?? ASPETO_POR_OMISSAO);
@@ -221,10 +243,33 @@ export default function PainelDoEstudio({
         ) : (
           <>
             <div
+              ref={separadoresRef}
               role="tablist"
               aria-label="O que mostrar"
-              className="mb-3 flex gap-1 rounded-lg bg-[var(--bo-tinta-6)] p-0.5"
+              /* `relative` porque é ESTA barra o `offsetParent` da marca: as
+                 medidas que o `useMarcaQueAnda` devolve são relativas a ela. */
+              className="relative mb-3 flex gap-1 rounded-lg bg-[var(--bo-tinta-6)] p-0.5"
             >
+              {/* A marca que anda. `aria-hidden` porque não diz nada que o
+                  `aria-selected` de cada separador não diga melhor — é
+                  desenho, não informação. Fica ATRÁS dos botões (eles são
+                  `relative`), para o texto continuar por cima do branco.
+
+                  `MARCA` traz `motion-safe:` nas duas classes: quem pediu para
+                  não animar vê-a mudar de sítio de um fotograma para o outro. */}
+              {marca && (
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute left-0 top-0 rounded-[6px] bg-white ${
+                    podeAndar ? MARCA : ""
+                  }`}
+                  style={{
+                    translate: `${marca.x}px ${marca.y}px`,
+                    width: marca.largura,
+                    height: marca.altura,
+                  }}
+                />
+              )}
               {(
                 [
                   ["pagina", "Esta página"],
@@ -237,9 +282,14 @@ export default function PainelDoEstudio({
                   role="tab"
                   aria-selected={vista === id}
                   onClick={() => setVista(id)}
-                  className={`flex-1 rounded-[6px] px-2 py-1.5 text-[11px] ${ESTADO} ${PRESSAO} ${
+                  className={`relative flex-1 rounded-[6px] px-2 py-1.5 text-[11px] ${ESTADO} ${PRESSAO} ${
                     vista === id
-                      ? "bg-white text-[var(--bo-text)] "
+                      ? /* O fundo próprio é a rede de antes de a marca existir
+                           — no servidor, e no fotograma antes da primeira
+                           medida. Sai no instante em que ela está no sítio:
+                           nunca há dois fundos, e nunca há nenhum. É a mesma
+                           regra que o `Segmented` explica por extenso. */
+                        `text-[var(--bo-text)] ${marca ? "" : "bg-white"}`
                       : "text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
                   }`}
                 >
@@ -249,60 +299,79 @@ export default function PainelDoEstudio({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              {vista === "pagina" && aVer ? (
-                <>
-                  <PreviaDaPagina
-                    {...daPagina(aVer)}
-                    titulo={aVer.board.title}
-                    subtitulo={aVer.board.subtitulo}
-                    legenda={aVer.board.annotation}
-                  />
-                  <p className="mt-2 text-center text-[11px] text-foreground/45">
-                    Inspiração {paginas.findIndex((p) => p.bi === aVer.bi) + 1} de {paginas.length}
-                  </p>
-                  {onEscolherFotos && (
-                    <button
-                      type="button"
-                      onClick={() => onEscolherFotos(aVer.bi)}
-                      className={`mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
-                    >
-                      Escolher fotografias para esta página
-                    </button>
-                  )}
-                </>
-              ) : (
-                /*
-                 * ── DUAS A DUAS, COMO NO PAPEL ──────────────────────────
-                 *
-                 * «Ver duas páginas lado a lado, como no PDF impresso.» Uma
-                 * proposta lê-se em par: quem a abre num leitor de PDF vê a
-                 * folha esquerda e a direita ao mesmo tempo, e a pergunta que
-                 * só se faz assim é se as duas combinam.
-                 */
-                <div className="grid grid-cols-2 gap-2">
-                  {paginas.map((p, i) => (
-                    <button
-                      key={p.board.id ?? p.bi}
-                      type="button"
-                      onClick={() => onSaltar(p.bi)}
-                      className={`rounded-[3px] text-left hover:opacity-100 ${ESTADO} ${PRESSAO} ${
-                        p.bi === activa ? "opacity-100" : "opacity-75"
-                      }`}
-                      aria-label={`Ir para a página ${i + 1}${p.board.title ? `: ${p.board.title}` : ""}`}
-                    >
-                      <PreviaDaPagina
-                        {...daPagina(p)}
-                        titulo={p.board.title}
-                        subtitulo={p.board.subtitulo}
-                        legenda={p.board.annotation}
-                      />
-                      <span className="mt-1 block truncate text-[10px] text-foreground/45 tabular-nums">
-                        {i + 1}. {p.board.title || "sem título"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* ── E O PAINEL QUE CHEGA APRESENTA-SE ────────────────────────
+                  O separador movia-se e o conteúdo trocava de golpe. É o mesmo
+                  gesto que os separadores do painel do pedido já têm — a
+                  `.view-in` da casa, 240 ms, a curva de quem apresenta.
+
+                  ── PORQUE É QUE AQUI O `key` PODE REMONTAR ─────────────────
+                  Lá os dois painéis ficam montados (só `hidden`) e a classe
+                  entra e sai com eles, porque o painel que sai guarda um
+                  rascunho escrito à mão. Aqui não guarda nada: o que estas
+                  duas vistas mostram é derivado do documento, e o cabeçalho
+                  deste ficheiro explica porque é que a vista escondida NÃO
+                  pode ficar montada — desenhar todas as páginas num ecrã onde
+                  não se veem foi o suficiente para o estúdio deixar de
+                  responder. As duas já se desmontavam uma à outra; o `key` só
+                  garante que a classe recomeça em vez de o React reaproveitar
+                  o nó e a animação nunca correr. */}
+              <div key={vista} className="view-in">
+                {vista === "pagina" && aVer ? (
+                  <>
+                    <PreviaDaPagina
+                      {...daPagina(aVer)}
+                      titulo={aVer.board.title}
+                      subtitulo={aVer.board.subtitulo}
+                      legenda={aVer.board.annotation}
+                    />
+                    <p className="mt-2 text-center text-[11px] text-foreground/45">
+                      Inspiração {paginas.findIndex((p) => p.bi === aVer.bi) + 1} de{" "}
+                      {paginas.length}
+                    </p>
+                    {onEscolherFotos && (
+                      <button
+                        type="button"
+                        onClick={() => onEscolherFotos(aVer.bi)}
+                        className={`mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                      >
+                        Escolher fotografias para esta página
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  /*
+                   * ── DUAS A DUAS, COMO NO PAPEL ──────────────────────────
+                   *
+                   * «Ver duas páginas lado a lado, como no PDF impresso.» Uma
+                   * proposta lê-se em par: quem a abre num leitor de PDF vê a
+                   * folha esquerda e a direita ao mesmo tempo, e a pergunta que
+                   * só se faz assim é se as duas combinam.
+                   */
+                  <div className="grid grid-cols-2 gap-2">
+                    {paginas.map((p, i) => (
+                      <button
+                        key={p.board.id ?? p.bi}
+                        type="button"
+                        onClick={() => onSaltar(p.bi)}
+                        className={`rounded-[3px] text-left hover:opacity-100 ${ESTADO} ${PRESSAO} ${
+                          p.bi === activa ? "opacity-100" : "opacity-75"
+                        }`}
+                        aria-label={`Ir para a página ${i + 1}${p.board.title ? `: ${p.board.title}` : ""}`}
+                      >
+                        <PreviaDaPagina
+                          {...daPagina(p)}
+                          titulo={p.board.title}
+                          subtitulo={p.board.subtitulo}
+                          legenda={p.board.annotation}
+                        />
+                        <span className="mt-1 block truncate text-[10px] text-foreground/45 tabular-nums">
+                          {i + 1}. {p.board.title || "sem título"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

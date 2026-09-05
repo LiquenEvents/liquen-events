@@ -12,6 +12,7 @@ import {
 } from "react";
 import { quandoGravado } from "@/lib/quando-gravado";
 import { rolarAteVer } from "@/lib/motion/rolar";
+import { SAIDA_FUNDO } from "./ui/saida";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -8567,23 +8568,34 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                          * dobras guardadas num objecto era mais
                                          * uma coisa a manter, para o navegador
                                          * fazer melhor de graça.
+                                         *
+                                         * Continua a ser o `details` a mandar —
+                                         * quem abre e fecha é ele, e nenhuma
+                                         * dobra é guardada de fora. O que o
+                                         * `DobraDaDisposicao` acrescenta é uma
+                                         * coisa só: saber que ela abriu ESTA
+                                         * dobra AGORA, para o corpo poder
+                                         * entrar sem que as sete animem ao
+                                         * carregar a proposta. Ver a ficha dele.
                                          */
-                                        <details className="group mt-1">
-                                          <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
-                                            <span
-                                              aria-hidden
-                                              className="text-[10px] text-foreground/35 motion-safe:transition-transform group-open:rotate-90"
-                                            >
-                                              ▸
-                                            </span>
-                                            Disposição:{" "}
-                                            <strong className="font-medium text-[var(--bo-tinta-72)]">
-                                              {NOME_DO_LAYOUT[layoutDoBoard]}
-                                            </strong>
-                                            <span className="text-foreground/35">
-                                              · {semRecorte ? "sem recorte" : "recorta"}
-                                            </span>
-                                          </summary>
+                                        <DobraDaDisposicao
+                                          resumo={
+                                            <>
+                                              Disposição:{" "}
+                                              <strong className="font-medium text-[var(--bo-tinta-72)]">
+                                                {NOME_DO_LAYOUT[layoutDoBoard]}
+                                              </strong>
+                                              <span className="text-foreground/35">
+                                                · {semRecorte ? "sem recorte" : "recorta"}
+                                              </span>
+                                            </>
+                                          }
+                                          corpo={`mt-2 grid gap-4 ${
+                                            painelLateralCabe
+                                              ? ""
+                                              : "@min-[30rem]:grid-cols-[minmax(0,1fr)_15rem]"
+                                          }`}
+                                        >
                                           {/* A segunda coluna abre-se quando há
                                             mesmo uma segunda coluna. Era
                                             `2xl:grid-cols-1` a desfazê-la com
@@ -8627,84 +8639,76 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               Sobram 224 px para o selector, que
                                               é `flex-wrap` com peças de 5,75rem:
                                               duas por linha, como já era. */}
-                                          <div
-                                            className={`mt-2 grid gap-4 ${
-                                              painelLateralCabe
-                                                ? ""
-                                                : "@min-[30rem]:grid-cols-[minmax(0,1fr)_15rem]"
-                                            }`}
-                                          >
-                                            <div className="min-w-0">
-                                              <SelectorDeLayout
-                                                valor={b.layout}
-                                                aspectos={aspectos}
-                                                semRecorte={semRecorte}
-                                                // `undefined` APAGA o campo: um mood board sem
-                                                // layout gravado continua sem ele, e uma proposta
-                                                // já enviada não muda de aspecto por causa disto.
-                                                onEscolher={(layout) => updateBoard(bi, { layout })}
-                                              />
-                                            </div>
-                                            {/*
-                                             * ── A MINIATURA REPETIDA SETE VEZES
-                                             *
-                                             * «Minúscula e repetida sete vezes.»
-                                             * Onde o painel da direita cabe, ele
-                                             * mostra a MESMA página, grande, e
-                                             * duas cópias da mesma coisa no mesmo
-                                             * ecrã são uma a mais. Abaixo disso
-                                             * fica, porque abaixo disso o painel
-                                             * não cabe — e tirá-la aí era tirar a
-                                             * pré-visualização a quem trabalha
-                                             * num portátil.
-                                             *
-                                             * MONTAGEM CONDICIONAL, e não
-                                             * `2xl:hidden`: escondida por CSS ela
-                                             * continuava a ser DESENHADA, sete
-                                             * vezes, com as URLs de todas as
-                                             * fotografias. Ver `painelLateralCabe`
-                                             * lá em cima, e o
-                                             * `PainelDoEstudio.tsx:52-57`, que
-                                             * conta o que isso custou quando era
-                                             * ele a fazê-lo.
-                                             */}
-                                            {/* A folga alinha a miniatura com o
+                                          <div className="min-w-0">
+                                            <SelectorDeLayout
+                                              valor={b.layout}
+                                              aspectos={aspectos}
+                                              semRecorte={semRecorte}
+                                              // `undefined` APAGA o campo: um mood board sem
+                                              // layout gravado continua sem ele, e uma proposta
+                                              // já enviada não muda de aspecto por causa disto.
+                                              onEscolher={(layout) => updateBoard(bi, { layout })}
+                                            />
+                                          </div>
+                                          {/*
+                                           * ── A MINIATURA REPETIDA SETE VEZES
+                                           *
+                                           * «Minúscula e repetida sete vezes.»
+                                           * Onde o painel da direita cabe, ele
+                                           * mostra a MESMA página, grande, e
+                                           * duas cópias da mesma coisa no mesmo
+                                           * ecrã são uma a mais. Abaixo disso
+                                           * fica, porque abaixo disso o painel
+                                           * não cabe — e tirá-la aí era tirar a
+                                           * pré-visualização a quem trabalha
+                                           * num portátil.
+                                           *
+                                           * MONTAGEM CONDICIONAL, e não
+                                           * `2xl:hidden`: escondida por CSS ela
+                                           * continuava a ser DESENHADA, sete
+                                           * vezes, com as URLs de todas as
+                                           * fotografias. Ver `painelLateralCabe`
+                                           * lá em cima, e o
+                                           * `PainelDoEstudio.tsx:52-57`, que
+                                           * conta o que isso custou quando era
+                                           * ele a fazê-lo.
+                                           */}
+                                          {/* A folga alinha a miniatura com o
                                                 selector ao lado — e por isso segue
                                                 o MESMO degrau que decide se estão
                                                 lado a lado. Era `lg:`, a mesma
                                                 janela do grid aqui em cima. */}
-                                            {!painelLateralCabe && (
-                                              <div className="@min-[30rem]:pt-6">
-                                                <PreviaDaPagina
-                                                  layout={layoutDoBoard}
-                                                  aspectos={aspectos}
-                                                  // Pela ordem de DESENHO, com a principal à frente
-                                                  // — a mesma que a página vai usar.
-                                                  urls={ordemDeDesenho
-                                                    .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                    .map((i) => assetUrls[b.images[i]])}
-                                                  // O plano B, o mesmo da grelha aqui
-                                                  // ao lado: uma miniatura que não
-                                                  // existe cai para o original em vez
-                                                  // de dar o ícone de imagem partida.
-                                                  originais={ordemDeDesenho
-                                                    .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                    .map((i) => assetOriginais[b.images[i]])}
-                                                  semRecorte={semRecorte}
-                                                  titulo={b.title}
-                                                  subtitulo={b.subtitulo}
-                                                  legenda={b.annotation}
-                                                  // Aqui o rótulo ainda diz alguma
-                                                  // coisa: é a única miniatura do
-                                                  // cartão, e sem ele lê-se como
-                                                  // mais uma fotografia. Ver
-                                                  // `comRotulo`.
-                                                  comRotulo
-                                                />
-                                              </div>
-                                            )}
-                                          </div>
-                                        </details>
+                                          {!painelLateralCabe && (
+                                            <div className="@min-[30rem]:pt-6">
+                                              <PreviaDaPagina
+                                                layout={layoutDoBoard}
+                                                aspectos={aspectos}
+                                                // Pela ordem de DESENHO, com a principal à frente
+                                                // — a mesma que a página vai usar.
+                                                urls={ordemDeDesenho
+                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                  .map((i) => assetUrls[b.images[i]])}
+                                                // O plano B, o mesmo da grelha aqui
+                                                // ao lado: uma miniatura que não
+                                                // existe cai para o original em vez
+                                                // de dar o ícone de imagem partida.
+                                                originais={ordemDeDesenho
+                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                  .map((i) => assetOriginais[b.images[i]])}
+                                                semRecorte={semRecorte}
+                                                titulo={b.title}
+                                                subtitulo={b.subtitulo}
+                                                legenda={b.annotation}
+                                                // Aqui o rótulo ainda diz alguma
+                                                // coisa: é a única miniatura do
+                                                // cartão, e sem ele lê-se como
+                                                // mais uma fotografia. Ver
+                                                // `comRotulo`.
+                                                comRotulo
+                                              />
+                                            </div>
+                                          )}
+                                        </DobraDaDisposicao>
                                       )}
                                       {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
                           Está aqui, por baixo dos diagramas, porque é com eles
@@ -11996,6 +12000,96 @@ function AvisoDeOrdem({
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
+ * A DOBRA DA DISPOSIÇÃO — E PORQUE É QUE A ENTRADA SÓ PODE VIR DO `onToggle`
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O bloco dos seis diagramas de cada mood board vive dentro de um `<details>`
+ * nativo — a decisão está contada no sítio onde ele se usa, e não muda: quem
+ * abre e fecha continua a ser o browser, de graça, com teclado e com o
+ * «localizar na página» a funcionar mesmo fechado.
+ *
+ * O que faltava era o corpo APARECER. Um `<details>` a abrir troca o `display`
+ * do conteúdo, que é o corte mais seco que há — e numa proposta com sete
+ * páginas de inspiração são sete dobras a fazer o mesmo salto.
+ *
+ * ── E PORQUE É QUE ISTO PRECISA DE ESTADO, SE O `<details>` JÁ TEM O SEU ───
+ *
+ * Porque a pergunta não é «está aberto?», é «acabou de ser aberto POR ELA?».
+ * São coisas diferentes, e confundi-las é exactamente o defeito que isto
+ * evita: uma entrada escrita em CSS (`details[open] > …`) corre sempre que o
+ * corpo estiver visível, portanto correria também ao carregar a proposta — e
+ * com sete páginas eram sete secções a animar de uma vez no primeiro
+ * fotograma do estúdio. Isso não é uma entrada, é ruído.
+ *
+ * Hoje nenhuma destas dobras nasce aberta, e por isso a distinção parece
+ * gratuita. Não é: é a rede para o dia em que alguém escrever `open` (ou
+ * restaurar a dobra de uma visita anterior) e não ligar as duas coisas.
+ *
+ * ── O QUE ESTE COMPONENTE NÃO FAZ ─────────────────────────────────────────
+ *
+ * Não guarda a dobra. `aberta` é a repetição do que o `<details>` já sabe,
+ * escrita só para o corpo saber se leva a classe; fechar a dobra apaga-a, e é
+ * isso que faz a entrada correr outra vez quando ela reabre.
+ *
+ * E não re-desenha o que está lá dentro. Os `children` chegam prontos de quem
+ * chama, portanto o React salta-os quando isto volta a desenhar-se ao abrir —
+ * o único nó que muda é o corpo, e só na `className`. Uma dobra a abrir não
+ * pode custar o desenho de um selector de layout e de uma miniatura.
+ */
+function DobraDaDisposicao({
+  resumo,
+  corpo,
+  children,
+}: {
+  /** O que se lê no fecho: a disposição escolhida e o enquadramento. */
+  resumo: React.ReactNode;
+  /** As classes do corpo. A entrada junta-se a estas, não as substitui. */
+  corpo: string;
+  children: React.ReactNode;
+}) {
+  const [aberta, setAberta] = useState(false);
+  return (
+    <details
+      className="group mt-1"
+      onToggle={(e) => setAberta(e.currentTarget.open)}
+      /* `name` de propósito NÃO: um `name` partilhado fecharia a dobra de um
+         board ao abrir a do seguinte, e o que se quer é poder comparar duas
+         páginas lado a lado. */
+    >
+      <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+        {/* A MESMA seta, e o mesmo tempo, do cabeçalho das secções e das duas
+            setas irmãs da casa (`Overview.tsx`, `Tarefas.tsx:810`): 200 ms na
+            `cubic-bezier(0, 0, 0.2, 1)`. Estava sem duração, ou seja nos 150 ms
+            de omissão do Tailwind, que ninguém escolheu.
+
+            `transition-transform` NOMEADA e não `transition-[transform]`: no
+            Tailwind v4 o `rotate-90` emite a propriedade autónoma `rotate`, e
+            só a forma nomeada a inclui (compilado com o 4.3.0 deste
+            repositório: `transform, translate, scale, rotate`). */}
+        <span
+          aria-hidden
+          className="text-[10px] text-foreground/35 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] group-open:rotate-90"
+        >
+          ▸
+        </span>
+        {resumo}
+      </summary>
+      {/* `bo-entrada-folha` — oito píxeis e não quatro: isto não é um menu que
+          nasce encostado ao botão, é um bloco de conteúdo a descer para dentro
+          da página, e oito é a distância que a casa reserva para isso.
+
+          A `.bo-entrada` não tem `fill-mode`: acabada a animação larga o
+          elemento e não fica `transform` nenhum pendurado — que é o que
+          quebraria a barra de acção `sticky` do estúdio se ela estivesse cá
+          dentro. Não está, mas a regra vale à mesma para o dia em que algum
+          descendente daqui precise de se colar. */}
+      <div className={aberta ? `${corpo} bo-entrada bo-entrada-folha` : corpo}>{children}</div>
+    </details>
+  );
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
  * UMA SECÇÃO NUNCA APARECE FECHADA
  * ══════════════════════════════════════════════════════════════════════════
  *
@@ -12063,9 +12157,35 @@ function Section({
   rodape?: React.ReactNode;
 }) {
   const [fechada, setFechada] = useState(false);
+  /**
+   * ── E O CORPO ENTRA QUANDO ELA ABRE — NUNCA AO CARREGAR ─────────────────
+   *
+   * A secção fechada continua a ter os campos no formulário (é o `hidden` aqui
+   * em baixo, e a razão está escrita lá): abrir e fechar é uma troca de
+   * `display`, e uma troca de `display` é o corte mais seco que há. Passa a
+   * haver a `.bo-entrada` da casa — 240 ms, quatro píxeis, a curva de quem
+   * apresenta.
+   *
+   * O que este estado guarda, e é a parte que importa, é que a entrada SÓ
+   * corre depois de ela tocar no título. Se a classe estivesse ligada apenas
+   * ao `!fechada`, as nove secções — que abrem todas abertas, de propósito —
+   * animavam ao mesmo tempo no instante em que a proposta abre, por cima da
+   * `.view-in` que o passo já traz. Duas apresentações do mesmo ecrã ao mesmo
+   * tempo lê-se como um salto, não como uma entrada.
+   *
+   * Depois do primeiro toque a classe fica, e é isso que faz a entrada correr
+   * de cada vez que a secção volta: um elemento que sai de `display: none`
+   * recomeça a animação sozinho, sem temporizador e sem remontar nada.
+   *
+   * A `.bo-entrada` acaba sem `fill-mode`, portanto não deixa `transform`
+   * pendurado — o que quebraria a barra `sticky` do fundo se ela estivesse cá
+   * dentro. Não está: é irmã dos três passos, e não filha de nenhuma secção.
+   */
+  const [jaAbriuAMao, setJaAbriuAMao] = useState(false);
 
   function alternar() {
     if (!id) return;
+    if (fechada) setJaAbriuAMao(true);
     setFechada((v) => !v);
   }
 
@@ -12101,9 +12221,33 @@ function Section({
                é quem cede espaço a um `nota` comprido. */
             className="alvo-toque group -my-1 flex shrink-0 items-baseline gap-2 py-2 text-left"
           >
+            {/* ── A SETA DEMORA O QUE AS IRMÃS DEMORAM ────────────────────
+                Tinha `motion-safe:transition-transform` e mais nada — sem
+                duração, o Tailwind cai no seu `--default-transition-duration`,
+                que são 150 ms que ninguém escolheu (é a mesma avaria que o
+                `ui/movimento.ts` conta por extenso, e a razão de os números
+                dele estarem escritos um a um).
+
+                As duas setas irmãs desta casa já escolheram: a do «Mais do
+                painel» (`Overview.tsx`, pela `.bo-mais-seta` do `globals.css`)
+                e a dos «Detalhes (opcional)» (`Tarefas.tsx:810`) rodam as duas
+                em 200 ms com a `cubic-bezier(0, 0, 0.2, 1)` — o registo do
+                back office, o mesmo dos 240/600 ms. Esta passa a ser a
+                terceira, e não uma quarta velocidade.
+
+                ── E A LISTA COBRE MESMO O `rotate` ────────────────────────
+                No Tailwind v4 `rotate-90` emite a propriedade AUTÓNOMA
+                `rotate: 90deg`, não um `transform` — a armadilha que já mordeu
+                esta casa duas vezes. O que a fecha é a forma NOMEADA:
+                compilado com o Tailwind 4.3.0 deste repositório,
+                `transition-transform` sai como
+                `transition-property: transform, translate, scale, rotate`, e
+                cobre-a. Quem NÃO a cobre é a forma entre parênteses rectos —
+                `transition-[transform]` sai literal e deixa o `rotate` de fora.
+                Por isso fica a nomeada, e uma varredura prende-a. */}
             <span
               aria-hidden
-              className={`text-[10px] text-foreground/35 motion-safe:transition-transform ${fechada ? "" : "rotate-90"}`}
+              className={`text-[10px] text-foreground/35 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] ${fechada ? "" : "rotate-90"}`}
             >
               ▶
             </span>
@@ -12120,8 +12264,18 @@ function Section({
         {accao && <div className="shrink-0">{accao}</div>}
       </div>
       {/* `hidden` e não desmontar: uma secção fechada continua a ter os campos
-          no formulário, e fechá-la não pode apagar o que lá está escrito. */}
-      <div id={corpoId} hidden={fechada}>
+          no formulário, e fechá-la não pode apagar o que lá está escrito.
+          A `.bo-entrada` entra por cima disso e não em vez disso — ver
+          `jaAbriuAMao`, lá em cima, para o porquê de ela só chegar ao primeiro
+          toque dela. */}
+      <div
+        id={corpoId}
+        hidden={fechada}
+        /* `bo-entrada-folha` — oito píxeis e não quatro, o mesmo que a dobra da
+           disposição: quatro é a distância de um item de menu, e isto é um
+           bloco de conteúdo a descer para dentro da página. */
+        className={jaAbriuAMao ? "bo-entrada bo-entrada-folha" : undefined}
+      >
         {children}
         {rodape}
       </div>
@@ -12271,6 +12425,88 @@ function CopiarResumo({ texto }: { texto: string }) {
   );
 }
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * O ESQUELETO ESBATE-SE — A ÚNICA SAÍDA DESTA CASA QUE SAI DE GRAÇA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * As duas miniaturas do estúdio — a do resumo (`PreviewThumb`) e a das grelhas
+ * de mood board (`Thumb`) — põem um `<span absolute inset-0>` cinzento POR CIMA
+ * da imagem, e não no lugar dela. Isso é uma decisão antiga e está contada nos
+ * dois sítios: a caixa nunca muda de tamanho, e o `src` está posto muito antes
+ * de os bytes chegarem, portanto há sempre alguma coisa a dizer «isto está a
+ * acontecer».
+ *
+ * O efeito colateral, que ninguém tinha aproveitado: quando a fotografia chega,
+ * ela JÁ ESTÁ PINTADA POR BAIXO. O esqueleto desaparecia num fotograma e a
+ * fotografia dava um salto para dentro do ecrã — quando o que se passou foi
+ * apenas que o pano que a tapava se pode levantar. Em toda a casa esta é a
+ * única saída que não precisa de segurar nada montado à espera: o que está por
+ * baixo é o destino final.
+ *
+ * ── A CLASSE É A `.bo-saida-fundo`, E NÃO A `.bo-saida` ───────────────────
+ *
+ * Zero de deslocação. Um esqueleto não vem de sítio nenhum nem vai para sítio
+ * nenhum — está exactamente por cima do que vai ficar, e quatro píxeis a subir
+ * fariam a mancha cinzenta DESLIZAR sobre a fotografia, que é uma coisa a
+ * mover-se onde não se moveu nada. O que ele faz é apagar-se, nos 200 ms e na
+ * `--ease-in` de tudo o que sai nesta casa.
+ *
+ * E não conflitua com o brilho: o `bo-shimmer` corre no `::after` do
+ * `.bo-skeleton`, não no elemento — as duas animações vivem em nós diferentes e
+ * a `animation` da `.bo-saida` não pisa nenhuma. O brilho continua até ao fim do
+ * esbatimento, que é o que se quer: ele diz «ainda vem», e o que se está a ver
+ * é ele a ir-se embora.
+ *
+ * ── E O ESQUELETO NÃO LEVA ENTRADA. NUNCA. ────────────────────────────────
+ *
+ * Meio segundo antes de aparecer conteúdo é o oposto do que um esqueleto existe
+ * para fazer — ele é a promessa de que já está a acontecer alguma coisa, e uma
+ * promessa que se apresenta chega tarde. Por isso `jaSeViu`: uma célula que
+ * nunca esteve a carregar (uma foto que já falhou quando o ecrã abriu) não
+ * desenha esqueleto nenhum, em vez de desenhar um só para o esbater — o que
+ * seria pôr uma entrada onde ela está proibida, disfarçada de saída.
+ *
+ * ── E NÃO SE DESMONTA ─────────────────────────────────────────────────────
+ *
+ * A `.bo-saida` é `forwards`: acabada a animação o nó fica em `opacity: 0` e
+ * sem `pointer-events` — invisível e inerte, sobre a fotografia que já lá
+ * estava. Não há aqui o problema que o `ui/saida.ts` existe para resolver
+ * (segurar montado um nó que o React ia deitar fora), e trazê-lo para cá era
+ * pôr um temporizador por miniatura numa grelha que pode ter vinte e quatro.
+ * Deixá-lo montado é também o que faz a volta funcionar: se a célula voltar a
+ * carregar — um URL reassinado, um «Tentar novamente» —, a classe sai e o
+ * esqueleto reacende no fotograma seguinte, sem entrada nenhuma.
+ */
+function EsqueletoPorCima({ aCarregar, comPega }: { aCarregar: boolean; comPega?: boolean }) {
+  /**
+   * Um trinco que só anda para um lado: já esteve à espera alguma vez?
+   *
+   * Ajustado NO DESENHO e não num `useEffect`. É o caminho que o React
+   * documenta para acertar estado quando uma propriedade muda: ele reentra
+   * neste componente antes de pintar o que quer que seja, portanto não há
+   * fotograma nenhum desenhado com a resposta velha nem um segundo commit. Com
+   * um efeito, a saída começava um fotograma depois da fotografia chegar — e
+   * numa grelha de vinte e quatro miniaturas isso é vinte e quatro efeitos a
+   * acordar por nada.
+   *
+   * O valor inicial já vem certo, portanto no caso normal — a célula nasce à
+   * espera — este ajuste nunca chega a correr.
+   */
+  const [jaSeViu, setJaSeViu] = useState(aCarregar);
+  if (aCarregar && !jaSeViu) setJaSeViu(true);
+  if (!aCarregar && !jaSeViu) return null;
+  return (
+    <span
+      className={`bo-skeleton pointer-events-none absolute inset-0 ${aCarregar ? "" : SAIDA_FUNDO}`}
+      aria-hidden
+      // A pega dos testes diz «esta célula está À ESPERA», e não «este nó
+      // existe»: a partir daqui ele fica montado a esbater-se e, depois, calado.
+      data-a-carregar={comPega && aCarregar ? "" : undefined}
+    />
+  );
+}
+
 /** Miniatura só de leitura (sem botão de remover) para o resumo. */
 function PreviewThumb({
   url,
@@ -12322,9 +12558,7 @@ function PreviewThumb({
           </div>
         )
       )}
-      {aCarregar && (
-        <span className="bo-skeleton pointer-events-none absolute inset-0" aria-hidden />
-      )}
+      <EsqueletoPorCima aCarregar={aCarregar} />
     </div>
   );
 }
@@ -13498,13 +13732,7 @@ function Thumb({
           que a foto chega, e o `src` está posto muito antes de os bytes
           chegarem — a caixa ficava cinzenta e calada durante os 34 s medidos.
           Assim há sempre alguma coisa a dizer «isto está a acontecer». */}
-      {aCarregar && (
-        <span
-          className="bo-skeleton pointer-events-none absolute inset-0"
-          aria-hidden
-          data-a-carregar=""
-        />
-      )}
+      <EsqueletoPorCima aCarregar={aCarregar} comPega />
       {/* Sobreposta, nunca no fluxo: a célula tem de ter exatamente o mesmo
           tamanho antes e depois de a foto assentar. */}
       {pendente && (
