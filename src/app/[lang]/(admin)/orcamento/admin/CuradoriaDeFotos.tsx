@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ThemeImage } from "@/lib/theme-types";
+import { assentar } from "@/lib/motion/mola";
 import { Button } from "./ui";
 
 /**
@@ -46,6 +47,67 @@ interface Decisao {
  *  trémulo, e a foto volta ao sítio. */
 const LIMIAR = 70;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FOTO QUE VOLTA — e a diferença entre voltar e saltar
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que estava: `largar` fazia `setArrastoX(0)` e o cartão não tinha transição
+ * nenhuma por baixo (o `transform` é escrito no `style`, e o `className` ao
+ * lado não trazia um único `transition-*`). Ou seja: um arrasto que não chegou
+ * ao limiar acabava com a fotografia a saltar para o sítio num fotograma.
+ *
+ * E é a leitura errada. Uma fotografia que SALTA de volta parece um erro — o
+ * ecrã piscou, alguma coisa se desfez. Uma que REGRESSA é uma recusa educada:
+ * ouvi-te, não chegou. É a mesma informação com o sinal trocado, e custa
+ * quatrocentos milissegundos.
+ *
+ * ── PORQUE É QUE É A MOLA E NÃO UMA CURVA ─────────────────────────────────
+ *
+ * A casa tem uma mola escrita (`lib/motion/mola.ts`) e, até aqui, nunca usada:
+ * o token `MOLA` do `lib/motion/tokens.ts` existia, os números estavam medidos,
+ * havia teste — e não havia um único sítio no produto a chamá-la. Este é o
+ * sítio, e está escrito no próprio ficheiro dela: «para o que se larga a meio
+ * de um gesto», «uma fotografia largada a meio de um arrasto», «num painel
+ * onde se arrastam quarenta fotografias».
+ *
+ * A razão é a que ela dá: uma `cubic-bezier` descreve um percurso com princípio
+ * e fim conhecidos ANTES de começar. Uma foto largada a meio não tem nenhum dos
+ * dois — vem com uma velocidade que ninguém escolheu. Com uma curva de duração
+ * fixa, um empurrão de 8 px e um arrasto de 200 px demoram o mesmo tempo a
+ * voltar, e o pequeno lê-se como preguiça. Com a mola, o tempo acompanha a
+ * distância sozinho (medido no `tokens.ts`: 8 px em 233 ms, 40 px em 350 ms,
+ * 200 px em 450 ms) e a velocidade do dedo continua a viagem em vez de a
+ * cortar.
+ *
+ * Aqui a mola tem as duas coisas de que precisa e o quadro do Kanban não tinha:
+ * um deslocamento a sério (`arrastoX`, que já existia) e uma velocidade a sério
+ * (a que se mede entre os dois últimos eventos do dedo).
+ *
+ * ── UM SÓ A ESCREVER NA FOTO ──────────────────────────────────────────────
+ *
+ * A mola pinta através do MESMO `arrastoX` que o dedo usa, e não directamente
+ * no `style` do elemento. É de propósito: dois escritores no mesmo `transform`
+ * é o defeito que o `assentar` avisa em letra grande — a peça treme. E não
+ * custa mais do que já custava, porque arrastar já era um `setArrastoX` por
+ * evento do dedo.
+ *
+ * ── E O QUE **NÃO** VOLTA COM MOLA ────────────────────────────────────────
+ *
+ * Uma decisão tomada (incluir, saltar) não volta: a foto sai e entra outra. Aí
+ * o `arrastoX` vai a zero de uma vez, como sempre foi — a mola é para o gesto
+ * que NÃO pegou, e mais nada. É essa a diferença que se quer ver.
+ */
+
+/**
+ * Abaixo disto não há regresso nenhum para animar: `assentar` já se considera
+ * em repouso (meio píxel, oito píxeis por segundo) e devolveria um
+ * cancelamento sem nunca pintar — o que deixaria a foto meio píxel ao lado com
+ * um `transform` pendurado no elemento para sempre.
+ */
+const IMOVEL_PX = 1;
+const IMOVEL_PX_S = 8;
+
 export function CuradoriaDeFotos({
   images,
   escolhidas,
@@ -75,6 +137,12 @@ export function CuradoriaDeFotos({
   const [arrastoX, setArrastoX] = useState(0);
   const inicio = useRef<{ x: number; y: number } | null>(null);
   const cartao = useRef<HTMLDivElement | null>(null);
+  /** Cancela a mola que ainda esteja a assentar a foto. Ver o bloco lá em cima. */
+  const recuo = useRef<(() => void) | null>(null);
+  /** A última amostra do dedo — é dela que sai a velocidade de largada. */
+  const amostra = useRef<{ x: number; t: number } | null>(null);
+  /** A velocidade com que o dedo ia, em píxeis por segundo. */
+  const velocidade = useRef(0);
 
   const foto = images[indice] ?? null;
   const acabou = indice >= images.length;
@@ -87,11 +155,49 @@ export function CuradoriaDeFotos({
     cartao.current?.focus();
   }, []);
 
+  /**
+   * A mola morre com o componente. Sem isto, sair da curadoria a meio de um
+   * regresso deixava um `requestAnimationFrame` a chamar `setArrastoX` num
+   * componente que já não existe.
+   */
+  useEffect(() => () => recuo.current?.(), []);
+
+  /** Pára a mola, se estiver a assentar alguma coisa. */
+  function pararMola() {
+    recuo.current?.();
+    recuo.current = null;
+  }
+
+  /**
+   * A foto REGRESSA ao sítio, com a mola da casa e com a velocidade que o dedo
+   * trazia.
+   */
+  function voltarAoSitio(de: number) {
+    const v = velocidade.current;
+    velocidade.current = 0;
+    if (Math.abs(de) < IMOVEL_PX && Math.abs(v) < IMOVEL_PX_S) {
+      setArrastoX(0);
+      return;
+    }
+    // Quem pediu para não animar não leva mola: a foto vai directa ao sítio.
+    // A regra da casa é `prefers-reduced-motion`, e aqui não há CSS onde a pôr
+    // — isto é um ciclo de `requestAnimationFrame`, e desliga-se em JS.
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setArrastoX(0);
+      return;
+    }
+    recuo.current = assentar({ x: de, y: 0 }, (p) => setArrastoX(p.x), { x: v, y: 0 });
+  }
+
   function decidir(incluir: boolean) {
     if (!foto) return;
     // Ao TETO, incluir não faz nada — mas saltar continua a fazer, senão a
     // curadoria ficava presa na mesma foto sem dizer porquê.
     if (incluir && !podeEscolherMais && !escolhidas.has(foto.path)) return;
+    // Uma decisão não é um regresso: a foto sai e entra outra. Se ainda houver
+    // mola a correr, ela escreveria o `arrastoX` da foto anterior por cima da
+    // que acabou de chegar.
+    pararMola();
     aoDecidir(foto.path, incluir);
     setHistorico((h) => [...h, { path: foto.path, incluida: incluir }]);
     setIndice((i) => i + 1);
@@ -103,6 +209,7 @@ export function CuradoriaDeFotos({
     if (!ultima) return;
     // Desfazer é desfazer mesmo: uma foto incluída sai da selecção. Uma saltada
     // não tem nada para tirar — só se volta a ela.
+    pararMola();
     if (ultima.incluida) aoDecidir(ultima.path, false);
     setHistorico((h) => h.slice(0, -1));
     setIndice((i) => Math.max(0, i - 1));
@@ -112,30 +219,62 @@ export function CuradoriaDeFotos({
   // ── Os dedos ──────────────────────────────────────────────────────────────
 
   function pousar(e: React.PointerEvent) {
+    // O dedo novo ganha à mola velha. Sem isto, pousar em cima de uma foto que
+    // ainda está a assentar punha os dois a escrever o mesmo `arrastoX` — que
+    // é a tremura que o `assentar` avisa em letra grande.
+    pararMola();
     inicio.current = { x: e.clientX, y: e.clientY };
+    amostra.current = { x: e.clientX, t: e.timeStamp };
+    velocidade.current = 0;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }
 
   function mover(e: React.PointerEvent) {
     if (!inicio.current) return;
+    const anterior = amostra.current;
+    if (anterior) {
+      // Entre as duas ÚLTIMAS amostras, e não sobre o gesto todo: o que
+      // interessa é a velocidade com que o dedo ia no instante de largar.
+      const dx = e.clientX - anterior.x;
+      const dt = e.timeStamp - anterior.t;
+      // Um dedo que NÃO ANDOU não vai a velocidade nenhuma, e isso sabe-se sem
+      // relógio nenhum. Tem de estar antes da divisão por duas razões: um `dt`
+      // de zero (duas amostras no mesmo milissegundo, que acontece) daria
+      // infinito e a mola divergia; e sem este ramo, o gesto que hesita e
+      // levanta parado ficava com a velocidade de quando ainda andava — a foto
+      // era atirada por um empurrão que já tinha acabado.
+      if (dx === 0) velocidade.current = 0;
+      else if (dt > 0) velocidade.current = (dx / dt) * 1000;
+    }
+    amostra.current = { x: e.clientX, t: e.timeStamp };
     setArrastoX(e.clientX - inicio.current.x);
   }
 
   function largar(e: React.PointerEvent) {
     const partida = inicio.current;
     inicio.current = null;
+    amostra.current = null;
     if (!partida) return;
     const dx = e.clientX - partida.x;
     const dy = e.clientY - partida.y;
-    setArrastoX(0);
     // Para CIMA é ver em grande, e ganha ao horizontal quando é mais vertical
     // do que lateral — senão um arrasto na diagonal decidia por acidente.
     if (-dy > LIMIAR && Math.abs(dy) > Math.abs(dx)) {
+      setArrastoX(0);
+      velocidade.current = 0;
       aoVerGrande(indice);
       return;
     }
-    if (dx > LIMIAR) decidir(true);
-    else if (dx < -LIMIAR) decidir(false);
+    if (dx > LIMIAR) {
+      decidir(true);
+      return;
+    }
+    if (dx < -LIMIAR) {
+      decidir(false);
+      return;
+    }
+    // Não chegou ao limiar: a foto não vai a lado nenhum — volta.
+    voltarAoSitio(dx);
   }
 
   function teclado(e: React.KeyboardEvent) {
@@ -243,8 +382,11 @@ export function CuradoriaDeFotos({
         onPointerMove={mover}
         onPointerUp={largar}
         onPointerCancel={() => {
+          // Um gesto cancelado (o browser tomou conta do dedo, a folha rolou)
+          // não é uma decisão — é o mesmo regresso do arrasto que não pegou.
           inicio.current = null;
-          setArrastoX(0);
+          amostra.current = null;
+          voltarAoSitio(arrastoX);
         }}
         style={{
           transform: arrastoX ? `translateX(${arrastoX}px) rotate(${inclinacao}deg)` : undefined,
