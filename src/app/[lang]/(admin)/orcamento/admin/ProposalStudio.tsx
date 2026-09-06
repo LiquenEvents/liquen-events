@@ -10794,54 +10794,40 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 existe para responder a «quanto vai a proposta», não para abrir
                 a discussão que o bloco de totais já resolve.
                 Ficam o total sem IVA, o total a pagar e o estado de guardado. */}
+            {/* ══════════════════════════════════════════════════════════════
+                O ESTADO FICA SOZINHO À ESQUERDA; O NÚMERO VAI TER COM A ACÇÃO
+                ══════════════════════════════════════════════════════════════
+            
+                MEDIDO num Chromium, com 4.500,00 € escritos no «Valor (sem IVA)»:
+                o texto acabava aos 371 px e o botão começava aos 1248 — 877 px de
+                nada entre o número que decide e a acção que o consome. A 1920 eram
+                1037. Mais de metade da barra era vazio, e ela olha para aqui
+                dezenas de vezes por proposta.
+            
+                A causa era uma só: o `mr-auto` do parágrafo empurrava TUDO o que é
+                texto para a borda esquerda e o botão ficava agarrado à direita. Dois
+                cantos opostos de um ecrã largo — duas fixações do olho para ler uma
+                pergunta só («quanto vai, e sigo?»).
+            
+                Agora a barra tem dois grupos com propósitos diferentes:
+            
+                  · à ESQUERDA, o ESTADO — o indicador de gravação e o aviso do preço
+                    que não chegou ao pedido. Lê-se quando alguma coisa está mal, e
+                    um canto é onde se procura um estado.
+                  · à DIREITA, a DECISÃO — o total e o botão que o consome, lado a
+                    lado, dentro de uma fixação.
+            
+                E é ISTO que separa o «guardado às 21:49» do total, que era a outra
+                queixa: já não estão colados por um espaço a fingir de pontuação —
+                estão em pontas diferentes porque são coisas diferentes. O vazio que
+                sobra deixou de ser vazio no meio de uma frase e passou a ser a
+                distância entre dois assuntos.
+            
+                O botão NÃO se mexe para a esquerda: os passos «prever» e «enviar»
+                encostam o seu grupo de acções à direita (`ml-auto`), e a acção
+                principal a saltar de sítio entre passos custa mais do que o vazio
+                alguma vez custou. Quem viaja é o número. */}
             <p className="mr-auto min-w-0 truncate text-xs text-[var(--bo-text-muted)]">
-              {/* ── A ETIQUETA VIAJA COM O NÚMERO ────────────────────────────
-                  A escolha acima — no telemóvel, o que o CLIENTE paga — estava
-                  certa. O que estava errado era a palavra: «Total» ficava FORA
-                  do corte e servia os dois números. No telemóvel lia-se
-                  «Total 3.025,80 €» (com IVA); no computador, «Total 2.460,00 €
-                  sem IVA». A mesma proposta, a mesma palavra, dois valores —
-                  e ela trabalha no telemóvel e confere no computador.
-
-                  Não é a conta que muda: é a etiqueta que mentia num dos dois.
-                  Em todo o resto do ficheiro `totais.aPagar` aparece sempre
-                  como «total a pagar» (ver o bloco de totais e o gerador do
-                  PDF); só esta barra lhe chamava «Total».
-
-                  Por isso o rótulo e o valor passam a viver DENTRO do mesmo
-                  ramo. Separá-los com dois `hidden` independentes foi o que
-                  deixou a palavra emparelhar-se com o número errado — e é um
-                  engano que volta sozinho se o par se voltar a separar. */}
-              {money.base > 0 ? (
-                <>
-                  <span className="sm:hidden">
-                    <span className="text-foreground/45">A pagar</span>{" "}
-                    <strong className="font-semibold text-[var(--bo-text)]">
-                      {eur(totais.aPagar)}
-                    </strong>
-                  </span>
-                  <span className="hidden sm:inline">
-                    <span className="text-foreground/45">Total</span>{" "}
-                    <strong className="font-semibold text-[var(--bo-text)]">
-                      {eur(totais.total)}
-                    </strong>{" "}
-                    <span className="text-foreground/45">
-                      sem IVA · a pagar {eur(totais.aPagar)}
-                    </span>
-                  </span>
-                </>
-              ) : (
-                /* A instrução do estado vazio estava `hidden sm:inline`: quem
-                   abre uma proposta em branco no telemóvel não via nada a dizer
-                   o que fazer a seguir. Fica, numa versão curta que cabe na
-                   barra sem ser cortada pelo `truncate` do `<p>`. */
-                <>
-                  <span className="sm:hidden">Preenche o conteúdo para avançar.</span>
-                  <span className="hidden sm:inline">
-                    Preenche o conteúdo e avança para pré-visualizar.
-                  </span>
-                </>
-              )}
               {/* ══════════════════════════════════════════════════════════
                   O PREÇO QUE NÃO CHEGOU AO PEDIDO
                   ══════════════════════════════════════════════════════════
@@ -10859,7 +10845,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               */}
               {precoPorChegar && (
                 <span
-                  className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
+                  className="ml-2 inline-flex first:ml-0 items-center gap-1.5 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
                   aria-live="assertive"
                   title={
                     precoPorChegar.porque ??
@@ -10906,8 +10892,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       // também seja anunciado a quem não olha para aqui.
                       className={
                         alarme
-                          ? "ml-2 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
-                          : "ml-2 text-[11px] text-foreground/35"
+                          ? "ml-2 first:ml-0 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
+                          : "ml-2 first:ml-0 text-[11px] text-foreground/35"
                       }
                       aria-live={alarme ? "assertive" : "polite"}
                       title={
@@ -10931,7 +10917,90 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   );
                 })()}
             </p>
-            {/* ══════════════════════════════════════════════════════════════
+            {/* ── UM `mr-auto` SÓ, E NÃO DOIS AUTOS FRENTE A FRENTE ──────────
+                A folga livre da fila é dada ao `mr-auto` acima, que a absorve toda e
+                encosta este grupo à direita. Pôr aqui um `ml-auto` seria pior do que
+                redundante: com margens automáticas dos dois lados o flexbox REPARTE
+                a folga em partes iguais, e o grupo ficaria centrado — com o total a
+                passear-se para o meio da barra sempre que o estado mudasse de
+                largura. */}
+            <div className="flex min-w-0 items-center gap-3">
+              {/* ── A ETIQUETA VIAJA COM O NÚMERO ────────────────────────────
+                    A escolha acima — no telemóvel, o que o CLIENTE paga — estava
+                    certa. O que estava errado era a palavra: «Total» ficava FORA
+                    do corte e servia os dois números. No telemóvel lia-se
+                    «Total 3.025,80 €» (com IVA); no computador, «Total 2.460,00 €
+                    sem IVA». A mesma proposta, a mesma palavra, dois valores —
+                    e ela trabalha no telemóvel e confere no computador.
+
+                    Não é a conta que muda: é a etiqueta que mentia num dos dois.
+                    Em todo o resto do ficheiro `totais.aPagar` aparece sempre
+                    como «total a pagar» (ver o bloco de totais e o gerador do
+                    PDF); só esta barra lhe chamava «Total».
+
+                    Por isso o rótulo e o valor passam a viver DENTRO do mesmo
+                    ramo. Separá-los com dois `hidden` independentes foi o que
+                    deixou a palavra emparelhar-se com o número errado — e é um
+                    engano que volta sozinho se o par se voltar a separar. */}
+              {/* ── O NÚMERO QUE DECIDE TEM DE SE DISTINGUIR DA MOLDURA ────────
+                  Estava tudo a 12 px: rótulo, número e ressalva. Um `font-semibold`
+                  no meio de uma linha inteira do mesmo tamanho não faz hierarquia
+                  nenhuma a três metros de distância — e a esta barra olha-se de
+                  relance, não se lê.
+            
+                  O valor sobe a 14 px e o resto fica nos 12; a caixa não cresce
+                  porque a altura da barra é dada pelo botão (40 px) e não pelo texto
+                  (16 px de linha, 20 com o valor maior).
+            
+                  QUAL dos dois números leva o tamanho não se mexe: continua a ser o
+                  que já estava a `<strong>` em cada ramo. Escolher outro seria
+                  decidir qual é «o» total da casa — decisão dela, não minha, e esta
+                  barra já perdeu uma terceira soma por alguém a ter tomado sozinho.
+            
+                  `tabular-nums` porque o total muda ENQUANTO ela escreve os serviços:
+                  com algarismos de larguras diferentes, cada tecla remede a linha e o
+                  número dança. Em algarismos tabulares um 4 e um 1 ocupam o mesmo, e
+                  a linha fica quieta. É o mesmo que o bloco de totais aqui em baixo
+                  já faz (ver `LinhaDeTotal`). */}
+              <p className="min-w-0 truncate text-xs tabular-nums text-[var(--bo-text-muted)]">
+                {money.base > 0 ? (
+                  <>
+                    <span className="sm:hidden">
+                      <span className="text-foreground/45">A pagar</span>{" "}
+                      <strong className="font-semibold text-[var(--bo-text)]">
+                        {eur(totais.aPagar)}
+                      </strong>
+                    </span>
+                    <span className="hidden sm:inline">
+                      <span className="text-foreground/45">Total</span>{" "}
+                      <strong className="font-semibold text-[var(--bo-text)]">
+                        {eur(totais.total)}
+                      </strong>{" "}
+                      <span className="text-foreground/45">
+                        sem IVA · a pagar {eur(totais.aPagar)}
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  /* A instrução do estado vazio estava `hidden sm:inline`: quem
+                       abre uma proposta em branco no telemóvel não via nada a dizer
+                       o que fazer a seguir. Fica, numa versão curta que cabe na
+                       barra sem ser cortada pelo `truncate` do `<p>`. */
+                  <>
+                    <span className="sm:hidden">Preenche o conteúdo para avançar.</span>
+                    <span className="hidden sm:inline">
+                      Preenche o conteúdo e avança para pré-visualizar.
+                    </span>
+                  </>
+                )}
+              </p>
+              {/* ── UMA DIVISÓRIA A SÉRIO ENTRE O QUE SE LÊ E O QUE SE CARREGA ──
+                  Um traço de 1 px com a altura do texto, no `--bo-hairline-strong`
+                  da casa. Diz que o número e o botão são vizinhos de propósito e não
+                  a mesma coisa — que é precisamente o que um espaço não conseguia
+                  dizer. `aria-hidden` porque não há nada aqui para ouvir. */}
+              <span aria-hidden className="h-5 w-px shrink-0 bg-[var(--bo-hairline-strong)]" />
+              {/* ══════════════════════════════════════════════════════════════
                 O «GUARDAR AGORA» SAIU — MENOS NO ÚNICO CASO EM QUE ERA A ÚNICA
                 MANEIRA DE GRAVAR
                 ══════════════════════════════════════════════════════════════
@@ -10957,23 +11026,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 não há botão nenhum — há o indicador, e mais nada. O ⌘S continua
                 a valer sempre, para quem se levanta da secretária e quer a
                 certeza sem esperar pelos 800 ms. */}
-            {soNesteComputador && (
+              {soNesteComputador && (
+                <Button
+                  variant="secondary"
+                  onClick={guardarAgora}
+                  loading={aGuardarAgora}
+                  title="Tentar guardar outra vez no servidor (⌘S)"
+                >
+                  Tentar outra vez
+                </Button>
+              )}
               <Button
-                variant="secondary"
-                onClick={guardarAgora}
-                loading={aGuardarAgora}
-                title="Tentar guardar outra vez no servidor (⌘S)"
+                variant="primary"
+                onClick={() => setStep("prever")}
+                iconRight={<span aria-hidden="true">→</span>}
               >
-                Tentar outra vez
+                Pré-visualizar
               </Button>
-            )}
-            <Button
-              variant="primary"
-              onClick={() => setStep("prever")}
-              iconRight={<span aria-hidden="true">→</span>}
-            >
-              Pré-visualizar
-            </Button>
+            </div>
           </>
         )}
 

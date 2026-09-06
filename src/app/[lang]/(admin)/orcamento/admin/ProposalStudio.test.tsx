@@ -1165,7 +1165,19 @@ describe("a barra do fundo chama cada número pelo seu nome", () => {
     await screen.findByText("Totais");
     const doc = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
     const esperado = totaisDaProposta(doc, 30);
-    const barra = container.querySelector("p.mr-auto")!;
+    // ── PROCURA-SE PELO QUE ISTO É, NÃO POR ONDE ESTÁ ────────────────────
+    // Isto dizia `p.mr-auto`, e apanhou uma reorganização da barra: o `mr-auto`
+    // mudou-se para o parágrafo do ESTADO, à esquerda, quando o total passou a
+    // viajar ao lado do botão que o consome. A regra que este describe guarda —
+    // a etiqueta viver dentro do mesmo ramo que o número — nunca se partiu; o
+    // que se partiu foi o localizador, agarrado a uma margem.
+    //
+    // Uma margem é arranjo e muda quando o desenho muda. O que NÃO muda é o que
+    // define este parágrafo: é o único da barra com os dois ramos de largura
+    // como filhos directos, um para o telemóvel e outro para o computador.
+    const barra = [...container.querySelectorAll("p")].find((el) =>
+      [...el.children].some((f) => f.className.includes("sm:hidden")),
+    )!;
     const ramos = [...barra.querySelectorAll(":scope > span")];
     const estreito = ramos.find((el) => el.className.includes("sm:hidden"));
     const largo = ramos.find((el) => el.className.includes("sm:inline"));
