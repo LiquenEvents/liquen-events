@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModeloProposta, TipoModelo } from "@/lib/proposal-templates";
 import { SAIDA, useSaidaDeUmSo } from "./ui/saida";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * MODELOS PARCIAIS — guardar e reutilizar UM grupo de serviços, ou UM mood
@@ -111,6 +112,8 @@ export default function ModelosParciais({
   /** A leitura falhou — o menu tem de dizer isso e não «não tens nenhum». */
   const [naoDeuParaLer, setNaoDeuParaLer] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
+  const abridorDaLista = useRef<HTMLButtonElement>(null);
+  const abridorDoGuardar = useRef<HTMLButtonElement>(null);
 
   /**
    * ── O PAINEL FECHAVA A SECO ───────────────────────────────────────────────
@@ -145,6 +148,33 @@ export default function ModelosParciais({
   /** O que se desenha: o painel aberto, ou o que ficou a apagar-se. */
   const aDesenhar = painel ?? (aSairAgora ? oQueSai : null);
 
+  /**
+   * ── E O FOCO VOLTA A QUEM ABRIU, NO INSTANTE DO GESTO ─────────────────────
+   *
+   * O nó fica montado 200 ms a apagar-se e passa a `inert` no fotograma do
+   * gesto. Quem estava lá dentro — a caixa de escrever do «Guardar como
+   * modelo» tem `autoFocus`, e o modelo escolhido é um botão — ficava com o
+   * foco numa caixa que já não conta: o browser larga-o e ele cai no `<body>`,
+   * portanto o Tab seguinte recomeça no topo da página. Numa proposta com
+   * dezenas de controlos é voltar a percorrê-los todos.
+   *
+   * Devolver o foco é uma TAREFA, não uma animação: acontece já, e não daqui a
+   * 200 ms. É a mesma frase que o `MenuDeAccoes` e o `MoreMenu` já dizem.
+   *
+   * O clique FORA não passa por aqui, de propósito: aí o foco vai para onde a
+   * pessoa carregou, que é exactamente onde ela quis ir.
+   *
+   * Qual dos dois abridores é dito por quem chama, e não lido do `painel`: assim
+   * esta função não fecha sobre estado nenhum e é ESTÁVEL — o efeito do Escape
+   * pode tê-la nas dependências sem se rearmar a cada tecla escrita na caixa do
+   * nome.
+   */
+  const fecharEDevolverFoco = useCallback((qual: Painel | null) => {
+    const abridor = qual === "lista" ? abridorDaLista.current : abridorDoGuardar.current;
+    setPainel(null);
+    abridor?.focus();
+  }, []);
+
   const carregar = useCallback(async () => {
     try {
       const r = await fetch("/api/propostas/modelos");
@@ -171,7 +201,9 @@ export default function ModelosParciais({
       if (caixa.current && !caixa.current.contains(e.target as Node)) setPainel(null);
     };
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPainel(null);
+      // O Escape fecha por baixo dos pés de quem está lá dentro: sem devolver o
+      // foco, ele fica preso na caixa que se apaga.
+      if (e.key === "Escape") fecharEDevolverFoco(painel);
     };
     document.addEventListener("mousedown", fora);
     document.addEventListener("keydown", esc);
@@ -179,7 +211,7 @@ export default function ModelosParciais({
       document.removeEventListener("mousedown", fora);
       document.removeEventListener("keydown", esc);
     };
-  }, [painel]);
+  }, [painel, fecharEDevolverFoco]);
 
   async function guardar() {
     const limpo = nome.trim();
@@ -197,7 +229,7 @@ export default function ModelosParciais({
       const j = await r.json().catch(() => null);
       if (!r.ok) throw new Error(j?.error ?? "Não deu para guardar.");
       setModelos((j.modelos as ModeloProposta[]).filter((m) => m.tipo === tipo));
-      setPainel(null);
+      fecharEDevolverFoco("guardar");
       setNome("");
       toast?.(`Modelo «${limpo}» guardado.`, "success");
     } catch (e) {
@@ -218,8 +250,9 @@ export default function ModelosParciais({
     <div ref={caixa} className={`relative inline-flex items-center gap-3 ${className ?? ""}`}>
       {podeInserir && (
         <button
+          ref={abridorDaLista}
           type="button"
-          className={botao}
+          className={`${botao} ${ESTADO} ${PRESSAO}`}
           aria-expanded={painel === "lista"}
           onClick={() => {
             const vai = painel !== "lista";
@@ -233,8 +266,9 @@ export default function ModelosParciais({
 
       {podeGuardar && (
         <button
+          ref={abridorDoGuardar}
           type="button"
-          className={botao}
+          className={`${botao} ${ESTADO} ${PRESSAO}`}
           aria-expanded={painel === "guardar"}
           onClick={() => {
             setPainel((p) => (p === "guardar" ? null : "guardar"));
@@ -266,7 +300,7 @@ export default function ModelosParciais({
                 <li key={m.id}>
                   <button
                     type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--bo-tinta-6)]"
+                    className={`w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
                     onClick={() => {
                       const conteudo = tipo === "grupo" ? m.grupo : m.moodboard;
                       // Um modelo sem conteúdo não pode passar por inserção
@@ -275,11 +309,14 @@ export default function ModelosParciais({
                         toast?.("Esse modelo está vazio.", "error");
                         return;
                       }
+                      // Devolver o foco ANTES da inserção: se ela levar a
+                      // outro sítio, é este abridor que fica memorizado — e o
+                      // botão escolhido desaparece com o painel.
+                      fecharEDevolverFoco("lista");
                       // Cópia funda: inserir o mesmo objecto duas vezes fazia
                       // as duas cópias partilharem os itens, e editar uma
                       // mudava a outra.
                       onInserir?.(JSON.parse(JSON.stringify(conteudo)));
-                      setPainel(null);
                     }}
                   >
                     {m.nome}
@@ -310,12 +347,16 @@ export default function ModelosParciais({
             className="bo-input mt-1 w-full px-2.5 py-1.5 text-xs"
           />
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" className={botao} onClick={() => setPainel(null)}>
+            <button
+              type="button"
+              className={`${botao} ${ESTADO} ${PRESSAO}`}
+              onClick={() => fecharEDevolverFoco("guardar")}
+            >
               Cancelar
             </button>
             <button
               type="button"
-              className="rounded-full bg-[#4d6350] px-3 py-1.5 text-xs text-white disabled:opacity-40"
+              className={`rounded-full bg-[#4d6350] px-3 py-1.5 text-xs text-white disabled:opacity-40 ${ESTADO} ${PRESSAO}`}
               disabled={!nome.trim()}
               onClick={() => void guardar()}
             >

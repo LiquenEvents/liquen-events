@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
@@ -322,6 +322,31 @@ export default function Calendario({ quotes, onOpen }: Props) {
     refresh: recarregar,
   } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
   const [modalDate, setModalDate] = useState<string | null>(null);
+  /**
+   * ── QUEM ABRIU O «NOVO NO CALENDÁRIO» ─────────────────────────────────────
+   *
+   * O diálogo fica montado 200 ms a apagar-se e passa a `inert` no fotograma do
+   * gesto — mas o campo do título tem `autoFocus`, portanto quem fecha deixa o
+   * foco DENTRO de uma caixa que já não conta: o browser larga-o e ele cai no
+   * `<body>`, e o Tab seguinte recomeça no topo da página, longe do dia em que
+   * se estava. Numa grelha de trinta e cinco dias isso é percorrê-la outra vez.
+   *
+   * Guarda-se o elemento activo à entrada e devolve-se-lhe o foco à saída, que
+   * é o mesmo padrão que a biblioteca de temas já usa para a lupa das fotos
+   * (`zoomOpener` / `closeZoom`, no `Temas.tsx`) — e serve os três caminhos de
+   * abertura sem cada um ter de trazer a sua referência: o dia vazio, o «+» da
+   * célula e o «Adicionar» do painel do dia.
+   */
+  const abridorDoModal = useRef<HTMLElement | null>(null);
+  /**
+   * Fecha e devolve o foco JÁ — nunca ao fim dos 200 ms. Devolver o foco é uma
+   * tarefa, e nenhuma animação desta casa atrasa uma.
+   */
+  const fecharOModal = useCallback(() => {
+    setModalDate(null);
+    abridorDoModal.current?.focus?.();
+    abridorDoModal.current = null;
+  }, []);
 
   /**
    * A marcação à espera de resposta à pergunta de a remover.
@@ -399,7 +424,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
     }
     setEvents((prev) => [...prev, ev]);
     toast("Adicionado ao calendário", "success");
-    setModalDate(null);
+    fecharOModal();
     return true;
   }
 
@@ -442,6 +467,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
   // Open the "add event" modal for a given day (shared by click + keyboard).
   function openAdd(key: string) {
+    // De onde se veio, para se poder voltar. Ver `abridorDoModal`.
+    abridorDoModal.current = document.activeElement as HTMLElement | null;
     setModalDate(key);
   }
 
@@ -452,15 +479,16 @@ export default function Calendario({ quotes, onOpen }: Props) {
     setSelectedDay(null);
   }
 
-  // Escape closes the add-event modal.
+  // Escape closes the add-event modal — e devolve o foco a quem o abriu, que é
+  // a saída de quem anda de teclado e a que mais se usa.
   useEffect(() => {
     if (!modalDate) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setModalDate(null);
+      if (e.key === "Escape") fecharOModal();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [modalDate]);
+  }, [modalDate, fecharOModal]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -1205,7 +1233,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
           aberto={modalDate !== null}
           date={dataDoModal}
           dateLabel={modalDateLabel}
-          onClose={() => setModalDate(null)}
+          onClose={fecharOModal}
           onCreate={createEvent}
         />
       )}
