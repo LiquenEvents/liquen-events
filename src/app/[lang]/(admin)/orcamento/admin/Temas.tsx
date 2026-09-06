@@ -36,6 +36,7 @@ import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
+import { useSaidaDeUmSo } from "./ui/saida";
 import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
@@ -626,6 +627,54 @@ async function expandDropEntries(entries: FileSystemEntry[]): Promise<{
   return { files, capped: files.length >= MAX_DROP_FILES || queue.length > 0 };
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE SAI NÃO MUDA DE CONTEÚDO A MEIO DA SAÍDA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Três caixas desta vista fechavam A SECO porque quem as desmontava era ESTE
+ * ficheiro: a folha de fundir temas, a de copiar fotos e o visualizador. As
+ * três já sabem sair (as duas primeiras pelo `FolhaOuDialogo`, a terceira pela
+ * `.bo-saida`); o que faltava era alguém segurá-las montadas os 200 ms — e esse
+ * alguém é quem tem o estado, ou seja aqui.
+ *
+ * O `useSaidaDeUmSo` dá o «ainda está a sair». O que ele não resolve é este
+ * outro problema, que só aparece quando o pai desmonta: **os dados de que a
+ * caixa vive desaparecem no mesmo instante em que ela fecha.** O `aFundir` cai
+ * para `null`, a seleção de fotos esvazia-se quando as fotos mudam de tema, o
+ * `zoomAt` deixa de ser um índice. Sem isto, o que ficava a apagar-se durante
+ * 200 ms era uma folha a dizer «0 fotos selecionadas» — ou um erro, porque a
+ * caixa precisa de um tema que já não existe.
+ *
+ * Então guarda-se o último valor que esteve ABERTO e é esse que se desenha
+ * enquanto sai. Devolve `null` quando não há nada para desenhar — fechado E sem
+ * saída a correr —, que é o que apaga a caixa da árvore no fim.
+ *
+ * ── EM ESTADO, AJUSTADO NO DESENHO, E NÃO NUMA REFERÊNCIA ─────────────────
+ *
+ * A primeira versão disto era um `useRef` escrito durante o desenho. É o mesmo
+ * defeito que a `react-hooks/refs` recusa, e recusa com razão: um valor lido no
+ * desenho a partir de uma referência é um valor que o React não sabe que
+ * existe — não re-desenha por causa dele, e no modo estrito (dois desenhos por
+ * commit) a referência já foi escrita uma vez quando a segunda leitura
+ * acontece. Ajustar ESTADO durante o desenho é o padrão que o React documenta
+ * para reagir a uma prop, e re-desenha sem pintar nada pelo meio.
+ *
+ * ── E POR ISSO O `valor` TEM DE SER ESTÁVEL ENTRE DESENHOS ────────────────
+ *
+ * A comparação é por identidade. Um objecto literal montado na chamada
+ * (`{origem: aFundir, temas: themes}`) é novo a cada desenho, e isto passava a
+ * chamar `setUltimo` para sempre — um ciclo. Quem chama passa portanto valores
+ * que já são estáveis: um item de estado, um array de estado, ou um `useMemo`.
+ * São duas chamadas quando são dois valores, e não uma com um objecto à volta.
+ */
+function useNoEcraAteSair<T>(aberto: boolean, aSair: boolean, valor: T | null): T | null {
+  const [ultimo, setUltimo] = useState<T | null>(null);
+  if (aberto && valor !== ultimo) setUltimo(valor);
+  if (aberto) return valor;
+  return aSair ? ultimo : null;
+}
+
 export default function Temas() {
   const { toast } = useToast();
   // Sair da Biblioteca esquece o que o SELETOR de temas tinha guardado.
@@ -1132,6 +1181,19 @@ export default function Temas() {
 
   const open = themes.find((t) => t.id === openId) ?? null;
 
+  /* ── ANTES DO `if (open)` LÁ EM BAIXO, E NÃO DEPOIS ────────────────────
+     Aquilo é um `return` condicional (a vista de UM tema), e um gancho depois
+     dele só corre em metade dos desenhos — a ordem dos ganchos parte-se no
+     fotograma em que se abre ou fecha um tema. Fica aqui, com os outros.
+
+     A folha de fundir temas fica montada os 200 ms da saída, com os dados
+     congelados no instante em que fechou. Ver `useNoEcraAteSair`. */
+  const aSairDaFusao = useSaidaDeUmSo(aFundir !== null);
+  // Duas chamadas e não um objecto com os dois lá dentro: ver a nota do
+  // `useNoEcraAteSair` — um literal novo a cada desenho seria um ciclo.
+  const origemDaFusao = useNoEcraAteSair(aFundir !== null, aSairDaFusao, aFundir);
+  const temasDaFusao = useNoEcraAteSair(aFundir !== null, aSairDaFusao, themes);
+
   /** Quantos temas estão arquivados — o que autoriza (ou não) mostrar o
    *  interruptor do arquivo. Sem nada lá dentro, seria um controlo a explicar
    *  uma funcionalidade que ninguém ainda usou. */
@@ -1251,10 +1313,15 @@ export default function Temas() {
 
   return (
     <div>
-      {aFundir && (
+      {/* Segurada montada os 200 ms da saída. O `onClose` continua a correr no
+          instante do gesto — o `setAFundir(null)` fecha, o `FolhaOuDialogo`
+          devolve o foco e larga o trinco do scroll já —, e o que fica é uma
+          imagem a apagar-se com os dados que tinha quando fechou. */}
+      {origemDaFusao && temasDaFusao && (
         <FundirTemas
-          sourceTheme={aFundir}
-          themes={themes}
+          aberto={aFundir !== null}
+          sourceTheme={origemDaFusao}
+          themes={temasDaFusao}
           onClose={() => setAFundir(null)}
           onDone={aplicarFusao}
         />
@@ -3451,6 +3518,29 @@ function ThemeFolder({
       ? Math.min(100, Math.round((thumbJob.cursor / thumbJob.total) * 100))
       : 0;
 
+  /* ── AS DUAS CAIXAS DESTA VISTA FICAM MONTADAS A SAIR ────────────────────
+     A folha de copiar fotos e o visualizador. Os dois fechavam a seco porque
+     era este componente que os desmontava; agora o fecho continua a acontecer
+     no instante do gesto e o que se segura, 200 ms, é só a imagem.
+
+     Os dados vão CONGELADOS (ver `useNoEcraAteSair`), e aqui isso não é zelo:
+     o `applyCopyOutcome` fecha a folha e, na mesma volta, tira da grelha as
+     fotos que foram movidas. Sem congelar, a folha passava os 200 ms da saída
+     a dizer «0 fotos selecionadas» — a última coisa que se lia dela era uma
+     contagem errada. */
+  /* Memorizada porque tem de ser ESTÁVEL entre desenhos — ver a nota do
+     `useNoEcraAteSair`. E pela ordem da GRELHA, não pela ordem por que ela
+     clicou: é assim que a lista do relatório se lê como a grelha se vê. */
+  const seleccionadas = useMemo(
+    () => images.filter((im) => selected.has(im.path)).map((im) => im.path),
+    [images, selected],
+  );
+  const aSairDaCopia = useSaidaDeUmSo(copyOpen);
+  const copiaNoEcra = useNoEcraAteSair(copyOpen, aSairDaCopia, seleccionadas);
+
+  const aSairDaLupa = useSaidaDeUmSo(zoomAt !== null);
+  const indiceDaLupa = useNoEcraAteSair(zoomAt !== null, aSairDaLupa, zoomAt);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -3842,22 +3932,25 @@ function ThemeFolder({
         </div>
       )}
 
-      {copyOpen && (
+      {copiaNoEcra && (
         <ThemeCopyDialog
+          aberto={copyOpen}
           sourceTheme={theme}
           themes={themes}
-          // Pela ordem da GRELHA, não pela ordem por que ela clicou: é assim
-          // que a lista do relatório se lê como a grelha se vê.
-          paths={images.filter((im) => selected.has(im.path)).map((im) => im.path)}
+          // Congelada no instante do fecho, para a contagem não mudar a meio
+          // da saída — o `applyCopyOutcome` tira da grelha, na mesma volta, as
+          // fotos que foram movidas.
+          paths={copiaNoEcra}
           onClose={() => setCopyOpen(false)}
           onDone={applyCopyOutcome}
         />
       )}
 
-      {zoomAt !== null && images[zoomAt] && (
+      {indiceDaLupa !== null && images[indiceDaLupa] && (
         <PhotoLightbox
+          aberto={zoomAt !== null}
           images={images}
-          index={zoomAt}
+          index={indiceDaLupa}
           onIndexChange={setZoomAt}
           onClose={closeZoom}
           onDownload={downloadImage}

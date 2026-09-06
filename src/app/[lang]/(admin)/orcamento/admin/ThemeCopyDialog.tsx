@@ -87,12 +87,29 @@ function countLabel(t: ThemeSummary): string {
 }
 
 export default function ThemeCopyDialog({
+  /**
+   * ── E ESTA FOLHA TAMBÉM SAI ─────────────────────────────────────────────
+   *
+   * O `FolhaOuDialogo` ganhou saída na ronda anterior, mas ela é disparada pela
+   * prop `aberto` a cair para falso — e aqui o `aberto` estava ESCRITO a
+   * verdadeiro, com o pai a desmontar isto de uma vez. Ou seja: a saída existia
+   * e este ecrã não a apanhava, porque nunca havia um fotograma em que o
+   * `aberto` fosse falso.
+   *
+   * Passa a vir de fora. O pai (`Temas.tsx`) fecha no instante do gesto, põe
+   * isto a `false` e segura o nó os 200 ms — é ele que tem o estado, portanto é
+   * ele que o pode segurar. Por omissão fica `true`, que é o que esta caixa era
+   * antes e o que os testes que a montam à mão continuam a querer.
+   */
+  aberto = true,
   sourceTheme,
   themes,
   paths,
   onClose,
   onDone,
 }: {
+  /** Ver a nota na desestruturação: é isto que dá a saída a esta folha. */
+  aberto?: boolean;
   sourceTheme: ThemeSummary;
   /** Todos os temas conhecidos (o de origem é filtrado aqui). */
   themes: ThemeSummary[];
@@ -229,7 +246,7 @@ export default function ThemeCopyDialog({
 
   return (
     <FolhaOuDialogo
-      aberto
+      aberto={aberto}
       onFechar={onClose}
       sobretitulo={`De “${sourceTheme.name}”`}
       titulo={plural(count, "foto selecionada", "fotos selecionadas")}

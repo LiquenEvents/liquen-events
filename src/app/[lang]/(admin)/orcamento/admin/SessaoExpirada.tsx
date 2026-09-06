@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Button, Field } from "./ui";
+import { Button, Field, cn } from "./ui";
+import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { useToast } from "./Toast";
@@ -271,10 +272,43 @@ export default function SessaoExpirada() {
     window.location.reload();
   }
 
-  if (!aberto) return null;
+  /* ══════════════════════════════════════════════════════════════════════
+     E A BARREIRA TAMBÉM SE VAI EMBORA
+     ══════════════════════════════════════════════════════════════════════
+
+     Entrava com a `.bo-entrada` e desaparecia A SECO: o `concluir` punha o
+     `aberto` a falso e, no fotograma seguinte, o back office estava outra vez
+     lá. É o pior sítio da casa para um corte, porque este é o único painel que
+     COBRE O ECRÃ INTEIRO sem saída nenhuma — a pessoa acabou de escrever a
+     palavra-passe e o que devia ler-se é «a barreira levantou-se», não «a
+     página trocou».
+
+     ── E NÃO ATRASA A REAUTENTICAÇÃO ──────────────────────────────────────
+
+     O `concluir` faz tudo o que tem a fazer no instante: limpa a
+     palavra-passe, marca a sessão aberta e manda gravar o que ficou por
+     gravar. O `useTrincoDeScroll(aberto)` e o `useFocusTrap(aberto)` aqui em
+     cima são regidos pelo ESTADO, não por isto — a página destranca-se já e o
+     foco volta já ao trabalho. O que fica são 200 ms de imagem a apagar-se.
+
+     ── E AQUI NÃO HÁ MOLDURA A LARGAR ────────────────────────────────────
+
+     A `.bo-saida` larga os `pointer-events` dentro da própria classe, mas quem
+     cobre o ecrã é esta moldura `fixed inset-0`, e ela não leva classe
+     nenhuma. Sem a linha de baixo, uma barreira a desvanecer-se continuava a
+     comer os toques do back office que a pessoa acabou de recuperar — e neste
+     painel isso é o defeito mais caro possível: ela reentrou justamente para
+     voltar a carregar em qualquer coisa. */
+  const aSair = useSaidaDeUmSo(aberto);
+  if (!aberto && !aSair) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
+    <div
+      className={cn(
+        "fixed inset-0 z-[110] flex items-center justify-center px-4",
+        aSair && "pointer-events-none",
+      )}
+    >
       {/*
        * O fundo NÃO fecha o painel ao ser clicado, e não há botão de fechar.
        * É a única coisa nesta casa desenhada assim, e é de propósito: com a
@@ -283,12 +317,32 @@ export default function SessaoExpirada() {
        * a pessoa a escrever para o vazio — que é exactamente o que aconteceu da
        * primeira vez.
        */}
-      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      {/* Dois ramos e não um `cn()` no ramo aberto: a varredura dos véus
+          (`entrada-dos-fundos.test.ts`) LÊ o ficheiro em vez de o correr e
+          procura a lista de classes por extenso no atributo — não sabe ler um
+          `cn(…)`. O véu ABERTO fica por extenso; o ramo da saída leva o `cn`.
+          Mesmo tipo e mesma posição, portanto o React reaproveita o elemento e
+          a saída parte da opacidade em que ele está. O `backdrop-blur-sm` fica
+          FORA das duas animações, como manda o `globals.css`. */}
+      {aSair ? (
+        <div
+          className={cn(SAIDA_FUNDO, "absolute inset-0 bg-black/60 backdrop-blur-sm")}
+          aria-hidden
+        />
+      ) : (
+        <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      )}
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="sessao-expirada-titulo"
+        /* Enquanto se apaga não tem `role`, não tem nome e não está no fio do
+           teclado. Para quem ouve o ecrã, uma barreira que continuasse
+           anunciada por cima do trabalho a que se acabou de voltar era pior do
+           que não animar nada. */
+        role={aSair ? undefined : "dialog"}
+        aria-modal={aSair ? undefined : "true"}
+        aria-labelledby={aSair ? undefined : "sessao-expirada-titulo"}
+        aria-hidden={aSair || undefined}
+        inert={aSair}
         /* O fundo já acendia (`bo-entrada-fundo`, aqui em cima) e a caixa que
            ele traz aparecia com a opacidade final no primeiro fotograma: meio
            gesto, com a parte que cobre o ecrã inteiro a fazer-se devagar e a
@@ -298,7 +352,10 @@ export default function SessaoExpirada() {
            Não atrasa nada — e aqui isso conta duas vezes, porque esta barreira
            só tem uma saída: os botões estão no sítio e clicáveis desde o
            primeiro fotograma, e o foco entra na caixa por cima da animação. */
-        className="bo-entrada relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]"
+        className={cn(
+          aSair ? SAIDA : "bo-entrada",
+          "relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]",
+        )}
       >
         <p className="bo-eyebrow">Sessão</p>
         <h2

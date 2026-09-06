@@ -153,3 +153,66 @@ export function useSaidaAdiada(
 
   return { aSair, comecarSaida, podar };
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * E PARA QUEM SÓ TEM UM NÓ — a mesma coisa, sem a chave à vista
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O `useSaidaAdiada` é indexado por chave porque nasceu numa PILHA. Quem só tem
+ * UMA caixa — uma folha, um diálogo, um visualizador, um véu — passa uma chave
+ * constante e ignora que ela existe; e a seguir escreve sempre estas mesmas
+ * oito linhas:
+ *
+ *     const { aSair, comecarSaida } = useSaidaAdiada(() => {});
+ *     const aSairAgora = !aberto && aSair.includes(CHAVE);
+ *     const [abertoAntes, setAbertoAntes] = useState(aberto);
+ *     if (abertoAntes !== aberto) { … }
+ *
+ * Estavam para ser copiadas para seis ficheiros de uma vez. É isso, e só isso,
+ * que este atalho poupa — a mecânica é a mesma e as regras não mudam nenhuma:
+ *
+ *  · **O `aberto` é que manda, e não a marca.** O `!aberto` está na conta: se
+ *    quem chama voltar a abrir a caixa a meio da saída, ela volta a entrar em
+ *    vez de continuar a apagar-se com o relógio antigo.
+ *
+ *  · **Ajusta-se DURANTE o desenho.** É o padrão do React para reagir a uma
+ *    prop, e aqui não é preferência: num `useEffect` o nó já teria sido
+ *    arrancado do DOM e o que aparecia era um nó NOVO no lugar dele — um
+ *    remonte, que perde o scroll de dentro da caixa e o que estiver escrito.
+ *
+ *  · **Não atrasa nada.** Isto não toca em quem fecha. Quem chama continua a
+ *    fazer o seu trabalho no instante do gesto — fechar, devolver o foco,
+ *    largar o trinco do scroll — e o que fica é uma imagem a apagar-se.
+ *
+ *  · **E quem pediu menos movimento não espera.** Vem de graça, do
+ *    `comecarSaida`: com `prefers-reduced-motion` isto devolve `false` no
+ *    mesmo instante e a caixa desaparece como sempre desapareceu.
+ *
+ * COMO SE USA — três linhas, e a última é a que faz o trabalho:
+ *
+ *     const aSair = useSaidaDeUmSo(open);
+ *     if (!open && !aSair) return null;
+ *     …  className={aSair ? SAIDA : "bo-entrada"}
+ *        {...(aSair && { inert: true, "aria-hidden": true })}
+ *
+ * O que NÃO vem daqui, e continua a ser de quem chama: pôr a moldura que cobre
+ * o ecrã sem `pointer-events` no mesmo desenho (a `.bo-saida` larga-os dentro
+ * da classe, mas uma moldura `fixed inset-0` sem classe nenhuma não), e tirar o
+ * `role`/nome/foco à caixa que já não é uma caixa.
+ */
+export function useSaidaDeUmSo(aberto: boolean, duracaoMs: number = SAIDA_MS): boolean {
+  const { aSair, comecarSaida } = useSaidaAdiada(NADA, duracaoMs);
+  const [abertoAntes, setAbertoAntes] = useState(aberto);
+  if (abertoAntes !== aberto) {
+    setAbertoAntes(aberto);
+    if (!aberto) comecarSaida(UM);
+  }
+  return !aberto && aSair.includes(UM);
+}
+
+/** A chave única de quem só tem um nó. Nunca sai daqui. */
+const UM = "um";
+/** Quem desmonta é quem chama, a partir do booleano — aqui não há nada a fazer
+ *  no fim. Fica fora do componente para a identidade não mudar a cada desenho. */
+const NADA = () => {};

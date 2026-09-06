@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeImage } from "@/lib/theme-types";
-import { Button } from "./ui";
+import { Button, cn } from "./ui";
+import { SAIDA } from "./ui/saida";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 
@@ -30,6 +31,18 @@ import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
  */
 
 export interface PhotoLightboxProps {
+  /**
+   * ── E O VISUALIZADOR TAMBÉM SE VAI EMBORA ─────────────────────────────
+   *
+   * Abria com a `.bo-entrada` e fechava A SECO: o pai punha o `zoomAt` a
+   * `null` e, no fotograma seguinte, a grelha estava outra vez lá. É o corte
+   * mais visível da biblioteca inteira, porque isto é preto e cobre o ecrã
+   * TODO — a diferença entre «a foto fechou-se» e «a página trocou».
+   *
+   * `false` quer dizer «já fechou, fica só a apagar-te». Quem segura o nó os
+   * 200 ms é o pai (`Temas.tsx`), que é quem tem o `zoomAt`.
+   */
+  aberto?: boolean;
   images: ThemeImage[];
   index: number;
   onIndexChange: (i: number) => void;
@@ -40,6 +53,7 @@ export interface PhotoLightboxProps {
 }
 
 export default function PhotoLightbox({
+  aberto = true,
   images,
   index,
   onIndexChange,
@@ -76,6 +90,9 @@ export default function PhotoLightbox({
 
   // Teclado: fechar, andar, e o foco presume-se cá dentro enquanto está aberto.
   useEffect(() => {
+    // No instante do gesto isto deixa de ser um visualizador: o Escape e as
+    // setas param já, e não daqui a 200 ms. Quem está a apagar-se não responde.
+    if (!aberto) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -111,7 +128,7 @@ export default function PhotoLightbox({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [go, onClose]);
+  }, [aberto, go, onClose]);
 
   // O foco entra no diálogo ao abrir. Quem o devolve ao mosaico de origem é
   // quem abriu (a grelha guarda o elemento activo).
@@ -119,45 +136,37 @@ export default function PhotoLightbox({
     closeRef.current?.focus();
   }, []);
 
-  // Enquanto está aberto, a página por baixo não rola.
+  // Enquanto está aberto, a página por baixo não rola. Regido pelo `aberto` e
+  // não pela montagem: a página destranca-se no INSTANTE do gesto, e não ao fim
+  // dos 200 ms da saída — nenhuma animação desta casa atrasa uma tarefa.
   useEffect(() => {
+    if (!aberto) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [aberto]);
 
   if (!image) return null;
 
-  return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Foto ${index + 1} de ${images.length}`}
-      // ── ISTO ABRIA NUM FOTOGRAMA ────────────────────────────────────────
-      // A página estava lá e, no seguinte, um ecrã preto inteiro por cima
-      // dela. É o mesmo corte que a `LupaDeFotos` já resolveu (ver o
-      // comentário longo lá, ao pé da mesma classe), e o pior sítio possível
-      // para um: esta é a superfície que cobre o ecrã TODO.
-      //
-      // E vai SÓ a `.bo-entrada`, sem a `.bo-entrada-fundo`, pela mesma razão
-      // que lá: aqui o véu e a caixa são o MESMO elemento — a tinta escura não
-      // está por trás de nada, é o visualizador. É por isso que o
-      // `entrada-dos-fundos.test.ts` já isenta este ficheiro da regra dos
-      // véus, e a variante do fundo (`--bo-entrada-y: 0px`) tirava a
-      // deslocação a tudo o que está cá dentro.
-      //
-      // Não atrasa nada: a lupa está no sítio e responde ao teclado desde o
-      // primeiro fotograma — o `closeRef.current?.focus()` continua a correr
-      // na montagem, por cima da animação.
-      className="bo-entrada fixed inset-0 z-50 flex flex-col bg-black/92"
-      onClick={(e) => {
-        // Clicar no fundo fecha; clicar na foto ou nos botões não.
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+  /* ── PORQUE É QUE O CONTEÚDO SAI PARA UMA VARIÁVEL ────────────────────
+     Porque a moldura tem de ser escrita duas vezes, e o conteúdo não.
+
+     Aqui a tinta preta e a caixa são o MESMO elemento — não há véu por trás
+     de nada, isto É o visualizador —, e é por isso que o
+     `entrada-dos-fundos.test.ts` isenta este ficheiro da REGRA dos véus. Da
+     regra, não da varredura: ele continua a contar este ficheiro, e conta a
+     LER o ficheiro — procura a lista de classes escrita por extenso no
+     `className`, e não sabe ler um `cn(…)` nem um ternário. Um véu
+     embrulhado num deles ficava invisível para ela, e no dia em que alguém
+     lhe tirasse a entrada ninguém dava por isso.
+
+     Dois ramos, portanto, com o ABERTO por extenso. Não são dois nós: mesmo
+     tipo e mesma posição, o React reaproveita o elemento e troca-lhe as
+     classes. */
+  const conteudo = (
+    <>
       <div className="flex items-center gap-2 px-4 py-3 text-white">
         <span className="text-sm tabular-nums text-white/80">
           {index + 1} / {images.length}
@@ -203,9 +212,9 @@ export default function PhotoLightbox({
           </button>
         )}
         {/* A miniatura por baixo enquanto o original não chega: há sempre
-            imagem, em vez de um retângulo preto durante um segundo. Deixa de
-            fazer sentido quando é ELA o alvo (seria a mesma foto desfocada por
-            baixo de si própria) ou quando já não há nada por onde tentar. */}
+          imagem, em vez de um retângulo preto durante um segundo. Deixa de
+          fazer sentido quando é ELA o alvo (seria a mesma foto desfocada por
+          baixo de si própria) ou quando já não há nada por onde tentar. */}
         {!loaded && !desistiu && image.thumbUrl && alvo !== image.thumbUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -245,6 +254,62 @@ export default function PhotoLightbox({
           </button>
         )}
       </div>
+    </>
+  );
+
+  /* ── E SAI PELO SÍTIO POR ONDE ENTROU ─────────────────────────────────
+     `SAIDA` e não `SAIDA_FUNDO`, pela mesma razão que a entrada leva a
+     `.bo-entrada` sem a variante do fundo: a variante põe a deslocação a
+     zero (`--bo-saida-y: 0px`) e isto ficaria a apagar-se sem ir a lado
+     nenhum. Quatro píxeis para cima, a espelhar valor a valor os quatro com
+     que desceu.
+
+     E o largar dos toques vem de graça: a `.bo-saida` larga os
+     `pointer-events` DENTRO da classe, e quem cobre o ecrã inteiro é este
+     mesmo elemento. Sem isso, um visualizador a desvanecer-se continuava a
+     comer os toques da grelha durante 200 ms — e o gesto seguinte de quem
+     fecha uma foto é abrir a do lado.
+
+     Sem `role`, sem nome e fora do fio do teclado: para quem ouve o ecrã e
+     para quem anda de Tab isto acabou no instante do gesto, e acabou mesmo
+     — o pai já devolveu o foco ao mosaico de onde a foto foi aberta. */
+  if (!aberto) {
+    return (
+      <div className={cn(SAIDA, "fixed inset-0 z-50 flex flex-col bg-black/92")} aria-hidden inert>
+        {conteudo}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Foto ${index + 1} de ${images.length}`}
+      // ── ISTO ABRIA NUM FOTOGRAMA ────────────────────────────────────────
+      // A página estava lá e, no seguinte, um ecrã preto inteiro por cima
+      // dela. É o mesmo corte que a `LupaDeFotos` já resolveu (ver o
+      // comentário longo lá, ao pé da mesma classe), e o pior sítio possível
+      // para um: esta é a superfície que cobre o ecrã TODO.
+      //
+      // E vai SÓ a `.bo-entrada`, sem a `.bo-entrada-fundo`, pela mesma razão
+      // que lá: aqui o véu e a caixa são o MESMO elemento — a tinta escura não
+      // está por trás de nada, é o visualizador. É por isso que o
+      // `entrada-dos-fundos.test.ts` já isenta este ficheiro da regra dos
+      // véus, e a variante do fundo (`--bo-entrada-y: 0px`) tirava a
+      // deslocação a tudo o que está cá dentro.
+      //
+      // Não atrasa nada: a lupa está no sítio e responde ao teclado desde o
+      // primeiro fotograma — o `closeRef.current?.focus()` continua a correr
+      // na montagem, por cima da animação.
+      className="bo-entrada fixed inset-0 z-50 flex flex-col bg-black/92"
+      onClick={(e) => {
+        // Clicar no fundo fecha; clicar na foto ou nos botões não.
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {conteudo}
     </div>
   );
 }

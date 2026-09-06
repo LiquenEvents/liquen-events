@@ -5,7 +5,8 @@ import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/ty
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
-import { Button, Card, EmptyState, Field, PerguntaDestrutiva } from "./ui";
+import { Button, Card, EmptyState, Field, PerguntaDestrutiva, cn } from "./ui";
+import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { ESTADO, PRESSAO } from "./ui/movimento";
@@ -122,11 +123,25 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 // 42-cell month grid + upcoming list. onCreate persists the completed payload
 // (the parent appends the result and closes the modal on success).
 function AddEventModal({
+  aberto,
   date,
   dateLabel,
   onClose,
   onCreate,
 }: {
+  /**
+   * ── E ISTO TAMBÉM SAI ────────────────────────────────────────────────
+   *
+   * O «Novo no calendário» entrava com a `.bo-entrada` e fechava A SECO: o
+   * pai punha o `modalDate` a `null`, o nó desaparecia no fotograma seguinte
+   * e o mês voltava. Meio gesto.
+   *
+   * O pai é o `Calendario` aqui em baixo — o mesmo ficheiro —, portanto a
+   * saída resolve-se sem tocar em código partilhado. O que ele passa é isto:
+   * `false` quer dizer «já fechou, fica só a apagar-te». Quem SEGURA o nó os
+   * 200 ms continua a ser ele, porque é ele que tem o estado.
+   */
+  aberto: boolean;
   date: string;
   dateLabel: string;
   onClose: () => void;
@@ -145,9 +160,11 @@ function AddEventModal({
     note: string;
   }>({ title: "", kind: "evento", time: "", note: "" });
   const [saving, setSaving] = useState(false);
-  // Só existe montado, portanto o trinco vale enquanto existir. Sem ele, o mês
-  // por trás rolava com o diálogo à frente — ver `useTrincoDeScroll`.
-  useTrincoDeScroll(true);
+  // O trinco segue o `aberto` e não a montagem: enquanto o diálogo se apaga já
+  // não é um diálogo, e o mês por trás volta a rolar no INSTANTE do gesto. Sem
+  // isto, a saída ficava a atrasar a devolução da página por 200 ms — e a
+  // regra da casa é que nenhuma animação atrasa uma tarefa.
+  useTrincoDeScroll(aberto);
 
   async function submit() {
     const title = form.title.trim();
@@ -160,12 +177,41 @@ function AddEventModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div
+      /* A `.bo-saida` larga os `pointer-events` dentro da própria classe, mas
+         quem cobre o ecrã inteiro é ESTA moldura, e ela não leva classe
+         nenhuma. Sem esta linha, o diálogo a desvanecer-se continuava a comer
+         os toques da grelha do mês durante 200 ms — e o gesto seguinte de quem
+         acabou de adicionar uma marcação é, quase sempre, carregar noutro dia. */
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center p-4",
+        !aberto && "pointer-events-none",
+      )}
+      onClick={aberto ? onClose : undefined}
+    >
+      {/* Dois ramos e não um `cn()` no ramo aberto: a varredura dos véus
+          (`entrada-dos-fundos.test.ts`) LÊ o ficheiro e procura a lista de
+          classes por extenso no atributo — não sabe ler um `cn(…)`. Mesmo tipo
+          e mesma posição, portanto o React reaproveita o elemento e a saída
+          parte da opacidade em que o véu está. O `backdrop-blur-sm` fica FORA
+          das duas animações, como manda o `globals.css`. */}
+      {aberto ? (
+        <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      ) : (
+        <div
+          className={cn(SAIDA_FUNDO, "absolute inset-0 bg-black/60 backdrop-blur-sm")}
+          aria-hidden
+        />
+      )}
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Adicionar ao calendário — ${dateLabel}`}
+        /* Enquanto se apaga não tem `role`, não tem nome e não está no fio do
+           teclado: para quem ouve o ecrã e para quem anda de Tab isto acabou no
+           instante do gesto. O que fica é uma imagem. */
+        role={aberto ? "dialog" : undefined}
+        aria-modal={aberto ? "true" : undefined}
+        aria-label={aberto ? `Adicionar ao calendário — ${dateLabel}` : undefined}
+        aria-hidden={!aberto || undefined}
+        inert={!aberto}
         /* O véu acendia (`bo-entrada-fundo`, na linha de cima) e a caixa que
            ele traz aparecia com a opacidade final no primeiro fotograma dele:
            o ecrã escurecia devagar e o diálogo saltava para lá. Meio gesto.
@@ -174,7 +220,14 @@ function AddEventModal({
            do título leva `autoFocus` e recebe o que se escrever desde o
            primeiro fotograma — a animação corre por cima disso, em `opacity`
            e `transform`, sem tocar no layout. */
-        className="bo-entrada relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]"
+        className={cn(
+          /* Quatro píxeis, e sai por onde entrou. A entrada não tem `fill-mode`
+             e larga o elemento; a saída tem `forwards`, e a rede dela é o nó
+             deixar de existir no fotograma a seguir aos 200 ms — senão ficava
+             um `transform` pendurado a criar bloco de contenção. */
+          aberto ? "bo-entrada" : SAIDA,
+          "relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]",
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-5">
@@ -525,8 +578,29 @@ export default function Calendario({ quotes, onOpen }: Props) {
       month: "long",
     });
 
-  const modalDateLabel = modalDate
-    ? new Date(modalDate + "T12:00:00").toLocaleDateString("pt-PT", {
+  /* ── QUEM SEGURA O «NOVO NO CALENDÁRIO» OS 200 MS ────────────────────────
+     O estado é daqui, portanto o nó é segurado daqui. O `modalDate` cai para
+     `null` no instante do gesto — é ele que fecha, que destranca a página e que
+     devolve o foco —, e o que fica é a `dataDoModal`: a última data aberta, só
+     para o diálogo que se está a apagar ter o que mostrar.
+
+     Guardada em ESTADO e ajustada durante o desenho, que é o padrão do React
+     para isto — e não numa referência: uma referência lida no desenho é um
+     valor que o React não sabe que existe, e a regra `react-hooks/refs` recusa-a
+     com razão. Ajustar estado no desenho re-desenha sem pintar nada pelo meio,
+     e a comparação é entre duas datas (`string`), portanto não há ciclo.
+
+     É também isto que segura o `key`: o `key` remonta, e um `key` a passar de
+     uma data para `undefined` a meio da saída trocava o diálogo por um novo —
+     com o formulário em branco, no fotograma em que ele devia estar a
+     apagar-se. */
+  const aSairDoModal = useSaidaDeUmSo(modalDate !== null);
+  const [ultimaDataDoModal, setUltimaDataDoModal] = useState<string | null>(null);
+  if (modalDate !== null && modalDate !== ultimaDataDoModal) setUltimaDataDoModal(modalDate);
+  const dataDoModal = modalDate ?? (aSairDoModal ? ultimaDataDoModal : null);
+
+  const modalDateLabel = dataDoModal
+    ? new Date(dataDoModal + "T12:00:00").toLocaleDateString("pt-PT", {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -900,7 +974,60 @@ export default function Calendario({ quotes, onOpen }: Props) {
                anima, de propósito — animar `height` é remedir a página a cada
                fotograma, que é exactamente o que o telemóvel dela não tem
                para dar. O painel toma o seu espaço de uma vez e é o conteúdo
-               que acende e assenta. */
+               que acende e assenta.
+
+               ── E A SAÍDA DESTE PAINEL NÃO SE ANIMA. É UMA DECISÃO. ───────
+
+               A `.bo-saida` deu saída aos diálogos e às folhas do back office,
+               e a pergunta óbvia era porque é que este ficou de fora. Ficou
+               porque é o único que FECHA ESPAÇO ATRÁS DE SI: está em fluxo,
+               dentro do cartão, e quando sai a grelha sobe e o documento
+               encolhe. Uma saída em `opacity` sozinha não chega — o buraco
+               fecharia na mesma, de repente, por baixo de uma coisa a
+               apagar-se.
+
+               Mediu-se, com o método e o instrumento do `Toast` (contadores
+               `LayoutCount`/`LayoutDuration` do CDP). O arnês está em
+               `e2e/saida-do-espreitar-o-dia.mjs`, com a marcação real desta
+               vista — 42 células, o painel de quatro linhas, e a página por
+               baixo. Três repetições, num viewport de 375×667:
+
+                 A · transicionar `height`             17,0 layouts   1,52 ms
+                 B · `grid-template-rows: 1fr → 0fr`   15,0 layouts   1,49 ms
+                 C · FLIP (o painel sai de fluxo)       4,0 layouts   0,82 ms
+                 D · não animar                         1,0 layout    0,09 ms
+
+               A e B voltam a dar o MESMO, como já tinha dado na pilha dos
+               avisos: a fama de que a grelha «não é layout da mesma maneira»
+               continua a não se confirmar. C é barato — e é aí que esta
+               conversa costuma acabar, e não pode.
+
+               O FLIP do `Toast` translada os IRMÃOS do que sai: quatro caixas,
+               todas dentro de uma pilha `position: fixed`, fora de fluxo. Aqui
+               os «irmãos» são o RESTO DA PÁGINA, e o mesmo arnês mede o que
+               isso custa em píxeis:
+
+                 · um `transform` no invólucro que contém o que vem a seguir
+                   cria bloco de contenção e o cabeçalho `sticky` do back
+                   office descola: medido, deixa de estar a 0 px do topo e
+                   passa a 24 px, ou seja deixa de estar colado;
+                 · e no instante em que o painel sai de fluxo o documento
+                   encolhe 291 px. Nesta vista — cartão do mês mais uma lista
+                   curta —, com a página no fundo, o browser trava o
+                   `scrollTop` (643 → 352) e A GRELHA DO MÊS SALTA 291 px no
+                   fotograma ZERO. O painel ia apagar-se suavemente por cima de
+                   uma página que acabou de dar um pulo de um ecrã inteiro.
+
+               Ou seja: das quatro, a única que não custa layout também é a que
+               parte o `sticky` e faz saltar aquilo para onde a pessoa está a
+               olhar. E o que este painel fecha é o painel dela própria — ela
+               carregou no «×» daqui de dentro, ou noutro dia, ou noutro mês:
+               sabe para onde foi, e não precisa de que lho digam durante 200
+               ms. Não animar é 1 recálculo de layout e nenhum salto.
+
+               Se um dia isto mudar de forma — sair do fluxo, passar a folha no
+               telemóvel — a resposta muda com ela, e o arnês está lá para se
+               voltar a correr. */
             <div className="bo-entrada mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
                 <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
@@ -1072,10 +1199,11 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
       {/* Add-event modal — keyed by date so it mounts fresh (and autofocuses)
           each open. Its form state is local, so typing never touches the grid. */}
-      {modalDate && (
+      {dataDoModal && (
         <AddEventModal
-          key={modalDate}
-          date={modalDate}
+          key={dataDoModal}
+          aberto={modalDate !== null}
+          date={dataDoModal}
           dateLabel={modalDateLabel}
           onClose={() => setModalDate(null)}
           onCreate={createEvent}
