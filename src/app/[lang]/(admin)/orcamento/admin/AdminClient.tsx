@@ -110,6 +110,7 @@ import {
    global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
    três sítios muito concretos, e nenhum deles é este ficheiro. */
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 /* A outra metade do vocabulário: a `.bo-saida` é a palavra em CSS, e este hook
    é a parte que o CSS não pode fazer sozinho — segurar o nó montado os 200 ms
    da saída. A prosa toda está no `ui/saida.ts` e na regra do `globals.css`. */
@@ -1393,57 +1394,36 @@ export default function AdminClient({
    * indicador é um filete que desliza pela esquerda — e é o `translate` que
    * anda, composto na GPU, sem remedir nada à volta (o filete é `absolute`).
    *
-   * ── PORQUE É QUE ISTO MEDE, EM VEZ DE CALCULAR ────────────────────────────
+   * ── A MEDIDA DEIXOU DE VIVER AQUI ─────────────────────────────────────────
    *
-   * A lista não tem altura fixa: quatro destinos escondem-se no computador e
-   * aparecem no telemóvel (`BARRA_INFERIOR`), a coluna rola quando não cabe, e
-   * o contador dos pedidos por responder faz um item crescer. Um número
-   * calculado a partir do índice ficava errado em todas essas situações. O
-   * `ResizeObserver` é o mesmo instrumento que o `Segmented` usa, e pela mesma
-   * razão.
+   * Estavam aqui trinta linhas — o `ResizeObserver`, o `offsetTop`, o
+   * fotograma que não anda — e havia uma segunda cópia delas no índice do
+   * estúdio. Quando a terceira apareceu (a barra «Esta página / Todas» do
+   * `PainelDoEstudio`), extraiu-se `ui/useMarcaQueAnda.ts` a partir DESTAS —
+   * mas este ficheiro estava então debaixo de outras mãos e a ordem foi não
+   * lhe tocar, portanto ficou a cópia. É essa cópia que sai agora: o gancho é
+   * literalmente esta lógica, mais o eixo `x` que uma barra vertical não usa,
+   * e as razões todas (porque MEDE em vez de calcular, porque não anda no
+   * primeiro desenho) estão escritas lá, uma vez só.
    *
-   * (Havia aqui um terceiro motivo — «o grupo “Mais” abre e fecha» — e saiu com
-   * ele: a lista deixou de ter dobra nenhuma. Ver a nota da coluna, lá em
-   * baixo.)
+   * ── A `chave` DIZ QUANDO É QUE HÁ QUE REMEDIR ────────────────────────────
    *
-   * ── E PORQUE É QUE NÃO ANDA NO PRIMEIRO DESENHO ───────────────────────────
+   * São as mesmas duas coisas que o efeito daqui pedia: o destino activo
+   * (`view`) e a gaveta do telemóvel (`navOpen`), que ao abrir dá disposição a
+   * uma coluna que até aí não tinha nenhuma. Vão numa cadeia de caracteres
+   * porque a `chave` é UM valor e entra na lista de dependências de um efeito:
+   * um objecto novo a cada desenho punha-o a correr sempre.
    *
-   * `podeAndar` só passa a verdadeiro no fotograma seguinte ao da primeira
-   * medida. Sem isso, ao abrir o back office o filete deslizava do topo até ao
-   * destino activo — um movimento que ninguém provocou, a dizer uma transição
-   * que não houve. Também é o que o `Segmented` faz.
+   * (Houve aqui uma terceira dependência — o grupo «Mais» que abria e fechava —
+   * e saiu com ele: a lista deixou de ter dobra nenhuma. Ver a nota da coluna,
+   * lá em baixo, e o caso que o prende no `AdminClient.menu-sem-dobra.test.tsx`.)
    */
   const colunaDosDestinos = useRef<HTMLElement | null>(null);
-  const [marcaDoDestino, setMarcaDoDestino] = useState<{ y: number; h: number } | null>(null);
-  const [marcaPodeAndar, setMarcaPodeAndar] = useState(false);
-
-  useEffect(() => {
-    const coluna = colunaDosDestinos.current;
-    if (!coluna) return;
-    const medir = () => {
-      const activo = coluna.querySelector<HTMLElement>('[aria-current="page"]');
-      // `offsetParent` nulo quer dizer escondido — hoje só o `hidden lg:flex`
-      // dos quatro que vivem na barra de baixo. Sem destino à vista não há
-      // marca: melhor nenhuma do que uma pousada no sítio errado.
-      if (!activo || activo.offsetParent === null) {
-        setMarcaDoDestino(null);
-        return;
-      }
-      setMarcaDoDestino({ y: activo.offsetTop, h: activo.offsetHeight });
-    };
-    medir();
-    if (typeof ResizeObserver === "undefined") return;
-    const observador = new ResizeObserver(medir);
-    observador.observe(coluna);
-    for (const b of coluna.querySelectorAll("button")) observador.observe(b);
-    return () => observador.disconnect();
-  }, [view, navOpen]);
-
-  useEffect(() => {
-    if (!marcaDoDestino || marcaPodeAndar) return;
-    const id = requestAnimationFrame(() => setMarcaPodeAndar(true));
-    return () => cancelAnimationFrame(id);
-  }, [marcaDoDestino, marcaPodeAndar]);
+  const { marca: marcaDoDestino, podeAndar: marcaPodeAndar } = useMarcaQueAnda(
+    colunaDosDestinos,
+    '[aria-current="page"]',
+    `${view}:${navOpen}`,
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newQuoteOpen, setNewQuoteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -4247,7 +4227,7 @@ export default function AdminClient({
         <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
           <aside
             inert={navEhGaveta && !navOpen}
-            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
+            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform motion-safe:duration-300 ${
               navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
             } ${
               /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
@@ -4358,7 +4338,7 @@ export default function AdminClient({
                   className={`pointer-events-none absolute left-1 top-0 w-[3px] rounded-full bg-[#4d6350] ${
                     marcaPodeAndar ? MARCA : ""
                   }`}
-                  style={{ translate: `0 ${marcaDoDestino.y}px`, height: marcaDoDestino.h }}
+                  style={{ translate: `0 ${marcaDoDestino.y}px`, height: marcaDoDestino.altura }}
                 />
               )}
               {CORE_NAV.map((id) => renderNavItem(id))}
@@ -4697,21 +4677,27 @@ export default function AdminClient({
               tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
               novo. */}
           <header
-            /* O FIO DO CABEÇALHO FICA COMO ESTAVA, E NÃO É DESCUIDO.
-               Devia ser `ESTADO` como o resto: `motion-safe:transition-colors`
-               sem duração cai nos 150 ms de omissão do Tailwind, que não é
-               degrau nenhum desta casa (o `duration-150` ao lado é esse mesmo
-               número copiado à mão). Só que o `fio-do-cabecalho.test.ts`
-               prende aqui, letra por letra, a classe `motion-safe:transition-colors`
-               — e esse ficheiro não é deste lote. A guarda de movimento
-               reduzido, que é o que aquele teste diz querer, está cumprida; o
-               que falta é a duração, e muda-se quando se puder mexer no teste. */
-            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors duration-150 ${
+            /* O FIO DO CABEÇALHO: 150 ms, e ainda não é o degrau da casa.
+               Devia ser o `ESTADO` (120 ms) como o resto. Não é, porque o
+               `fio-do-cabecalho.test.ts` prende aqui a classe
+               `motion-safe:transition-colors` letra por letra, e mudá-la é
+               mexer nesse teste. Os 150 são o valor de omissão do Tailwind
+               escrito à mão — dívida assumida, não descuido.
+
+               O que MUDOU foi a guarda da duração. O `duration-150` estava sem
+               `motion-safe:`, e isso não era cosmético: o Tailwind compila a
+               duração no topo, fora da media query, enquanto o
+               `motion-safe:transition-colors` fica lá dentro. Com
+               `prefers-reduced-motion: reduce`, o `transition-property` caía no
+               valor inicial — `all` — e ficava `all 150ms ease`. Ou seja, quem
+               pedia MENOS movimento recebia MAIS, e com a curva errada. Medido
+               num Chromium, não deduzido. */
+            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
               desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
             }`}
           >
             <div
-              className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5 motion-safe:transition-[padding] duration-200 ${
+              className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5  ${
                 desceu ? "py-1.5" : "py-2.5"
               }`}
             >
@@ -4799,7 +4785,7 @@ export default function AdminClient({
                     o nome da vista está sempre também na barra de baixo ou na
                     gaveta de onde se veio. */}
                 <h1
-                  className="text-[var(--bo-text)] font-medium leading-none truncate motion-safe:transition-[font-size] duration-200"
+                  className="text-[var(--bo-text)] font-medium leading-none truncate"
                   style={{
                     fontFamily: "var(--font-display)",
                     letterSpacing: "var(--bo-tracking-display)",

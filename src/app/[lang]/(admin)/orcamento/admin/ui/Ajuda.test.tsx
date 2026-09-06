@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { Ajuda } from "./Ajuda";
+import { SAIDA_MS } from "./saida";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -29,12 +30,33 @@ describe("Ajuda", () => {
     expect(screen.getByRole("button").getAttribute("aria-expanded")).toBe("false");
   });
 
+  /**
+   * ── E O FECHO DEIXOU DE SER UM CORTE ─────────────────────────────────────
+   *
+   * Isto media «no fotograma seguinte ao clique o texto já não está no DOM» — e
+   * media-o porque o painel desaparecia A SECO. Desde que ele sai com a
+   * `.bo-saida` (200 ms), o nó fica montado esse tempo, e a pergunta certa
+   * passou a ser outra: **para quem lê o ecrã, acabou já?** Sim — sai da árvore
+   * de acessibilidade no instante do gesto. O nó some quando a animação acaba.
+   */
   it("abre a pedido e volta a fechar", () => {
-    render(<Ajuda sobre="o que faz a caixa Extra">Marca a linha como opcional.</Ajuda>);
-    abrir();
-    expect(screen.getByText("Marca a linha como opcional.")).toBeTruthy();
-    abrir();
-    expect(screen.queryByText("Marca a linha como opcional.")).toBeNull();
+    vi.useFakeTimers();
+    try {
+      render(<Ajuda sobre="o que faz a caixa Extra">Marca a linha como opcional.</Ajuda>);
+      abrir();
+      expect(screen.getByText("Marca a linha como opcional.")).toBeTruthy();
+
+      abrir();
+      // No mesmo fotograma: fora da árvore de acessibilidade e fora do teclado.
+      expect(screen.queryByRole("note")).toBeNull();
+      // E ao fim da saída não sobra nó nenhum.
+      act(() => {
+        vi.advanceTimersByTime(SAIDA_MS + 20);
+      });
+      expect(screen.queryByText("Marca a linha como opcional.")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /** Dez botões «Ajuda» numa lista lida em voz alta são dez botões iguais. */

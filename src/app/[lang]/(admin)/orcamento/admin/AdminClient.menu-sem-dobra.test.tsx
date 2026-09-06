@@ -195,15 +195,34 @@ describe("e o estado do grupo não ficou pendurado", () => {
     expect(CODIGO, "sobrou a abertura automática do grupo").not.toMatch(/activeInMore/);
   });
 
-  it("e a lista de dependências do filete deixou de o pedir", () => {
+  it("e a chave do filete continua a não o pedir", () => {
     /**
-     * Uma dependência a mais não dá erro nenhum — só volta a correr por uma
-     * razão que já não há. É por isso que precisa de teste: não se vê.
+     * ── A MEDIDA MUDOU DE SÍTIO, A AFIRMAÇÃO NÃO ──────────────────────────
+     *
+     * Este caso lia as dependências do efeito que media o filete AQUI. Essa
+     * cópia saiu: a barra lateral passou a chamar o `ui/useMarcaQueAnda.ts`, o
+     * mesmo gancho do índice do estúdio e do painel «O que vai sair». O que
+     * eram as dependências do efeito é hoje a `chave` que se lhe passa, e a
+     * afirmação é a mesma: ela pede o destino activo e a gaveta, e mais nada.
+     * Uma razão a mais para remedir não dá erro nenhum — só volta a correr por
+     * uma razão que já não há, e é por isso que precisa de teste: não se vê.
      */
-    const efeito = CODIGO.match(/const activo = coluna\.querySelector[\s\S]*?\}, \[([^\]]*)\]\);/);
-    expect(efeito, "o efeito que mede o filete mudou de forma").not.toBeNull();
-    const deps = efeito![1].split(",").map((d) => d.trim());
-    expect(deps.sort()).toEqual(["navOpen", "view"]);
+    expect(CODIGO, "a barra lateral voltou a ter uma cópia da medida").not.toMatch(
+      /const activo = coluna\.querySelector/,
+    );
+    const chamada = CODIGO.match(/useMarcaQueAnda\(([\s\S]*?)\);/);
+    expect(chamada, "a barra lateral deixou de chamar o gancho da marca").not.toBeNull();
+    const argumentos = chamada![1].split(",").map((a) => a.trim());
+    expect(argumentos[0], "o gancho deixou de medir dentro da coluna dos destinos").toBe(
+      "colunaDosDestinos",
+    );
+    expect(argumentos[1], "o gancho deixou de procurar o destino marcado").toContain(
+      'aria-current="page"',
+    );
+    const chave = argumentos[2] ?? "";
+    expect(chave).toContain("view");
+    expect(chave).toContain("navOpen");
+    expect(chave, "sobrou a dobra na chave que manda remedir").not.toContain("moreNavOpen");
   });
 
   it("a coluna continua a rolar quando os onze não couberem", () => {

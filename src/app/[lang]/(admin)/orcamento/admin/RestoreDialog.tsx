@@ -15,7 +15,8 @@ import { useTrincoDeScroll } from "./useTrincoDeScroll";
    propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
    As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
 import { ESTADO, PRESSAO } from "./ui/movimento";
-import { Button } from "./ui";
+import { Button, cn } from "./ui";
+import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 
 /**
  * REPOR UMA CÓPIA DE SEGURANÇA — o ecrã da operação mais destrutiva da casa.
@@ -130,17 +131,57 @@ async function enviar(corpo: unknown): Promise<Response> {
   });
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E ESTE TAMBÉM SAI — a casca que segura o nó os 200 ms
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Fechava A SECO: o `open` passava a falso, este `return null` levava o nó e o
+ * ecrã voltava. Meio gesto, no diálogo mais pesado da casa — uma caixa de 3xl
+ * com uma tabela de conjuntos lá dentro.
+ *
+ * ── O PAI NÃO PRECISA DE MUDAR NADA ─────────────────────────────────────────
+ *
+ * O levantamento dizia que o `AdminClient` desmontava isto. Não desmonta:
+ * passa-lhe `open={restoreOpen}` e mantém-no montado. Quem o fazia desaparecer
+ * era esta função, e é aqui que se resolve — sem tocar num ficheiro de 7500
+ * linhas partilhado por todo o back office.
+ *
+ * ── E PORQUE É QUE A `key` VOLTOU, DEPOIS DE O CONTRATO DIZER QUE REMONTA ───
+ *
+ * O `ui/saida.ts` avisa que um `key` REMONTA, e remontar a meio de uma saída é
+ * o contrário do que se quer. Este `key` não muda durante a saída: muda a cada
+ * ABERTURA. E aí remontar é exactamente o certo — o estado deste diálogo é a
+ * frase de confirmação escrita à mão, o ficheiro escolhido e a fase em que se
+ * está. Sem ele, reabrir dentro dos 200 ms da saída anterior devolvia o
+ * diálogo com a frase ainda escrita e, pior, no ecrã do RESULTADO da reposição
+ * que já tinha acabado. O `key` é o que mantém a promessa antiga («cada
+ * abertura começa do zero») agora que o nó já não morre a cada fecho.
+ */
 export default function RestoreDialog({ open, onClose, toast }: Props) {
-  if (!open) return null;
-  return <RestoreDialogInner onClose={onClose} toast={toast} />;
+  const aSair = useSaidaDeUmSo(open);
+  const [abertura, setAbertura] = useState(0);
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (abertoAntes !== open) {
+    setAbertoAntes(open);
+    // Ajustado DURANTE o desenho, que é o padrão do React para reagir a uma
+    // prop: re-desenha sem pintar nada pelo meio.
+    if (open) setAbertura((n) => n + 1);
+  }
+  if (!open && !aSair) return null;
+  return <RestoreDialogInner key={abertura} aSair={aSair} onClose={onClose} toast={toast} />;
 }
 
-function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
+function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { aSair: boolean }) {
   // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
   // ordem de declaração, portanto a página já está trancada quando o foco entra
   // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
-  useTrincoDeScroll(true);
-  const dialogRef = useFocusTrap<HTMLDivElement>(true);
+  //
+  // `!aSair` e não `true`: enquanto o nó se apaga já não é um diálogo. O trinco
+  // do scroll larga-se e o foco volta ao botão que abriu isto no INSTANTE do
+  // gesto — a saída é uma imagem, não um adiamento da tarefa.
+  useTrincoDeScroll(!aSair);
+  const dialogRef = useFocusTrap<HTMLDivElement>(!aSair);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [fase, setFase] = useState<Fase>("escolher");
@@ -170,12 +211,16 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
   // Fechar com Esc — mas nunca a meio de uma reposição: fechar o separador
   // agora não pararia a escrita, só esconderia o que está a acontecer.
   useEffect(() => {
+    // `aSair` na guarda: o `onClose` deste diálogo revalida os pedidos todos ao
+    // servidor. Um Escape carregado durante os 200 ms da saída mandava uma
+    // segunda volta de rede para fechar o que já estava fechado.
+    if (aSair) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && fase !== "a-repor") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, fase]);
+  }, [onClose, fase, aSair]);
 
   useEffect(() => {
     if (fase !== "a-repor") return;
@@ -277,13 +322,46 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
   const podeRepor = !bloqueado && frase.trim().toUpperCase() === RESTORE_CONFIRM_PHRASE && !ocupado;
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center px-4">
-      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div
+      /* A `.bo-saida` larga os `pointer-events` dentro da própria classe, mas
+         quem cobre o ecrã inteiro é ESTA moldura, e ela não leva classe
+         nenhuma. Sem esta linha, um diálogo a desvanecer-se continuava a comer
+         os toques do que está por baixo durante 200 ms: a pessoa carrega, não
+         acontece nada, e não há sinal nenhum de porquê. */
+      className={cn(
+        "fixed inset-0 z-[95] flex items-center justify-center px-4",
+        aSair && "pointer-events-none",
+      )}
+    >
+      {/* ── O VÉU APAGA-SE COM A CAIXA ────────────────────────────────────
+          Dois ramos e não um `cn()` no ramo aberto: a varredura dos véus
+          (`entrada-dos-fundos.test.ts`) LÊ o ficheiro em vez de o correr e
+          procura a lista de classes escrita por extenso no atributo — não sabe
+          ler um `cn(…)`. O véu ABERTO fica por extenso; é o ramo da saída que
+          leva o `cn`. Mesmo tipo e mesma posição, portanto o React reaproveita
+          o elemento: a saída parte da opacidade em que o véu está.
+
+          E o `backdrop-blur-sm` fica FORA das duas animações, como manda o
+          `globals.css` — um desfoque em transição repinta o ecrã inteiro a
+          cada fotograma. */}
+      {aSair ? (
+        <div
+          className={cn(SAIDA_FUNDO, "absolute inset-0 bg-black/60 backdrop-blur-sm")}
+          aria-hidden
+        />
+      ) : (
+        <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      )}
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Repor cópia de segurança"
+        /* Enquanto se apaga não tem `role`, não tem nome e não está no fio do
+           teclado: para quem ouve o ecrã e para quem anda de Tab, isto acabou
+           no instante do gesto. O que fica é uma imagem. */
+        role={aSair ? undefined : "dialog"}
+        aria-modal={aSair ? undefined : "true"}
+        aria-label={aSair ? undefined : "Repor cópia de segurança"}
+        aria-hidden={aSair || undefined}
+        inert={aSair}
         /* O véu já acendia (`bo-entrada-fundo`, na linha de cima) e a caixa
            não: o ecrã escurecia em 240 ms e a caixa aparecia inteira no
            primeiro fotograma deles. Quatro píxeis e os mesmos 240 ms põem os
@@ -292,7 +370,14 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
            Só `transform` e `opacity`, e sem `fill-mode`: no fim a animação
            larga o elemento e não fica um `transform` pendurado a criar um
            bloco de contenção por cima do que está cá dentro. */
-        className="bo-entrada relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
+        className={cn(
+          /* Quatro píxeis, e sai por onde entrou. A entrada não tem `fill-mode`
+             e larga o elemento no fim; a saída tem `forwards`, e a rede dela é
+             o nó deixar de existir no fotograma a seguir aos 200 ms — senão
+             ficava um `transform` pendurado a criar bloco de contenção. */
+          aSair ? SAIDA : "bo-entrada",
+          "relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]",
+        )}
       >
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b border-[var(--bo-hairline)] px-6 py-4">

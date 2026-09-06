@@ -177,7 +177,30 @@ export default function Material() {
           { value: "regras", label: "Regras" },
         ]}
       />
-      <div className="mt-5">
+      {/* ── O PAINEL TROCA COM UM GESTO, E NÃO ENTRE DOIS FOTOGRAMAS ────────
+          A pílula do `Segmented` DESLIZA de um segmento para o outro (250 ms,
+          `ui/movimento.ts`) e o painel que ela comanda mudava a seco: o
+          conteúdo inteiro do cartão era substituído sem um único sinal de que
+          foi a ABA que mudou e não o conteúdo que foi trocado por baixo. Meio
+          gesto — a metade que se vê é a pequena.
+
+          A palavra é a da casa e não uma nova: `.view-in` (240 ms, 8 px,
+          `cubic-bezier(0, 0, 0.2, 1)`, `backwards` — sem `transform` pendurado
+          no fim, que é o que já partiu uma gaveta `fixed` uma vez). É
+          literalmente o que aqui se passa: a moldura fica, o conteúdo dentro
+          dela passa a ser outro. É o mesmo que os separadores do detalhe já
+          fazem em `AdminClient.tsx:7195`.
+
+          ── E PORQUE É QUE O `key` AQUI NÃO CUSTA NADA ──────────────────────
+          Regra da casa: `key` REMONTA, e nunca se lhe toca para animar o que
+          guarda foco, rolo ou texto escrito. Aqui não guarda: os três ramos são
+          COMPONENTES DIFERENTES, portanto o React já destrói um e monta o outro
+          a cada troca de aba — com `key` ou sem ele. O que o `key` acrescenta é
+          só que o invólucro também é novo, e por isso a animação volta a correr
+          nele. Nada que sobrevivesse à troca deixa de sobreviver.
+
+          Com `prefers-reduced-motion` a `.view-in` não anima (globals.css). */}
+      <div key={aba} className="view-in mt-5">
         {aba === "catalogo" ? (
           <Catalogo />
         ) : aba === "listas" ? (

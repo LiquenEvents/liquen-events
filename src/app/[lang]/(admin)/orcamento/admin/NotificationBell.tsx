@@ -28,6 +28,57 @@ function BellIcon() {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O SININHO NÃO ANIMA NADA — e isto é a decisão, não o esquecimento
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Quem vier a este ficheiro à procura da lista a abrir e do contador a mudar
+ * não os encontra, e não é por estarem noutro sítio: NÃO EXISTEM. Este
+ * componente é UM BOTÃO — um sino que liga as notificações push do aparelho e,
+ * quando já estão ligadas, manda o resumo agora. Não há caixa suspensa, não há
+ * lista de avisos, não há número por cima do sino. Fica escrito porque a
+ * ausência de um contador lê-se como um contador esquecido, e a primeira coisa
+ * que alguém faria era animar um número que não há.
+ *
+ * ── E SE O CONTADOR APARECER? NÃO PULSA ─────────────────────────────────────
+ *
+ * A regra da casa é que o movimento indica DIRECÇÃO e ORIGEM, não chama
+ * atenção. Um número a pulsar não indica coisa nenhuma: repete-se para sempre,
+ * não tem destino, e o que ele acrescenta ao «3» é só insistência. Pior: o
+ * único movimento periódico que este back office tem hoje é o ponto do
+ * `ui/EmCurso` — e esse quer dizer, exactamente, «ISTO ESTÁ A ACONTECER
+ * AGORA». Pôr a mesma pulsação num contador parado ensinava o olho a ignorá-la
+ * nos dois sítios, e o que se perdia era o primeiro.
+ *
+ * O que um contador PODE fazer, no dia em que existir, é a entrada de 240 ms da
+ * casa quando o número aparece pela primeira vez — uma vez, com fim. Repetir
+ * não.
+ *
+ * ── E O SINO A APARECER DO NADA? TAMBÉM NÃO SE ANIMA ────────────────────────
+ *
+ * Há aqui um corte seco verdadeiro: enquanto o estado é `loading` este
+ * componente devolve `null`, e quando a sondagem responde nasce um botão na
+ * barra do cabeçalho — ao lado do «Guardar tudo» e da pesquisa, que SALTAM para
+ * o lado para lhe abrir espaço. Uma `.bo-entrada` por cima disto piora o que
+ * está mal: os vizinhos mexem-se no primeiro fotograma e o recém-chegado só
+ * fica visível 240 ms depois, ou seja a linha parece partir-se e só depois se
+ * explica.
+ *
+ * A avaria é de DISPOSIÇÃO (um lugar que não estava reservado), e a casa já
+ * escreveu esta lição a propósito do rodopio do `ui/Button.tsx`: «o salto de
+ * largura […] resolve-se com espaço reservado, que é layout e não animação —
+ * não se remenda com uma transição». Reservar o lugar do sino é do dono do
+ * cabeçalho; até lá, uma animação aqui seria maquilhagem por cima de um salto.
+ *
+ * ── O QUE JÁ ANIMA, E CHEGA ─────────────────────────────────────────────────
+ *
+ * A troca entre os quatro ramos (`indisponivel`, `granted`, `denied`, o de
+ * activar) é sempre o MESMO `<Button>` na mesma posição: o React remenda-lhe as
+ * propriedades em vez de o trocar, e a mudança de tinta corre nos 120 ms do
+ * `ESTADO` que o `ui/Button.tsx` já traz. Não falta nada aqui.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ *
  * `unconfigured` é uma RESPOSTA do servidor («não há chaves VAPID montadas»).
  * `indisponivel` é uma AVARIA («a rota não respondeu, ou respondeu em erro»).
  *

@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
+import { SAIDA, useSaidaDeUmSo } from "./saida";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -57,6 +58,21 @@ export function Ajuda({
   const id = useId();
   const caixa = useRef<HTMLSpanElement>(null);
 
+  /**
+   * ── E FECHAVA A SECO ──────────────────────────────────────────────────────
+   *
+   * Entrava com a `.bo-entrada` e desaparecia entre dois fotogramas nas três
+   * saídas (o botão, o Escape, o carregar fora). Um painel de explicação é
+   * exactamente o caso em que o corte se lê mal: ele aparece ENCOSTADO ao `?`,
+   * e sem saída não se percebe se recolheu para o botão ou se a página é que
+   * mudou por baixo.
+   *
+   * A palavra é a da casa e a distância também — `SAIDA` são os quatro píxeis
+   * de um item de menu, que é o tamanho desta coisa. Com `prefers-reduced-motion`
+   * o gancho devolve `false` no instante e nada disto chega a existir.
+   */
+  const aSairAgora = useSaidaDeUmSo(aberto);
+
   // Fechar com Escape e ao carregar fora. As duas juntas: sem a primeira, quem
   // anda pelo teclado fica preso; sem a segunda, o painel acompanha a página
   // enquanto ela já está a escrever noutro sítio.
@@ -98,15 +114,22 @@ export function Ajuda({
       >
         <span aria-hidden="true">?</span>
       </button>
-      {aberto && (
+      {(aberto || aSairAgora) && (
         <span
           id={id}
-          role="note"
+          /* A SAIR, JÁ NÃO É UMA NOTA. O nó fica montado 200 ms para ter o que
+             animar, mas sai da árvore de acessibilidade no mesmo fotograma do
+             gesto: quem ouve o ecrã não pode continuar a ouvir uma explicação
+             que a pessoa já fechou. */
+          role={aSairAgora ? undefined : "note"}
+          aria-hidden={aSairAgora || undefined}
+          inert={aSairAgora}
           // Encostado ao botão e não centrado: um painel de 18rem cabe sem sair
           // do cartão em qualquer largura de ecrã — desde que cresça para o
           // lado onde há espaço, que é o que `alinhar` escolhe.
           className={cn(
-            "bo-entrada absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-[var(--bo-hairline-strong)] bg-white p-3 text-[11px] leading-relaxed text-[var(--bo-tinta-72)] normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
+            aSairAgora ? SAIDA : "bo-entrada",
+            "absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-[var(--bo-hairline-strong)] bg-white p-3 text-[11px] leading-relaxed text-[var(--bo-tinta-72)] normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
             alinhar === "direita" ? "right-0" : "left-0",
           )}
         >

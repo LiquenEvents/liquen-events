@@ -4,11 +4,12 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
-/* A escala de movimento da casa — ver `ui/movimento.ts`. O `motion-safe:` já
-   aqui estava; o que faltava era a DURAÇÃO: uma `transition-*` sem duração cai
-   nos 150 ms do `--default-transition-duration` do Tailwind, que não é degrau
-   nenhum desta casa. `ESTADO` são os 120 ms do `micro`, `PRESSAO` o toque. */
-import { ESTADO, PRESSAO } from "./ui/movimento";
+/* A escala de movimento da casa — ver `ui/movimento.ts`. O `PRESSAO` são os
+   20 ms do carregar. O `ESTADO` (120 ms) SAIU daqui de propósito: numa lista
+   que se percorre com o ↓ segurado, um realce que esbate é um realce que não
+   diz qual é a linha. A razão inteira está no ponto 3 do cabeçalho. */
+import { PRESSAO } from "./ui/movimento";
+import { SAIDA, SAIDA_FUNDO, useSaidaAdiada } from "./ui/saida";
 
 export interface Command {
   id: string;
@@ -37,7 +38,90 @@ interface Props {
 /**
  * ⌘K / Ctrl+K command palette: jump to any view or search a quote by name,
  * email or id. Keyboard-first, on-brand, minimal.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE AQUI SE ANIMA, E — SOBRETUDO — O QUE AQUI NÃO SE ANIMA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta é a superfície onde a regra «nenhuma animação pode atrasar uma tarefa»
+ * deixa de ser um princípio e passa a ser a única que conta: quem abre isto
+ * está a escrever, e escreve depressa. Três decisões, e duas delas são «não».
+ *
+ * ── 1. A ENTRADA FICA COMO ESTÁ ───────────────────────────────────────────
+ *
+ * A caixa entra com a `.bo-entrada` e o véu com a `.bo-entrada-fundo`, e não se
+ * lhes toca. Não atrasam nada: a caixa está no sítio e a escrever desde o
+ * primeiro fotograma (o foco vai para o campo num `requestAnimationFrame`, e
+ * não no fim de animação nenhuma), e o que a animação faz são quatro píxeis e
+ * uma opacidade a subir por cima disso.
+ *
+ * ── 2. A SAÍDA DEPENDE DE QUEM A CAUSOU, E ISSO NÃO É UM CAPRICHO ─────────
+ *
+ * Esta paleta fecha-se por dois motivos diferentes, e só um deles é uma saída:
+ *
+ *   · **DISPENSA** — o Escape, o «×», o carregar no véu. A paleta vai-se
+ *     embora e NADA a substitui: por baixo fica exactamente o ecrã que já lá
+ *     estava. Aqui o corte seco lê-se como uma avaria («desapareceu?») e a
+ *     saída da casa é a palavra certa — 200 ms, e o ecrã volta.
+ *
+ *   · **ESCOLHA** — o Enter, ou o clique numa linha. A paleta vai-se embora
+ *     PORQUE outra coisa está a chegar: o comando corre no mesmo instante e o
+ *     que vem a seguir é uma vista nova, que se apresenta com a sua própria
+ *     entrada. Aqui a saída não indica direcção nenhuma — compete com a
+ *     resposta que a pessoa pediu. E custa: este véu tem `backdrop-blur-sm`,
+ *     ou seja manter 200 ms de véu a apagar-se é manter 200 ms de desfoque a
+ *     recompor o ecrã INTEIRO a cada fotograma, exactamente no momento em que
+ *     o browser está a montar a vista de destino. É o preço mais alto do
+ *     orçamento de quadro pago no instante em que ele já está esgotado, para
+ *     um gesto para onde ninguém está a olhar — o olho já foi para o
+ *     resultado.
+ *
+ *     O `globals.css` diz a mesma coisa do outro lado, sobre a entrada dos
+ *     véus: «o `backdrop-filter` NÃO entra na animação — um desfoque em
+ *     transição repinta o ecrã inteiro a cada fotograma». A opacidade dele
+ *     entra; a existência do desfoque durante esse tempo é o que aqui se
+ *     recusa a prolongar.
+ *
+ *     Portanto: escolher fecha A SECO, de propósito, e é a decisão mais
+ *     importante deste ficheiro.
+ *
+ * ── 3. O REALCE DA LINHA ESCOLHIDA NÃO TEM TRANSIÇÃO — E TINHA ────────────
+ *
+ * As linhas traziam o `ESTADO` (120 ms sobre `background-color` e `color`, a
+ * escala de `ui/movimento.ts`). Numa lista normal é o que se quer. Aqui não:
+ * a linha escolhida move-se com o ↓ e o ↑ SEGURADOS, à cadência de repetição
+ * do teclado.
+ *
+ * A conta, e é uma CONTA e não uma medição num browser (fica dito, para
+ * ninguém a citar como medida): a repetição de tecla dos sistemas anda entre
+ * uns 15 e uns 30 por segundo, ou seja um passo a cada 33–66 ms. Com uma
+ * transição de 120 ms, isso são DOIS A QUATRO passos dentro do tempo de um só
+ * esbatimento — várias linhas meio-acesas ao mesmo tempo e nenhuma a ler-se
+ * como «é esta que o Enter abre». Uma escolha não é um estado que assenta: é
+ * uma posição, e uma posição ambígua num sítio onde a tecla seguinte confirma é
+ * pior do que um corte.
+ *
+ * (O `ui/TabelaOuCartoes.tsx` já recusou uma animação pelo mesmo motivo e com a
+ * mesma aritmética — a entrada por filtro, «a 5 teclas por segundo há uma
+ * entrada nova de 240 ms a cada 200 ms». É a mesma família de erro: animar ao
+ * ritmo do teclado torna ilegível o ecrã que a pessoa está a tentar ler.)
+ *
+ * O que FICA é a resposta ao toque: o `PRESSAO` (os 20 ms do carregar) com a
+ * lista de propriedades mínima que o cobre — `scale`, e mais nada. Isto não é
+ * uma terceira linguagem: são os mesmos dois degraus da casa (120/20 ms), só
+ * que sobre a única propriedade que aqui se quer animada. Sem a
+ * `transition-[scale]`, o `PRESSAO` não anima coisa nenhuma — no Tailwind 4 a
+ * classe `scale-*` emite a propriedade autónoma `scale`, e é precisamente essa
+ * a avaria nº 1 que o `ui/movimento.ts` conta por extenso.
  */
+
+/**
+ * O toque da linha, sem o esbatimento da escolha. Ver o ponto 3 acima.
+ */
+const TOQUE_DA_LINHA = `motion-safe:transition-[scale] motion-safe:duration-[120ms] ${PRESSAO}`;
+
+/** Um véu e uma caixa, mas um gesto só — uma chave só. Ver `ui/saida.ts`. */
+const CHAVE = "paleta";
 export default function CommandPalette({
   open,
   onClose,
@@ -57,6 +141,37 @@ export default function CommandPalette({
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const listaId = useId();
   const idDaOpcao = (i: number) => `${listaId}-op-${i}`;
+
+  /**
+   * ── PORQUE É QUE ISTO NÃO USA O `useSaidaDeUmSo` ──────────────────────────
+   *
+   * O atalho de `ui/saida.ts` começa a saída SEMPRE que o `aberto` cai, e é o
+   * que se quer nas outras cinco superfícies pequenas desta ronda. Aqui não:
+   * a saída depende de QUEM a causou (ponto 2 do cabeçalho), e essa condição
+   * não cabe num booleano de entrada. Fica a forma longa, com o motivo à vista.
+   *
+   * `porEscolha` é estado e não referência: é LIDO durante o desenho, no mesmo
+   * commit em que o `open` cai, e uma referência lida no desenho é exactamente
+   * o que a análise estática desta casa recusa (e com razão: sob `StrictMode` o
+   * valor lido podia ser o da passagem anterior).
+   */
+  const [porEscolha, setPorEscolha] = useState(false);
+  const { aSair, comecarSaida } = useSaidaAdiada(() => {});
+  const aSairAgora = !open && aSair.includes(CHAVE);
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (abertoAntes !== open) {
+    setAbertoAntes(open);
+    // Escolher fecha a seco: a vista de destino é que é a resposta.
+    if (!open && !porEscolha) comecarSaida(CHAVE);
+    setPorEscolha(false);
+  }
+
+  /** Correr um comando: o fecho que vem a seguir é uma ESCOLHA, não uma saída. */
+  function escolher(cmd: Command) {
+    setPorEscolha(true);
+    cmd.run();
+    onClose();
+  }
 
   useEffect(() => {
     if (open) {
@@ -122,7 +237,8 @@ export default function CommandPalette({
     document.getElementById(`${listaId}-op-${active}`)?.scrollIntoView({ block: "nearest" });
   }, [open, active, listaId, results.length]);
 
-  if (!open) return null;
+  // Enquanto a saída corre o nó fica montado, e é a única coisa que o segura.
+  if (!open && !aSairAgora) return null;
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -134,10 +250,7 @@ export default function CommandPalette({
     } else if (e.key === "Enter") {
       e.preventDefault();
       const cmd = results[active];
-      if (cmd) {
-        cmd.run();
-        onClose();
-      }
+      if (cmd) escolher(cmd);
     } else if (e.key === "Escape") {
       onClose();
     }
@@ -157,16 +270,35 @@ export default function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12dvh]"
-      onClick={onClose}
+      /* A MOLDURA LARGA OS TOQUES NO PRIMEIRO FOTOGRAMA DA SAÍDA. Ela cobre o
+         ecrã todo e o seu `onClick` fecha a paleta; enquanto o véu se apaga,
+         um toque destinado ao que está por baixo era engolido aqui — a pessoa
+         carrega e não acontece nada, sem sinal nenhum de porquê. O `.bo-saida`
+         larga os toques dentro de si; esta moldura não a leva, por isso é
+         explícito — e no mesmo commit, nunca num `setTimeout`. */
+      className={`fixed inset-0 z-[90] flex items-start justify-center px-4 pt-[12dvh] ${
+        aSairAgora ? "pointer-events-none" : ""
+      }`}
+      onClick={aSairAgora ? undefined : onClose}
     >
-      <div className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm" />
+      <div
+        className={`${
+          aSairAgora ? SAIDA_FUNDO : "bo-entrada bo-entrada-fundo"
+        } absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm`}
+      />
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Pesquisar e navegar"
-        className="bo-entrada relative w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white shadow-[var(--bo-sombra-modal)]"
+        /* A SAIR, DEIXA DE SER UM DIÁLOGO — no fotograma do gesto, e não no fim
+           da animação: quem ouve o ecrã e quem anda de Tab não pode continuar
+           dentro de uma caixa que já foi dispensada. */
+        role={aSairAgora ? undefined : "dialog"}
+        aria-modal={aSairAgora ? undefined : "true"}
+        aria-label={aSairAgora ? undefined : "Pesquisar e navegar"}
+        aria-hidden={aSairAgora || undefined}
+        inert={aSairAgora}
+        className={`${
+          aSairAgora ? SAIDA : "bo-entrada"
+        } relative w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white shadow-[var(--bo-sombra-modal)]`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -258,11 +390,10 @@ export default function CommandPalette({
                       role="option"
                       aria-selected={isActive}
                       onMouseEnter={() => setActive(idx)}
-                      onClick={() => {
-                        c.run();
-                        onClose();
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ${ESTADO} ${PRESSAO} ${
+                      onClick={() => escolher(c)}
+                      /* Sem `ESTADO`: o realce da escolha não esbate. A razão
+                         está por extenso no ponto 3 do cabeçalho. */
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ${TOQUE_DA_LINHA} ${
                         isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-[var(--bo-tinta-6)]"
                       }`}
                     >

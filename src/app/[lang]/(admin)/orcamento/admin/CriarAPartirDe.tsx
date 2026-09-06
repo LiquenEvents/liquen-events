@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dataCurta } from "@/lib/data-curta";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { Button, EmCurso } from "./ui";
+import { Button, EmCurso, cn } from "./ui";
+import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { ModeloProposta } from "@/lib/proposal-templates";
 import { fotosDoDocumento, type CampoAMudar } from "@/lib/proposal-copy";
@@ -275,161 +276,242 @@ export default function CriarAPartirDe({
     }
   };
 
-  if (!open) return null;
+  /* ══════════════════════════════════════════════════════════════════════
+     E ISTO TAMBÉM SAI
+     ══════════════════════════════════════════════════════════════════════
+
+     Entrava com a `.bo-entrada` (véu e caixa, os dois) e fechava A SECO: o
+     `open` passava a falso, o nó desaparecia no fotograma seguinte e o ecrã
+     voltava. Meio gesto — e num sítio onde se nota, porque o que estava a
+     cobrir o ecrã era uma caixa a 8vh do topo com uma lista inteira dentro.
+
+     ── O PAI JÁ O TINHA MONTADO, E É POR ISSO QUE ISTO SE RESOLVE AQUI ────
+
+     O levantamento que chegou com esta tarefa dizia que o pai desmontava este
+     diálogo. Não desmonta: o `ProposalStudio` passa-lhe `open={copiarAberto}`
+     e mantém-no montado — é o `return null` desta linha que o faz desaparecer.
+     Ou seja não é preciso tocar em nada do lado de lá: quem segura o nó os 200
+     ms é este ficheiro, exactamente como o `FolhaOuDialogo` faz com o dele.
+
+     ── E O `onClose` NÃO ESPERA ──────────────────────────────────────────
+
+     Continua a ser chamado no instante do gesto. O `useTrincoDeScroll(open)` e
+     o `useFocusTrap(open)` aqui em cima são regidos pela PROP, não por isto:
+     a página destranca-se já e o foco volta já ao botão que abriu o diálogo. O
+     que fica cá é uma imagem a apagar-se, sem nome, sem foco e sem apanhar um
+     único toque. Uma saída que adiasse o fecho era uma animação a atrasar uma
+     tarefa, que é a única coisa que esta casa não deixa fazer a nenhuma.
+
+     ── A ARMADILHA DESTE FICHEIRO EM PARTICULAR ──────────────────────────
+
+     O campo de procura leva foco automático e a lista tem um item activo que
+     se anda com as setas. Nada disso pode ser remontado a meio da saída — por
+     isso o nó é SEGURADO, e não recriado: a marca entra no mesmo elemento, que
+     é o que impede um `key` (ou um efeito) de trocar a caixa por uma nova com
+     a procura em branco. */
+  const aSair = useSaidaDeUmSo(open);
+  if (!open && !aSair) return null;
+
+  /* ── PORQUE É QUE A CAIXA SAI DAQUI PARA UMA VARIÁVEL ───────────────────
+     Porque a MOLDURA tem de ser escrita duas vezes, e a caixa não.
+
+     Aqui o véu e a moldura são o mesmo elemento — a tinta escura e o
+     `flex items-start justify-center` que centra a caixa vivem na mesma
+     linha, e é por isso que o `entrada-dos-fundos.test.ts` isenta este
+     ficheiro da varredura dos véus. Isenta-o da varredura DA REGRA, não da
+     varredura: ele continua a contar este ficheiro como tendo véu, e a
+     conta é feita a LER o ficheiro — procura a lista de classes escrita por
+     extenso no atributo `className`. Não sabe ler um `cn(…)` nem um
+     ternário. Um véu embrulhado num deles ficava invisível para ela, e no
+     dia em que alguém lhe tirasse a entrada ninguém dava por isso.
+
+     Daí os dois ramos: o véu ABERTO fica por extenso, e é o ramo da saída
+     que leva o `cn`. São dois ramos e não dois nós — mesmo tipo e mesma
+     posição, o React reaproveita o elemento e troca-lhe as classes. */
+  const caixaDoDialogo = (
+    <div
+      ref={caixa}
+      /* ── A CAIXA A SAIR JÁ NÃO É UMA CAIXA ──────────────────────────
+       Enquanto se apaga não tem `role`, não tem nome e não está no fio do
+       teclado: para quem ouve o ecrã e para quem anda de Tab isto acabou no
+       instante do gesto — e acabou mesmo, porque o `onClose` já correu e o
+       foco já voltou. O que fica é uma imagem. */
+      role={aSair ? undefined : "dialog"}
+      aria-modal={aSair ? undefined : "true"}
+      aria-labelledby={aSair ? undefined : "cad-titulo"}
+      aria-hidden={aSair || undefined}
+      inert={aSair}
+      /* ── E A CAIXA ──────────────────────────────────────────────────
+       Quatro píxeis, de cima, que é de onde ela vem: isto pousa a 8vh do
+       topo, como uma paleta de comandos. Mesmos 240 ms e mesma curva do
+       véu, para os dois lerem como um gesto só.
+
+       As duas opacidades compõem-se (a caixa está DENTRO do véu, e o véu
+       também está a acender), portanto a caixa chega um nada depois dele
+       e os dois assentam no mesmo instante. É a ordem certa: primeiro o
+       ecrã escurece, depois a caixa pousa.
+
+       Sem `fill-mode`, e é o que aqui interessa: o campo de procura leva
+       foco automático na montagem e a animação larga o elemento ao fim
+       dos 240 ms, sem deixar `transform` pendurado por cima da lista. */
+      className={cn(
+        /* Quatro píxeis, e sai por onde entrou — por cima. A entrada não tem
+         `fill-mode` e larga o elemento; a saída tem `forwards`, e a rede
+         dela é o nó deixar de existir no fotograma a seguir aos 200 ms
+         (senão ficava um `transform` pendurado a criar bloco de contenção
+         por cima da lista). */
+        aSair ? SAIDA : "bo-entrada",
+        "flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]",
+      )}
+      onKeyDown={aSair ? undefined : teclas}
+    >
+      <div className="border-b border-[var(--bo-hairline-strong)] px-5 py-4">
+        <h2 id="cad-titulo" className="font-display text-lg text-[var(--bo-text)]">
+          Criar a partir de…
+        </h2>
+        <p className="mt-1 text-xs text-foreground/50">
+          Copia os serviços, os mood boards, o orçamento e as condições. O nome, a data, o local, os
+          convidados e o valor passam a ser os deste pedido.
+        </p>
+        <input
+          ref={campoProcura}
+          value={procura}
+          onChange={(e) => {
+            setProcura(e.target.value);
+            // Voltar ao topo da lista faz parte de filtrar, por isso é aqui
+            // e não num efeito: o que o efeito fazia era reagir a uma coisa
+            // que este mesmo gesto já sabe.
+            setAtivo(0);
+          }}
+          placeholder="Procurar por cliente, local ou data…"
+          aria-label="Procurar propostas anteriores"
+          className="bo-input mt-3 w-full px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {aCarregar && <p className="p-4 text-sm text-foreground/50">A carregar…</p>}
+        {!aCarregar && naoDeuParaLer && linhas.length === 0 && (
+          <p className="p-4 text-sm text-[#8a2a22]">
+            Não deu para ler as propostas anteriores. Fecha e volta a abrir — o que já fizeste
+            continua guardado.
+          </p>
+        )}
+        {!aCarregar && !naoDeuParaLer && linhas.length === 0 && (
+          <p className="p-4 text-sm text-foreground/50">
+            {procura
+              ? "Nada encontrado. Experimenta outro nome ou local."
+              : "Ainda não há propostas anteriores nem modelos guardados. A primeira faz-se do zero; a partir daí é copiar."}
+          </p>
+        )}
+        <ul className="flex flex-col gap-1">
+          {linhas.map((linha, i) => {
+            const aTrabalhar = aCopiar === linha.id;
+            const sugerida = linha.tipo === "proposta" && linha.sugerida;
+            return (
+              <li key={linha.id}>
+                <button
+                  type="button"
+                  onClick={() => void escolher(linha)}
+                  onMouseEnter={() => setAtivo(i)}
+                  disabled={!!aCopiar}
+                  aria-current={i === ativo}
+                  className={`w-full rounded-xl border px-4 py-3 text-left ${ESTADO} ${PRESSAO} disabled:opacity-50 ${
+                    i === ativo
+                      ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
+                      : "border-transparent hover:border-[var(--bo-hairline-strong)]"
+                  }`}
+                >
+                  <span className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-sm font-medium text-[var(--bo-text)]">
+                      {linha.tipo === "modelo" ? linha.modelo.nome : linha.proposta.clientName}
+                    </span>
+                    <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em]">
+                      {sugerida && (
+                        <span className="rounded-full bg-[#4d6350] px-2 py-0.5 text-white">
+                          já foi teu cliente
+                        </span>
+                      )}
+                      <span className="text-foreground/40">
+                        {linha.tipo === "modelo" ? "modelo" : dataCurta(linha.proposta.createdAt)}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-foreground/50">
+                    {linha.tipo === "modelo"
+                      ? resumirModelo(linha.modelo)
+                      : resumirProposta(linha.proposta)}
+                  </span>
+                </button>
+                {/* ── ENQUANTO ESTÁ A COPIAR ──────────────────────────────
+                  Fica DEBAIXO da linha em que ela carregou, e não num canto
+                  do diálogo: com a lista toda apagada, o que interessa
+                  dizer é qual delas é que está a vir. Fora do `<button>`
+                  de propósito — o botão está desactivado, e o que está
+                  dentro de um botão desactivado não é lido por toda a
+                  gente. */}
+                {aTrabalhar && (
+                  <EmCurso
+                    className="mt-1"
+                    titulo={
+                      fotosDaLinha(linha) > 0
+                        ? `A copiar as ${fotosDaLinha(linha)} fotos…`
+                        : "A copiar a proposta…"
+                    }
+                    estimadoMs={tempoDaCopia(fotosDaLinha(linha))}
+                    nota="Os serviços, os mood boards e o orçamento vêm com elas. Não feches esta janela."
+                    notaDemorada="Com rede fraca demora — não feches o separador. As fotos estão a ser copiadas uma a uma."
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-[var(--bo-hairline-strong)] px-5 py-3">
+        <p className="text-[11px] text-foreground/40">↑ ↓ percorre · Enter escolhe · Esc fecha</p>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (aSair) {
+    return (
+      <div
+        /* A `.bo-saida` larga os `pointer-events` DENTRO da classe, e aqui
+           isso é tudo o que faz falta: quem cobre o ecrã inteiro é esta
+           moldura, e é ela que leva a classe. Sem isto, uma caixa a
+           desvanecer-se continuava a comer os toques do que está por baixo
+           durante 200 ms — a pessoa carrega, não acontece nada, e não há
+           sinal nenhum de porquê. */
+        className={cn(
+          SAIDA_FUNDO,
+          "fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[8vh] backdrop-blur-sm",
+        )}
+        aria-hidden
+      >
+        {caixaDoDialogo}
+      </div>
+    );
+  }
 
   return (
     <div
       /* ── O VÉU ─────────────────────────────────────────────────────────
-         Aqui o véu e a caixa que ele traz são o MESMO elemento — a tinta
-         escura e o `flex items-start justify-center` que centra a caixa
-         vivem os dois nesta linha, e é por isso que o
-         `entrada-dos-fundos.test.ts` isenta este ficheiro da varredura dos
-         véus. Isenta-o da varredura, não da regra: escurecia o ecrã inteiro
-         num fotograma, por baixo de uma caixa que também aparecia de uma
-         vez. Este era o único sítio da pasta com os DOIS por tratar.
-
          `bo-entrada-fundo` põe a deslocação a zero (`--bo-entrada-y: 0px`),
          que é o que um fundo pede: um véu não vem de sítio nenhum, está por
-         todo o lado. O que ele faz é acender.
+         todo o lado. O que ele faz é acender — e, à saída, apagar-se.
 
-         E o `backdrop-blur-sm` fica FORA da animação, como manda o
+         E o `backdrop-blur-sm` fica FORA das duas animações, como manda o
          `globals.css`: um desfoque em transição repinta o ecrã inteiro a
          cada fotograma. Só a opacidade se move. */
       className="bo-entrada bo-entrada-fundo fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[8vh] backdrop-blur-sm"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div
-        ref={caixa}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cad-titulo"
-        /* ── E A CAIXA ──────────────────────────────────────────────────
-           Quatro píxeis, de cima, que é de onde ela vem: isto pousa a 8vh do
-           topo, como uma paleta de comandos. Mesmos 240 ms e mesma curva do
-           véu, para os dois lerem como um gesto só.
-
-           As duas opacidades compõem-se (a caixa está DENTRO do véu, e o véu
-           também está a acender), portanto a caixa chega um nada depois dele
-           e os dois assentam no mesmo instante. É a ordem certa: primeiro o
-           ecrã escurece, depois a caixa pousa.
-
-           Sem `fill-mode`, e é o que aqui interessa: o campo de procura leva
-           foco automático na montagem e a animação larga o elemento ao fim
-           dos 240 ms, sem deixar `transform` pendurado por cima da lista. */
-        className="bo-entrada flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]"
-        onKeyDown={teclas}
-      >
-        <div className="border-b border-[var(--bo-hairline-strong)] px-5 py-4">
-          <h2 id="cad-titulo" className="font-display text-lg text-[var(--bo-text)]">
-            Criar a partir de…
-          </h2>
-          <p className="mt-1 text-xs text-foreground/50">
-            Copia os serviços, os mood boards, o orçamento e as condições. O nome, a data, o local,
-            os convidados e o valor passam a ser os deste pedido.
-          </p>
-          <input
-            ref={campoProcura}
-            value={procura}
-            onChange={(e) => {
-              setProcura(e.target.value);
-              // Voltar ao topo da lista faz parte de filtrar, por isso é aqui
-              // e não num efeito: o que o efeito fazia era reagir a uma coisa
-              // que este mesmo gesto já sabe.
-              setAtivo(0);
-            }}
-            placeholder="Procurar por cliente, local ou data…"
-            aria-label="Procurar propostas anteriores"
-            className="bo-input mt-3 w-full px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {aCarregar && <p className="p-4 text-sm text-foreground/50">A carregar…</p>}
-          {!aCarregar && naoDeuParaLer && linhas.length === 0 && (
-            <p className="p-4 text-sm text-[#8a2a22]">
-              Não deu para ler as propostas anteriores. Fecha e volta a abrir — o que já fizeste
-              continua guardado.
-            </p>
-          )}
-          {!aCarregar && !naoDeuParaLer && linhas.length === 0 && (
-            <p className="p-4 text-sm text-foreground/50">
-              {procura
-                ? "Nada encontrado. Experimenta outro nome ou local."
-                : "Ainda não há propostas anteriores nem modelos guardados. A primeira faz-se do zero; a partir daí é copiar."}
-            </p>
-          )}
-          <ul className="flex flex-col gap-1">
-            {linhas.map((linha, i) => {
-              const aTrabalhar = aCopiar === linha.id;
-              const sugerida = linha.tipo === "proposta" && linha.sugerida;
-              return (
-                <li key={linha.id}>
-                  <button
-                    type="button"
-                    onClick={() => void escolher(linha)}
-                    onMouseEnter={() => setAtivo(i)}
-                    disabled={!!aCopiar}
-                    aria-current={i === ativo}
-                    className={`w-full rounded-xl border px-4 py-3 text-left ${ESTADO} ${PRESSAO} disabled:opacity-50 ${
-                      i === ativo
-                        ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
-                        : "border-transparent hover:border-[var(--bo-hairline-strong)]"
-                    }`}
-                  >
-                    <span className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-[var(--bo-text)]">
-                        {linha.tipo === "modelo" ? linha.modelo.nome : linha.proposta.clientName}
-                      </span>
-                      <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em]">
-                        {sugerida && (
-                          <span className="rounded-full bg-[#4d6350] px-2 py-0.5 text-white">
-                            já foi teu cliente
-                          </span>
-                        )}
-                        <span className="text-foreground/40">
-                          {linha.tipo === "modelo" ? "modelo" : dataCurta(linha.proposta.createdAt)}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-foreground/50">
-                      {linha.tipo === "modelo"
-                        ? resumirModelo(linha.modelo)
-                        : resumirProposta(linha.proposta)}
-                    </span>
-                  </button>
-                  {/* ── ENQUANTO ESTÁ A COPIAR ──────────────────────────────
-                      Fica DEBAIXO da linha em que ela carregou, e não num canto
-                      do diálogo: com a lista toda apagada, o que interessa
-                      dizer é qual delas é que está a vir. Fora do `<button>`
-                      de propósito — o botão está desactivado, e o que está
-                      dentro de um botão desactivado não é lido por toda a
-                      gente. */}
-                  {aTrabalhar && (
-                    <EmCurso
-                      className="mt-1"
-                      titulo={
-                        fotosDaLinha(linha) > 0
-                          ? `A copiar as ${fotosDaLinha(linha)} fotos…`
-                          : "A copiar a proposta…"
-                      }
-                      estimadoMs={tempoDaCopia(fotosDaLinha(linha))}
-                      nota="Os serviços, os mood boards e o orçamento vêm com elas. Não feches esta janela."
-                      notaDemorada="Com rede fraca demora — não feches o separador. As fotos estão a ser copiadas uma a uma."
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-[var(--bo-hairline-strong)] px-5 py-3">
-          <p className="text-[11px] text-foreground/40">↑ ↓ percorre · Enter escolhe · Esc fecha</p>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancelar
-          </Button>
-        </div>
-      </div>
+      {caixaDoDialogo}
     </div>
   );
 }
