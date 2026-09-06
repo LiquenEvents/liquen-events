@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModeloProposta, TipoModelo } from "@/lib/proposal-templates";
+import { SAIDA, useSaidaDeUmSo } from "./ui/saida";
 
 /**
  * MODELOS PARCIAIS — guardar e reutilizar UM grupo de serviços, ou UM mood
@@ -77,8 +78,23 @@ const ROTULO = {
  * garantia, em CSS, de que o que está escrito lá dentro se lê inteiro.
  */
 const PAINEL_SUSPENSO =
-  "bo-entrada absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
+  "absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
   "rounded-xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-suspensa)]";
+
+/**
+ * ── UM PAINEL DE CADA VEZ, E UM ESTADO SÓ ─────────────────────────────────
+ *
+ * Eram dois booleanos (`aberto` e `aGuardar`) que se desligavam um ao outro à
+ * mão em quatro sítios. Enquanto o fecho era seco isso não se via; a partir do
+ * momento em que o painel demora 200 ms a sair, vê-se — abrir «Guardar como
+ * modelo» com a lista aberta punha os DOIS painéis no mesmo canto, um a entrar
+ * por cima do outro a sair.
+ *
+ * Com um estado só, a exclusão deixa de ser uma regra que alguém tem de se
+ * lembrar de escrever: só há saída quando se vai para `null`, e trocar de
+ * painel é uma troca, não uma sobreposição.
+ */
+type Painel = "lista" | "guardar";
 
 export default function ModelosParciais({
   tipo,
@@ -89,13 +105,45 @@ export default function ModelosParciais({
   toast,
   className,
 }: Props) {
-  const [aberto, setAberto] = useState(false);
+  const [painel, setPainel] = useState<Painel | null>(null);
   const [modelos, setModelos] = useState<ModeloProposta[]>([]);
-  const [aGuardar, setAGuardar] = useState(false);
   const [nome, setNome] = useState("");
   /** A leitura falhou — o menu tem de dizer isso e não «não tens nenhum». */
   const [naoDeuParaLer, setNaoDeuParaLer] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
+
+  /**
+   * ── O PAINEL FECHAVA A SECO ───────────────────────────────────────────────
+   *
+   * Entrava com a `.bo-entrada` (está no `PAINEL_SUSPENSO`) e desaparecia entre
+   * dois fotogramas em todas as saídas: Escape, clique fora, inserir um modelo,
+   * cancelar, gravar. A `.bo-saida` é a outra metade da mesma palavra, e o
+   * gancho é o que segura o nó os 200 ms que ela dura.
+   *
+   * O que fica a sair é uma IMAGEM: `inert`, sem `pointer-events` (a classe
+   * larga-os), e — no painel de guardar — com a caixa de escrever já fora do
+   * alcance do teclado, para que a tecla seguinte não caia num campo que já não
+   * conta.
+   */
+  const aSairAgora = useSaidaDeUmSo(painel !== null);
+  /**
+   * Qual dos dois é que está a sair — o estado já não o diz, porque é `null`.
+   * É a única coisa que o atalho de `ui/saida.ts` não pode saber por nós: ele
+   * devolve um booleano, e aqui há duas caixas a partilhar o mesmo canto.
+   *
+   * Nota: só se guarda quando se vai para `null`. Trocar DIRECTAMENTE de painel
+   * (a lista aberta e carregar em «Guardar como modelo») não é uma saída — é
+   * uma troca, e quem chega é o sinal. Sem isto, os dois ficavam no mesmo canto
+   * 200 ms, um a entrar por cima do outro a sair.
+   */
+  const [painelAntes, setPainelAntes] = useState<Painel | null>(painel);
+  const [oQueSai, setOQueSai] = useState<Painel | null>(null);
+  if (painelAntes !== painel) {
+    setPainelAntes(painel);
+    if (painel === null) setOQueSai(painelAntes);
+  }
+  /** O que se desenha: o painel aberto, ou o que ficou a apagar-se. */
+  const aDesenhar = painel ?? (aSairAgora ? oQueSai : null);
 
   const carregar = useCallback(async () => {
     try {
@@ -118,18 +166,12 @@ export default function ModelosParciais({
 
   // Fechar ao clicar fora e no Esc — as duas saídas que as pessoas tentam.
   useEffect(() => {
-    if (!aberto && !aGuardar) return;
+    if (painel === null) return;
     const fora = (e: MouseEvent) => {
-      if (caixa.current && !caixa.current.contains(e.target as Node)) {
-        setAberto(false);
-        setAGuardar(false);
-      }
+      if (caixa.current && !caixa.current.contains(e.target as Node)) setPainel(null);
     };
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setAberto(false);
-        setAGuardar(false);
-      }
+      if (e.key === "Escape") setPainel(null);
     };
     document.addEventListener("mousedown", fora);
     document.addEventListener("keydown", esc);
@@ -137,7 +179,7 @@ export default function ModelosParciais({
       document.removeEventListener("mousedown", fora);
       document.removeEventListener("keydown", esc);
     };
-  }, [aberto, aGuardar]);
+  }, [painel]);
 
   async function guardar() {
     const limpo = nome.trim();
@@ -155,7 +197,7 @@ export default function ModelosParciais({
       const j = await r.json().catch(() => null);
       if (!r.ok) throw new Error(j?.error ?? "Não deu para guardar.");
       setModelos((j.modelos as ModeloProposta[]).filter((m) => m.tipo === tipo));
-      setAGuardar(false);
+      setPainel(null);
       setNome("");
       toast?.(`Modelo «${limpo}» guardado.`, "success");
     } catch (e) {
@@ -178,11 +220,10 @@ export default function ModelosParciais({
         <button
           type="button"
           className={botao}
-          aria-expanded={aberto}
+          aria-expanded={painel === "lista"}
           onClick={() => {
-            const vai = !aberto;
-            setAberto(vai);
-            setAGuardar(false);
+            const vai = painel !== "lista";
+            setPainel(vai ? "lista" : null);
             if (vai) void carregar();
           }}
         >
@@ -194,9 +235,9 @@ export default function ModelosParciais({
         <button
           type="button"
           className={botao}
+          aria-expanded={painel === "guardar"}
           onClick={() => {
-            setAGuardar((v) => !v);
-            setAberto(false);
+            setPainel((p) => (p === "guardar" ? null : "guardar"));
             setNome(nomeSugerido ?? "");
           }}
         >
@@ -204,8 +245,12 @@ export default function ModelosParciais({
         </button>
       )}
 
-      {aberto && (
-        <div className={PAINEL_SUSPENSO + " p-1"}>
+      {aDesenhar === "lista" && (
+        <div
+          className={`${aSairAgora ? SAIDA : "bo-entrada"} ${PAINEL_SUSPENSO} p-1`}
+          aria-hidden={aSairAgora || undefined}
+          inert={aSairAgora}
+        >
           {naoDeuParaLer ? (
             <p className="px-3 py-2 text-xs text-[#8a2a22]">
               Não deu para ler os modelos guardados. Volta a tentar — os que tinhas continuam lá.
@@ -234,7 +279,7 @@ export default function ModelosParciais({
                       // as duas cópias partilharem os itens, e editar uma
                       // mudava a outra.
                       onInserir?.(JSON.parse(JSON.stringify(conteudo)));
-                      setAberto(false);
+                      setPainel(null);
                     }}
                   >
                     {m.nome}
@@ -246,8 +291,12 @@ export default function ModelosParciais({
         </div>
       )}
 
-      {aGuardar && (
-        <div className={PAINEL_SUSPENSO + " p-3"}>
+      {aDesenhar === "guardar" && (
+        <div
+          className={`${aSairAgora ? SAIDA : "bo-entrada"} ${PAINEL_SUSPENSO} p-3`}
+          aria-hidden={aSairAgora || undefined}
+          inert={aSairAgora}
+        >
           <label className="block text-[11px] text-[var(--bo-text-muted)]" htmlFor={`mp-${tipo}`}>
             Nome do modelo
           </label>
@@ -261,7 +310,7 @@ export default function ModelosParciais({
             className="bo-input mt-1 w-full px-2.5 py-1.5 text-xs"
           />
           <div className="mt-2 flex justify-end gap-2">
-            <button type="button" className={botao} onClick={() => setAGuardar(false)}>
+            <button type="button" className={botao} onClick={() => setPainel(null)}>
               Cancelar
             </button>
             <button

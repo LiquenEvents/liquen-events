@@ -8,6 +8,10 @@ import { Button } from "./ui";
    nos 150 ms do `--default-transition-duration` do Tailwind, que não é degrau
    nenhum desta casa. `ESTADO` são os 120 ms do `micro`, `PRESSAO` o toque. */
 import { ESTADO, PRESSAO } from "./ui/movimento";
+/* A saída da casa — 200 ms, `--ease-in`, quatro píxeis (a distância de um item
+   de menu), e o `pointer-events` largado dentro da própria classe. O gancho é o
+   que segura o nó montado esses 200 ms; o contrato está em `ui/saida.ts`. */
+import { SAIDA, useSaidaDeUmSo } from "./ui/saida";
 
 /**
  * A small, accessible "⋯ Mais" overflow menu for secondary/print actions.
@@ -44,6 +48,18 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const menuId = useId();
+
+  /**
+   * ── O MENU ENTRAVA E DESAPARECIA ──────────────────────────────────────────
+   *
+   * Havia `.bo-entrada` na abertura e NADA no fecho: o `{open && …}` passava a
+   * falso e o painel sumia entre dois fotogramas. E as três saídas deste menu
+   * (Escape, clique fora, escolher uma acção) davam todas no mesmo corte.
+   *
+   * Com `prefers-reduced-motion` o gancho devolve `false` no próprio instante e
+   * nada disto chega a acontecer — o painel desmonta como desmontava.
+   */
+  const aSairAgora = useSaidaDeUmSo(open);
 
   // Focus the first item when the menu opens.
   useEffect(() => {
@@ -126,12 +142,21 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
       >
         <span className="hidden sm:inline">{label}</span>
       </Button>
-      {open && (
+      {(open || aSairAgora) && (
         <div
           id={menuId}
-          role="menu"
-          aria-label="Mais ações"
-          className="bo-entrada absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-[var(--bo-hairline)] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]"
+          /* A SAIR, DEIXA DE SER UM MENU no mesmo fotograma do gesto. O nó fica
+             montado para ter o que animar, mas sem `role`, sem nome e `inert`:
+             para quem ouve o ecrã e para quem anda de Tab isto já acabou. Sem
+             isto, os itens continuavam alcançáveis durante 200 ms depois de a
+             pessoa já ter escolhido. */
+          role={aSairAgora ? undefined : "menu"}
+          aria-label={aSairAgora ? undefined : "Mais ações"}
+          aria-hidden={aSairAgora || undefined}
+          inert={aSairAgora}
+          className={`${
+            aSairAgora ? SAIDA : "bo-entrada"
+          } absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-[var(--bo-hairline)] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]`}
         >
           {items.map((item, idx) => (
             <button

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
+import { SAIDA, useSaidaDeUmSo } from "./saida";
 
 /**
  * AS ACÇÕES DE UM ITEM — reveladas ao passar o rato no computador, sempre
@@ -55,6 +56,19 @@ export interface MenuDeAccoesProps {
   className?: string;
 }
 
+/**
+ * ── E O MENU TAMBÉM SAI ─────────────────────────────────────────────────────
+ *
+ * O menu entrava com a `.bo-entrada` e fechava A SECO: o `{aberto && …}`
+ * passava a falso e o painel desaparecia entre dois fotogramas. Meio gesto —
+ * e é a metade que se vê mais vezes, porque um menu abre-se uma vez e fecha-se
+ * sempre (Escape, clique fora, escolher uma acção: três saídas, todas seco).
+ *
+ * A palavra já existia (`.bo-saida`, 200 ms, `--ease-in`, quatro píxeis — a
+ * distância de um item de menu) e o gancho que segura o nó montado durante os
+ * 200 ms também. Aqui só se liga uma à outra, pelo atalho de quem tem UM nó só
+ * (`useSaidaDeUmSo`, em `ui/saida.ts` — o contrato está escrito lá).
+ */
 export function MenuDeAccoes({
   accoes,
   sobre,
@@ -64,6 +78,10 @@ export function MenuDeAccoes({
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
   const abridorRef = useRef<HTMLButtonElement>(null);
+
+  // Reabrir a meio da saída traz o menu de volta: o `aberto` é que manda, e
+  // não a marca — a regra vem de dentro do gancho.
+  const aSairAgora = useSaidaDeUmSo(aberto);
 
   /**
    * ── O FOCO VOLTA A QUEM ABRIU ─────────────────────────────────────────────
@@ -157,11 +175,23 @@ export function MenuDeAccoes({
             </svg>
           </button>
 
-          {aberto && (
+          {(aberto || aSairAgora) && (
             <div
-              role="menu"
-              aria-label={`Acções de ${sobre}`}
-              className="bo-entrada absolute right-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] py-1 shadow-[var(--bo-sombra-suspensa)]"
+              /* A SAIR, ISTO JÁ NÃO É UM MENU. O nó fica montado 200 ms para
+                 ter o que animar, mas para quem ouve o ecrã e para quem anda de
+                 Tab a escolha acabou no instante do gesto: sem `role`, sem
+                 nome, e fora do fio do teclado. O `pointer-events` vem dentro
+                 da própria `.bo-saida` (ver `globals.css`), no MESMO commit —
+                 nunca num `setTimeout`, que é a janela que ele existe para
+                 fechar. */
+              role={aSairAgora ? undefined : "menu"}
+              aria-label={aSairAgora ? undefined : `Acções de ${sobre}`}
+              aria-hidden={aSairAgora || undefined}
+              inert={aSairAgora}
+              className={cn(
+                "absolute right-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] py-1 shadow-[var(--bo-sombra-suspensa)]",
+                aSairAgora ? SAIDA : "bo-entrada",
+              )}
             >
               {noMenu.map((a, i) => {
                 // Uma linha a separar antes da primeira destrutiva: é o que
