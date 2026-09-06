@@ -12,6 +12,7 @@ import { MAXIMO_CORPO_ESCRITO } from "@/lib/email-limites";
 import { tamanhoEmPalavras } from "@/lib/custo-do-pdf";
 import { Button, Field } from "./ui";
 import { useGaveta } from "./ui/gaveta";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -501,7 +502,7 @@ export default function EmailDoEnvio({
       >
         <summary
           onClick={gaveta.aoTocarNoResumo}
-          className="cursor-pointer list-none px-3 py-2 text-xs text-[var(--bo-text-muted)]"
+          className={`cursor-pointer list-none px-3 py-2 text-xs text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
         >
           <span aria-hidden="true">▸ </span>Ver como o cliente o recebe
         </summary>

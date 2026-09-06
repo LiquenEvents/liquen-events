@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EIXOS, type Eixo, type EixoDaRegra, type Etiqueta } from "@/lib/biblioteca-types";
 import { MAX_THEME_NAME } from "@/lib/theme-types";
-import { Button, Card, EmCurso } from "./ui";
+import { Button, Card, EmCurso, Escolha } from "./ui";
 import { useToast } from "./Toast";
 import ImagemComPlanoB from "./ImagemComPlanoB";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * REVER ETIQUETAS — o ecrã onde se arruma a biblioteca em lote.
@@ -298,7 +299,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
   const porEixo = (eixo: Eixo) => vocabulario.filter((e) => e.eixo === eixo);
 
   const chip = (activo: boolean) =>
-    `alvo-toque rounded-full px-3 py-1.5 text-xs transition-colors ${
+    `alvo-toque rounded-full px-3 py-1.5 text-xs ${
       activo
         ? "bg-[#4d6350] text-white"
         : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-10)]"
@@ -341,7 +342,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                   prev.includes(eixo) ? prev.filter((e) => e !== eixo) : [...prev, eixo],
                 )
               }
-              className={chip(semEixo.includes(eixo))}
+              className={`${chip(semEixo.includes(eixo))} ${ESTADO} ${PRESSAO}`}
             >
               sem {eixo}
             </button>
@@ -350,7 +351,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
             type="button"
             aria-pressed={porConfirmar}
             onClick={() => setPorConfirmar((v) => !v)}
-            className={chip(porConfirmar)}
+            className={`${chip(porConfirmar)} ${ESTADO} ${PRESSAO}`}
           >
             por confirmar
           </button>
@@ -372,7 +373,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                       prev.includes(e.id) ? prev.filter((x) => x !== e.id) : [...prev, e.id],
                     )
                   }
-                  className={chip(exigidas.includes(e.id))}
+                  className={`${chip(exigidas.includes(e.id))} ${ESTADO} ${PRESSAO}`}
                 >
                   {e.nome}
                 </button>
@@ -423,7 +424,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
               setSemEixo([]);
               setPorConfirmar(false);
             }}
-            className="bo-text-muted mt-3 text-xs underline underline-offset-2"
+            className={`bo-text-muted mt-3 text-xs underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
           >
             Limpar filtros
           </button>
@@ -468,9 +469,9 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                 aria-pressed={escolhida}
                 aria-label={`Foto ${f.path.split("/").pop()}`}
                 onClick={(ev) => tocar(f.path, ev.shiftKey)}
-                className={`relative aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
+                className={`relative aspect-square overflow-hidden rounded-lg border-2  ${
                   escolhida ? "border-[#4d6350]" : "border-transparent hover:border-foreground/20"
-                }`}
+                } ${ESTADO} ${PRESSAO}`}
               >
                 {/* A miniatura, com o ORIGINAL como plano B. Assinar um caminho
                     no Storage não confirma que o ficheiro lá está: as fotos
@@ -536,28 +537,42 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
             <button
               type="button"
               onClick={() => setSeleccionadas(new Set())}
-              className="bo-text-muted text-xs underline underline-offset-2"
+              className={`bo-text-muted text-xs underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
             >
               limpar
             </button>
             <button
               type="button"
               onClick={() => setSeleccionadas(new Set(fotos.map((f) => f.path)))}
-              className="bo-text-muted text-xs underline underline-offset-2"
+              className={`bo-text-muted text-xs underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
             >
               escolher as {fotos.length} do ecrã
             </button>
-            <label className="ml-auto flex items-center gap-2">
-              <span className="sr-only">Etiqueta a aplicar</span>
-              <select
+            {/* ── ERAM DOIS CONTROLOS DENTRO DE UM `<label>` SÓ ──────────
+                Um `<label>` nomeia UM controlo. Com dois lá dentro, o nome
+                («Etiqueta a aplicar») ia para o primeiro e o segundo ficava sem
+                nome nenhum. Cada um passou a dizer o seu, que é também o que
+                eles fazem — pôr e tirar não é a mesma acção. */}
+            <div className="ml-auto flex items-center gap-2">
+              {/* ── ISTO NÃO É UM CAMPO: É UM MENU DISFARÇADO ─────────────
+                  Nunca guardou valor nenhum. Era um `<select>` com
+                  `defaultValue=""` que, ao escolher, corria a acção e se repunha
+                  no vazio à mão (`ev.target.value = ""`) — o remendo clássico
+                  para um `<select>` fazer de menu.
+
+                  Com o `Escolha` o remendo desaparece: o `valor` é "" sempre,
+                  vindo de fora, portanto o campo volta sozinho ao rótulo depois
+                  de cada acção. Menos uma linha a mexer no DOM por baixo do
+                  React. */}
+              <Escolha
+                aria-label="Pôr etiqueta nas fotos escolhidas"
                 disabled={aGuardar}
-                defaultValue=""
-                onChange={(ev) => {
-                  const id = ev.target.value;
-                  ev.target.value = "";
+                valor=""
+                aoMudar={(id) => {
                   if (id) void aplicar(id, "por");
                 }}
-                className="bo-input w-auto py-2 pl-3 pr-8 text-xs"
+                containerClassName="w-auto"
+                className="py-2 pl-3 text-xs"
               >
                 <option value="">Pôr etiqueta…</option>
                 {EIXOS.map((eixo) => (
@@ -569,16 +584,16 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                     ))}
                   </optgroup>
                 ))}
-              </select>
-              <select
+              </Escolha>
+              <Escolha
+                aria-label="Tirar etiqueta das fotos escolhidas"
                 disabled={aGuardar}
-                defaultValue=""
-                onChange={(ev) => {
-                  const id = ev.target.value;
-                  ev.target.value = "";
+                valor=""
+                aoMudar={(id) => {
                   if (id) void aplicar(id, "tirar");
                 }}
-                className="bo-input w-auto py-2 pl-3 pr-8 text-xs"
+                containerClassName="w-auto"
+                className="py-2 pl-3 text-xs"
               >
                 <option value="">Tirar etiqueta…</option>
                 {EIXOS.map((eixo) => (
@@ -590,8 +605,8 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                     ))}
                   </optgroup>
                 ))}
-              </select>
-            </label>
+              </Escolha>
+            </div>
           </div>
 
           {/* A ESPERA, DENTRO DA BARRA E NÃO POR CIMA DELA.

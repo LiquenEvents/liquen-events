@@ -816,7 +816,7 @@ const QuoteCard = memo(function QuoteCard({
       <button
         type="button"
         onClick={() => onOpen(q)}
-        className="w-full text-left p-5 pl-12 rounded-xl"
+        className={`w-full text-left p-5 pl-12 rounded-xl ${ESTADO} ${PRESSAO}`}
       >
         {/* ── A HIERARQUIA, E PORQUE É QUE ELA NÃO EXISTIA ─────────────────
             Palavras dela: «o nome do casal tem o mesmo peso visual que o email,
@@ -5612,7 +5612,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -5622,7 +5622,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -5636,7 +5636,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-6)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -6899,7 +6899,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`mailto:${selected.email}`}
-                                className="alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline"
+                                className={`alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline ${ESTADO} ${PRESSAO}`}
                               >
                                 {selected.email}
                               </a>
@@ -6928,7 +6928,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`tel:${selected.phone}`}
-                                className="alvo-toque text-xs text-[var(--bo-tinta-72)] hover:text-[var(--bo-text)]"
+                                className={`alvo-toque text-xs text-[var(--bo-tinta-72)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                               >
                                 {selected.phone}
                               </a>
@@ -7050,10 +7050,10 @@ export default function AdminClient({
                                       );
                                     tabs?.[nextIdx]?.focus();
                                   }}
-                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,translate] motion-safe:duration-[120ms] ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
                                       ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
-                                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] "
+                                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-6)] "
                                   }`}
                                 >
                                   <span
@@ -7178,7 +7178,7 @@ export default function AdminClient({
                                   >
                                     <summary
                                       onClick={gavetaDoPlano.aoTocarNoResumo}
-                                      className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]"
+                                      className={`alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <svg
                                         className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}
@@ -7498,7 +7498,7 @@ export default function AdminClient({
                                   >
                                     <summary
                                       onClick={gavetaDoHistorico.aoTocarNoResumo}
-                                      className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]"
+                                      className={`alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <svg
                                         className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}

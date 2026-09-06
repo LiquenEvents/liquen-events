@@ -14,6 +14,7 @@ import {
   type Desfecho,
 } from "@/lib/orcamento/desfecho";
 import { eur, randomId } from "./util";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -221,7 +222,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
   }
 
   const botao =
-    "alvo-toque rounded-full border px-3.5 py-1.5 text-[10px] font-semibold tracking-[0.1em] uppercase transition-colors motion-reduce:transition-none disabled:opacity-50";
+    "alvo-toque rounded-full border px-3.5 py-1.5 text-[10px] font-semibold tracking-[0.1em] uppercase disabled:opacity-50";
   const previsto = valorConfirmado(escrito);
 
   return (
@@ -269,7 +270,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                       type="button"
                       onClick={() => void guardarMotivo(m)}
                       disabled={motivoAGravar !== null}
-                      className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30`}
+                      className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 ${ESTADO} ${PRESSAO}`}
                     >
                       {motivoAGravar === m ? "A guardar…" : NOME_DO_MOTIVO[m]}
                     </button>
@@ -314,7 +315,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
               type="button"
               onClick={confirmarGanho}
               disabled={fase.tipo === "a-gravar"}
-              className={`${botao} border-[#4d6350] bg-[#4d6350] text-white hover:bg-[#3f5343]`}
+              className={`${botao} border-[#4d6350] bg-[#4d6350] text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
             >
               {fase.tipo === "a-gravar"
                 ? "A marcar…"
@@ -329,7 +330,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                 setAviso(null);
                 setFase({ tipo: "pergunta" });
               }}
-              className={`${botao} border-transparent text-foreground/45 hover:text-[var(--bo-tinta-72)]`}
+              className={`${botao} border-transparent text-foreground/45 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
             >
               Cancelar
             </button>
@@ -356,7 +357,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
               setAviso(null);
               setFase({ tipo: "quanto" });
             }}
-            className={`${botao} border-[#4d6350] bg-[#4d6350] text-white hover:bg-[#3f5343]`}
+            className={`${botao} border-[#4d6350] bg-[#4d6350] text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
           >
             Ganho
           </button>
@@ -364,7 +365,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
             type="button"
             disabled={fase.tipo === "a-gravar"}
             onClick={() => void marcar("perdido")}
-            className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/35 hover:text-[var(--bo-text)]`}
+            className={`${botao} border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/35 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
           >
             Perdido
           </button>

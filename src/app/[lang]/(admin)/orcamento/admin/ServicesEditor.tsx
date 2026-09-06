@@ -736,7 +736,7 @@ export default function ServicesEditor({
       <details className="pointer-coarse:hidden group -mt-2 mb-3" onToggle={gaveta.aoAlternar}>
         <summary
           onClick={gaveta.aoTocarNoResumo}
-          className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden"
+          className={`marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
         >
           <span
             aria-hidden
@@ -1127,7 +1127,7 @@ export default function ServicesEditor({
           <button
             type="button"
             onClick={undoRemoval}
-            className="font-medium text-[#4d6350] underline underline-offset-2 hover:text-[#415440]"
+            className={`font-medium text-[#4d6350] underline underline-offset-2 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
           >
             Anular
           </button>
@@ -1219,7 +1219,7 @@ function DragHandle({
       {...rest}
       aria-label={`${label} (ou usa as setas)`}
       title="Arrastar para reordenar"
-      className={`[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 hover:text-[var(--bo-text)] focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100 ${ESTADO}`}
+      className={`[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 hover:text-[var(--bo-text)] focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100 ${ESTADO} ${PRESSAO}`}
     >
       <span aria-hidden="true" className="text-[13px] leading-none">
         ⠿

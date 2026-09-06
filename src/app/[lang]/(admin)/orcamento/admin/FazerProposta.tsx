@@ -370,7 +370,10 @@ export default function FazerProposta({
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] ${MOV_ESTADO} ${PRESSAO} ${
                 filtro === f.id
                   ? "bg-[#1b2119] text-white "
-                  : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"
+                  : /* `hover:bg-…-6` era o MESMO token do fundo em repouso: a
+                       pastilha não escolhida não mudava de fundo ao passar o
+                       rato. Sobe um degrau na escada de tinta da casa (3/6/10). */
+                    "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"
               }`}
             >
               {f.label} · {f.n}

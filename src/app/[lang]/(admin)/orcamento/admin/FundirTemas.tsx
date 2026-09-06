@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { normalizedThemeName, type ThemeSummary } from "@/lib/theme-types";
 import { Button, FolhaOuDialogo } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -382,11 +383,11 @@ export default function FundirTemas({
                 aria-checked={on}
                 disabled={running}
                 onClick={() => setDestId(t.id)}
-                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left motion-safe:transition-colors disabled:opacity-50 ${
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left  disabled:opacity-50 ${
                   on
                     ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
                     : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/40"
-                }`}
+                } ${ESTADO} ${PRESSAO}`}
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--bo-tinta-6)]">
                   {t.coverUrl && (

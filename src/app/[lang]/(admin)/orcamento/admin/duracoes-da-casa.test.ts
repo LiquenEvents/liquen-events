@@ -75,80 +75,29 @@ const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
  * Quando a tabela ficar vazia, apaga-se a tabela — e este teste passa a ser
  * só a regra.
  */
-const EXCEPCOES: { ficheiro: string; tecto: number; porque: string }[] = [
-  {
-    ficheiro: "BibliotecaRevisao.tsx",
-    tecto: 2,
-    porque:
-      "Lote por converter: 2 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "FechosMeta.tsx",
-    tecto: 4,
-    porque:
-      "Lote por converter: 4 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "FollowUpField.tsx",
-    tecto: 2,
-    porque:
-      "Lote por converter: 2 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "Gralhas.tsx",
-    tecto: 3,
-    porque:
-      "Lote por converter: 3 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "MoodBoardIndice.tsx",
-    tecto: 2,
-    porque:
-      "Lote por converter: 2 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "PorTraduzir.tsx",
-    tecto: 3,
-    porque:
-      "Lote por converter: 3 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "PorqueNaoDaParaEnviar.tsx",
-    tecto: 1,
-    porque:
-      "Lote por converter: 1 transição à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "ProposalStudio.tsx",
-    tecto: 17,
-    porque:
-      "Lote por converter: 17 transições à seca (transition-colors, transition-opacity). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "Versoes.tsx",
-    tecto: 1,
-    porque:
-      "Lote por converter: 1 transição à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "evento/[id]/DossierAside.tsx",
-    tecto: 1,
-    porque:
-      "Lote por converter: 1 transição à seca (transition-opacity). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "evento/[id]/DossierClient.tsx",
-    tecto: 1,
-    porque:
-      "Lote por converter: 1 transição à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-  {
-    ficheiro: "evento/[id]/DossierHeader.tsx",
-    tecto: 2,
-    porque:
-      "Lote por converter: 2 transições à seca (transition-colors). Fica de fora enquanto a conversão deste conjunto de ficheiros corre noutro lote — ver o censo em `ui/movimento.ts`. A linha apaga-se quando o ficheiro ficar limpo.",
-  },
-];
+/**
+ * A TABELA DE EXCEPÇÕES — E ELA MORREU, QUE ERA O QUE SE QUERIA.
+ *
+ * Estava aqui uma lista de doze ficheiros que ainda transicionavam à seca, com
+ * o tecto de cada um ao lado: `BibliotecaRevisao` (2), `FechosMeta` (4),
+ * `FollowUpField` (2), `Gralhas` (3), `MoodBoardIndice` (2), `PorTraduzir` (3),
+ * `PorqueNaoDaParaEnviar` (1), `ProposalStudio` (17), `Versoes` (1),
+ * `DossierAside` (1), `DossierClient` (1), `DossierHeader` (2). Quarenta
+ * transições a animar para quem tinha pedido para não animar.
+ *
+ * Foram todas convertidas na ronda da resposta ao toque: os elementos em que se
+ * toca passaram a levar o `ESTADO` de `ui/movimento.ts` — que já traz a guarda,
+ * o degrau de 120 ms e uma lista fechada de propriedades — em vez de uma
+ * `transition-colors` à seca ao lado. Contadas depois: ZERO em todo o back
+ * office.
+ *
+ * A tabela fica vazia de propósito, e não apagada: `EXCEPCOES` continua a ser
+ * lida pelos dois testes lá em baixo, portanto quem quiser voltar a desculpar
+ * um ficheiro tem de escrever aqui a linha e o número — que é exactamente o
+ * atrito que se queria. Um array vazio é a forma mais curta de dizer «não há
+ * dívida nenhuma» sem tirar a rede.
+ */
+const EXCEPCOES: { ficheiro: string; tecto: number; porque: string }[] = [];
 
 /** Tira comentários: a prosa desta casa cita classes e números de propósito. */
 function semComentarios(fonte: string): string {
@@ -284,10 +233,24 @@ describe("o instrumento encontra mesmo o que diz encontrar", () => {
     expect(FICHEIROS.length).toBeGreaterThan(100);
     expect(FICHEIROS).toContain("AdminClient.tsx");
     expect(FICHEIROS.some((f) => f.includes("/"))).toBe(true);
-    const comTransicao = FICHEIROS.filter((f) =>
-      /transition-/.test(semComentarios(readFileSync(join(RAIZ, f), "utf8"))),
-    );
-    expect(comTransicao.length).toBeGreaterThan(20);
+    /* ── PORQUE É QUE ISTO DEIXOU DE CONTAR SÓ `transition-` ────────────────
+       A conta era `> 20` ficheiros com a classe `transition-*` literal. Caiu
+       para 18, e não porque o back office tenha deixado de ter movimento: é
+       que passou a declará-lo pela constante `ESTADO` de `ui/movimento.ts`
+       (que traz a lista e a guarda de uma vez) em vez de escrever uma
+       `transition-colors` em cada ficheiro. Convergir era o objectivo da
+       ronda — a conta antiga media a dispersão e ia ficando vermelha à medida
+       que a casa melhorava.
+
+       Conta-se agora o que a substituiu: um ficheiro DECLARA MOVIMENTO se
+       escreve uma `transition-*` sua ou se importa a escala da casa. A rede
+       serve para o mesmo — se a varredura deixar de ler os ficheiros, isto
+       cai —, e deixa de castigar a convergência. */
+    const comMovimento = FICHEIROS.filter((f) => {
+      const fonte = semComentarios(readFileSync(join(RAIZ, f), "utf8"));
+      return /transition-/.test(fonte) || /from "[^"]*movimento"/.test(fonte);
+    });
+    expect(comMovimento.length).toBeGreaterThan(20);
   });
 });
 

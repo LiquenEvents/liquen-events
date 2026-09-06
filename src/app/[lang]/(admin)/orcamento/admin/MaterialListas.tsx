@@ -9,6 +9,7 @@ import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * LISTAS BASE — as receitas do que costuma ir em cada montagem.
@@ -444,7 +445,7 @@ export default function MaterialListas() {
                     // e ficava abaixo dos 44px mínimos. `alvo-toque` (globals.css)
                     // dá-lhe 44px de altura só no dedo; `!justify-start` porque é
                     // texto alinhado à esquerda, não um ícone a centrar.
-                    className="alvo-toque !justify-start text-left font-medium"
+                    className={`alvo-toque !justify-start text-left font-medium ${ESTADO} ${PRESSAO}`}
                     onClick={() => setAbertaId(aberta ? null : lista.id)}
                     aria-expanded={aberta}
                   >

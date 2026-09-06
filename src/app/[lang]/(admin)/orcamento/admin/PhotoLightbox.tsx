@@ -6,6 +6,7 @@ import { Button, cn } from "./ui";
 import { SAIDA } from "./ui/saida";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * VER UMA FOTO EM GRANDE, dentro da biblioteca de temas.
@@ -188,7 +189,7 @@ export default function PhotoLightbox({
             // 36×36 medidos a 375 px. As setas ao lado já têm 44 (`h-11 w-11`)
             // e esta — a única forma de sair de um ecrã preto inteiro — tinha
             // menos. `.alvo-toque` iguala-a a elas, só ao dedo.
-            className="alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
           >
             ×
           </button>
@@ -206,7 +207,7 @@ export default function PhotoLightbox({
             type="button"
             onClick={() => go(-1)}
             aria-label="Foto anterior"
-            className="absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-xl leading-none text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className={`absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-xl leading-none text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
           >
             ‹
           </button>
@@ -248,7 +249,7 @@ export default function PhotoLightbox({
             type="button"
             onClick={() => go(1)}
             aria-label="Foto seguinte"
-            className="absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-xl leading-none text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className={`absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-xl leading-none text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
           >
             ›
           </button>

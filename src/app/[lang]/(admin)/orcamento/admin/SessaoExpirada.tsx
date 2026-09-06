@@ -9,6 +9,7 @@ import { useToast } from "./Toast";
 import { useAccaoDeGuardarTudo, useInscritos } from "./registo-de-gravacoes";
 import { entrarComDispositivo, mensagemDeErro, suportaPasskeys } from "@/lib/passkeys-cliente";
 import { limparMarcaDeSessao, marcarSessaoAberta } from "./entrada-destino";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -473,7 +474,7 @@ export default function SessaoExpirada() {
         <button
           type="button"
           onClick={sairEVoltarAEntrada}
-          className="alvo-toque mt-4 w-full text-center text-xs text-foreground/45 underline underline-offset-4 hover:text-[var(--bo-tinta-72)]"
+          className={`alvo-toque mt-4 w-full text-center text-xs text-foreground/45 underline underline-offset-4 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
         >
           {porGravar > 0
             ? "Prefiro sair e voltar à entrada (perde-se o que não foi guardado)"

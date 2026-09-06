@@ -25,13 +25,13 @@ import type { Quote } from "@/lib/orcamento/types";
  * ── QUATRO PÍXEIS, E NÃO OITO ─────────────────────────────────────────────
  *
  * É a decisão que este ficheiro prende, e é a que se perde primeiro. A
- * `.bo-entrada` nua são quatro píxeis — a distância de um rótulo ao seu campo.
- * A `.bo-entrada-folha` são oito, e o `globals.css` chama-lhes «a distância de
+ * `.bo-entrada` nua são dez píxeis — a distância de um rótulo ao seu campo.
+ * A `.bo-entrada-folha` são dezoito, e o `globals.css` chama-lhes «a distância de
  * um aviso» a pensar na FOLHA do telemóvel e na pilha do `Toast`: coisas que
  * vêm de fora do ecrã.
  *
  * Nada disto vem de fora do ecrã. Um erro por baixo de uma caixa de texto nasce
- * COLADO a ela, e os oito píxeis dir-lhe-iam que veio de outro sítio qualquer.
+ * COLADO a ela, e os dezoito píxeis dir-lhe-iam que veio de outro sítio qualquer.
  * Por isso a `.bo-entrada` nua, e por isso o teste que se segue verifica que
  * nenhuma delas apanhou o `-folha` por distracção.
  *
@@ -122,11 +122,11 @@ describe("os avisos de erro nascem colados ao campo", () => {
   /**
    * O controlo que dá sentido ao de cima. Um `bo-entrada-folha` aqui seria
    * silencioso — anima na mesma, e ninguém dá por ele numa revisão — e estaria
-   * errado: oito píxeis são a distância de quem vem de fora do ecrã, e nenhum
+   * errado: dezoito píxeis são a distância de quem vem de fora do ecrã, e nenhum
    * destes vem. É o engano mais fácil de cometer, porque o `globals.css` chama
    * aos oito «a distância de um aviso» (a pensar na folha e no `Toast`).
    */
-  it("nenhum deles usa a distância de oito píxeis, que é de quem vem de fora", () => {
+  it("nenhum deles usa a distância de uma folha, que é de quem vem de fora", () => {
     for (const { ficheiro, marca } of AVISOS) {
       const linha = ler(ficheiro).match(marca)?.[0] ?? "";
       expect(linha).not.toMatch(/bo-entrada-folha/);
@@ -164,10 +164,15 @@ describe("os painéis que abrem saem do botão que os abriu", () => {
 });
 
 describe("a classe que todos eles usam", () => {
-  it("são 240 ms, quatro píxeis, e a curva de quem chega e assenta", () => {
-    // Os quatro píxeis são o valor por omissão da variável — é o que faz da
-    // `.bo-entrada` nua a distância de um rótulo.
-    expect(CSS).toMatch(/transform:\s*translateY\(var\(--bo-entrada-y,\s*-4px\)\)/);
+  it("são 240 ms, o degrau de um rótulo, e a curva de quem chega e assenta", () => {
+    // O degrau do RÓTULO é o valor por omissão da variável — é o que faz da
+    // `.bo-entrada` nua a distância de um aviso ao campo que o gerou. Eram
+    // quatro píxeis escritos à mão aqui; hoje são dez, e vêm da escada do
+    // percurso do `:root`, para não haver dois sítios a discordar.
+    expect(CSS).toMatch(
+      /transform:\s*translateY\(var\(--bo-entrada-y,\s*calc\(-1 \* var\(--bo-percurso-rotulo\)\)\)\)/,
+    );
+    expect(CSS).toContain("--bo-percurso-rotulo: 10px");
     expect(CSS).toMatch(
       /\.bo-entrada\s*\{\s*animation:\s*bo-entrada\s+240ms\s+cubic-bezier\(0,\s*0,\s*0\.2,\s*1\)/,
     );

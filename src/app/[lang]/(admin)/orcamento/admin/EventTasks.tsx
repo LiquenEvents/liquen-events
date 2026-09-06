@@ -421,7 +421,7 @@ export default function EventTasks({ quote, userName }: Props) {
                   negativa puxava o quadrado para fora da linha. */}
               <button
                 onClick={() => toggleDone(task)}
-                className="alvo-toque mt-0.5 shrink-0 pointer-coarse:-mt-3"
+                className={`alvo-toque mt-0.5 shrink-0 pointer-coarse:-mt-3 ${ESTADO} ${PRESSAO}`}
                 aria-label={task.done ? "Marcar como pendente" : "Marcar como concluída"}
               >
                 <span

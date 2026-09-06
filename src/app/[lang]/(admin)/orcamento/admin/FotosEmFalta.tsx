@@ -11,6 +11,7 @@ import {
   type MotivoSuspeito,
   type VerificacaoDeFotos,
 } from "@/lib/proposta-fotos-verificacao-tipos";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -84,7 +85,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
       <div className={`${CAIXA} bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]`}>
         Não foi possível confirmar as fotografias.{" "}
         <strong className="font-medium">Isto não quer dizer que estejam bem.</strong>{" "}
-        <button type="button" onClick={() => void verificar()} className="alvo-toque underline">
+        <button type="button" onClick={() => void verificar()} className={`alvo-toque underline ${ESTADO} ${PRESSAO}`}>
           Tentar outra vez
         </button>
       </div>
@@ -182,7 +183,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
             setEstado("a-ver");
             void verificar();
           }}
-          className="alvo-toque mt-2.5 underline"
+          className={`alvo-toque mt-2.5 underline ${ESTADO} ${PRESSAO}`}
         >
           Já corrigi — voltar a confirmar
         </button>

@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 import { chaveDoCampo, type CampoDeTexto } from "@/lib/proposal-ortografia";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -216,7 +217,7 @@ export default function CaixaInglesa({
               <button
                 type="button"
                 onClick={aoConfirmar}
-                className="underline underline-offset-2 hover:no-underline"
+                className={`underline underline-offset-2 hover:no-underline ${ESTADO} ${PRESSAO}`}
               >
                 Já está bem assim
               </button>

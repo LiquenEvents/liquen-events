@@ -14,6 +14,7 @@ import {
   BRAND_TEXT_COLORS,
   type RichDoc,
 } from "@/lib/email-rich-format";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * The visual ("WYSIWYG") email composer — the PRIMARY editing experience on the
@@ -303,7 +304,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
                     aria-label={c.label}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => applyColor(c.value)}
-                    className="h-6 w-6 rounded-full border border-[var(--bo-hairline-strong)]"
+                    className={`h-6 w-6 rounded-full border border-[var(--bo-hairline-strong)] ${ESTADO} ${PRESSAO}`}
                     style={{ background: c.value }}
                   />
                 ))}
@@ -345,14 +346,14 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
             <button
               type="button"
               onClick={confirmButton}
-              className="px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440]"
+              className={`px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440] ${ESTADO} ${PRESSAO}`}
             >
               Inserir botão
             </button>
             <button
               type="button"
               onClick={() => setButtonOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)]"
+              className={`px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
             >
               Cancelar
             </button>
@@ -412,7 +413,7 @@ function TbButton({
       aria-expanded={onOpen ? !!expanded : undefined}
       onMouseDown={onRun ? (e) => e.preventDefault() : undefined}
       onClick={onOpen ?? onRun}
-      className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-[var(--bo-tinta-72)] hover:bg-white hover:text-[var(--bo-text)] motion-safe:transition-colors"
+      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-[var(--bo-tinta-72)] hover:bg-white hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
     >
       {children}
     </button>
@@ -453,14 +454,14 @@ function MiniForm({
         <button
           type="button"
           onClick={onConfirm}
-          className="px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440]"
+          className={`px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440] ${ESTADO} ${PRESSAO}`}
         >
           {confirmLabel}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)]"
+          className={`px-3 py-1.5 rounded-lg text-xs text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
         >
           Cancelar
         </button>

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useToast } from "./Toast";
 import { EmCurso } from "./ui/EmCurso";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -330,7 +331,7 @@ export default function Miniaturas() {
           type="button"
           onClick={contarDeNovo}
           disabled={aContar || aGerar}
-          className={BOTAO_VAZADO}
+          className={`${BOTAO_VAZADO} ${ESTADO} ${PRESSAO}`}
         >
           {aContar ? "A contar…" : "Contar as que faltam"}
         </button>
@@ -342,7 +343,7 @@ export default function Miniaturas() {
             type="button"
             onClick={() => gerar("essencial", semMiniatura)}
             disabled={aGerar || aContar}
-            className={BOTAO_CHEIO}
+            className={`${BOTAO_CHEIO} ${ESTADO} ${PRESSAO}`}
           >
             Gerar as miniaturas de {fotografias(semMiniatura)}
           </button>
@@ -352,7 +353,7 @@ export default function Miniaturas() {
             type="button"
             onClick={() => gerar("leve", semLeve)}
             disabled={aGerar || aContar}
-            className={essenciais > 0 ? BOTAO_VAZADO : BOTAO_CHEIO}
+            className={`${essenciais > 0 ? BOTAO_VAZADO : BOTAO_CHEIO} ${ESTADO} ${PRESSAO}`}
           >
             Gerar as versões leves de {fotografias(semLeve)}
           </button>
@@ -466,7 +467,7 @@ export default function Miniaturas() {
                 <button
                   type="button"
                   onClick={() => setTudoAVista((v) => !v)}
-                  className="alvo-toque text-[11px] text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2 hover:text-foreground"
+                  className={`alvo-toque text-[11px] text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2 hover:text-foreground ${ESTADO} ${PRESSAO}`}
                 >
                   {tudoAVista
                     ? "Mostrar menos"

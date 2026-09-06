@@ -46,7 +46,10 @@ function resposta(body: unknown) {
 
 beforeEach(() => {
   localStorage.clear();
-  vi.stubGlobal("fetch", vi.fn(async () => resposta([])));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => resposta([])),
+  );
 });
 afterEach(() => {
   cleanup();
@@ -88,14 +91,20 @@ describe("o cabeçalho acompanha a troca de vista", () => {
   });
 
   /**
-   * A distância é a de um rótulo, não a de uma página. A casa reserva quatro
-   * píxeis para «um item de menu» e oito para «um aviso»; o cromado não sai do
-   * sítio, muda o nome que ele traz.
+   * A distância é a de um rótulo, não a de uma página. A casa reserva o degrau
+   * `--bo-percurso-rotulo` para «um item de menu» e o `--bo-percurso-folha`
+   * para «um aviso»; o cromado não sai do sítio, muda o nome que ele traz.
+   *
+   * Os degraus subiram (4 → 10 px e 8 → 18 px) quando o vocabulário passou a
+   * ver-se; o que este caso guarda não é o número, é o DEGRAU — o cabeçalho
+   * continua a entrar como um rótulo, e não como uma página inteira.
    */
   it("entra à distância de um rótulo, e cala-se com movimento reduzido", async () => {
     const { readFileSync } = await import("node:fs");
     const css = readFileSync("src/app/globals.css", "utf8");
-    expect(css).toMatch(/@keyframes bo-entrada[\s\S]{0,200}?translateY\(var\(--bo-entrada-y, -4px\)\)/);
+    expect(css).toMatch(
+      /@keyframes bo-entrada[\s\S]{0,1600}?translateY\(var\(--bo-entrada-y, calc\(-1 \* var\(--bo-percurso-rotulo\)\)\)\)/,
+    );
     expect(css).toMatch(/\.bo-entrada\s*\{\s*animation:\s*bo-entrada\s+240ms/);
     expect(css).toMatch(
       /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.bo-entrada\s*\{\s*animation:\s*none/,

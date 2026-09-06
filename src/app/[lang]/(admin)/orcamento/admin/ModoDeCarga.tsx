@@ -146,7 +146,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
             <button
               type="button"
               onClick={limpar}
-              className="alvo-toque shrink-0 px-3 py-2 text-xs text-foreground/50 underline underline-offset-2"
+              className={`alvo-toque shrink-0 px-3 py-2 text-xs text-foreground/50 underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
             >
               Limpar
             </button>

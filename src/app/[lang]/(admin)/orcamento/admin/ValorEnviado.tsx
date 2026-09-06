@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useToast } from "./Toast";
 import { EmCurso } from "./ui/EmCurso";
 import type { ValorDivergente } from "@/lib/orcamento/valor-enviado";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -117,7 +118,7 @@ export default function ValorEnviado() {
           type="button"
           onClick={procurar}
           disabled={aLer || aCorrigir}
-          className="min-h-11 rounded-full border border-foreground/20 px-4 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50"
+          className={`min-h-11 rounded-full border border-foreground/20 px-4 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
         >
           {aLer ? "A procurar…" : "Procurar"}
         </button>
@@ -131,7 +132,7 @@ export default function ValorEnviado() {
                com o canto do cartão apaga a distinção. Foi o
                `raios-do-back-office.test.ts` a apanhar-me — escrevi a regra
                ontem e hoje ia desfazê-la. */
-            className="min-h-11 rounded-full bg-[#4d6350] px-4 text-sm font-medium text-white hover:bg-[#415440] disabled:opacity-50"
+            className={`min-h-11 rounded-full bg-[#4d6350] px-4 text-sm font-medium text-white hover:bg-[#415440] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
           >
             {aCorrigir
               ? "A corrigir…"

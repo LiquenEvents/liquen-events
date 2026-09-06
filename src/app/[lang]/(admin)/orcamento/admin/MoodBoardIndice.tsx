@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { MoodBoard } from "@/lib/proposal-doc";
 import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import { contagemDosEstados, diagnosticoDoBoard } from "@/lib/proposal-moodboard";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -217,7 +218,7 @@ function EntradaDoIndice({
           {...attributes}
           {...listeners}
           aria-label={`Arrastar a página ${pos + 1}`}
-          className="alvo-toque flex h-7 w-4 shrink-0 cursor-grab items-center justify-center rounded text-foreground/25 transition-colors hover:text-[var(--bo-text-muted)] active:cursor-grabbing"
+          className={`alvo-toque flex h-7 w-4 shrink-0 cursor-grab items-center justify-center rounded text-foreground/25 hover:text-[var(--bo-text-muted)] active:cursor-grabbing ${ESTADO} ${PRESSAO}`}
         >
           <span aria-hidden="true">⠿</span>
         </button>
@@ -229,13 +230,13 @@ function EntradaDoIndice({
         // informação, e quem lê por voz também precisa dela.
         aria-current={activo ? "true" : undefined}
         title={oQueFalta ? `Página ${pos + 1}: ${oQueFalta}` : undefined}
-        className={`alvo-toque flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] leading-tight transition-colors ${
+        className={`alvo-toque flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] leading-tight  ${
           activo
             ? "border-[#4d6350]/55 bg-[#4d6350]/[0.07] text-[var(--bo-text)]"
             : vazio
               ? "border-dashed border-foreground/20 text-foreground/45"
               : "border-[var(--bo-hairline-strong)] text-[var(--bo-tinta-72)] hover:border-foreground/25"
-        }`}
+        } ${ESTADO} ${PRESSAO}`}
       >
         <span className="text-foreground/30 tabular-nums">{pos + 1}</span>
         <span className="min-w-0 flex-1 truncate">{board?.title?.trim() || "sem título"}</span>

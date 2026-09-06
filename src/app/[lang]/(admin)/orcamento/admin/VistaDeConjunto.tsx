@@ -146,7 +146,7 @@ export default function VistaDeConjunto({
                 {...aumentada.pega(i, () =>
                   bi === undefined ? onIrParaSeccao(pagina.seccao) : onSaltar(bi),
                 )}
-                className="block w-full text-left"
+                className={`block w-full text-left ${ESTADO} ${PRESSAO}`}
                 aria-label={`Ir para onde se escreve a página ${i + 1}, ${pagina.titulo}`}
               >
                 {/* A folha cresce COM `transform`: não empurra nada, não abre

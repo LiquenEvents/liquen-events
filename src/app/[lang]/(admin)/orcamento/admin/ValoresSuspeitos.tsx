@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useToast } from "./Toast";
 import { EmCurso } from "./ui/EmCurso";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -135,7 +136,7 @@ export default function ValoresSuspeitos() {
           type="button"
           onClick={procurar}
           disabled={aLer}
-          className="min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50"
+          className={`min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-[var(--bo-tinta-6)] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
         >
           {aLer ? "A procurar…" : "Procurar"}
         </button>

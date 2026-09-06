@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
-import { Button } from "./ui";
+import { Escolha, Button } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
@@ -871,14 +871,21 @@ export default function EmailTemplatesBilingue() {
           <div className="bo-card p-5 lg:sticky lg:top-5">
             <p className="bo-eyebrow mb-1.5">Pré-visualização</p>
 
-            <label htmlFor="etb-pedido" className="sr-only">
+            {/* `aria-labelledby` e não só o `for`: o `for` de um `<label>`
+                nomeia um `<select>` por ele ser nativo, mas não nomeia um
+                `role="combobox"`. Os dois ficam — o `for` para o clique no
+                rótulo levar ao campo, o `aria-labelledby` para o nome. */}
+            <label id="etb-pedido-rotulo" htmlFor="etb-pedido" className="sr-only">
               Pedido a usar na pré-visualização
             </label>
-            <select
+            <Escolha
               id="etb-pedido"
-              value={pedidoId}
-              onChange={(e) => setPedidoId(e.target.value)}
-              className={`${inputCls} w-full mb-2`}
+              aria-labelledby="etb-pedido-rotulo"
+              valor={pedidoId}
+              aoMudar={setPedidoId}
+              variante="nua"
+              containerClassName="mb-2 w-full"
+              className={`${inputCls} w-full`}
             >
               <option value="">Dados de exemplo</option>
               {pedidos.map((p) => (
@@ -888,7 +895,7 @@ export default function EmailTemplatesBilingue() {
                   {p.idioma === "en" ? " · EN" : ""}
                 </option>
               ))}
-            </select>
+            </Escolha>
             {/* NÃO é o `AvisoDeFalha` de página inteira, de propósito: a
                 pré-visualização continua a funcionar com os dados de exemplo,
                 e um painel vermelho por cima dela diria que rebentou tudo. O

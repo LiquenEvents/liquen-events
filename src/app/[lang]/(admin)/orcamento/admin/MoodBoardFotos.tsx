@@ -505,7 +505,7 @@ export function CelulaDeFoto({
           {...attributes}
           {...listeners}
           aria-label={`Arrastar a fotografia ${ii + 1}`}
-          className={`alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover/foto:opacity-100 com-rato:focus-visible:opacity-100 active:cursor-grabbing ${ESTADO}`}
+          className={`alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover/foto:opacity-100 com-rato:focus-visible:opacity-100 active:cursor-grabbing ${ESTADO} ${PRESSAO}`}
         >
           <span aria-hidden="true">⠿</span>
         </button>

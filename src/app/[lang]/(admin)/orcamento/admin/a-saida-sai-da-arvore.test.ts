@@ -63,29 +63,36 @@ const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)");
 /**
  * O que falha hoje, e o que lhe falta. Só encolhe — ver o último teste.
  *
- *  · `AdminClient.tsx` — a gaveta do pedido. Leva `inert` e não leva
- *    `aria-hidden`, e mantém `role="dialog"`, `aria-modal="true"` e o
+ *  · ~~`AdminClient.tsx`~~ — **CORRIGIDO.** Ficava com `inert` e sem
+ *    `aria-hidden`, e mantinha `role="dialog"`, `aria-modal="true"` e o
  *    `aria-labelledby` durante a saída (são regidos por `isDetailOverlay`, que
- *    é a LARGURA do ecrã e não muda quando ela fecha). Medido: com a gaveta a
- *    sair, o `getByRole("dialog")` ainda a encontra pelo nome.
- *    Alteração mínima: `aria-hidden={painelASair || undefined}` na mesma
- *    etiqueta, e trocar as três condições de `isDetailOverlay` para
+ *    é a LARGURA do ecrã e não muda quando ela fecha): com a gaveta a sair, o
+ *    `getByRole("dialog")` ainda a encontrava pelo nome. Levou o
+ *    `aria-hidden={painelASair || undefined}` e as três condições passaram a
  *    `isDetailOverlay && !painelASair`.
- *    (E há um segundo defeito no mesmo sítio, que esta varredura não vê: o
- *    `useFocusTrap(!!selected && isDetailOverlay)` continua ARMADO durante a
+ *    E com elas o segundo defeito do mesmo sítio, que esta varredura NÃO vê: o
+ *    `useFocusTrap(!!selected && isDetailOverlay)` ficava ARMADO durante a
  *    saída, porque `selected` só cai ao fim dos 200 ms — ou seja o foco só
- *    volta 200 ms depois do gesto. `&& !painelASair` resolve os dois.)
+ *    voltava 200 ms depois do gesto, e quem fecha com Escape ficava esse tempo
+ *    sem sítio para o teclado. O `&& !painelASair` desarma-a no gesto.
+ *    Fica escrito em vez de apagado: a entrada saiu do `DIVIDA` aqui em baixo
+ *    (é isso que o teste do fundo exige), e a linha diz o que era, para quem
+ *    vier a seguir não voltar a lá pôr.
  *
- *  · `Toast.tsx` — o aviso que sai. Não leva nem um nem outro: o «×» continua
- *    a ser encontrado pelo `getByRole` e a mensagem fica na região
- *    `role="alert"` durante os 200 ms.
- *    Alteração mínima: `aria-hidden={aSair || undefined}` e `inert={aSair}` no
- *    `<div>` do `ToastItem`.
+ *  · ~~`Toast.tsx`~~ — **CORRIGIDO.** O aviso que saía não levava nem um nem
+ *    outro: o «×» continuava a ser encontrado pelo `getByRole`, a mensagem
+ *    ficava na região `role="alert"` durante os 200 ms, e o foco ficava no «×»
+ *    a desaparecer. Levou `aria-hidden={aSair || undefined}` e `inert={aSair}`
+ *    no `<div>` do `ToastItem`, no fotograma do gesto e não no fim da
+ *    animação — a mesma regra, e a mesma razão, dos `pointer-events` que já lá
+ *    estavam ao lado. Fica escrito em vez de apagado, como a entrada acima: a
+ *    linha diz o que era, para quem vier a seguir não voltar a lá pôr.
+ *
+ * A lista está VAZIA, e é assim que deve ficar. Quem lhe acrescentar uma
+ * entrada está a escrever dívida, não a resolver um vermelho: a alteração
+ * mínima cabe sempre na etiqueta, e são dois atributos.
  */
-const DIVIDA: Record<string, string> = {
-  "AdminClient.tsx": "a gaveta do pedido — falta o `aria-hidden`",
-  "Toast.tsx": "o aviso que sai — faltam os dois",
-};
+const DIVIDA: Record<string, string> = {};
 
 function ficheiros(dir: string, achados: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {

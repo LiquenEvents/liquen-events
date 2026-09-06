@@ -6,7 +6,7 @@ import { useToast } from "./Toast";
 import { metaFor } from "./status-meta";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
-import { Button, Field } from "./ui";
+import { Button, Escolha, Field } from "./ui";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -316,24 +316,27 @@ export default function GuestList({ quote, onChange }: Props) {
                 />
                 convidados
               </label>
-              <select
+              <Escolha
                 // `?? ""` porque um registo anterior ao campo nem sequer o tem:
-                // um `value` indefinido passava o select a NÃO-controlado a meio
+                // um valor indefinido passava o campo a NÃO-controlado a meio
                 // da vida do componente, e a partir daí ele deixava de reflectir
                 // o que está gravado.
-                value={g.rsvp ?? ""}
-                onChange={(e) => setRsvpOf(g.id, e.target.value as RsvpStatus)}
+                valor={g.rsvp ?? ""}
+                aoMudar={(v) => setRsvpOf(g.id, v as RsvpStatus)}
                 aria-label={`Estado do RSVP de ${g.name}`}
-                // `text-xs` e não `text-[11px]`: a regra de `globals.css` que
-                // encolhe legendas (`.text-[11px]` etc.) para
-                // `--bo-fs-caption` a 1024px para baixo apanhava também este
-                // `<select>` — e ao ganhar por especificidade ao `select {
-                // font-size: 16px }` do mesmo ficheiro (que só existe para o
-                // Safari do iOS não ampliar a página ao focar), o campo ficava
-                // a 12px e o zoom automático voltava. `text-xs` não está na
-                // lista de classes que essa regra apanha, por isso o campo
-                // fica ao alcance da regra dos 16px em ecrãs de toque.
-                className="bo-input w-[110px] shrink-0 px-2 py-1 text-xs font-medium"
+                // ── E OS 16 px DO iOS PASSARAM A SER PEDIDOS, NÃO HERDADOS ──
+                // Enquanto isto foi um `<select>`, os 16 px que impedem o Safari
+                // de AMPLIAR a página ao focar vinham da regra
+                // `@media (pointer: coarse) { select { font-size: 16px } }` do
+                // `globals.css` — e a nota que aqui estava explicava porque é que
+                // o `text-xs` era preciso para não lhe ganhar. No dedo isto
+                // CONTINUA a ser um `<select>` (é a decisão do `ui/Escolha`),
+                // portanto a regra continua a valer tal e qual; e no dia em que
+                // deixar de ser, o `pointer-coarse:text-base` do próprio
+                // `Escolha` faz o mesmo trabalho. O `text-xs` fica porque é ele
+                // que dá a densidade com rato.
+                containerClassName="w-[110px] shrink-0"
+                className="px-2 py-1 text-xs font-medium"
                 // `RSVP_META[g.rsvp].color` à bruta era `undefined.color` assim
                 // que aparecesse um valor de fora — uma linha antiga, uma
                 // migração, uma correcção feita à mão na base de dados. Num
@@ -348,7 +351,7 @@ export default function GuestList({ quote, onChange }: Props) {
                 <option value="pendente">Pendente</option>
                 <option value="confirmado">Confirmado</option>
                 <option value="recusado">Recusado</option>
-              </select>
+              </Escolha>
               {/* MEDIDO a 768×1024 com dedo (o iPad em retrato): 12 destes botões e
                     ZERO visíveis. 768 passa dos 640 do `sm:`, portanto `sm:opacity-0`
                     disparava — e sem rato não há como o revelar. A pergunta certa é sobre o

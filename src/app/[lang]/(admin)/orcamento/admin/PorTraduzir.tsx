@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { camposPorTraduzir, type CampoBilingue } from "@/lib/proposal-doc-bilingue";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -63,7 +64,7 @@ export default function PorTraduzir({
           <button
             type="button"
             onClick={onFicarTodosEmPortugues}
-            className="alvo-toque text-[11px] font-medium text-[#4d6350] transition-colors hover:text-[#415440]"
+            className={`alvo-toque text-[11px] font-medium text-[#4d6350] hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
           >
             Ficar em português nos {faltam.length}
           </button>
@@ -92,14 +93,14 @@ export default function PorTraduzir({
             <button
               type="button"
               onClick={() => onFicarEmPortugues(c)}
-              className="alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
+              className={`alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
             >
               Ficar em português
             </button>
             <button
               type="button"
               onClick={() => onIr(c)}
-              className="alvo-toque text-[11px] font-medium text-[#4d6350] underline-offset-2 transition-colors hover:text-[#415440] hover:underline"
+              className={`alvo-toque text-[11px] font-medium text-[#4d6350] underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
             >
               Traduzir
             </button>

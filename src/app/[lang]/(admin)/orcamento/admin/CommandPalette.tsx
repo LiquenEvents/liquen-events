@@ -354,7 +354,12 @@ export default function CommandPalette({
             // à variante e o botão nunca aparecia, em ecrã de toque nenhum.
             // Medido: `display: none`, 0x0. Com a variante do lado de quem
             // esconde, a ordem passa a jogar a favor.
-            className="alvo-toque flex pointer-fine:hidden shrink-0 items-center justify-center rounded-lg text-xl leading-none text-foreground/45"
+            /* O `TOQUE_DA_LINHA` e não o `ESTADO`: este ficheiro recusou o
+               esbatimento de 120 ms por escrito (ponto 3 do cabeçalho) e tem um
+               teste a guardá-lo. O que este botão precisava era só do toque —
+               e da `transition-[scale]` que o cobre, senão o `PRESSAO` não
+               anima nada. */
+            className={`alvo-toque flex pointer-fine:hidden shrink-0 items-center justify-center rounded-lg text-xl leading-none text-foreground/45 ${TOQUE_DA_LINHA}`}
           >
             ×
           </button>

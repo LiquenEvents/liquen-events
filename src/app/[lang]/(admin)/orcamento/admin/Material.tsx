@@ -16,6 +16,7 @@ import {
   Card,
   EmCurso,
   EmptyState,
+  Escolha,
   Field,
   PerguntaDestrutiva,
   Segmented,
@@ -700,27 +701,25 @@ function Catalogo() {
           placeholder="Procurar material…"
           aria-label="Procurar material"
         />
-        <select
-          className="bo-input w-auto"
-          value={cat}
-          onChange={(e) => setCat(e.target.value)}
-          aria-label="Filtrar por categoria"
-        >
+        <Escolha className="w-auto" valor={cat} aoMudar={setCat} aria-label="Filtrar por categoria">
+          {/* `<option>` sem `value`: o valor é o TEXTO, como no nativo. É a
+              regra que o `Escolha` copia de propósito, para migrações destas
+              não trocarem um valor por um rótulo em silêncio. */}
           <option>Todas</option>
           {MATERIAL_CATEGORIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
-        </select>
-        <select
-          className="bo-input w-auto"
-          value={kind}
-          onChange={(e) => setKind(e.target.value as "Todos" | MaterialKind)}
+        </Escolha>
+        <Escolha
+          containerClassName="w-auto"
+          valor={kind}
+          aoMudar={(v) => setKind(v as "Todos" | MaterialKind)}
           aria-label="Filtrar por tipo"
         >
           <option value="Todos">Todos</option>
           <option value="reutilizavel">Reutilizável</option>
           <option value="consumivel">Consumível</option>
-        </select>
+        </Escolha>
         {emFalta.length > 0 && (
           <Button
             size="sm"

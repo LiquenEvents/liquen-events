@@ -19,7 +19,7 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
    montado enquanto ela corre vive no `ui/saida.ts`. As duas nasceram aqui e
    estão lá fora de propósito — o mesmo buraco existe em todas as folhas e
    diálogos do back office. */
-import { SAIDA_FOLHA, SAIDA_MS, useSaidaAdiada } from "./ui/saida";
+import { SAIDA_FOLHA, SAIDA_MS, semMovimento, useSaidaAdiada } from "./ui/saida";
 
 type ToastKind = "success" | "error" | "info";
 interface Toast {
@@ -105,6 +105,45 @@ const ENTRADA_DO_AVISO =
 const CURVA_QUE_APRESENTA = "cubic-bezier(0, 0, 0.2, 1)";
 
 /**
+ * ── O QUE UM NÓ TEM A MAIS DO QUE A SUA POSIÇÃO DE LAYOUT ───────────────────
+ *
+ * O `getBoundingClientRect` devolve o sítio onde o nó está DESENHADO, ou seja
+ * já com tudo o que estiver a animar por cima dele somado. Para o FLIP isso não
+ * serve: o que ele precisa de comparar entre dois fotogramas é onde o nó
+ * ASSENTA — senão um aviso medido a meio de um gesto entra no cálculo seguinte
+ * com a posição errada, e o deslize sai a compensar um movimento que já estava
+ * a acontecer.
+ *
+ * São DUAS propriedades e não uma, e é uma armadilha do Tailwind 4: o
+ * `translate-y-2` da entrada emite a propriedade AUTÓNOMA `translate`, que não
+ * é o `transform` que este ficheiro escreve à mão no deslize. As duas somam-se
+ * no que se vê, portanto as duas têm de ser lidas.
+ *
+ * Em jsdom não há disposição nenhuma e o `getComputedStyle` devolve vazio —
+ * isto dá zero, e o FLIP inteiro fica a somar zeros, que é o que lá se quer.
+ */
+function deslocamentoY(el: HTMLElement): { entrada: number; deslize: number; total: number } {
+  if (typeof getComputedStyle !== "function") return { entrada: 0, deslize: 0, total: 0 };
+  const estilo = getComputedStyle(el);
+  let entrada = 0;
+  const daEntrada = estilo.translate;
+  if (daEntrada && daEntrada !== "none") {
+    const partes = daEntrada.trim().split(/\s+/);
+    if (partes.length > 1) entrada = Number.parseFloat(partes[1]) || 0;
+  }
+  let deslize = 0;
+  const doDeslize = estilo.transform;
+  if (doDeslize && doDeslize !== "none" && typeof DOMMatrixReadOnly === "function") {
+    try {
+      deslize = new DOMMatrixReadOnly(doDeslize).m42;
+    } catch {
+      /* uma matriz que o browser não saiba ler não vale um erro aqui */
+    }
+  }
+  return { entrada, deslize, total: entrada + deslize };
+}
+
+/**
  * ═════════════════════════════════════════════════════════════════════════════
  * A SAÍDA DE UM AVISO — porque é que ela não podia ser feita da maneira óbvia
  * ═════════════════════════════════════════════════════════════════════════════
@@ -181,6 +220,51 @@ const CURVA_QUE_APRESENTA = "cubic-bezier(0, 0, 0.2, 1)";
  * `.bo-saida` (que o traz para toda a casa) e pelo utilitário do Tailwind aqui
  * no sítio, que é o que fica de pé se alguém um dia trocar a classe. O
  * `Toast.saida.test.tsx` tem um teste só para isto.
+ *
+ * ── 3. E A ENTRADA É O MESMO FLIP, AO CONTRÁRIO ─────────────────────────────
+ *
+ * A saída ficou tratada e a ENTRADA continuou a empurrar. MEDIDO, com o
+ * `e2e/60-fotogramas-no-telemovel.mjs`: um aviso que já lá estava mexia-se
+ * **53,25 px num único fotograma** quando o seguinte entrava — enquanto o que
+ * entra percorre 8 px em 240 ms, no máximo 3,4 px por fotograma. Dezassete
+ * vezes mais depressa não é um gesto: é um salto. E havia um segundo, de
+ * 53,9 px, quando um aviso saía ENQUANTO outro entrava.
+ *
+ * As duas metades são a mesma coisa: a pilha está encostada ao FUNDO, portanto
+ * o que muda o seu conteúdo empurra para cima ou puxa para baixo tudo o que lá
+ * está. Um aviso a chegar é o mesmo acontecimento de um aviso a sair, com o
+ * sinal trocado — e por isso não há aqui um segundo mecanismo: há o mesmo FLIP,
+ * a correr para os dois casos, no mesmo efeito.
+ *
+ * O que a saída tinha e não chegava era o **«antes»**. Ele era medido DENTRO do
+ * efeito, e isso só está certo quando a saída é a única coisa a acontecer: num
+ * commit em que um aviso chega e outro se vai embora, quando o efeito corre o
+ * recém-chegado já empurrou toda a gente, e o «antes» medido ali já é o depois
+ * — era exactamente esse o salto de 53,9 px. Agora o «antes» é o que ficou
+ * GUARDADO do commit anterior (`pousada`), que é o único sítio onde ele existe.
+ *
+ * E guarda-se medido a partir do CHÃO da pilha, não do topo do ecrã. A pilha
+ * levanta-se e baixa-se sozinha quando o estúdio publica outra
+ * `--bo-barra-accao`; com coordenadas de ecrã, esse movimento — que leva a
+ * pilha inteira de uma vez e não desarruma nada — entrava no FLIP como um
+ * desvio e os avisos deslizavam por causa de uma barra a mudar de altura. O
+ * chão é `bottom`, que é fixo por construção (`position: fixed` com `bottom:`
+ * escrito e `top: auto`): só se mexe quando a barra se mexe, e é por isso que
+ * medir a partir dele apaga esse falso desvio e deixa passar o verdadeiro.
+ *
+ * ── E ISTO FOI MEDIDO DEPOIS, NUM BROWSER ──────────────────────────────────
+ *
+ * O instrumento é o `e2e/a-entrada-nao-empurra.mjs`: segue um aviso, fotograma
+ * a fotograma, enquanto o seguinte chega. Nesta geometria a caixa mais o `gap`
+ * dão 78 px, e o mesmo percurso lê-se assim:
+ *
+ *     sem o FLIP na entrada    78 px em  1 fotograma   (100 % num só)
+ *     com o FLIP na entrada    78 px em 11 fotogramas  (26 % no maior)
+ *
+ * E o mesmo com um aviso a chegar 90 ms depois de outro começar a sair — o
+ * segundo salto do enunciado —, que passou de 78 px num fotograma para os
+ * mesmos 11. Esse caso precisou de mais do que o «antes» guardado: precisou de
+ * contar o deslize que ainda ia A MEIO (ver `aMeio`, lá em baixo).
  */
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -189,8 +273,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const pilhaRef = useRef<HTMLDivElement | null>(null);
   /** O nó de cada aviso montado, para o FLIP os poder medir e deslocar. */
   const nos = useRef(new Map<string, HTMLDivElement>());
-  /** Saídas cujo deslize já foi montado — o efeito de layout é reentrante. */
+  /** Saídas cujo nó já foi tirado do fluxo — o efeito de layout é reentrante. */
   const jaDeslizados = useRef(new Set<string>());
+  /**
+   * ONDE É QUE CADA AVISO ASSENTOU NO COMMIT ANTERIOR — o «antes» do FLIP.
+   *
+   * `chao` é o `bottom` da pilha; cada item guarda a que ALTURA desse chão
+   * assentava. Ver o ponto 3 do bloco acima para o porquê das duas escolhas.
+   */
+  const pousada = useRef<{ chao: number; itens: Map<string, number> }>({
+    chao: 0,
+    itens: new Map(),
+  });
+  /**
+   * Os deslizes a correr, e o bilhete de cada um. O bilhete existe porque um
+   * aviso pode ser apanhado por um segundo deslize antes de o primeiro acabar
+   * (três chegadas seguidas dão isso): sem ele, a arrumação do primeiro
+   * apagava o `transform` do segundo a meio.
+   */
+  const deslizes = useRef(new WeakMap<HTMLDivElement, number>());
+  const bilhetes = useRef(0);
 
   /** Tira o aviso do array de vez. Chamado pelo hook quando a saída acaba. */
   const arrumar = useCallback((id: string) => {
@@ -214,14 +316,64 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * O FLIP. Corre num efeito de LAYOUT — antes de o browser pintar —, senão o
-   * salto que isto existe para esconder aparecia um fotograma antes de ser
-   * corrigido, que é precisamente o defeito.
+   * Onde é que cada aviso ASSENTA agora — a altura a que está acima do chão da
+   * pilha, sem o que estiver a animar por cima dele. É o que fica guardado de
+   * um commit para o seguinte e serve de «antes» ao FLIP.
+   */
+  const medirPousada = useCallback(() => {
+    const pilha = pilhaRef.current;
+    const chao = pilha ? pilha.getBoundingClientRect().bottom : 0;
+    const itens = new Map<string, number>();
+    for (const [id, el] of nos.current) {
+      if (!el.isConnected) continue;
+      itens.set(id, chao - (el.getBoundingClientRect().top - deslocamentoY(el).total));
+    }
+    return { chao, itens };
+  }, []);
+
+  /**
+   * PLAY — larga o aviso para o lugar novo e, quando lá chegar, apaga o que o
+   * FLIP lhe escreveu. A arrumação é de cada deslize e não de um efeito por
+   * cima de todos: um `transform` apagado a meio é um salto, e o caso REAL em
+   * que isso acontecia é o do enunciado — um aviso a chegar enquanto outro se
+   * vai embora. O relógio é a rede para o `transitionend` que não chega (uma
+   * transição que o browser decida não correr não avisa ninguém).
+   */
+  const largar = useCallback((el: HTMLDivElement, bilhete: number) => {
+    el.style.transition = `transform ${SAIDA_MS}ms ${CURVA_QUE_APRESENTA}`;
+    el.style.transform = "translateY(0px)";
+    const arrumarDeslize = () => {
+      if (deslizes.current.get(el) !== bilhete) return; // já há outro a mandar
+      deslizes.current.delete(el);
+      el.removeEventListener("transitionend", noFim);
+      clearTimeout(relogio);
+      el.style.transition = "";
+      el.style.transform = "";
+    };
+    const noFim = (e: TransitionEvent) => {
+      if (e.target === el && e.propertyName === "transform") arrumarDeslize();
+    };
+    el.addEventListener("transitionend", noFim);
+    const relogio = setTimeout(arrumarDeslize, SAIDA_MS + 60);
+  }, []);
+
+  /**
+   * O FLIP, e é UM SÓ para a entrada e para a saída. Corre num efeito de
+   * LAYOUT — antes de o browser pintar —, senão o salto que isto existe para
+   * esconder aparecia um fotograma antes de ser corrigido, que é precisamente
+   * o defeito. Ver o ponto 3 do bloco grande lá em cima.
    */
   useLayoutEffect(() => {
     const pilha = pilhaRef.current;
     if (!pilha) return;
+    const antes = pousada.current;
 
+    // ── FIRST está GUARDADO, não se mede aqui ────────────────────────────
+    // Medir o «antes» dentro deste efeito era o defeito: neste instante o
+    // aviso que chegou já empurrou toda a gente. O «antes» é o `pousada` do
+    // commit anterior, lá em cima.
+
+    // 1 · SAÍDA — quem sai passa a `absolute` no sítio onde ELA o viu.
     for (const id of aSair) {
       if (jaDeslizados.current.has(id)) continue;
       const noQueSai = nos.current.get(id);
@@ -229,21 +381,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       if (!noQueSai || !grupo) continue;
       jaDeslizados.current.add(id);
 
-      // Os que ficam. Um irmão que JÁ está a sair está fora de fluxo e pregado
-      // ao sítio onde morreu: deslocá-lo seria mexer num fantasma.
-      const irmaos = [...nos.current.entries()]
-        .filter(([outro, el]) => outro !== id && !aSair.includes(outro) && el.isConnected)
-        .map(([, el]) => el);
-
-      // FIRST — onde é que cada um está agora.
-      const caixaPilha = pilha.getBoundingClientRect();
-      const antes = irmaos.map((el) => el.getBoundingClientRect().top);
-
       // A largura da pilha é a do aviso mais largo, e a caixa está encostada à
       // direita. Se quem sai for o mais largo, tirá-lo do fluxo encolhe a pilha
       // e leva os que ficam com ela, para o lado. Fixa-se a largura durante a
       // saída; volta ao normal quando a pilha ficar sem ninguém a sair.
-      pilha.style.minWidth = `${caixaPilha.width}px`;
+      pilha.style.minWidth = `${pilha.getBoundingClientRect().width}px`;
 
       // Fora do fluxo, no sítio exacto onde já estava. O grupo é `relative`,
       // portanto o `top` é medido a partir dele.
@@ -258,62 +400,183 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       // arranjos possíveis da pilha (ver `e2e/saida-do-aviso.mjs`); com o grupo
       // medido depois, o salto é zero nos quatro.
       const caixa = noQueSai.getBoundingClientRect();
+      // A altura guardada, e não a caixa de agora: se um aviso chegou no mesmo
+      // commit, a caixa de agora já está empurrada para cima — e pregá-lo aí
+      // era o salto de 53,9 px do enunciado, agora do lado de quem sai.
+      const guardado = antes.itens.get(id);
+      const topoAntigo =
+        guardado === undefined
+          ? caixa.top - deslocamentoY(noQueSai).total
+          : pilha.getBoundingClientRect().bottom - guardado;
       noQueSai.style.position = "absolute";
       noQueSai.style.right = "0px";
       noQueSai.style.width = `${caixa.width}px`;
       const caixaGrupo = grupo.getBoundingClientRect();
-      noQueSai.style.top = `${caixa.top - caixaGrupo.top}px`;
-
-      // LAST — e onde é que cada um passou a estar.
-      const depois = irmaos.map((el) => el.getBoundingClientRect().top);
-
-      // INVERT — de volta ao sítio antigo, sem transição nenhuma.
-      const deslocados: HTMLDivElement[] = [];
-      irmaos.forEach((el, i) => {
-        const desvio = antes[i] - depois[i];
-        if (Math.abs(desvio) < 0.5) return;
-        el.style.transition = "none";
-        el.style.transform = `translateY(${desvio}px)`;
-        deslocados.push(el);
-      });
-
-      if (deslocados.length === 0) continue;
-      // Obriga o browser a assentar o `transform` acima ANTES de o fotograma
-      // seguinte lhe mexer: sem esta leitura as duas escritas juntavam-se numa
-      // só e não havia transição nenhuma para animar.
-      void pilha.offsetHeight;
-
-      // PLAY — e daí para o lugar novo, nos mesmos 200 ms do desvanecimento.
-      // Dois `requestAnimationFrame` porque o primeiro pode ainda cair no
-      // fotograma que já está a ser preparado, e aí o «inverter» e o «largar»
-      // aconteciam no mesmo — ou seja, não se via nada.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          for (const el of deslocados) {
-            el.style.transition = `transform ${SAIDA_MS}ms ${CURVA_QUE_APRESENTA}`;
-            el.style.transform = "translateY(0px)";
-          }
-        });
-      });
+      noQueSai.style.top = `${topoAntigo - caixaGrupo.top}px`;
     }
-  }, [aSair]);
+
+    // 2 · LAST — onde é que tudo passou a assentar, já com quem sai fora do
+    //     fluxo e com quem chegou no lugar. E guarda-se, que é o «antes» do
+    //     commit seguinte. Guarda-se SEMPRE, mesmo sem movimento nenhum: quem
+    //     pediu menos movimento continua a precisar de contas certas no dia em
+    //     que voltar a ligá-lo.
+    const depois = medirPousada();
+    pousada.current = depois;
+
+    // A guarda de movimento reduzido é aqui, em JavaScript, e não só no CSS:
+    // sem ela o `transform` era escrito na mesma e ficava pendurado à espera de
+    // uma transição que a media query desligou.
+    if (semMovimento()) return;
+
+    // 3 · INVERT — de volta ao sítio antigo, sem transição nenhuma.
+    //     Quem já está a sair está pregado ao sítio onde morreu: deslocá-lo
+    //     seria mexer num fantasma.
+    const paradas = new Set(aSair);
+    const ficam: [string, HTMLDivElement][] = [...nos.current.entries()].filter(
+      ([id, el]) => !paradas.has(id) && el.isConnected,
+    );
+    /**
+     * O DESLIZE QUE AINDA VAI A MEIO — a peça que o cenário B do
+     * `e2e/a-entrada-nao-empurra.mjs` apanhou, e que faltava.
+     *
+     * MEDIDO: um aviso a chegar 90 ms depois de outro começar a sair dava
+     * **78 px num único fotograma** — o salto inteiro, com o FLIP a correr. A
+     * razão: um FLIP devolve o nó à posição em que ELA O VIU, e um nó a meio de
+     * um deslize NÃO está na sua posição de layout — está nela mais o
+     * `transform` que ainda falta andar. Escrever o desvio novo por cima
+     * deitava fora esse resto de uma vez.
+     *
+     * Lê-se AQUI, antes de qualquer escrita, e é só a parte do `transform`: a
+     * `translate` da entrada é outra animação, que continua por sua conta e não
+     * pode ser contada duas vezes.
+     */
+    const aMeio = new Map<string, number>();
+    for (const [id, el] of ficam) aMeio.set(id, deslocamentoY(el).deslize);
+
+    const deslocados: { el: HTMLDivElement; bilhete: number }[] = [];
+    for (const [id, el] of ficam) {
+      const alturaAntes = antes.itens.get(id);
+      const alturaDepois = depois.itens.get(id);
+      // Um aviso que acabou de nascer não tem «antes»: entra pela sua própria
+      // entrada (240 ms, 8 px) e não é assunto do FLIP.
+      if (alturaAntes === undefined || alturaDepois === undefined) continue;
+      // As alturas contam-se a partir do chão, portanto crescem para CIMA e o
+      // ecrã conta para baixo: o desvio que devolve o nó ao sítio antigo é a
+      // diferença das alturas, e o sinal vem trocado de graça. Mais o que
+      // faltava andar do deslize anterior, se houver um a meio.
+      const desvio = alturaDepois - alturaAntes + (aMeio.get(id) ?? 0);
+      if (Math.abs(desvio) < 0.5) continue;
+      const bilhete = ++bilhetes.current;
+      deslizes.current.set(el, bilhete);
+      el.style.transition = "none";
+      el.style.transform = `translateY(${desvio}px)`;
+      deslocados.push({ el, bilhete });
+    }
+
+    if (deslocados.length === 0) return;
+    // Obriga o browser a assentar o `transform` acima ANTES de o fotograma
+    // seguinte lhe mexer: sem esta leitura as duas escritas juntavam-se numa
+    // só e não havia transição nenhuma para animar.
+    void pilha.offsetHeight;
+
+    // PLAY — e daí para o lugar novo, nos mesmos 200 ms do desvanecimento.
+    // Dois `requestAnimationFrame` porque o primeiro pode ainda cair no
+    // fotograma que já está a ser preparado, e aí o «inverter» e o «largar»
+    // aconteciam no mesmo — ou seja, não se via nada.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        for (const { el, bilhete } of deslocados) largar(el, bilhete);
+      });
+    });
+  }, [toasts, aSair, medirPousada, largar]);
 
   /**
-   * Quando não há ninguém a sair, apaga-se tudo o que o FLIP escreveu à mão.
-   * Não é arrumação por gosto: um `transform` que fica pendurado num elemento
-   * cria um containing block, e é assim que um `position: fixed` lá dentro
-   * deixa de ser fixo. Corre num efeito de layout para o apagar antes de pintar
-   * — nesse instante os irmãos já estão em `translateY(0px)`, portanto
-   * tirar-lho não mexe nada.
+   * A rede: quando não há ninguém a sair, apaga-se o que o FLIP tenha deixado
+   * escrito. Não é arrumação por gosto — um `transform` que fica pendurado num
+   * elemento cria um containing block, e é assim que um `position: fixed` lá
+   * dentro deixa de ser fixo.
+   *
+   * ── E SALTA O QUE ESTÁ A DESLIZAR, QUE É O CASO NOVO ────────────────────
+   * Isto apagava tudo, e passou a poder apagar de mais: com o FLIP a correr
+   * TAMBÉM na entrada, há deslizes vivos em commits em que ninguém está a
+   * sair. O caso concreto é o do enunciado — um aviso chega enquanto outro se
+   * vai embora: 200 ms depois a saída acaba, o `aSair` esvazia-se, este efeito
+   * corria e cortava as pernas ao deslize da entrada, que ainda ia a meio.
+   * Cada deslize arruma-se a si próprio no fim (ver `largar`); aqui só se
+   * apaga o que não tem dono.
    */
   useLayoutEffect(() => {
     if (aSair.length > 0) return;
     for (const el of nos.current.values()) {
+      if (deslizes.current.has(el)) continue;
       el.style.transition = "";
       el.style.transform = "";
     }
     if (pilhaRef.current) pilhaRef.current.style.minWidth = "";
   }, [aSair]);
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * O AVISO NÃO PODE FICAR `inert` — e o `z-index` não tinha nada a ver
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * O DEFEITO, medido: com o painel do pedido aberto num telemóvel, o «×» de um
+   * aviso não se conseguia tocar. `document.elementFromPoint` no centro do
+   * botão devolvia o conteúdo do painel POR BAIXO, e um toque a sério não
+   * fechava nada — enquanto os avisos se viam, inteiros, por cima do painel.
+   *
+   * A suspeita óbvia era empilhamento: a pilha é `z-[80]`, o painel `z-50`, e
+   * um `z-index` só compete dentro do seu contexto. MEDIDO num Chromium,
+   * subindo a árvore a partir dos dois: **não há contexto de empilhamento
+   * nenhum pelo caminho.** Da pilha até ao `<html>` são
+   * `main#conteudo` → `body` → `html`, os três `position: static`,
+   * `z-index: auto`, sem `transform`, sem `filter`, sem `isolation`, sem
+   * `opacity` e sem `will-change`. Os dois competem no mesmo contexto (o da
+   * raiz) e o 80 ganha ao 50 — que é precisamente por isso que os avisos SE
+   * VÊEM. A pintura estava certa desde sempre.
+   *
+   * O que estava errado era outra coisa, e estava escrita num atributo: com o
+   * painel aberto, a pilha tinha **`inert` e `aria-hidden="true"`**. Um
+   * elemento `inert` continua a ser PINTADO e deixa de existir para o teste de
+   * acerto — o toque atravessa-o como se não estivesse lá. É o retrato exacto
+   * do sintoma, e explica porque é que aumentar o `z-index` nunca ia resolver
+   * nada.
+   *
+   * Quem os põe é o `useFocusTrap`: quando o painel abre como gaveta, ele sobe
+   * do painel até ao `<body>` e marca, em cada nível, os IRMÃOS por onde não
+   * subiu. A pilha é irmã da aplicação dentro do `<main>` — logo, apanha.
+   *
+   * ── E UM PORTAL PARA O `<body>` NÃO RESOLVE ISTO ────────────────────────
+   * Foi a primeira resposta a ser MEDIDA, e não passa. As variáveis chegam lá
+   * (um nó posto no `<body>` lê `--bo-barra-inferior: 72px` e
+   * `--bo-barra-accao: 90px` e calcula `bottom: 174px`, porque a primeira é
+   * declarada NO `body` e a segunda no `documentElement`, e as custom
+   * properties herdam-se) — mas o `inert` chega lá também: o `useFocusTrap`
+   * sobe ATÉ ao `body` e marca os irmãos do `<main>`, que é onde o portal
+   * aterraria. Medido na mesma corrida: com o painel aberto, todos os filhos
+   * do `<body>` que não sejam o `<main>` estão `inert`. Um portal custava a
+   * ordem de pintura, o SSR e o FLIP a medir irmãos, e não comprava nada.
+   *
+   * Fica portanto a pilha a recusar-se. A alternativa mais limpa — o
+   * `useFocusTrap` saltar quem se declara acima dos modais — é UMA LINHA e
+   * está fora deste ficheiro; enquanto não for feita, é aqui que a pilha se
+   * defende. E defende-se com razão: o `role="alert"` desta pilha é onde
+   * aparece «não foi possível guardar». Um aviso que não se pode ler nem
+   * dispensar enquanto há um painel aberto é pior do que não haver aviso.
+   */
+  useEffect(() => {
+    const pilha = pilhaRef.current;
+    if (!pilha || typeof MutationObserver !== "function") return;
+    const naoMeApagues = () => {
+      if (pilha.hasAttribute("inert")) pilha.removeAttribute("inert");
+      if (pilha.getAttribute("aria-hidden") === "true") pilha.removeAttribute("aria-hidden");
+    };
+    // Uma vez já: o painel pode estar aberto antes de isto montar.
+    naoMeApagues();
+    const olho = new MutationObserver(naoMeApagues);
+    olho.observe(pilha, { attributes: true, attributeFilter: ["inert", "aria-hidden"] });
+    return () => olho.disconnect();
+  }, []);
 
   /**
    * Um aviso a sair pode ser deitado fora pelo tecto do `MAX_TOASTS` antes de a
@@ -481,6 +744,22 @@ function ToastItem({
       onMouseLeave={resume}
       onFocus={pause}
       onBlur={resume}
+      /* ── E O AVISO QUE SAI SAI TAMBÉM DA ÁRVORE E DO FIO DO TECLADO ──────
+         O mesmo defeito dos `pointer-events`, dito aos outros dois públicos —
+         e MEDIDO, com o aviso a apagar-se: o `getByRole("button", { name:
+         "Fechar" })` ainda o encontrava, a mensagem continuava dentro da
+         região `role="alert"` (um leitor de ecrã podia anunciar um aviso que
+         já se foi), e o foco ficava no «×» a desaparecer até cair no `<body>`
+         200 ms depois — quem anda de Tab perdia o sítio sem nada lhe dizer.
+
+         `aria-hidden` tira-o da árvore; `inert` tira-o do fio do teclado. São
+         os dois e não um: o `aria-hidden` não tira do Tab e o `inert` não é
+         igualmente forte em todo o lado. E chegam no MESMO commit do gesto,
+         pela mesma razão que os `pointer-events` — ver o ponto 2 do bloco
+         grande lá em cima. É o que o `FolhaOuDialogo` já faz, e o que a
+         varredura `a-saida-sai-da-arvore.test.ts` passou a exigir. */
+      aria-hidden={aSair || undefined}
+      inert={aSair}
       /* ── O `pointer-events` LARGA-SE AQUI, E É POR ISSO QUE É UMA CLASSE ──
          `aSair` chega a este componente no mesmo commit do React em que a saída
          começa, portanto o `pointer-events-none` está aplicado antes de o

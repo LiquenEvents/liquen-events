@@ -887,7 +887,7 @@ function EditorClassico() {
                 <button
                   type="button"
                   onClick={switchToAdvanced}
-                  className="text-[11px] text-foreground/35 hover:text-[var(--bo-text-muted)] underline underline-offset-2"
+                  className={`text-[11px] text-foreground/35 hover:text-[var(--bo-text-muted)] underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                 >
                   HTML avançado
                 </button>
@@ -895,7 +895,7 @@ function EditorClassico() {
                 <button
                   type="button"
                   onClick={switchToVisual}
-                  className="text-[11px] text-[#4d6350] hover:text-[#415440] underline underline-offset-2"
+                  className={`text-[11px] text-[#4d6350] hover:text-[#415440] underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                 >
                   ← Voltar ao editor visual
                 </button>

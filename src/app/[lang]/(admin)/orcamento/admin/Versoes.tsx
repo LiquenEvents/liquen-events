@@ -8,6 +8,9 @@ import { paragrafoDoQueMudou } from "@/lib/email-proposta-textos";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { Button } from "./ui/Button";
 import { PerguntaDestrutiva } from "./ui/PerguntaDestrutiva";
+// `ESTADO` entra com outro nome: este ficheiro já tem um mapa `ESTADO` seu
+// (os rótulos dos estados de uma versão), e são coisas diferentes.
+import { ESTADO as MOV_ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -353,7 +356,7 @@ export default function Versoes({
               <button
                 type="button"
                 onClick={() => onInserirNaMensagem(paragrafo)}
-                className="alvo-toque mt-2 text-[11px] font-medium text-[#4d6350] underline-offset-2 transition-colors hover:text-[#415440] hover:underline"
+                className={`alvo-toque mt-2 text-[11px] font-medium text-[#4d6350] underline-offset-2 hover:text-[#415440] hover:underline ${MOV_ESTADO} ${PRESSAO}`}
               >
                 Inserir na mensagem para o cliente
               </button>
@@ -385,7 +388,7 @@ export default function Versoes({
                     type="button"
                     onClick={() => setAberta(expandida ? null : v.id)}
                     aria-expanded={expandida}
-                    className="alvo-toque text-[11px] text-[var(--bo-text-muted)] underline underline-offset-2 hover:text-[var(--bo-text)]"
+                    className={`alvo-toque text-[11px] text-[var(--bo-text-muted)] underline underline-offset-2 hover:text-[var(--bo-text)] ${MOV_ESTADO} ${PRESSAO}`}
                   >
                     {expandida ? "Esconder o que mudou" : "Ver o que mudou"}
                   </button>

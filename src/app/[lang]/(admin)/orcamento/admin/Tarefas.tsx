@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Escolha,
   Field,
   MenuDeAccoes,
   PerguntaDestrutiva,
@@ -128,7 +129,7 @@ const TaskRow = memo(function TaskRow({
            dá-lhe 36 px para o rato sem ocupar mais espaço na linha, e o
            `alvo-toque` leva-o aos 44 no dedo (só sob `(pointer: coarse)`,
            ver globals.css — o portátil mantém a densidade que tem). */
-        className="alvo-toque -m-2 flex shrink-0 items-center justify-center p-2"
+        className={`alvo-toque -m-2 flex shrink-0 items-center justify-center p-2 ${ESTADO} ${PRESSAO}`}
       >
         <span
           className={`w-5 h-5 rounded-md border flex items-center justify-center ${ESTADO} ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 group-hover:border-[#4d6350]/60"}`}
@@ -658,17 +659,21 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               className="bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] w-full"
             />
             <div className="flex flex-wrap gap-2">
-              <select
-                value={editTaskFields.priority}
-                onChange={(e) =>
-                  setEditTaskFields({ ...editTaskFields, priority: e.target.value as TaskPriority })
+              <Escolha
+                // Este campo NÃO tinha rótulo nenhum — nem `<label>`, nem
+                // `aria-label`. Com a caixa do sistema ninguém deu por isso;
+                // quem ouve o ecrã ouvia «combobox» e mais nada. Passou a ter.
+                aria-label="Prioridade"
+                valor={editTaskFields.priority}
+                aoMudar={(v) =>
+                  setEditTaskFields({ ...editTaskFields, priority: v as TaskPriority })
                 }
-                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
+                className="px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
               >
                 <option value="alta">Alta</option>
                 <option value="normal">Normal</option>
                 <option value="baixa">Baixa</option>
-              </select>
+              </Escolha>
               <input
                 type="date"
                 value={editTaskFields.dueDate}
@@ -676,13 +681,12 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                 className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1"
               />
               {equipa.length > 0 ? (
-                <select
+                <Escolha
                   aria-label="Responsável"
-                  value={editTaskFields.assignee}
-                  onChange={(e) =>
-                    setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
-                  }
-                  className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
+                  valor={editTaskFields.assignee}
+                  aoMudar={(v) => setEditTaskFields({ ...editTaskFields, assignee: v })}
+                  containerClassName="flex-1 min-w-[100px]"
+                  className="px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
                 >
                   <option value="">Sem responsável</option>
                   {opcoesDeResponsavel(editTaskFields.assignee).map((n) => (
@@ -690,7 +694,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                       {n}
                     </option>
                   ))}
-                </select>
+                </Escolha>
               ) : (
                 <input
                   value={editTaskFields.assignee}
@@ -701,10 +705,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                   className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
                 />
               )}
-              <select
-                value={editTaskFields.area}
-                onChange={(e) => setEditTaskFields({ ...editTaskFields, area: e.target.value })}
-                className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
+              <Escolha
+                aria-label="Área"
+                valor={editTaskFields.area}
+                aoMudar={(v) => setEditTaskFields({ ...editTaskFields, area: v })}
+                className="px-2 py-1.5 text-xs text-[var(--bo-text-muted)]"
               >
                 <option value="">Área…</option>
                 {AREAS.map((a) => (
@@ -712,7 +717,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                     {a}
                   </option>
                 ))}
-              </select>
+              </Escolha>
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => saveEditTask(t.id)} className="flex-1">
@@ -802,7 +807,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               a classe centra por omissão. */}
           <summary
             onClick={gaveta.aoTocarNoResumo}
-            className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden"
+            className={`alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="12"
