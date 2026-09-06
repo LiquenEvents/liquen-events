@@ -91,6 +91,7 @@ export default defineConfig({
         "**/carregamento-movel.spec.ts",
         "**/fazer-proposta-cliente.spec.ts",
         "**/nav-estudio-marca.spec.ts",
+        "**/painel-estudio-marca.spec.ts",
         "**/geometria-dos-alvos.spec.ts",
         "**/proposta-rascunho.spec.ts",
         "**/temas.spec.ts",

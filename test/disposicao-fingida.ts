@@ -30,6 +30,20 @@ const originais = new Map<string, PropertyDescriptor | undefined>();
  * Passa a ler `data-x`, `data-y`, `data-w` e `data-h` de cada elemento.
  * `data-escondido` põe o `offsetParent` a nulo — a convenção por onde os
  * medidores desta casa reconhecem «não está à vista».
+ *
+ * ── PORQUE É QUE O TAMANHO POR OMISSÃO NÃO É ZERO ─────────────────────────
+ *
+ * Os cantos (`data-x`/`data-y`) por declarar são ZERO, que é o que se espera —
+ * um elemento no canto da zona. O TAMANHO por declarar é 1, e não zero, por
+ * uma razão que custou uma corrida a perceber: num browser um elemento
+ * desenhado nunca mede 0×0 por acidente, e os medidores desta casa passaram a
+ * ler «0 de largura» como «isto não está à vista» (é a regra do `Segmented`,
+ * `!activo.offsetWidth`, hoje também no `ui/useMarcaQueAnda.ts`). Com zero por
+ * omissão, um teste que só quisesse provar que a marca EXISTE — sem se
+ * importar com onde — deixava de a ver, e o vermelho lia-se como defeito do
+ * produto quando era o duplo a fingir um elemento impossível.
+ *
+ * Quem quiser provar o caso do tamanho zero declara-o: `data-w="0"`.
  */
 export function fingirDisposicao(): void {
   if (originais.size > 0) return;
@@ -45,8 +59,8 @@ export function fingirDisposicao(): void {
     });
   definir("offsetLeft", (el) => Number(el.dataset.x ?? 0));
   definir("offsetTop", (el) => Number(el.dataset.y ?? 0));
-  definir("offsetWidth", (el) => Number(el.dataset.w ?? 0));
-  definir("offsetHeight", (el) => Number(el.dataset.h ?? 0));
+  definir("offsetWidth", (el) => Number(el.dataset.w ?? 1));
+  definir("offsetHeight", (el) => Number(el.dataset.h ?? 1));
   definir("offsetParent", (el) => (el.dataset.escondido ? null : el.parentElement));
 }
 

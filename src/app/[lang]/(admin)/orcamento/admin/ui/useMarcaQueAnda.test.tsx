@@ -84,6 +84,47 @@ function Lista({ destinos, activo }: { destinos: Destino[]; activo: string }) {
   );
 }
 
+/**
+ * A MESMA lista, mas que só EXISTE quando lhe dizem.
+ *
+ * É a forma do `PainelDoEstudio`: ele devolve `null` enquanto não souber que
+ * cabe, e a largura da fila só se sabe depois do primeiro desenho — ou seja, a
+ * zona nasce um desenho DEPOIS de o gancho ter corrido pela primeira vez. O
+ * `if` está a seguir ao gancho e antes do `return`, exactamente como lá.
+ */
+function ListaQueChegaTarde({ montada, activo }: { montada: boolean; activo: string }) {
+  const zona = useRef<HTMLDivElement>(null);
+  const { marca } = useMarcaQueAnda(zona, '[aria-current="page"]', activo);
+  if (!montada) return null;
+  return (
+    <div ref={zona} style={{ position: "relative" }}>
+      {marca && (
+        <span
+          data-testid="filete"
+          style={{
+            translate: `${marca.x}px ${marca.y}px`,
+            width: marca.largura,
+            height: marca.altura,
+          }}
+        />
+      )}
+      {COLUNA.map((d) => (
+        <button
+          key={d.id}
+          type="button"
+          aria-current={d.id === activo ? "page" : undefined}
+          data-x={d.x}
+          data-y={d.y}
+          data-w={d.w}
+          data-h={d.h}
+        >
+          {d.id}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const COLUNA: Destino[] = [
   { id: "pedidos", x: 0, y: 0, w: 192, h: 36 },
   { id: "agenda", x: 0, y: 40, w: 192, h: 36 },
@@ -147,6 +188,62 @@ describe("a marca segue o destino marcado, e não o primeiro da lista", () => {
     const escondidos = COLUNA.map((d) => (d.id === "temas" ? { ...d, escondido: true } : d));
     const { queryByTestId } = render(<Lista destinos={escondidos} activo="temas" />);
     expect(queryByTestId("filete")).toBeNull();
+  });
+
+  it("uma medida de tamanho zero NÃO é marca nenhuma", async () => {
+    /**
+     * ── PORQUE É QUE ISTO NÃO É UM DETALHE ────────────────────────────────
+     *
+     * O gancho só rejeitava o `offsetParent` nulo; uma caixa de 0×0 passava por
+     * marca válida. Nos dois sítios com fundo próprio — o `Segmented` e a barra
+     * «Esta página / Todas» — o elemento activo LARGA o seu fundo assim que há
+     * marca («nunca há dois fundos, e nunca há nenhum»). Uma marca que existe e
+     * não pinta nada deixava, portanto, o separador activo indistinguível dos
+     * outros: perdia-se a marca E a rede que a substitui.
+     *
+     * Um elemento com uma das medidas a zero não pinta coisa nenhuma, logo não
+     * há marca legítima a perder. É a regra que o `Segmented` já tinha
+     * (`!activo.offsetWidth`), com o eixo que ele não precisa de testar e a
+     * barra lateral precisa: lá a marca É a altura.
+     */
+    fingirDisposicao();
+    const semCaixa = COLUNA.map((d) => (d.id === "temas" ? { ...d, w: 0, h: 0 } : d));
+    const { queryByTestId } = render(<Lista destinos={semCaixa} activo="temas" />);
+    expect(queryByTestId("filete")).toBeNull();
+
+    // E só a ALTURA a zero chega para não haver marca: um filete de 3 px por
+    // 0 px é o mesmo nada que uma largura zero.
+    cleanup();
+    const semAltura = COLUNA.map((d) => (d.id === "temas" ? { ...d, h: 0 } : d));
+    const segunda = render(<Lista destinos={semAltura} activo="temas" />);
+    expect(segunda.queryByTestId("filete")).toBeNull();
+  });
+
+  it("a zona que só nasce mais tarde é medida na mesma", async () => {
+    /**
+     * ── O DEFEITO QUE UM PASSEIO APANHOU NUM BROWSER ──────────────────────
+     *
+     * O efeito da medida lia `zona.current` e tinha o `RefObject` nas
+     * dependências. Um `RefObject` é sempre o mesmo objecto: se a zona ainda
+     * não existia quando o efeito correu, ele saía pelo `return` e nunca mais
+     * voltava a correr. Medido no `PainelDoEstudio`, que só se monta depois de
+     * a fila das colunas se medir — a barra abria com ZERO marcas, e só a
+     * primeira troca de separador (que muda a `chave`) a fazia aparecer, já no
+     * destino e sem percurso nenhum. Ver `e2e/painel-estudio-marca.spec.ts`.
+     */
+    fingirDisposicao();
+    const { queryByTestId, rerender } = render(
+      <ListaQueChegaTarde montada={false} activo="agenda" />,
+    );
+    expect(queryByTestId("filete"), "não há zona: não pode haver marca").toBeNull();
+
+    await act(async () => {
+      rerender(<ListaQueChegaTarde montada activo="agenda" />);
+    });
+    expect(
+      queryByTestId("filete")?.style.translate,
+      "a zona apareceu e ninguém a chegou a medir",
+    ).toBe("0px 40px");
   });
 
   it("o primeiro desenho NÃO anda — só o fotograma seguinte", async () => {

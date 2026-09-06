@@ -350,6 +350,42 @@ describe("a barra de separadores do painel", () => {
     ).toContain("bg-white");
   });
 
+  it("e uma medida de tamanho ZERO conta como nenhuma — o fundo do botão fica", async () => {
+    /**
+     * ── O QUE ESTE CASO EXISTE PARA IMPEDIR ───────────────────────────────
+     *
+     * O medidor (`ui/useMarcaQueAnda.ts`) só rejeitava o `offsetParent` nulo:
+     * uma caixa de 0×0 — um antepassado com `content-visibility: hidden`, um
+     * ramo ainda por dispor — passava por marca válida. E aqui isso é pior do
+     * que uma marca invisível: o separador activo LARGA o seu fundo branco no
+     * instante em que há marca (é o caso mesmo acima). Com uma marca que existe
+     * e não pinta nada, ele ficava sem marca E sem fundo, ou seja
+     * indistinguível dos outros — o contrário do que a barra serve para dizer.
+     *
+     * É a regra que o `Segmented` já tinha (`!activo.offsetWidth`), e o
+     * medidor passou a ter nos dois eixos.
+     */
+    fingirObservadorDeTamanho();
+    fingirDisposicao();
+    desenhar();
+    for (const b of screen.getAllByRole("tab")) {
+      const el = b as HTMLElement;
+      el.dataset.x = "2";
+      el.dataset.y = "2";
+      el.dataset.w = "0";
+      el.dataset.h = "0";
+    }
+    await act(async () => {
+      for (const f of remedir) f();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(marcas(), "uma caixa de 0×0 passou por marca").toHaveLength(0);
+    expect(
+      screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
+      "o separador activo ficou sem marca E sem fundo — invisível na sua própria barra",
+    ).toContain("bg-white");
+  });
+
   it("o painel que chega apresenta-se — e num nó NOVO, para a animação recomeçar", async () => {
     // Um `<div>` reaproveitado ficava com a `.view-in` colada e a animação
     // corria uma vez só, na primeira. É o defeito que não se vê em captura

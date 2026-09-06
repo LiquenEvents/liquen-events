@@ -52,13 +52,16 @@ import { useEffect, useState, type RefObject } from "react";
  * mede o elemento certo, que se apaga a marca quando ele está escondido, e que
  * o primeiro fotograma não anda.
  *
- * ── E A BARRA LATERAL, PORQUE É QUE NÃO USA ISTO? ─────────────────────────
+ * ── E A BARRA LATERAL JÁ USA ISTO ─────────────────────────────────────────
  *
- * Porque o filete do `AdminClient` está feito e fechado, e a instrução de quem
- * manda foi lê-lo e não lhe tocar. A sua medida é este gancho menos o eixo `x`
- * — trocá-la por uma chamada daqui é um diff de duas linhas, e é para isso que
- * este ficheiro está escrito genérico. Fica dito para que o terceiro sítio que
- * precisar de uma marca a andar venha cá, em vez de fazer a terceira cópia.
+ * Usava uma cópia desta lógica, e a nota que aqui estava dizia porquê: quando
+ * este ficheiro nasceu, o `AdminClient` estava debaixo de outras mãos e a
+ * instrução era lê-lo e não lhe tocar. A cópia saiu. A medida da barra lateral
+ * é este gancho menos o eixo `x`, e é hoje uma chamada daqui. São CINCO as
+ * barras que medem por este código — a coluna do back office, o índice do
+ * estúdio, o painel «O que vai sair» e as duas dos modelos de email
+ * («Modelos / Editor clássico» e «Português / English») —, que é o que faz uma
+ * correcção como a do «tamanho zero», lá em baixo, valer nas cinco de uma vez.
  */
 export interface Marca {
   /** Canto esquerdo do elemento marcado, relativo à zona. */
@@ -92,15 +95,78 @@ export function useMarcaQueAnda(
   const [marca, setMarca] = useState<Marca | null>(null);
   const [podeAndar, setPodeAndar] = useState(false);
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A ZONA PODE NASCER DEPOIS DO PRIMEIRO EFEITO — E NASCE MESMO
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * Isto era `const lista = zona.current` lido dentro do efeito da medida, com
+   * `[zona, seletor, chave]` na lista de dependências. Um `RefObject` é sempre
+   * o MESMO objecto, portanto essa lista não muda quando o elemento aparece: se
+   * a zona ainda não existia quando o efeito correu, ele saía pelo `return` e
+   * NUNCA MAIS voltava a correr. Sem observador, sem medida, sem marca — para
+   * sempre, e sem um erro em lado nenhum.
+   *
+   * Não é hipótese: foi MEDIDO num Chromium, na barra «Esta página / Todas» do
+   * `PainelDoEstudio` (ver `e2e/painel-estudio-marca.spec.ts`). Aquele painel
+   * só se MONTA depois de a fila das colunas se medir a si própria, e no
+   * primeiro desenho a largura ainda é zero — ou seja, o `<div role="tablist">`
+   * nasce um desenho DEPOIS do gancho. Ao abrir o estúdio a barra ficava com
+   * zero marcas; a primeira mudava a `chave`, o efeito corria pela primeira vez
+   * e a marca aparecia já no destino, sem percurso nenhum. O gesto que isto
+   * existe para fazer — ANDAR de um separador para o outro — não acontecia
+   * nunca na primeira troca, e ninguém dava por isso porque o separador activo
+   * mantinha o seu próprio fundo enquanto não houvesse marca.
+   *
+   * Guardar o elemento em ESTADO é o que dá ao efeito da medida uma dependência
+   * que muda quando ele aparece. O efeito abaixo não tem lista de dependências
+   * de propósito — corre a seguir a cada desenho, que é a única altura em que se
+   * pode dar por um `ref` que mudou —, e não faz nada quando o elemento é o
+   * mesmo: o React ignora um `setState` com o valor anterior, portanto isto
+   * assenta num desenho e não anda a redesenhar-se sozinho.
+   */
+  const [zonaViva, setZonaViva] = useState<HTMLElement | null>(null);
+  /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect --
+     As duas regras avisam do que aqui é deliberado, e a razão está por extenso
+     em cima: sem lista de dependências porque é a seguir a CADA desenho que se
+     pode dar por um `ref` que passou a apontar para alguma coisa, e com
+     `setState` porque é isso que dá ao efeito da medida uma dependência que
+     muda quando o elemento aparece. Não encadeia desenhos: o React ignora um
+     `setState` que devolve o valor anterior, portanto isto escreve UMA vez —
+     quando a zona nasce — e nunca mais. */
   useEffect(() => {
-    const lista = zona.current;
+    setZonaViva((antes) => (antes === zona.current ? antes : zona.current));
+  });
+  /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    const lista = zonaViva;
     if (!lista) return;
     const medir = () => {
       const activo = lista.querySelector<HTMLElement>(seletor);
       // `offsetParent` nulo quer dizer escondido (um grupo dobrado, um ramo com
       // `display:none` do outro lado de um corte). Sem elemento à vista não há
       // marca — melhor nenhuma do que uma pousada no sítio errado.
-      if (!activo || activo.offsetParent === null) {
+      //
+      // ── E UMA CAIXA DE TAMANHO ZERO TAMBÉM NÃO É UMA MARCA ───────────────
+      //
+      // Este era o único ponto em que a medida daqui DIVERGIA do `Segmented`,
+      // que testa `!activo.offsetWidth`. A divergência foi apontada quando o
+      // gancho servia UM sítio e não se corrigiu; hoje serve cinco barras, e o
+      // que ela deixa passar é pior do que uma marca invisível: nas três com
+      // fundo próprio (a do `PainelDoEstudio` e as duas dos modelos de email,
+      // pela regra que o `Segmented` explica), o separador activo LARGA o seu
+      // fundo no instante em que há marca — «nunca há dois fundos, e nunca há
+      // nenhum». Uma marca de 0×0 é uma marca que conta como existente e não
+      // pinta nada: o resultado é um separador activo que deixa de se
+      // distinguir dos outros.
+      //
+      // Um elemento com uma das medidas a zero não pinta coisa nenhuma, logo
+      // não há caso em que rejeitá-lo perca uma marca legítima. Os dois eixos e
+      // não só a largura (que é o que o `Segmented` testa): na barra lateral a
+      // marca É a altura, e uma altura zero deixava lá um filete de 3 px por
+      // 0 px, que é exactamente o mesmo nada.
+      if (!activo || activo.offsetParent === null || !activo.offsetWidth || !activo.offsetHeight) {
         setMarca(null);
         return;
       }
@@ -120,7 +186,7 @@ export function useMarcaQueAnda(
     observador.observe(lista);
     for (const b of lista.querySelectorAll("button")) observador.observe(b);
     return () => observador.disconnect();
-  }, [zona, seletor, chave]);
+  }, [zonaViva, seletor, chave]);
 
   useEffect(() => {
     if (!marca || podeAndar) return;
