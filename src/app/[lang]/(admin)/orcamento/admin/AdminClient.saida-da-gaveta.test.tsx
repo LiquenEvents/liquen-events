@@ -156,10 +156,28 @@ function montar(pedidos: Quote[]) {
   );
 }
 
-/** A gaveta: o nó que tem o botão «Fechar» lá dentro. */
+/**
+ * A gaveta — pelo DOM, e NÃO pelo `getByRole`.
+ *
+ * ── PORQUE É QUE ISTO MUDOU ────────────────────────────────────────────────
+ *
+ * Chegava aqui pelo botão «Fechar» (`screen.getByRole`), e isso deixou de
+ * funcionar a partir do gesto de fechar — de propósito. A gaveta que sai passou
+ * a levar `aria-hidden` (e a largar o `role="dialog"`, o `aria-modal` e o
+ * nome), portanto SAI DA ÁRVORE DE ACESSIBILIDADE no fotograma do gesto e o
+ * `getByRole` deixa de a encontrar. É exactamente o defeito que o
+ * `a-saida-sai-da-arvore.test.ts` nomeava neste ficheiro, agora corrigido.
+ *
+ * Ou seja: os três casos que passavam a chamar isto DEPOIS do clique passavam
+ * porque a gaveta ainda se anunciava. Eram verdes por causa da avaria.
+ *
+ * A gaveta continua MONTADA e continua a ver-se — é o que a saída existe para
+ * fazer —, portanto o que muda é só o instrumento com que se lhe chega: uma
+ * consulta ao DOM, que não passa pela árvore de acessibilidade. A classe é a
+ * mesma âncora que já se usava (`max-h-[100dvh]`, o tecto de altura da folha).
+ */
 function gaveta(): HTMLElement {
-  const fechar = screen.getByRole("button", { name: "Fechar" });
-  const caixa = fechar.closest("[class*='max-h-[100dvh]']");
+  const caixa = document.querySelector("[class*='max-h-[100dvh]']");
   if (!(caixa instanceof HTMLElement)) throw new Error("não encontrei a gaveta");
   return caixa;
 }
@@ -221,12 +239,28 @@ describe("a saída da gaveta do pedido", () => {
       fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     });
 
-    // Ainda lá está, e já a sair.
-    expect(screen.getByRole("button", { name: "Fechar" })).toBeInTheDocument();
+    /**
+     * Ainda lá está, e já a sair — e agora há DUAS coisas a dizer, não uma.
+     *
+     * A gaveta continua MONTADA (é o que a saída existe para fazer: sem nó não
+     * há o que animar), e é isso que a primeira asserção mede, pelo DOM.
+     *
+     * Mas já não se ANUNCIA: leva `aria-hidden` e largou o `role="dialog"`, o
+     * `aria-modal` e o nome, portanto o `getByRole` deixa de a alcançar. Esta
+     * asserção estava escrita ao contrário — `getByRole(…"Fechar")` a seguir ao
+     * clique — e passava por causa da avaria que o
+     * `a-saida-sai-da-arvore.test.ts` nomeava aqui. Fica agora a dizer a coisa
+     * certa: montada para os olhos, fora da árvore para quem não olha.
+     */
+    expect(gaveta(), "a gaveta desmontou no fotograma do gesto").toBeInTheDocument();
     expect(gaveta().className).toContain("bo-saida");
+    expect(
+      screen.queryByRole("button", { name: "Fechar" }),
+      "a gaveta que sai continua a anunciar-se — é o defeito, não a garantia",
+    ).not.toBeInTheDocument();
 
     avancar(SAIDA_MS);
-    expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
+    expect(document.querySelector("[class*='max-h-[100dvh]']")).toBeNull();
   });
 
   it("a classe entra no PRIMEIRO fotograma, com ela os toques e o teclado saem", async () => {
@@ -251,6 +285,88 @@ describe("a saída da gaveta do pedido", () => {
     // Sem avançar relógio nenhum: é o mesmo commit do React.
     expect(gaveta().className).toContain("bo-saida");
     expect(gaveta().hasAttribute("inert")).toBe(true);
+  });
+
+  it("o foco volta NO GESTO, e não 200 ms depois", async () => {
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * NENHUMA ANIMAÇÃO PODE ATRASAR UMA TAREFA — E O FOCO É A TAREFA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * A armadilha de foco (`useFocusTrap`) só larga o que segura quando o seu
+     * `active` passa a falso, e o `active` era `!!selected && isDetailOverlay`.
+     * Nenhum dos dois cai no gesto: o `isDetailOverlay` é a LARGURA DO ECRÃ, e
+     * o `selected` só é limpo ao fim dos 200 ms da saída. Resultado medido: a
+     * gaveta já está a desaparecer e o foco continua LÁ DENTRO — o
+     * `previouslyFocused?.focus?.()` da limpeza da armadilha só corre um quinto
+     * de segundo mais tarde.
+     *
+     * Quem fecha com Escape fica esse tempo sem sítio para o teclado. Uma
+     * animação de saída pode demorar o que quiser a apagar-se; o que não pode é
+     * ficar com uma coisa de que a pessoa precisa já.
+     *
+     * ── PORQUE É QUE ISTO NÃO ESTÁ NA VARREDURA ────────────────────────────
+     *
+     * O `a-saida-sai-da-arvore.test.ts` lê ATRIBUTOS no JSX — vê o `inert` e o
+     * `aria-hidden`, e é por isso que nomeou a outra metade deste mesmo
+     * defeito. Não vê para onde o foco foi parar, que é comportamento e mede-se
+     * a correr. São as duas metades da mesma linha (`&& !painelASair`), e ficam
+     * guardadas pelos dois lados.
+     */
+    montar([pedido({ id: "LQ-046", name: "Sofia Pinto" })]);
+    await abrirOPainel("Sofia Pinto");
+
+    /**
+     * O QUE A ARMADILHA SEGURA, e é isto que se mede.
+     *
+     * O `useFocusTrap` faz duas coisas ao armar-se: leva o foco para dentro, e
+     * marca os IRMÃOS de cada nível entre a gaveta e o `<body>` com
+     * `aria-hidden` e `inert` — o fundo inteiro sai do alcance. A limpeza dele
+     * desfaz as duas.
+     *
+     * Enquanto a limpeza esperava pelo `selected` (200 ms), o que ficava
+     * bloqueado não era só o foco: era **o resto do ecrã**. A lista de pedidos
+     * por trás, a barra de baixo, o menu — tudo `inert` durante um quinto de
+     * segundo depois de ela já ter fechado a gaveta. É a tarefa seguinte a
+     * esperar pelo fim de uma animação.
+     *
+     * Mede-se pelos irmãos e não pelo `document.activeElement` porque quem tira
+     * o foco de um nó marcado `inert` é o BROWSER, e o jsdom não implementa esse
+     * comportamento — aqui uma asserção sobre o foco mediria o jsdom e não o
+     * produto. Os atributos são do React e estão no DOM nos dois sítios.
+     */
+    /* A BARRA DE BAIXO é um dos irmãos que a armadilha marca ao subir, e é
+       um nó com nome e endereço — melhor âncora do que uma contagem. Lê-se pelo
+       DOM e não por `getByRole`: a partir do momento em que leva `aria-hidden`,
+       o seu papel deixa de a encontrar, que é o ponto.
+
+       E lê-se o `aria-hidden` e não o `inert`: a armadilha põe o primeiro com
+       `setAttribute` (fica no DOM) e o segundo pela PROPRIEDADE
+       (`sibling.inert = true`), e o jsdom não reflecte essa propriedade em
+       atributo nenhum — um `[inert]` aqui media o jsdom e não o produto. */
+    const barraDeBaixo = () => document.querySelector('nav[aria-label="Destinos principais"]')!;
+    expect(
+      barraDeBaixo().getAttribute("aria-hidden"),
+      "com a gaveta aberta o fundo tem de estar fora do alcance — sem isso este caso não mede nada",
+    ).toBe("true");
+
+    vi.useFakeTimers();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    });
+
+    // Sem avançar relógio nenhum: é o mesmo commit do gesto.
+    expect(
+      barraDeBaixo().getAttribute("aria-hidden"),
+      "a barra de baixo continua fora do alcance depois de ela fechar a gaveta — o " +
+        "ecrã só volta a responder 200 ms mais tarde, quando a animação acabar",
+    ).toBeNull();
+
+    // E a gaveta que sai deixa de ser um diálogo modal com nome: a promessa do
+    // `aria-modal` é «só isto conta», e isto já não está cá.
+    expect(gaveta().getAttribute("role")).toBeNull();
+    expect(gaveta().getAttribute("aria-modal")).toBeNull();
+    expect(gaveta().getAttribute("aria-hidden")).toBe("true");
   });
 
   it("e o véu vai-se com ela, e não fica um fotograma para trás", async () => {
