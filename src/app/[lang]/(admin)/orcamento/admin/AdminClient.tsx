@@ -4227,7 +4227,7 @@ export default function AdminClient({
         <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
           <aside
             inert={navEhGaveta && !navOpen}
-            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform duration-300 ${
+            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform motion-safe:duration-300 ${
               navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
             } ${
               /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
@@ -4677,21 +4677,27 @@ export default function AdminClient({
               tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
               novo. */}
           <header
-            /* O FIO DO CABEÇALHO FICA COMO ESTAVA, E NÃO É DESCUIDO.
-               Devia ser `ESTADO` como o resto: `motion-safe:transition-colors`
-               sem duração cai nos 150 ms de omissão do Tailwind, que não é
-               degrau nenhum desta casa (o `duration-150` ao lado é esse mesmo
-               número copiado à mão). Só que o `fio-do-cabecalho.test.ts`
-               prende aqui, letra por letra, a classe `motion-safe:transition-colors`
-               — e esse ficheiro não é deste lote. A guarda de movimento
-               reduzido, que é o que aquele teste diz querer, está cumprida; o
-               que falta é a duração, e muda-se quando se puder mexer no teste. */
-            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors duration-150 ${
+            /* O FIO DO CABEÇALHO: 150 ms, e ainda não é o degrau da casa.
+               Devia ser o `ESTADO` (120 ms) como o resto. Não é, porque o
+               `fio-do-cabecalho.test.ts` prende aqui a classe
+               `motion-safe:transition-colors` letra por letra, e mudá-la é
+               mexer nesse teste. Os 150 são o valor de omissão do Tailwind
+               escrito à mão — dívida assumida, não descuido.
+
+               O que MUDOU foi a guarda da duração. O `duration-150` estava sem
+               `motion-safe:`, e isso não era cosmético: o Tailwind compila a
+               duração no topo, fora da media query, enquanto o
+               `motion-safe:transition-colors` fica lá dentro. Com
+               `prefers-reduced-motion: reduce`, o `transition-property` caía no
+               valor inicial — `all` — e ficava `all 150ms ease`. Ou seja, quem
+               pedia MENOS movimento recebia MAIS, e com a curva errada. Medido
+               num Chromium, não deduzido. */
+            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
               desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
             }`}
           >
             <div
-              className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5 motion-safe:transition-[padding] duration-200 ${
+              className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5  ${
                 desceu ? "py-1.5" : "py-2.5"
               }`}
             >
@@ -4779,7 +4785,7 @@ export default function AdminClient({
                     o nome da vista está sempre também na barra de baixo ou na
                     gaveta de onde se veio. */}
                 <h1
-                  className="text-[var(--bo-text)] font-medium leading-none truncate motion-safe:transition-[font-size] duration-200"
+                  className="text-[var(--bo-text)] font-medium leading-none truncate"
                   style={{
                     fontFamily: "var(--font-display)",
                     letterSpacing: "var(--bo-tracking-display)",
