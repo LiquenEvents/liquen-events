@@ -1069,6 +1069,17 @@ interface Ahead {
 
 interface Props {
   quoteId: string;
+  /**
+   * Falso enquanto a folha SAI. O pai segura-a montada durante os 200 ms da
+   * `.bo-saida` (ver `ui/saida.ts`); esta prop é o que diz ao `FolhaOuDialogo`
+   * que já não está aberta. Por omissão verdadeira, para quem a monta sem
+   * saída nenhuma continuar a funcionar como antes.
+   *
+   * Tem de ser o MESMO nó a sair, e não um recriado: esta folha rouba o foco
+   * ao montar, e um nó novo a meio da saída roubava-o outra vez para uma caixa
+   * que já se está a apagar.
+   */
+  aberto?: boolean;
   /** `false` para as capas (uma imagem por espaço). */
   multiple: boolean;
   /** Caminhos da BIBLIOTECA (`<tema>/<ficheiro>`) que já foram importados para
@@ -1123,6 +1134,7 @@ export default function ThemePicker({
   onReserve,
   onDropped,
   paginaEmConstrucao,
+  aberto = true,
 }: Props) {
   const { toast } = useToast();
   /* A armadilha de foco, o trinco do scroll, o Escape, a pega que se arrasta, a
@@ -2138,7 +2150,7 @@ export default function ThemePicker({
        GRELHA, não o corpo; `accoesQuebram` porque a contagem e três botões não
        cabem numa fila a 375 px. */
     <FolhaOuDialogo
-      aberto
+      aberto={aberto}
       onFechar={dismiss}
       /* ── O NOME DESTA FOLHA DIZ AS DUAS COISAS ─────────────────────────
          O que uma pessoa com leitor de ecrã ouve ao abrir isto é o
