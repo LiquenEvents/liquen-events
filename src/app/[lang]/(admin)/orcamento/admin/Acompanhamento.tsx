@@ -705,9 +705,25 @@ function LinhaCartao({
         </button>
       </div>
 
-      {/* ── Seguimento ──────────────────────────────────────────────────── */}
+      {/* ── Seguimento ──────────────────────────────────────────────────────
+          O painel abre a partir do botão «Marcar seguimento», que está na fila
+          logo acima, e aparecia num fotograma — a data, a nota e os botões
+          todos de uma vez, com o cartão a crescer por baixo deles.
+
+          `.bo-entrada` — 240 ms e QUATRO píxeis, a distância de um rótulo: sai
+          do botão que se carregou e assenta. Não são os oito de uma folha,
+          porque isto não vem de fora do ecrã; está preso ao gesto que o abriu.
+
+          NADA DE `key`: este painel guarda uma data e uma nota por gravar, e
+          remontá-lo deitava as duas fora. A entrada é a CLASSE do elemento que
+          monta, e a montagem é a que o `{seguimentoAberto && …}` já fazia.
+
+          Nenhum campo aqui dentro tem `autoFocus` — se algum passar a ter, esta
+          classe tem de sair: uma entrada debaixo de um cursor que já assentou
+          arrasta o campo quatro píxeis por baixo dele. É a armadilha que o
+          `momentos-que-nao-saltam.test.ts` prende no `PerguntaDeDesfecho`. */}
       {seguimentoAberto && (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-[var(--bo-tinta-3)] p-3">
+        <div className="bo-entrada mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-[var(--bo-tinta-3)] p-3">
           <label className="flex flex-col gap-1">
             <span className="text-[10px] tracking-[0.1em] uppercase text-foreground/50">
               Voltar a falar em
@@ -761,9 +777,23 @@ function LinhaCartao({
         </div>
       )}
 
-      {/* ── Porque é que se perdeu ──────────────────────────────────────── */}
+      {/* ── Porque é que se perdeu ──────────────────────────────────────────
+          Marcar uma proposta como perdida abre este painel, e ele aparecia num
+          fotograma: a pergunta, os motivos e o campo do detalhe de uma vez só.
+          É o pior sítio para um salto — é o momento em que ela acaba de dizer
+          que um negócio se perdeu, e o ecrã responde-lhe com um sobressalto.
+
+          `.bo-entrada` — 240 ms e QUATRO píxeis, a distância de um rótulo. Sai
+          do botão que a abriu, que é onde ela está a olhar, e assenta. Não são
+          os oito de uma folha: isto não vem de fora do ecrã.
+
+          NADA DE `key`, pela mesma razão do painel de seguimento aqui em cima:
+          o motivo escolhido e o detalhe escrito ainda não estão gravados.
+
+          E também aqui nenhum campo tem `autoFocus` — se algum vier a ter, esta
+          classe sai, senão o campo mexe-se debaixo do cursor. */}
       {aRecusar && (
-        <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-3">
+        <div className="bo-entrada mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-3">
           <p className="text-[11px] text-[var(--bo-text-muted)]">
             Porque é que se perdeu? Fica só do lado de cá, e é o que permite saber daqui a um ano
             quantas se perderam por preço.

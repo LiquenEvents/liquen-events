@@ -369,11 +369,23 @@ export default function EventCosts({ quote, onChange }: Props) {
           (é a verdade) e este aviso fica em cima a dizer o que é que ela
           estava a fazer quando ele chegou, com o gesto à distância de um
           clique. Reaplicar é somar-se ao que ele lançou, não apagá-lo: o gesto
-          corre por cima da versão adoptada. */}
+          corre por cima da versão adoptada.
+
+          ── E APARECE DE ALGUM SÍTIO ────────────────────────────────────────
+          `.bo-entrada` — 240 ms, QUATRO píxeis, a distância de um rótulo. Não
+          são os oito de uma folha: este aviso não vem de fora do ecrã, nasce
+          colado à lista que ele comenta.
+
+          A regra que manda aqui é a de que uma animação nunca atrasa uma
+          tarefa, e num aviso de erro é a única que interessa: a curva é a
+          `cubic-bezier(0, 0, 0.2, 1)`, que gasta a maior parte da distância no
+          primeiro terço — a frase está legível muito antes dos 240 ms, e o que
+          os 240 ms fazem é só dizer de onde ela veio. Uma entrada mais longa,
+          ou de mais longe, punha-a a chegar depois de ela já ter olhado. */}
       {colisoes.length > 0 && (
         <div
           role="alert"
-          className="mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="bo-entrada mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
         >
           <p className="font-medium text-[#8a2a22]">
             Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: os custos mudaram noutro sítio

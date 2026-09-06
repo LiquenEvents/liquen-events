@@ -415,8 +415,41 @@ export default function Miniaturas() {
               )}
               {comProblema.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-[var(--bo-text-muted)]">
-                  {visiveis.map((l) => (
-                    <li key={`${l.origem}/${l.pasta}`} className="truncate">
+                  {/* ── SÓ O LOTE NOVO ENTRA, E ENTRA COMO UM BLOCO ────────
+                      «Ver as outras N» troca uma lista cortada às oito pela
+                      lista inteira. As oito primeiras JÁ ESTAVAM no ecrã e não
+                      se mexem — animá-las era animar o que não mudou, e o
+                      resultado seria a lista toda a piscar para dizer que lhe
+                      acrescentaram um pedaço.
+
+                      As que chegam levam `.bo-entrada`: quatro píxeis, 240 ms,
+                      a distância de um rótulo. São linhas de texto de 11 px
+                      dentro de um painel, não um ecrã a apresentar-se — a
+                      `.bo-cena` (600 ms, doze píxeis) seria a palavra do ecrã
+                      inteiro aplicada a meia dúzia de frases.
+
+                      ── TODAS AO MESMO TEMPO, E ISSO É QUE É SER UM BLOCO ──
+                      A mesma classe, sem `--cena` e sem degrau: as N novas
+                      entram em uníssono, que é o que faz delas UM bloco e não
+                      N entradas. «A escada é por bloco, nunca por linha» está
+                      escrito em `EventTasks.tsx:400-402`, e aqui a lista não
+                      tem tecto nenhum — este painel chega a ter 55 linhas por
+                      arranjar. Cinquenta e cinco linhas a chegar uma a uma, com
+                      degrau ou sem ele, é a lentidão que a regra existe para
+                      evitar. Sem escada não é preciso tecto: o custo é o mesmo
+                      para 6 linhas e para 60.
+
+                      Não se pôde embrulhar o lote num `<div>` com uma classe só
+                      porque um `<div>` entre `<ul>` e `<li>` parte a lista para
+                      quem a ouve. A classe repetida é a mesma coisa vista do
+                      lado do browser: um começo, uma duração, um fim. */}
+                  {visiveis.map((l, i) => (
+                    <li
+                      key={`${l.origem}/${l.pasta}`}
+                      className={
+                        tudoAVista && i >= LINHAS_A_MOSTRAR ? "bo-entrada truncate" : "truncate"
+                      }
+                    >
                       <span className="text-[var(--bo-tinta-72)]">{l.nome}</span>
                       {!l.daBiblioteca && <span className="text-foreground/40"> · pedido</span>}
                       {" — "}

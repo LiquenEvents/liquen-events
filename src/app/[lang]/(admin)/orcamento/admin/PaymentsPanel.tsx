@@ -742,11 +742,25 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       </p>
 
       {/* Aviso suave: recebido acima do total contratado (mesmo estilo do banner
-          de reconciliação — algo para verificar, não um erro bloqueante). */}
+          de reconciliação — algo para verificar, não um erro bloqueante).
+
+          ── E APARECE DE ALGUM SÍTIO ────────────────────────────────────────
+          Este aviso nasce de um número que ela acabou de escrever na linha
+          logo acima: marcar mais um pagamento como pago faz a soma passar o
+          contratado, e a caixa amarela aparecia no fotograma seguinte, do
+          nada, a empurrar a lista para baixo.
+
+          `.bo-entrada` — 240 ms e QUATRO píxeis, a distância de um rótulo. É a
+          distância certa porque é daqui mesmo que ele vem: do campo em cima, e
+          não de fora do ecrã (esses são os oito da `.bo-entrada-folha`).
+
+          Números não pulsam e o aviso não pisca: o que se move é a caixa a
+          assentar, uma vez, e a frase está legível quase desde o primeiro
+          fotograma — a curva da casa gasta a distância toda no arranque. */}
       {overReceived && (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-lg border border-[#c99a3a]/40 bg-[#c99a3a]/[0.08] px-3.5 py-2.5 mb-4"
+          className="bo-entrada flex items-start gap-2.5 rounded-lg border border-[#c99a3a]/40 bg-[#c99a3a]/[0.08] px-3.5 py-2.5 mb-4"
         >
           <svg
             className="text-[#8a6420] shrink-0 mt-0.5"

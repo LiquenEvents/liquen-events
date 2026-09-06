@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+/* As medidas que o jsdom não tem — o mesmo duplo que o `NavEstudio.test.tsx`
+   usa. O caminho é relativo porque o `@/` desta casa aponta para `src/`. */
+import { fingirDisposicao, reporDisposicao } from "../../../../../../test/disposicao-fingida";
 import PainelDoEstudio, { type PaginaParaOPainel } from "./PainelDoEstudio";
 import { CORTES } from "./ui/adaptativo";
 import type { MoodBoard } from "@/lib/proposal-doc";
@@ -190,5 +193,176 @@ describe("o que o painel mostra", () => {
     largura(true);
     desenhar({ paginas: [] });
     expect(screen.getByText(/Ainda não há páginas de inspiração/i)).toBeTruthy();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OS SEPARADORES DESTE PAINEL TROCAVAM DE GOLPE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Esta barra («Esta página» / «Todas») é a única do estúdio escrita à mão, fora
+ * do `ui/Segmented.tsx` — e era a única sem o gesto que ele tem. O botão activo
+ * mudava de cor nos 120 ms do `ESTADO`, não havia marca nenhuma a deslizar de
+ * um separador para o outro, e o painel por baixo trocava no mesmo fotograma.
+ *
+ * ── O QUE SE PROVA AQUI, E O QUE SE PROVA NUM BROWSER ─────────────────────
+ *
+ * Aqui: que a marca EXISTE, que é uma só, que se mede pelo separador certo,
+ * que usa a constante da casa (`MARCA`) em vez de um segundo tempo escrito
+ * outra vez, e que o painel que chega traz a `.view-in` num NÓ NOVO — que é a
+ * parte que se parte sem ninguém dar por isso (com o nó reaproveitado a classe
+ * fica lá e a animação nunca mais corre).
+ *
+ * Onde a marca PÁRA são píxeis, e píxeis não se fingem: o jsdom não faz
+ * disposição. As medidas daqui são declaradas (`test/disposicao-fingida.ts`), a
+ * mesma receita do `NavEstudio.test.tsx`.
+ */
+describe("a barra de separadores do painel", () => {
+  /**
+   * Um `ResizeObserver` que se pode mandar disparar. O do `vitest.setup.ts` é
+   * inerte de propósito — sem disposição não há redimensionamento nenhum —, mas
+   * é ele que manda a marca remedir-se, e sem o poder disparar não havia como
+   * pôr as medidas nos botões ANTES da medida. Um duplo que se controla prova,
+   * de passagem, que a ligação ao observador existe.
+   */
+  const remedir: Array<() => void> = [];
+  function fingirObservadorDeTamanho() {
+    remedir.length = 0;
+    class ObservadorDeTamanho {
+      constructor(private aoMudar: ResizeObserverCallback) {
+        remedir.push(() => this.aoMudar([], this as unknown as ResizeObserver));
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", ObservadorDeTamanho);
+  }
+
+  /** Desenha o painel com as duas abas já medidas, lado a lado. */
+  async function desenharMedido() {
+    fingirObservadorDeTamanho();
+    fingirDisposicao();
+    const vista = desenhar();
+    medirAsAbas();
+    await act(async () => {
+      for (const f of remedir) f();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    return vista;
+  }
+
+  /** As medidas de cada separador, declaradas depois de ele existir. */
+  function medirAsAbas() {
+    const abas = screen.getAllByRole("tab");
+    let x = 2;
+    for (const b of abas) {
+      const el = b as HTMLElement;
+      el.dataset.x = String(x);
+      el.dataset.y = "2";
+      el.dataset.w = "150";
+      el.dataset.h = "26";
+      x += 154;
+    }
+  }
+
+  /** O fotograma seguinte ao da primeira medida — o primeiro não anda. */
+  async function passarUmFotograma() {
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+
+  const barra = () => screen.getByRole("tablist", { name: "O que mostrar" });
+  const marcas = () => barra().querySelectorAll<HTMLElement>(':scope > [aria-hidden="true"]');
+
+  afterEach(() => {
+    reporDisposicao();
+  });
+
+  it("tem UMA marca, e está onde o separador activo está", async () => {
+    await desenharMedido();
+    expect(marcas(), "a barra troca de separador sem marca nenhuma a deslizar").toHaveLength(1);
+    const activa = screen.getByRole("tab", { name: "Esta página" }) as HTMLElement;
+    expect(marcas()[0].style.translate).toBe(`${activa.dataset.x}px ${activa.dataset.y}px`);
+    expect(marcas()[0].style.width).toBe(`${activa.dataset.w}px`);
+    expect(marcas()[0].style.height).toBe(`${activa.dataset.h}px`);
+  });
+
+  it("e muda de sítio quando se muda de separador", async () => {
+    await desenharMedido();
+    const user = userEvent.setup();
+    await act(async () => {
+      await user.click(screen.getByRole("tab", { name: "Todas" }));
+    });
+    // A lista mudou de forma (a `chave` do medidor é a vista): remedir é o que
+    // o browser faria sozinho.
+    medirAsAbas();
+    await act(async () => {
+      for (const f of remedir) f();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const activa = screen.getByRole("tab", { name: "Todas" }) as HTMLElement;
+    expect(marcas()[0].style.translate).toBe(`${activa.dataset.x}px ${activa.dataset.y}px`);
+  });
+
+  it("e ANDA — com a constante da casa, não com um tempo escrito outra vez", async () => {
+    await desenharMedido();
+    await passarUmFotograma();
+    const classes = marcas()[0].className.split(/\s+/);
+    // `MARCA` traz `motion-safe:` nas duas: quem pediu para não animar vê a
+    // marca mudar de sítio de um fotograma para o outro.
+    expect(classes).toContain("motion-safe:transition-[translate,width]");
+    expect(classes).toContain("motion-safe:duration-[250ms]");
+  });
+
+  it("o primeiro fotograma não anda — a marca não desliza do canto ao abrir", async () => {
+    fingirObservadorDeTamanho();
+    fingirDisposicao();
+    desenhar();
+    medirAsAbas();
+    await act(async () => {
+      for (const f of remedir) f();
+    });
+    expect(marcas(), "sem marca não há primeiro fotograma nenhum para medir").toHaveLength(1);
+    expect(marcas()[0].className).not.toContain("motion-safe:transition-");
+  });
+
+  it("nunca há dois fundos brancos — o do botão sai quando a marca chega", async () => {
+    await desenharMedido();
+    expect(
+      screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
+      "o separador activo ficou com fundo branco POR BAIXO da marca branca",
+    ).not.toContain("bg-white");
+  });
+
+  it("e nunca há nenhum — sem medida, o fundo do botão é a rede", () => {
+    // CONTROLO POSITIVO, e é o que impede que a correcção seja «tirar o fundo».
+    // Sem disposição — o servidor, e o fotograma antes da primeira medida — não
+    // há marca nenhuma, e o separador activo tem de continuar a ver-se.
+    desenhar();
+    expect(marcas(), "houve marca sem disposição nenhuma para a medir").toHaveLength(0);
+    expect(
+      screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
+      "sem marca medida, o separador activo ficou sem se distinguir",
+    ).toContain("bg-white");
+  });
+
+  it("o painel que chega apresenta-se — e num nó NOVO, para a animação recomeçar", async () => {
+    // Um `<div>` reaproveitado ficava com a `.view-in` colada e a animação
+    // corria uma vez só, na primeira. É o defeito que não se vê em captura
+    // nenhuma: a classe está lá, e não faz nada.
+    const user = userEvent.setup();
+    desenhar();
+    const antes = document.querySelector(".view-in");
+    expect(antes, "o painel troca de conteúdo sem se apresentar").toBeTruthy();
+    await user.click(screen.getByRole("tab", { name: "Todas" }));
+    const depois = document.querySelector(".view-in");
+    expect(depois).toBeTruthy();
+    expect(depois, "o nó foi reaproveitado — a `.view-in` fica colada e nunca mais corre").not.toBe(
+      antes,
+    );
   });
 });

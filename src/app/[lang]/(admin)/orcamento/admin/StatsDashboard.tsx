@@ -11,6 +11,7 @@ import { Button, Card, EmptyState, Segmented } from "./ui";
 import AnalisePropostas from "./AnalisePropostas";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 import { ESTADO, PROGRESSO } from "./ui/movimento";
+import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
 // the back office (Overview, Kanban): Novo / Aguardar resposta / Proposta enviada /
@@ -192,24 +193,49 @@ function Section({
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  /**
+   * ── E A ENTRADA NÃO PODE CORRER AO CARREGAR A VISTA ─────────────────────
+   *
+   * Três destas secções nascem com `defaultOpen`, e a vista onde vivem JÁ traz
+   * a cascata da casa — os controlos (0), os números do topo (1) e esta caixa
+   * inteira (2), com a `.bo-cena`. Uma entrada à montagem batia de frente com
+   * ela: a caixa a entrar como um bloco só e, por dentro, três secções a entrar
+   * cada uma por si, ao mesmo tempo.
+   *
+   * A peça (`ui/gaveta.ts`) resolve isso com uma regra que vale nos sete
+   * sítios: só anima o que ela abriu, com o gesto, agora. Uma secção que chega
+   * aberta chega quieta — quem a apresenta é a `.bo-cena` da vista.
+   *
+   * E o corpo é UM bloco, não uma escada: aqui dentro há colunas de números
+   * (os `QUADRADOS_DE_NUMERO`), e uma coluna de valores entra inteira num
+   * degrau só. Uma escada por linha não é uma cascata, é um tremor.
+   */
+  const gaveta = useGaveta();
   return (
     <details
       open={defaultOpen}
+      onToggle={gaveta.aoAlternar}
       className="group rounded-2xl border border-[var(--bo-hairline)] bg-white overflow-hidden"
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden">
+      <summary
+        onClick={gaveta.aoTocarNoResumo}
+        className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden"
+      >
         <div className="min-w-0">
           <span className="text-[var(--bo-text-muted)] text-[10px] tracking-[0.3em] uppercase font-medium">
             {title}
           </span>
           {hint && <p className="mt-1 text-[11px] text-foreground/35 leading-snug">{hint}</p>}
         </div>
-        {/* 200 ms e `cubic-bezier(0, 0, 0.2, 1)`: é o que a `.bo-mais-seta`
-            do `globals.css` já escolheu para esta mesma seta a rodar. Sem
-            duração escrita, esta caía nos 150 ms de omissão do Tailwind — duas
-            setas iguais no mesmo back office a rodar a tempos diferentes. */}
+        {/* Os 200 ms e a curva da casa deixam de estar escritos aqui: são a
+            `SETA_DA_GAVETA`, uma vez para todas as setas destes `<details>`.
+            Estavam certos — o que estava errado era serem uma escolha local,
+            que é como as outras setas do back office acabaram nos 150 ms de
+            omissão do Tailwind sem ninguém decidir nada. Muda também a
+            propriedade: `transition-[rotate]`, que é a que o `rotate-180` do
+            Tailwind v4 mexe. */}
         <svg
-          className="shrink-0 text-foreground/30 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] group-open:rotate-180"
+          className={`shrink-0 text-foreground/30 ${SETA_DA_GAVETA} group-open:rotate-180`}
           width="16"
           height="16"
           viewBox="0 0 24 24"
@@ -221,7 +247,7 @@ function Section({
           <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </summary>
-      <div className="px-6 pb-6 pt-1">{children}</div>
+      <div className={`px-6 pb-6 pt-1 ${gaveta.corpo}`}>{children}</div>
     </details>
   );
 }

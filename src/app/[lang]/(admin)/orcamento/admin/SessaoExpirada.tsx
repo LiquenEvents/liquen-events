@@ -289,7 +289,16 @@ export default function SessaoExpirada() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="sessao-expirada-titulo"
-        className="relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]"
+        /* O fundo já acendia (`bo-entrada-fundo`, aqui em cima) e a caixa que
+           ele traz aparecia com a opacidade final no primeiro fotograma: meio
+           gesto, com a parte que cobre o ecrã inteiro a fazer-se devagar e a
+           parte que se lê a saltar para lá. Quatro píxeis e os mesmos 240 ms,
+           para os dois lerem como um gesto só.
+
+           Não atrasa nada — e aqui isso conta duas vezes, porque esta barreira
+           só tem uma saída: os botões estão no sítio e clicáveis desde o
+           primeiro fotograma, e o foco entra na caixa por cima da animação. */
+        className="bo-entrada relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]"
       >
         <p className="bo-eyebrow">Sessão</p>
         <h2

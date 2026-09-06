@@ -110,6 +110,14 @@ import {
    global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
    três sítios muito concretos, e nenhum deles é este ficheiro. */
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+/* A outra metade do vocabulário: a `.bo-saida` é a palavra em CSS, e este hook
+   é a parte que o CSS não pode fazer sozinho — segurar o nó montado os 200 ms
+   da saída. A prosa toda está no `ui/saida.ts` e na regra do `globals.css`. */
+import { SAIDA, SAIDA_FUNDO, useSaidaAdiada } from "./ui/saida";
+/* E a palavra do corpo de um `<details>`, escrita uma vez para os dez do
+   back office. O censo dela conta estes dois como «fora de alcance» porque
+   vivem aqui; ficam dentro. */
+import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
@@ -166,6 +174,81 @@ const LIST_PAGE_SIZE = 50;
 // já tinham perdido 137 para o cabeçalho fixo e para a barra de baixo.
 const VIEW_WRAP =
   "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10 py-[var(--bo-p-vista)] lg:py-10";
+
+/** A chave da saída do painel do pedido — há um painel só, e a chave é uma. */
+const SAIDA_DO_PAINEL = "painel-do-pedido";
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * O LOTE QUE O «MOSTRAR MAIS» ACRESCENTA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O botão fica onde estava e as linhas novas montavam-se sem gesto nenhum: a
+ * única pista de que alguma coisa tinha acontecido era a barra de rolagem a
+ * encolher. Carregar num botão e não ver nada acontecer é o defeito que faz
+ * carregar segunda vez.
+ *
+ * ── SÓ O LOTE NOVO, E TODO ELE AO MESMO TEMPO ─────────────────────────────
+ *
+ * A lista que já lá estava NÃO se reanima — reanimá-la era dizer que também
+ * ela acabou de chegar, e é mentira. E o lote novo entra como UM bloco, sem
+ * escada: a regra da casa é escada por bloco e nunca por linha, e cinquenta
+ * linhas escalonadas seriam exactamente a segunda coisa.
+ *
+ * ── PORQUE É QUE ISTO É UM `:has()` E NÃO UMA CLASSE NA LINHA ─────────────
+ *
+ * Porque a linha não é minha. Quem desenha o `<tr>` do computador e o `<li>`
+ * do telemóvel é o `ui/TabelaOuCartoes.tsx`, e ele não aceita classe por
+ * linha — o que eu escrevo são as CÉLULAS (`COLUNAS_DE_PEDIDOS`) e o CARTÃO
+ * (`QuoteCard`). Animar célula a célula dava sete animações por linha e
+ * deixava de fora o fio que separa as linhas, que é do `<tr>`/`<li>`:
+ * viam-se os fios a aparecer a seco e o conteúdo a acender por dentro deles.
+ *
+ * Com `:has()` a marca vai onde eu chego (uma célula, o cartão) e a animação
+ * vai onde ela pertence (a linha inteira, fio incluído). Uma marca por linha,
+ * dois selectores, e o `TabelaOuCartoes` não precisa de saber que isto existe.
+ *
+ * ── E ISTO NÃO CONTRADIZ O «POR BLOCO, NUNCA POR LINHA» DA PRIMITIVA ──────
+ *
+ * O `ui/TabelaOuCartoes.tsx` tem hoje a sua própria entrada e uma regra
+ * escrita: a classe entra no `<tbody>`/`<ul>`, uma vez, e NUNCA na linha —
+ * porque cinquenta linhas a chegar UMA A UMA são a lentidão que o tecto do
+ * sexto degrau existe para evitar. É a regra da ESCADA, e aqui não há escada
+ * nenhuma: o lote inteiro parte no mesmo fotograma e lê-se como um bloco só.
+ * O que se recusa é o desfasamento, não o número de nós que se movem.
+ *
+ * E as duas entradas nunca correm juntas, porque respondem a coisas
+ * diferentes: a da primitiva dispara quando é a MESMA gente noutra ordem
+ * (reordenar), e cala-se de propósito quando é OUTRA gente — que é o caso de
+ * quem escreve na procura, e também o de acrescentar um lote. É precisamente
+ * o buraco que esta deixa: de dentro, a primitiva não distingue «filtrou» de
+ * «carregou no Mostrar mais»; de fora, quem carregou no botão sabe.
+ *
+ * ── E VÊM DE BAIXO, QUE É DE ONDE VÊM MESMO ──────────────────────────────
+ *
+ * O bloco da lista põe `--bo-entrada-y: 4px` (positivo), e a `@keyframes
+ * bo-entrada` lê essa variável: o lote sobe para o lugar em vez de descer. É a
+ * distância de omissão da casa, com o sinal trocado — «o movimento indica
+ * direcção e origem», e a origem destas linhas é o fim da lista.
+ *
+ * ── E OS NÚMEROS SÃO OS DA CASA, ESCRITOS À MÃO CONTRA VONTADE ────────────
+ *
+ * `240ms cubic-bezier(0, 0, 0.2, 1)` é, letra por letra, a `.bo-entrada` do
+ * `globals.css`. Repeti-los aqui não é uma escolha: uma variante do Tailwind
+ * (aqui, um `[&…]:`) só sabe prefixar UTILITÁRIOS, e `bo-entrada` é uma classe
+ * escrita à mão — `[&_tr:has(…)]:bo-entrada` não compila. Ou se declarava um
+ * `--animate-*` no `@theme`, que é do `tema.css` e não é meu, ou se escreve o
+ * atalho aqui. Fica escrito aqui, e o `entrada-do-painel-do-pedido.test.ts`
+ * prende esta linha à regra do `globals.css`: afinar um dos lados põe o outro
+ * vermelho.
+ *
+ * `motion-safe:` porque a guarda da `.bo-entrada` mora dentro da própria
+ * classe e este atalho não a herda — sem isto animava para quem pediu para não
+ * animar.
+ */
+const ENTRADA_DO_LOTE =
+  "motion-safe:[&_li:has([data-lote-novo])]:animate-[bo-entrada_240ms_cubic-bezier(0,0,0.2,1)] " +
+  "motion-safe:[&_tr:has([data-lote-novo])]:animate-[bo-entrada_240ms_cubic-bezier(0,0,0.2,1)]";
 
 // Code-split views + detail-panel tools live in ./lazy — only the view the
 // user opens ships its JS, keeping the back-office's initial load lean.
@@ -447,6 +530,14 @@ function COLUNAS_DE_PEDIDOS(ctx: {
   userName: string;
   /** O pedido gravado quando alguém marca o desfecho na própria linha. */
   onDesfecho: (q: Quote) => void;
+  /**
+   * Este pedido veio no lote que o «Mostrar mais» acabou de acrescentar?
+   *
+   * Marca a LINHA, e não anima nada por si: quem anima é o `ENTRADA_DO_LOTE`,
+   * pousado no bloco da lista, que alcança o `<tr>` inteiro por `:has()`. Ver
+   * a nota da constante — a razão de ser assim e não uma classe na célula.
+   */
+  ehDoLoteNovo?: (q: Quote) => boolean;
 }): Coluna<Quote>[] {
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -501,7 +592,11 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       cabecalho: "Cliente",
       ordenar: (a, b) => a.name.localeCompare(b.name, "pt"),
       celula: (q) => (
-        <span className="block">
+        // A marca do lote novo vai aqui e não numa célula própria: esta é a
+        // coluna que existe sempre (as outras escondem-se abaixo de 1440), e
+        // um atributo vazio não desenha nada nem é lido por ninguém. Quem a
+        // usa é o `:has()` do `ENTRADA_DO_LOTE`, lá em cima.
+        <span className="block" data-lote-novo={ctx.ehDoLoteNovo?.(q) ? "" : undefined}>
           <span
             className={`block truncate ${
               ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-[var(--bo-text)]"
@@ -641,6 +736,7 @@ const QuoteCard = memo(function QuoteCard({
   onOpen,
   onToggle,
   onDesfecho,
+  doLoteNovo = false,
 }: {
   q: Quote;
   isCurrent: boolean;
@@ -652,6 +748,14 @@ const QuoteCard = memo(function QuoteCard({
   onToggle: (id: string) => void;
   /** O pedido gravado quando alguém marca aqui o desfecho. */
   onDesfecho: (q: Quote) => void;
+  /**
+   * Veio no lote que o «Mostrar mais» acabou de acrescentar.
+   *
+   * Marca, e nada mais: quem anima é o `ENTRADA_DO_LOTE`, pousado no bloco da
+   * lista, que a partir daqui alcança o `<li>` inteiro — o da linha, com o fio
+   * que a separa da de cima — por `:has()`. Ver a nota da constante.
+   */
+  doLoteNovo?: boolean;
 }) {
   const cat = CATEGORIES.find((c) => c.id === q.category);
   const et =
@@ -683,6 +787,7 @@ const QuoteCard = memo(function QuoteCard({
        cartões. O `ESTADO` traz uma lista fechada, e o `motion-safe:` dele faz
        o mesmo trabalho que o `motion-reduce:transition-none` que aqui estava. */
     <div
+      data-lote-novo={doLoteNovo ? "" : undefined}
       className={`relative rounded-xl border ${ESTADO} ${
         isCurrent
           ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
@@ -1093,97 +1198,6 @@ export default function AdminClient({
   // o elemento da lista passa a ser o pedido INTEIRO devolvido pelo servidor.
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [selected, setSelected] = useState<Quote | null>(null);
-  /**
-   * Os pedidos que já foram buscados por inteiro nesta sessão. Sem esta marca
-   * não havia como distinguir «este casamento não tem convidados registados»
-   * de «a lista de convidados ainda não veio» — as duas coisas são um campo
-   * ausente —, e reabrir o mesmo pedido pagava outra ida ao servidor.
-   */
-  const completos = useRef(new Set<string>());
-  const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  /**
-   * Os quatro filtros rápidos pedidos. Todos "all" por omissão: um filtro
-   * ligado sem se dar por isso é a maneira de jurar que um pedido desapareceu.
-   *
-   * `filterEspera` é o único que não é uma lista de valores — é um corte ("há
-   * três dias ou mais"), porque a pergunta que serve não é "quais esperam há
-   * exactamente quatro dias" mas "o que é que já esperou de mais".
-   */
-  /** O pedido que está a ser aberto agora — ver `openQuote`. */
-  const [aAbrir, setAAbrir] = useState<{ id: string; nome: string } | null>(null);
-  /**
-   * As perguntas destrutivas abertas.
-   *
-   * Estado e não `window.confirm`: a pergunta tem de caber uma LISTA lá dentro
-   * — ver `PerguntaDestrutiva`, e a razão por que «tens a certeza?» não é uma
-   * pergunta.
-   */
-  const [aApagar, setAApagar] = useState<Quote | null>(null);
-  const [aApagarLote, setAApagarLote] = useState<string[] | null>(null);
-  const [aSair, setASair] = useState(false);
-  const [filterEspera, setFilterEspera] = useState<"all" | "3" | "7">("all");
-  const [filterMes, setFilterMes] = useState<string>("all");
-  const [filterRegiao, setFilterRegiao] = useState<string>("all");
-  const [filterPlanner, setFilterPlanner] = useState<string>("all");
-  const [showArchived, setShowArchived] = useState(false);
-  const [mineOnly, setMineOnly] = useState(false);
-  const [search, setSearch] = useState("");
-  /**
-   * O painel dos filtros está aberto? SÓ IMPORTA NO TELEMÓVEL.
-   *
-   * Medido a 390×844: os controlos comiam 52% do ecrã antes de aparecer um
-   * pedido. A partir de `lg` o painel é sempre visível por CSS e este estado
-   * não pinta nada — não há dois layouts, há um que recolhe.
-   *
-   * Começa fechado de propósito: a lista é o que se veio ver.
-   */
-  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
-  /**
-   * A ordem por omissão é a ESPERA, não a data de entrada.
-   *
-   * "Mais recentes" põe à cabeça o que acabou de chegar — que é o que menos
-   * urge. O que se perde é o pedido de há nove dias, que com essa ordem está no
-   * fundo do ecrã, com a mesma etiqueta "Novo" de um que entrou esta manhã.
-   */
-  const [sort, setSort] = useState<
-    "espera" | "recent" | "old" | "value" | "followup" | "eventdate"
-  >("espera");
-  /**
-   * QUANTOS FILTROS ESTÃO A ESCONDER PEDIDOS NESTE MOMENTO.
-   *
-   * É o que o botão «Filtros» mostra ao lado do nome, e é o que torna honesto
-   * recolher os controlos: um filtro escondido E calado faz uma lista filtrada
-   * parecer uma lista vazia — e é assim que se perde um pedido e se responde
-   * tarde a um casamento.
-   *
-   * O que NÃO entra na conta, e porquê:
-   *   · a ORDENAÇÃO — muda a ordem, não tira nada da lista. Contá-la seria um
-   *     alarme falso, e um alarme falso gasta-se depressa (a mesma razão por
-   *     que o aviso laranja do orçamento se cala quando não há preços).
-   *   · o ESTADO, as ETIQUETAS e os ARQUIVADOS — continuam à vista em pastilhas
-   *     próprias, portanto já se vê que estão ligados. Contá-los era dizer duas
-   *     vezes a mesma coisa.
-   */
-  /**
-   * Está alguma coisa a esconder pedidos? (filtros + procura + estado + etiqueta)
-   *
-   * Serve o ecrã de lista vazia, que tem de saber distinguir «ainda não entrou
-   * nada» de «isto está filtrado». São perguntas diferentes: `filtrosActivos`
-   * conta só o que está DENTRO do painel recolhido, porque é isso que o botão
-   * anuncia; esta inclui também o que está à vista, porque para a lista vazia
-   * o que importa é se há ALGUMA razão para faltarem pedidos.
-   */
-  const filtrosActivos =
-    (mineOnly ? 1 : 0) +
-    (filterCategory !== "all" ? 1 : 0) +
-    (filterEspera !== "all" ? 1 : 0) +
-    (filterMes !== "all" ? 1 : 0) +
-    (filterRegiao !== "all" ? 1 : 0) +
-    (filterPlanner !== "all" ? 1 : 0);
-  const haFiltroAActuar =
-    filtrosActivos > 0 || search.trim() !== "" || filterStatus !== "all" || tagFilter !== null;
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -1361,9 +1375,6 @@ export default function AdminClient({
    *  não se perde — o estúdio grava rascunho —, mas ter de reescolher a
    *  pessoa a cada volta era atrito puro.) */
   const [propostaPara, setPropostaPara] = useState<string | null>(null);
-  // The sidebar's "Mais" group (secondary destinations) is collapsed by default.
-  const [moreNavOpen, setMoreNavOpen] = useState(false);
-
   /**
    * ══════════════════════════════════════════════════════════════════════════
    * A MARCA DO DESTINO ACTIVO ANDA, EM VEZ DE PISCAR NOUTRO SÍTIO
@@ -1384,11 +1395,16 @@ export default function AdminClient({
    *
    * ── PORQUE É QUE ISTO MEDE, EM VEZ DE CALCULAR ────────────────────────────
    *
-   * A lista não tem altura fixa: o grupo «Mais» abre e fecha, quatro destinos
-   * escondem-se no computador e aparecem no telemóvel (`BARRA_INFERIOR`), e a
-   * coluna rola quando não cabe. Um número calculado a partir do índice ficava
-   * errado em todas essas situações. O `ResizeObserver` é o mesmo instrumento
-   * que o `Segmented` usa, e pela mesma razão.
+   * A lista não tem altura fixa: quatro destinos escondem-se no computador e
+   * aparecem no telemóvel (`BARRA_INFERIOR`), a coluna rola quando não cabe, e
+   * o contador dos pedidos por responder faz um item crescer. Um número
+   * calculado a partir do índice ficava errado em todas essas situações. O
+   * `ResizeObserver` é o mesmo instrumento que o `Segmented` usa, e pela mesma
+   * razão.
+   *
+   * (Havia aqui um terceiro motivo — «o grupo “Mais” abre e fecha» — e saiu com
+   * ele: a lista deixou de ter dobra nenhuma. Ver a nota da coluna, lá em
+   * baixo.)
    *
    * ── E PORQUE É QUE NÃO ANDA NO PRIMEIRO DESENHO ───────────────────────────
    *
@@ -1406,9 +1422,9 @@ export default function AdminClient({
     if (!coluna) return;
     const medir = () => {
       const activo = coluna.querySelector<HTMLElement>('[aria-current="page"]');
-      // `offsetParent` nulo quer dizer escondido (o `hidden lg:flex` dos quatro
-      // que vivem na barra de baixo, ou o grupo «Mais» fechado). Sem destino à
-      // vista não há marca — melhor nenhuma do que uma pousada no sítio errado.
+      // `offsetParent` nulo quer dizer escondido — hoje só o `hidden lg:flex`
+      // dos quatro que vivem na barra de baixo. Sem destino à vista não há
+      // marca: melhor nenhuma do que uma pousada no sítio errado.
       if (!activo || activo.offsetParent === null) {
         setMarcaDoDestino(null);
         return;
@@ -1421,7 +1437,7 @@ export default function AdminClient({
     observador.observe(coluna);
     for (const b of coluna.querySelectorAll("button")) observador.observe(b);
     return () => observador.disconnect();
-  }, [view, moreNavOpen, navOpen]);
+  }, [view, navOpen]);
 
   useEffect(() => {
     if (!marcaDoDestino || marcaPodeAndar) return;
@@ -1458,6 +1474,206 @@ export default function AdminClient({
   // is an inline sticky column. Only the overlay should behave as a dialog (focus
   // trap, aria-modal, scroll lock) — the inline panel must not trap focus.
   const [isDetailOverlay, setIsDetailOverlay] = useState(false);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * E A GAVETA DO PEDIDO TAMBÉM DEIXA DE FECHAR A SECO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Ela abria com o véu a acender em 240 ms e desaparecia num fotograma — o
+   * painel e o véu, os dois, no mesmo instante em que `selected` passava a
+   * `null`. É a metade que faltava ao gesto, e a palavra para ela já existe:
+   * a `.bo-saida` do `globals.css` (200 ms, a curva de quem sai, e o
+   * `pointer-events` largado dentro da própria classe).
+   *
+   * ── O QUE SE SEGURA, E PORQUE É QUE NÃO É UM FANTASMA ─────────────────────
+   *
+   * O que se adia é o `setSelected(null)`, e não uma cópia do pedido posta de
+   * lado para o desenho. Enquanto a saída corre, o painel continua a ser o
+   * painel — com os dados verdadeiros, o trinco do scroll, a armadilha de foco
+   * e a camada de história que ele já tinha. Um fantasma obrigava a duplicar
+   * mil e seiscentas linhas de JSX para mostrar uma casca vazia, e a casca é
+   * precisamente o que não se quer ver a desvanecer-se.
+   *
+   * ── E POR ISSO É PRECISO UM PORTEIRO NO FIM ──────────────────────────────
+   *
+   * Durante os 200 ms a LISTA continua viva (a saída larga os toques do painel,
+   * não os da página). Ela pode fechar um pedido e abrir outro dentro desse
+   * intervalo — e o relógio que fecha o primeiro não pode fechar o segundo. Daí
+   * o `idASair`: quando o tempo acaba, só desmonta se ainda for o mesmo pedido.
+   * E quando o pedido muda antes do fim, `podar` esquece a saída, senão a marca
+   * ficava presa e o painel novo nascia já a desaparecer.
+   *
+   * O `useSaidaAdiada` é indexado por chave porque nasceu numa pilha de avisos;
+   * aqui há um painel só, e a chave é constante.
+   */
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS DOIS «MAIS CAMPOS» DO PAINEL
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O plano de decoração e o histórico de atividade: dois `<details>` NATIVOS
+   * cujo corpo aparecia e desaparecia do fluxo sem gesto nenhum.
+   *
+   * A palavra é do `ui/gaveta.ts`, e não uma escrita aqui — o censo dela conta
+   * dez gavetas no back office, sete tratadas lá e estas duas dadas como «fora
+   * de alcance» por viverem neste ficheiro. Ficam dentro: uma palavra escrita
+   * duas vezes é o passo antes de haver duas palavras.
+   *
+   * O que a peça resolve, e que uma classe pousada no corpo não resolve: uma
+   * animação em CSS é do ELEMENTO, e este elemento nunca desmonta (é isso que o
+   * `<details>` nativo faz de bom — abre sem JavaScript, e o «localizar na
+   * página» encontra-o fechado). Deixada lá, a entrada corria uma vez e nunca
+   * mais. A peça arma-a no gesto e desarma-a no fecho, e por isso só anima o
+   * que ELA abriu, agora: uma gaveta aberta pelo ⌘F do browser não anima nada,
+   * porque ali não houve gesto nenhum a que responder.
+   *
+   * Dois `useGaveta()` e não um: são duas gavetas, em dois separadores, e cada
+   * uma tem o seu estado.
+   */
+  const gavetaDoPlano = useGaveta();
+  const gavetaDoHistorico = useGaveta();
+
+  const idASair = useRef<string | null>(null);
+  const {
+    aSair: saidasDoPainel,
+    comecarSaida: comecarSaidaDoPainel,
+    podar: podarSaidaDoPainel,
+  } = useSaidaAdiada(() => {
+    const id = idASair.current;
+    idASair.current = null;
+    setSelected((prev) => (prev && prev.id === id ? null : prev));
+  });
+  const painelASair = saidasDoPainel.includes(SAIDA_DO_PAINEL);
+  const sairDoPainel = useCallback(
+    (id: string | null) => {
+      // ── E SÓ A GAVETA SAI; A COLUNA DO COMPUTADOR NÃO ────────────────────
+      //
+      // Abaixo de `xl` isto é uma gaveta FORA DE FLUXO por cima da página: sai
+      // e não deixa espaço nenhum atrás de si — o caso que o `ui/saida.ts`
+      // descreve como o dele («uma folha ou um diálogo não deixam espaço
+      // nenhum»).
+      //
+      // A partir de `xl` é uma COLUNA DENTRO DA GRELHA, e a grelha reparte-se
+      // pelo que lá está: com o painel aberto são duas faixas (o carril de
+      // 360 px e o resto), sem ele é uma só. Segurar a coluna 200 ms a
+      // desvanecer-se não animava essa mudança — a lista continuava estreita
+      // durante a saída e SALTAVA para a largura toda no fim. Seria o mesmo
+      // corte seco, 200 ms mais tarde e com uma animação por cima a dizer que
+      // não era. E animar a largura da grelha está fora de questão: é layout a
+      // cada fotograma, que é a regra que esta casa não quebra.
+      //
+      // Portanto: gaveta sai, coluna fecha. Não é uma excepção envergonhada,
+      // é a diferença entre um elemento fora de fluxo e um elemento em fluxo.
+      if (!isDetailOverlay || id === null) {
+        setSelected(null);
+        return;
+      }
+      idASair.current = id;
+      comecarSaidaDoPainel(SAIDA_DO_PAINEL);
+    },
+    [comecarSaidaDoPainel, isDetailOverlay],
+  );
+  const idSeleccionado = selected?.id ?? null;
+  useEffect(() => {
+    // Abriu outro pedido a meio da saída: a saída deixou de ter sujeito.
+    if (idASair.current !== null && idASair.current !== idSeleccionado) {
+      idASair.current = null;
+      podarSaidaDoPainel([]);
+    }
+  }, [idSeleccionado, podarSaidaDoPainel]);
+  /**
+   * Os pedidos que já foram buscados por inteiro nesta sessão. Sem esta marca
+   * não havia como distinguir «este casamento não tem convidados registados»
+   * de «a lista de convidados ainda não veio» — as duas coisas são um campo
+   * ausente —, e reabrir o mesmo pedido pagava outra ida ao servidor.
+   */
+  const completos = useRef(new Set<string>());
+  const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  /**
+   * Os quatro filtros rápidos pedidos. Todos "all" por omissão: um filtro
+   * ligado sem se dar por isso é a maneira de jurar que um pedido desapareceu.
+   *
+   * `filterEspera` é o único que não é uma lista de valores — é um corte ("há
+   * três dias ou mais"), porque a pergunta que serve não é "quais esperam há
+   * exactamente quatro dias" mas "o que é que já esperou de mais".
+   */
+  /** O pedido que está a ser aberto agora — ver `openQuote`. */
+  const [aAbrir, setAAbrir] = useState<{ id: string; nome: string } | null>(null);
+  /**
+   * As perguntas destrutivas abertas.
+   *
+   * Estado e não `window.confirm`: a pergunta tem de caber uma LISTA lá dentro
+   * — ver `PerguntaDestrutiva`, e a razão por que «tens a certeza?» não é uma
+   * pergunta.
+   */
+  const [aApagar, setAApagar] = useState<Quote | null>(null);
+  const [aApagarLote, setAApagarLote] = useState<string[] | null>(null);
+  const [aSair, setASair] = useState(false);
+  const [filterEspera, setFilterEspera] = useState<"all" | "3" | "7">("all");
+  const [filterMes, setFilterMes] = useState<string>("all");
+  const [filterRegiao, setFilterRegiao] = useState<string>("all");
+  const [filterPlanner, setFilterPlanner] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
+  const [mineOnly, setMineOnly] = useState(false);
+  const [search, setSearch] = useState("");
+  /**
+   * O painel dos filtros está aberto? SÓ IMPORTA NO TELEMÓVEL.
+   *
+   * Medido a 390×844: os controlos comiam 52% do ecrã antes de aparecer um
+   * pedido. A partir de `lg` o painel é sempre visível por CSS e este estado
+   * não pinta nada — não há dois layouts, há um que recolhe.
+   *
+   * Começa fechado de propósito: a lista é o que se veio ver.
+   */
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  /**
+   * A ordem por omissão é a ESPERA, não a data de entrada.
+   *
+   * "Mais recentes" põe à cabeça o que acabou de chegar — que é o que menos
+   * urge. O que se perde é o pedido de há nove dias, que com essa ordem está no
+   * fundo do ecrã, com a mesma etiqueta "Novo" de um que entrou esta manhã.
+   */
+  const [sort, setSort] = useState<
+    "espera" | "recent" | "old" | "value" | "followup" | "eventdate"
+  >("espera");
+  /**
+   * QUANTOS FILTROS ESTÃO A ESCONDER PEDIDOS NESTE MOMENTO.
+   *
+   * É o que o botão «Filtros» mostra ao lado do nome, e é o que torna honesto
+   * recolher os controlos: um filtro escondido E calado faz uma lista filtrada
+   * parecer uma lista vazia — e é assim que se perde um pedido e se responde
+   * tarde a um casamento.
+   *
+   * O que NÃO entra na conta, e porquê:
+   *   · a ORDENAÇÃO — muda a ordem, não tira nada da lista. Contá-la seria um
+   *     alarme falso, e um alarme falso gasta-se depressa (a mesma razão por
+   *     que o aviso laranja do orçamento se cala quando não há preços).
+   *   · o ESTADO, as ETIQUETAS e os ARQUIVADOS — continuam à vista em pastilhas
+   *     próprias, portanto já se vê que estão ligados. Contá-los era dizer duas
+   *     vezes a mesma coisa.
+   */
+  /**
+   * Está alguma coisa a esconder pedidos? (filtros + procura + estado + etiqueta)
+   *
+   * Serve o ecrã de lista vazia, que tem de saber distinguir «ainda não entrou
+   * nada» de «isto está filtrado». São perguntas diferentes: `filtrosActivos`
+   * conta só o que está DENTRO do painel recolhido, porque é isso que o botão
+   * anuncia; esta inclui também o que está à vista, porque para a lista vazia
+   * o que importa é se há ALGUMA razão para faltarem pedidos.
+   */
+  const filtrosActivos =
+    (mineOnly ? 1 : 0) +
+    (filterCategory !== "all" ? 1 : 0) +
+    (filterEspera !== "all" ? 1 : 0) +
+    (filterMes !== "all" ? 1 : 0) +
+    (filterRegiao !== "all" ? 1 : 0) +
+    (filterPlanner !== "all" ? 1 : 0);
+  const haFiltroAActuar =
+    filtrosActivos > 0 || search.trim() !== "" || filterStatus !== "all" || tagFilter !== null;
+
   /**
    * ── A ALTURA DA COLUNA DE DETALHE, MEDIDA E NÃO PRESUMIDA ─────────────────
    *
@@ -2363,13 +2579,25 @@ export default function AdminClient({
           !dirtyRef.current ||
           window.confirm("Tem alterações por guardar neste pedido. Descartar?")
         ) {
-          setSelected(null);
+          // Pela mesma porta do «×» e do véu: fechar por Escape não é um
+          // fecho de segunda classe, e um painel que sai por um caminho e
+          // pisca no outro lê-se como duas coisas diferentes.
+          sairDoPainel(selected.id);
         }
       }
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [paletteOpen, newQuoteOpen, shortcutsOpen, ajudaOpen, restoreOpen, navOpen, selected]);
+  }, [
+    paletteOpen,
+    newQuoteOpen,
+    shortcutsOpen,
+    ajudaOpen,
+    restoreOpen,
+    navOpen,
+    selected,
+    sairDoPainel,
+  ]);
 
   // Lock background scroll while the mobile nav drawer is open. O trinco é o
   // mesmo dos diálogos (`useTrincoDeScroll`), agora num sítio só: era daqui que
@@ -2573,7 +2801,7 @@ export default function AdminClient({
     return window.confirm("Tem alterações por guardar neste pedido. Descartar?");
   }
   function closeDetail() {
-    if (discardGuard()) setSelected(null);
+    if (discardGuard()) sairDoPainel(selected?.id ?? null);
   }
 
   /**
@@ -3671,10 +3899,44 @@ export default function AdminClient({
   // degrada a página. Só o RENDER é paginado — exportar CSV, "selecionar
   // todos" e contagens continuam a operar sobre a lista filtrada completa.
   const [visibleCount, setVisibleCount] = useState(LIST_PAGE_SIZE);
+  /**
+   * ONDE COMEÇA O LOTE QUE O «MOSTRAR MAIS» ACABOU DE TRAZER.
+   *
+   * `null` quando não há lote novo nenhum — a primeira página, e tudo o que
+   * venha de uma mudança de filtro. É a diferença entre «isto acabou de
+   * chegar» e «isto sempre esteve aqui», e sem ela a entrada do lote animava
+   * a lista inteira a cada desenho.
+   *
+   * Um ÍNDICE e não um `Set` de ids: quem manda é a posição na lista filtrada
+   * nesse instante, e o `Set` deriva daqui. Guardar os ids era guardar duas
+   * verdades sobre a mesma coisa.
+   */
+  const [inicioDoLote, setInicioDoLote] = useState<number | null>(null);
   useEffect(() => {
     setVisibleCount(LIST_PAGE_SIZE);
+    // Uma lista que voltou ao princípio não tem lote novo nenhum: sem isto, a
+    // marca antiga ficava pendurada e as primeiras linhas de uma procura nova
+    // entravam como se tivessem acabado de ser acrescentadas.
+    setInicioDoLote(null);
   }, [search, filterStatus, filterCategory, tagFilter, sort, showArchived, mineOnly]);
   const visibleQuotes = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  /**
+   * Os ids do lote novo — e nada quando não há lote novo.
+   *
+   * Um `Set` e não um `indexOf` por linha: com centenas de pedidos, procurar
+   * cada linha na lista filtrada era uma varredura por linha desenhada.
+   */
+  const idsDoLoteNovo = useMemo(
+    () =>
+      inicioDoLote === null
+        ? null
+        : new Set(filtered.slice(inicioDoLote, visibleCount).map((q) => q.id)),
+    [filtered, inicioDoLote, visibleCount],
+  );
+  const ehDoLoteNovo = useCallback(
+    (q: Quote) => idsDoLoteNovo?.has(q.id) ?? false,
+    [idsDoLoteNovo],
+  );
 
   /**
    * ── A SELECÇÃO SOBRE QUE OS BOTÕES DO LOTE AGEM ───────────────────────────
@@ -4062,10 +4324,26 @@ export default function AdminClient({
               />
             </div>
 
-            {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
-              everything else tucked into a collapsed "Mais" group so a newcomer
-              sees few things at once. The group auto-opens when a "Mais" view is
-              active, so the current item (and its aria-current) is never hidden. */}
+            {/* ── A COLUNA MOSTRA TUDO, E NÃO ESCONDE NADA ────────────────
+                Palavras dela: «retira o mais e deixa tudo à vista».
+
+                Havia aqui um grupo dobrável chamado «Mais» (as reticências) com
+                cinco destinos lá dentro — Propostas Aceites, Material, Temas,
+                Estatísticas e Definições —, fechado por omissão. A ideia era
+                que quem chega visse uma lista curta. Ela não chega: TRABALHA
+                aqui, todos os dias, e sabe de cor o que quer. O que a dobra lhe
+                dava era um toque a mais para cinco destinos e um sítio onde
+                procurar o que ela já sabia que existia.
+
+                Fica um fio a separar o dia de trabalho do resto. Um fio não é
+                uma dobra: não esconde nada, não tem estado, não precisa de ser
+                aberto — só diz onde acaba o que se usa a toda a hora. Onze
+                destinos numa lista sem nenhuma pausa lêem-se como uma parede.
+
+                O QUE SAIU COM O GRUPO, e não ficou pendurado: o estado
+                `moreNavOpen`, a abertura automática quando o destino activo
+                vivia lá dentro, e a dependência que esse estado tinha no efeito
+                que mede o filete (ver a nota dele lá em cima). */}
             <nav
               ref={colunaDosDestinos}
               aria-label="Navegação do back office"
@@ -4085,62 +4363,18 @@ export default function AdminClient({
               )}
               {CORE_NAV.map((id) => renderNavItem(id))}
 
-              {/* "Mais" — secondary destinations, collapsed by default.
-                NO TELEMÓVEL NÃO SE DOBRA. Ali esta gaveta já É "o resto" (os
-                quatro do dia estão na barra de baixo), portanto uma dobra
-                chamada "Mais" dentro de um menu que se abriu para ver mais era
-                a terceira camada da mesma escolha — e, fechada, deixava a
-                gaveta com dois destinos à vista num ecrã inteiro.
-                Na coluna do computador a lista está completa e a dobra continua
-                a fazer o seu trabalho: manter a vista curta. */}
-              {(() => {
-                const activeInMore = MORE_NAV.includes(view);
-                const expanded = moreNavOpen || activeInMore;
-                return (
-                  <div className="mt-3 pt-3 border-t border-[var(--bo-hairline)] flex flex-col gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setMoreNavOpen((o) => !o)}
-                      aria-expanded={expanded}
-                      className={`alvo-toque !justify-start group hidden lg:flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
-                    >
-                      <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                        >
-                          <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                          <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                        </svg>
-                      </span>
-                      <span className="truncate">Mais</span>
-                      <svg
-                        className={`ml-auto shrink-0 text-[var(--bo-text-faint)] motion-safe:transition-transform duration-200 ${
-                          expanded ? "rotate-180" : ""
-                        }`}
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                      >
-                        <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {/* Sempre no DOM, e sempre visível no telemóvel; no
-                      computador é a dobra que decide. */}
-                    <div className={`flex flex-col gap-1 ${expanded ? "" : "lg:hidden"}`}>
-                      {MORE_NAV.map(renderNavItem)}
-                    </div>
-                  </div>
-                );
-              })()}
+              {/* O resto, do outro lado de um fio. A mesma árvore serve a
+                  gaveta do telemóvel e a coluna do computador: não há dobra num
+                  nem no outro, e portanto não há duas navegações a explicar.
+
+                  NOTA PARA QUEM LÊ O `nav.tsx`: o `CORE_NAV` e o `MORE_NAV`
+                  continuam a decidir a ORDEM e onde cai o fio, e isso continua
+                  a fazer sentido. O que já não faz é o nome e a prosa que os
+                  acompanha, que falam de «a collapsible Mais group» — a dobra
+                  saiu daqui e o nome ficou lá. Renomeá-los é no `nav.tsx`. */}
+              <div className="mt-3 flex flex-col gap-1 border-t border-[var(--bo-hairline)] pt-3">
+                {MORE_NAV.map((id) => renderNavItem(id))}
+              </div>
             </nav>
 
             {/* User */}
@@ -5077,7 +5311,31 @@ export default function AdminClient({
                 aria-label="Filtros dos pedidos"
                 /* `hidden` a sério, e não `opacity-0`: fechado, também não se
                    percorre com o teclado nem com o leitor de ecrã. */
-                className={`${filtrosAbertos ? "grid" : "hidden"} grid-cols-2 gap-2 lg:flex lg:flex-wrap`}
+                /* ── E ABERTO, ABRE DE ALGUM SÍTIO ──────────────────────────
+                   O painel passava de `hidden` a `grid` num fotograma: seis
+                   controlos e a lista inteira a descer de uma vez, sem nada a
+                   dizer de onde é que aquilo veio. É o gesto que ela faz mais
+                   vezes no telemóvel, e era dos mais secos.
+
+                   A `bo-entrada` da casa, e não uma transição própria: quatro
+                   píxeis vindos de CIMA, que é onde está o botão que a abriu.
+                   Só `transform` e `opacity`; o `hidden` continua a ser quem
+                   fecha, portanto o teclado e o leitor de ecrã continuam a não
+                   percorrer o que está fechado. E não atrasa nada — os seis
+                   controlos estão no sítio e clicáveis no primeiro fotograma.
+
+                   Não leva `motion-safe:`: a classe traz a guarda dentro dela
+                   (`@media (prefers-reduced-motion: reduce) { .bo-entrada {
+                   animation: none } }`), como as outras nove entradas da casa.
+
+                   A classe vive no ramo ABERTO do ternário, e é o que faz o
+                   gesto repetir-se sem `key` e sem um fotograma de JavaScript:
+                   `display: none` termina a animação, e voltar a desenhar o
+                   elemento volta a arrancá-la (CSS Animations, § display).
+                   MEDIDO num Chromium 141, três aberturas seguidas com cliques
+                   a sério: opacidade 0,22 / 0,22 / 0,22 dois fotogramas depois
+                   de cada uma — ver `e2e/entrada-que-se-repete.mjs`. */
+                className={`${filtrosAbertos ? "grid bo-entrada" : "hidden"} grid-cols-2 gap-2 lg:flex lg:flex-wrap`}
               >
                 <button
                   onClick={() => setMineOnly((v) => !v)}
@@ -5428,8 +5686,12 @@ export default function AdminClient({
             >
               {/* List */}
               <div
-                style={{ "--cena": 2 } as React.CSSProperties}
-                className="bo-cena flex min-w-0 flex-col gap-3"
+                /* O `--bo-entrada-y` positivo é para o LOTE NOVO, e só para
+                   ele: a `@keyframes bo-entrada` lê esta variável, e um lote
+                   que é acrescentado no fim da lista sobe para o lugar em vez
+                   de descer. Ver a nota do `ENTRADA_DO_LOTE`. */
+                style={{ "--cena": 2, "--bo-entrada-y": "4px" } as React.CSSProperties}
+                className={`bo-cena flex min-w-0 flex-col gap-3 ${ENTRADA_DO_LOTE}`}
               >
                 {filtered.length === 0 && (
                   <div className="bo-card">
@@ -5485,6 +5747,7 @@ export default function AdminClient({
                     cartao={(q) => (
                       <QuoteCard
                         q={q}
+                        doLoteNovo={ehDoLoteNovo(q)}
                         isCurrent={selected?.id === q.id}
                         isSelected={selectedIds.has(q.id)}
                         todayStr={todayStr}
@@ -5502,13 +5765,20 @@ export default function AdminClient({
                       atual: selected?.id,
                       userName,
                       onDesfecho: marcarDesfecho,
+                      ehDoLoteNovo,
                     })}
                   />
                 )}
                 {filtered.length > visibleCount && (
                   <button
                     type="button"
-                    onClick={() => setVisibleCount((c) => c + LIST_PAGE_SIZE)}
+                    onClick={() => {
+                      // A marca ANTES do crescimento, e com o valor de agora:
+                      // é a fronteira entre o que já estava no ecrã e o que
+                      // este toque acrescenta.
+                      setInicioDoLote(visibleCount);
+                      setVisibleCount((c) => c + LIST_PAGE_SIZE);
+                    }}
                     className={`w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-[var(--bo-tinta-72)] bg-white border border-[var(--bo-hairline)] rounded-xl hover:border-foreground/20 ${ESTADO} ${PRESSAO}`}
                   >
                     Mostrar mais ({filtered.length - visibleCount} restante
@@ -5520,8 +5790,23 @@ export default function AdminClient({
               {/* Detail — in-grid sticky panel on desktop, slide-over drawer on mobile */}
               {selected ? (
                 <>
+                  {/* ── O VÉU VAI-SE COM A CAIXA QUE TROUXE ──────────────
+                      Acendia em 240 ms e apagava-se num fotograma. A saída é a
+                      do fundo — zero de deslocação, porque um fundo não vem de
+                      sítio nenhum nem vai para sítio nenhum, só apaga —, e ela
+                      traz o `pointer-events: none` dentro da classe: durante os
+                      200 ms o véu deixa de comer o toque que ela deu na lista.
+
+                      NOTA PARA QUEM VARRE: o `entrada-dos-fundos.test.ts`
+                      procura véus por `className="…inset-0…"` literal, e a
+                      partir daqui esta lista deixou de ser literal — este véu
+                      sai desse censo. Quem passa a guardá-lo, e guarda mais do
+                      que ele guardava (a entrada E a saída), é o
+                      `entrada-do-painel-do-pedido.test.ts`. */}
                   <div
-                    className="bo-entrada bo-entrada-fundo fixed inset-0 z-40 bg-black/50 xl:hidden"
+                    className={`${
+                      painelASair ? SAIDA_FUNDO : "bo-entrada bo-entrada-fundo"
+                    } fixed inset-0 z-40 bg-black/50 xl:hidden`}
                     onClick={closeDetail}
                   />
                   <div
@@ -5546,13 +5831,57 @@ export default function AdminClient({
                        que rola fica por cima dele: o `sticky` do estúdio cola
                        ali e nunca mais o tapa, sem guerra de `z-index` e sem o
                        estúdio ter de saber que existe um pé por baixo. */
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]"
+                    /* ── A CAIXA ENTRA E SAI, E SEM SE MEXER UM PÍXEL ──────
+                       O véu já entrava; a caixa aparecia no primeiro fotograma.
+                       Lia-se como meio gesto — o ecrã escurecia devagar e o
+                       painel estava lá desde sempre.
+
+                       ZERO DE DESLOCAÇÃO, e não os quatro píxeis de omissão da
+                       casa. A razão é geométrica e vê-se: no telemóvel esta
+                       caixa é `fixed inset-y-0`, ou seja encosta às duas
+                       arestas do ecrã. Qualquer `translateY` abre uma fresta da
+                       altura da deslocação numa delas — a página a espreitar
+                       por baixo de uma gaveta que devia tapar o ecrã inteiro.
+                       Uma entrada que mostra o que devia esconder não é uma
+                       entrada melhor do que nenhuma.
+
+                       Fica portanto só a opacidade, escrita como a casa a
+                       escreve: a `.bo-entrada` com o `--bo-entrada-y` a zero, e
+                       a `.bo-saida` com o `--bo-saida-y` a zero. É a mesma
+                       decisão que o véu já tinha (a `-fundo` é exactamente
+                       isto), mas dita aqui em vez de emprestada — esta caixa
+                       não é um fundo, e chamar-lhe um só para lhe apanhar o
+                       zero fazia-a passar a ser lida como tal.
+
+                       E há uma segunda razão para não deixar um `transform`
+                       vivo aqui: esta caixa é `fixed` no telemóvel e `sticky`
+                       no computador, tem um cabeçalho `sticky` lá dentro e o
+                       estúdio de propostas traz a sua barra `sticky bottom-0`.
+                       Um `transform` num antepassado cria um bloco de contenção
+                       e é a razão por que as classes desta casa acabam em
+                       `transform: none`. MEDIDO num Chromium sobre a mesma
+                       geometria (`e2e/entrada-da-gaveta.mjs`): com `translateY`
+                       vivo o cabeçalho e a barra do estúdio deslocam-se com a
+                       caixa durante a animação; com zero, ficam onde estavam,
+                       fotograma a fotograma. */
+                    className={`${
+                      painelASair ? SAIDA : "bo-entrada"
+                    } fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]`}
+                    /* A saída larga os toques dentro da própria classe; o
+                       `inert` é a mesma frase dita ao teclado e ao leitor de
+                       ecrã. Sem ele, durante 200 ms havia um painel a
+                       desaparecer onde ainda se podia entrar com o Tab. */
+                    inert={painelASair}
                     // A altura medida ganha à classe — e só existe na coluna do
                     // computador. Ver `alturaDoDetalhe`.
                     style={
-                      isDetailOverlay || alturaDoDetalhe === null
-                        ? undefined
-                        : { maxHeight: alturaDoDetalhe }
+                      {
+                        "--bo-entrada-y": "0px",
+                        "--bo-saida-y": "0px",
+                        ...(isDetailOverlay || alturaDoDetalhe === null
+                          ? null
+                          : { maxHeight: alturaDoDetalhe }),
+                      } as React.CSSProperties
                     }
                   >
                     <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
@@ -6716,10 +7045,16 @@ export default function AdminClient({
                                   agora vê (ver `e2e/ergonomia-tactil.mjs`). Só
                                   cresce sob `(pointer: coarse)`; no portátil
                                   fica como estava. */}
-                                  <details className="group border-t border-[var(--bo-hairline-strong)] pt-4">
-                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
+                                  <details
+                                    className="group border-t border-[var(--bo-hairline-strong)] pt-4"
+                                    onToggle={gavetaDoPlano.aoAlternar}
+                                  >
+                                    <summary
+                                      onClick={gavetaDoPlano.aoTocarNoResumo}
+                                      className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]"
+                                    >
                                       <svg
-                                        className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
+                                        className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}
                                         width="14"
                                         height="14"
                                         viewBox="0 0 24 24"
@@ -6735,7 +7070,9 @@ export default function AdminClient({
                                       </svg>
                                       Plano de decoração, cronograma e convidados
                                     </summary>
-                                    <div className="flex flex-col gap-4 pt-4 sm:gap-6 sm:pt-6">
+                                    <div
+                                      className={`flex flex-col gap-4 pt-4 sm:gap-6 sm:pt-6 ${gavetaDoPlano.corpo}`}
+                                    >
                                       {/* Decor production plan (sourcing → strike) */}
                                       <ProductionPlan
                                         key={`prod-${selected.id}`}
@@ -7028,10 +7365,16 @@ export default function AdminClient({
                                   />
 
                                   {/* Activity history — de-emphasised, collapsed by default. */}
-                                  <details className="group border-t border-[var(--bo-hairline-strong)] pt-4">
-                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]">
+                                  <details
+                                    className="group border-t border-[var(--bo-hairline-strong)] pt-4"
+                                    onToggle={gavetaDoHistorico.aoAlternar}
+                                  >
+                                    <summary
+                                      onClick={gavetaDoHistorico.aoTocarNoResumo}
+                                      className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]"
+                                    >
                                       <svg
-                                        className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
+                                        className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}
                                         width="14"
                                         height="14"
                                         viewBox="0 0 24 24"
@@ -7047,7 +7390,7 @@ export default function AdminClient({
                                       </svg>
                                       Histórico de atividade
                                     </summary>
-                                    <div className="pt-4 sm:pt-6">
+                                    <div className={`pt-4 sm:pt-6 ${gavetaDoHistorico.corpo}`}>
                                       <ActivityLog
                                         quote={selected}
                                         actor={userName}

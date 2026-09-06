@@ -18,6 +18,7 @@ import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
    propriedades (nenhuma delas força *layout*); `PRESSAO` é o toque a 20 ms.
    As duas trazem `motion-safe:` — não há rede global no `globals.css`. */
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { useGaveta } from "./ui/gaveta";
 import { rolarAJanela } from "@/lib/motion/rolar";
 import {
   PARAM_DESTINO,
@@ -118,6 +119,8 @@ const ONDE_SE_REGISTA = "Os meus dispositivos";
 const MANTER_SESSAO_POR_OMISSAO = false;
 
 export default function AdminLogin() {
+  /** «Mudaste de telemóvel ou de computador?». Ver `ui/gaveta.ts`. */
+  const gaveta = useGaveta();
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -760,7 +763,10 @@ export default function AdminLogin() {
               React: abre sem JavaScript, é focável e anunciável por omissão, e
               o browser trata do resto. */}
           {temPasskeys && (
-            <details className="group mt-5 border-t border-[var(--bo-hairline-strong)] pt-4">
+            <details
+              className="group mt-5 border-t border-[var(--bo-hairline-strong)] pt-4"
+              onToggle={gaveta.aoAlternar}
+            >
               {/* `alvo-toque`: MEDIDO a 375×667 com toque emulado, este resumo
                   dava 293×16 px. Dezasseis píxeis de altura — a altura da
                   própria letra — e é o único caminho para o que está lá dentro,
@@ -769,11 +775,26 @@ export default function AdminLogin() {
                   `(pointer: coarse)`, ver globals.css), sem mexer na letra nem
                   no sublinhado. Passa a 232×44. */}
               <summary
+                onClick={gaveta.aoTocarNoResumo}
                 className={`alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
               >
                 Mudaste de telemóvel ou de computador?
               </summary>
-              <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+              {/* ── E ESTA GAVETA VALE MESMO O TRABALHO ────────────────────
+                  O levantamento marcou-a «por confirmar» — leu o markup e não
+                  soube dizer em que ramo do fluxo é que ela aparece. Confirmado:
+                  aparece sempre que o browser percebe de passkeys (o
+                  `temPasskeys` aqui em cima), que é o caminho principal desta
+                  página e não um canto raro. E quem a abre é, por definição,
+                  quem acabou de trocar de aparelho e não percebe porque é que o
+                  botão de cima não lhe serve.
+
+                  Seis linhas de instruções são UM bloco. Entram nos 240 ms e nos
+                  quatro píxeis da `.bo-entrada` — distância de rótulo, porque a
+                  resposta sai de debaixo da pergunta que está mesmo por cima. */}
+              <p
+                className={`mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)] ${gaveta.corpo}`}
+              >
                 Entra aqui com o email e a palavra-passe. Já dentro, abre{" "}
                 <span className="font-medium text-[var(--bo-tinta-72)]">«{ONDE_SE_REGISTA}»</span>,
                 no fundo da barra lateral, e regista este aparelho. Da próxima vez entras só com o
@@ -804,7 +825,21 @@ function AvisoDeRecusa({ texto, className = "" }: { texto: string; className?: s
     <p
       role="alert"
       aria-live="assertive"
-      className={`flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22] ${className}`}
+      /* ── QUATRO PÍXEIS, E NÃO OITO ────────────────────────────────────────
+         A regra da casa mede a distância pela importância e pela origem: um
+         item de menu 4 px, um aviso 8, uma página inteira 32. Isto tem cara de
+         aviso e não é um: é um RÓTULO — nasce colado ao campo que a provocou,
+         por baixo dele, e não vem de fora da página como um toast. Oito píxeis
+         punham-na a saltar para um sítio onde nunca esteve.
+
+         Os 240 ms e a curva de quem apresenta são os da `.bo-entrada`, a
+         mesma classe (e a mesma prosa) que os nove sítios que aparecem por
+         cima da página já usam — escrita pelo nome, como lá. E quem
+         pediu menos movimento não perde nada: a classe desliga-se sozinha
+         dentro do `prefers-reduced-motion` do `globals.css`, e o `aria-live`
+         nunca dependeu da animação — para quem ouve o ecrã, isto lê-se na
+         mesma, na mesma altura. */
+      className={`bo-entrada flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22] ${className}`}
     >
       <span aria-hidden="true">⚠</span>
       <span>{texto}</span>

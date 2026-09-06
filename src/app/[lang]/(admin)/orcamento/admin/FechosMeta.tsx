@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { eur } from "@/lib/money";
+import { useGaveta } from "./ui/gaveta";
 import type { Excluido, MotivoExclusao } from "@/lib/meta/conversoes-fecho";
 
 /**
@@ -82,6 +83,8 @@ function diasQueFaltam(fechadoEm: number, diasAceites: number, agora = Date.now(
 }
 
 export default function FechosMeta() {
+  /** «Ver o que ficou de fora». Ver `ui/gaveta.ts`. */
+  const gaveta = useGaveta();
   const [relatorio, setRelatorio] = useState<Relatorio | null>(null);
   const [aLer, setALer] = useState(true);
   const [falhouALeitura, setFalhouALeitura] = useState(false);
@@ -297,7 +300,7 @@ export default function FechosMeta() {
             </p>
           )}
 
-          <details className="mt-4">
+          <details className="mt-4" onToggle={gaveta.aoAlternar}>
             {/* ── O ALVO DESTA LINHA TINHA 35 px ────────────────────────
                 Medido pelo passeio `admin-mobile` a 390 px: 293x38, abaixo do
                 mínimo de 44. É um `<summary>` — abre e fecha ao toque, portanto
@@ -315,12 +318,21 @@ export default function FechosMeta() {
                 é o que põe o texto a meio dessa caixa em vez de encostado ao
                 topo. Só em ecrãs de toque: no computador esta linha fica como
                 estava. */}
-            <summary className="cursor-pointer text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3">
+            <summary
+              onClick={gaveta.aoTocarNoResumo}
+              className="cursor-pointer text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3"
+            >
               {relatorio.examinados}{" "}
               {relatorio.examinados === 1 ? "fecho examinado" : "fechos examinados"} — ver o que
               ficou de fora
             </summary>
-            <ul className="mt-2 flex flex-col gap-1">
+            {/* ── UM DEGRAU PARA A LISTA INTEIRA ────────────────────────
+                Isto é uma COLUNA DE NÚMEROS — quantos ficaram de fora, por
+                motivo. Uma coluna de valores nunca entra escalonada: o olho
+                compara os números uns com os outros, e escalonar obriga-o a
+                esperar pelo último para poder ler o primeiro. A lista entra
+                inteira, num só bloco. */}
+            <ul className={`mt-2 flex flex-col gap-1 ${gaveta.corpo}`}>
               {contarPorMotivo(relatorio.excluidos).map(([motivo, quantos]) => (
                 <li key={motivo} className="text-[11px] text-foreground/45">
                   <span className="tabular-nums">{quantos}</span> — {EXPLICACAO[motivo]}

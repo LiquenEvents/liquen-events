@@ -18,6 +18,7 @@ import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { corDeTexto, metaFor } from "./status-meta";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -291,6 +292,8 @@ const TaskRow = memo(function TaskRow({
 
 export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: string }) {
   const { toast } = useToast();
+  /** «Detalhes (opcional)», na caixa de escrever uma tarefa. Ver `ui/gaveta.ts`. */
+  const gaveta = useGaveta();
   const {
     data: tasks = [],
     setData: setTasks,
@@ -782,7 +785,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
             Adicionar
           </Button>
         </div>
-        <details className="group mt-3">
+        <details className="group mt-3" onToggle={gaveta.aoAlternar}>
           {/* ── 122×15 NUM TELEMÓVEL ────────────────────────────────────────
               MEDIDO a 375 px: este interruptor tinha 15 px de altura — um
               terço do mínimo de 44 — e é a ÚNICA porta para o responsável, o
@@ -797,7 +800,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               portátil a linha fica exactamente como estava; `!justify-start`
               porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
               a classe centra por omissão. */}
-          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+          <summary
+            onClick={gaveta.aoTocarNoResumo}
+            className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden"
+          >
             <svg
               width="12"
               height="12"
@@ -807,14 +813,26 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] group-open:rotate-90"
+              className={`${SETA_DA_GAVETA} group-open:rotate-90`}
               aria-hidden="true"
             >
               <path d="m9 18 6-6-6-6" />
             </svg>
             Detalhes (opcional)
           </summary>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* ── O CORPO É UM BLOCO, E NÃO QUATRO CAMPOS ────────────────────
+              Quatro campos numa grelha são uma LINHA, não quatro blocos: a
+              escada da casa é por bloco, e uma fila de campos a entrar um a um
+              lê-se como um tremor. Entra tudo junto, nos 240 ms e nos quatro
+              píxeis da `.bo-entrada` — a distância de um rótulo, porque isto
+              sai de debaixo do resumo que está mesmo por cima.
+
+              E o `gaveta.corpo` é uma CLASSE, não uma `key`: estes campos
+              guardam o que ela já escreveu, e um `key` a mudar remontava-os e
+              deitava fora o responsável e o prazo que ela acabou de escolher. */}
+          <div
+            className={`mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 ${gaveta.corpo}`}
+          >
             {equipa.length > 0 ? (
               <Field
                 as="select"

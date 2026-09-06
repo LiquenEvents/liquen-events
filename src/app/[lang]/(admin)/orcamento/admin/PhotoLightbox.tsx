@@ -136,7 +136,23 @@ export default function PhotoLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={`Foto ${index + 1} de ${images.length}`}
-      className="fixed inset-0 z-50 flex flex-col bg-black/92"
+      // ── ISTO ABRIA NUM FOTOGRAMA ────────────────────────────────────────
+      // A página estava lá e, no seguinte, um ecrã preto inteiro por cima
+      // dela. É o mesmo corte que a `LupaDeFotos` já resolveu (ver o
+      // comentário longo lá, ao pé da mesma classe), e o pior sítio possível
+      // para um: esta é a superfície que cobre o ecrã TODO.
+      //
+      // E vai SÓ a `.bo-entrada`, sem a `.bo-entrada-fundo`, pela mesma razão
+      // que lá: aqui o véu e a caixa são o MESMO elemento — a tinta escura não
+      // está por trás de nada, é o visualizador. É por isso que o
+      // `entrada-dos-fundos.test.ts` já isenta este ficheiro da regra dos
+      // véus, e a variante do fundo (`--bo-entrada-y: 0px`) tirava a
+      // deslocação a tudo o que está cá dentro.
+      //
+      // Não atrasa nada: a lupa está no sítio e responde ao teclado desde o
+      // primeiro fotograma — o `closeRef.current?.focus()` continua a correr
+      // na montagem, por cima da animação.
+      className="bo-entrada fixed inset-0 z-50 flex flex-col bg-black/92"
       onClick={(e) => {
         // Clicar no fundo fecha; clicar na foto ou nos botões não.
         if (e.target === e.currentTarget) onClose();

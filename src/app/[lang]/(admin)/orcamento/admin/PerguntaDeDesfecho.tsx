@@ -371,8 +371,22 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
         </div>
       )}
 
+      {/* ── O QUE CORREU MAL NASCE COLADO AO CAMPO ─────────────────────────
+          O aviso é quase sempre sobre o valor combinado — um número que não se
+          percebe — e aparece debaixo da linha onde ela o escreveu. Aparecia num
+          fotograma.
+
+          `.bo-entrada`, os mesmos 240 ms e QUATRO píxeis do recibo aqui em
+          cima: a distância de um rótulo, porque é do campo que ele vem.
+
+          E note-se onde ESTÁ, que é o que o `momentos-que-nao-saltam.test.ts`
+          prende: aqui fora, irmão dos dois ramos. O painel do valor combinado
+          continua SEM entrada nenhuma — tem `autoFocus`, e animá-lo arrastava o
+          campo debaixo do cursor que já lá está. Uma entrada no aviso não é uma
+          entrada no painel: o aviso monta sozinho, depois de o campo estar
+          parado e focado, e nunca mexe no que está por cima dele. */}
       {aviso && (
-        <p role="alert" className="mt-2 text-[#8a2a22] text-[11px] leading-snug">
+        <p role="alert" className="bo-entrada mt-2 text-[#8a2a22] text-[11px] leading-snug">
           {aviso}
         </p>
       )}

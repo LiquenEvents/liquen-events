@@ -76,18 +76,12 @@ function collectErrors(page: Page) {
   return errors;
 }
 
-/** "Temas" lives behind the collapsed "Mais" disclosure in the sidebar. */
+/** "Temas" vive do outro lado do fio, na coluna — à vista, sem dobra a abrir. */
 async function openTemas(page: Page): Promise<void> {
   const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
-  const maisToggle = sidebar.getByRole("button", { name: /^Mais$/ });
-  if ((await maisToggle.count()) > 0) {
-    const expanded = await maisToggle.first().getAttribute("aria-expanded");
-    if (expanded !== "true") await maisToggle.first().click();
-  }
-  await sidebar
-    .getByRole("button", { name: /^Temas$/ })
-    .first()
-    .click();
+  const temas = sidebar.getByRole("button", { name: /^Temas$/ }).first();
+  await temas.waitFor({ state: "visible", timeout: 30000 });
+  await temas.click();
   // The H1 confirms the lazy chunk mounted, not the skeleton.
   await expect(page.getByRole("heading", { level: 1, name: /^Temas$/ })).toBeVisible();
 }

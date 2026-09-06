@@ -20,6 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useGaveta } from "./ui/gaveta";
 import {
   fallbackServiceGroupId,
   fallbackServiceItemId,
@@ -246,6 +247,8 @@ export default function ServicesEditor({
   bilingue = false,
 }: ServicesEditorProps) {
   const { toast } = useToast();
+  /** «Atalhos de teclado», no topo do editor. Ver `ui/gaveta.ts`. */
+  const gaveta = useGaveta();
   // Campos por chave estável, para o foco poder ir para uma linha que ACABOU de
   // nascer (o nó só existe depois do render seguinte).
   const inputs = useRef(new Map<string, CampoDeEscrita>());
@@ -730,8 +733,11 @@ export default function ServicesEditor({
        * estava: sessenta píxeis no topo da secção mais escrita da casa, gastos
        * a explicar gestos que ali não existem.
        */}
-      <details className="pointer-coarse:hidden group -mt-2 mb-3">
-        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+      <details className="pointer-coarse:hidden group -mt-2 mb-3" onToggle={gaveta.aoAlternar}>
+        <summary
+          onClick={gaveta.aoTocarNoResumo}
+          className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden"
+        >
           <span
             aria-hidden
             className="grid h-4 w-4 place-items-center rounded-full border border-foreground/20 text-[10px] leading-none"
@@ -740,7 +746,10 @@ export default function ServicesEditor({
           </span>
           Atalhos de teclado
         </summary>
-        <p className="mt-2 text-xs leading-relaxed text-foreground/50">
+        {/* Quatro atalhos num parágrafo só: UM bloco, uma entrada. Não há
+            escada nenhuma a fazer aqui — a escada da casa é por bloco, e isto
+            é uma frase. */}
+        <p className={`mt-2 text-xs leading-relaxed text-foreground/50 ${gaveta.corpo}`}>
           <strong className="font-semibold text-[var(--bo-tinta-72)]">Enter</strong> abre a linha
           seguinte ·{" "}
           <strong className="font-semibold text-[var(--bo-tinta-72)]">

@@ -184,8 +184,21 @@ export default function ClientMessenger({ quote, onSent }: Props) {
         hint="A assinatura da Líquen (Catarina Gaspar, contactos) entra sozinha no fim — não precisas de te despedir."
       />
 
+      {/* ── A RAZÃO POR QUE NÃO SAIU NASCE COLADA AO CAMPO ─────────────────
+          Esta frase aparece debaixo da caixa onde ela acabou de escrever a
+          mensagem, no instante em que carregou em «Enviar». Aparecia num
+          fotograma, e nada a ligava ao gesto que a provocou.
+
+          `.bo-entrada` — 240 ms, QUATRO píxeis, a distância de um rótulo: o
+          aviso desce os mesmos quatro píxeis que separam um rótulo do seu
+          campo, ou seja lê-se como tendo saído DA caixa de texto. Os oito da
+          `.bo-entrada-folha` são de quem vem de fora do ecrã; isto não vem.
+
+          E não atrasa a leitura: a curva da casa gasta a maior parte da
+          distância no arranque, portanto a frase está legível bem antes de a
+          animação acabar — que é a regra que manda num aviso de erro. */}
       {error && (
-        <p className="text-[#8a2a22] text-xs mb-3 leading-relaxed" role="alert">
+        <p className="bo-entrada text-[#8a2a22] text-xs mb-3 leading-relaxed" role="alert">
           {error}
         </p>
       )}

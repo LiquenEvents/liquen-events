@@ -97,11 +97,15 @@ async function quemEstaNoCentro(page: Page, seletor: string) {
 /** Vai a um destino pelo menu lateral (a coluna do computador). */
 async function irPara(page: Page, rotulo: RegExp | string) {
   const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
-  const item = nav.getByRole("button", { name: rotulo });
-  if ((await item.count()) === 0) {
-    await nav.getByRole("button", { name: "Mais", exact: true }).click();
-  }
-  await item.first().click();
+  // A coluna já não tem dobra nenhuma: os onze destinos estão todos à vista,
+  // do outro lado de um fio. O que aqui estava era um `count()` — um
+  // instantâneo, sem espera — e, quando a coluna ainda não tinha desenhado,
+  // caía no ramo que abria o «Mais». Esse clique funcionava por acidente como
+  // uma espera, e era isso que segurava o passeio. Sem a dobra, a corrida
+  // ficou à vista: espera-se pelo DESTINO, que é o que se quer mesmo.
+  const item = nav.getByRole("button", { name: rotulo }).first();
+  await item.waitFor({ state: "visible", timeout: 30000 });
+  await item.click();
 }
 
 /**
@@ -148,10 +152,7 @@ async function rolarOPainel(page: Page, fracao: number) {
  */
 async function abrirOPainelDoPedido(page: Page) {
   const porta = page.getByRole("button", { name: /^Abrir o pedido$/ });
-  await expect(
-    porta,
-    "O ecrã de fazer proposta perdeu a porta de volta ao pedido.",
-  ).toHaveCount(1);
+  await expect(porta, "O ecrã de fazer proposta perdeu a porta de volta ao pedido.").toHaveCount(1);
   await porta.click();
 }
 

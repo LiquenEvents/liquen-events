@@ -5,7 +5,7 @@ import { entrarNoBackOffice } from "./semear-pedido";
  * Back-office secondary-views walk.
  *
  * A companion to admin-smoke: that spec covers the always-visible CORE sidebar
- * items, this one opens the collapsed "Mais" disclosure and walks the SECONDARY
+ * items, this one walks the SECONDARY
  * destinations tucked behind it (Propostas Aceites, Temas, Estatísticas —
  * labels from nav.tsx's MORE_NAV).
  * For each it asserts:
@@ -73,7 +73,7 @@ async function login(page: Page): Promise<boolean> {
   return entrarNoBackOffice(page);
 }
 
-// The SECONDARY destinations, tucked behind the collapsed "Mais" group in the
+// The SECONDARY destinations, below the hairline in the
 // sidebar (nav.tsx's MORE_NAV). `nav` is the sidebar button label; `heading` is
 // the H1 the sticky header shows for that view (AdminClient's VIEW_TITLES).
 // admin-smoke already covers every CORE item, so this walk complements it.
@@ -117,7 +117,10 @@ test.describe("Back office — a marca do destino activo", () => {
     await expect(filete, "a barra lateral perdeu a marca do destino activo").toHaveCount(1);
     const antes = await filete.evaluate((el) => el.getBoundingClientRect().top);
 
-    await coluna.getByRole("button", { name: /^Pedidos/ }).first().click();
+    await coluna
+      .getByRole("button", { name: /^Pedidos/ })
+      .first()
+      .click();
     await expect(page.getByRole("heading", { level: 1, name: /^Pedidos$/ })).toBeVisible();
 
     // Mudou de sítio…
@@ -164,16 +167,9 @@ test.describe("Back office — secondary views", () => {
     const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
     const errorBoundary = page.getByRole("heading", { name: /Ocorreu um erro inesperado/i });
 
-    // The secondary items live behind a collapsed "Mais" disclosure. Expand it if
-    // present and still collapsed; clicking a "Mais" view also auto-opens it, but
-    // opening up-front makes the buttons clickable and keeps the walk resilient.
-    const maisToggle = sidebar.getByRole("button", { name: /^Mais$/ });
-    if ((await maisToggle.count()) > 0) {
-      const expanded = await maisToggle.first().getAttribute("aria-expanded");
-      if (expanded !== "true") {
-        await maisToggle.first().click();
-      }
-    }
+    // Estes destinos viviam atrás de uma dobra «Mais» e este passeio abria-a.
+    // A dobra saiu — estão todos à vista, do outro lado de um fio —, portanto
+    // não há nada a abrir: vai-se directo a cada um.
 
     for (const view of SECONDARY_VIEWS) {
       const navButton = sidebar.getByRole("button", { name: view.nav });

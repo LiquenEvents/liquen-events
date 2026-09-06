@@ -1165,7 +1165,19 @@ describe("a barra do fundo chama cada número pelo seu nome", () => {
     await screen.findByText("Totais");
     const doc = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
     const esperado = totaisDaProposta(doc, 30);
-    const barra = container.querySelector("p.mr-auto")!;
+    // ── PROCURA-SE PELO QUE ISTO É, NÃO POR ONDE ESTÁ ────────────────────
+    // Isto dizia `p.mr-auto`, e apanhou uma reorganização da barra: o `mr-auto`
+    // mudou-se para o parágrafo do ESTADO, à esquerda, quando o total passou a
+    // viajar ao lado do botão que o consome. A regra que este describe guarda —
+    // a etiqueta viver dentro do mesmo ramo que o número — nunca se partiu; o
+    // que se partiu foi o localizador, agarrado a uma margem.
+    //
+    // Uma margem é arranjo e muda quando o desenho muda. O que NÃO muda é o que
+    // define este parágrafo: é o único da barra com os dois ramos de largura
+    // como filhos directos, um para o telemóvel e outro para o computador.
+    const barra = [...container.querySelectorAll("p")].find((el) =>
+      [...el.children].some((f) => f.className.includes("sm:hidden")),
+    )!;
     const ramos = [...barra.querySelectorAll(":scope > span")];
     const estreito = ramos.find((el) => el.className.includes("sm:hidden"));
     const largo = ramos.find((el) => el.className.includes("sm:inline"));
@@ -8966,9 +8978,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
     it("a miniatura em cada uma das cinco larguras", async () => {
       const el = await grelha();
       const miniatura = (janela: number) => {
-        const n = efectivas(classesDe(el), noCartao(janela)).has("grid-cols-4")
-          ? 4
-          : 3;
+        const n = efectivas(classesDe(el), noCartao(janela)).has("grid-cols-4") ? 4 : 3;
         return Math.floor((CARTAO[janela] - (n - 1) * 8) / n);
       };
       // Antes: 101 · 134 · 229 · 68 · 105 — o portátil dela era o pior de todos.
@@ -9055,7 +9065,9 @@ describe("o estúdio numa coluna, e não numa janela", () => {
         return COLUNA[janela] - (comColuna ? 176 + 20 : 0) - 32;
       };
       const miniatura = (janela: number) => {
-        const n = efectivas(classesDe(foto), { ...naColuna(janela), caixa: cartao(janela) }).has("grid-cols-4")
+        const n = efectivas(classesDe(foto), { ...naColuna(janela), caixa: cartao(janela) }).has(
+          "grid-cols-4",
+        )
           ? 4
           : 3;
         return Math.floor((cartao(janela) - (n - 1) * 8) / n);
@@ -9432,5 +9444,292 @@ describe("o salto para a pré-visualização não deixa o ecrã sem nada", () =>
     expect(removidos).not.toContain(campoDosClientes);
     expect(campoDosClientes.closest("[hidden]")).not.toBeNull();
     expect(document.body.children.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE SE DOBRA E DESDOBRA NESTE ECRÃ APARECE, EM VEZ DE SALTAR
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Três dobras, o mesmo defeito: o corpo passava de inexistente a inteiro no
+ * mesmo fotograma, porque abrir e fechar é uma troca de `display` e uma troca
+ * de `display` é o corte mais seco que há.
+ *
+ * ── E A REGRA QUE ISTO NÃO PODE VIOLAR ────────────────────────────────────
+ *
+ * As nove secções abrem TODAS abertas, de propósito («uma secção nunca aparece
+ * fechada», aqui em cima), e uma proposta com sete páginas de inspiração tem
+ * sete dobras de disposição. Uma entrada ligada só ao «está aberto» corria em
+ * todas ao carregar o estúdio — dezasseis blocos a animar de uma vez, por cima
+ * da `.view-in` que o passo já traz. Isso não é uma entrada, é ruído; e é a
+ * metade que se perde primeiro, porque a captura de ecrã é igual nos dois
+ * casos.
+ *
+ * Por isso os testes vêm aos pares: um diz que a entrada CHEGA quando ela abre,
+ * e o outro que ela NÃO chega quando a proposta abre.
+ */
+describe("as dobras do estúdio apresentam o que abrem", () => {
+  const cartaoDaSeccao = (id: string) =>
+    waitFor(() => {
+      const el = document.getElementById(`seccao-${id}`);
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+  /** O botão do TÍTULO — o mesmo `:scope > div >` que o salto da Conferência usa. */
+  const cabecalho = (el: HTMLElement) =>
+    el.querySelector<HTMLButtonElement>(":scope > div > button[aria-expanded]")!;
+  const corpoDaSeccao = (id: string) => document.getElementById(`sec-${id}`)!;
+
+  it("ao carregar a proposta, NENHUM corpo de secção anima", async () => {
+    seedDraft(1);
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    const corpos = Array.from(document.querySelectorAll<HTMLElement>('[id^="sec-"]'));
+    // CONTROLO POSITIVO: as secções estão MESMO desenhadas — senão «nenhuma
+    // anima» era verdade por não haver nenhuma.
+    expect(corpos.length).toBeGreaterThan(3);
+    expect(
+      corpos.filter((c) => c.className.includes("bo-entrada")).map((c) => c.id),
+      "as secções animam todas ao abrir o estúdio — por cima da `.view-in` do passo",
+    ).toEqual([]);
+  });
+
+  it("mas quando ELA abre uma secção, o corpo entra", async () => {
+    seedDraft(1);
+    renderStudio();
+    const cartao = await cartaoDaSeccao("servicos");
+    const botao = cabecalho(cartao);
+
+    fireEvent.click(botao);
+    await waitFor(() => expect(botao.getAttribute("aria-expanded")).toBe("false"));
+    fireEvent.click(botao);
+    await waitFor(() => expect(botao.getAttribute("aria-expanded")).toBe("true"));
+
+    const classes = corpoDaSeccao("servicos").className.split(/\s+/);
+    expect(classes, "a secção volta a aparecer a corte seco").toContain("bo-entrada");
+    // Oito píxeis e não quatro: é um bloco de conteúdo a descer para dentro da
+    // página, não um menu encostado ao botão que o abriu.
+    expect(classes).toContain("bo-entrada-folha");
+  });
+
+  it("e a secção fechada continua a ter os campos — a entrada não desmontou nada", async () => {
+    // A armadilha desta dobra está escrita no `Section`: desmontar apagava o
+    // que lá está escrito. Uma entrada feita com `key` ou com montagem
+    // condicional passava nos dois testes acima e partia isto.
+    seedDraft(1);
+    renderStudio();
+    const cartao = await cartaoDaSeccao("servicos");
+    fireEvent.click(cabecalho(cartao));
+    await waitFor(() => expect(cabecalho(cartao).getAttribute("aria-expanded")).toBe("false"));
+    const corpo = corpoDaSeccao("servicos");
+    expect(corpo, "o corpo da secção fechada foi desmontado").toBeTruthy();
+    expect(corpo.hidden).toBe(true);
+  });
+
+  it("a seta da secção escolhe a duração — não cai nos 150 ms de omissão", async () => {
+    seedDraft(1);
+    renderStudio();
+    const cartao = await cartaoDaSeccao("servicos");
+    const seta = cabecalho(cartao).querySelector<HTMLElement>("span[aria-hidden]")!;
+    const classes = seta.className.split(/\s+/);
+    // As duas setas irmãs da casa já escolheram: 200 ms na curva do back
+    // office (`Overview.tsx` pela `.bo-mais-seta`, `Tarefas.tsx`). Sem duração
+    // escrita, o Tailwind serve o seu `--default-transition-duration` — 150 ms
+    // que ninguém escolheu, e uma quarta velocidade num ecrã com três.
+    expect(classes, "a seta voltou aos 150 ms de omissão do Tailwind").toContain(
+      "motion-safe:duration-200",
+    );
+    expect(classes).toContain("motion-safe:ease-[cubic-bezier(0,0,0.2,1)]");
+    // ── E A LISTA TEM DE COBRIR O `rotate` ──────────────────────────────
+    // No Tailwind v4 `rotate-90` emite a propriedade AUTÓNOMA `rotate`. A
+    // forma NOMEADA `transition-transform` compila para
+    // `transform, translate, scale, rotate` e cobre-a; a forma entre
+    // parênteses rectos sai literal e deixa-a de fora — é a armadilha que já
+    // mordeu esta casa duas vezes, e trocar uma pela outra apagava a animação
+    // sem apagar uma única classe do ecrã.
+    expect(classes).toContain("motion-safe:transition-transform");
+    expect(seta.className, "a lista entre rectos não cobre o `rotate` autónomo").not.toMatch(
+      /transition-\[[^\]]*\]/,
+    );
+  });
+
+  /**
+   * ── E A DOBRA DA DISPOSIÇÃO, QUE SÃO SETE ─────────────────────────────
+   */
+  describe("a dobra da disposição de cada mood board", () => {
+    const comDoisBoards = () => {
+      assetsServidor = [{ path: "board/foto-0.jpg", url: "https://sb/0.jpg" }];
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          template: "decoracao",
+          ref: "PO Decoração",
+          clientNames: "Maria & Zé",
+          serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+          moodBoards: [
+            { id: "b1", title: "Cerimónia", images: ["board/foto-0.jpg"] },
+            { id: "b2", title: "Jantar", images: ["board/foto-0.jpg"] },
+          ],
+          budgetItems: [],
+          coverImages: ["", ""],
+          totalAmount: 3000,
+          totalVatMode: "acrescer",
+        }),
+      );
+      renderStudio();
+    };
+
+    /** As `<details>` da disposição, pela ordem das páginas. */
+    const dobras = async () =>
+      (await screen.findAllByText(/^Disposição:/)).map(
+        (t) => t.closest("details") as HTMLDetailsElement,
+      );
+    /** O corpo de uma dobra: o último filho, a seguir ao `<summary>`. */
+    const corpo = (d: HTMLDetailsElement) => d.lastElementChild as HTMLElement;
+
+    it("ao carregar a proposta, nenhuma das dobras anima", async () => {
+      // Com sete páginas de inspiração eram sete blocos a animar de uma vez no
+      // primeiro fotograma do estúdio. É o caso que a entrada em CSS puro
+      // (`details[open] > …`) não sabe distinguir.
+      comDoisBoards();
+      const todas = await dobras();
+      expect(todas.length, "não há dobras nenhumas para medir").toBe(2);
+      expect(todas.map((d) => corpo(d).className).filter((c) => c.includes("bo-entrada"))).toEqual(
+        [],
+      );
+    });
+
+    it("e quando ela abre UMA, entra só essa", async () => {
+      comDoisBoards();
+      const [primeira, segunda] = await dobras();
+      fireEvent.click(primeira.querySelector("summary")!);
+      await waitFor(() => expect(primeira.open).toBe(true));
+      await waitFor(() =>
+        expect(
+          corpo(primeira).className,
+          "a dobra abriu a corte seco — o `onToggle` não chegou ao corpo",
+        ).toContain("bo-entrada"),
+      );
+      // A vizinha não se mexe: sete dobras não são um acordeão.
+      expect(corpo(segunda).className).not.toContain("bo-entrada");
+    });
+
+    it("e fechá-la tira a classe — para a entrada voltar a correr da próxima vez", async () => {
+      // Sem isto a classe ficava colada e a animação corria uma vez só, na
+      // primeira. É o defeito que não se vê em captura nenhuma.
+      comDoisBoards();
+      const [primeira] = await dobras();
+      const summary = primeira.querySelector("summary")!;
+      fireEvent.click(summary);
+      await waitFor(() => expect(corpo(primeira).className).toContain("bo-entrada"));
+      fireEvent.click(summary);
+      await waitFor(() => expect(primeira.open).toBe(false));
+      await waitFor(() => expect(corpo(primeira).className).not.toContain("bo-entrada"));
+    });
+
+    it("a seta da dobra demora o mesmo que a das secções", async () => {
+      comDoisBoards();
+      const [primeira] = await dobras();
+      const classes = primeira
+        .querySelector<HTMLElement>("summary span[aria-hidden]")!
+        .className.split(/\s+/);
+      expect(classes).toContain("motion-safe:duration-200");
+      expect(classes).toContain("motion-safe:ease-[cubic-bezier(0,0,0.2,1)]");
+      expect(classes).toContain("motion-safe:transition-transform");
+    });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ESQUELETO DA MINIATURA ESBATE-SE — A SAÍDA QUE SAI DE GRAÇA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O esqueleto destas células é um `<span absolute inset-0>` POR CIMA da
+ * fotografia, e não no lugar dela — decisão antiga, contada no `Thumb`. Ou
+ * seja: quando a foto chega, ela já está pintada por baixo, e o esqueleto
+ * desaparecia num fotograma. A fotografia dava um salto para dentro do ecrã
+ * quando o que se passou foi só o pano levantar-se.
+ *
+ * É a única saída desta casa que não precisa de segurar nada montado à espera
+ * — o destino final já está desenhado. O que ela NÃO pode ter é entrada: meio
+ * segundo antes de aparecer conteúdo é o contrário do que um esqueleto faz.
+ */
+describe("o esqueleto da miniatura", () => {
+  const celulas = () => Array.from(document.querySelectorAll<HTMLElement>("[data-foto]"));
+  const esqueleto = (celula: HTMLElement) => celula.querySelector<HTMLElement>(".bo-skeleton");
+
+  /** O que o navegador faria: dar forma à imagem e disparar o `load`. */
+  function aFotoChega(celula: HTMLElement) {
+    const img = celula.querySelector("img")!;
+    Object.defineProperty(img, "naturalWidth", { value: 1500, configurable: true });
+    Object.defineProperty(img, "naturalHeight", { value: 1000, configurable: true });
+    Object.defineProperty(img, "complete", { value: true, configurable: true });
+    fireEvent.load(img);
+  }
+
+  async function comUmaCelulaAEsperar() {
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/original.jpg", thumbUrl: "https://sb/mini.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => {
+      const img = celulas()[0]?.querySelector("img");
+      if (!img?.getAttribute("src")) throw new Error("ainda não");
+    });
+    return celulas()[0];
+  }
+
+  it("enquanto a foto vem, está lá — e SEM entrada nenhuma", async () => {
+    const celula = await comUmaCelulaAEsperar();
+    const esq = esqueleto(celula);
+    expect(esq, "a célula à espera ficou sem esqueleto").toBeTruthy();
+    // A regra que não se pode violar: um esqueleto que se apresenta soma meio
+    // segundo ANTES de aparecer conteúdo, que é o oposto do que ele faz.
+    expect(esq!.className).not.toContain("bo-entrada");
+    expect(esq!.className).not.toContain("bo-saida");
+    // E continua a dizer aos testes que esta célula está à espera.
+    expect(celula.querySelector("[data-a-carregar]")).not.toBeNull();
+  });
+
+  it("quando a foto chega, ESBATE-SE — não desaparece num fotograma", async () => {
+    const celula = await comUmaCelulaAEsperar();
+    aFotoChega(celula);
+    const esq = await waitFor(() => {
+      const e = esqueleto(celula);
+      if (!e) throw new Error("o esqueleto desapareceu de um fotograma para o outro");
+      if (!e.className.includes("bo-saida")) throw new Error("ainda não");
+      return e;
+    });
+    const classes = esq.className.split(/\s+/);
+    // `bo-saida-fundo` e não `bo-saida`: zero de deslocação. Quatro píxeis a
+    // subir fariam a mancha cinzenta DESLIZAR por cima da fotografia — uma
+    // coisa a mover-se onde não se moveu nada.
+    expect(classes, "o esqueleto sai a deslizar por cima da fotografia").toContain(
+      "bo-saida-fundo",
+    );
+    // E a pega dos testes cala-se: a célula já não está à espera de nada.
+    expect(celula.querySelector("[data-a-carregar]")).toBeNull();
+  });
+
+  it("e quando a leitura FALHA, ele também se cala — não fica cinzento por cima do aviso", async () => {
+    // A célula esteve mesmo à espera (a leitura começou «a caminho»), portanto
+    // há esqueleto e ele esbate-se. O que não pode acontecer é ficar aceso: por
+    // baixo dele está a única coisa que ela pode fazer — «Não carregou» e o
+    // botão de tentar outra vez.
+    seedDraft(1);
+    assetsFalham = true;
+    renderStudio();
+    await screen.findAllByText(/Não carregou/i);
+    for (const c of celulas()) {
+      const esq = esqueleto(c);
+      if (!esq) continue;
+      expect(esq.className, "o esqueleto ficou aceso por cima do aviso").toContain(
+        "bo-saida-fundo",
+      );
+      expect(c.querySelector("[data-a-carregar]")).toBeNull();
+    }
   });
 });

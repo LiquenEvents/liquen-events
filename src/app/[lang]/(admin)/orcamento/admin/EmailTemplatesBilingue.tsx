@@ -5,7 +5,8 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
-import { ESTADO, PRESSAO } from "./ui/movimento";
+import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 import { insertToken } from "@/lib/email-template-format";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { renderizarAssunto, renderizarCorpo, validarModelo } from "@/lib/email-template-engine";
@@ -167,6 +168,38 @@ export default function EmailTemplatesBilingue() {
   const [aEnviarTeste, setAEnviarTeste] = useState(false);
 
   const modelo = useMemo(() => modelos.find((m) => m.chave === chave) ?? null, [modelos, chave]);
+
+  /**
+   * ── A MARCA DA LÍNGUA ACTIVA ANDA ────────────────────────────────────────
+   *
+   * A barra «Português / English» é escrita à mão, fora do `ui/Segmented.tsx`,
+   * e trocava de língua a corte seco: o fundo verde apagava-se num separador e
+   * acendia-se no outro no mesmo fotograma. As cores tinham os 120 ms do
+   * `ESTADO`; a posição não tinha tempo nenhum.
+   *
+   * É o mesmo gancho do `NavEstudio` e da barra de cima do `EmailTemplates` —
+   * `useMarcaQueAnda`, medido e não calculado, porque «Português» e «English»
+   * não medem o mesmo e porque um deles pode trazer «(por escrever)» ao lado,
+   * o que lhe muda a largura sem nada no índice o dizer. E porque a barra tem
+   * `flex-wrap`: a 390 px os dois passam a duas linhas e a marca desce com o
+   * activo, que é para isso que o gancho devolve os DOIS eixos.
+   *
+   * ── PORQUE É QUE A CHAVE É O MODELO *E* A LÍNGUA ─────────────────────────
+   *
+   * A barra só existe depois de haver modelo aberto — antes disso o `ref` está
+   * vazio e não há nada a medir. Pôr as duas coisas na chave é o que manda
+   * medir tanto quando ela muda de língua (o gesto) como quando a barra nasce
+   * ao abrir o primeiro modelo (senão a marca só aparecia à segunda troca).
+   *
+   * O gancho é chamado AQUI, acima dos `return` de espera e de falha, para a
+   * ordem dos ganchos não depender do que o servidor respondeu.
+   */
+  const barraDaLinguaRef = useRef<HTMLDivElement>(null);
+  const { marca: marcaDaLingua, podeAndar: linguaPodeAndar } = useMarcaQueAnda(
+    barraDaLinguaRef,
+    '[aria-selected="true"]',
+    `${chave ?? ""}:${idioma}`,
+  );
 
   const abrir = useCallback((m: ModeloBilingue, lingua: Idioma) => {
     const lado = m[lingua];
@@ -621,10 +654,33 @@ export default function EmailTemplatesBilingue() {
                 falta — e a etiqueta di-lo, em vez de o ecrã fingir que está
                 tudo escrito. */}
             <div
-              className="flex flex-wrap gap-1.5 mb-4"
+              ref={barraDaLinguaRef}
+              /* `relative`: é esta barra o `offsetParent` das medidas que o
+                 gancho devolve, e é dentro dela que a pílula se posiciona. */
+              className="relative flex flex-wrap gap-1.5 mb-4"
               role="tablist"
               aria-label="Língua do modelo"
             >
+              {/* A pílula que anda, entre um separador e o outro. `aria-hidden`
+                  porque não diz nada que o `aria-selected` não diga melhor — é
+                  desenho, não informação. Só anda a partir do segundo desenho
+                  (`linguaPodeAndar`): sem isso, abrir um modelo fazia-a deslizar
+                  do canto até ao «Português», a anunciar uma troca de língua que
+                  ninguém fez. E `MARCA` traz `motion-safe:`, portanto quem pediu
+                  para não animar vê-a mudar de sítio num fotograma. */}
+              {marcaDaLingua && (
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute left-0 top-0 rounded-md bg-[#5F7C66] ${
+                    linguaPodeAndar ? MARCA : ""
+                  }`}
+                  style={{
+                    translate: `${marcaDaLingua.x}px ${marcaDaLingua.y}px`,
+                    width: marcaDaLingua.largura,
+                    height: marcaDaLingua.altura,
+                  }}
+                />
+              )}
               {(["pt", "en"] as Idioma[]).map((l) => {
                 const activo = l === idioma;
                 const vazio = !modelo[l].subject.trim() && !modelo[l].body.trim();
@@ -634,9 +690,17 @@ export default function EmailTemplatesBilingue() {
                     role="tab"
                     aria-selected={activo}
                     onClick={() => abrir(modelo, l)}
-                    className={`px-3 py-1.5 rounded-md text-xs ${ESTADO} ${PRESSAO} ${
+                    /* `relative`: o rótulo fica POR CIMA da pílula, que é um
+                       irmão absoluto desenhado antes dele. */
+                    className={`relative px-3 py-1.5 rounded-md text-xs ${ESTADO} ${PRESSAO} ${
                       activo
-                        ? "bg-[#5F7C66] text-white"
+                        ? // O fundo próprio é a rede de antes de a pílula estar
+                          // medida — no HTML do servidor não há medida nenhuma, e
+                          // um separador activo sem fundo lia-se como inactivo.
+                          // Sai no instante em que ela está no sítio: nunca há
+                          // dois fundos, e nunca há nenhum. É a manobra do
+                          // `Segmented`, contada lá por extenso.
+                          `text-white ${marcaDaLingua ? "" : "bg-[#5F7C66]"}`
                         : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
                     }`}
                   >
@@ -829,11 +893,23 @@ export default function EmailTemplatesBilingue() {
                 pré-visualização continua a funcionar com os dados de exemplo,
                 e um painel vermelho por cima dela diria que rebentou tudo. O
                 que falhou foi só a lista de pedidos — diz-se onde ela está, e
-                dá-se por onde repetir. */}
+                dá-se por onde repetir.
+
+                ── E APARECE DE ALGUM SÍTIO ────────────────────────────────
+                `.bo-entrada` — 240 ms e QUATRO píxeis, a distância de um
+                rótulo. Nasce colado ao `<select>` logo acima, que é o campo de
+                que ele fala: a lista que ficou só com os dados de exemplo é
+                aquela. Os oito píxeis da `.bo-entrada-folha` são de quem vem
+                de fora do ecrã, e este vem daqui.
+
+                A frase está legível bem antes dos 240 ms — a curva da casa
+                gasta a distância quase toda no arranque —, que é a regra que
+                manda num aviso: a animação diz de onde ele veio, nunca atrasa
+                o que ele tem para dizer. */}
             {falhaNosPedidos !== null && (
               <div
                 role="alert"
-                className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[#f6e6df]/60 px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]"
+                className="bo-entrada mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[#f6e6df]/60 px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]"
               >
                 <span>
                   Não foi possível ler os pedidos para pré-visualizar

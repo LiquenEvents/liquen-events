@@ -5,7 +5,8 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
-import { ESTADO, PRESSAO } from "./ui/movimento";
+import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import EmailTemplatesBilingue from "./EmailTemplatesBilingue";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -1032,27 +1033,102 @@ function EditorClassico() {
  */
 export default function EmailTemplates() {
   const [vista, setVista] = useState<"modelos" | "classico">("modelos");
+
+  /**
+   * ── A MARCA DO SEPARADOR ACTIVO ANDA, EM VEZ DE ACENDER NOUTRO SÍTIO ──────
+   *
+   * Esta barra é escrita à mão — está fora do `ui/Segmented.tsx`, que é o
+   * primitivo que já tem a marca a deslizar. O gesto era o mesmo do índice do
+   * estúdio antes de ele o receber: o fundo verde apagava-se num separador e
+   * acendia-se no outro, no mesmo fotograma, e nada dizia que se veio de um e
+   * se foi para o outro. As cores tinham os 120 ms do `ESTADO`; a POSIÇÃO não
+   * tinha tempo nenhum, porque não havia nada que se movesse.
+   *
+   * `useMarcaQueAnda` é a medida do `Segmented` e da barra lateral extraída
+   * para um sítio só, e é o mesmo gancho que o `NavEstudio` usa. Mede-se em vez
+   * de se calcular porque «Modelos» e «Editor clássico» não medem o mesmo, e
+   * porque esta barra tem `flex-wrap`: a 390 px os dois separadores passam a
+   * duas linhas e a marca tem de descer com o activo — é para isso que o eixo
+   * `y` vem no gancho, e é por isso que ele traz um `ResizeObserver`.
+   *
+   * O selector é `[aria-selected="true"]`, que é como um `role="tab"` diz qual
+   * é o activo. Não se inventa um `data-*` para isto: a informação já está no
+   * ARIA, e duas fontes para a mesma verdade divergem.
+   */
+  const barraRef = useRef<HTMLDivElement>(null);
+  const { marca, podeAndar } = useMarcaQueAnda(barraRef, '[aria-selected="true"]', vista);
+  const temMarca = marca !== null;
+
   const separador = (chave: "modelos" | "classico", rotulo: string) => (
     <button
       role="tab"
       aria-selected={vista === chave}
       onClick={() => setVista(chave)}
-      className={`px-3 py-1.5 rounded-md text-xs ${ESTADO} ${PRESSAO} ${
+      /* `relative`: o rótulo tem de ficar POR CIMA da pílula, que é um irmão
+         absoluto desenhado antes dele. */
+      className={`relative px-3 py-1.5 rounded-md text-xs ${ESTADO} ${PRESSAO} ${
         vista === chave
-          ? "bg-[#5F7C66] text-white"
+          ? // O fundo próprio é a rede de antes de a pílula estar medida — entre
+            // o HTML do servidor e o primeiro fotograma do React não há medida
+            // nenhuma, e um separador activo sem fundo lia-se como inactivo.
+            // Sai no instante em que a pílula está no sítio: nunca há dois
+            // fundos ao mesmo tempo, e nunca há nenhum. É a manobra do
+            // `Segmented`, e a razão está escrita lá por extenso.
+            `text-white ${temMarca ? "" : "bg-[#5F7C66]"}`
           : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
       }`}
     >
       {rotulo}
     </button>
   );
+
   return (
     <div>
-      {/* Empilha e embrulha a 390 px como tudo o resto deste ecrã. */}
-      <div className="flex flex-wrap gap-1.5 mb-4" role="tablist" aria-label="Editor de modelos">
+      {/* Empilha e embrulha a 390 px como tudo o resto deste ecrã.
+          `relative` porque é ESTA barra o `offsetParent` das medidas que o
+          gancho devolve, e é dentro dela que a pílula se posiciona. */}
+      <div
+        ref={barraRef}
+        className="relative flex flex-wrap gap-1.5 mb-4"
+        role="tablist"
+        aria-label="Editor de modelos"
+      >
+        {/* A pílula que anda. `aria-hidden` porque não diz nada que o
+            `aria-selected` de cada separador não diga melhor — é desenho, não
+            informação. `MARCA` traz `motion-safe:` nas duas classes, portanto
+            quem pediu para não animar vê-a mudar de sítio de um fotograma para
+            o outro; e só entra depois do primeiro desenho (`podeAndar`), senão
+            ao abrir o ecrã ela deslizava do canto até ao separador activo, a
+            anunciar uma transição que ninguém provocou. */}
+        {marca && (
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-0 top-0 rounded-md bg-[#5F7C66] ${
+              podeAndar ? MARCA : ""
+            }`}
+            style={{
+              translate: `${marca.x}px ${marca.y}px`,
+              width: marca.largura,
+              height: marca.altura,
+            }}
+          />
+        )}
         {separador("modelos", "Modelos")}
         {separador("classico", "Editor clássico")}
       </div>
+      {/* ── E O PAINEL? JÁ SE APRESENTA, E NÃO LEVA SEGUNDA ENTRADA ──────────
+          Os dois lados montam de raiz a cada troca (são componentes
+          diferentes, portanto o React desmonta um e monta o outro), e a raiz de
+          cada um já traz a `.bo-cena` — 600 ms, a banda de apresentação — para
+          quando os modelos chegam do servidor. Uma `.view-in` aqui por cima
+          somava uma segunda entrada de 240 ms à mesma troca: dois gestos para
+          uma coisa só, que é exactamente o «hesitar entre as duas velocidades»
+          que o `ui/movimento.ts` proíbe.
+
+          E o que aparece no INSTANTE do clique é o esqueleto, enquanto a
+          leitura vai a caminho. Esse não leva entrada nenhuma de propósito: um
+          estado de espera que demorasse 240 ms a ficar visível é uma animação a
+          atrasar uma tarefa, que é a regra que não se quebra. */}
       {vista === "modelos" ? <EmailTemplatesBilingue /> : <EditorClassico />}
     </div>
   );
