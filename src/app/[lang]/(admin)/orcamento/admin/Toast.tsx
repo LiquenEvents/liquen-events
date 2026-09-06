@@ -515,68 +515,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (pilhaRef.current) pilhaRef.current.style.minWidth = "";
   }, [aSair]);
 
-  /**
-   * ═════════════════════════════════════════════════════════════════════════
-   * O AVISO NÃO PODE FICAR `inert` — e o `z-index` não tinha nada a ver
-   * ═════════════════════════════════════════════════════════════════════════
-   *
-   * O DEFEITO, medido: com o painel do pedido aberto num telemóvel, o «×» de um
-   * aviso não se conseguia tocar. `document.elementFromPoint` no centro do
-   * botão devolvia o conteúdo do painel POR BAIXO, e um toque a sério não
-   * fechava nada — enquanto os avisos se viam, inteiros, por cima do painel.
-   *
-   * A suspeita óbvia era empilhamento: a pilha é `z-[80]`, o painel `z-50`, e
-   * um `z-index` só compete dentro do seu contexto. MEDIDO num Chromium,
-   * subindo a árvore a partir dos dois: **não há contexto de empilhamento
-   * nenhum pelo caminho.** Da pilha até ao `<html>` são
-   * `main#conteudo` → `body` → `html`, os três `position: static`,
-   * `z-index: auto`, sem `transform`, sem `filter`, sem `isolation`, sem
-   * `opacity` e sem `will-change`. Os dois competem no mesmo contexto (o da
-   * raiz) e o 80 ganha ao 50 — que é precisamente por isso que os avisos SE
-   * VÊEM. A pintura estava certa desde sempre.
-   *
-   * O que estava errado era outra coisa, e estava escrita num atributo: com o
-   * painel aberto, a pilha tinha **`inert` e `aria-hidden="true"`**. Um
-   * elemento `inert` continua a ser PINTADO e deixa de existir para o teste de
-   * acerto — o toque atravessa-o como se não estivesse lá. É o retrato exacto
-   * do sintoma, e explica porque é que aumentar o `z-index` nunca ia resolver
-   * nada.
-   *
-   * Quem os põe é o `useFocusTrap`: quando o painel abre como gaveta, ele sobe
-   * do painel até ao `<body>` e marca, em cada nível, os IRMÃOS por onde não
-   * subiu. A pilha é irmã da aplicação dentro do `<main>` — logo, apanha.
-   *
-   * ── E UM PORTAL PARA O `<body>` NÃO RESOLVE ISTO ────────────────────────
-   * Foi a primeira resposta a ser MEDIDA, e não passa. As variáveis chegam lá
-   * (um nó posto no `<body>` lê `--bo-barra-inferior: 72px` e
-   * `--bo-barra-accao: 90px` e calcula `bottom: 174px`, porque a primeira é
-   * declarada NO `body` e a segunda no `documentElement`, e as custom
-   * properties herdam-se) — mas o `inert` chega lá também: o `useFocusTrap`
-   * sobe ATÉ ao `body` e marca os irmãos do `<main>`, que é onde o portal
-   * aterraria. Medido na mesma corrida: com o painel aberto, todos os filhos
-   * do `<body>` que não sejam o `<main>` estão `inert`. Um portal custava a
-   * ordem de pintura, o SSR e o FLIP a medir irmãos, e não comprava nada.
-   *
-   * Fica portanto a pilha a recusar-se. A alternativa mais limpa — o
-   * `useFocusTrap` saltar quem se declara acima dos modais — é UMA LINHA e
-   * está fora deste ficheiro; enquanto não for feita, é aqui que a pilha se
-   * defende. E defende-se com razão: o `role="alert"` desta pilha é onde
-   * aparece «não foi possível guardar». Um aviso que não se pode ler nem
-   * dispensar enquanto há um painel aberto é pior do que não haver aviso.
-   */
-  useEffect(() => {
-    const pilha = pilhaRef.current;
-    if (!pilha || typeof MutationObserver !== "function") return;
-    const naoMeApagues = () => {
-      if (pilha.hasAttribute("inert")) pilha.removeAttribute("inert");
-      if (pilha.getAttribute("aria-hidden") === "true") pilha.removeAttribute("aria-hidden");
-    };
-    // Uma vez já: o painel pode estar aberto antes de isto montar.
-    naoMeApagues();
-    const olho = new MutationObserver(naoMeApagues);
-    olho.observe(pilha, { attributes: true, attributeFilter: ["inert", "aria-hidden"] });
-    return () => olho.disconnect();
-  }, []);
+  /* ── A PILHA DECLARA-SE ACIMA DOS MODAIS, E ISSO CHEGA ────────────────────
+     Aqui esteve uma defesa por `MutationObserver`: a pilha vigiava-se a si
+     própria e apagava o `inert` sempre que a armadilha de foco lho punha. Era
+     uma pilha a discutir com um armadilhador, e não um acordo — dois
+     mecanismos para a mesma coisa, com o segundo a correr para sempre.
+
+     A raiz está corrigida no `useFocusTrap`: quem tem `data-acima-dos-modais`
+     não se inertiza. O atributo está no `<div>` da pilha, aqui em baixo. */
 
   /**
    * Um aviso a sair pode ser deitado fora pelo tecto do `MAX_TOASTS` antes de a
@@ -637,6 +583,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           fica, encostada ao fundo: por isso o `lg:` também a soma. */}
       <div
         ref={pilhaRef}
+        data-acima-dos-modais=""
         className="fixed bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-accao,0px)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-[calc(var(--bo-barra-accao,0px)+1.5rem)]"
       >
         {/* `relative` porque o aviso que sai passa a `absolute` DENTRO da sua
