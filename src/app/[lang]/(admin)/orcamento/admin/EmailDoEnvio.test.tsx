@@ -3,6 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { escolher } from "../../../../../../test/escolher";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import EmailDoEnvio from "./EmailDoEnvio";
 
@@ -148,6 +149,25 @@ describe("EmailDoEnvio", () => {
     render(<Estudio />);
     await waitFor(() => expect(caixa().value).toContain("Olá Maria & Zé,"));
 
+    /* ── A ORDEM AQUI É DE PROPÓSITO, E CUSTOU UMA MANHÃ ────────────────────
+       O campo «Modelo» deixou de ser um `<select>`: é o `ui/Escolha`, e escolher
+       nele são DOIS gestos (abrir, carregar) em vez de um `selectOptions`.
+
+       Isso destapou uma corrida que já cá estava e que o gesto único escondia:
+       este ecrã relê o rascunho com uma pausa (`ESPERA_MS`), e essa releitura
+       reentra sempre que o componente volta a desenhar — abrir a lista é um
+       desenho. Com a `resposta` já trocada ANTES de abrir, era a releitura (com
+       o modelo VELHO no pedido) que trazia o texto novo e punha o `modelo` no
+       novo valor. A seguir, carregar na opção não mudava nada — o campo já
+       estava nesse valor — e o teste passava a medir a releitura em vez de
+       medir a troca.
+
+       Verde a dizer a coisa errada. Agora abre-se primeiro, troca-se a resposta
+       com a lista JÁ aberta, e só então se escolhe: o pedido que se mede é o da
+       troca, e não o da pausa. */
+    const campoDoModelo = screen.getByLabelText("Modelo");
+    await userEvent.click(campoDoModelo);
+
     resposta = {
       ...RASCUNHO,
       rascunho: {
@@ -158,9 +178,12 @@ describe("EmailDoEnvio", () => {
         texto: "Olá Maria & Zé,\n\nFoi um gosto falar convosco.",
       },
     };
-    await userEvent.selectOptions(screen.getByLabelText("Modelo"), "conversa-primeira");
+
+    await userEvent.click(screen.getByRole("option", { name: "Primeira conversa" }));
     await waitFor(() => expect(caixa().value).toContain("Foi um gosto falar convosco."));
-    expect(pedidos.at(-1)!.corpo.modelo).toBe("conversa-primeira");
+    // `some` e não `at(-1)`: a releitura com pausa pode chegar depois desta, e o
+    // que se mede é que a TROCA foi pedida — não qual foi o último pedido.
+    expect(pedidos.map((p) => p.corpo.modelo)).toContain("conversa-primeira");
     expect(screen.getByTestId("modelo-do-envio")).toHaveTextContent("conversa-primeira");
   });
 
@@ -178,7 +201,10 @@ describe("EmailDoEnvio", () => {
       ...RASCUNHO,
       rascunho: { ...RASCUNHO.rascunho, chave: "conversa-primeira", texto: "Outro texto." },
     };
-    await userEvent.selectOptions(screen.getByLabelText("Modelo"), "conversa-primeira");
+    // O campo «Modelo» deixou de ser um `<select>`: é o `ui/Escolha` (ver o
+    // cabeçalho desse ficheiro), portanto escolhe-se pelo RÓTULO e não pelo
+    // valor. A tradução vive em `test/escolher.ts`.
+    await escolher(userEvent, screen.getByLabelText("Modelo"), "Primeira conversa");
     await waitFor(() => expect(caixa().value).toBe("Outro texto."));
 
     await userEvent.click(screen.getByRole("button", { name: /Repor o meu texto/ }));

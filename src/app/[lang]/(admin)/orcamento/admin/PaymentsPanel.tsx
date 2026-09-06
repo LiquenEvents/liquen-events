@@ -814,7 +814,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
 
       <form onSubmit={submit} aria-label="Registar pagamento" className={GRID}>
         <Escolha
-          refDoControlo={firstFieldRef}
+          controloRef={firstFieldRef}
           aria-label="Tipo de pagamento"
           valor={kind}
           aoMudar={(v) => pickKind(v as PaymentKind)}
