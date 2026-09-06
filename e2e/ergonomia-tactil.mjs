@@ -499,12 +499,10 @@ export async function irParaDestinoMovel(page, rotulo) {
   await abrirGaveta(page);
   const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
   await nav.waitFor({ state: "visible" });
-  // O grupo "Mais" da coluna do computador fica ABERTO depois do primeiro
-  // destino lá de dentro; no telemóvel nem existe. Por isso a pergunta é
-  // sempre "o botão está à vista?", nunca "esta vista é das de dentro?".
-  const item = nav.getByRole("button", { name: rotulo, exact: true });
-  if ((await item.count()) === 0) {
-    await nav.getByRole("button", { name: "Mais", exact: true }).click();
-  }
-  await item.first().click();
+  // Sem dobra em lado nenhum: espera-se pelo destino, não por um abridor que
+  // já não existe. (O `count()` de antes era um instantâneo, e o clique no
+  // «Mais» segurava a corrida por acidente.)
+  const item = nav.getByRole("button", { name: rotulo, exact: true }).first();
+  await item.waitFor({ state: "visible", timeout: 30000 });
+  await item.click();
 }
