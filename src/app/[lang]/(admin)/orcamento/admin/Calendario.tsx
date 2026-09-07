@@ -37,6 +37,46 @@ const STATUS_COLOR: Record<string, string> = {
   rejeitado: "#5a5a55",
 };
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ESTADO DE UM PEDIDO NÃO PODE VIVER SÓ NA COR DO PONTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `STATUS_COLOR` acima pinta um ponto de 6 px à frente de cada pedido — na
+ * grelha do mês e no painel do dia — e era o ÚNICO sítio onde o estado
+ * aparecia. O nome acessível do botão dizia «Abrir pedido de Marta Nunes —
+ * Casamento» e mais nada; o ponto do painel do dia é `aria-hidden`. Ou seja:
+ * para quem lê com um leitor de ecrã o estado simplesmente não existia, e para
+ * quem vê ficava dependente de distinguir cinco tons.
+ *
+ * E dois deles não se distinguem mesmo com visão de cor completa: «Novo» é
+ * `#8a8a82` e «Perdido» é `#5a5a55` — dois cinzentos a 6 px, lado a lado no
+ * mesmo mês. Um pedido novo e um pedido perdido são as duas pontas opostas do
+ * funil, e eram o mesmo ponto cinzento.
+ *
+ * A cura é a PALAVRA, e é a mesma palavra do resto da casa (o `STATUS_META` da
+ * Visão Geral): à vista no painel do dia, onde há linha para ela, e no nome
+ * acessível dos dois sítios. A cor do ponto fica como está — continua a ser um
+ * atalho útil para quem já a conhece —, mas deixa de ser a única via.
+ *
+ * Porque é que NÃO leva também um ícone por estado: a etiqueta da grelha é
+ * `text-[9px]` com o nome já truncado, e o ponto tem 6 px. Um glifo diferente
+ * por estado nesse tamanho não se lê — acrescenta ruído sem acrescentar
+ * informação, e a informação que falta já vai na palavra.
+ */
+const STATUS_LABEL: Record<string, string> = {
+  pendente: "Novo",
+  em_revisao: "Aguardar resposta",
+  cotado: "Proposta enviada",
+  aceite: "Ganho",
+  rejeitado: "Perdido",
+};
+
+/** A palavra do estado, ou o valor cru se for um estado que o mapa não conhece. */
+function estadoEmPalavra(status: string): string {
+  return STATUS_LABEL[status] ?? status ?? "—";
+}
+
 const KIND_META: Record<CalendarEventKind, { label: string; color: string }> = {
   reuniao: { label: "Reunião", color: "#7a8caa" },
   evento: { label: "Evento", color: "#7c854b" },
@@ -834,7 +874,19 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
                 ...dayEvents.map((ev) => KIND_META[ev.kind].color),
               ].slice(0, 4);
-              const dayLabel = `${c.day} de ${MONTHS[month]}${isToday ? " (hoje)" : ""} — ${
+              /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
+                 O nome acessível da célula era «9 de Janeiro — 2 eventos», sem
+                 ANO. Num calendário em que se anda para trás e para a frente
+                 mês a mês — e esta casa fecha datas com um ano e meio de
+                 antecedência —, quem o percorre com um leitor de ecrã ouve
+                 «9 de Janeiro» e não tem como saber se está no ano que abriu
+                 ou dois cliques à frente. O cabeçalho diz «Janeiro 2026», mas
+                 fica lá atrás: quando se chega às células já se ouviu, e não
+                 se volta a ouvir a cada dia.
+
+                 O ano vem do `year` que a própria grelha já usa para se
+                 desenhar, portanto não há segunda fonte para discordar. */
+              const dayLabel = `${c.day} de ${MONTHS[month]} de ${year}${isToday ? " (hoje)" : ""} — ${
                 total > 0
                   ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
                   : "Enter para adicionar"
@@ -910,11 +962,12 @@ export default function Calendario({ quotes, onOpen }: Props) {
                           e.stopPropagation();
                           onOpen(q);
                         }}
-                        aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
-                        title={`${q.name} — ${eventTypeLabel(q)}`}
+                        aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                        title={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
                         className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
+                          aria-hidden="true"
                           className="w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ background: STATUS_COLOR[q.status] }}
                         />
@@ -1090,8 +1143,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
                         {q.name}
                       </span>
+                      {/* A palavra do estado À VISTA — aqui há linha para ela.
+                          Na grelha do mês o estado ia só na cor do ponto (ver
+                          o `STATUS_LABEL`); este painel é onde o dia se lê a
+                          sério, e é onde a palavra tem de estar. */}
                       <span className="block text-foreground/40 text-[10px] truncate">
-                        {eventTypeLabel(q)}
+                        {estadoEmPalavra(q.status)}
+                        {` · ${eventTypeLabel(q)}`}
                         {q.guests ? ` · ${q.guests} convidados` : ""}
                       </span>
                     </span>
