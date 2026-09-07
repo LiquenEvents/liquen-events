@@ -144,7 +144,6 @@ import { depositPercentOf } from "@/lib/proposal-doc";
 import {
   ASPETO_POR_OMISSAO,
   alturaDaLegenda,
-  aspetoDaCaixa,
   aspetoDaCapa,
   caixasDoMoodboard,
   layoutSugerido,
@@ -7493,7 +7492,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
                     : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
                 } ${ESTADO} ${PRESSAO}`}
-                title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
+                title="Acrescenta uma caixa em inglês por baixo de cada campo de texto"
               >
                 <span aria-hidden="true">{bilingue ? "✓" : "+"}</span>
                 Proposta bilingue (PT + EN)
@@ -8060,6 +8059,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                            * cartão discordavam uma da outra.
                            */
                           const alturaLegenda = alturaDaLegenda(linhasDaLegendaAprox(b.annotation));
+                          /**
+                           * As caixas que a página vai MESMO desenhar.
+                           *
+                           * Já não decidem a forma das células da grelha — ver o
+                           * `aspeto` mais abaixo, e a razão por extenso. Ficam
+                           * porque o aviso da última fila (`filaDesequilibrada`)
+                           * as lê, e esse tem de contar as filas da PÁGINA e não
+                           * as do ecrã.
+                           */
                           const caixas = caixasDoMoodboard(
                             layoutDoBoard,
                             aspectos,
@@ -8505,20 +8513,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               semRemover
                                               onRemove={() => removeBoardImageAt(bi, ii)}
                                               onMedida={(a) => registarAspeto(path, a)}
-                                              // A forma da célula que ESTA foto vai ocupar na
-                                              // página — sai da caixa que a disposição escolhida
-                                              // lhe dá, e muda com ela e com o número de fotos.
-                                              // Nenhuma delas é quadrada. As que já não são
-                                              // impressas ficam quadradas: não têm caixa nenhuma.
+                                              // ── TODAS AS CÉLULAS COM A MESMA FORMA ──────────
+                                              // Pedido dela, a olhar para a grelha: «as fotos
+                                              // umas são maiores que outras. coloca tudo igual
+                                              // aqui».
                                               //
-                                              // Pela ORDEM DE DESENHO e não pela posição no
-                                              // array: com uma foto marcada como principal, a
-                                              // página troca-a para a caixa grande, e a célula
-                                              // tem de mostrar a forma dessa caixa (ver
-                                              // `ordemDasFotos`).
-                                              aspeto={aspetoDaCaixa(
-                                                caixas[ordemDeDesenho.indexOf(ii)],
-                                              )}
+                                              // O que estava aqui era a forma da CAIXA que esta
+                                              // foto vai ocupar na página: a do destaque é alta,
+                                              // as da grelha da direita são baixas, e por isso a
+                                              // grelha ficava aos degraus. Não era descuido —
+                                              // existia para ela não escolher uma foto pelo que
+                                              // via e o cliente receber a MESMA foto cortada
+                                              // noutro sítio (ver o `aspeto` no `Thumb`).
+                                              //
+                                              // Foi-lhe dito o que se perdia, com estas palavras,
+                                              // e ela escolheu igualar à mesma. Fica escrito
+                                              // porque quem vier a seguir encontra o `aspeto`
+                                              // documentado no `Thumb` e pergunta porque é que
+                                              // este sítio não o usa: não é esquecimento.
+                                              //
+                                              // E igualar aqui não a deixa às cegas: o diagrama
+                                              // da disposição continua a desenhar as caixas
+                                              // verdadeiras, e o `cortadas` aqui em cima continua
+                                              // a dizer, foto a foto, quanto é que cada uma perde
+                                              // no recorte. Perdeu-se ver a forma; não se perdeu
+                                              // ser avisada.
+                                              aspeto={1}
                                               foraDoPdf={
                                                 ordemDeDesenho.indexOf(ii) >= MOOD_BOARD_MAX_IMAGES
                                               }
