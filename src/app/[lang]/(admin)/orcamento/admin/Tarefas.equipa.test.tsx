@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
 import Tarefas from "./Tarefas";
@@ -73,15 +73,49 @@ async function montar() {
 }
 
 describe("com contas configuradas", () => {
+  /**
+   * ── A CORRIDA QUE ESTE FICHEIRO TEVE, E O QUE ELA ENSINOU ────────────────
+   *
+   * Estes dois testes esperavam por um `<select>` e falhavam ~4 vezes em 8,
+   * medido num laço de corridas repetidas — primeiro só na CI, depois também
+   * aqui. São DUAS trocas em cima uma da outra:
+   *
+   *  1. Os dois ramos do campo (a `Escolha` quando há equipa, o `<input>` de
+   *     texto livre quando não há) passaram a ter ambos `aria-label`. Antes o
+   *     `<input>` não tinha rótulo nenhum, e era ISSO, por acidente, que fazia
+   *     a consulta esperar pela equipa.
+   *
+   *  2. A `Escolha` troca de FORMA depois de montar. Sem JavaScript sai o
+   *     `<select>` nativo, para o campo funcionar na mesma; com rato torna-se
+   *     um combobox do APG — `role="combobox"` num `<button>`.
+   *
+   * Esperar pelo `<select>` era esperar pelo estado TRANSITÓRIO. A mensagem de
+   * erro dizia-o à letra — «expected 'BUTTON' to be 'SELECT'» — e eu li-a ao
+   * contrário três vezes: o botão não era o acidente, era o destino.
+   *
+   * E em modo de botão não há `<option>` nenhuma na árvore: esta `Escolha` não
+   * leva `name`, logo não há `<select>` escondido a acompanhá-la. As opções só
+   * existem com a lista ABERTA. Daí o ajudante esperar pela forma final, abrir,
+   * e ler por papel.
+   */
+  async function opcoesDoResponsavel(): Promise<string[]> {
+    const gatilho = await waitFor(() => {
+      const el = screen.getByLabelText(/Responsável/i);
+      expect(el.tagName, "ainda não assentou na forma final").toBe("BUTTON");
+      return el;
+    });
+    fireEvent.click(gatilho);
+    const opcoes = await screen.findAllByRole("option");
+    return opcoes.map((o) => (o.textContent ?? "").trim());
+  }
+
   it("o responsável passa a escolher-se de uma lista", async () => {
     await montar();
-    const campo = await screen.findByLabelText(/Responsável/i);
+    const nomes = await opcoesDoResponsavel();
     expect(
-      campo.tagName,
-      "o responsável continua a ser texto livre: «Ana» e «ana» são duas pessoas",
-    ).toBe("SELECT");
-    const nomes = [...campo.querySelectorAll("option")].map((o) => o.textContent);
-    expect(nomes).toContain("Ana");
+      nomes,
+      "o responsável voltou a ser texto livre: «Ana» e «ana» seriam duas pessoas",
+    ).toContain("Ana");
     expect(nomes).toContain("Catarina");
   });
 
@@ -89,9 +123,11 @@ describe("com contas configuradas", () => {
     // Uma lista sem saída obriga a escolher alguém para criar uma tarefa, e
     // muitas tarefas não são de ninguém em particular.
     await montar();
-    const campo = await screen.findByLabelText(/Responsável/i);
-    const vazio = [...campo.querySelectorAll("option")].find((o) => o.getAttribute("value") === "");
-    expect(vazio?.textContent).toMatch(/sem responsável/i);
+    const nomes = await opcoesDoResponsavel();
+    expect(
+      nomes.some((n) => /sem responsável/i.test(n)),
+      `nenhuma opção diz «sem responsável» — só há: ${nomes.join(", ")}`,
+    ).toBe(true);
   });
 
   it("o filtro mostra quem NÃO tem tarefas nenhumas", async () => {
