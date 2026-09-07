@@ -364,7 +364,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 size="sm"
                 className="alvo-toque"
                 onClick={() => printEventDossier(quote)}
-                title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
+                title="Imprimir o dossier completo: contactos, financeiro, cronograma e convidados"
                 iconLeft={
                   <svg
                     width="14"

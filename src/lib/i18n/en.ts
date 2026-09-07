@@ -402,7 +402,7 @@ export const en: Dict = {
       resposta24: "Tailored proposal",
       errNome: "Please enter your name",
       errEmail: "Invalid email",
-      error: "We couldn't send your message. Please try again or contact us on WhatsApp.",
+      error: "Your message did not go through. Please try again or contact us on WhatsApp.",
       successEyebrow: "Sent successfully",
       successTitle1: "Message",
       successTitle2: "received.",
@@ -507,7 +507,7 @@ export const en: Dict = {
     enviar: "Send request",
     enviando: "Sending…",
     ouWhatsApp: "or via WhatsApp",
-    error: "We couldn't send your request. Please try again or reach us on WhatsApp.",
+    error: "Your request did not go through. Please try again or reach us on WhatsApp.",
     // Ver `pt.ts` para o porquê destas duas.
     requiredNote: "All fields are required, except the contact: either one will do.",
     avisoSemEmail:
@@ -659,7 +659,7 @@ export const en: Dict = {
     contactIntroPlural: "For any questions, you can contact us directly:",
     contactWhatsapp: "Chat on WhatsApp",
     contactWhatsappSub: "The fastest way to reach us.",
-    notFoundTitle: "We couldn't find this request",
+    notFoundTitle: "This link does not open any request",
     notFoundBody:
       "The link may be incomplete or no longer valid. If you sent a request and didn't receive our confirmation email, get in touch and we'll sort it out the same day.",
     voltarInicio: "Back to Home",
@@ -700,7 +700,8 @@ export const en: Dict = {
     linkInvalidBody:
       "This proposal link is no longer valid. Get in touch and we'll gladly send you a new one.",
     notFoundTitle: "Proposal not found",
-    notFoundBody: "We couldn't find this proposal. If you think this is a mistake, get in touch.",
+    notFoundBody:
+      "This link does not open any proposal. If you think this is a mistake, get in touch and we'll send you the right one.",
     greeting: "Hello",
     intro:
       "We have prepared this proposal with great care for your day. Take your time: any adjustment is welcome, just reply to the email.",
@@ -785,10 +786,10 @@ export const en: Dict = {
     notFoundTitle: "This path doesn't exist.",
     notFoundText:
       "The page you're looking for may have been moved or is no longer available. But your next event is still waiting to be created.",
-    errorEyebrow: "Something went wrong",
-    errorTitle: "An unexpected error occurred.",
+    errorEyebrow: "Page stopped",
+    errorTitle: "This page did not load.",
     errorText:
-      "We're sorry for the inconvenience. Please try again. If the problem persists, contact us directly and we'll be glad to help.",
+      "Nothing you filled in was lost. Try loading it again and, if it happens again, take one of the routes below.",
     retry: "Try again",
     loading: "Loading",
   },

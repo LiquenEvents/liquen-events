@@ -278,7 +278,10 @@ export default function NotificationBell() {
           setASondar(true);
           void sondar().finally(() => setASondar(false));
         }}
-        title="Não foi possível saber se as notificações estão ligadas — o servidor não respondeu. Carrega para perguntar outra vez."
+        // Regra 8 da «Escrita»: a dica descreve o CONTROLO, não repete o
+        // rótulo («Notificações: sem resposta» já está no botão) e não leva
+        // ponto final. O que faltava era o que ela faz ao ser carregada.
+        title="Perguntar outra vez ao servidor, que costuma estar só a acordar"
       >
         <span className="hidden sm:inline">Notificações: sem resposta</span>
       </Button>

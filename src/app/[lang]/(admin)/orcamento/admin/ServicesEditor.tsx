@@ -796,7 +796,7 @@ export default function ServicesEditor({
                           onChange={(e) => updateGroup(gi, { letter: e.target.value })}
                           onKeyDown={(e) => onGroupKeyDown(e, gi, "letter")}
                           placeholder={autoLetter(gi)}
-                          title="Marcador do grupo — numera-se sozinho (a, b, c…); escreva por cima para fixar outro."
+                          title="Numera-se sozinho (a, b, c…); escreve por cima para fixar outra letra"
                           aria-label={`Marcador do grupo ${gi + 1} — numera-se sozinho`}
                         />
                         <CampoQueCresce

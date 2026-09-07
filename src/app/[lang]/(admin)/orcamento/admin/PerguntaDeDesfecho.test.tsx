@@ -253,7 +253,10 @@ describe("marcar perdido", () => {
 
     await user.click(screen.getByRole("button", { name: /^perdido$/i }));
     await waitFor(() => expect(screen.getByText(/motivo.*opcional/i)).toBeInTheDocument());
-    await user.type(screen.getByPlaceholderText(/detalhe/i), "escolheram fazer em casa");
+    // Pelo RÓTULO, não pelo marcador: o marcador passou a dar um exemplo
+    // («Ex.: ficou acima do orçamento») e quem nomeia o campo é o
+    // `aria-label`, que é o que a regra 7 da «Escrita» manda.
+    await user.type(screen.getByLabelText(/detalhe/i), "escolheram fazer em casa");
     await user.click(screen.getByRole("button", { name: /^outro$/i }));
 
     await waitFor(() => expect(chamadas).toHaveLength(3));

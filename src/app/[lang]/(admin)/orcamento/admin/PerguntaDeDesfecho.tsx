@@ -281,7 +281,11 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
                   value={notaMotivo}
                   maxLength={300}
                   onChange={(e) => setNotaMotivo(e.target.value)}
-                  placeholder="Detalhe opcional…"
+                  // Sem rótulo nenhum, era o `placeholder` a dizer o que o
+                  // campo é. Regra 7: o rótulo fica (para quem ouve o ecrã) e
+                  // o marcador passa a dar um exemplo do que aqui se escreve.
+                  aria-label="Detalhe (opcional)"
+                  placeholder="Ex.: ficou acima do orçamento"
                   className="bo-input px-2.5 py-2 text-sm text-[var(--bo-text)]"
                 />
               </div>

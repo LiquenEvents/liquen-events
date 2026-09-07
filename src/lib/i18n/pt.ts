@@ -728,7 +728,7 @@ export const pt = {
     contactIntroPlural: "Para qualquer questão, podem contactar-nos diretamente:",
     contactWhatsapp: "Falar por WhatsApp",
     contactWhatsappSub: "O caminho mais rápido até nós.",
-    notFoundTitle: "Não encontrámos este pedido",
+    notFoundTitle: "Esta ligação não abre nenhum pedido",
     // No quote here, so the register is unknown — singular formal is the safe
     // form for an anonymous visitor.
     notFoundBody:
@@ -772,7 +772,7 @@ export const pt = {
       "Este link de proposta já não é válido. Contacte-nos e enviamos-lhe um novo com todo o gosto.",
     notFoundTitle: "Proposta não encontrada",
     notFoundBody:
-      "Não conseguimos encontrar esta proposta. Se acha que é um engano, fale connosco.",
+      "Esta ligação não abre nenhuma proposta. Se acha que é um engano, fale connosco e enviamos-lhe a certa.",
     greeting: "Olá",
     intro:
       "Preparámos esta proposta com todo o cuidado para o vosso dia. Vejam com calma: qualquer ajuste é bem-vindo, basta responderem ao email.",
@@ -881,10 +881,10 @@ export const pt = {
     notFoundTitle: "Este caminho não existe.",
     notFoundText:
       "A página que procura pode ter sido movida ou já não está disponível. Mas o seu próximo evento ainda está à espera de ser criado.",
-    errorEyebrow: "Algo correu mal",
-    errorTitle: "Ocorreu um erro inesperado.",
+    errorEyebrow: "Página parada",
+    errorTitle: "Esta página não chegou a carregar.",
     errorText:
-      "Pedimos desculpa pelo incómodo. Tente novamente. Se o problema persistir, contacte-nos diretamente e teremos todo o gosto em ajudar.",
+      "Nada do que preencheu se perdeu. Tente carregar outra vez e, se voltar a acontecer, siga por um dos caminhos aqui em baixo.",
     retry: "Tentar novamente",
     loading: "A carregar",
   },

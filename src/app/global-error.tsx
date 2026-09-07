@@ -17,17 +17,17 @@ const LANG_COOKIE = "liquen-lang";
 const STRINGS = {
   pt: {
     lang: "pt-PT",
-    eyebrow: "Erro",
-    title: "Algo correu mal.",
-    body: "Pedimos desculpa pelo incómodo. Tente novamente — se o problema persistir, contacte-nos diretamente.",
-    retry: "Tentar novamente",
+    eyebrow: "Página parada",
+    title: "Esta página não chegou a carregar.",
+    body: "Foi o desenho da página que falhou, não uma gravação: nada do que já tinha enviado se perdeu. Tente carregar outra vez e, se voltar a acontecer, recarregue a página.",
+    retry: "Tentar carregar outra vez",
   },
   en: {
     lang: "en",
-    eyebrow: "Error",
-    title: "Something went wrong.",
-    body: "Sorry for the inconvenience. Please try again — if the problem persists, contact us directly.",
-    retry: "Try again",
+    eyebrow: "Page stopped",
+    title: "This page did not load.",
+    body: "The page failed to render, not a save: nothing you had already sent was lost. Try loading it again and, if it happens again, reload the page.",
+    retry: "Try loading it again",
   },
 } as const;
 

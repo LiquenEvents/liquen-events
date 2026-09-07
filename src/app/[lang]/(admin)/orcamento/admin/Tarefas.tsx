@@ -701,7 +701,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                   onChange={(e) =>
                     setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
                   }
-                  placeholder="Responsável"
+                  // O ramo do lado (a `Escolha`, quando a equipa está montada)
+                  // tinha `aria-label`; este não tinha rótulo NENHUM, e o
+                  // `placeholder` era a palavra «Responsável» a fazer de
+                  // rótulo. Regra 7 da «Escrita»: o marcador dá um exemplo,
+                  // não substitui o rótulo — e um rótulo que desaparece ao
+                  // primeiro caracter escrito não é rótulo.
+                  aria-label="Responsável"
+                  placeholder="Ex.: quem fica responsável"
                   className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
                 />
               )}

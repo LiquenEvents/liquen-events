@@ -146,7 +146,28 @@ describe("abrir um pedido sem lhe tocar", () => {
   it("um pedido sem estado abre em vez de rebentar o back office", async () => {
     const semEstado = { ...COM_ESPACOS, status: undefined } as unknown as Quote;
     await abrir(semEstado);
-    expect(screen.queryByRole("heading", { name: /Ocorreu um erro inesperado/i })).toBeNull();
+    /**
+     * ── E AQUI ESTAVA UMA GUARDA QUE NUNCA PODIA DISPARAR ────────────────
+     *
+     * Estava escrito:
+     *
+     *     expect(screen.queryByRole("heading", { name: /Ocorreu um erro
+     *       inesperado/i })).toBeNull();
+     *
+     * Essa frase vinha do `pt.errors.errorTitle`, que é desenhado pelo
+     * `(site)/error.tsx` e pelo `s/not-found.tsx` — nenhum dos dois entra
+     * neste teste, que monta o `AdminClient` à mão e sem fronteira de erro do
+     * Next. O `queryByRole` procurava no DOM uma coisa que não tinha por onde
+     * lá chegar: dava `null` com o defeito e sem ele.
+     *
+     * O que prende mesmo a correcção é a linha abaixo. Se o `oQueMudou`
+     * voltar a chamar `.trim()` sobre `undefined`, a montagem lança e o teste
+     * cai antes de aqui chegar — que é o sinal a sério.
+     *
+     * (A frase, entretanto, já nem existe: o capítulo «Escrita» tirou-a do
+     * dicionário. Uma guarda escrita sobre cópia é uma guarda que envelhece
+     * sozinha.)
+     */
     expect(rotulo()).toMatch(/Tudo guardado/i);
   });
 });
