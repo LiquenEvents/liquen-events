@@ -137,3 +137,66 @@ describe("o rótulo de um campo", () => {
     ).not.toMatch(/bo-eyebrow/);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS TRÊS DEGRAUS DO BOTÃO — 32 · 40 · 52
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Do sistema de design. As duas primeiras alturas e as três folgas horizontais
+ * (12 · 16 · 24) já estavam certas antes de se lhes tocar; o degrau grande
+ * media 48 e o tamanho da letra estava escrito à mão (`text-[15px]`).
+ *
+ * ── OS 52 E A GRELHA DE 4 ────────────────────────────────────────────────
+ *
+ * 52 não consta da lista de espaçamentos que o documento fixa (4, 8, 12, 16,
+ * 20, 24, 32, 40, 48, 64). Mas essa lista é de ESPAÇO, e isto é ALTURA: 52 é
+ * múltiplo de 4 e é o número que o próprio documento dá a este degrau.
+ *
+ * É a mesma distinção que a linha de tabela de 44 px obrigou a fazer, aqui em
+ * cima. Duas vezes no mesmo capítulo, o que sugere que a regra da grelha é
+ * sobre folgas e não sobre medidas — e é assim que está a ser lida.
+ *
+ * ── E O ALVO NO DEDO ─────────────────────────────────────────────────────
+ *
+ * O `pointer-coarse:h-11` põe os dois degraus pequenos nos 44 px quando não há
+ * rato. O grande não precisa: 52 já está acima.
+ */
+const BOTAO = readFileSync(
+  join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/ui/Button.tsx"),
+  "utf8",
+).replace(/\/\*[\s\S]*?\*\//g, "");
+
+describe("os degraus do botão", () => {
+  const degrau = (nome: "sm" | "md" | "lg") => {
+    const m = BOTAO.match(new RegExp(`\\b${nome}: "([^"]+)"`));
+    expect(m, `o degrau \`${nome}\` desapareceu do Button`).not.toBeNull();
+    return m![1];
+  };
+
+  it.each([
+    ["sm", /\bh-8\b/, /\bpx-3\b/],
+    ["md", /\bh-10\b/, /\bpx-4\b/],
+    ["lg", /\bh-13\b/, /\bpx-6\b/],
+  ] as const)("%s tem a altura e a folga do documento", (nome, altura, folga) => {
+    expect(degrau(nome), "a altura saiu do degrau").toMatch(altura);
+    expect(degrau(nome), "a folga horizontal saiu do degrau").toMatch(folga);
+  });
+
+  it("os dois degraus pequenos chegam aos 44 no dedo", () => {
+    expect(degrau("sm"), "sem rato, um botão de 32 px é um alvo a menos").toMatch(
+      /pointer-coarse:h-11/,
+    );
+    expect(degrau("md")).toMatch(/pointer-coarse:h-11/);
+  });
+
+  it("o tamanho da letra vem da escala, não escrito à mão", () => {
+    for (const nome of ["sm", "md", "lg"] as const) {
+      expect(
+        degrau(nome),
+        `o degrau ${nome} voltou a ter um tamanho de letra escrito à mão`,
+      ).not.toMatch(/text-\[/);
+    }
+    expect(degrau("lg")).toMatch(/\btext-body\b/);
+  });
+});

@@ -155,9 +155,21 @@ const VARIANTS: Record<ButtonVariant, string> = {
  * pela qual quase todos os alvos medidos a 375 px davam 32 ou 40 px de altura.
  */
 const SIZES: Record<ButtonSize, string> = {
-  sm: "h-8 pointer-coarse:h-11 px-3 text-xs",
-  md: "h-10 pointer-coarse:h-11 px-4 text-sm",
-  lg: "h-12 px-6 text-[15px]",
+  /* ── AS ALTURAS, E A REGRA QUE ELAS PARECEM QUEBRAR ────────────────────
+     Do sistema de design: 32 · 40 · 52 px, com folgas de 12 · 16 · 24. As
+     duas primeiras alturas e as três folgas já estavam certas; o grande media
+     48 e o tamanho da letra estava escrito à mão.
+
+     Os 52 não constam da lista de espaçamentos da grelha de 4 (4, 8, 12, 16,
+     20, 24, 32, 40, 48, 64) — mas essa lista é de ESPAÇO, e isto é altura. 52
+     é múltiplo de 4 e é o número que o documento dá para este degrau; a
+     mesma distinção que a linha de tabela de 44 px obrigou a fazer.
+
+     O `pointer-coarse:h-11` é o alvo de 44 px no dedo. O degrau grande não
+     precisa dele: 52 já está acima. */
+  sm: "h-8 pointer-coarse:h-11 px-3 text-caption",
+  md: "h-10 pointer-coarse:h-11 px-4 text-callout",
+  lg: "h-13 px-6 text-body",
 };
 
 function Spinner() {
