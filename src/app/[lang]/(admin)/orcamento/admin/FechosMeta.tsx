@@ -152,7 +152,7 @@ export default function FechosMeta() {
 
   return (
     <section className="rounded-2xl border border-[var(--bo-hairline)] bg-white p-6 ">
-      <h3 className="text-[var(--bo-text-muted)] text-[10px] font-medium uppercase tracking-[0.3em]">
+      <h3 className="text-title3 font-semibold text-[var(--bo-text-muted)]">
         Casamentos fechados · Meta
       </h3>
       <p className="mt-1 text-[11px] leading-snug text-foreground/35">

@@ -327,7 +327,7 @@ const QUADRADOS_DE_NUMERO = "grid grid-cols-1 min-[22rem]:grid-cols-2 gap-3";
 function Sub({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-foreground/45 text-[10px] tracking-[0.25em] uppercase mb-5 font-medium">
+      <h3 className="mb-5 text-title3 font-semibold text-[var(--bo-text-muted)]">
         {title}
       </h3>
       {children}
