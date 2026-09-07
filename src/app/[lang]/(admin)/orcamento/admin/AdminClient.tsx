@@ -4646,36 +4646,107 @@ export default function AdminClient({
           />
         )}
 
-        {/* ── Mobile bottom navigation ──
-            Hidden while a quote detail drawer is open: it's a focused, modal
-            surface, so the tab bar would only overlap its footer and distract. */}
+        {/* ══════════════════════════════════════════════════════════════════
+            A BARRA DE DESTINOS DO TELEMÓVEL — UMA CÁPSULA QUE FLUTUA
+            ══════════════════════════════════════════════════════════════════
+
+            Pedido dela, com uma captura de uma barra de navegação a flutuar no
+            fundo de um telemóvel: «quero deixar o back office com o mesmo
+            design da Apple de liquid glass».
+
+            O que se copia é a FORMA, e o que se copia dela é o que a web sabe
+            fazer: a barra deixa de estar encostada ao fundo e a toda a largura
+            e passa a ser uma CÁPSULA a flutuar, com folga por baixo e dos
+            lados, mais uma peça REDONDA à parte para o abridor da gaveta.
+
+            ── O QUE NÃO SE FINGE ────────────────────────────────────────────
+            O material da Apple refracta o que está por trás em tempo real e
+            responde ao movimento com brilhos. Em CSS há `backdrop-filter` com
+            desfoque e saturação, e mais nada. Portanto: camadas, cantos
+            concêntricos, a pastilha do activo e a cápsula a flutuar — sim; um
+            vidro pintado a gradientes a fingir refracção — não. É a mesma
+            recusa que o `globals.css` já escreveu a propósito da vibrância do
+            texto.
+
+            ── PORQUE É QUE O ABRIDOR SAIU DA CÁPSULA ────────────────────────
+            Porque não é um destino, e já estava escrito aqui que não é: «é a
+            porta para os que não cabem aqui». A captura tem a mesma divisão —
+            os destinos numa cápsula, a lupa numa peça redonda separada — e a
+            documentação que ela mandou diz o mesmo por palavras: agrupar por
+            AFINIDADE, «o que faz coisas parecidas fica junto». Quatro destinos
+            num sítio, a porta noutro.
+
+            Continua a ser UM abridor: o hambúrguer do cabeçalho só aparece
+            quando esta barra não está. Não voltam a ser dois.
+
+            ── OS 44 PX, CONTADOS A 390 ──────────────────────────────────────
+            É a restrição que manda, e conta-se antes de desenhar:
+
+                largura da janela ................... 390 px
+                folga lateral (--bo-barra-folga) × 2 . 24
+                peça redonda (= altura da cápsula) ... 62
+                folga entre as duas peças ............  8
+                ──────────────────────────────────────────
+                cápsula ............................. 296
+                fio da moldura (1 px) × 2 ............  2
+                folga do material (4 px) × 2 .........  8
+                ──────────────────────────────────────────
+                fila útil ........................... 286  ÷ 4 = 71,5 px
+
+            E a altura, pela mesma conta: 62 − 2 (fio) − 8 (folga) = 52. A
+            altura da cápsula está contada no `globals.css`, e vem do chão da
+            letra do telemóvel — 12 px, não 8.
+
+            73 × 52 por destino, e a peça redonda 62 × 62. Os três acima dos 44
+            do `.alvo-toque`, e MEDIDOS num browser — não deduzidos. A 320 px, o
+            telemóvel mais estreito que ainda se vê, a fila útil dá 216 ÷ 4 = 54
+            px, e continua a passar.
+
+            ── A ALTURA OCUPADA NÃO MUDOU, E ISSO FOI DE PROPÓSITO ───────────
+            56 (cápsula) + 12 (folga por baixo) = 68, e o `--bo-barra-inferior`
+            reserva 72. O aviso do `Toast`, a barra de acção do estúdio e o
+            fundo da lista da biblioteca leem esse token e continuam a pousar
+            onde pousavam. A conta e a desigualdade estão no `globals.css` e no
+            `barra-inferior.test.tsx`.
+
+            ── E O DEDO PASSA PELOS BURACOS ─────────────────────────────────
+            A `<nav>` continua a cobrir a faixa toda, mas deixou de a TAPAR:
+            `pointer-events-none` nela e `pointer-events-auto` nas duas peças.
+            O que está por baixo, ao lado da cápsula, volta a ser tocável — que
+            antes não era.
+
+            Continua escondida enquanto uma gaveta de detalhe está aberta: é
+            uma superfície modal, e a barra só lhe sobreporia o rodapé. */}
         <nav
           // Duas navegações no mesmo ecrã precisam de dois nomes: sem isto,
           // um leitor de ecrã anuncia "navegação" duas vezes e não há como
           // saber qual é qual — nem para quem ouve, nem para um teste.
           aria-label="Destinos principais"
-          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] motion-safe:transition-transform motion-safe:duration-300 ${
+          className={`lg:hidden pointer-events-none fixed bottom-0 inset-x-0 z-30 flex items-end justify-center gap-2 px-[var(--bo-barra-folga)] motion-safe:transition-transform motion-safe:duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          // A folga por baixo SOMA-SE ao entalhe: no iPhone há a barra de
+          // gestos do sistema por baixo de tudo, e uma cápsula que flutue a 12
+          // px do bordo da janela flutua a 12 px POR BAIXO dela. A soma põe-a a
+          // 12 px do sítio onde o ecrã acaba de facto.
+          style={{
+            paddingBottom: "calc(var(--bo-barra-folga) + env(safe-area-inset-bottom))",
+          }}
         >
-          {/* OS QUATRO DO DIA, MAIS O ABRIDOR DA GAVETA.
+          {/* ── A CÁPSULA: OS QUATRO DO DIA ──────────────────────────────────
               Estavam aqui três destinos repetidos da gaveta e um "Mais" que
               abria a mesma gaveta que o hambúrguer do cabeçalho já abria — dois
               abridores em cantos opostos. A regra que ficou é outra: os quatro
               destinos do dia vivem SÓ aqui, o resto vive SÓ na gaveta (a lista
-              e a razão estão em `nav.tsx`), e há **um** abridor de cada vez.
+              e a razão estão em `nav.tsx`).
 
-              O abridor voltou para aqui, e não para o canto superior esquerdo,
-              por uma razão de mão: o polegar de quem segura o telemóvel chega
-              ao fundo do ecrã e não chega ao topo do lado oposto. Como o
-              Calendário, as Tarefas e os Temas passaram todos a viver na
-              gaveta, obrigá-la a esticar-se até ao canto para lá chegar era
-              trocar uma duplicação por um mau alcance.
-
-              Não voltam a ser dois: o hambúrguer do cabeçalho só aparece
-              quando ESTA barra não está — ver lá em cima. */}
-          <div className="flex items-stretch">
+              `min-w-0` na cápsula e `flex-1 min-w-0` em cada destino: sem isso
+              o rótulo mais comprido («Fazer proposta») estica a célula dele e
+              as quatro deixam de ter a mesma largura. */}
+          <div
+            className="bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)]"
+            style={{ height: "var(--bo-barra-capsula)" }}
+          >
             {BARRA_INFERIOR.map((id) => {
               const navItem = NAV.find((n) => n.id === id)!;
               const isActive = view === id;
@@ -4683,12 +4754,32 @@ export default function AdminClient({
                 <button
                   key={id}
                   onClick={() => setView(id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] ${ESTADO} ${PRESSAO} ${
-                    isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
+                  aria-current={isActive ? "page" : undefined}
+                  /* ── A PASTILHA DO DESTINO ONDE ELA ESTÁ ──────────────────
+                     A MESMA que a coluna da esquerda usa (ver `renderNavItem`):
+                     lavagem de acento e tinta de acento. Duas navegações da
+                     mesma casa que marcassem a escolha de maneiras diferentes
+                     eram duas casas — e «colocação previsível e iconografia
+                     consistente» é o que a documentação que ela mandou pede.
+
+                     A lavagem aqui é a OPACA (`--bo-accent-lavagem`) e não o
+                     `--bo-accent-ring`: por baixo desta pastilha não está o
+                     branco do painel, está vidro, e o que passa através dele
+                     pode ser uma fotografia escura. Com a lavagem translúcida,
+                     o acento por cima descia com o fundo e perdia os 4,5:1;
+                     com ela opaca mede 5,19:1 e não depende de nada. A conta
+                     está no `globals.css`, ao lado do token.
+
+                     E não é só cor: a pastilha é uma FORMA que aparece, e o
+                     `font-medium` fica como terceira pista (WCAG 1.4.1). */
+                  className={`alvo-toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
+                    isActive
+                      ? "bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] font-medium"
+                      : "text-[var(--bo-text-muted)] font-normal"
                   }`}
                 >
                   {id === "pedidos" && pendingCount > 0 && (
-                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
+                    <span className="absolute top-1.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
                   )}
                   {/* 120 ms e não 150 — e é o `ESTADO` que serve, apesar de aqui só
                       mudar a escala: no Tailwind v4 a classe `scale-110` emite a
@@ -4696,53 +4787,62 @@ export default function AdminClient({
                       lista do `ESTADO` (ver `ui/movimento.ts`). Um degrau a menos
                       para a casa manter. */}
                   <span className={`${ESTADO} ${isActive ? "scale-110" : ""}`}>{navItem.icon}</span>
-                  {/* `text-center` e `leading-tight`: com cinco células cada
-                      uma fica com 75 px, e "Fazer proposta" precisa de partir
-                      em duas linhas em vez de ser cortado a meio. 75 px continua
-                      bem acima dos 44 do alvo mínimo.
-
-                      DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
+                  {/* DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
                       e não só na que parte. Sem isso, a célula mais alta empurra
-                      o seu ícone para cima e os cinco ícones da barra deixam de
-                      estar à mesma altura — lê-se como um desalinhamento, que é
+                      o seu ícone para cima e os ícones da barra deixam de estar à
+                      mesma altura — lê-se como um desalinhamento, que é
                       exactamente a queixa que trouxe este trabalho. Reservar o
                       espaço em todas custa uns píxeis e devolve a linha direita. */}
-                  <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center min-h-[2.2em] flex items-start justify-center">
+                  {/* `2.5em` e não `2.2em`: a reserva tem de ser a altura REAL
+                      de duas linhas, e no telemóvel o chão da letra desta casa
+                      é 12 px (`escala-movel.test.ts`) — duas linhas a
+                      `leading-tight` são 30 px, ou seja 2,5em. Com 2,2em a
+                      reserva mentia e o rótulo transbordava a cápsula por
+                      baixo: medido, 2 px em «Visão Geral» e «Fazer proposta». */}
+                  <span className="text-[8px] tracking-wide uppercase leading-tight text-center min-h-[2.5em] flex items-start justify-center">
                     {navItem.label}
                   </span>
                 </button>
               );
             })}
-            {/* O ABRIDOR DA GAVETA, ao alcance do polegar. Não é um destino —
-                é a porta para os que não cabem aqui. */}
-            <button
-              onClick={() => setNavOpen(true)}
-              aria-label="Mais destinos"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] ${ESTADO} ${PRESSAO} ${
-                !BARRA_INFERIOR.includes(view)
-                  ? "text-[var(--bo-accent)]"
-                  : "text-[var(--bo-text-faint)]"
-              }`}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-              </svg>
-              {/* A mesma reserva de duas linhas das outras cinco células: esta
-                  é a sexta da mesma barra e tem de alinhar com elas. */}
-              <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center min-h-[2.2em] flex items-start justify-center">
-                Mais
-              </span>
-            </button>
           </div>
+
+          {/* ── A PEÇA REDONDA: A PORTA DA GAVETA ────────────────────────────
+              Ao alcance do polegar, e à parte da cápsula porque não é um
+              destino. Sem rótulo escrito: é a peça redonda da captura, e o
+              nome dela vive no `aria-label` — quem ouve continua a ouvir «Mais
+              destinos», e quem vê continua a ver o mesmo ⋯ no mesmo canto.
+
+              O abridor voltou para aqui, e não para o canto superior esquerdo,
+              por uma razão de mão: o polegar de quem segura o telemóvel chega
+              ao fundo do ecrã e não chega ao topo do lado oposto. */}
+          <button
+            onClick={() => setNavOpen(true)}
+            aria-label="Mais destinos"
+            aria-expanded={navOpen}
+            className={`alvo-toque bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex shrink-0 items-center justify-center shadow-[var(--bo-sombra-suspensa)] ${ESTADO} ${PRESSAO} ${
+              !BARRA_INFERIOR.includes(view)
+                ? "text-[var(--bo-accent)]"
+                : "text-[var(--bo-text-muted)]"
+            }`}
+            style={{
+              height: "var(--bo-barra-capsula)",
+              width: "var(--bo-barra-capsula)",
+            }}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
         </nav>
 
         {/* ── Main ── */}

@@ -1684,10 +1684,37 @@ export default function Temas() {
                          `opacity-100` em toda a parte. Os outros escondem-se só
                          onde há rato, que é onde o `group-hover` os pode trazer
                          de volta. */
-                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm ${ESTADO} ${PRESSAO} ${
+                      /* ── O CHIP QUE POUSA NA FOTOGRAFIA ────────────────
+                         Era `bg-white/85` com `backdrop-blur-sm` e tinta a
+                         `text-foreground/45`. Três coisas erradas de uma vez,
+                         e as três medidas:
+
+                         · a TINTA. 3,11:1 sobre uma fotografia branca e 2,91:1
+                           sobre uma preta — o segundo chumba até os 3:1 que o
+                           1.4.11 pede a um ícone, e a estrela é o que diz se um
+                           tema está fixado;
+                         · o DESFOQUE. Um por chip, ou seja um por acção e por
+                           cartão: doze numa vista de quatro temas, noventa numa
+                           biblioteca de trinta. A própria investigação que
+                           trouxe o vidro fixa um tecto de cinco superfícies
+                           filtradas por ecrã;
+                         · o FUNDO. Branco a 85% em cima de uma fotografia
+                           clara é invisível — o chip desaparece na foto.
+
+                         Passa à variante CLARA da casa (`.bo-vidro-claro`):
+                         véu de 50% mais vidro a 10%, sem filtro, com o glifo a
+                         branco. Medido: 3,35:1 sobre a pior fotografia. A conta
+                         inteira está no `globals.css`.
+
+                         E o FIXADO deixa de ser uma cor de aviso a mais
+                         (`#8a6d2f`, que nesta casa quer dizer «atenção») e
+                         passa a ser a pastilha cheia de acento — o mesmo gesto
+                         com que os menus, a coluna e a barra de baixo dizem
+                         «esta». Branco sobre `--bo-accent`: 6,55:1. */
+                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-full text-white opacity-100 ${ESTADO} ${PRESSAO} ${
                         fixar && t.favorito
-                          ? "text-[#8a6d2f]"
-                          : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
+                          ? "bg-[var(--bo-accent)]"
+                          : "bo-vidro-claro com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
                       }`}
                     >
                       {a.icone}

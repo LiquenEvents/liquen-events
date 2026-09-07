@@ -53,6 +53,15 @@ const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
 /** WCAG 2.1 §1.4.3 — texto normal, nível AA. */
 const AA = 4.5;
+/** WCAG 2.1 §1.4.11 — o que não é texto: fronteiras, ícones, estados. */
+const NAO_TEXTO = 3;
+/**
+ * A FOLGA que este ficheiro exige por cima de cada mínimo, e a razão de ela
+ * existir: um rácio que passa por uma centésima passa hoje e chumba no dia em
+ * que alguém mexa um degrau na tinta ou no verde. Cinco por cento é o que
+ * separa «passa» de «passou por sorte».
+ */
+const FOLGA = 1.05;
 
 type RGB = [number, number, number];
 const BRANCO: RGB = [255, 255, 255];
@@ -173,8 +182,12 @@ describe("o material é translúcido, e o contraste aguenta-o", () => {
         // O chão de tinta do material: dicas, nomes de grupo, ícones apagados.
         { o_que: `--bo-text-muted (0,64) · ${nome}`, frente: tintaSobre(0.64, fundo), fundo },
         // O visto do `ui/Escolha`, que é o único portador da escolha actual
-        // quando a linha não está sob o cursor.
-        { o_que: `o visto, em --bo-accent · ${nome}`, frente: acento, fundo },
+        // quando a linha não está sob o cursor. Era pintado com o `--bo-accent`
+        // e mudou para a tinta: um verde escuro sobre um material que escurece
+        // com o fundo desce muito mais depressa do que um cinzento, e era ELE —
+        // e não a tinta — que travava a opacidade. A razão por extenso está no
+        // `globals.css` e no próprio `ui/Escolha.tsx`.
+        { o_que: `o visto, em --bo-text (0,82) · ${nome}`, frente: tintaSobre(0.82, fundo), fundo },
       );
     }
 
@@ -202,6 +215,98 @@ describe("o material é translúcido, e o contraste aguenta-o", () => {
   });
 
   /**
+   * O ACENTO CONTINUA A TOCAR O MATERIAL — mas só como NÃO-TEXTO.
+   *
+   * Depois de o visto passar a tinta, o verde ainda assenta na superfície em
+   * duas coisas que não são texto: a moldura do campo em foco
+   * (`border-color: var(--bo-accent)`) e o ponto de aviso. Essas medem-se pelo
+   * 1.4.11, que pede 3:1 — e a diferença entre as duas barras é precisamente o
+   * que este ficheiro tem de manter explícito, senão daqui a um mês alguém
+   * volta a pôr verde por cima de um rótulo.
+   */
+  it("o acento sobre o material chega aos 3:1 do não-texto", () => {
+    const pior = racioDeContraste(ACENTO(), material(PRETO));
+    expect(
+      pior,
+      `o --bo-accent mede ${pior.toFixed(2)}:1 sobre o pior material — abaixo dos ` +
+        `${NAO_TEXTO}:1 que o 1.4.11 pede a uma fronteira ou a um estado`,
+    ).toBeGreaterThanOrEqual(NAO_TEXTO * FOLGA);
+  });
+
+  /**
+   * ── E O VERDE NÃO VOLTA A SER TINTA ──────────────────────────────────────
+   *
+   * A rede que fecha a decisão de cima. O caso do AA mede o que ESTÁ escrito;
+   * isto impede o que se voltaria a escrever: um `text-[var(--bo-accent)]` num
+   * dos sete ficheiros põe verde a 4,08:1 numa superfície onde a barra é 4,5.
+   *
+   * O acento como FUNDO (`bg-`, `hover:bg-`) continua a ser o gesto da casa e
+   * não entra aqui — a pastilha é opaca e a conta dela é outra.
+   */
+  it("nenhum dos sete pinta TEXTO com o acento", () => {
+    const verdes: string[] = [];
+    for (const rel of FAMILIA) {
+      fonteDe(rel)
+        .split("\n")
+        .forEach((linha, i) => {
+          for (const m of linha.matchAll(
+            /\b(?:group-)?(?:hover:|active:|focus:|focus-visible:)?text-\[var\(--bo-accent\)\]/g,
+          )) {
+            verdes.push(`${rel}:${i + 1}  ${m[0]}`);
+          }
+        });
+    }
+    expect(
+      verdes,
+      "o `--bo-accent` mede 4,08:1 sobre o pior material e não chega aos 4,5:1 de " +
+        "texto. Ou é tinta (`--bo-text`), ou é o preenchimento de uma pastilha:\n" +
+        verdes.join("\n"),
+    ).toEqual([]);
+  });
+
+  /**
+   * ── A FRONTEIRA SOBRE FUNDO CLARO, QUE É O QUE UMA SUPERFÍCIE MAIS
+   *    TRANSPARENTE PODIA TER PERDIDO ─────────────────────────────────────
+   *
+   * Não perdeu, e a razão é aritmética: a superfície é BRANCA, e branco a
+   * qualquer α sobre branco continua branco. Quem desenha a fronteira sobre um
+   * painel claro é o FIO e a SOMBRA, e nenhum dos dois depende do α.
+   *
+   * O que se guarda aqui é isso mesmo, medido: que a superfície não se separa
+   * do branco sozinha (e portanto ninguém pode argumentar que se separa), e que
+   * o fio por cima dela não desce do que hoje mede. Os 3:1 do 1.4.11 não se
+   * aplicam à MOLDURA de um menu — aplicam-se aos controlos lá dentro, que são
+   * as linhas, e essas têm o seu texto e a sua pastilha. Está por extenso no
+   * `globals.css`.
+   */
+  it("sobre um painel branco a fronteira é o fio, e o fio não enfraquece", () => {
+    const superficie = material(BRANCO);
+    expect(
+      racioDeContraste(superficie, BRANCO),
+      "a superfície do material deixou de ser branca — a conta da fronteira muda toda",
+    ).toBeCloseTo(1, 3);
+
+    // O `--bo-hairline-strong` é um APELIDO — vale `var(--bo-tinta-13)`. Segue-se
+    // a seta até à cor, senão o que se mede é o nome e não o fio.
+    const seguir = (nome: string): string => {
+      let v = token(nome);
+      for (let volta = 0; volta < 4 && /^var\(/.test(v); volta++) {
+        v = token(v.replace(/^var\(\s*/, "").replace(/\s*\)$/, ""));
+      }
+      return v;
+    };
+    const { cor, alpha } = corComAlpha(seguir("--bo-hairline-strong"));
+    // O fundo estende-se por baixo da borda (`background-clip: border-box`),
+    // portanto o fio assenta na superfície e não no que está por trás dela.
+    const fio = achatar(cor, alpha, superficie);
+    const racio = racioDeContraste(fio, BRANCO);
+    expect(
+      racio,
+      `o fio do material mede ${racio.toFixed(3)}:1 sobre branco — era 1,326:1`,
+    ).toBeGreaterThanOrEqual(1.32);
+  });
+
+  /**
    * A outra metade, e a que impede a correcção de virar excesso de zelo: o
    * material tem de continuar a SER material. Se alguém resolver um problema de
    * contraste empurrando a opacidade para cima, o desfoque deixa de se ver e
@@ -214,10 +319,37 @@ describe("o material é translúcido, e o contraste aguenta-o", () => {
   it("e continua a ser translúcido — a opacidade não sobe para resolver contraste", () => {
     const { alpha } = corComAlpha(token("--bo-material"));
     expect(alpha, "o material ficou opaco: já não é material, é uma superfície").toBeLessThan(0.92);
+  });
+
+  /**
+   * ── O PISO, CONTADO E NÃO CRAVADO ────────────────────────────────────────
+   *
+   * Aqui estava `toBeGreaterThanOrEqual(0.8)`. Um número escrito à mão dá
+   * licença enquanto ninguém o recalcula — que é a queixa que este repositório
+   * já fez a si próprio a propósito dos comentários de contraste.
+   *
+   * Passa a ser CONTA: o piso é o α mais translúcido em que o chão de tinta
+   * ainda passa AA e o acento ainda passa o 1.4.11, os dois com a `FOLGA`. Se
+   * amanhã o chão de tinta subir um degrau, o piso sobe sozinho e este teste
+   * apanha o material que ficou para trás.
+   */
+  it("e não desce abaixo do piso que a própria conta impõe", () => {
+    const piso = (() => {
+      for (let a = 50; a <= 100; a++) {
+        const s = achatar(BRANCO, a / 100, PRETO);
+        const tinta = racioDeContraste(tintaSobre(0.64, s), s);
+        const acento = racioDeContraste(ACENTO(), s);
+        if (tinta >= AA * FOLGA && acento >= NAO_TEXTO * FOLGA) return a / 100;
+      }
+      throw new Error("nenhuma opacidade satisfaz a conta — os tokens mudaram de forma");
+    })();
+
+    const { alpha } = corComAlpha(token("--bo-material"));
     expect(
       alpha,
-      "o material ficou vidro: a tinta do menu deixa de passar AA",
-    ).toBeGreaterThanOrEqual(0.8);
+      `o material está a ${alpha} e o piso medido é ${piso}: abaixo dele o chão de ` +
+        "tinta (ou o acento nas fronteiras) deixa de ter folga sobre o mínimo",
+    ).toBeGreaterThanOrEqual(piso);
   });
 });
 

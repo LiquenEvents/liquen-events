@@ -984,12 +984,28 @@ export function Escolha({
 
                     Sobre a pastilha cheia o visto passa a branco: um verde
                     sobre verde não se lê, e é o erro mais fácil de cometer ao
-                    trocar um realce cinzento por um preenchido. */}
+                    trocar um realce cinzento por um preenchido.
+
+                    ── E FORA DA PASTILHA É TINTA, E NÃO VERDE ────────────────
+                    Era `--bo-accent`. Um verde escuro sobre um material que
+                    escurece com o que está por baixo mede muito pior do que um
+                    cinzento: no material mais escuro que este ecrã permite
+                    (branco a α sobre uma fotografia preta) o acento dava 4,08:1
+                    a 0,80 de opacidade e CHUMBAVA os 4,5:1 — era ele, e não a
+                    tinta, o que travava o material em 0,84.
+
+                    Passa a `--bo-text` (tinta-82), que mede 8,29:1 no mesmo
+                    sítio. E não é uma cedência: nos menus do macOS destas
+                    capturas o visto é da cor do RÓTULO — o acento é o que
+                    preenche a linha realçada, que é exactamente o que a
+                    pastilha aqui em cima faz. A conta está por extenso no
+                    `globals.css` e medida no
+                    `material-do-que-aparece-por-cima.test.ts`. */}
                 <span
                   aria-hidden="true"
                   className={cn(
                     "w-[var(--bo-material-coluna)] shrink-0 text-center",
-                    i === activa && !o.desactivada ? "text-white" : "text-[var(--bo-accent)]",
+                    i === activa && !o.desactivada ? "text-white" : "text-[var(--bo-text)]",
                   )}
                 >
                   {o.valor === valor ? "✓" : ""}
