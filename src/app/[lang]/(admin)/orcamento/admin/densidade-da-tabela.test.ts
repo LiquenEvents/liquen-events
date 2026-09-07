@@ -83,3 +83,57 @@ describe("a densidade da tabela do back office", () => {
     );
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O RÓTULO DE CAMPO É `text-footnote`, NÃO UMA SOBRANCELHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Do mapeamento do sistema de design: rótulo de campo em `text-footnote` com
+ * peso 600 — 13 px, capitalização normal.
+ *
+ * Era a `bo-eyebrow`: 11 px, caixa alta, `letter-spacing` de 0,14em. A
+ * sobrancelha continua a ser a sobrancelha e continua a rotular BLOCOS; o que
+ * mudou é que um rótulo de CAMPO deixou de ser uma. Um formulário com trinta
+ * palavras em maiúsculas lê-se como um impresso de repartição, e 11 px é o
+ * tamanho a que se lê pior.
+ *
+ * Isto atravessa 61 ficheiros de uma vez, porque o `ui/Field` é o primitivo
+ * partilhado. É por isso que fica guardado num sítio só.
+ */
+/**
+ * O `ui/Field` SEM comentários.
+ *
+ * É a segunda vez no mesmo dia que uma varredura destas casa com prosa em vez
+ * de código: o `<th` apanhou um `<thead>` dentro de um comentário, e aqui o
+ * `<label` apanhou o «a real `<label for>`» do cabeçalho do ficheiro. Numa casa
+ * que comenta tanto como esta, tirar os comentários antes de procurar não é
+ * uma precaução — é a regra.
+ */
+const CAMPO = readFileSync(
+  join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/ui/Field.tsx"),
+  "utf8",
+)
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+describe("o rótulo de um campo", () => {
+  /** O `<label>` do primitivo, com as classes que ele leva. */
+  const rotulo = () => {
+    const i = CAMPO.search(/<label\b/);
+    expect(i, "não há `<label>` no `ui/Field` — a varredura envelheceu").toBeGreaterThan(-1);
+    return CAMPO.slice(i, CAMPO.indexOf(">", CAMPO.indexOf("hideLabel", i)));
+  };
+
+  it("está na escala, com o degrau do rótulo", () => {
+    expect(rotulo(), "o rótulo saiu da escala tipográfica").toMatch(/\btext-footnote\b/);
+    expect(rotulo(), "um rótulo de campo é semibold no mapeamento").toMatch(/font-semibold/);
+  });
+
+  it("deixou de ser uma sobrancelha", () => {
+    expect(
+      rotulo(),
+      "a `bo-eyebrow` voltou ao rótulo do campo — 11 px em caixa alta em todos os formulários",
+    ).not.toMatch(/bo-eyebrow/);
+  });
+});

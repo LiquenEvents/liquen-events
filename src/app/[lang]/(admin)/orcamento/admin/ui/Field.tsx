@@ -178,7 +178,27 @@ export function Field(props: FieldProps) {
 
   return (
     <div className={cn("flex flex-col gap-1.5", containerClassName)}>
-      <label id={labelId} htmlFor={id} className={cn("bo-eyebrow", hideLabel && "sr-only")}>
+      {/* ── O RÓTULO DE CAMPO, NA ESCALA ──────────────────────────────────
+          Era a `bo-eyebrow`: 11 px, caixa alta, `letter-spacing` de 0,14em. O
+          mapeamento do sistema de design dá ao rótulo de campo o
+          `text-footnote` — 13 px, peso 600, capitalização normal.
+
+          A sobrancelha continua a ser a sobrancelha, e continua a rotular
+          BLOCOS. O que muda é que um rótulo de campo deixou de ser uma: um
+          formulário com trinta palavras em maiúsculas lê-se como um formulário
+          de repartição, e 11 px é o tamanho a que ela lê pior.
+
+          O texto no DOM não muda — a caixa alta era `text-transform`, ou seja
+          pintura. Nenhuma consulta por rótulo se parte com isto, e foi
+          verificado antes de mexer. */}
+      <label
+        id={labelId}
+        htmlFor={id}
+        className={cn(
+          "text-footnote font-semibold text-[var(--bo-text-muted)]",
+          hideLabel && "sr-only",
+        )}
+      >
         {label}
         {required && (
           <span aria-hidden="true" className="ml-1 text-[#8a2a22]/80">
