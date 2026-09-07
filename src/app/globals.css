@@ -981,7 +981,17 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      UM valor: as classes usam `sage-600` (o `@theme` do `tema.css`), o
      JavaScript que não pode usar `var()` usa o mesmo hexadecimal, e este token
      aponta para o mesmo sítio. Medido: 6,23:1 sobre branco. */
-  --bo-accent: var(--color-sage-600, #4c6752); /* = --accent do sistema */
+     ── E PORQUE É QUE ISTO É UM HEXADECIMAL E NÃO UM `var()` ───────────────
+     A primeira versão escrevia `var(--color-sage-600, …)`. Ficava elegante e
+     partia três testes de contraste desta casa, que LÊEM este token do CSS e
+     fazem a conta da norma com ele: `hexParaRgb(token("--bo-accent"))` não tem
+     como seguir uma indirecção.
+
+     Podia ter-se ensinado os três testes a resolver o `var()`. Fica o valor
+     literal, e um guarda a exigir que ele seja igual ao `--color-sage-600` do
+     `tema.css` — porque o que interessa não é a forma como está escrito, é não
+     haver dois valores. Um guarda vale mais do que três leitores espertos. */
+  --bo-accent: #4c6752; /* = --color-sage-600. Guardado por `um-verde-so.test.ts` */
   --bo-accent-ring: rgba(76, 99, 80, 0.16); /* focus / active soft ring */
   /* ── A LAVAGEM DE ACENTO, JÁ COMPOSTA SOBRE BRANCO ──────────────────────
      O `--bo-accent-ring` é translúcido, e é isso que se quer na coluna da
@@ -3733,7 +3743,7 @@ body[data-menu-open] .whatsapp-fixed {
 .bo-input:focus {
   outline: none;
   /* Active field borders adopt the single moss accent. */
-  border-color: var(--bo-accent, #4c6350);
+  border-color: var(--bo-accent, #4c6752);
 }
 /* Eyebrow label used atop panels and as the Field <label> — bumped to ~5:1 on
    white (0.66 alpha) so it clears AA as a real label, with a calmer, more

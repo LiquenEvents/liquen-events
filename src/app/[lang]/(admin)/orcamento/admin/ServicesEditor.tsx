@@ -83,7 +83,7 @@ export interface ServicesEditorProps {
 const ROW_INPUT =
   "min-w-0 rounded-md border border-[var(--bo-control-border,rgba(42,38,32,0.5))] " +
   "bg-[var(--bo-surface,#ffffff)] px-2 py-1.5 text-xs leading-5 text-[var(--bo-text)] " +
-  `focus:border-[var(--bo-accent,#4c6350)] focus:outline-none ${ESTADO}`;
+  `focus:border-[var(--bo-accent,#4c6752)] focus:outline-none ${ESTADO}`;
 /** `alvo-toque`: 44 px no dedo, sem mexer no aspeto com rato (ver globals.css).
  *  `!justify-start` porque a classe centra o conteúdo e este botão é uma linha
  *  de texto que tem de ficar alinhada à esquerda com o resto da coluna. */

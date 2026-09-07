@@ -325,7 +325,7 @@ describe("Button (extended)", () => {
     );
     const btn = screen.getByRole("button", { name: "Guardar" });
     // primary → moss-dark fill; sm → h-8 padding scale.
-    expect(btn).toHaveClass("bg-[#4d6350]");
+    expect(btn).toHaveClass("bg-sage-600");
     expect(btn).toHaveClass("h-8");
   });
 
