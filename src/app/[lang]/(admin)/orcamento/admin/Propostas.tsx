@@ -8,7 +8,7 @@ import { MenuDeAccoes, TabelaOuCartoes, type AccaoDeItem } from "./ui";
 import { Button, Card, EmptyState, PerguntaDestrutiva, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { useCachedList } from "./useCachedList";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import {
   lugaresNoCliente,
@@ -138,7 +138,7 @@ function EstadoChip({ p }: { p: Proposal }) {
   return (
     <span
       className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
-      style={{ background: `${meta.color}1f`, color: meta.color }}
+      style={{ background: `${meta.color}1f`, color: corDeTexto(meta.color) }}
     >
       {meta.label}
     </span>

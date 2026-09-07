@@ -7,7 +7,7 @@ import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { Button, Field, EmptyState } from "./ui";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -486,7 +486,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                     className="rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em]"
                     style={{
                       background: `${metaFor(STATUS_META, it.status).color}18`,
-                      color: metaFor(STATUS_META, it.status).color,
+                      color: corDeTexto(metaFor(STATUS_META, it.status).color),
                     }}
                   >
                     {metaFor(STATUS_META, it.status).label}

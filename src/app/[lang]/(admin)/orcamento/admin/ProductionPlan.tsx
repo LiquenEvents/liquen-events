@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { Escolha, Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -527,7 +527,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                     className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
                     style={{
                       background: `${estado.color}1f`,
-                      color: estado.color,
+                      color: corDeTexto(estado.color),
                     }}
                   >
                     {estado.label}

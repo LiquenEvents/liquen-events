@@ -5,6 +5,7 @@ import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { eur0 as eur } from "@/lib/money";
 import { todayKey } from "./util";
+import { corDeTexto } from "./status-meta";
 import { Button, Card, EmptyState } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -369,7 +370,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                           </div>
                           <span
                             className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
-                            style={{ background: `${it.color}1f`, color: it.color }}
+                            style={{ background: `${it.color}1f`, color: corDeTexto(it.color) }}
                           >
                             {KIND_LABEL[it.kind]}
                           </span>

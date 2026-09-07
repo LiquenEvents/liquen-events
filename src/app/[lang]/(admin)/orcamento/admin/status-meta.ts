@@ -80,11 +80,43 @@ export function metaFor<T extends StatusMeta>(map: Record<string, T>, key: strin
  * o tom mantém-se, e ficam todos no primeiro valor que chega aos 4,5:1, para
  * não escurecerem mais do que o necessário. O `#9aa36a` serve dois fundos
  * diferentes e leva o valor do PIOR deles.
+ *
+ * ── A SEGUNDA VOLTA: A TABELA ESTAVA CERTA E CURTA ───────────────────────
+ *
+ * Três cores não eram as três cores da paleta — eram as três que a lista
+ * ESCRITA À MÃO do `contraste-dos-rotulos.test.ts` calhou de visitar. O padrão
+ * do crachá (`background: ${cor}<alfa>` com `color: cor`) aparece em nove
+ * ficheiros, e a lista tinha cinco entradas. Medido sobre o fundo composto de
+ * cada um:
+ *
+ *     «Enviada»              #9aa36a sobre #9aa36a1f      2,43:1   Propostas
+ *     «Em negociação»        #7d8a55 sobre #7d8a551f      3,27:1   Propostas
+ *     «Gerada, por enviar»   #a9781f sobre #a9781f1f      3,40:1   Propostas
+ *     crachá âmbar           #b5894a sobre #b5894a1f      2,81:1   Agenda
+ *     crachá azul            #7a8caa sobre #7a8caa1f      3,01:1   Agenda
+ *     «Confirmado»           #7c854b sobre #7c854b1f      3,45:1   Produção
+ *
+ * E o mais revelador: o `#8a8a82`, que JÁ ESTAVA corrigido e JÁ ESTAVA a ser
+ * testado, media 4,40:1 no `#8a8a821f` do plano de produção — porque esse sítio
+ * não constava da lista. A cor tinha sido curada; o sítio é que não tinha sido
+ * visitado. Uma lista à mão de sítios envelhece exactamente como o número à mão
+ * num comentário: ninguém a revisita quando acrescenta um crachá.
+ *
+ * Por isso o degrau deixou de ser calculado contra os fundos que alguém se
+ * lembrou de escrever e passa a ser calculado contra o PIOR fundo que a casa
+ * usa — o próprio tom no alfa mais escuro que existe no código (`0x22`) — e o
+ * teste varre a fonte à procura de cores e de alfas em vez de os ter em lista.
+ * Um crachá novo, ou um alfa novo, entra na conta sozinho.
  */
 const TEXTO_LEGIVEL: Record<string, string> = {
-  "#9aa36a": "#6c724a", // 2,40:1 → 4,52:1
-  "#8a8a82": "#707069", // 3,16:1 → 4,54:1
-  "#8a6d2f": "#84692d", // 4,26:1 → 4,55:1
+  "#9aa36a": "#6c724a", // 2,40:1 → 4,53:1
+  "#8a8a82": "#6d6d67", // 3,03:1 → 4,54:1  (era #707069, e dava 4,40 no `1f`)
+  "#8a6d2f": "#84692d", // 4,12:1 → 4,55:1
+  "#7c854b": "#69703f", // 3,40:1 → 4,53:1
+  "#b5894a": "#8a6736", // 2,77:1 → 4,52:1
+  "#a9781f": "#8e6418", // 3,34:1 → 4,52:1
+  "#7d8a55": "#677145", // 3,23:1 → 4,52:1
+  "#7a8caa": "#606e86", // 2,98:1 → 4,50:1
 };
 
 /**

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
 import { Button, Escolha, Field } from "./ui";
@@ -342,7 +342,7 @@ export default function GuestList({ quote, onChange }: Props) {
                 // migração, uma correcção feita à mão na base de dados. Num
                 // componente de cliente isso não perde a linha: perde o back
                 // office inteiro para o ecrã de erro.
-                style={{ color: metaFor(RSVP_META, g.rsvp).color }}
+                style={{ color: corDeTexto(metaFor(RSVP_META, g.rsvp).color) }}
               >
                 {/* Sem esta, um valor desconhecido não casava com opção
                     nenhuma e o campo mostrava "Pendente" — dizia uma coisa

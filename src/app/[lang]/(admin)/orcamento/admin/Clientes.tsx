@@ -18,7 +18,7 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { eur0 as eur } from "@/lib/money";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 // Unified status vocabulary (Novo / Aguardar resposta / Proposta enviada / Ganho / Perdido).
@@ -818,7 +818,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-md font-medium"
                     style={{
                       background: `${metaFor(STATUS_META, q.status).color}18`,
-                      color: metaFor(STATUS_META, q.status).color,
+                      color: corDeTexto(metaFor(STATUS_META, q.status).color),
                     }}
                   >
                     {metaFor(STATUS_META, q.status).label}
