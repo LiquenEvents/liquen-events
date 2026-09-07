@@ -961,7 +961,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           </span>
           <button
             type="button"
-            className={`alvo-toque shrink-0 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque shrink-0 text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={() => {
               setItems(linhaRemovida.items);
               setLinhaRemovida(null);
@@ -1061,7 +1061,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         size="sm"
         onClick={addRow}
         iconLeft={<span aria-hidden="true">+</span>}
-        className="mt-2 mb-5 text-[#4d6350] hover:text-[#415440]"
+        className="mt-2 mb-5 text-sage-600 hover:text-[#415440]"
       >
         Adicionar linha
       </Button>
@@ -1096,7 +1096,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         </div>
         <div className="flex justify-between text-base font-medium pt-2 border-t border-[var(--bo-hairline-strong)]">
           <span className="text-[var(--bo-tinta-72)]">Total</span>
-          <span className="text-[#4d6350] font-semibold">{eur(total)}</span>
+          <span className="text-sage-600 font-semibold">{eur(total)}</span>
         </div>
       </div>
 

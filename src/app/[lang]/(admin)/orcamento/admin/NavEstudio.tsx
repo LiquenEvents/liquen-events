@@ -249,7 +249,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
         {marca && (
           <li
             aria-hidden="true"
-            className={`pointer-events-none absolute left-0 top-0 w-[3px] rounded-full bg-[#4d6350] ${
+            className={`pointer-events-none absolute left-0 top-0 w-[3px] rounded-full bg-sage-600 ${
               podeAndar ? MARCA : ""
             }`}
             style={{ translate: `${marca.x}px ${marca.y}px`, height: marca.altura }}
@@ -274,7 +274,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                    ser transparente — a coluna é a de sempre, ao pixel. */
                 className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${ESTADO} ${PRESSAO} ${
                   aqui
-                    ? "bg-[#4d6350]/[0.08]"
+                    ? "bg-sage-600/[0.08]"
                     : /* O fundo sob o rato tem de ser UM DEGRAU MAIS FUNDO do que o
                          fundo em repouso, e na tira não era: `bg-…-6` em repouso e
                          `hover:bg-…-6` — o mesmo token. Aproximar o rato de um
@@ -287,7 +287,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 <span
                   aria-hidden
                   className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                    s.preenchida ? "bg-[#4d6350]" : "border border-foreground/25"
+                    s.preenchida ? "bg-sage-600" : "border border-foreground/25"
                   }`}
                 />
                 <span className="min-w-0 flex-1">

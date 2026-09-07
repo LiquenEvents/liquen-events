@@ -108,7 +108,7 @@ function Delta({ now, prev }: { now: number; prev: number }) {
     <span
       aria-label={`${up ? "a subir" : "a descer"} ${Math.abs(pct)}% face ao mês anterior`}
       className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
-        up ? "text-[#4d6350]" : "text-[#8a6420]"
+        up ? "text-sage-600" : "text-[#8a6420]"
       }`}
     >
       <svg
@@ -501,7 +501,7 @@ function LinhaEstado({
     return <span className="text-foreground/40 text-[10px]">A guardar…</span>;
   if (estado.tipo === "guardado")
     return (
-      <span className="text-[#4d6350] text-[10px]">
+      <span className="text-sage-600 text-[10px]">
         Guardado no servidor{estado.quando ? ` às ${estado.quando}` : ""}
       </span>
     );
@@ -585,7 +585,7 @@ const MetaReceita = memo(function MetaReceita({
             // que é o mesmo defeito de legibilidade noutro sítio. O título é
             // uma legenda e quebra bem; o rótulo do botão são duas palavras
             // que se lêem de uma vez.
-            className={`alvo-toque shrink-0 text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
+            className={`alvo-toque shrink-0 text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-sage-600 ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
           >
             {goal > 0 ? "Editar meta" : "Definir meta"}
           </button>
@@ -643,7 +643,7 @@ const MetaReceita = memo(function MetaReceita({
                 className="font-light"
                 style={{
                   fontSize: "clamp(18px, 2vw, 24px)",
-                  color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
+                  color: wonThisMonth >= goal ? "#3a5c39" : "#4c6752",
                 }}
               >
                 {eur(wonThisMonth)}
@@ -652,7 +652,7 @@ const MetaReceita = memo(function MetaReceita({
             </div>
             <span
               className="text-sm font-semibold tabular-nums"
-              style={{ color: wonThisMonth >= goal ? "#3a5c39" : "#4d6350" }}
+              style={{ color: wonThisMonth >= goal ? "#3a5c39" : "#4c6752" }}
             >
               {Math.min(100, Math.round((wonThisMonth / goal) * 100))}%
             </span>
@@ -667,7 +667,7 @@ const MetaReceita = memo(function MetaReceita({
               className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
               style={{
                 transform: `scaleX(${fraccaoDaBarra(wonThisMonth, goal)})`,
-                background: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
+                background: wonThisMonth >= goal ? "#3a5c39" : "#4c6752",
               }}
             />
           </div>
@@ -811,7 +811,7 @@ const NotasEquipa = memo(function NotasEquipa({
         {!editingNotes && carga !== "erro" && (
           <button
             onClick={() => setEditingNotes(true)}
-            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
+            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-sage-600 ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
           >
             {teamNotes ? "Editar" : "Adicionar nota"}
           </button>
@@ -841,7 +841,7 @@ const NotasEquipa = memo(function NotasEquipa({
             />
             <button
               onClick={fechar}
-              className={`text-[#4d6350] text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 shrink-0 ${ESTADO} ${PRESSAO}`}
+              className={`text-sage-600 text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 shrink-0 ${ESTADO} ${PRESSAO}`}
             >
               Fechar
             </button>
@@ -1008,7 +1008,7 @@ function AEsperaDeResposta({
                   {eventTypeLabel(quote)} · {esperaEmPalavras(dias)}
                 </span>
               </span>
-              <span className="shrink-0 text-[#4d6350] text-sm font-semibold tabular-nums">
+              <span className="shrink-0 text-sage-600 text-sm font-semibold tabular-nums">
                 {eur(valor)}
               </span>
             </button>
@@ -1553,7 +1553,7 @@ export default function Overview({
         ) : (
           <div className="bo-card p-[var(--bo-p-vazio)] sm:p-12 text-center flex flex-col items-center">
             <span
-              className="flex items-center justify-center w-14 h-14 rounded-2xl mb-3.5 sm:mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
+              className="flex items-center justify-center w-14 h-14 rounded-2xl mb-3.5 sm:mb-5 bg-sage-600/[0.08] text-sage-600"
               aria-hidden="true"
             >
               <svg
@@ -1732,7 +1732,7 @@ export default function Overview({
               ? "bg-[#8a2a22]/[0.07] border-[#8a2a22]/25 hover:border-[#8a2a22]/40"
               : data.nextEventDays <= 7
                 ? "bg-amber-500/[0.05] border-amber-500/20 hover:border-amber-500/35"
-                : "bg-[#4d6350]/[0.05] border-[#4d6350]/20 hover:border-[#4d6350]/35"
+                : "bg-sage-600/[0.05] border-sage-600/20 hover:border-sage-600/35"
           }`}
         >
           <div className="flex items-start justify-between gap-4">
@@ -1745,7 +1745,7 @@ export default function Overview({
                       ? "#8a2a22"
                       : data.nextEventDays <= 7
                         ? "#b5894a"
-                        : "#4d6350",
+                        : "#4c6752",
                 }}
               >
                 {data.nextEventDays === 0
@@ -1779,7 +1779,7 @@ export default function Overview({
                       ? "#8a2a22"
                       : data.nextEventDays <= 7
                         ? "#b5894a"
-                        : "#4d6350",
+                        : "#4c6752",
                 }}
               >
                 {data.nextEventDays === 0 ? "hoje" : `${data.nextEventDays}d`}
@@ -1911,7 +1911,7 @@ export default function Overview({
             v: eur(data.received),
             l: "Recebido",
             hint: "pagamentos que já estão dados como recebidos",
-            cor: "#4d6350",
+            cor: "#4c6752",
             tamanho: "clamp(20px, 2.4vw, 26px)",
             go: onGoStats,
           },
@@ -2048,7 +2048,7 @@ export default function Overview({
               <h3 className="bo-eyebrow">Fases dos pedidos</h3>
               <button
                 onClick={() => onGo("kanban")}
-                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
+                className={`alvo-toque text-sage-600 hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
               >
                 Abrir →
               </button>
@@ -2100,7 +2100,7 @@ export default function Overview({
               <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
               <button
                 onClick={onGoStats}
-                className={`alvo-toque text-[#4d6350] hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
+                className={`alvo-toque text-sage-600 hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
               >
                 Ver tudo →
               </button>
@@ -2108,7 +2108,7 @@ export default function Overview({
             <div className="grid grid-cols-2 gap-3 mb-3.5 sm:mb-5">
               <div>
                 <p
-                  className="text-[#4d6350] font-light leading-none mb-1"
+                  className="text-sage-600 font-light leading-none mb-1"
                   style={{ fontSize: "clamp(18px, 2vw, 24px)" }}
                 >
                   {eur(data.received)}
@@ -2131,7 +2131,7 @@ export default function Overview({
               <>
                 <div className="relative h-2 rounded-full overflow-hidden bg-[var(--bo-tinta-6)]">
                   <div
-                    className={`absolute inset-0 origin-left bg-[#4d6350] ${PROGRESSO}`}
+                    className={`absolute inset-0 origin-left bg-sage-600 ${PROGRESSO}`}
                     style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
                   />
                   <div
@@ -2143,7 +2143,7 @@ export default function Overview({
                 </div>
                 <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#4d6350]" /> Recebido
+                    <span className="w-2 h-2 rounded-full bg-sage-600" /> Recebido
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#c0a060]/70" /> Por receber
@@ -2182,7 +2182,7 @@ export default function Overview({
                   </span>
                 )}
                 {data.needAction.length > 0 && (
-                  <span className="text-[10px] tabular-nums bg-[#4d6350]/10 text-[#4d6350] rounded-full px-2 py-0.5">
+                  <span className="text-[10px] tabular-nums bg-sage-600/10 text-sage-600 rounded-full px-2 py-0.5">
                     {data.needAction.length}
                   </span>
                 )}
@@ -2191,7 +2191,7 @@ export default function Overview({
             <div className="divide-y divide-[var(--bo-hairline)] max-h-[360px] overflow-y-auto">
               {data.needAction.length === 0 && (
                 <div className="text-center py-[var(--bo-p-vazio)] px-[var(--bo-p-cartao)] sm:py-12">
-                  <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
+                  <p className="text-sage-600 text-sm font-medium">Tudo tratado.</p>
                   <p className="text-foreground/35 text-xs mt-1.5 leading-relaxed">
                     Não há pedidos à tua espera. Bom trabalho — aproveita para preparar os próximos
                     eventos.

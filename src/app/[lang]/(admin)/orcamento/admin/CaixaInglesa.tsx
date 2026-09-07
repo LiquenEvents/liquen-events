@@ -179,8 +179,8 @@ export default function CaixaInglesa({
       desactualizada
         ? "border-[#8a2a22]/50 bg-[#8a2a22]/[0.05]"
         : porTraduzir
-          ? "border-dashed border-[#c08a3e]/60 bg-[#4d6350]/[0.04]"
-          : "bg-[#4d6350]/[0.04]"
+          ? "border-dashed border-[#c08a3e]/60 bg-sage-600/[0.04]"
+          : "bg-sage-600/[0.04]"
     }`.trim(),
   };
 
@@ -196,7 +196,7 @@ export default function CaixaInglesa({
     >
       <span
         aria-hidden="true"
-        className="mt-1.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold tracking-[0.14em] text-[#4d6350]/80 uppercase"
+        className="mt-1.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold tracking-[0.14em] text-sage-600/80 uppercase"
       >
         EN
       </span>

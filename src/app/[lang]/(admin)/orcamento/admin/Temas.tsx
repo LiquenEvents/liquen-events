@@ -1749,7 +1749,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left hover:border-[#4d6350]/40 ${ESTADO} ${PRESSAO}`}
+                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left hover:border-sage-600/40 ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -3606,7 +3606,7 @@ function ThemeFolder({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className={`alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-sage-600 ${ESTADO} ${PRESSAO}`}
               title="Renomear tema"
             >
               {theme.name}
@@ -3681,7 +3681,7 @@ function ThemeFolder({
                 corria, na prática, nos 150 ms de omissão. O `PROGRESSO` escreve
                 os mesmos 250 ms num utilitário que compila mesmo. */}
             <div
-              className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+              className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
               style={{ transform: `scaleX(${pct / 100})` }}
             />
           </div>
@@ -3718,7 +3718,7 @@ function ThemeFolder({
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
-                  className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+                  className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
                   style={{ transform: `scaleX(${thumbPct / 100})` }}
                 />
               </div>
@@ -3893,7 +3893,7 @@ function ThemeFolder({
       {(selectedCount > 0 || emBloco) && (
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 backdrop-blur">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-sage-600/25 bg-white/95 px-4 py-3 backdrop-blur">
               <p className="text-sm text-[var(--bo-text)]">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
@@ -4018,7 +4018,7 @@ function ThemeFolder({
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
         // `GRELHA_DE_FOTOS`.
         className={`@container rounded-2xl border border-dashed p-4 ${ESTADO} ${
-          drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-[var(--bo-hairline-strong)]"
+          drag ? "border-sage-600/60 bg-sage-600/[0.06]" : "border-[var(--bo-hairline-strong)]"
         }`}
       >
         {loading ? (
@@ -4118,11 +4118,11 @@ function ThemeFolder({
                     // isso a barra de deslocamento não mexe. Ver globals.css.
                     className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
                       isSelected
-                        ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
+                        ? "border-sage-600 ring-2 ring-sage-600/40"
                         : "border-[var(--bo-hairline-strong)]"
                     } ${dragFrom === i ? "opacity-40" : ""} ${
                       dragOver === i && dragFrom !== null && dragFrom !== i
-                        ? "ring-2 ring-[#4d6350]"
+                        ? "ring-2 ring-sage-600"
                         : ""
                     }`}
                   >
@@ -4166,7 +4166,7 @@ function ThemeFolder({
                         aria-hidden
                         className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] leading-none ${ESTADO} ${
                           isSelected
-                            ? "border-[#4d6350] bg-[#4d6350] text-white opacity-100"
+                            ? "border-sage-600 bg-sage-600 text-white opacity-100"
                             : "border-white/70 bg-black/35 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
                         }`}
                       >

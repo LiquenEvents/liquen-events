@@ -923,7 +923,7 @@ export default function Inventario() {
                             {i.notes}
                           </p>
                         )}
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.1em] text-[#4d6350]/70">
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.1em] text-sage-600/70">
                           {i.category}
                           {i.location ? (
                             <span className="text-foreground/35"> · {i.location}</span>
@@ -982,7 +982,7 @@ export default function Inventario() {
                         className="w-full px-2.5 py-1.5"
                       />
                     ) : (
-                      <span className="text-[11px] uppercase tracking-[0.1em] text-[#4d6350]/70">
+                      <span className="text-[11px] uppercase tracking-[0.1em] text-sage-600/70">
                         {i.category}
                       </span>
                     ),
@@ -1080,7 +1080,7 @@ export default function Inventario() {
                         <span className="hidden com-rato:flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(i)}
-                            className={`alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 rounded-md p-1 ${ESTADO} ${PRESSAO}`}
+                            className={`alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-sage-600 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 rounded-md p-1 ${ESTADO} ${PRESSAO}`}
                             aria-label="Editar"
                           >
                             {LapisIcon}

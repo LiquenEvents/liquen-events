@@ -150,7 +150,7 @@ export default function BotaoGuardarTudo() {
            para o canto e as cores chegarem juntos. */
         className={`motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,border-radius] motion-safe:duration-[120ms] ${
           quantos > 0
-            ? `alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
+            ? `alvo-toque flex items-center gap-2 rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
             : `alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] ${PRESSAO} hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11`
         }`}
       >

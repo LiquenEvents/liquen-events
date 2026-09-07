@@ -56,11 +56,11 @@ import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
 const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
   pendente: {
     label: "Novo",
-    classe: "bg-[#4d6350]/10 text-[#4d6350] ring-1 ring-inset ring-[#4d6350]/30",
+    classe: "bg-sage-600/10 text-sage-600 ring-1 ring-inset ring-sage-600/30",
   },
-  em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/18 text-[#4d6350]" },
-  cotado: { label: "Proposta enviada", classe: "bg-[#4d6350]/25 text-[#4d6350]" },
-  aceite: { label: "Ganho", classe: "bg-[#4d6350]/35 text-[#4d6350]" },
+  em_revisao: { label: "Aguardar resposta", classe: "bg-sage-600/18 text-sage-600" },
+  cotado: { label: "Proposta enviada", classe: "bg-sage-600/25 text-sage-600" },
+  aceite: { label: "Ganho", classe: "bg-sage-600/35 text-sage-600" },
   rejeitado: { label: "Perdido", classe: "bg-[var(--bo-tinta-10)] text-foreground/30" },
 };
 
@@ -422,7 +422,7 @@ export default function FazerProposta({
                   onClick={() => onSelect(q.id)}
                   className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left ${MOV_ESTADO} ${PRESSAO} ${
                     espera
-                      ? "border-[var(--bo-hairline)] bg-white hover:border-[#4d6350]/40"
+                      ? "border-[var(--bo-hairline)] bg-white hover:border-sage-600/40"
                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"
                   }`}
                 >

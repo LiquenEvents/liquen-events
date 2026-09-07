@@ -309,7 +309,7 @@ export default function FundirTemas({
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
-                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  className="h-full w-full origin-left rounded-full bg-sage-600 motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
                   style={{ transform: `scaleX(${pct / 100})` }}
                 />
               </div>
@@ -385,8 +385,8 @@ export default function FundirTemas({
                 onClick={() => setDestId(t.id)}
                 className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left  disabled:opacity-50 ${
                   on
-                    ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
-                    : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/40"
+                    ? "border-sage-600 bg-sage-600/[0.07]"
+                    : "border-[var(--bo-hairline-strong)] hover:border-sage-600/40"
                 } ${ESTADO} ${PRESSAO}`}
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--bo-tinta-6)]">

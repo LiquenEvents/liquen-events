@@ -324,7 +324,7 @@ function esperaDaCopiaDeFotos(fotos: number): number {
 
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-[var(--bo-text)]";
 const ADD_BTN =
-  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] inline-flex items-center";
+  "alvo-toque !justify-start gap-1 text-xs font-medium text-sage-600 hover:text-[#415440] inline-flex items-center";
 const REMOVE_BTN =
   "alvo-toque text-foreground/30 hover:text-[#8a2a22] text-base leading-none shrink-0";
 
@@ -7196,7 +7196,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <div className="mt-2.5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className={`alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                 onClick={() => void reporOsValoresEnviados()}
               >
                 Repor os valores que seguiram
@@ -7224,7 +7224,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </span>
           <button
             type="button"
-            className={`alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={anularLimpeza}
           >
             Anular
@@ -7489,7 +7489,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 aria-pressed={bilingue}
                 className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium  ${
                   bilingue
-                    ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
+                    ? "border-sage-600/40 bg-sage-600/[0.08] text-sage-600"
                     : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
                 } ${ESTADO} ${PRESSAO}`}
                 title="Acrescenta uma caixa em inglês por baixo de cada campo de texto"
@@ -8113,7 +8113,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               // pela da janela — ver o comentário na grelha.
                               className={`@container rounded-2xl border p-4 ${
                                 fechado
-                                  ? "border-[#4d6350]/35 bg-[#4d6350]/[0.04]"
+                                  ? "border-sage-600/35 bg-sage-600/[0.04]"
                                   : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
                               }`}
                             >
@@ -8227,7 +8227,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       }
                                       className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs  ${
                                         fechado
-                                          ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                          ? "bg-sage-600/15 text-sage-600"
                                           : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
                                       } ${ESTADO} ${PRESSAO}`}
                                     >
@@ -8762,7 +8762,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                                           <input
                                             type="checkbox"
-                                            className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                                            className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
                                             checked={semRecorte}
                                             onChange={(e) =>
                                               updateBoard(bi, {
@@ -8922,7 +8922,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <label className="flex items-center gap-2 text-xs text-[var(--bo-text-muted)]">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 shrink-0 accent-[#4d6350]"
+                            className="h-4 w-4 shrink-0 accent-sage-600"
                             checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
                             onChange={(e) =>
                               patch({
@@ -10052,7 +10052,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                      */}
                     <button
                       type="button"
-                      className={`alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                      className={`alvo-toque -my-1 py-2 text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                       onClick={() =>
                         pedirConfirmacaoDeDinheiro({
                           oQue: "o total",
@@ -10172,7 +10172,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          a apanhá-lo e não a máquina de quem escreveu — só
                          aparece quando a proposta tem uma validade diferente da
                          preferida, e os dados locais não a tinham. */
-                        className={`alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque -my-1 py-2 text-[11px] text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                         onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
                       >
                         Passar a usar {doc.validUntilDays} dias em todas as propostas novas
@@ -10395,8 +10395,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                `prefers-reduced-motion` já tratado no `globals.css`.
 
                Passa a ser o mesmo dos dois lados — ela vê o que o casal vê. */
-            <div className="bo-cena flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
-              <p className="flex items-center gap-2 font-display text-base text-[#4d6350]">
+            <div className="bo-cena flex flex-col items-start gap-3 rounded-2xl border border-sage-600/25 bg-sage-600/[0.06] p-5">
+              <p className="flex items-center gap-2 font-display text-base text-sage-600">
                 <svg
                   viewBox="0 0 52 52"
                   className="h-5 w-5 shrink-0"
@@ -11662,7 +11662,7 @@ function BarraDaSeleccao({
 }) {
   if (quantas === 0) return null;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#4d6350]/35 bg-[#4d6350]/[0.06] px-3 py-2">
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-sage-600/35 bg-sage-600/[0.06] px-3 py-2">
       <p className="text-xs font-medium text-[var(--bo-tinta-72)]">
         {quantas === 1 ? "1 fotografia escolhida" : `${quantas} fotografias escolhidas`}
       </p>
@@ -12005,7 +12005,7 @@ function AccoesDaFoto({
                   aria-hidden="true"
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[13px] ${
                     a.activa
-                      ? "bg-[#4d6350] text-white"
+                      ? "bg-sage-600 text-white"
                       : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                   }`}
                 >
@@ -12432,7 +12432,7 @@ function StepNav({
               aria-current={active ? "step" : undefined}
               className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium  inline-flex items-center ${
                 active
-                  ? "bg-[#4d6350] text-white"
+                  ? "bg-sage-600 text-white"
                   : "text-foreground/50 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
               } ${ESTADO} ${PRESSAO}`}
             >
@@ -12732,7 +12732,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         <span className="bo-eyebrow">Só para si</span>
         <span className="text-xs text-[var(--bo-tinta-72)]">
           Margem{" "}
-          <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-[#4d6350]"}`}>
+          <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-sage-600"}`}>
             {eur(total.margem)} · {Math.round(total.percentagem)}%
           </strong>
         </span>
@@ -13098,9 +13098,9 @@ function DiagramaDeLayout({
           width={c.w}
           height={c.h}
           rx={6}
-          fill="#4d6350"
+          fill="#4c6752"
           fillOpacity={0.22}
-          stroke="#4d6350"
+          stroke="#4c6752"
           strokeOpacity={0.45}
           strokeWidth={3}
         />
@@ -13184,8 +13184,8 @@ function SelectorDeLayout({
               onClick={() => onEscolher(op)}
               className={`w-[5.75rem] rounded-lg border p-1.5 text-left  ${
                 activo
-                  ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] "
-                  : "border-[var(--bo-hairline-strong)] bg-white hover:border-[#4d6350]/40"
+                  ? "border-sage-600/70 bg-sage-600/[0.07] "
+                  : "border-[var(--bo-hairline-strong)] bg-white hover:border-sage-600/40"
               } ${ESTADO} ${PRESSAO}`}
             >
               <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-white">
@@ -13987,7 +13987,7 @@ function UploadArea({
       // por cima: duas utilidades da mesma propriedade decidem-se pela ordem na
       // folha de estilo e não pela ordem na string, e um `flex-col` de base
       // ganharia ao `flex-row` da faixa sem nada o denunciar.
-      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${caixa} ${
+      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center  focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/55 ${caixa} ${
         faixa
           ? "flex-row gap-2 p-2"
           : curto
@@ -13997,8 +13997,8 @@ function UploadArea({
               : "flex-col gap-1 p-3"
       } ${
         drag
-          ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
-          : "border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] hover:border-[#4d6350]/45"
+          ? "border-sage-600/60 bg-sage-600/[0.06]"
+          : "border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] hover:border-sage-600/45"
       } ${ESTADO} ${PRESSAO}`}
     >
       <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">{label}</span>

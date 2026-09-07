@@ -378,7 +378,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
               num telemóvel com a carrinha a abanar. `motion-safe:` porque quem
               desligou o movimento no sistema não o quer aqui. */}
           <div
-            className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+            className="h-full w-full origin-left rounded-full bg-sage-600 motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
             style={{ transform: `scaleX(${p.total ? p.carregados / p.total : 0})` }}
           />
         </div>
@@ -478,7 +478,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                           aria-hidden
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 ${
                             carregado
-                              ? "border-[#4d6350] bg-[#4d6350] text-white"
+                              ? "border-sage-600 bg-sage-600 text-white"
                               : "border-foreground/25"
                           }`}
                         >
@@ -522,7 +522,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                abanar dentro de uma carrinha, é um toque enganado que fica. */
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="min-w-0 flex-1 text-sm">
-                <strong className="font-medium text-[#4d6350]">Carrinha dada por carregada</strong>
+                <strong className="font-medium text-sage-600">Carrinha dada por carregada</strong>
                 {horaDoFecho && (
                   <span className="text-[var(--bo-text-muted)]"> às {horaDoFecho}</span>
                 )}
@@ -563,7 +563,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => marcarFecho("carregada")}
-                  className={`min-h-[48px] flex-1 rounded-full bg-[#4d6350] px-4 text-white ${ESTADO} ${PRESSAO}`}
+                  className={`min-h-[48px] flex-1 rounded-full bg-sage-600 px-4 text-white ${ESTADO} ${PRESSAO}`}
                 >
                   Seguir assim
                 </button>
@@ -576,7 +576,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 if (p.criticosPorCarregar.length > 0) setConfirmar(true);
                 else marcarFecho("carregada");
               }}
-              className={`min-h-[52px] w-full rounded-full bg-[#4d6350] px-4 text-white disabled:opacity-45 ${ESTADO} ${PRESSAO}`}
+              className={`min-h-[52px] w-full rounded-full bg-sage-600 px-4 text-white disabled:opacity-45 ${ESTADO} ${PRESSAO}`}
               disabled={p.carregados === 0}
             >
               {p.carregados === p.total

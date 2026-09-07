@@ -577,7 +577,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
    */
   const chip =
     "alvo-toque rounded-full border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-2.5 py-1 " +
-    "text-[11px] tabular-nums text-[var(--bo-text-muted)] hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
+    "text-[11px] tabular-nums text-[var(--bo-text-muted)] hover:border-sage-600/50 hover:text-sage-600 " +
     `${ESTADO} ${PRESSAO}`;
   const ghostFailed = Boolean(failed?.ghost && !payments.some((p) => p.id === failed.id));
 
@@ -667,15 +667,15 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           </p>
         </div>
         <div className={`${QUADRADO} ${NEUTRO}`}>
-          <p className={`${VALOR} text-base text-[#4d6350]`}>{eur2(headlinePaid)}</p>
+          <p className={`${VALOR} text-base text-sage-600`}>{eur2(headlinePaid)}</p>
           <p className={`${ROTULO} text-foreground/40`}>Recebido</p>
         </div>
         {allReceived ? (
           <div
-            className={`${QUADRADO} @min-[26rem]:border-[#4d6350]/25 @min-[26rem]:bg-[#4d6350]/[0.05]`}
+            className={`${QUADRADO} @min-[26rem]:border-sage-600/25 @min-[26rem]:bg-sage-600/[0.05]`}
           >
             <p
-              className={`${VALOR} inline-flex items-center gap-1.5 text-sm text-[#4d6350] @min-[26rem]:justify-center`}
+              className={`${VALOR} inline-flex items-center gap-1.5 text-sm text-sage-600 @min-[26rem]:justify-center`}
             >
               Tudo recebido
               <svg
@@ -690,7 +690,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 <path d="M4 12.5 9.5 18 20 6.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </p>
-            <p className={`${ROTULO} text-[#4d6350]/60`}>Em falta</p>
+            <p className={`${ROTULO} text-sage-600/60`}>Em falta</p>
           </div>
         ) : (
           <div
@@ -728,8 +728,8 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           aria-valuetext={`${Math.round(pct)}% recebido de ${eur2(total)}`}
           className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
         >
-          <div className="h-full bg-[#4d6350]" style={{ width: `${pct}%` }} />
-          <div className="h-full bg-[#4d6350]/35" style={{ width: `${pctDraft}%` }} />
+          <div className="h-full bg-sage-600" style={{ width: `${pct}%` }} />
+          <div className="h-full bg-sage-600/35" style={{ width: `${pctDraft}%` }} />
         </div>
       )}
       {/* Linha de altura fixa: alterna entre a nota fixa e a pré-visualização —
@@ -873,7 +873,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             type="checkbox"
             checked={paidOnAdd}
             onChange={(e) => setPaidOnAdd(e.target.checked)}
-            className="h-3.5 w-3.5 accent-[#4d6350]"
+            className="h-3.5 w-3.5 accent-sage-600"
           />
           Já pago
         </label>
@@ -1020,7 +1020,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   // botão que abre a edição do valor, e 24 px é meia polpa de
                   // dedo.
                   className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-[var(--bo-tinta-6)] ${
-                    p.paid ? "text-[#4d6350]" : "text-[var(--bo-text-muted)]"
+                    p.paid ? "text-sage-600" : "text-[var(--bo-text-muted)]"
                   } ${ESTADO} ${PRESSAO}`}
                 >
                   {eur2(p.amount)}
@@ -1051,7 +1051,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 // fica encostado ao × de remover.
                 className={`rounded-md px-1.5 py-0.5 pointer-coarse:min-h-11 text-[9px] tracking-[0.1em] uppercase text-center ${ESTADO} ${PRESSAO} ${
                   p.paid
-                    ? "bg-[#4d6350]/15 text-[#4d6350] hover:bg-[#4d6350]/25"
+                    ? "bg-sage-600/15 text-sage-600 hover:bg-sage-600/25"
                     : "bg-[var(--bo-tinta-6)] text-foreground/50 hover:bg-[var(--bo-tinta-10)]"
                 }`}
               >

@@ -911,17 +911,17 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       else openAdd(key);
                     }
                   }}
-                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${
+                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
                     isSelected
-                      ? "ring-1 ring-inset ring-[#4d6350]/45 bg-[#4d6350]/[0.04]"
+                      ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
                       : isToday
-                        ? "hover:bg-[#4d6350]/[0.03]"
-                        : "hover:bg-[#4d6350]/[0.025]"
+                        ? "hover:bg-sage-600/[0.03]"
+                        : "hover:bg-sage-600/[0.025]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     {isToday ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white text-[10px] font-semibold tabular-nums">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white text-[10px] font-semibold tabular-nums">
                         {c.day}
                       </span>
                     ) : (
@@ -947,7 +947,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                          `size-6` é só a CAIXA que recebe o clique: o «+» fica
                          com o mesmo `text-sm`, centrado, e como a célula tem
                          `min-h-[80px]` a linha do topo não empurra nada. */
-                      className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none ${ESTADO} ${PRESSAO}`}
+                      className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
                     >
                       +
                     </button>
@@ -964,7 +964,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
                         title={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
+                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           aria-hidden="true"
@@ -983,7 +983,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
+                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -1228,8 +1228,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 className={`w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">
-                    <p className="text-[#4d6350] text-lg font-light leading-none">
+                  <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-sage-600/[0.06]">
+                    <p className="text-sage-600 text-lg font-light leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>
                     {/* O ANO, quando não é este.

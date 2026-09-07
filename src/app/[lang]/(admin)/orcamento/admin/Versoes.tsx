@@ -322,7 +322,7 @@ export default function Versoes({
 
       {/* ── O que está no ecrã, comparado com a última que seguiu ─────────── */}
       {ultimoDoc && (
-        <div className="mt-3 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.05] p-3">
+        <div className="mt-3 rounded-xl border border-sage-600/25 bg-sage-600/[0.05] p-3">
           <p className="text-xs font-medium text-[var(--bo-tinta-72)]">
             {porEnviar.length === 0
               ? "Esta versão está igual à última enviada"
@@ -346,7 +346,7 @@ export default function Versoes({
               caixa "Mensagem para o cliente"; nunca escreve directamente no
               email que vai sair. */}
           {paragrafo && onInserirNaMensagem && (
-            <div className="mt-3 border-t border-[#4d6350]/15 pt-3">
+            <div className="mt-3 border-t border-sage-600/15 pt-3">
               <p className="text-[11px] font-medium tracking-[0.08em] uppercase text-foreground/50">
                 Para o email
               </p>
@@ -356,7 +356,7 @@ export default function Versoes({
               <button
                 type="button"
                 onClick={() => onInserirNaMensagem(paragrafo)}
-                className={`alvo-toque mt-2 text-[11px] font-medium text-[#4d6350] underline-offset-2 hover:text-[#415440] hover:underline ${MOV_ESTADO} ${PRESSAO}`}
+                className={`alvo-toque mt-2 text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[#415440] hover:underline ${MOV_ESTADO} ${PRESSAO}`}
               >
                 Inserir na mensagem para o cliente
               </button>

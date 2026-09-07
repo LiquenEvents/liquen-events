@@ -404,7 +404,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 vinham de nota escrita nenhuma; riscar um item da lista é um
                 gesto rápido, e a barra chegava sempre atrasada a ele. */}
             <div
-              className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+              className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
               style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
             />
           </div>
@@ -508,13 +508,13 @@ export default function EventChecklist({ quote, onChange }: Props) {
                   role="checkbox"
                   aria-checked={i.done}
                   aria-label={i.label}
-                  className={`alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/55 ${ESTADO} ${PRESSAO}`}
                 >
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-md border ${ESTADO} ${
                       i.done
-                        ? "border-[#4d6350] bg-[#4d6350]"
-                        : "border-foreground/30 hover:border-[#4d6350]/60"
+                        ? "border-sage-600 bg-sage-600"
+                        : "border-foreground/30 hover:border-sage-600/60"
                     }`}
                   >
                     {i.done && (

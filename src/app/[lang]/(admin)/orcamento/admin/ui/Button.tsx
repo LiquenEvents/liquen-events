@@ -7,12 +7,12 @@ import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * The back-office button, redesigned for the calm "ChatGPT-app" direction while
- * staying on the Líquen palette (moss `#4d6350`, forest ink, cream). One button
+ * staying on the Líquen palette (moss `#4c6752`, forest ink, cream). One button
  * so every screen shares the same radii, focus ring, motion and disabled feel.
  *
  * Design notes
  * - Colours come from the existing tokens only — no new palette. `primary` fills
- *   with moss-dark `#4d6350` (≈6:1 on white → WCAG AA); `secondary` is a hairline
+ *   with moss-dark `#4c6752` (≈6:1 on white → WCAG AA); `secondary` is a hairline
  *   outline; `ghost` is quiet until hover; `subtle` is the soft moss tint used for
  *   in-context actions; `danger` is a dark red that also passes AA on white.
  * - Focus ring is inherited from the global `:focus-visible` rule in globals.css
@@ -98,7 +98,7 @@ const BASE =
  *
  * As duas variantes CHEIAS (`primary`, `danger`) ficam só com o gesto de
  * escala, e isto é uma falta assumida e não um esquecimento: escurecer um
- * `#4d6350` cheio obriga a um sexto verde e a um terceiro vermelho, e o
+ * `#4c6752` cheio obriga a um sexto verde e a um terceiro vermelho, e o
  * `DESIGN.md` desta pasta é explícito — «no new palette», «resist inventing a
  * parallel palette». Dois tokens de pressão resolvem-no no dia em que
  * existirem; até lá o corte seco desapareceu na mesma, porque o que o tirou
@@ -106,7 +106,7 @@ const BASE =
  */
 const VARIANTS: Record<ButtonVariant, string> = {
   // Moss-dark solid — the affirmative primary action.
-  primary: "bg-[#4d6350] text-white hover:bg-[#415440]",
+  primary: "bg-sage-600 text-white hover:bg-[#415440]",
   // Outline on white — secondary emphasis.
   //
   // Era `border-[var(--bo-hairline-strong)]` com `text-[var(--bo-text)]`, e lia-se como
@@ -128,7 +128,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
     "bg-transparent text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] " +
     "active:bg-[var(--bo-tinta-10)]",
   // Soft moss tint — an in-context "yes, this one" without full weight.
-  subtle: "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/[0.16] active:bg-[#4d6350]/[0.24]",
+  subtle: "bg-sage-600/10 text-sage-600 hover:bg-sage-600/[0.16] active:bg-sage-600/[0.24]",
   // Dark red solid (~5:1 on white) — destructive actions.
   danger: "bg-[#8a2a22] text-white hover:bg-[#73211b]",
 };

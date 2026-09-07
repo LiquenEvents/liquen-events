@@ -255,7 +255,7 @@ const PELE = {
   caixa: "bo-input px-3.5 py-2.5",
   sublinhado:
     "w-full rounded-none border-0 border-b border-foreground/20 bg-transparent px-0 py-2 " +
-    "text-sm hover:border-foreground/40 focus:border-[#4d6350]",
+    "text-sm hover:border-foreground/40 focus:border-sage-600",
   nua: "",
 } as const;
 

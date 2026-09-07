@@ -130,12 +130,12 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
         {tags.map((t) => (
           <span
             key={t}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[11px] font-medium"
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-600/10 text-sage-600 text-[11px] font-medium"
           >
             {t}
             <button
               onClick={() => remove(t)}
-              className={`text-[#4d6350]/50 hover:text-[#4d6350] ${ESTADO} ${PRESSAO} leading-none`}
+              className={`text-sage-600/50 hover:text-sage-600 ${ESTADO} ${PRESSAO} leading-none`}
               aria-label={`Remover etiqueta ${t}`}
             >
               ×

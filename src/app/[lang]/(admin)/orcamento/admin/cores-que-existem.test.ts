@@ -60,6 +60,31 @@ function tokensDoTema(): Set<string> {
   return new Set(nomes.map((n) => n.replace(/--color-|\s*:/g, "")));
 }
 
+/**
+ * Os TAMANHOS de letra declarados no tema — `--text-body`, `--text-footnote`…
+ *
+ * Lidos, e não escritos à mão numa lista. A escala tipográfica do sistema de
+ * design trouxe `text-footnote`, `text-callout`, `text-headline`, e o primeiro
+ * a aparecer num ecrã foi acusado aqui como «cor que não existe»: partilham o
+ * prefixo `text-` com as cores e a heurística não os distinguia.
+ *
+ * Acrescentá-los ao `NAO_SAO_COR` era o caminho fácil e o errado. Esta sessão
+ * já encontrou TRÊS listas de excepções mortas — entradas que ninguém revisitou
+ * e que calavam defeitos já corrigidos. Uma lista à mão de tamanhos ia pelo
+ * mesmo caminho: bastava alguém acrescentar um degrau à escala para o teste
+ * voltar a chumbar sem razão, e a correcção óbvia seria alargar a lista outra
+ * vez.
+ *
+ * Lidos do tema, um degrau novo entra sozinho e um degrau removido deixa de
+ * ser dispensado — que é exactamente o que se quer.
+ */
+function tamanhosDoTema(): Set<string> {
+  const bloco = CSS.slice(CSS.indexOf("@theme {"));
+  const fim = bloco.indexOf("\n}");
+  const nomes = bloco.slice(0, fim).match(/--text-([a-z0-9]+)\s*:/g) ?? [];
+  return new Set(nomes.map((n) => n.replace(/--text-|\s*:/g, "")));
+}
+
 /** As cores que vêm com o Tailwind e não precisam de token nenhum. */
 const DO_TAILWIND = new Set(["white", "black", "transparent", "current", "inherit"]);
 
@@ -232,6 +257,7 @@ describe("as classes de cor apontam para cores que existem", () => {
 
   it("nenhuma classe de cor do back office aponta para um token inexistente", () => {
     const tema = tokensDoTema();
+    const tamanhos = tamanhosDoTema();
     const conhecidas = new Set([...tema, ...DO_TAILWIND]);
     const orfas: string[] = [];
 
@@ -240,6 +266,9 @@ describe("as classes de cor apontam para cores que existem", () => {
         for (const token of cadeia.split(/\s+/)) {
           const cor = corDoToken(token);
           if (!cor || NAO_SAO_COR.has(cor.nome) || conhecidas.has(cor.nome)) continue;
+          // Um tamanho da escala tipográfica não é uma cor, mesmo partilhando
+          // o prefixo `text-`. Lidos do tema — ver `tamanhosDoTema`.
+          if (cor.prefixo === "text" && tamanhos.has(cor.nome)) continue;
           orfas.push(`${ficheiro.replace(process.cwd() + "/", "")} — ${token}`);
         }
       }

@@ -414,7 +414,7 @@ export default function CommandPalette({
                       /* Sem `ESTADO`: o realce da escolha não esbate. A razão
                          está por extenso no ponto 3 do cabeçalho. */
                       /* ── A LINHA ESCOLHIDA É UMA PASTILHA CHEIA ─────────
-                         Era `bg-[#4d6350]/[0.12]` — doze por cento de verde,
+                         Era `bg-sage-600/[0.12]` — doze por cento de verde,
                          uma lavagem. Numa lista que se percorre com o ↓ segurado
                          é precisamente o realce que não diz qual é a linha, e é
                          a mesma queixa que o ponto 3 do cabeçalho já resolveu

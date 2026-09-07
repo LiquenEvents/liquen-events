@@ -517,8 +517,8 @@ export default function EventTimeline({ quote, onChange }: Props) {
           de distância, e a contagem («daqui a 25 min») está ao lado porque uma
           hora sozinha obriga a fazer a conta de cabeça. */}
       {seguinte && (
-        <div className="mb-5 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] px-4 py-3.5">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d6350]">
+        <div className="mb-5 rounded-xl border border-sage-600/25 bg-sage-600/[0.06] px-4 py-3.5">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-sage-600">
             <span>Agora</span>
             <span className="tabular-nums font-normal tracking-normal text-[var(--bo-text-muted)]">
               {horaDoMinuto(minutoAgora)}
@@ -546,8 +546,8 @@ export default function EventTimeline({ quote, onChange }: Props) {
           )}
 
           {seguinte.aSeguir && (
-            <div className="mt-3 border-t border-[#4d6350]/20 pt-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d6350]">
+            <div className="mt-3 border-t border-sage-600/20 pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-sage-600">
                 A seguir
               </p>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -913,7 +913,7 @@ function BlocoLi({
           {/* O «agora» caiu neste vazio: é o único sítio onde marcá-lo é
               verdade. Uma risca a atravessar a coluna inteira mentiria. */}
           {agoraNaBandaAntes && (
-            <span className="absolute -left-0.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[#4d6350]" />
+            <span className="absolute -left-0.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-sage-600" />
           )}
         </div>
       )}
@@ -922,7 +922,7 @@ function BlocoLi({
         style={{ minHeight: altura }}
         className={`group relative flex flex-col gap-0.5 overflow-hidden rounded-xl py-1.5 pl-3 pr-1 ${
           aDecorrer
-            ? "bg-[#4d6350]/[0.09] ring-1 ring-inset ring-[#4d6350]/30"
+            ? "bg-sage-600/[0.09] ring-1 ring-inset ring-sage-600/30"
             : instante
               ? "hover:bg-[var(--bo-tinta-3)]"
               : "bg-[var(--bo-surface-sunken)] hover:bg-[var(--bo-tinta-6)]"
@@ -937,8 +937,8 @@ function BlocoLi({
             emChoque
               ? "bg-[#8a2a22]"
               : instante
-                ? "bg-[repeating-linear-gradient(to_bottom,#4d6350_0_3px,transparent_3px_6px)]"
-                : "bg-[#4d6350]"
+                ? "bg-[repeating-linear-gradient(to_bottom,#4c6752_0_3px,transparent_3px_6px)]"
+                : "bg-sage-600"
           }`}
         />
 
@@ -970,7 +970,7 @@ function BlocoLi({
               // o momento 155×39 e o responsável 155×16. Todos abrem
               // um campo de edição, e o guião do dia é lido e corrigido
               // no local, de pé. `alvo-toque` põe-nos nos 44 sob dedo.
-              className={`alvo-toque !justify-start shrink-0 rounded-md text-left text-sm font-semibold tabular-nums text-[#4d6350] decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque !justify-start shrink-0 rounded-md text-left text-sm font-semibold tabular-nums text-sage-600 decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             >
               {i.time}
             </button>
@@ -1094,7 +1094,7 @@ function BlocoLi({
         {aDecorrer && bloco.duracao > 0 && (
           <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden">
             <span
-              className={`block h-full w-full origin-left bg-[#4d6350]/45 ${PROGRESSO}`}
+              className={`block h-full w-full origin-left bg-sage-600/45 ${PROGRESSO}`}
               style={{ transform: `scaleX(${decorrido})` }}
             />
           </span>
@@ -1103,7 +1103,7 @@ function BlocoLi({
       {/* Uma linha só, e é a resposta a «quanto falta». Sem relógio não aparece:
           fora do dia do evento não há «agora» nenhum de que falar. */}
       {comRelogio && aDecorrer && bloco.duracao > 0 && (
-        <p className="mt-1 pl-3 text-[11px] tabular-nums text-[#4d6350]">
+        <p className="mt-1 pl-3 text-[11px] tabular-nums text-sage-600">
           A decorrer · faltam {porExtenso(Math.max(0, bloco.fim - minutoAgora))}
         </p>
       )}

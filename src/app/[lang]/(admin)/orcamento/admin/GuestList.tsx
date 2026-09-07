@@ -12,7 +12,7 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const RSVP_META: Record<RsvpStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },
-  confirmado: { label: "Confirmado", color: "#4d6350" },
+  confirmado: { label: "Confirmado", color: "#4c6752" },
   recusado: { label: "Recusado", color: "#8a2a22" },
 };
 
@@ -260,7 +260,7 @@ export default function GuestList({ quote, onChange }: Props) {
           painéis vizinhos), onde as quatro colunas têm 90 px cada. */}
       <div className="mb-5 grid grid-cols-2 gap-2.5 @min-[26rem]:grid-cols-4">
         <div className="rounded-xl bg-[var(--bo-tinta-6)] p-3 text-center">
-          <p className="text-base font-semibold text-[#4d6350]">{totals.confirmed}</p>
+          <p className="text-base font-semibold text-sage-600">{totals.confirmed}</p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-foreground/45">
             Confirm.
           </p>

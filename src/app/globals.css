@@ -971,7 +971,17 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-raio-pilula: 999px;
 
   /* ── Single accent: Líquen moss ── */
-  --bo-accent: #4c6350; /* moss-dark — primary actions / active states */
+  /* ── O VERDE DESTA CASA, UM SÓ ────────────────────────────────────────────
+     Era `#4c6350` aqui e `#4d6350` escrito à mão em 458 sítios — dois verdes
+     a um dígito de distância, invisíveis ao olho (6,55:1 contra 6,53:1) e
+     indistinguíveis para quem lê o código. Uma bifurcação assim já custou um
+     defeito nesta sessão.
+
+     Passa a ser o acento do sistema de design que ela aprovou, e passa a haver
+     UM valor: as classes usam `sage-600` (o `@theme` do `tema.css`), o
+     JavaScript que não pode usar `var()` usa o mesmo hexadecimal, e este token
+     aponta para o mesmo sítio. Medido: 6,23:1 sobre branco. */
+  --bo-accent: var(--color-sage-600, #4c6752); /* = --accent do sistema */
   --bo-accent-ring: rgba(76, 99, 80, 0.16); /* focus / active soft ring */
   /* ── A LAVAGEM DE ACENTO, JÁ COMPOSTA SOBRE BRANCO ──────────────────────
      O `--bo-accent-ring` é translúcido, e é isso que se quer na coluna da

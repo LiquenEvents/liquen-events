@@ -440,7 +440,7 @@ export default function SessaoExpirada() {
               name="manterSessao"
               checked={manterSessao}
               onChange={(e) => setManterSessao(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
             />
             <span className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
               Manter a sessão iniciada 30 dias neste aparelho.

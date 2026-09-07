@@ -582,7 +582,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
             type="checkbox"
             checked={ctx.selectedIds.has(q.id)}
             onChange={() => ctx.toggleSelect(q.id)}
-            className="h-4 w-4 cursor-pointer accent-[#4d6350]"
+            className="h-4 w-4 cursor-pointer accent-sage-600"
             aria-label={`Selecionar pedido de ${q.name}`}
           />
         </label>
@@ -600,7 +600,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         <span className="block" data-lote-novo={ctx.ehDoLoteNovo?.(q) ? "" : undefined}>
           <span
             className={`block truncate ${
-              ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-[var(--bo-text)]"
+              ctx.atual === q.id ? "font-semibold text-sage-600" : "text-[var(--bo-text)]"
             }`}
           >
             {q.name}
@@ -791,9 +791,9 @@ const QuoteCard = memo(function QuoteCard({
       data-lote-novo={doLoteNovo ? "" : undefined}
       className={`relative rounded-xl border ${ESTADO} ${
         isCurrent
-          ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
+          ? "border-sage-600/45 bg-sage-600/[0.05] "
           : isSelected
-            ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+            ? "border-sage-600/30 bg-sage-600/[0.03]"
             : "border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] bg-white "
       }`}
     >
@@ -809,7 +809,7 @@ const QuoteCard = memo(function QuoteCard({
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggle(q.id)}
-          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
+          className="w-4 h-4 accent-sage-600 cursor-pointer"
           aria-label={`Selecionar pedido de ${q.name}`}
         />
       </label>
@@ -843,7 +843,7 @@ const QuoteCard = memo(function QuoteCard({
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <p className="text-[13px] bo-text-muted truncate">{q.email}</p>
               {q.assignedTo && (
-                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
+                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-sage-600/10 text-sage-600 font-medium whitespace-nowrap">
                   {q.assignedTo}
                 </span>
               )}
@@ -888,7 +888,7 @@ const QuoteCard = memo(function QuoteCard({
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
                     q.followUpAt < todayStr
                       ? "bg-[#8a2a22]/15 text-[#8a2a22]"
-                      : "bg-[#637a5f]/15 text-[#4d6350]"
+                      : "bg-[#637a5f]/15 text-sage-600"
                   }`}
                   title={q.followUpAt < todayStr ? "Seguimento em atraso" : "Seguimento hoje"}
                 >
@@ -984,7 +984,7 @@ const QuoteCard = memo(function QuoteCard({
         {ctx.destination && (
           <div className="mt-2.5">
             <span
-              className="inline-flex items-center rounded-full bg-[#4d6350]/10 px-2 py-0.5 text-[9px] font-medium tracking-wide text-[#4d6350]"
+              className="inline-flex items-center rounded-full bg-sage-600/10 px-2 py-0.5 text-[9px] font-medium tracking-wide text-sage-600"
               title="Sem data e sem local concreto — normalmente organiza-se à distância"
             >
               Provável casamento à distância
@@ -996,7 +996,7 @@ const QuoteCard = memo(function QuoteCard({
             {q.tags.slice(0, 4).map((t) => (
               <span
                 key={t}
-                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
+                className="px-2 py-0.5 rounded-full bg-sage-600/10 text-sage-600 text-[9px] font-medium tracking-wide"
               >
                 {t}
               </span>
@@ -1024,7 +1024,7 @@ const QuoteCard = memo(function QuoteCard({
         <div className="flex items-center justify-end mt-3 pt-3 border-t border-[var(--bo-hairline)]">
           <div className="flex items-center gap-3">
             {q.quotedPrice ? (
-              <span className="text-[#4d6350] text-[13px] font-semibold">
+              <span className="text-sage-600 text-[13px] font-semibold">
                 {formatPrice(q.quotedPrice)}
               </span>
             ) : q.priceBreakdown?.total ? (
@@ -4385,7 +4385,7 @@ export default function AdminClient({
                   ── DUAS CORRECÇÕES, E AS DUAS SÃO DE PERTENÇA ──────────────
 
                   1. **A COR ERA UM HEX À MÃO, E ERA O TOKEN ERRADO POR UM
-                     DÍGITO.** Estava escrito `bg-[#4d6350]`; o acento da casa é
+                     DÍGITO.** Estava escrito `bg-sage-600`; o acento da casa é
                      `--bo-accent: #4c6350`. Um `d` por um `c` — perto o
                      suficiente para ninguém ver, longe o suficiente para o
                      filete deixar de acompanhar o acento no dia em que ele
@@ -5488,7 +5488,7 @@ export default function AdminClient({
                   aria-controls="painel-filtros-pedidos"
                   className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium ${ESTADO} ${PRESSAO} ${
                     filtrosActivos > 0
-                      ? "bg-[#4d6350] border-[#4d6350] text-white"
+                      ? "bg-sage-600 border-sage-600 text-white"
                       : "bg-white border-[var(--bo-hairline)] text-[var(--bo-text-muted)]"
                   }`}
                 >
@@ -5548,7 +5548,7 @@ export default function AdminClient({
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
                   className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border ${ESTADO} ${PRESSAO} ${
                     mineOnly
-                      ? "bg-[#4d6350] border-[#4d6350] text-white"
+                      ? "bg-sage-600 border-sage-600 text-white"
                       : "bg-white border-[var(--bo-hairline)] text-foreground/45 hover:text-[var(--bo-text-muted)]"
                   }`}
                 >
@@ -5764,8 +5764,8 @@ export default function AdminClient({
                     onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
                     className={`alvo-toque px-3 py-1 rounded-full text-[10px] font-medium tracking-wide ${ESTADO} ${PRESSAO} ${
                       tagFilter === t
-                        ? "bg-[#4d6350] text-white "
-                        : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"
+                        ? "bg-sage-600 text-white "
+                        : "bg-sage-600/10 text-sage-600 hover:bg-sage-600/18"
                     }`}
                   >
                     {t}
@@ -5784,15 +5784,15 @@ export default function AdminClient({
 
             {/* Bulk actions */}
             {seleccionadosAVista.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06]">
-                <span className="text-[#4d6350] text-xs font-semibold">
+              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl border border-sage-600/25 bg-sage-600/[0.06]">
+                <span className="text-sage-600 text-xs font-semibold">
                   {seleccionadosAVista.length} selecionado
                   {seleccionadosAVista.length !== 1 ? "s" : ""}
                 </span>
                 {seleccionadosAVista.length < filtered.length && (
                   <button
                     onClick={() => setSelectedIds(new Set(filtered.map((q) => q.id)))}
-                    className={`text-foreground/40 text-xs hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
+                    className={`text-foreground/40 text-xs hover:text-sage-600 ${ESTADO} ${PRESSAO}`}
                   >
                     Selecionar todos ({filtered.length})
                   </button>
@@ -5831,7 +5831,7 @@ export default function AdminClient({
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] ${ESTADO} ${PRESSAO} `}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
                 >
                   Exportar seleção
                 </button>
@@ -5843,7 +5843,7 @@ export default function AdminClient({
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] ${ESTADO} ${PRESSAO} `}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -6144,7 +6144,7 @@ export default function AdminClient({
                               unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
                               href={localizeHref(`/orcamento/admin/evento/${selected.id}`, locale)}
-                              className={`alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] ${ESTADO} ${PRESSAO} hover:bg-[#4d6350]/[0.16] inline-flex items-center`}
+                              className={`alvo-toque h-9 gap-2 rounded-xl bg-sage-600/10 px-3.5 text-xs font-medium tracking-[0.02em] text-sage-600 ${ESTADO} ${PRESSAO} hover:bg-sage-600/[0.16] inline-flex items-center`}
                               title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                             >
                               <svg
@@ -6497,7 +6497,7 @@ export default function AdminClient({
                                     rolarAteVer(toolsRef.current, { block: "start" });
                                   }
                                 }}
-                                className={`flex w-full items-center gap-3 rounded-full bg-[#4d6350] px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
+                                className={`flex w-full items-center gap-3 rounded-full bg-sage-600 px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
@@ -6702,7 +6702,7 @@ export default function AdminClient({
                                         Custos {formatPrice(costs)} · Margem{" "}
                                         <span
                                           className={
-                                            margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"
+                                            margin >= 0 ? "text-sage-600" : "text-[#8a2a22]"
                                           }
                                         >
                                           {formatPrice(margin)}
@@ -6983,7 +6983,7 @@ export default function AdminClient({
                                   </div>
                                   <div className="flex justify-between border-t border-[var(--bo-hairline)] pt-1 text-xs font-medium">
                                     <span className="text-[var(--bo-text-muted)]">Total</span>
-                                    <span className="font-semibold text-[#4d6350]">
+                                    <span className="font-semibold text-sage-600">
                                       {formatPrice(selected.priceBreakdown.total)}
                                     </span>
                                   </div>
@@ -6999,7 +6999,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`mailto:${selected.email}`}
-                                className={`alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline ${ESTADO} ${PRESSAO}`}
+                                className={`alvo-toque !justify-start truncate text-xs text-sage-600 hover:underline ${ESTADO} ${PRESSAO}`}
                               >
                                 {selected.email}
                               </a>
@@ -7037,7 +7037,7 @@ export default function AdminClient({
                                   href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className={`alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] ${ESTADO} ${PRESSAO} hover:opacity-80 inline-flex items-center`}
+                                  className={`alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-sage-600 ${ESTADO} ${PRESSAO} hover:opacity-80 inline-flex items-center`}
                                   title="Abrir conversa no WhatsApp"
                                 >
                                   <svg
@@ -7150,9 +7150,9 @@ export default function AdminClient({
                                       );
                                     tabs?.[nextIdx]?.focus();
                                   }}
-                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,translate] motion-safe:duration-[120ms] ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,translate] motion-safe:duration-[120ms] ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
-                                      ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
+                                      ? "border-sage-600/45 bg-sage-600/[0.05] "
                                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-6)] "
                                   }`}
                                 >
@@ -7160,7 +7160,7 @@ export default function AdminClient({
                                     aria-hidden
                                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ESTADO} ${
                                       active
-                                        ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
+                                        ? "bg-sage-600/[0.12] text-sage-600"
                                         : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                                     }`}
                                   >
@@ -7184,7 +7184,7 @@ export default function AdminClient({
                                     <span
                                       className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
                                         active
-                                          ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                          ? "bg-sage-600/15 text-sage-600"
                                           : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                                       }`}
                                     >

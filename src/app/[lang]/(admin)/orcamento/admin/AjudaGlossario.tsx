@@ -64,7 +64,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
         <ol className="flex flex-col gap-3">
           {LIFECYCLE.map((it, i) => (
             <li key={it.step} className="flex gap-3">
-              <span className="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-[#4d6350]/12 text-[#4d6350] text-[11px] font-semibold flex items-center justify-center tabular-nums">
+              <span className="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-sage-600/12 text-sage-600 text-[11px] font-semibold flex items-center justify-center tabular-nums">
                 {i + 1}
               </span>
               <div className="min-w-0">

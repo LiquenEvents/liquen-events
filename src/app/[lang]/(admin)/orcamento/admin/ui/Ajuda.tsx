@@ -108,7 +108,7 @@ export function Ajuda({
           // para quem pediu para não animar. Ver `movimento.ts`.
           `border text-[10px] leading-none font-medium ${ESTADO} ${PRESSAO}`,
           aberto
-            ? "border-[#4d6350]/60 bg-[#4d6350]/10 text-[#4d6350]"
+            ? "border-sage-600/60 bg-sage-600/10 text-sage-600"
             : "border-foreground/25 text-[var(--bo-text-muted)] hover:border-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-6)]",
         )}
       >

@@ -174,7 +174,7 @@ const KanbanCard = memo(function KanbanCard({
             className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold ${
               q.followUpAt < todayKey
                 ? "bg-[#8a2a22]/15 text-[#8a2a22]"
-                : "bg-[#637a5f]/15 text-[#4d6350]"
+                : "bg-[#637a5f]/15 text-sage-600"
             }`}
             title={q.followUpAt < todayKey ? "Seguimento em atraso" : "Seguimento hoje"}
           >
@@ -188,7 +188,7 @@ const KanbanCard = memo(function KanbanCard({
           {q.tags.slice(0, 3).map((t) => (
             <span
               key={t}
-              className="px-1.5 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[8px] font-medium tracking-wide"
+              className="px-1.5 py-0.5 rounded-full bg-sage-600/10 text-sage-600 text-[8px] font-medium tracking-wide"
             >
               {t}
             </span>
@@ -211,7 +211,7 @@ const KanbanCard = memo(function KanbanCard({
           // Com IVA, para bater com o «Total» da coluna e os KPIs do topo —
           // o mesmo cartão não pode mostrar um número numa unidade e a coluna
           // que o soma noutra.
-          <span className="text-[#4d6350] text-xs font-semibold">
+          <span className="text-sage-600 text-xs font-semibold">
             {eur(contractedAmounts(q).gross)}
           </span>
         ) : (
@@ -284,7 +284,7 @@ const KanbanCard = memo(function KanbanCard({
                   onMove(q, 1);
                 }}
                 aria-label="Mover para a coluna seguinte"
-                className={`alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20 ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-sage-600/10 text-sage-600 active:bg-sage-600/20 ${ESTADO} ${PRESSAO}`}
               >
                 <svg
                   width="11"

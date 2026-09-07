@@ -65,7 +65,7 @@ export default function Gralhas({
           <button
             type="button"
             onClick={onCorrigirTudo}
-            className={`alvo-toque text-[11px] font-medium text-[#4d6350] hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
           >
             Corrigir as {gralhas.length}
           </button>
@@ -107,7 +107,7 @@ export default function Gralhas({
             <button
               type="button"
               onClick={() => onIr(g)}
-              className={`alvo-toque text-[11px] font-medium text-[#4d6350] underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
             >
               Ver no campo
             </button>

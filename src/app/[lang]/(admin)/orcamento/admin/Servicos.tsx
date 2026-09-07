@@ -194,7 +194,7 @@ export default function Servicos() {
                 type="checkbox"
                 checked={mostrarArquivados}
                 onChange={(e) => setMostrarArquivados(e.target.checked)}
-                className="h-4 w-4 accent-[#4d6350]"
+                className="h-4 w-4 accent-sage-600"
               />
               Ver arquivados
             </label>

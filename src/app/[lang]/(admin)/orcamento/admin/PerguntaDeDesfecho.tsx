@@ -227,7 +227,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
 
   return (
     <div
-      className={`${compacto ? "mt-3 pt-3 border-t border-[var(--bo-hairline)]" : "rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.04] p-4"}`}
+      className={`${compacto ? "mt-3 pt-3 border-t border-[var(--bo-hairline)]" : "rounded-xl border border-sage-600/25 bg-sage-600/[0.04] p-4"}`}
       // O gesto vive dentro de cartões que são eles próprios um botão de abrir.
       // Sem isto, tocar em «Ganho» abria o pedido por baixo da marcação.
       onClick={(e) => e.stopPropagation()}
@@ -245,7 +245,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
            deste, tem `autoFocus` no campo — uma entrada ali arrastava o campo
            quatro píxeis debaixo do cursor que já lá está. */
         <div className="bo-entrada flex flex-col gap-2">
-          <p className={`text-[#4d6350] ${compacto ? "text-[11px]" : "text-sm"} font-medium`}>
+          <p className={`text-sage-600 ${compacto ? "text-[11px]" : "text-sm"} font-medium`}>
             {fase.desfecho === "ganho"
               ? `Marcado como ganho${fase.valor != null ? ` — ${eur(fase.valor)}` : ""}.`
               : "Marcado como perdido."}
@@ -319,7 +319,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
               type="button"
               onClick={confirmarGanho}
               disabled={fase.tipo === "a-gravar"}
-              className={`${botao} border-[#4d6350] bg-[#4d6350] text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
+              className={`${botao} border-sage-600 bg-sage-600 text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
             >
               {fase.tipo === "a-gravar"
                 ? "A marcar…"
@@ -361,7 +361,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
               setAviso(null);
               setFase({ tipo: "quanto" });
             }}
-            className={`${botao} border-[#4d6350] bg-[#4d6350] text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
+            className={`${botao} border-sage-600 bg-sage-600 text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
           >
             Ganho
           </button>

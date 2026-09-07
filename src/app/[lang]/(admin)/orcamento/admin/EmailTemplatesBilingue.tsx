@@ -598,7 +598,7 @@ export default function EmailTemplatesBilingue() {
                 }`}
               >
                 <p
-                  className={`text-sm ${activo ? "text-[#4d6350] font-medium" : "text-[var(--bo-tinta-72)]"}`}
+                  className={`text-sm ${activo ? "text-sage-600 font-medium" : "text-[var(--bo-tinta-72)]"}`}
                 >
                   {m.nome}
                   {!temIngles && (
@@ -701,7 +701,7 @@ export default function EmailTemplatesBilingue() {
                           // dois fundos, e nunca há nenhum. É a manobra do
                           // `Segmented`, contada lá por extenso.
                           `text-white ${marcaDaLingua ? "" : "bg-[#5F7C66]"}`
-                        : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
+                        : "bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20"
                     }`}
                   >
                     {l === "pt" ? "Português" : "English"}
@@ -754,7 +754,7 @@ export default function EmailTemplatesBilingue() {
                         className={`px-2.5 py-1 rounded-md text-[11px] ${ESTADO} ${PRESSAO} ${
                           grupo.grupo === "remetente"
                             ? "bg-[#8a5d13]/10 text-[#8a5d13] hover:bg-[#8a5d13]/20"
-                            : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
+                            : "bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20"
                         }`}
                       >
                         {v.rotulo}
@@ -776,7 +776,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(false)}
-                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
+                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
               >
                 só se houver data
               </button>
@@ -784,7 +784,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(true)}
-                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
+                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
               >
                 só se NÃO houver data
               </button>

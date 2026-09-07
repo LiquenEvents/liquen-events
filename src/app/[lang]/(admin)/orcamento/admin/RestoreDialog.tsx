@@ -441,7 +441,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                     const f = e.target.files?.[0];
                     if (f) void escolherFicheiro(f);
                   }}
-                  className="block w-full text-sm text-[var(--bo-tinta-72)] file:mr-3 file:rounded-full file:border-0 file:bg-[#4d6350] file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
+                  className="block w-full text-sm text-[var(--bo-tinta-72)] file:mr-3 file:rounded-full file:border-0 file:bg-sage-600 file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
                 />
               </label>
               {ocupado && <p className="bo-text-muted mt-3 text-sm">A ler a cópia…</p>}
@@ -614,7 +614,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                 role="status"
                 className={`rounded-xl px-4 py-3 ${
                   resultado.ok
-                    ? "border border-[#4d6350]/30 bg-[#4d6350]/[0.07]"
+                    ? "border border-sage-600/30 bg-sage-600/[0.07]"
                     : "border border-[#8a2a22]/30 bg-[#f6e6df]/60"
                 }`}
               >

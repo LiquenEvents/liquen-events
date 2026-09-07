@@ -141,7 +141,7 @@ export function Field(props: FieldProps) {
     error
       ? "border-[#8a2a22]/70 focus:border-[#8a2a22]"
       : variant === "underline"
-        ? "border-foreground/20 focus:border-[#4d6350] hover:border-foreground/40"
+        ? "border-foreground/20 focus:border-sage-600 hover:border-foreground/40"
         : "border-foreground/50 focus:border-foreground/75",
     className,
   );

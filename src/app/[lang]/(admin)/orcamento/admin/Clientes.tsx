@@ -465,7 +465,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
 function Avatar({ c }: { c: Client }) {
   return (
     <div
-      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[#d6ab3a]/20 text-[#8a6420] ring-[#d6ab3a]/20" : "bg-[#4d6350] text-white ring-[#4d6350]/10"}`}
+      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[#d6ab3a]/20 text-[#8a6420] ring-[#d6ab3a]/20" : "bg-sage-600 text-white ring-sage-600/10"}`}
     >
       {c.name.slice(0, 1).toUpperCase()}
     </div>
@@ -483,7 +483,7 @@ function Avatar({ c }: { c: Client }) {
 function Dinheiro({ c }: { c: Client }) {
   if (c.totalWon > 0)
     return (
-      <span className="text-[#4d6350] text-sm font-semibold tabular-nums">{eur(c.totalWon)}</span>
+      <span className="text-sage-600 text-sm font-semibold tabular-nums">{eur(c.totalWon)}</span>
     );
   if (c.totalPipeline > 0)
     return (
@@ -632,7 +632,7 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
       alinharADireita: true,
       celula: (c) =>
         c.totalWon > 0 ? (
-          <span className="font-semibold tabular-nums text-[#4d6350]">{eur(c.totalWon)}</span>
+          <span className="font-semibold tabular-nums text-sage-600">{eur(c.totalWon)}</span>
         ) : (
           <span className="text-foreground/25">—</span>
         ),
@@ -668,7 +668,7 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
           <span className="text-foreground/25">—</span>
         ) : (
           <span
-            className={`tabular-nums font-medium ${taxa >= 50 ? "text-[#4d6350]" : taxa >= 25 ? "text-foreground/50" : "text-foreground/35"}`}
+            className={`tabular-nums font-medium ${taxa >= 50 ? "text-sage-600" : taxa >= 25 ? "text-foreground/50" : "text-foreground/35"}`}
           >
             {taxa}%
           </span>
@@ -742,7 +742,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
         {c.phone && (
           <a
             href={`tel:${c.phone}`}
-            className={`alvo-toque text-foreground/45 hover:text-[#4d6350] flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-foreground/45 hover:text-sage-600 flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="11"
@@ -761,7 +761,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
         {c.email && (
           <a
             href={`mailto:${c.email}`}
-            className={`alvo-toque text-[#4d6350]/80 hover:text-[#4d6350] flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-sage-600/80 hover:text-sage-600 flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="11"
@@ -783,7 +783,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
             href={`https://wa.me/${waPhone.replace("+", "")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className={`alvo-toque text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-sage-600 text-[10px] tracking-[0.08em] uppercase hover:opacity-75 flex items-center gap-1 ${ESTADO} ${PRESSAO}`}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
@@ -824,7 +824,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                     {metaFor(STATUS_META, q.status).label}
                   </span>
                   {q.assignedTo && (
-                    <span className="text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-md bg-[#4d6350]/10 text-[#4d6350] font-medium">
+                    <span className="text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-md bg-sage-600/10 text-sage-600 font-medium">
                       {q.assignedTo}
                     </span>
                   )}
@@ -845,7 +845,7 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                 {q.quotedPrice ? (
                   // Com IVA — para bater com o «Ganho»/«Pipeline»
                   // do cliente ali em cima, que somam o mesmo campo.
-                  <span className="text-[#4d6350] text-xs font-medium">
+                  <span className="text-sage-600 text-xs font-medium">
                     {eur(contractedAmounts(q).gross)}
                   </span>
                 ) : q.priceBreakdown?.total ? (

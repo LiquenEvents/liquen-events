@@ -309,7 +309,7 @@ export default function EventTasks({ quote, userName }: Props) {
       </div>
 
       {adding && (
-        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.04] p-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-sage-600/25 bg-sage-600/[0.04] p-4">
           <Field
             label="Título da tarefa"
             autoFocus
@@ -427,8 +427,8 @@ export default function EventTasks({ quote, userName }: Props) {
                 <span
                   className={`flex h-[18px] w-[18px] items-center justify-center rounded-md border-[1.5px] ${ESTADO}`}
                   style={{
-                    borderColor: task.done ? "#4d6350" : PRIORITY_COLOR[task.priority],
-                    background: task.done ? "#4d635014" : "transparent",
+                    borderColor: task.done ? "#4c6752" : PRIORITY_COLOR[task.priority],
+                    background: task.done ? "#4c675214" : "transparent",
                   }}
                 >
                   {task.done && (
@@ -437,7 +437,7 @@ export default function EventTasks({ quote, userName }: Props) {
                       height="11"
                       viewBox="0 0 12 12"
                       fill="none"
-                      stroke="#4d6350"
+                      stroke="#4c6752"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                     >

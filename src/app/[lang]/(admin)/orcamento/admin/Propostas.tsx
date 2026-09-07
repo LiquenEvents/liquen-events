@@ -596,7 +596,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         <div className="flex flex-col gap-3">
           <Card padding="sm" className="flex flex-col gap-2">
             <p
-              className="font-light leading-none tabular-nums text-[#4d6350]"
+              className="font-light leading-none tabular-nums text-sage-600"
               style={{ fontSize: "clamp(32px, 4.6vw, 48px)" }}
             >
               {eur(totalWon)}

@@ -14,7 +14,7 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },
   confirmado: { label: "Confirmado", color: "#7c854b" },
-  pago: { label: "Pago", color: "#4d6350" },
+  pago: { label: "Pago", color: "#4c6752" },
 };
 
 /**
@@ -440,7 +440,7 @@ export default function EventCosts({ quote, onChange }: Props) {
           <p className={NOTA}>c/ IVA {eur2(totals.actual)}</p>
         </div>
         <div className={QUADRADO}>
-          <p className={`${VALOR} ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}>
+          <p className={`${VALOR} ${totals.margin >= 0 ? "text-sage-600" : "text-[#8a2a22]"}`}>
             {eur2(totals.margin)}
           </p>
           <p className={ROTULO}>Margem{totals.revenueNet > 0 ? ` · ${totals.marginPct}%` : ""}</p>

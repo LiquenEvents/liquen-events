@@ -332,7 +332,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
             {days.map((key) => (
               <div key={key} className="border-b border-[var(--bo-hairline)] last:border-0">
                 <p
-                  className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-[#4d6350]" : "text-foreground/40"}`}
+                  className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-sage-600" : "text-foreground/40"}`}
                 >
                   {dayLabel(key)}
                 </p>
@@ -378,7 +378,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                         {it.atalho && (
                           <a
                             href={it.atalho.href}
-                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] hover:bg-[#4d6350]/[0.06] ${ESTADO} ${PRESSAO}`}
+                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-sage-600/30 bg-white px-2.5 text-[11px] font-medium text-sage-600 hover:bg-sage-600/[0.06] ${ESTADO} ${PRESSAO}`}
                           >
                             {it.atalho.rotulo}
                           </a>

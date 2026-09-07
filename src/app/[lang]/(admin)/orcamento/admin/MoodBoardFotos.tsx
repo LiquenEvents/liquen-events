@@ -327,7 +327,7 @@ export function GrelhaDeFotos({
       <div
         ref={setNodeRef}
         className={`rounded-xl ${ESTADO} ${
-          isOver ? "ring-2 ring-[#4d6350]/50 ring-offset-2 ring-offset-transparent" : ""
+          isOver ? "ring-2 ring-sage-600/50 ring-offset-2 ring-offset-transparent" : ""
         } ${className}`}
       >
         {children}
@@ -380,7 +380,7 @@ export function CartaoDeBoard({
       // `scroll-mt`: o back office tem uma barra fixa no topo, e sem margem de
       // deslocamento o salto do índice deixa o cabeçalho do board por baixo dela.
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`scroll-mt-24 ${className} ${isDragging ? "relative z-10 opacity-90 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-[#4d6350]" : ""}`}
+      className={`scroll-mt-24 ${className} ${isDragging ? "relative z-10 opacity-90 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-sage-600" : ""}`}
     >
       {children({ ...attributes, ...listeners })}
     </div>
@@ -458,12 +458,12 @@ export function CelulaDeFoto({
       {isOver && !isDragging && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -left-1 top-0 bottom-0 z-20 w-0.5 rounded-full bg-[#4d6350]"
+          className="pointer-events-none absolute -left-1 top-0 bottom-0 z-20 w-0.5 rounded-full bg-sage-600"
         />
       )}
       <div
         className={`relative overflow-hidden rounded-lg ${
-          seleccionada ? "ring-2 ring-[#4d6350] ring-offset-1" : ""
+          seleccionada ? "ring-2 ring-sage-600 ring-offset-1" : ""
         }`}
       >
         {children}
@@ -483,7 +483,7 @@ export function CelulaDeFoto({
           </span>
         )}
         {principal && (
-          <span className="pointer-events-none absolute top-1 left-1 z-10 rounded-full bg-[#4d6350] px-1.5 py-0.5 text-[8px] font-medium tracking-[0.1em] uppercase text-white">
+          <span className="pointer-events-none absolute top-1 left-1 z-10 rounded-full bg-sage-600 px-1.5 py-0.5 text-[8px] font-medium tracking-[0.1em] uppercase text-white">
             principal
           </span>
         )}

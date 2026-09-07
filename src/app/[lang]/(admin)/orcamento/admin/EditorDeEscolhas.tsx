@@ -84,7 +84,7 @@ export interface FotoDisponivel {
 }
 
 const CAIXA =
-  "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-[#4d6350] focus:outline-none";
+  "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-sage-600 focus:outline-none";
 const BOTAO_MAGRO =
   "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] " +
   `text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`;
@@ -278,7 +278,7 @@ export default function EditorDeEscolhas({
           </span>
           <button
             type="button"
-            className={`alvo-toque shrink-0 text-[12px] font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque shrink-0 text-[12px] font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={() => {
               onChange(anulavel.escolhas);
               setAnulavel(null);
@@ -310,7 +310,7 @@ export default function EditorDeEscolhas({
                     />
                     {bilingue && (
                       <input
-                        className={`${CAIXA} bg-[#4d6350]/[0.04]`}
+                        className={`${CAIXA} bg-sage-600/[0.04]`}
                         value={escolha.tituloEn ?? ""}
                         placeholder="Ceremony palette"
                         aria-label={`Título da alternativa ${i + 1} (inglês)`}
@@ -328,7 +328,7 @@ export default function EditorDeEscolhas({
                     />
                     {bilingue && (
                       <input
-                        className={`${CAIXA} bg-[#4d6350]/[0.04]`}
+                        className={`${CAIXA} bg-sage-600/[0.04]`}
                         value={escolha.notaEn ?? ""}
                         placeholder="Note in English (optional)"
                         aria-label={`Nota da alternativa ${i + 1} (inglês)`}
@@ -420,7 +420,7 @@ export default function EditorDeEscolhas({
                           />
                           {bilingue && (
                             <input
-                              className={`${CAIXA} bg-[#4d6350]/[0.04]`}
+                              className={`${CAIXA} bg-sage-600/[0.04]`}
                               value={opcao.rotuloEn ?? ""}
                               placeholder="Olive and white"
                               aria-label={`Opção ${j + 1} (inglês)`}
@@ -438,7 +438,7 @@ export default function EditorDeEscolhas({
                           />
                           {bilingue && (
                             <input
-                              className={`${CAIXA} bg-[#4d6350]/[0.04]`}
+                              className={`${CAIXA} bg-sage-600/[0.04]`}
                               value={opcao.descricaoEn ?? ""}
                               placeholder="One line in English (optional)"
                               aria-label={`Descrição da opção ${j + 1} (inglês)`}
@@ -505,8 +505,8 @@ export default function EditorDeEscolhas({
                                       }}
                                       className={`h-14 w-14 overflow-hidden rounded-md border ${ESTADO} ${PRESSAO} ${
                                         opcao.imagem === f.caminho
-                                          ? "border-[#4d6350]"
-                                          : "border-[var(--bo-hairline)] hover:border-[#4d6350]/60"
+                                          ? "border-sage-600"
+                                          : "border-[var(--bo-hairline)] hover:border-sage-600/60"
                                       }`}
                                     >
                                       {f.url ? (

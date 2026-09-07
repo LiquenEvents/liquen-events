@@ -380,7 +380,7 @@ export function TabelaOuCartoes<T>({
                 /* `foco-largo`: esta linha é uma CAIXA de 80 px, não um botão. O anel
                    de base, colado a ela, lê-se como moldura da linha; com quatro
                    píxeis de folga lê-se como foco. Ver a nota no `globals.css`. */
-                className={`alvo-toque foco-largo group block w-full p-3.5 text-left hover:bg-[#4d6350]/[0.04] active:bg-[#4d6350]/[0.08] ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque foco-largo group block w-full p-3.5 text-left hover:bg-sage-600/[0.04] active:bg-sage-600/[0.08] ${ESTADO} ${PRESSAO}`}
               >
                 {cartao(item)}
               </button>

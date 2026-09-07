@@ -89,7 +89,7 @@ const ROW_INPUT =
  *  de texto que tem de ficar alinhada à esquerda com o resto da coluna. */
 const ADD_BTN =
   "alvo-toque !justify-start gap-1 text-xs font-medium inline-flex items-center " +
-  `text-[#4d6350] hover:text-[#415440] ${ESTADO} ${PRESSAO}`;
+  `text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`;
 /** Ações da linha: presentes SEMPRE no layout (nunca há salto), visíveis só em
  *  hover/foco — e sempre visíveis onde não há hover nenhum (tablet). */
 const ROW_ACTIONS =
@@ -1127,7 +1127,7 @@ export default function ServicesEditor({
           <button
             type="button"
             onClick={undoRemoval}
-            className={`font-medium text-[#4d6350] underline underline-offset-2 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`font-medium text-sage-600 underline underline-offset-2 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
           >
             Anular
           </button>
@@ -1175,7 +1175,7 @@ function SortableRow({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${className ?? ""} ${
         isDragging
-          ? "relative z-10 bg-white opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-[#4d6350]"
+          ? "relative z-10 bg-white opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-sage-600"
           : ""
       }`}
     >

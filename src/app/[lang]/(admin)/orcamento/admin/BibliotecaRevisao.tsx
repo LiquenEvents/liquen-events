@@ -301,7 +301,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
   const chip = (activo: boolean) =>
     `alvo-toque rounded-full px-3 py-1.5 text-xs ${
       activo
-        ? "bg-[#4d6350] text-white"
+        ? "bg-sage-600 text-white"
         : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-10)]"
     }`;
 
@@ -470,7 +470,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                 aria-label={`Foto ${f.path.split("/").pop()}`}
                 onClick={(ev) => tocar(f.path, ev.shiftKey)}
                 className={`relative aspect-square overflow-hidden rounded-lg border-2  ${
-                  escolhida ? "border-[#4d6350]" : "border-transparent hover:border-foreground/20"
+                  escolhida ? "border-sage-600" : "border-transparent hover:border-foreground/20"
                 } ${ESTADO} ${PRESSAO}`}
               >
                 {/* A miniatura, com o ORIGINAL como plano B. Assinar um caminho
@@ -485,7 +485,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                   className="h-full w-full object-cover"
                 />
                 {escolhida && (
-                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-[11px] text-white">
+                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-[11px] text-white">
                     ✓
                   </span>
                 )}

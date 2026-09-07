@@ -132,7 +132,7 @@ export default function ValorEnviado() {
                com o canto do cartão apaga a distinção. Foi o
                `raios-do-back-office.test.ts` a apanhar-me — escrevi a regra
                ontem e hoje ia desfazê-la. */
-            className={`min-h-11 rounded-full bg-[#4d6350] px-4 text-sm font-medium text-white hover:bg-[#415440] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
+            className={`min-h-11 rounded-full bg-sage-600 px-4 text-sm font-medium text-white hover:bg-[#415440] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
           >
             {aCorrigir
               ? "A corrigir…"
@@ -187,7 +187,7 @@ export default function ValorEnviado() {
                     <span aria-hidden className="text-foreground/30">
                       →
                     </span>
-                    <span className="tabular-nums font-semibold text-[#4d6350]">
+                    <span className="tabular-nums font-semibold text-sage-600">
                       {eur(d.enviado)}
                     </span>
                     <span className="w-full text-[11px] text-foreground/45 sm:w-auto">

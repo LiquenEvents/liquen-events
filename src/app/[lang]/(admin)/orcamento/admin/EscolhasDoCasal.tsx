@@ -86,7 +86,7 @@ export default function EscolhasDoCasal({
 
             {estado.tipo === "escolhida" && (
               <p className="mt-1 text-sm">
-                <span className="font-medium text-[#4d6350]">{estado.opcao.rotulo}</span>
+                <span className="font-medium text-sage-600">{estado.opcao.rotulo}</span>
                 <span className="text-foreground/40"> · {dia(estado.em)}</span>
               </p>
             )}
