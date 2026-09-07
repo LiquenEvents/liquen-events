@@ -129,7 +129,13 @@ describe("a escada de entrada do back office", () => {
 describe("a mola da chegada tem cerca", () => {
   it("existe, e é um `linear()` — não uma cubic-bezier com um ponto ao olho", () => {
     expect(CSS).toContain("--bo-mola-chegada: linear(");
-    expect(CSS).toContain("--bo-mola-chegada-ms: 360ms");
+    // E dura o MESMO que a entrada de toda a gente. Houve uma versão de 360 ms
+    // e foi medida a custar fotogramas a 1440×900 com o CPU travado 6× — o
+    // percurso e a escala saíam de graça, a duração é que não. A mola foi
+    // endurecida até assentar nos 240; a conta está no `lib/motion/tokens.ts`.
+    const base = /\.bo-entrada\s*\{\s*animation:\s*bo-entrada (\d+)ms/.exec(CSS);
+    expect(base, "a regra `.bo-entrada` desapareceu").not.toBeNull();
+    expect(CSS).toContain(`--bo-mola-chegada-ms: ${base![1]}ms`);
   });
 
   it("e passa mesmo do sítio — senão não é mola nenhuma", () => {

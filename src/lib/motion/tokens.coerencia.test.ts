@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import {
   EASE_OUT,
   EASE_IN,
+  MOLA,
+  MOLA_CHEGADA,
+  CHEGADA_MS,
+  molaEmLinear,
   DUR_MICRO_MS,
   DUR_ELEMENTO_MS,
   DUR_VISTA_MS,
@@ -72,6 +76,40 @@ describe("ficha de movimento ↔ globals.css", () => {
     expect(x1).toBeLessThan(0.35); // arranca depressa
     expect(x2).toBeLessThan(0.5); // e já está quase parada bem antes do fim
     expect(y2).toBe(1);
+  });
+
+  /**
+   * ── A MOLA DA CHEGADA: DOIS SÍTIOS, UM VALOR ─────────────────────────────
+   *
+   * Os trinta e um números do `--bo-mola-chegada` não se escrevem: calculam-se
+   * a partir da `MOLA_CHEGADA`. Este caso REGENERA-OS e compara-os com os que
+   * estão no CSS, exactamente como os dois casos das curvas aqui em cima — se
+   * alguém afinar a mola num dos lados, o outro fica vermelho em vez de ficar a
+   * animar por uma mola que já não é aquela.
+   *
+   * É também a razão por que isto não conta como «uma terceira curva escrita à
+   * mão»: não há nenhuma mão. Ver o argumento inteiro no
+   * `movimento-da-casa.test.ts`.
+   */
+  it("a mola da chegada no CSS é a `MOLA_CHEGADA` amostrada, e não outra coisa", () => {
+    const m = /--bo-mola-chegada:\s*(linear\([^;]+\));/.exec(css);
+    expect(m, "o `--bo-mola-chegada` desapareceu do :root do globals.css").not.toBeNull();
+    expect(norm(m![1])).toBe(norm(molaEmLinear()));
+    const d = /--bo-mola-chegada-ms:\s*(\d+)ms/.exec(css);
+    expect(d, "a duração da mola desapareceu do CSS").not.toBeNull();
+    expect(Number(d![1])).toBe(CHEGADA_MS);
+  });
+
+  it("e é uma mola de CHEGADA, não a do arrasto — as duas têm trabalhos opostos", () => {
+    // O amortecimento é o que as separa, e é medível. A do ARRASTO assenta e
+    // fica (ζ ≈ 0,95, ultrapassagem de 0,007%); usá-la numa chegada era
+    // escrever «mola» e não ter mola nenhuma. A da CHEGADA passa do sítio de
+    // propósito, e é isso que se lê como «chegou» em vez de «apareceu».
+    const zeta = (m: { rigidez: number; amortecimento: number; massa: number }) =>
+      m.amortecimento / (2 * Math.sqrt(m.rigidez * m.massa));
+    expect(zeta(MOLA), "a mola do arrasto começou a oscilar").toBeGreaterThan(0.9);
+    expect(zeta(MOLA_CHEGADA), "a mola da chegada deixou de passar do sítio").toBeLessThan(0.75);
+    expect(zeta(MOLA_CHEGADA), "a mola da chegada passou a saltitar").toBeGreaterThan(0.4);
   });
 
   it("EASE_IN é, caracter a caracter, a mesma curva que `--ease-in` no CSS", () => {
