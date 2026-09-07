@@ -438,8 +438,18 @@ export function TabelaOuCartoes<T>({
               <th
                 key={c.chave}
                 scope="col"
+                /* ── A DENSIDADE, E DE ONDE VÊM OS NÚMEROS ──────────────
+                   Do sistema de design: cabeçalho de tabela com 40 px de
+                   altura, linhas com 44, e 12 px de folga horizontal nas duas.
+
+                   A altura vai em `h-*` e não em `py-*`, e isso não é
+                   preferência: 44 px com uma linha de texto de 22 (o
+                   `text-callout` das linhas) pedia 11 px de cada lado, e 11
+                   não é da grelha de 4 desta casa. Com a altura declarada e o
+                   `align-middle`, a folga vertical resolve-se sozinha e a
+                   grelha fica intacta. */
                 className={cn(
-                  "bo-eyebrow px-3 py-2.5 text-left font-medium",
+                  "bo-eyebrow h-10 px-3 text-left font-medium",
                   c.alinharADireita && "text-right",
                   c.largura,
                 )}
@@ -500,7 +510,8 @@ export function TabelaOuCartoes<T>({
               {visiveis.map((c, i) => (
                 <td
                   key={c.chave}
-                  className={cn("px-3 py-2.5 align-middle", c.alinharADireita && "text-right")}
+                  // 44 px de altura — ver a nota no cabeçalho, aqui em cima.
+                  className={cn("h-11 px-3 align-middle", c.alinharADireita && "text-right")}
                 >
                   {/* Clicar na LINHA é uma comodidade do rato. Quem navega por
                       teclado precisa de um controlo a sério, com nome — e ele
