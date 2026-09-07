@@ -296,15 +296,30 @@ export default function CommandPalette({
         aria-label={aSairAgora ? undefined : "Pesquisar e navegar"}
         aria-hidden={aSairAgora || undefined}
         inert={aSairAgora}
+        /* ── O MATERIAL, E O DESFOQUE QUE AQUI SE RECUSA ──────────────────
+           Era `rounded-2xl border … bg-white`: o `rounded-2xl` media 8 px como
+           todo o resto do conteúdo (ver o bloco dos raios do `globals.css`) e o
+           branco era opaco e escrito à mão.
+
+           Leva a `.bo-material` e o degrau GRANDE do raio — 18 px —, porque
+           isto tem 576 px de largura e um raio de menu numa caixa desta
+           dimensão lê-se apertado.
+
+           E NÃO leva a `.bo-material-desfoque`, de propósito. O véu aqui em
+           cima já tem `backdrop-blur-sm` e desfoca o ecrã inteiro; um segundo
+           `backdrop-filter` por cima dele volta a amostrar o que o primeiro já
+           compôs, e paga-o outra vez — no ecrã onde este ficheiro escreveu, no
+           ponto 2 do cabeçalho, que o desfoque é «o preço mais alto do
+           orçamento de quadro». A translucidez fica; o segundo desfoque não. */
         className={`${
           aSairAgora ? SAIDA : "bo-entrada"
-        } relative w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white shadow-[var(--bo-sombra-modal)]`}
+        } relative w-full max-w-xl overflow-hidden bo-material bo-material-grande shadow-[var(--bo-sombra-modal)]`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
         <div className="flex items-center gap-3 border-b border-[var(--bo-hairline)] px-4 py-3.5">
           <svg
-            className="shrink-0 text-foreground/40"
+            className="shrink-0 text-[var(--bo-text-muted)]"
             width="18"
             height="18"
             viewBox="0 0 24 24"
@@ -334,14 +349,14 @@ export default function CommandPalette({
             aria-controls={listaId}
             aria-autocomplete="list"
             aria-activedescendant={results.length > 0 ? idDaOpcao(active) : undefined}
-            className="flex-1 bg-transparent text-[15px] text-[var(--bo-text)] placeholder-foreground/35 focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] text-[var(--bo-text)] placeholder-foreground/45 focus:outline-none"
           />
           {/* FECHAR: uma tecla em quem tem teclado, um botão em quem não tem.
               Aqui só havia a etiqueta "ESC". Num telemóvel isso é uma
               instrução impossível de seguir, e o que restava para fechar era
               tocar no fundo escuro — que não é um controlo, é uma coisa que se
               descobre por acaso. */}
-          <kbd className="pointer-coarse:hidden rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] tracking-wider text-foreground/45">
+          <kbd className="pointer-coarse:hidden rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] tracking-wider text-[var(--bo-text-muted)]">
             ESC
           </kbd>
           <button
@@ -359,7 +374,7 @@ export default function CommandPalette({
                teste a guardá-lo. O que este botão precisava era só do toque —
                e da `transition-[scale]` que o cobre, senão o `PRESSAO` não
                anima nada. */
-            className={`alvo-toque flex pointer-fine:hidden shrink-0 items-center justify-center rounded-lg text-xl leading-none text-foreground/45 ${TOQUE_DA_LINHA}`}
+            className={`alvo-toque flex pointer-fine:hidden shrink-0 items-center justify-center rounded-lg text-xl leading-none text-[var(--bo-text-muted)] ${TOQUE_DA_LINHA}`}
           >
             ×
           </button>
@@ -371,7 +386,7 @@ export default function CommandPalette({
               nada, e ficava sem saber se a paleta estava a pensar, se tinha
               partido, ou se não havia mesmo nada. */}
           {results.length === 0 && (
-            <p role="status" className="py-10 text-center text-sm text-foreground/45">
+            <p role="status" className="py-10 text-center text-sm text-[var(--bo-text-muted)]">
               Sem resultados para “{query.trim()}”.
             </p>
           )}
@@ -380,7 +395,7 @@ export default function CommandPalette({
               <div key={g.name} role="group" aria-label={g.name} className="mb-1 last:mb-0">
                 <p
                   aria-hidden="true"
-                  className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45"
+                  className="px-2.5 pb-1 pt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--bo-text-muted)]"
                 >
                   {g.name}
                 </p>
@@ -398,15 +413,29 @@ export default function CommandPalette({
                       onClick={() => escolher(c)}
                       /* Sem `ESTADO`: o realce da escolha não esbate. A razão
                          está por extenso no ponto 3 do cabeçalho. */
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ${TOQUE_DA_LINHA} ${
-                        isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-[var(--bo-tinta-6)]"
+                      /* ── A LINHA ESCOLHIDA É UMA PASTILHA CHEIA ─────────
+                         Era `bg-[#4d6350]/[0.12]` — doze por cento de verde,
+                         uma lavagem. Numa lista que se percorre com o ↓ segurado
+                         é precisamente o realce que não diz qual é a linha, e é
+                         a mesma queixa que o ponto 3 do cabeçalho já resolveu
+                         do lado do TEMPO: aqui resolve-se do lado do PESO.
+
+                         Medido: branco sobre `--bo-accent` dá 6,55:1. */
+                      className={`flex w-full items-center gap-3 rounded-[var(--bo-material-raio-pastilha)] px-2.5 py-2.5 text-left ${TOQUE_DA_LINHA} ${
+                        isActive
+                          ? "bg-[var(--bo-accent)] text-white"
+                          : "hover:bg-[var(--bo-tinta-6)]"
                       }`}
                     >
                       <span
+                        /* Dentro da pastilha o quadrado do ícone inverte-se
+                           também: um verde sobre verde não se lê. E fora dela o
+                           `text-foreground/40` sai — media 2,67:1 sobre branco,
+                           que é menos de metade do que a norma pede. */
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
                           isActive
-                            ? "bg-[#4d6350]/[0.16] text-[#4d6350]"
-                            : "bg-[var(--bo-tinta-6)] text-foreground/40"
+                            ? "bg-white/20 text-white"
+                            : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                         }`}
                         aria-hidden="true"
                       >
@@ -441,18 +470,25 @@ export default function CommandPalette({
                       </span>
                       <span
                         className={`min-w-0 flex-1 truncate text-sm ${
-                          isActive ? "font-medium text-[#4d6350]" : "text-[var(--bo-tinta-72)]"
+                          isActive ? "font-medium text-white" : "text-[var(--bo-tinta-72)]"
                         }`}
                       >
                         {c.label}
                       </span>
                       {c.hint && (
-                        <span className="max-w-[180px] shrink-0 truncate text-xs text-foreground/40">
+                        /* `--bo-text-muted` (5,91:1) no lugar do
+                           `foreground/40` (2,67:1); e branco a 85% dentro da
+                           pastilha, que dá 5,28:1 contra o acento. */
+                        <span
+                          className={`max-w-[180px] shrink-0 truncate text-xs ${
+                            isActive ? "text-white/85" : "text-[var(--bo-text-muted)]"
+                          }`}
+                        >
                           {c.hint}
                         </span>
                       )}
                       {isActive && (
-                        <kbd className="pointer-coarse:hidden shrink-0 rounded-md border border-[#4d6350]/25 px-1.5 py-0.5 text-[10px] text-[#4d6350]">
+                        <kbd className="pointer-coarse:hidden shrink-0 rounded-md border border-white/55 px-1.5 py-0.5 text-[10px] text-white">
                           ↵
                         </kbd>
                       )}
@@ -468,7 +504,7 @@ export default function CommandPalette({
             ecrã de toque é uma barra a ocupar altura para dizer três coisas
             que não se podem fazer — e a altura, num telemóvel, é o que falta
             para ver os resultados. */}
-        <div className="pointer-coarse:hidden flex items-center gap-4 border-t border-[var(--bo-hairline)] px-4 py-2.5 text-[11px] text-foreground/45">
+        <div className="pointer-coarse:hidden flex items-center gap-4 border-t border-[var(--bo-hairline)] px-4 py-2.5 text-[11px] text-[var(--bo-text-muted)]">
           <span className="flex items-center gap-1.5">
             <kbd className="rounded-md border border-[var(--bo-hairline-strong)] px-1.5 py-0.5">
               ↑↓

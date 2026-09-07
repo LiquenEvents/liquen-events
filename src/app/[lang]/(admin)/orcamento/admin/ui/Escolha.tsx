@@ -849,7 +849,12 @@ export function Escolha({
         style={style}
         {...aria}
       >
-        <span className={cn("block truncate", !escolhida && "text-foreground/45")}>
+        {/* O vazio do campo: `--bo-text-muted` e não o `text-foreground/45`
+            que aqui estava. Aquele media 3,11:1 sobre branco — e isto não é
+            decoração nenhuma: é o texto que diz o que o campo tem quando ele
+            ainda não tem nada. Este mede 5,91:1. De caminho aproxima-o do que o
+            `<select>` nativo desenha no dedo, que nunca esbateu o rótulo. */}
+        <span className={cn("block truncate", !escolhida && "text-[var(--bo-text-muted)]")}>
           {escolhida ? escolhida.rotulo : valor !== "" ? valor : vazio}
         </span>
       </button>
@@ -901,8 +906,26 @@ export function Escolha({
           inert={aSair}
           className={cn(
             "absolute left-0 z-30 max-h-72 min-w-full overflow-y-auto overscroll-contain",
-            "rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)]",
-            "py-1 shadow-[var(--bo-sombra-suspensa)]",
+            /* ── O MATERIAL ────────────────────────────────────────────────
+               Era `rounded-xl border … bg-[var(--bo-surface)]`, e o
+               `rounded-xl` não valia os 12 px que o nome promete: o bloco dos
+               raios do `globals.css` colapsa a escala do Tailwind toda em 8 px
+               para o CONTEÚDO. Esta lista tinha, medida, os mesmos cantos de um
+               campo de texto.
+
+               A `.bo-material` vive fora de camadas de propósito e escapa a
+               esse colapso: traz o raio de 12 px, o fio e a superfície
+               translúcida. O desfoque vem numa classe à parte, para se poder
+               baixar num sítio só — a razão está por extenso no `globals.css`,
+               e a conta do contraste também. */
+            "bo-material bo-material-desfoque shadow-[var(--bo-sombra-suspensa)]",
+            /* A FOLGA QUE FAZ DA PASTILHA UMA PASTILHA. Era `py-1`, ou seja
+               folga em cima e em baixo e ZERO aos lados: uma linha realçada só
+               podia ser uma faixa de bordo a bordo. Com folga nos quatro lados
+               o realce ganha forma própria — que é o que as capturas mostram —
+               e o raio dele é o desta moldura menos esta folga, escrito como
+               `calc()` no token para os dois não se descolarem. */
+            "p-[var(--bo-material-folga)]",
             encaixe?.acima ? "bottom-full mb-1" : "top-full mt-1",
             // 4 px e a curva de quem chega: isto é um item de menu, e é essa a
             // distância que a casa mediu para um. A saída é a mesma palavra ao
@@ -925,7 +948,9 @@ export function Escolha({
                 onClick={() => escolher(i)}
                 onPointerMove={() => !o.desactivada && setActiva(i)}
                 className={cn(
-                  "alvo-toque flex w-full cursor-default items-center gap-2 px-3 py-2 text-left text-sm",
+                  "alvo-toque flex w-full cursor-default items-center gap-2 px-2.5 py-2 text-left text-sm",
+                  // O raio da pastilha = o da moldura menos a folga. Ver o token.
+                  "rounded-[var(--bo-material-raio-pastilha)]",
                   ESTADO,
                   // O MESMO gesto do botão que abre esta lista. Sem ele, o
                   // comando afundava e a opção — que é onde a escolha acontece
@@ -934,12 +959,39 @@ export function Escolha({
                   o.desactivada
                     ? "cursor-not-allowed opacity-40"
                     : i === activa
-                      ? "bg-[var(--bo-tinta-10)] text-[var(--bo-text)]"
+                      ? /* ── A LINHA ESCOLHIDA É UMA PASTILHA CHEIA ──────────
+                           Era `bg-[var(--bo-tinta-10)]`: dez por cento de preto,
+                           uma faixa cinzenta de bordo a bordo. Numa lista de
+                           doze linhas sobre um material translúcido, dez por
+                           cento não é «esta» — é «esta talvez».
+
+                           Passa a ser preenchimento de acento com texto
+                           invertido, que é o gesto das capturas. Medido: branco
+                           sobre `--bo-accent` dá 6,55:1 (AA pede 4,5:1), e o
+                           acento é OPACO de propósito — a 80% sobre o material
+                           mais escuro que este ecrã permite caía para 4,65:1,
+                           que passa por pouco e não tem margem para o dia em
+                           que alguém mexa no verde. */
+                        "bg-[var(--bo-accent)] text-white"
                       : "text-[var(--bo-tinta-72)]",
                 )}
               >
-                {/* A escolha não se diz só pela tinta: há um visto. */}
-                <span aria-hidden="true" className="w-3 shrink-0 text-[#4d6350]">
+                {/* ── O VISTO, NUMA COLUNA COM LARGURA FIXA ─────────────────
+                    A escolha não se diz só pela tinta: há um visto, como na
+                    lista aberta da captura. A largura é o token da coluna e não
+                    um `w-3` à mão — é a MESMA coluna dos ícones dos menus, e é
+                    o que mantém os rótulos todos a começar no mesmo sítio.
+
+                    Sobre a pastilha cheia o visto passa a branco: um verde
+                    sobre verde não se lê, e é o erro mais fácil de cometer ao
+                    trocar um realce cinzento por um preenchido. */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "w-[var(--bo-material-coluna)] shrink-0 text-center",
+                    i === activa && !o.desactivada ? "text-white" : "text-[var(--bo-accent)]",
+                  )}
+                >
                   {o.valor === valor ? "✓" : ""}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{o.rotulo}</span>
@@ -949,8 +1001,15 @@ export function Escolha({
             return (
               <div key={`b${n}`} role="group" aria-label={b.grupo}>
                 {/* `aria-hidden`: o nome do grupo já é dito pelo `aria-label`
-                    do `role="group"`. Sem isto era lido duas vezes. */}
-                <div aria-hidden="true" className="bo-eyebrow px-3 pb-1 pt-2 text-foreground/45">
+                    do `role="group"`. Sem isto era lido duas vezes.
+
+                    O `text-foreground/45` que aqui estava era tinta MORTA — a
+                    `.bo-eyebrow` vive fora de camadas e já lhe ganhava — e era
+                    tinta que chumbava: 3,11:1 sobre branco. Sai, e fica o 0,64
+                    da `.bo-eyebrow`, que mede 5,32:1 sobre o pior material.
+                    O `px` acompanha a folga nova da moldura para o nome do
+                    grupo ficar alinhado com o rótulo das opções. */}
+                <div aria-hidden="true" className="bo-eyebrow px-2.5 pb-1 pt-2">
                   {b.grupo}
                 </div>
                 {linhas}

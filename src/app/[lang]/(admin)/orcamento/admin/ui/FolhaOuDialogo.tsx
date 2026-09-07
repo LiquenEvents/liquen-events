@@ -407,6 +407,24 @@ export function FolhaOuDialogo({
               : undefined
         }
         className={cn(
+          /* ── ONDE O MATERIAL PÁRA, E PORQUÊ ──────────────────────────────
+             A família do que aparece por cima — menus, listas, notas, painéis —
+             passou toda a material translúcido com desfoque. Estas duas não, e
+             é uma recusa e não um esquecimento:
+
+              1. **Uma folha ocupa 390×743 no telemóvel dela.** Um
+                 `backdrop-filter` é trabalho de composição por fotograma sobre
+                 a área que cobre, e esta cobre o ecrã quase todo. É o oposto do
+                 que este ficheiro promete no telemóvel, e o véu que já está por
+                 baixo tem o seu próprio desfoque — seriam dois, sobrepostos.
+              2. **Uma caixa que existe para TAPAR a página não pode deixá-la
+                 passar.** Um menu translúcido diz «isto é uma camada por cima
+                 do teu trabalho»; um diálogo translúcido diz «não sei bem se
+                 estou aqui». São mensagens contrárias, e a segunda está errada.
+
+             O que ELAS levam do material é a geometria: o degrau GRANDE do raio
+             (18 px, aqui em baixo) e a sombra modal, que já era larga. A
+             superfície continua opaca. */
           "relative z-10 flex flex-col overflow-hidden bg-[var(--bo-surface,#ffffff)] shadow-[var(--bo-sombra-modal)]",
           // ── DE ONDE ELA VEM, E PARA ONDE VAI ───────────────────────────
           // A folha sobe (8 px), o diálogo desce (4 px): cada um vem do lado
@@ -433,10 +451,19 @@ export function FolhaOuDialogo({
                 // `dvh` e não `vh`: com a barra do browser à vista, `100vh` é
                 // maior do que o que se vê, e o rodapé com as acções ficava
                 // debaixo dela.
-                "mt-auto w-full rounded-t-2xl",
+                // `rounded-t-2xl` media 8 px: o bloco dos raios do
+                // `globals.css` colapsa a escala do Tailwind toda para o
+                // conteúdo, e uma folha do tamanho do ecrã com os cantos de um
+                // campo de texto é exactamente o que as capturas não têm.
+                "mt-auto w-full rounded-t-[var(--bo-material-raio-grande)]",
                 folhaAlta ? "h-[92dvh]" : "max-h-[88dvh]",
               )
-            : cn("m-auto w-full rounded-2xl", LARGURAS[largura], "max-h-[85dvh]"),
+            : cn(
+                // Ver a nota da folha aqui em cima: 8 px medidos, 18 px pedidos.
+                "m-auto w-full rounded-[var(--bo-material-raio-grande)]",
+                LARGURAS[largura],
+                "max-h-[85dvh]",
+              ),
         )}
       >
         {comoFolha && (
@@ -520,7 +547,7 @@ export function FolhaOuDialogo({
             // Este fechar não tinha transição NENHUMA — o hover entrava e saía
             // a zero, um corte seco. É o mesmo defeito que os 20 ms tratam no
             // carregar, só que no passar do rato.
-            `alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] disabled:opacity-40 ${ESTADO} ${PRESSAO}`,
+            `alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] disabled:opacity-40 ${ESTADO} ${PRESSAO}`,
             comoFolha ? "top-8" : "top-2",
           )}
         >

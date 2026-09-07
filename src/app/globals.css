@@ -651,10 +651,161 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      não haver sombra — pagava-se o desenho e não se recebia nada. Noventa
      vezes. O que se vê é a página deixar de ser um mar de caixas todas ao
      mesmo nível e passar a ter dois: o chão, e o que está em cima dele. */
+  /* ── E A SUSPENSA ABRIU-SE, PORQUE ERA UM CONTORNO E NÃO UMA SOMBRA ──────
+     Era `0 4px 12px -2px / 0.10` mais `0 2px 4px -2px / 0.06`. Doze píxeis de
+     desfoque a quatro de queda desenham uma orla ESCURA E CURTA colada ao
+     bordo — a olho lê-se como uma segunda moldura por baixo do fio, e não como
+     um objecto levantado da página. É o defeito que as capturas do macOS não
+     têm: lá a sombra é larga, difusa e quase não se vê onde acaba.
+
+     Passa a `0 12px 32px -8px / 0.16` mais `0 4px 10px -4px / 0.08`. Os três
+     números mudaram pela mesma razão:
+
+       queda    4 → 12 px   um menu está mais alto do que a página, e a queda é
+                            a única coisa que diz quanto.
+       desfoque 12 → 32 px  é o que apaga a aresta da sombra. Abaixo de ~24 px
+                            ela tem contorno; a partir daí é penumbra.
+       tinta    0,10 → 0,16 um desfoque três vezes mais largo espalha a mesma
+                            tinta por três vezes mais área e desaparece — a
+                            subida devolve-lhe o peso que o alargamento tirou.
+
+     O recuo (`-8px` e `-4px`) fica e cresce com o desfoque: é ele que impede a
+     penumbra de sair pelos lados e de pousar sobre o vizinho. Uma sombra que
+     assoma à esquerda e à direita de um menu de 200 px lê-se como sujidade.
+
+     Isto vale para a família toda do token — menus, avisos, barras coladas, o
+     cartão em arrasto —, e é de propósito: são todos «o que flutua e volta a
+     fechar». A MODAL não se toca: já era larga (48 px) porque tapa a página. */
   --bo-sombra-suspensa:
-    0 4px 12px -2px rgba(13, 13, 13, 0.1), 0 2px 4px -2px rgba(13, 13, 13, 0.06);
+    0 12px 32px -8px rgba(13, 13, 13, 0.16), 0 4px 10px -4px rgba(13, 13, 13, 0.08);
   --bo-sombra-modal:
     0 24px 48px -12px rgba(13, 13, 13, 0.18), 0 8px 16px -8px rgba(13, 13, 13, 0.1);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     O MATERIAL DO QUE APARECE POR CIMA
+     ══════════════════════════════════════════════════════════════════════
+
+     Pedido dela, com duas capturas de menus do macOS por baixo: «eu quero que
+     fique assim com este aspecto no back office quando vamos seleccionar
+     alguma coisa».
+
+     O que dá àquilo o aspecto que tem não é a cor — é o MATERIAL: uma
+     superfície que deixa perceber que há página por baixo, com cantos
+     generosos, uma sombra larga e difusa, e a linha escolhida como uma
+     pastilha CHEIA em vez de uma linha cinzenta.
+
+     A paleta é deles e fica lá. O azul daquelas capturas é o acento do sistema
+     da Apple; o desta casa é o `--bo-accent`, verde-musgo. Não entra azul
+     nenhum — ver a lista do que se recusou, no fim deste bloco.
+
+     ── 1. A OPACIDADE NÃO É UM GOSTO: É O QUE O CONTRASTE DEIXA ───────────
+
+     Um material translúcido põe texto por cima de um fundo VARIÁVEL, e é o
+     modo mais fácil que há de partir a legibilidade sem dar por isso. O pior
+     caso não é o fundo branco do painel — é uma fotografia escura por baixo
+     de um menu, que nesta casa existe (as grelhas de material e de temas).
+
+     Portanto mede-se contra PRETO, que é o pior caso possível, e não contra o
+     branco, que é o mais generoso. Material branco a α sobre preto dá uma
+     superfície de `255·α`; a tinta da casa assenta nela e mede-se aí:
+
+         α      superfície   tinta-82   tinta-72   tinta-64   tinta-58
+         0,80   #cccccc        8,29       6,21       4,88       4,09
+         0,84   #d6d6d6        8,94       6,58       5,10       4,24
+         0,88   #e0e0e0        9,60       6,93       5,32       4,38
+         0,92   #ebebeb       10,27       7,29       5,52       4,52
+
+     **0,88.** É o mais TRANSLÚCIDO que ainda deixa passar toda a tinta que os
+     painéis usam a sério — e a linha do `tinta-58` diz porquê não mais: o
+     `--bo-text-faint` mede 4,38:1 sobre este material e CHUMBA os 4,5:1. Só
+     passaria a 0,92, que já não se lê como material nenhum.
+
+     A conclusão não foi subir a opacidade até o degrau mais fraco caber. Foi
+     a contrária, e é a decisão que este bloco fixa: **o material tem um chão
+     de tinta, e esse chão é o `--bo-text-muted` (0,64).** O `faint` não sobe
+     para cá. Os painéis que o usavam — e os `text-foreground/45` e `/40` que
+     andavam pelo meio, que já chumbavam a 3,11:1 e a 2,67:1 SOBRE BRANCO —
+     subiram um degrau. `material-e-contraste.test.ts` corre a conta na CI e
+     varre os sete ficheiros à procura de tinta abaixo do chão.
+
+     ── 2. O DESFOQUE É A ÚNICA COISA DESTA LISTA QUE PODE CUSTAR CARO ─────
+
+     Este ficheiro tem escrito, e por medição, que o `backdrop-filter` fica
+     FORA das animações: um desfoque em transição repinta o ecrã inteiro a
+     cada fotograma. Um desfoque ESTÁTICO é outra conversa — não há
+     recomposição por fotograma enquanto nada se mexe —, mas continua a ser
+     trabalho numa superfície grande, e ela trabalha num iPhone, em 4G, dentro
+     de quintas.
+
+     Por isso o desfoque é UM NÚMERO (`--bo-material-desfoque`) e uma classe
+     à parte (`.bo-material-desfoque`), e não uma propriedade cozida na
+     superfície: baixar a intensidade — ou desligá-la — passa a ser mudar um
+     valor aqui, e não caçar sete ficheiros. Quem NÃO leva a segunda classe
+     fica com a superfície translúcida sem desfoque, que continua a ler-se.
+
+     20 px e não mais: é o raio a partir do qual o que está por baixo deixa de
+     se reconhecer (letras de 15 px desaparecem enquanto a mancha de cor fica),
+     e cada píxel acima disso é área de amostragem paga a troco de nada.
+
+     A saturação a 180% é o resto do truque da Apple: um desfoque puro
+     acinzenta o que passa, e a saturação devolve-lhe a cor. Não custa
+     amostragem nenhuma — vai no mesmo passo de filtro.
+
+     ── 3. OS RAIOS SÃO CONCÊNTRICOS, E É POR ISSO QUE SÃO TRÊS ────────────
+
+     O bloco dos raios lá em cima colapsou a escala do Tailwind toda em 8 px,
+     de propósito: nove valores para conteúdo não eram hierarquia nenhuma. O
+     que aparece POR CIMA é outra escala, e é a que as capturas mostram.
+
+     Três valores, e o terceiro é uma CONTA e não uma escolha:
+
+       --bo-material-raio        12 px  a moldura de um menu ou de uma lista
+       --bo-material-raio-grande 18 px  uma folha ou um diálogo — é maior, e um
+                                        raio que não cresce com a caixa
+                                        lê-se como apertado
+       --bo-material-raio-pastilha      = raio − folga
+
+     A regra dos raios concêntricos: uma pastilha desenhada dentro de uma
+     moldura com `folga` de afastamento só fica paralela à moldura se o raio
+     dela for `raio − folga`. Com 12 e 4, dá 8. Escrito como `calc()` e não
+     como um quarto número, para que mexer no raio da moldura arraste a
+     pastilha atrás dele em vez de as descolar.
+
+     ── 4. O QUE SE RECUSOU DAQUELAS CAPTURAS ─────────────────────────────
+
+     · **O azul.** É o acento do sistema deles. Aqui a pastilha é
+       `--bo-accent`, e a diferença entre «inspirado» e «um painel de
+       definições do Mac com o nome errado» é essa.
+     · **O material nas folhas e nos diálogos.** Levam o raio e a sombra, e
+       ficam OPACOS. Uma folha ocupa 390×743 no telemóvel dela: desfocar isso
+       é o oposto da promessa deste ficheiro, e ver a página a atravessar uma
+       caixa que existe para a TAPAR não é material, é ruído.
+     · **O desfoque dentro da paleta de comandos.** O véu dela já desfoca o
+       ecrã inteiro; um segundo `backdrop-filter` por cima amostra o que o
+       primeiro já compôs, e paga-o outra vez.
+     · **A vibrância do texto.** O macOS pinta os rótulos dos menus com modos
+       de mistura (`plus-darker`), que é o que lhe permite ser mais
+       translúcido do que isto sem partir a leitura. Em CSS não há equivalente
+       fiável, e imitar o aspecto sem o mecanismo é exactamente como se chumba
+       um contraste sem dar por isso.
+     · **O separador a toda a largura.** Nas capturas o filete vai de bordo a
+       bordo; aqui a pastilha tem folga lateral, e um filete que passe por fora
+       dela desalinha as duas fronteiras verticais que o olho lê. Fica com a
+       mesma folga da pastilha. */
+  --bo-material: rgba(255, 255, 255, 0.88);
+  /* O recuo de quem não tem `backdrop-filter` e de quem pediu menos
+     transparência. Branco puro — a superfície que a casa já tinha. */
+  --bo-material-opaco: #ffffff;
+  --bo-material-desfoque: 20px;
+  --bo-material-saturacao: 180%;
+  --bo-material-raio: 0.75rem; /* 12px — menus, listas, notas */
+  --bo-material-raio-grande: 1.125rem; /* 18px — folhas e diálogos */
+  --bo-material-folga: 0.25rem; /* 4px — a folga da moldura à pastilha */
+  --bo-material-raio-pastilha: calc(var(--bo-material-raio) - var(--bo-material-folga));
+  /* A coluna dos ícones e do visto: uma fila alinhada à esquerda, todos do
+     mesmo tamanho — e a MESMA largura mesmo quando o item não tem ícone
+     nenhum, senão os rótulos de um menu misto ficam em duas colunas. */
+  --bo-material-coluna: 1rem;
 
   /* ── Single accent: Líquen moss ── */
   --bo-accent: #4c6350; /* moss-dark — primary actions / active states */
@@ -3031,6 +3182,78 @@ body[data-menu-open] .whatsapp-fixed {
   .bo-saida {
     animation: none;
     opacity: 0;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O MATERIAL, EM DUAS CLASSES — E PORQUE É QUE SÃO DUAS
+   ══════════════════════════════════════════════════════════════════════════
+
+   Os números e a conta do contraste estão nos tokens, lá em cima. Aqui só se
+   arruma o que cada superfície do back office pede:
+
+     `.bo-material`           a SUPERFÍCIE — translúcida, com o fio e o raio
+                              generoso. É o que faz a família toda parecer a
+                              mesma coisa.
+     `.bo-material-desfoque`  o DESFOQUE, que se pede à parte.
+
+   São duas porque o desfoque é a única coisa desta lista que pode custar caro,
+   e uma superfície que o traga cozido não se pode desligar sem se desfazer.
+   Quem NÃO o pede — a paleta de comandos, que já tem um véu desfocado por
+   baixo — fica com a superfície na mesma.
+
+   ── E FICA FORA DE `@layer` DE PROPÓSITO ────────────────────────────────
+   Neste ficheiro todo o CSS escrito à mão está fora de camadas, e no Tailwind
+   v4 isso ganha sempre à `@layer utilities`. É o que se quer aqui: o bloco dos
+   raios lá em cima colapsa `rounded-xl` e `rounded-2xl` em 8 px para o
+   CONTEÚDO, e uma superfície que aparece por cima tem de escapar a esse
+   colapso sem ter de gritar `!important` em sete ficheiros.
+
+   A consequência a saber: um `rounded-*` ou um `bg-*` escrito ao lado de
+   `bo-material` na mesma etiqueta não vale nada. É a mesma armadilha que a
+   largura do `.bo-input` já documenta vinte linhas abaixo. */
+.bo-material {
+  background: var(--bo-material, #ffffff);
+  border: 1px solid var(--bo-hairline-strong, rgba(13, 13, 13, 0.13));
+  border-radius: var(--bo-material-raio, 0.75rem);
+}
+/* O degrau grande do raio, para o que já não é um menu — uma caixa de 576 px
+   com um raio de menu lê-se apertada. Vem depois da `.bo-material` e com a
+   mesma especificidade, portanto ganha-lhe; e é uma classe e não um
+   `rounded-*` porque a `.bo-material` está fora de camadas e um utilitário não
+   lhe chegava. */
+.bo-material-grande {
+  border-radius: var(--bo-material-raio-grande, 1.125rem);
+}
+.bo-material-desfoque {
+  -webkit-backdrop-filter: blur(var(--bo-material-desfoque, 20px))
+    saturate(var(--bo-material-saturacao, 180%));
+  backdrop-filter: blur(var(--bo-material-desfoque, 20px))
+    saturate(var(--bo-material-saturacao, 180%));
+}
+/* Sem `backdrop-filter` não há material nenhum: o que passava era o que está
+   por baixo, nítido, por trás de um véu branco. Legível — a conta do contraste
+   é a mesma —, mas ilegível de LER. Volta ao branco que a casa já tinha. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bo-material {
+    background: var(--bo-material-opaco, #ffffff);
+  }
+}
+/* ── QUEM PEDE MENOS TRANSPARÊNCIA RECEBE MENOS TRANSPARÊNCIA ────────────
+   `prefers-reduced-transparency` é a irmã do `prefers-reduced-motion`, e a
+   razão dela é a mesma: há quem o desfoque e a translucidez cansem ou
+   desorientem. Custa duas regras e devolve a superfície opaca — que é
+   exactamente o recuo que já existe para quem não tem o filtro.
+
+   E tem um segundo efeito, que não é acidental: desliga o único trabalho de
+   composição por fotograma desta folha para quem o pediu. */
+@media (prefers-reduced-transparency: reduce) {
+  .bo-material {
+    background: var(--bo-material-opaco, #ffffff);
+  }
+  .bo-material-desfoque {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
