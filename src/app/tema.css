@@ -118,6 +118,142 @@
      é deliberada (carrega a 20, larga a 120), e o número vem de uma medição na
      apple.com: imperceptível como animação, perceptível como suavidade. */
   --transition-duration-toque: 20ms;
+
+  /* ══════════════════════════════════════════════════════════════════════
+     FASE 01 DO SISTEMA DE DESIGN — A PARTE 1 DO BRIEF, PALAVRA POR PALAVRA
+     ══════════════════════════════════════════════════════════════════════
+
+     Entra aqui e não no `globals.css`, e a razão é a mesma que fez este
+     ficheiro nascer: o `globals.css` tem `@source not "./[lang]/(admin)"`, e
+     um `@theme` lá dentro geraria utilitários que NUNCA chegariam ao back
+     office. Aqui, o `admin.css` refere este ficheiro e o site importa-o —
+     os dois recebem as mesmas classes.
+
+     Nenhum componente muda com este bloco. É só a fonte de verdade a passar
+     a existir, que é o que a fase 01 pede.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* ---------- COR: escala da marca ---------- */
+  --color-sage-50: #f5faf6;
+  --color-sage-100: #e9f2eb;
+  --color-sage-200: #d0e1d4;
+  --color-sage-300: #abc4b1;
+  --color-sage-400: #7ea086;
+  /* cor de marca — NUNCA como texto sobre branco (medido: 4,58:1) */
+  --color-sage-500: #5f7c66;
+  /* acento utilizável — medido: 6,23:1 sobre branco */
+  --color-sage-600: #4c6752;
+  --color-sage-700: #39513f;
+  --color-sage-800: #2a3c2f;
+  --color-sage-900: #161d18;
+
+  /* ---------- TIPOGRAFIA ----------
+     Escala derivada dos text styles do iOS e do macOS, com o tracking da San
+     Francisco: abre a letra abaixo de 12px, fecha entre 13 e 23, reabre acima
+     de 24. */
+  --text-caption2: 0.6875rem;
+  --text-caption2--line-height: 1rem;
+  --text-caption2--letter-spacing: 0.006em;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--letter-spacing: 0em;
+  --text-footnote: 0.8125rem;
+  --text-footnote--line-height: 1.25rem;
+  --text-footnote--letter-spacing: -0.006em;
+  --text-callout: 0.875rem;
+  --text-callout--line-height: 1.375rem;
+  --text-callout--letter-spacing: -0.011em;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5rem;
+  --text-body--letter-spacing: -0.016em;
+  --text-headline: 0.9375rem;
+  --text-headline--line-height: 1.375rem;
+  --text-headline--font-weight: 600;
+  --text-title3: 1.0625rem;
+  --text-title3--line-height: 1.5rem;
+  --text-title3--letter-spacing: -0.025em;
+  --text-title2: 1.25rem;
+  --text-title2--line-height: 1.625rem;
+  --text-title2--letter-spacing: -0.022em;
+  --text-title1: 1.5rem;
+  --text-title1--line-height: 1.875rem;
+  --text-title1--letter-spacing: 0.003em;
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.25rem;
+  --text-display--letter-spacing: 0.013em;
+
+  /* ---------- ESPAÇO ----------
+     Grelha de 4: 4 8 12 16 20 24 32 40 48 64. É já o valor por omissão do
+     Tailwind v4; fica escrito para a grelha ser uma decisão e não um acaso. */
+  --spacing: 0.25rem;
+
+  /* ---------- FORMA ---------- */
+  --radius-badge: 6px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-sheet: 26px;
+
+  /* ---------- MOVIMENTO ----------
+     ATENÇÃO AO PREFIXO, e é a armadilha que este ficheiro já conta aqui em
+     cima: o Tailwind v4 lê os utilitários `duration-*` do espaço
+     `--transition-duration-*` e SÓ desse. O brief escreve `--duration-fast`;
+     escrito assim, a classe `duration-fast` não gera regra nenhuma, não dá
+     erro e não dá aviso — foi exactamente o que aconteceu às três durações da
+     casa, catorze chamadas em oito ficheiros a correr aos 150 ms por omissão.
+
+     Os NOMES DE CLASSE são os do brief (`duration-instant`, `duration-fast`,
+     …). Só o prefixo do token é que muda, para elas existirem mesmo. */
+  --transition-duration-instant: 80ms;
+  --transition-duration-fast: 140ms;
+  --transition-duration-base: 200ms;
+  --transition-duration-slow: 280ms;
+  --transition-duration-sheet: 320ms;
+  --transition-duration-exit: 120ms;
+
+  /* ---------- AS CURVAS ----------
+     A `--ease-out` e a `--ease-in` da casa JÁ SÃO, dígito por dígito, as que o
+     brief pede — estão no `:root` do `globals.css` e não se tocou nelas.
+
+     Estas duas são novas. E vêm para o `@theme` e não para o `:root` por uma
+     razão que a sonda apanhou em flagrante: postas no `:root`, a VARIÁVEL
+     existe mas as classes `ease-inout` e `ease-spring` não geram regra
+     nenhuma. É a mesma família de armadilha do prefixo das durações aqui em
+     cima — o Tailwind gera utilitários a partir do `@theme`, e mais nada.
+     Compilado para confirmar, nos dois sentidos.
+
+     A casa recusava uma terceira curva, e a razão mantém-se: existia para
+     nenhum componente escolher à sorte. O que muda é que passam a estar
+     nomeadas, com um uso declarado cada — A→B, e a mola do `:active`.
+
+     A `--ease-spring` é uma `linear()` e não uma `cubic-bezier` porque uma
+     curva de Bézier não passa dos 100%: não há como fazer ultrapassagem com
+     ela, e sem ultrapassagem não há mola. */
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: linear(
+    0,
+    0.0067,
+    0.0265,
+    0.0587 5.5%,
+    0.1281,
+    0.2004 11.4%,
+    0.3427,
+    0.4938 20.9%,
+    0.6314,
+    0.7553,
+    0.8598 30.3%,
+    0.9481,
+    1.0128 36.4%,
+    1.0508,
+    1.0623 41.1%,
+    1.06,
+    1.0483 45.9%,
+    1.0179 53.3%,
+    1.0009 61.1%,
+    0.9964 69.4%,
+    0.9998 88.9%,
+    1
+  );
 }
 
 @custom-variant com-rato (@media (hover: hover) and (pointer: fine));

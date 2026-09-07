@@ -115,6 +115,59 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* ══════════════════════════════════════════════════════════════════════
+     TOKENS SEMÂNTICOS — A PARTE 1 DO BRIEF
+     ══════════════════════════════════════════════════════════════════════
+
+     Definidos por FUNÇÃO e não por aparência, que é a regra que os torna
+     úteis: `--fg-secondary` diz para que serve; `#596959` não diz nada.
+
+     Vivem aqui e não no `@theme` do `tema.css` porque não são para gerar
+     utilitários — são variáveis CSS, e uma variável CSS desce a árvore toda
+     independentemente do que o Tailwind varre. O `globals.css` é carregado
+     em todas as páginas, back office incluído (`[lang]/layout.tsx`), logo
+     estas chegam a todo o lado sem depender do `@source`.
+
+     Os rácios ao lado são os do brief. Nenhum componente os usa ainda: a
+     fase 01 cria a fonte de verdade e mais nada.
+     ══════════════════════════════════════════════════════════════════════ */
+  --bg-base: #f7f8f7;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-elevated-2: #ffffff;
+  --bg-subtle: #eef1ee;
+
+  --fg-primary: #1e241e; /* 15,8:1 sobre branco */
+  --fg-secondary: #596959; /* 5,9:1 */
+  --fg-tertiary: #6b766c; /* 4,7:1 */
+  --fg-placeholder: #8a968a; /* só placeholder, nunca conteúdo */
+
+  --border: #dee3de;
+  --border-strong: #c3ccc3;
+
+  --accent: #4c6752; /* 6,2:1 sobre branco; branco sobre ele: 6,2:1 */
+  --accent-hover: #39513f;
+  --accent-subtle: #e9f2eb;
+  --focus-ring: #4c6752;
+
+  --success: #2f6d4f; /* 6,1:1 */
+  --warning: #8a5a12; /* 5,9:1 */
+  --danger: #b23b2e; /* 5,9:1 */
+  --info: #2c5f86; /* 6,8:1 */
+
+  /* material */
+  --glass-bg: rgb(255 255 255 / 0.55);
+  --glass-bg-clear: rgb(255 255 255 / 0.1);
+  --glass-border: rgb(255 255 255 / 0.62);
+  --glass-hi: rgb(255 255 255 / 0.92);
+  --glass-lo: rgb(255 255 255 / 0.16);
+  --glass-shadow: 0 10px 34px rgb(16 28 20 / 0.17);
+  --glass-blur: 24px;
+  --glass-sat: 180%;
+
+  --shadow-raised: 0 1px 2px rgb(16 28 20 / 0.06), 0 1px 3px rgb(16 28 20 / 0.04);
+  --shadow-overlay: 0 10px 30px rgb(16 28 20 / 0.16);
+
+  /* ══════════════════════════════════════════════════════════════════════
      A ESCADA DO PERCURSO — TRÊS DEGRAUS, E O NÚMERO VIVE AQUI
      ══════════════════════════════════════════════════════════════════════
 
@@ -5384,4 +5437,61 @@ body:has(.barra-consentimento) footer {
   to {
     transform: none;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MODO ESCURO — OS MESMOS TOKENS, OUTROS VALORES
+   ══════════════════════════════════════════════════════════════════════════
+
+   Esta casa não tinha modo escuro nenhum: zero `.dark`, zero
+   `prefers-color-scheme`. Este bloco é inteiramente novo e fica INERTE até
+   alguém pôr a classe `dark` na raiz — nada muda de aspecto com este commit.
+
+   Duas ideias do brief que decidem os valores, e que quase toda a gente falha:
+
+   1. A paleta escura NÃO é a inversão da clara. Alguns valores invertem,
+      outros não.
+   2. Há quatro fundos e não um. Em modo claro a elevação faz-se por SOMBRA (o
+      fundo é sempre branco); em modo escuro faz-se por LUMINOSIDADE, e a
+      sombra quase não se vê. São dois mecanismos diferentes para a mesma
+      hierarquia — daí `--bg-base` → `--bg-elevated-2` subirem de tom.
+
+   Vem depois do `:root` de propósito: `.dark` e `:root` têm a MESMA
+   especificidade (0,1,0), portanto quem ganha é quem vier por último. Trocar
+   a ordem destes dois blocos apaga o modo escuro em silêncio.
+   ══════════════════════════════════════════════════════════════════════════ */
+.dark {
+  --bg-base: #101310;
+  --bg-surface: #171b17;
+  --bg-elevated: #1e241e;
+  --bg-elevated-2: #262d26;
+  --bg-subtle: #1e241e;
+
+  --fg-primary: #f1f5f1; /* 16,4:1 sobre #171b17 */
+  --fg-secondary: #acb9ac; /* 8,5:1 */
+  --fg-tertiary: #8a968a; /* 5,7:1 */
+  --fg-placeholder: #6b776b;
+
+  --border: #2c332c;
+  --border-strong: #3a433a;
+
+  --accent: #abc4b1; /* 9,3:1 sobre #171b17 */
+  --accent-hover: #d0e1d4;
+  --accent-subtle: #2a3c2f;
+  --focus-ring: #7ea086;
+
+  --success: #7fc7a0;
+  --warning: #e8b45c;
+  --danger: #f4a79d;
+  --info: #8fc0e6;
+
+  --glass-bg: rgb(26 34 28 / 0.52);
+  --glass-bg-clear: rgb(20 28 22 / 0.16);
+  --glass-border: rgb(255 255 255 / 0.16);
+  --glass-hi: rgb(255 255 255 / 0.3);
+  --glass-lo: rgb(255 255 255 / 0.06);
+  --glass-shadow: 0 12px 38px rgb(0 0 0 / 0.55);
+
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.34);
+  --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.45);
 }
