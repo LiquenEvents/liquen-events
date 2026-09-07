@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -39,7 +40,6 @@ const TEMA = readFileSync(join(RAIZ, "src/app/tema.css"), "utf8");
 
 /** Os ficheiros de PRODUTO — sem testes, que podem nomear o verde antigo. */
 function ficheirosDeProduto(): string[] {
-  const { execSync } = require("node:child_process") as typeof import("node:child_process");
   return execSync("find src/app src/components -name '*.tsx' -o -name '*.css' || true", {
     encoding: "utf8",
   })
