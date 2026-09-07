@@ -952,14 +952,36 @@ test.describe("Back office — mobile", () => {
     }
 
     const barra = page.getByRole("navigation", { name: /Destinos principais/i });
-    const naBarra = (await barra.getByRole("button").allInnerTexts()).map((t) => t.trim());
-    // Os quatro do dia, e a seguir o abridor da gaveta — que não é um destino,
-    // é a porta para os que não cabem ali.
+
+    /**
+     * ── PORQUE É QUE O ABRIDOR JÁ NÃO SE CONTA PELO TEXTO ────────────────
+     *
+     * Isto era `toEqual([...NA_BARRA, "Mais"])`, e passou a receber
+     * `[…, ""]`. Não foi o abridor que desapareceu: foi a palavra.
+     *
+     * A barra passou a ser a cápsula que ela pediu — os quatro destinos numa
+     * pastilha de material e o abridor numa PEÇA REDONDA à parte, porque não é
+     * um destino, é a porta. Uma peça redonda de 62 px não leva a palavra
+     * «Mais» lá dentro, e o nome dela passou a viver no `aria-label`.
+     *
+     * A regra que este teste guarda não mudou nada — quatro destinos em baixo,
+     * o resto na gaveta, nenhum nos dois sítios, UM só abridor. O que mudou foi
+     * a forma de contar o abridor: pelo nome acessível, que é o que continua a
+     * existir, em vez do texto visível, que deixou de existir de propósito.
+     */
+    const textos = (await barra.getByRole("button").allInnerTexts())
+      .map((t) => t.trim())
+      .filter(Boolean);
     expect(
-      naBarra,
-      "A barra de baixo deixou de ser os quatro destinos do dia mais o abridor. " +
+      textos,
+      "A barra de baixo deixou de ser os quatro destinos do dia. " +
         "Ver BARRA_INFERIOR em nav.tsx — e, se mudou de propósito, mudar também o NA_BARRA deste ficheiro.",
-    ).toEqual([...NA_BARRA, "Mais"]);
+    ).toEqual([...NA_BARRA]);
+
+    await expect(
+      barra.getByRole("button", { name: /Mais destinos/i }),
+      "a porta da gaveta: uma, e com nome para quem ouve o ecrã",
+    ).toHaveCount(1);
 
     await abrirGaveta(page);
     const gaveta = page.getByRole("navigation", { name: /Navegação do back office/i });
