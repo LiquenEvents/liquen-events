@@ -236,6 +236,28 @@ const timelineItemSchema = z.object({
   time: trimmed(20),
   title: trimmed(300),
   owner: trimmed(120).optional(),
+  /**
+   * Quanto tempo dura o momento, em minutos. Ver `TimelineItem`, onde está
+   * escrito porque é duração e não hora de fim.
+   *
+   * ── E PORQUE É QUE ESTA LINHA É LOAD-BEARING ────────────────────────────
+   *
+   * O `quoteUpdateSchema` corre em `.strip()` (o modo por omissão do zod): uma
+   * chave que não esteja DECLARADA aqui é apagada em silêncio, sem erro e sem
+   * 400. Sem esta linha, o ecrã mandava a duração, o servidor respondia 200, e
+   * ela voltava no dia seguinte com o guião outra vez sem durações — o pior
+   * defeito possível, porque parece que funcionou.
+   *
+   * `int`: minutos não têm casas decimais. O tecto é um dia — mais do que isso
+   * é engano de dedo e não um momento. Zero é aceite e vale o mesmo que
+   * ausente (um instante), para uma duração apagada poder ser gravada.
+   */
+  duracao: z
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 60)
+    .optional(),
 });
 
 const paymentSchema = z.object({
