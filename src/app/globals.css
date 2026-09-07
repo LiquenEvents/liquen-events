@@ -3448,6 +3448,45 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   A FAIXA — MATERIAL PARA O QUE ATRAVESSA O ECRÃ DE LADO A LADO
+   ══════════════════════════════════════════════════════════════════════════
+
+   A `.bo-material` desenha uma PEÇA: traz raio e traz moldura dos quatro
+   lados, que é o que um menu ou uma folha querem. Uma barra de topo colada ao
+   cimo da janela não é uma peça — não tem cantos nem lados, e o único fio que
+   lhe faz sentido é o de baixo, que ela já acende sozinha ao rolar.
+
+   Daí uma classe própria em vez de `.bo-material` com utilitários a desfazer o
+   que ela faz: a `.bo-material` vive FORA de camadas e ganha sempre à
+   `@layer utilities`, portanto um `rounded-none` ou um `border-x-0` ao lado
+   dela não lhe chegavam. O que ela partiria é concreto — o fio de baixo do
+   cabeçalho troca entre transparente e visível conforme a página desceu, e um
+   `border: 1px solid var(--bo-hairline-strong)` fora de camadas comia essa
+   troca sem deixar rasto.
+
+   Fica com a superfície e com a linha especular; a moldura e o raio ficam com
+   quem chama. O desfoque continua a ser pedido à parte
+   (`.bo-material-desfoque`), como em todo o lado.
+
+   ── PORQUE É QUE ISTO SE VÊ NA BARRA DE TOPO E NÃO SE VERIA NA COLUNA ────
+
+   Vidro só existe se houver alguma coisa por trás. A barra de topo é
+   `sticky top-0` e o conteúdo passa MESMO por baixo dela ao rolar — há o que
+   atravessar, e o material lê-se. A coluna da esquerda é uma coluna ao LADO do
+   conteúdo: por trás dela está o chão da aplicação, que nesta casa é branco
+   por pedido dela. Vidro translúcido sobre branco liso vê-se exactamente como
+   branco, e é por isso que a coluna não entra aqui sem uma decisão sobre o
+   chão. Está escrito para não se voltar a tentar. */
+.bo-material-faixa {
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.7),
+    rgba(255, 255, 255, 0) 1.5px
+  );
+  background-color: var(--bo-material, #ffffff);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    A SEGUNDA VARIANTE — O VIDRO CLARO, PARA CONTROLOS EM CIMA DE FOTOGRAFIAS
    ══════════════════════════════════════════════════════════════════════════
 
@@ -3530,7 +3569,8 @@ body[data-menu-open] .whatsapp-fixed {
    E tem um segundo efeito, que não é acidental: desliga o único trabalho de
    composição por fotograma desta folha para quem o pediu. */
 @media (prefers-reduced-transparency: reduce) {
-  .bo-material {
+  .bo-material,
+  .bo-material-faixa {
     background: var(--bo-material-opaco, #ffffff);
   }
   .bo-material-desfoque {
@@ -3561,6 +3601,9 @@ body[data-menu-open] .whatsapp-fixed {
     background: var(--bo-material-opaco, #ffffff);
     border-color: currentColor;
     box-shadow: none;
+  }
+  .bo-material-faixa {
+    background: var(--bo-material-opaco, #ffffff);
   }
   .bo-material-desfoque {
     -webkit-backdrop-filter: none;

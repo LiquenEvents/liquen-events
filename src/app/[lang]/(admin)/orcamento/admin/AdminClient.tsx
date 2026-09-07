@@ -4912,7 +4912,7 @@ export default function AdminClient({
                valor inicial — `all` — e ficava `all 150ms ease`. Ou seja, quem
                pedia MENOS movimento recebia MAIS, e com a curva errada. Medido
                num Chromium, não deduzido. */
-            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
+            className={`bo-material-faixa bo-material-desfoque sticky top-0 z-30 border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
               desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
             }`}
           >
