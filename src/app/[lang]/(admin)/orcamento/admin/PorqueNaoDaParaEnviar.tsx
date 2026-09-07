@@ -2,6 +2,7 @@
 
 import { destinatarioDoEnvio } from "@/lib/destinatario-do-envio";
 import type { Impedimento } from "@/lib/proposal-progress";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -117,7 +118,7 @@ function PorqueTrava({
                 <button
                   type="button"
                   onClick={() => onIr(f)}
-                  className="alvo-invisivel group flex w-full items-baseline gap-1.5 text-left text-[var(--bo-tinta-72)] transition-colors hover:text-foreground"
+                  className={`alvo-invisivel group flex w-full items-baseline gap-1.5 text-left text-[var(--bo-tinta-72)] hover:text-foreground ${ESTADO} ${PRESSAO}`}
                 >
                   <span aria-hidden="true" className="text-foreground/35">
                     ·

@@ -162,7 +162,12 @@ describe("Material — com dados", () => {
     // O campo é um controlo a sério, ligado à etiqueta — e não um `<input>`
     // solto ao lado dela.
     expect((screen.getByLabelText("Nome") as HTMLInputElement).tagName).toBe("INPUT");
-    expect((screen.getByLabelText("Categoria") as HTMLSelectElement).tagName).toBe("SELECT");
+    // O campo de escolher deixou de ser um `<select>` com rato: é o `ui/Escolha`
+    // (ver o cabeçalho desse ficheiro). O que este teste guarda não muda — que o
+    // controlo existe e está LIGADO À ETIQUETA, e não solto ao lado dela —, e
+    // ganha uma exigência que o `<select>` trazia de graça e o substituto tem de
+    // dizer por escrito: o papel de `combobox`.
+    expect(screen.getByLabelText("Categoria")).toHaveAttribute("role", "combobox");
   });
 
   it("desenha as listas base", async () => {
@@ -183,7 +188,7 @@ describe("Material — com dados", () => {
       </ToastProvider>,
     );
     await waitFor(() => expect(screen.getByLabelText("Nome (para ti)")).toBeTruthy());
-    expect((screen.getByLabelText("Quando") as HTMLSelectElement).tagName).toBe("SELECT");
+    expect(screen.getByLabelText("Quando")).toHaveAttribute("role", "combobox");
   });
 });
 

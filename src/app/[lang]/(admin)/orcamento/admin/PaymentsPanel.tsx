@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import type { FormEvent } from "react";
 import { parseMoney, randomId, eur2, todayKey, isDateKey } from "./util";
-import { Button } from "./ui";
+import { Escolha, Button } from "./ui";
 import { useToast } from "./Toast";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 import { splitSinal } from "@/lib/money";
@@ -136,7 +136,10 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
 
   // O foco volta sempre ao PRIMEIRO campo depois de registar — é isso que
   // permite encadear pagamentos sem tocar no rato.
-  const firstFieldRef = useRef<HTMLSelectElement>(null);
+  // `HTMLElement` e não `HTMLSelectElement`: o primeiro campo deixou de ser um
+  // `<select>` com rato (ver `ui/Escolha`) e passou a ser um botão. Quem leva o
+  // foco aqui não precisa de saber qual dos dois é hoje.
+  const firstFieldRef = useRef<HTMLElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
   // Evita que o `blur` provocado pelo Enter grave a mesma edição duas vezes.
@@ -810,19 +813,19 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       </div>
 
       <form onSubmit={submit} aria-label="Registar pagamento" className={GRID}>
-        <select
-          ref={firstFieldRef}
+        <Escolha
+          controloRef={firstFieldRef}
           aria-label="Tipo de pagamento"
-          value={kind}
-          onChange={(e) => pickKind(e.target.value as PaymentKind)}
-          className="bo-input px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
+          valor={kind}
+          aoMudar={(v) => pickKind(v as PaymentKind)}
+          className="px-2 py-2 text-xs text-[var(--bo-tinta-72)]"
         >
           {kindOptions.map((k) => (
             <option key={k} value={k}>
               {KIND_LABEL[k]}
             </option>
           ))}
-        </select>
+        </Escolha>
         <input
           ref={amountRef}
           type="text"
@@ -1018,7 +1021,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   // dedo.
                   className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-[var(--bo-tinta-6)] ${
                     p.paid ? "text-[#4d6350]" : "text-[var(--bo-text-muted)]"
-                  }`}
+                  } ${ESTADO} ${PRESSAO}`}
                 >
                   {eur2(p.amount)}
                 </button>
@@ -1060,7 +1063,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   <button
                     type="button"
                     onClick={retryFailed}
-                    className="rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10"
+                    className={`rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10 ${ESTADO} ${PRESSAO}`}
                   >
                     Repetir
                   </button>
@@ -1115,7 +1118,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               <button
                 type="button"
                 onClick={retryFailed}
-                className="rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10"
+                className={`rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10 ${ESTADO} ${PRESSAO}`}
               >
                 Repetir
               </button>
@@ -1123,7 +1126,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 type="button"
                 onClick={() => setFailed(null)}
                 aria-label="Descartar registo não guardado"
-                className="text-foreground/45 hover:text-[#8a2a22] p-1"
+                className={`text-foreground/45 hover:text-[#8a2a22] p-1 ${ESTADO} ${PRESSAO}`}
               >
                 ×
               </button>

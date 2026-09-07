@@ -94,6 +94,27 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
       for (const sibling of Array.from(parent.children)) {
         if (sibling === actual) continue;
         if (!(sibling instanceof HTMLElement)) continue;
+        /* ── QUEM VIVE ACIMA DOS MODAIS NÃO SE INERTIZA ──────────────────────
+           Um elemento `inert` continua a ser PINTADO e deixa de existir para o
+           teste de acerto. Foi assim que a pilha de avisos passou meses a
+           ver-se por cima do painel do pedido e a não se deixar tocar: o `×`
+           estava lá, visível, e o toque atravessava-o para o painel de baixo.
+           Medido num Chromium — `elementFromPoint` no centro do botão devolvia
+           o conteúdo do painel, e um toque a sério não fechava nada.
+
+           E não era contexto de empilhamento, que foi o primeiro palpite: da
+           pilha até à raiz não há um único `transform`, `filter`, `isolation`,
+           `opacity` menor que 1 nem `contain`. A pintura sempre esteve certa.
+
+           A armadilha sobe do diálogo até ao `<body>` e marca, em cada nível,
+           os irmãos por onde não subiu. A pilha de avisos é irmã da aplicação
+           dentro do `<main>`, e por isso caía sempre — inclusive num portal
+           para o `<body>`, que foi medido e não resolvia nada.
+
+           Quem se declara acima dos modais fica de fora. É uma declaração de
+           quem lá vive, e não uma lista mantida aqui: um sítio novo acima dos
+           modais passa a atributo, não a alteração deste ficheiro. */
+        if (sibling.hasAttribute("data-acima-dos-modais")) continue;
         siblings.push({
           el: sibling,
           ariaHidden: sibling.getAttribute("aria-hidden"),

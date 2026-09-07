@@ -10,6 +10,7 @@ import {
   type Verificacao,
 } from "@/lib/orcamento/conferencia";
 import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * A PASSAGEM DE OLHOS ANTES DE ENVIAR.
@@ -151,7 +152,7 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto, idiom
                   <button
                     type="button"
                     onClick={() => onIr?.(v)}
-                    className="alvo-toque text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+                    className={`alvo-toque text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60 ${ESTADO} ${PRESSAO}`}
                   >
                     {frase}
                   </button>

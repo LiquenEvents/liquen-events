@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -111,7 +112,7 @@ export default function MedidorDeTransbordo() {
       <button
         type="button"
         onClick={() => setResultado(medir())}
-        className="min-h-[44px] w-full rounded-lg bg-[#5F7C66] px-3 font-semibold text-white"
+        className={`min-h-[44px] w-full rounded-lg bg-[#5F7C66] px-3 font-semibold text-white ${ESTADO} ${PRESSAO}`}
       >
         Medir o que está a passar da margem
       </button>

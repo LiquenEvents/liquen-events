@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Escolha,
   Field,
   MenuDeAccoes,
   PerguntaDestrutiva,
@@ -198,6 +199,31 @@ function ConditionChip({ condition }: { condition: Condition }) {
  * empilha), e a medida entra por `className`. O rótulo, o tipo e o que cada
  * campo escreve ficam aqui, num sítio, onde não podem divergir.
  */
+/**
+ * ── A LARGURA VAI PARA A CAIXA, O RESTO PARA O CONTROLO ─────────────────────
+ *
+ * Estes campos recebem de quem os chama uma cadeia que MISTURA as duas coisas
+ * («w-full px-2.5 py-1.5», «flex-1 px-2.5 py-2»). Enquanto foram `<select>` isso
+ * não fazia diferença — era tudo o mesmo elemento. Agora o campo de escolher é
+ * um controlo dentro de uma caixa, e a seta é desenhada por cima da CAIXA: se a
+ * largura ficasse só no controlo, um `w-20` numa célula de tabela deixava a seta
+ * a flutuar à direita, longe do campo a que pertence.
+ *
+ * Separar é uma regra de duas linhas e não vale um componente novo; o que vale
+ * é estar escrito porquê.
+ */
+const LARGURA = /^(w-|min-w-|max-w-|flex-1$|flex-\[|basis-|sm:w-|lg:w-)/;
+const larguraDe = (c?: string) =>
+  (c ?? "")
+    .split(/\s+/)
+    .filter((x) => LARGURA.test(x))
+    .join(" ");
+const restoDe = (c?: string) =>
+  (c ?? "")
+    .split(/\s+/)
+    .filter((x) => x && !LARGURA.test(x))
+    .join(" ");
+
 interface CampoDeEdicao {
   f: FormState;
   set: (f: FormState) => void;
@@ -218,18 +244,22 @@ function CampoNome({ f, set, className }: CampoDeEdicao) {
 
 function CampoCategoria({ f, set, className }: CampoDeEdicao) {
   return (
-    <select
-      value={f.category}
-      onChange={(e) => set({ ...f, category: e.target.value })}
+    <Escolha
+      valor={f.category}
+      aoMudar={(v) => set({ ...f, category: v })}
       aria-label="Categoria"
-      className={cn("bo-input text-sm text-[var(--bo-tinta-72)]", className)}
+      /* A largura vai na CAIXA e o resto no controlo: a seta é desenhada por
+         cima da caixa, e um controlo mais estreito do que ela deixava-a a
+         flutuar ao lado do campo. Ver `containerClassName` no `Escolha`. */
+      containerClassName={larguraDe(className)}
+      className={cn("text-sm text-[var(--bo-tinta-72)]", restoDe(className))}
     >
       {PROP_CATEGORIES.map((c) => (
         <option key={c} value={c}>
           {c}
         </option>
       ))}
-    </select>
+    </Escolha>
   );
 }
 
@@ -248,18 +278,19 @@ function CampoQuantidade({ f, set, className }: CampoDeEdicao) {
 
 function CampoEstado({ f, set, className }: CampoDeEdicao) {
   return (
-    <select
-      value={f.condition}
-      onChange={(e) => set({ ...f, condition: e.target.value as Condition })}
+    <Escolha
+      valor={f.condition}
+      aoMudar={(v) => set({ ...f, condition: v as Condition })}
       aria-label="Estado"
-      className={cn("bo-input text-sm text-[var(--bo-tinta-72)]", className)}
+      containerClassName={larguraDe(className)}
+      className={cn("text-sm text-[var(--bo-tinta-72)]", restoDe(className))}
     >
       {CONDITIONS.map((c) => (
         <option key={c} value={c}>
           {CONDITION_LABEL[c]}
         </option>
       ))}
-    </select>
+    </Escolha>
   );
 }
 
@@ -598,11 +629,12 @@ export default function Inventario() {
                 className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
               />
             </div>
-            <select
-              value={cond}
-              onChange={(e) => setCond(e.target.value as "Todos" | Condition)}
+            <Escolha
+              valor={cond}
+              aoMudar={(v) => setCond(v as "Todos" | Condition)}
               aria-label="Filtrar por estado"
-              className="bo-input px-3 py-2.5 text-sm text-[var(--bo-tinta-72)] sm:w-44"
+              containerClassName="sm:w-44"
+              className="px-3 py-2.5 text-sm text-[var(--bo-tinta-72)]"
             >
               <option value="Todos">Todos os estados</option>
               {CONDITIONS.map((c) => (
@@ -610,7 +642,7 @@ export default function Inventario() {
                   {CONDITION_LABEL[c]}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </>
         }
         end={

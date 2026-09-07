@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { escolher, valorVisivel } from "../../../../../../test/escolher";
 import { ToastProvider } from "./Toast";
 import GuestList from "./GuestList";
 import type { Guest, Quote } from "@/lib/orcamento/types";
@@ -55,8 +56,15 @@ function montar(guestList: Guest[], onChange: (g: Guest[]) => void = () => {}) {
   );
 }
 
-const rsvpDe = (nome: string) =>
-  screen.getByLabelText(`Estado do RSVP de ${nome}`) as HTMLSelectElement;
+/**
+ * O campo do RSVP deixou de ser um `<select>` — é o `ui/Escolha`, um
+ * `role="combobox"` com uma lista nossa (ver o cabeçalho desse ficheiro). Por
+ * isso já não há `.value` nem `selectOptions`: o que se lê é o RÓTULO que o
+ * botão mostra, e o que se faz é abrir e carregar na opção. A tradução vive em
+ * `test/escolher.ts`, num sítio só.
+ */
+const rsvpDe = (nome: string) => screen.getByLabelText(`Estado do RSVP de ${nome}`);
+const rsvpVisivel = (nome: string) => valorVisivel(rsvpDe(nome));
 
 afterEach(() => {
   cleanup();
@@ -82,22 +90,22 @@ describe("Lista de convidados — duas gravações ao mesmo tempo", () => {
     const user = userEvent.setup();
     montar([A, B], (g) => vistoPeloPai.push(g));
 
-    await user.selectOptions(rsvpDe("Família Andrade"), "confirmado");
-    await user.selectOptions(rsvpDe("Família Bento"), "recusado");
-    await waitFor(() => expect(rsvpDe("Família Bento").value).toBe("recusado"));
+    await escolher(user, rsvpDe("Família Andrade"), "Confirmado");
+    await escolher(user, rsvpDe("Família Bento"), "Recusado");
+    await waitFor(() => expect(rsvpVisivel("Família Bento")).toBe("Recusado"));
 
     // Só agora o servidor recusa o primeiro pedido — que já foi substituído.
     recusarPrimeiro!();
     await new Promise((r) => setTimeout(r, 0));
 
     expect(
-      rsvpDe("Família Bento").value,
+      rsvpVisivel("Família Bento"),
       "a recusa que o servidor aceitou desapareceu do ecrã",
-    ).toBe("recusado");
+    ).toBe("Recusado");
     expect(
-      rsvpDe("Família Andrade").value,
+      rsvpVisivel("Família Andrade"),
       "a confirmação que seguiu no segundo PATCH (aceite) foi desfeita",
-    ).toBe("confirmado");
+    ).toBe("Confirmado");
     // E o pai — que é quem alimenta as métricas e o que se grava a seguir — não
     // pode ficar com a lista de antes das duas.
     expect(vistoPeloPai.at(-1)).toEqual([
@@ -115,9 +123,9 @@ describe("Lista de convidados — duas gravações ao mesmo tempo", () => {
     const user = userEvent.setup();
     montar([A, B]);
 
-    await user.selectOptions(rsvpDe("Família Andrade"), "confirmado");
+    await escolher(user, rsvpDe("Família Andrade"), "Confirmado");
 
-    await waitFor(() => expect(rsvpDe("Família Andrade").value).toBe("pendente"));
+    await waitFor(() => expect(rsvpVisivel("Família Andrade")).toBe("Pendente"));
     // E o aviso diz QUE família ficou por gravar, e que o servidor é que está
     // em baixo — não «Não foi possível guardar a lista de convidados», que era
     // a mesma frase para a rede, para a sessão expirada e para isto.

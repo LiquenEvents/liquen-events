@@ -3,6 +3,7 @@
 import type { Quote, ActivityEntry } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { ActivityLog } from "../../lazy";
+import { ESTADO, PRESSAO } from "../../ui/movimento";
 
 /**
  * Coluna lateral do Dossier — Contacto (só leitura) + factos do Evento,
@@ -65,7 +66,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
         <div className="flex flex-col gap-2">
           <a
             href={`mailto:${quote.email}`}
-            className="alvo-toque !justify-start text-[#4d6350] text-xs hover:underline"
+            className={`alvo-toque !justify-start text-[#4d6350] text-xs hover:underline ${ESTADO} ${PRESSAO}`}
           >
             {/* O `truncate` mudou-se para cá: num `inline-flex` (que é o que o
                 `alvo-toque` faz do link) o corte com reticências não pega no
@@ -77,7 +78,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <a
                 href={`tel:${quote.phone}`}
-                className="alvo-toque !justify-start text-[var(--bo-text-muted)] text-xs hover:text-[var(--bo-tinta-72)]"
+                className={`alvo-toque !justify-start text-[var(--bo-text-muted)] text-xs hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
               >
                 {quote.phone}
               </a>
@@ -85,7 +86,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
                 href={`https://wa.me/${wa}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="alvo-toque !justify-start inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 transition-opacity"
+                className={`alvo-toque !justify-start inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 ${ESTADO} ${PRESSAO}`}
                 title="Abrir conversa no WhatsApp"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

@@ -15,6 +15,7 @@ import { eventTagLabel } from "@/lib/orcamento/data";
 import { downloadEventIcs, printEventDossier, printRunSheet } from "../../export";
 import { Button } from "../../ui";
 import { useDesceu } from "../../ui/adaptativo";
+import { ESTADO, PRESSAO } from "../../ui/movimento";
 
 /** Ghost-style toolbar control shared by the header's link + button actions.
  *
@@ -24,8 +25,11 @@ import { useDesceu } from "../../ui/adaptativo";
  * 44×44 onde se toca com o dedo, sem mexer no desenho. */
 const TOOL_LINK =
   "alvo-toque inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-[var(--bo-text-muted)] " +
-  "hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] motion-safe:transition-colors " +
-  "motion-safe:duration-150";
+  // Sem lista nem duração próprias: o único sítio que usa isto junta-lhe o
+  // `ESTADO`, e duas `transition-property` no mesmo elemento é uma corrida que
+  // a ordem do CSS gerado decide — não a ordem do atributo. Os `150 ms` que
+  // aqui estavam eram, mais uma vez, o valor de omissão do Tailwind à mão.
+  "hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]";
 
 /**
  * Copia texto para a área de transferência com degradação graciosa. O caminho
@@ -223,7 +227,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 letra nem na cor. */}
               <Link
                 href={`/${lang}/orcamento/admin`}
-                className={`alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] motion-safe:transition-colors ${
+                className={`alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] ${ESTADO} ${PRESSAO} ${
                   desceu ? "shrink-0" : "mb-3"
                 }`}
               >
@@ -332,7 +336,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 href={portalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={TOOL_LINK}
+                className={`${TOOL_LINK} ${ESTADO} ${PRESSAO}`}
                 title="Abrir o portal do cliente num separador novo"
               >
                 <svg
@@ -474,7 +478,19 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   href={portalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
+                  /* ── O AFUNDAR ESTAVA ESCRITO E NÃO ACONTECIA ──────────────
+                     Tinha `motion-safe:active:scale-[0.98]` — e a lista ao lado
+                     era `transition-colors`, que no Tailwind v4 sai como
+                     `color, background-color, border-color, outline-color,
+                     text-decoration-color, fill, stroke`. `scale` não está lá.
+                     O botão encolhia na mesma, mas a CORTE SECO, 0 ms — e os
+                     `duration-150` do lado (o valor de omissão do Tailwind
+                     copiado à mão, que ninguém escolheu) não lhe tocavam. É a
+                     mesma avaria que o `ui/movimento.ts` conta ter apanhado no
+                     `Button`, viva neste ficheiro.
+                     O `ESTADO` traz a lista certa (com `scale`) e o degrau da
+                     casa; o `PRESSAO` traz os 20 ms do toque. */
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                   <svg
@@ -493,7 +509,19 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 <button
                   type="button"
                   onClick={() => onScrollTo(zone)}
-                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
+                  /* ── O AFUNDAR ESTAVA ESCRITO E NÃO ACONTECIA ──────────────
+                     Tinha `motion-safe:active:scale-[0.98]` — e a lista ao lado
+                     era `transition-colors`, que no Tailwind v4 sai como
+                     `color, background-color, border-color, outline-color,
+                     text-decoration-color, fill, stroke`. `scale` não está lá.
+                     O botão encolhia na mesma, mas a CORTE SECO, 0 ms — e os
+                     `duration-150` do lado (o valor de omissão do Tailwind
+                     copiado à mão, que ninguém escolheu) não lhe tocavam. É a
+                     mesma avaria que o `ui/movimento.ts` conta ter apanhado no
+                     `Button`, viva neste ficheiro.
+                     O `ESTADO` traz a lista certa (com `scale`) e o degrau da
+                     casa; o `PRESSAO` traz os 20 ms do toque. */
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                   <svg
@@ -514,7 +542,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   type="button"
                   disabled
                   title="Disponível na fase de ações rápidas"
-                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed"
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                 </button>
@@ -554,11 +582,11 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                       btns?.[(i + dir + arr.length) % arr.length]?.focus();
                     }}
                     data-step
-                    className="group flex flex-col items-center gap-1 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/40 rounded-lg"
+                    className={`group flex flex-col items-center gap-1 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/40 rounded-lg ${ESTADO} ${PRESSAO}`}
                     title={when ? `${STAGE_LABELS[s]} · ${when}` : STAGE_LABELS[s]}
                   >
                     <span
-                      className={`w-2.5 h-2.5 rounded-full border transition-colors ${
+                      className={`w-2.5 h-2.5 rounded-full border ${ESTADO} ${
                         current
                           ? "bg-[#4d6350] border-[#4d6350] ring-4 ring-[#4d6350]/15"
                           : reached
@@ -567,7 +595,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                       }`}
                     />
                     <span
-                      className={`text-[9px] tracking-[0.08em] uppercase whitespace-nowrap transition-colors ${
+                      className={`text-[9px] tracking-[0.08em] uppercase whitespace-nowrap ${ESTADO} ${
                         current
                           ? "text-[var(--bo-text)] font-semibold"
                           : reached

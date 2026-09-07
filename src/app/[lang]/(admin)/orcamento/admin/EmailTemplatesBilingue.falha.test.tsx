@@ -156,7 +156,26 @@ describe("os pedidos da pré-visualização deixaram de falhar em silêncio", ()
     montar();
 
     await screen.findByLabelText(/assunto/i);
-    await waitFor(() => expect(screen.getByRole("option", { name: /Marta e João/ })).toBeTruthy());
+
+    /* ── E A OPÇÃO SÓ EXISTE COM A LISTA ABERTA ─────────────────────────────
+       O campo dos pedidos deixou de ser um `<select>`: é o `ui/Escolha`, e num
+       `role="listbox"` nosso as opções só estão no DOM enquanto a lista está
+       aberta — ao contrário de um `<select>`, que as tem sempre lá dentro.
+
+       Este teste procurava a opção com a lista FECHADA e passava a metade das
+       vezes. A razão da intermitência vale a pena ficar escrita: no primeiro
+       desenho (servidor e primeiro fotograma do browser) o `Escolha` é mesmo um
+       `<select>` nativo — é assim que ele funciona sem JavaScript —, e só troca
+       para a lista nossa depois de montado. O teste apanhava ora um ora outro.
+
+       Agora abre-se, que é o gesto que a pessoa faz — depois de esperar pela
+       troca, senão o clique cai no `<select>` do primeiro fotograma, que em
+       jsdom não abre lista nenhuma. É por isso que se espera pelo
+       `aria-expanded`: é ele que só existe do lado de cá. */
+    const campo = () => screen.getByRole("combobox", { name: /Pedido a usar/i });
+    await waitFor(() => expect(campo()).toHaveAttribute("aria-expanded"));
+    await userEvent.click(campo());
+    expect(await screen.findByRole("option", { name: /Marta e João/ })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

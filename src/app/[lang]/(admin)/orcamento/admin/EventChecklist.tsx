@@ -508,7 +508,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                   role="checkbox"
                   aria-checked={i.done}
                   aria-label={i.label}
-                  className="alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55"
+                  className={`alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${ESTADO} ${PRESSAO}`}
                 >
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-md border ${ESTADO} ${
@@ -565,7 +565,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                     // corrido, alinhado à esquerda.
                     className={`alvo-toque !justify-start flex-1 rounded-md text-left text-sm leading-snug decoration-dotted underline-offset-2 hover:underline ${
                       i.done ? "text-foreground/35 line-through" : "text-[var(--bo-tinta-72)]"
-                    }`}
+                    } ${ESTADO} ${PRESSAO}`}
                   >
                     {i.label}
                   </button>

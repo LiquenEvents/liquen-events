@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui";
 import { useToast } from "./Toast";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ESCOLHER DA BIBLIOTECA EM VEZ DE ESCREVER OUTRA VEZ.
@@ -136,7 +137,7 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
                       onEscolher(s);
                       toast(`"${s.nome}" acrescentado`, "success");
                     }}
-                    className="alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)]"
+                    className={`alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
                   >
                     <span className="block text-xs font-medium text-[var(--bo-text)]">
                       {s.nome}

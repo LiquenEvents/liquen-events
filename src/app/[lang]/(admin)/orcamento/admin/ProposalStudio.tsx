@@ -210,6 +210,7 @@ import {
   precoDoPedidoParaBase,
   type ContextoDoPreco,
 } from "@/lib/preco-do-pedido";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -324,9 +325,9 @@ function esperaDaCopiaDeFotos(fotos: number): number {
 
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-[var(--bo-text)]";
 const ADD_BTN =
-  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors inline-flex items-center";
+  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] inline-flex items-center";
 const REMOVE_BTN =
-  "alvo-toque text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
+  "alvo-toque text-foreground/30 hover:text-[#8a2a22] text-base leading-none shrink-0";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -7196,14 +7197,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <div className="mt-2.5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className="alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                className={`alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                 onClick={() => void reporOsValoresEnviados()}
               >
                 Repor os valores que seguiram
               </button>
               <button
                 type="button"
-                className="alvo-toque text-xs text-[var(--bo-text-muted)] underline-offset-2 hover:underline"
+                className={`alvo-toque text-xs text-[var(--bo-text-muted)] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                 onClick={manterOsValoresDesteAparelho}
               >
                 Manter os deste aparelho
@@ -7224,7 +7225,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </span>
           <button
             type="button"
-            className="alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            className={`alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={anularLimpeza}
           >
             Anular
@@ -7487,11 +7488,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 type="button"
                 onClick={() => setBilingue((v) => !v)}
                 aria-pressed={bilingue}
-                className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium  ${
                   bilingue
                     ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
                     : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
-                }`}
+                } ${ESTADO} ${PRESSAO}`}
                 title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
               >
                 <span aria-hidden="true">{bilingue ? "✓" : "+"}</span>
@@ -7553,7 +7554,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     type="button"
                     disabled={!traducaoLigada}
                     onClick={() => void traduzirTudo()}
-                    className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className={`alvo-toque inline-flex items-center gap-2 rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--bo-tinta-72)] hover:border-foreground/30 hover:text-[var(--bo-text)] disabled:cursor-not-allowed disabled:opacity-40 ${ESTADO} ${PRESSAO}`}
                   >
                     <span aria-hidden="true">⇄</span>
                     Traduzir para inglês
@@ -7712,7 +7713,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         setRefEdited(false);
                         setDoc((d) => ({ ...d, ref: buildRef(d) }));
                       }}
-                      className={ADD_BTN}
+                      className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
                     >
                       ↺ Automática
                     </button>
@@ -7863,7 +7864,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           />
                           <button
                             type="button"
-                            className={`${ADD_BTN} mt-1.5`}
+                            className={`${ADD_BTN} mt-1.5 ${ESTADO} ${PRESSAO}`}
                             onClick={() => setPicker({ kind: "cover", idx })}
                             // Ao passar o rato já se vai buscar o que o diálogo
                             // precisa. Quando ela carrega, está lá. `focus` para
@@ -8118,7 +8119,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       type="button"
                                       {...pega}
                                       aria-label={`Arrastar o mood board ${pos + 1}`}
-                                      className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:cursor-grabbing"
+                                      className={`alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:cursor-grabbing ${ESTADO} ${PRESSAO}`}
                                     >
                                       <span aria-hidden="true">⠿</span>
                                     </button>
@@ -8136,7 +8137,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           ? `Abrir o mood board ${pos + 1}`
                                           : `Fechar o mood board ${pos + 1}`
                                       }
-                                      className="alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                      className={`alvo-toque flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <span aria-hidden="true">{dobrado ? "▸" : "▾"}</span>
                                     </button>
@@ -8216,11 +8217,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           ? `Reabrir o mood board ${pos + 1} a alterações`
                                           : `Marcar o mood board ${pos + 1} como terminado`
                                       }
-                                      className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs transition-colors ${
+                                      className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs  ${
                                         fechado
                                           ? "bg-[#4d6350]/15 text-[#4d6350]"
                                           : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
-                                      }`}
+                                      } ${ESTADO} ${PRESSAO}`}
                                     >
                                       <span aria-hidden="true">{fechado ? "🔒" : "🔓"}</span>
                                     </button>
@@ -8239,7 +8240,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         aria-label={`Arrumar por cor as fotografias do mood board ${pos + 1}`}
                                         title="Arrumar as fotografias por cor"
                                         disabled={fechado}
-                                        className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:opacity-40"
+                                        className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] disabled:opacity-40 ${ESTADO} ${PRESSAO}`}
                                       >
                                         <span aria-hidden="true">◑</span>
                                       </button>
@@ -8248,13 +8249,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       type="button"
                                       onClick={() => duplicarBoard(bi)}
                                       aria-label={`Duplicar o mood board ${pos + 1}`}
-                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                                      className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <span aria-hidden="true">⧉</span>
                                     </button>
                                     <button
                                       type="button"
-                                      className={REMOVE_BTN}
+                                      className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
                                       onClick={() => removeBoard(bi)}
                                       aria-label="Remover mood board"
                                       disabled={fechado}
@@ -8817,7 +8818,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       <div className="mt-2 flex flex-wrap items-center gap-4">
                                         <button
                                           type="button"
-                                          className={ADD_BTN}
+                                          className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
                                           onClick={() => setPicker({ kind: "board", bi })}
                                           disabled={fechado}
                                           onPointerEnter={aquecerBiblioteca}
@@ -8855,7 +8856,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       </ListaDeBoards>
                     </ArrastoDosMoodBoards>
                     <div className="mt-3 flex flex-wrap items-center gap-4">
-                      <button type="button" className={ADD_BTN} onClick={addBoard}>
+                      <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBoard}>
                         + Adicionar mood board
                       </button>
                       {/* Fechar tudo é o gesto de quem acabou uma proposta e quer ver
@@ -8866,14 +8867,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <>
                           <button
                             type="button"
-                            className={ADD_BTN}
+                            className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
                             onClick={() => dobrarTodos(true)}
                           >
                             Fechar todos
                           </button>
                           <button
                             type="button"
-                            className={ADD_BTN}
+                            className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
                             onClick={() => dobrarTodos(false)}
                           >
                             Abrir todos
@@ -8920,7 +8921,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       {doc.moodBoards.length > 1 && (
                         <button
                           type="button"
-                          className={ADD_BTN}
+                          className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
                           onClick={() => {
                             const enq = doc.enquadramentoPorOmissao;
                             patch({
@@ -9016,7 +9017,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         />
                         <button
                           type="button"
-                          className={REMOVE_BTN}
+                          className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
                           onClick={() => removePhase(pi)}
                           aria-label="Remover fase"
                         >
@@ -9039,7 +9040,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             />
                             <button
                               type="button"
-                              className={REMOVE_BTN}
+                              className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
                               onClick={() => removePhaseItem(pi, ii)}
                               aria-label="Remover tarefa"
                             >
@@ -9047,14 +9048,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             </button>
                           </div>
                         ))}
-                        <button type="button" className={ADD_BTN} onClick={() => addPhaseItem(pi)}>
+                        <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={() => addPhaseItem(pi)}>
                           + Adicionar tarefa
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button type="button" className={`${ADD_BTN} mt-3`} onClick={addPhase}>
+                <button type="button" className={`${ADD_BTN} mt-3 ${ESTADO} ${PRESSAO}`} onClick={addPhase}>
                   + Adicionar fase
                 </button>
               </Section>
@@ -9333,7 +9334,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           )}
                           <button
                             type="button"
-                            className={REMOVE_BTN}
+                            className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
                             onClick={() => removeBudgetItem(i)}
                             aria-label="Remover item"
                           >
@@ -9381,7 +9382,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       );
                     })}
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
+                      <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBudgetItem}>
                         + Adicionar item
                       </button>
                       {/* O CONTADOR, no lugar onde estava «Soma das linhas».
@@ -9708,7 +9709,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             </select>
                             <button
                               type="button"
-                              className={REMOVE_BTN}
+                              className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
                               onClick={() => removeBudgetExtra(i)}
                               aria-label="Remover linha adicional"
                             >
@@ -9726,7 +9727,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           </div>
                         );
                       })}
-                      <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
+                      <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBudgetExtra}>
                         + Adicionar valor adicional
                       </button>
                       {/* O «Somado ao total: X» que aqui estava saiu para o bloco
@@ -9787,7 +9788,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         />
                         <button
                           type="button"
-                          className={REMOVE_BTN}
+                          className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
                           onClick={() => removeBudgetRow(i)}
                           aria-label="Remover linha"
                         >
@@ -9795,7 +9796,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         </button>
                       </div>
                     ))}
-                    <button type="button" className={ADD_BTN} onClick={addBudgetRow}>
+                    <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBudgetRow}>
                       + Adicionar linha
                     </button>
                   </div>
@@ -10031,7 +10032,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                      */}
                     <button
                       type="button"
-                      className="alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                      className={`alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                       onClick={() =>
                         pedirConfirmacaoDeDinheiro({
                           oQue: "o total",
@@ -10151,7 +10152,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          a apanhá-lo e não a máquina de quem escreveu — só
                          aparece quando a proposta tem uma validade diferente da
                          preferida, e os dados locais não a tinham. */
-                        className="alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline"
+                        className={`alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                         onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
                       >
                         Passar a usar {doc.validUntilDays} dias em todas as propostas novas
@@ -10878,7 +10879,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   {precoPorChegar.valeTentarDeNovo && (
                     <button
                       type="button"
-                      className="alvo-toque foco-largo underline underline-offset-2 disabled:opacity-60"
+                      className={`alvo-toque foco-largo underline underline-offset-2 disabled:opacity-60 ${ESTADO} ${PRESSAO}`}
                       disabled={precoAGravar}
                       onClick={() => void tentarGravarOPreco(precoPorChegar.base)}
                     >
@@ -11245,7 +11246,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <button
                         type="button"
                         onClick={() => irParaCampo(primeiro.campo, "en")}
-                        className="font-medium underline underline-offset-2"
+                        className={`font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                       >
                         Ver quais
                       </button>
@@ -11670,7 +11671,7 @@ function BarraDaSeleccao({
       <button
         type="button"
         onClick={onLimpar}
-        className="alvo-toque text-xs font-medium text-[var(--bo-text-muted)] transition-colors hover:text-[var(--bo-text)]"
+        className={`alvo-toque text-xs font-medium text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
       >
         Limpar
       </button>
@@ -11869,7 +11870,7 @@ function AccoesDaFoto({
      falhasse, sete ícones de 24 px se tornassem sete quadrados de 44 — que é a
      coluna de 328 px medida em cima. */
   const botao =
-    "flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white transition-colors hover:bg-black/75 disabled:opacity-30";
+    "flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white hover:bg-black/75 disabled:opacity-30";
 
   /* A MESMA lista para os dois caminhos. Duas listas seriam duas versões da
      verdade — a acção acrescentada num sítio e esquecida no outro é a forma
@@ -11943,7 +11944,7 @@ function AccoesDaFoto({
         onClick={() => setFolhaAberta(true)}
         aria-label={`Acções de ${nome}`}
         aria-haspopup="dialog"
-        className="alvo-toque pointer-events-auto absolute right-0.5 bottom-0.5 z-20 flex h-11 w-11 items-center justify-center rounded-lg bg-black/60 text-white transition-colors com-rato:hidden"
+        className={`alvo-toque pointer-events-auto absolute right-0.5 bottom-0.5 z-20 flex h-11 w-11 items-center justify-center rounded-lg bg-black/60 text-white com-rato:hidden ${ESTADO} ${PRESSAO}`}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <circle cx="5" cy="12" r="1.8" />
@@ -11974,11 +11975,11 @@ function AccoesDaFoto({
                   setFolhaAberta(false);
                   a.onAccao();
                 }}
-                className={`alvo-toque !justify-start flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors disabled:opacity-30 ${
+                className={`alvo-toque !justify-start flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm  disabled:opacity-30 ${
                   a.destrutiva
                     ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07]"
                     : "text-[var(--bo-text)] hover:bg-[var(--bo-tinta-6)]"
-                } ${primeiraDestrutiva ? "mt-1 border-t border-[var(--bo-hairline)] pt-3" : ""}`}
+                } ${primeiraDestrutiva ? "mt-1 border-t border-[var(--bo-hairline)] pt-3" : ""} ${ESTADO} ${PRESSAO}`}
               >
                 <span
                   aria-hidden="true"
@@ -12013,11 +12014,11 @@ function AccoesDaFoto({
 
           `hidden com-rato:flex`: não existe até haver rato — nem desenhada nem
           a apanhar toques. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex">
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 ${ESTADO} group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex`}>
         <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
           <button
             type="button"
-            className={botao}
+            className={`${botao} ${ESTADO} ${PRESSAO}`}
             onClick={onRecuar}
             disabled={!podeRecuar}
             aria-label="Mover para trás"
@@ -12026,7 +12027,7 @@ function AccoesDaFoto({
           </button>
           <button
             type="button"
-            className={botao}
+            className={`${botao} ${ESTADO} ${PRESSAO}`}
             onClick={onAvancar}
             disabled={!podeAvancar}
             aria-label="Mover para a frente"
@@ -12041,7 +12042,7 @@ function AccoesDaFoto({
               «⋯» verde ler-se-ia como se o próprio botão estivesse ligado. */}
           <button
             type="button"
-            className={botao}
+            className={`${botao} ${ESTADO} ${PRESSAO}`}
             onClick={() => setFolhaAberta(true)}
             aria-haspopup="dialog"
             aria-label={`Mais acções de ${nome}`}
@@ -12079,7 +12080,7 @@ function AvisoDeOrdem({
       <button
         type="button"
         onClick={onFixar}
-        className="alvo-toque shrink-0 rounded-lg border border-[var(--bo-hairline-strong)] px-2.5 py-1 text-[11px] font-medium text-[var(--bo-tinta-72)] transition-colors hover:border-foreground/30 hover:text-[var(--bo-text)]"
+        className={`alvo-toque shrink-0 rounded-lg border border-[var(--bo-hairline-strong)] px-2.5 py-1 text-[11px] font-medium text-[var(--bo-tinta-72)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
       >
         Arrumar eu
       </button>
@@ -12145,7 +12146,7 @@ function DobraDaDisposicao({
          board ao abrir a do seguinte, e o que se quer é poder comparar duas
          páginas lado a lado. */
     >
-      <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden">
+      <summary className={`marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}>
         {/* A MESMA seta, e o mesmo tempo, do cabeçalho das secções e das duas
             setas irmãs da casa (`Overview.tsx`, `Tarefas.tsx:810`): 200 ms na
             `cubic-bezier(0, 0, 0.2, 1)`. Estava sem duração, ou seja nos 150 ms
@@ -12308,7 +12309,7 @@ function Section({
                a seta e o título continuarem alinhados pela base.
                `shrink-0`: ver o comentário acima do invólucro — o título nunca
                é quem cede espaço a um `nota` comprido. */
-            className="alvo-toque group -my-1 flex shrink-0 items-baseline gap-2 py-2 text-left"
+            className={`alvo-toque group -my-1 flex shrink-0 items-baseline gap-2 py-2 text-left ${ESTADO} ${PRESSAO}`}
           >
             {/* ── A SETA DEMORA O QUE AS IRMÃS DEMORAM ────────────────────
                 Tinha `motion-safe:transition-transform` e mais nada — sem
@@ -12409,11 +12410,11 @@ function StepNav({
               type="button"
               onClick={() => onSelect(s.id)}
               aria-current={active ? "step" : undefined}
-              className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium motion-safe:transition-colors inline-flex items-center ${
+              className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium  inline-flex items-center ${
                 active
                   ? "bg-[#4d6350] text-white"
                   : "text-foreground/50 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
-              }`}
+              } ${ESTADO} ${PRESSAO}`}
             >
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
@@ -13161,11 +13162,11 @@ function SelectorDeLayout({
               aria-checked={activo}
               tabIndex={i === (escolhido === -1 ? 0 : escolhido) ? 0 : -1}
               onClick={() => onEscolher(op)}
-              className={`w-[5.75rem] rounded-lg border p-1.5 text-left motion-safe:transition-colors ${
+              className={`w-[5.75rem] rounded-lg border p-1.5 text-left  ${
                 activo
                   ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] "
                   : "border-[var(--bo-hairline-strong)] bg-white hover:border-[#4d6350]/40"
-              }`}
+              } ${ESTADO} ${PRESSAO}`}
             >
               <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-white">
                 <DiagramaDeLayout
@@ -13707,7 +13708,7 @@ function Thumb({
                   href={ultimoAlvo}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 underline underline-offset-2 text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
+                  className={`mt-1 underline underline-offset-2 text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                 >
                   Abrir ficheiro
                 </a>
@@ -13751,7 +13752,7 @@ function Thumb({
                     aoTentarDeNovo?.();
                     tentarDeNovo();
                   }}
-                  className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)]"
+                  className={`rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
                 >
                   Tentar novamente
                 </button>
@@ -13760,7 +13761,7 @@ function Thumb({
                     href={ultimoAlvo}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline underline-offset-2 text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
+                    className={`underline underline-offset-2 text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                   >
                     Abrir ficheiro
                   </a>
@@ -13806,7 +13807,7 @@ function Thumb({
                   type="button"
                   onClick={aoTentarDeNovo}
                   aria-label="Ir buscar outra vez as fotografias desta proposta"
-                  className="mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)]"
+                  className={`mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
                 >
                   Tentar
                 </button>
@@ -13859,7 +13860,7 @@ function Thumb({
            * APAGA, um alvo grande de mais é tão mau como um pequeno de mais.
            * 32 px no dedo é o meio-termo, e é o que cabe.
            */
-          className="absolute top-1 right-1 flex h-5 w-5 pointer-coarse:h-8 pointer-coarse:w-8 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-opacity"
+          className={`absolute top-1 right-1 flex h-5 w-5 pointer-coarse:h-8 pointer-coarse:w-8 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
         >
           ×
         </button>
@@ -13966,7 +13967,7 @@ function UploadArea({
       // por cima: duas utilidades da mesma propriedade decidem-se pela ordem na
       // folha de estilo e não pela ordem na string, e um `flex-col` de base
       // ganharia ao `flex-row` da faixa sem nada o denunciar.
-      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${caixa} ${
+      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${caixa} ${
         faixa
           ? "flex-row gap-2 p-2"
           : curto
@@ -13978,7 +13979,7 @@ function UploadArea({
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
           : "border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] hover:border-[#4d6350]/45"
-      }`}
+      } ${ESTADO} ${PRESSAO}`}
     >
       <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">{label}</span>
       {!compact && <span className="text-[9px] text-foreground/25">arraste ou clique</span>}

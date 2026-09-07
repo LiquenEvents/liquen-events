@@ -132,10 +132,26 @@ export default function BotaoGuardarTudo() {
            juntas. `border-radius` é pintura, não disposição — não remede nada
            à volta, e é a excepção pontual que a lista fechada admite quando o
            que muda é mesmo a forma. */
-        className={`motion-safe:transition-[border-radius] motion-safe:duration-[120ms] ${
+        /* ── UMA LISTA SÓ, E NÃO DUAS A DISPUTAR ─────────────────────────
+           Este elemento tinha `transition-[border-radius]` aqui e o `ESTADO`
+           (que traz a SUA lista) lá dentro, nos dois ramos. São duas
+           declarações de `transition-property` no mesmo elemento, e quem ganha
+           não é a ordem em que estão escritas no atributo — é a ordem em que o
+           Tailwind as emite no CSS. Ou seja: ou o canto animava e as cores não,
+           ou o contrário, conforme a ordenação dos utilitários. Não se pode
+           saber a ler.
+
+           A lista passa a ser uma, escrita por extenso: é a do `ESTADO` mais
+           `border-radius`, que é a excepção pontual que este botão precisa (o
+           canto muda mesmo de forma quando há alterações por gravar). Sai o
+           `${ESTADO}` dos dois ramos — o `${PRESSAO}` fica, que é o toque e não
+           uma lista. Escrita literal porque o Tailwind só gera regra para o que
+           encontra literal na fonte; os 120 ms são os do `ESTADO`, de propósito,
+           para o canto e as cores chegarem juntos. */
+        className={`motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,border-radius] motion-safe:duration-[120ms] ${
           quantos > 0
-            ? `alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
-            : `alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11`
+            ? `alvo-toque flex items-center gap-2 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
+            : `alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] ${PRESSAO} hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11`
         }`}
       >
         {accao.aGravar ? (
@@ -226,7 +242,7 @@ export default function BotaoGuardarTudo() {
               type="button"
               onClick={accao.dispensarResposta}
               aria-label="Fechar"
-              className="alvo-toque -mt-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+              className={`alvo-toque -mt-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
             >
               <svg
                 width="13"

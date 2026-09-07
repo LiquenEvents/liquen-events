@@ -15,6 +15,7 @@ import {
   type MarcacaoPendente,
 } from "@/lib/material-offline";
 import { AvisoDeFalha } from "../../AvisoDeFalha";
+import { ESTADO, PRESSAO } from "../../ui/movimento";
 
 /**
  * A VISTA DE CARREGAMENTO — telemóvel, uma mão, sem rede.
@@ -406,7 +407,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
               onClick={() => setVeiculo("todos")}
               className={`shrink-0 rounded-full px-3 py-1 text-xs ${
                 veiculo === "todos" ? "bg-[var(--bo-tinta-10)]" : "bg-[var(--bo-tinta-6)]"
-              }`}
+              } ${ESTADO} ${PRESSAO}`}
             >
               Todas
             </button>
@@ -417,7 +418,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 onClick={() => setVeiculo(v)}
                 className={`shrink-0 rounded-full px-3 py-1 text-xs ${
                   veiculo === v ? "bg-[var(--bo-tinta-10)]" : "bg-[var(--bo-tinta-6)]"
-                }`}
+                } ${ESTADO} ${PRESSAO}`}
               >
                 {v}
               </button>
@@ -471,7 +472,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                         type="button"
                         onClick={() => marcar(i)}
                         aria-pressed={carregado}
-                        className="flex min-h-[56px] w-full items-center gap-3 border-b border-[var(--bo-hairline)] px-4 text-left active:bg-[var(--bo-tinta-6)]"
+                        className={`flex min-h-[56px] w-full items-center gap-3 border-b border-[var(--bo-hairline)] px-4 text-left active:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           aria-hidden
@@ -536,7 +537,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => marcarFecho("preparada")}
-                  className="alvo-toque shrink-0 rounded-lg px-2 text-xs text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2"
+                  className={`alvo-toque shrink-0 rounded-lg px-2 text-xs text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2 ${ESTADO} ${PRESSAO}`}
                 >
                   Reabrir
                 </button>
@@ -552,7 +553,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => setConfirmar(false)}
-                  className="min-h-[48px] flex-1 rounded-xl bg-[var(--bo-tinta-6)] px-4"
+                  className={`min-h-[48px] flex-1 rounded-xl bg-[var(--bo-tinta-6)] px-4 ${ESTADO} ${PRESSAO}`}
                 >
                   Voltar
                 </button>
@@ -562,7 +563,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 <button
                   type="button"
                   onClick={() => marcarFecho("carregada")}
-                  className="min-h-[48px] flex-1 rounded-full bg-[#4d6350] px-4 text-white"
+                  className={`min-h-[48px] flex-1 rounded-full bg-[#4d6350] px-4 text-white ${ESTADO} ${PRESSAO}`}
                 >
                   Seguir assim
                 </button>
@@ -575,7 +576,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 if (p.criticosPorCarregar.length > 0) setConfirmar(true);
                 else marcarFecho("carregada");
               }}
-              className="min-h-[52px] w-full rounded-full bg-[#4d6350] px-4 text-white disabled:opacity-45"
+              className={`min-h-[52px] w-full rounded-full bg-[#4d6350] px-4 text-white disabled:opacity-45 ${ESTADO} ${PRESSAO}`}
               disabled={p.carregados === 0}
             >
               {p.carregados === p.total

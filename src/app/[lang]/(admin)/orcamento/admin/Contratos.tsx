@@ -21,6 +21,7 @@ import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { referenciaCurta } from "@/lib/referencia-curta";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -623,9 +624,18 @@ function colunasDeContratos({
       chave: "pedido",
       cabecalho: "Pedido",
       soLargo: true,
+      /* A referência inteira — `LIQ-MT7CWVWU-C4BFD3877E978CFF` — é um nome de
+         máquina, e numa coluna ocupava mais espaço do que o nome do casal ao
+         lado. A casa já tinha decidido isto duas vezes (fora da lista de
+         pedidos, encurtada no painel de detalhe) e esta tabela ficou de fora.
+         Fica a forma curta, com a inteira no `title` para quem a precisa de
+         ler ao telefone. Ver `referenciaCurta`. */
       celula: (c) => (
-        <span className="whitespace-nowrap font-mono text-xs text-foreground/50">
-          {c.quoteId || "—"}
+        <span
+          className="whitespace-nowrap font-mono text-xs text-foreground/50"
+          title={c.quoteId || undefined}
+        >
+          {c.quoteId ? referenciaCurta(c.quoteId) : "—"}
         </span>
       ),
     },

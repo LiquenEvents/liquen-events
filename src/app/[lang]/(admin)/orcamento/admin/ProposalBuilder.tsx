@@ -10,6 +10,8 @@ import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravac
 import { useTravaoDeSaida } from "./useGravacaoAutomatica";
 import { tempoEstimado } from "@/lib/custo-do-pdf";
 import { eur, round2 } from "@/lib/money";
+import { Escolha } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /* O `eur` e o `round2` da casa. Havia aqui uma quinta cópia local do
    `Intl.NumberFormat`, que é o género de coisa que diverge sem ninguém dar
@@ -959,7 +961,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           </span>
           <button
             type="button"
-            className="alvo-toque shrink-0 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            className={`alvo-toque shrink-0 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={() => {
               setItems(linhaRemovida.items);
               setLinhaRemovida(null);
@@ -1073,17 +1075,22 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         <div className="flex justify-between text-sm items-center">
           <span className="text-[var(--bo-text-muted)] flex items-center gap-2">
             IVA
-            <select
+            <Escolha
               aria-label="Taxa de IVA"
-              value={vatRate}
-              onChange={(e) => setVatRate(Number(e.target.value))}
-              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/40"
+              // `String(…)` e `Number(…)` nas duas pontas: o valor de um
+              // `<select>` SEMPRE foi uma cadeia (o `value={0.23}` do JSX era
+              // convertido pelo DOM), e o `Escolha` copia essa regra de
+              // propósito para uma migração não mudar o que já se gravava.
+              valor={String(vatRate)}
+              aoMudar={(v) => setVatRate(Number(v))}
+              variante="nua"
+              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-[var(--bo-tinta-72)] focus:border-foreground/40 focus:outline-none"
             >
               <option value={0.23}>23%</option>
               <option value={0.13}>13%</option>
               <option value={0.06}>6%</option>
               <option value={0}>0%</option>
-            </select>
+            </Escolha>
           </span>
           <span className="text-[var(--bo-tinta-72)]">{eur(vat)}</span>
         </div>

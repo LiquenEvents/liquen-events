@@ -16,9 +16,13 @@ import { DUR_MICRO_MS, DUR_ELEMENTO_MS } from "@/lib/motion/tokens";
  * E duas curvas? Também não: UMA, e também por omissão — a
  * `--default-transition-timing-function` do `@theme`. Nenhum primitivo pedia
  * curva nenhuma. Deslocações animadas: **zero** — nenhum `translate` em
- * transição em toda a pasta, portanto a regra dos «4 px / 8 px / 32 px» da
- * análise não tem aqui nada a que se aplicar. Fica dito, porque uma regra sem
- * sítio onde valer é uma regra que não se cumpre nem se desobedece.
+ * transição em toda a pasta, portanto a escada do percurso da casa — hoje
+ * 10 px para um rótulo, 18 px para um aviso ou uma folha, 28 px para uma cena,
+ * 32 px para uma página, no `:root` do `globals.css` — não tem aqui nada a que
+ * se aplicar. (Eram «4 / 8 / 32» quando isto se escreveu; ficam os números de
+ * hoje, para o censo não mandar ninguém procurar uma escada que já não existe.)
+ * Fica dito, porque uma regra sem sítio onde valer é uma regra que não se
+ * cumpre nem se desobedece.
  *
  * As três avarias que o censo encontrou, todas silenciosas:
  *
@@ -108,13 +112,37 @@ import { DUR_MICRO_MS, DUR_ELEMENTO_MS } from "@/lib/motion/tokens";
  * convergidas de propósito para a assinatura, e o `tokens.coerencia.test.ts`
  * tem um teste cujo comentário diz, letra por letra, que guarda «contra uma
  * troca distraída por uma curva simétrica (`ease`, `cubic-bezier(0.4,0,0.2,1)`)».
- * Não se desfaz isso a partir daqui.
+ * Não se desfaz isso a partir daqui, e continua a não se desfazer.
+ *
+ * ── MAS HÁ UMA MOLA, E ISTO TEM DE ESTAR ESCRITO AQUI ─────────────────────
+ *
+ * Este parágrafo dizia «são duas, e já cá estavam». Passou a ser meia verdade
+ * no dia em que a escada do percurso subiu, e uma meia verdade num censo é o
+ * que manda quem vem a seguir procurar no sítio errado. O que é verdade hoje:
+ *
+ *   · para o que TRANSICIONA — tudo o que este ficheiro trata — as curvas
+ *     continuam a ser duas, `--ease-out` e `--ease-in`, e não faltava nenhuma;
+ *   · para UMA animação de entrada, e só uma — a caixa que o utilizador
+ *     convocou (`.bo-entrada-folha` e o diálogo `aria-modal`) —, o
+ *     `globals.css` passou a ter um `--bo-mola-chegada`, que é um `linear()`.
+ *
+ * E a distinção não é um truque de vocabulário. A curva recusada era uma
+ * segunda DESACELERAÇÃO a fazer o mesmo trabalho da assinatura, e duas
+ * maneiras de fazer a mesma coisa é o defeito que estas rondas todas vieram
+ * tirar. A mola faz um trabalho que nenhuma das duas faz e que nenhuma
+ * `cubic-bezier` faz sem um ponto de controlo escolhido ao olho fora do
+ * intervalo: passar do sítio e assentar. Além disso não é uma curva ESCRITA —
+ * é a `MOLA_CHEGADA` do `lib/motion/tokens.ts` amostrada, e mexer na mola
+ * reescreve-a inteira, com um teste a ligar as duas pontas.
+ *
+ * Nada disto chega aqui: nenhum primitivo desta pasta ganha mola, e o
+ * `PRESSAO` não é tocado.
  *
  * E, para ser franco: aos 20 ms e aos 120 ms a curva é indiscutivelmente
  * invisível — não há olho que distinga duas curvas num sexto de segundo. O que
  * se lê nestas velocidades é a DURAÇÃO. A discussão de curvas é real onde há
- * percurso (entradas, saídas, barras), e aí a casa já tem as duas de que
- * precisa.
+ * percurso (entradas, saídas, barras), e aí a casa tem as duas de sempre mais
+ * a mola de uma chegada.
  *
  * ── PORQUÊ VALORES ENTRE PARÊNTESES RECTOS E NÃO TOKENS ────────────────────
  *

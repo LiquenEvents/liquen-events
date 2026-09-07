@@ -54,14 +54,43 @@ describe("dois momentos que não saltam", () => {
     expect(ate).not.toMatch(/bo-entrada|bo-cena|view-in/);
   });
 
+  /**
+   * ── UMA LISTA, E NÃO DUAS — E A ANTIGA FAZIA O CONTRÁRIO DO QUE DIZIA ─────
+   *
+   * Estava assim: `transition-[border-radius]` no elemento e o `${ESTADO}` (com
+   * a lista dele) lá dentro, nos dois ramos do ternário. São DUAS declarações
+   * de `transition-property` no mesmo elemento, com a mesma especificidade —
+   * ganha a que o Tailwind emitir mais abaixo na folha, não a que está escrita
+   * primeiro no atributo.
+   *
+   * COMPILADO nesta casa (Tailwind 4.3) para não ficar por dedução: os
+   * utilitários `transition-[…]` saem por ordem alfabética do valor, portanto
+   *
+   *     .transition-[background-color,border-color,color,box-shadow,opacity,scale]   ← linha 4443
+   *     .transition-[border-radius]                                                  ← linha 4463
+   *
+   * e o `border-radius` fica DEPOIS. Resultado real: `transition-property:
+   * border-radius` e mais nada — o canto deslizava e as cores é que saltavam,
+   * ao contrário do que o comentário deste ficheiro descrevia. A avaria que se
+   * queria corrigida estava viva, só que virada do avesso.
+   *
+   * A lista passa a ser UMA, escrita por extenso: a do `ESTADO` mais
+   * `border-radius`. O `${ESTADO}` sai dos ramos (era ele a segunda
+   * declaração); o `${PRESSAO}` fica, porque é o toque e não uma lista.
+   */
   it("o botão «Guardar tudo» muda de forma com a mesma cadência da cor", () => {
-    // Os 120 ms são os do `ESTADO`, para as duas coisas chegarem juntas.
+    // Uma só declaração, com as duas coisas lá dentro e os 120 ms do `ESTADO`.
     expect(GUARDAR).toMatch(
-      /motion-safe:transition-\[border-radius\] motion-safe:duration-\[120ms\]/,
+      /motion-safe:transition-\[background-color,border-color,color,box-shadow,opacity,scale,border-radius\] motion-safe:duration-\[120ms\]/,
     );
-    // Controlo positivo: as cores continuam a vir do `ESTADO` da casa — se
-    // alguém as trocar por um número à mão, as duas voltam a discordar.
-    expect(GUARDAR).toMatch(/\$\{ESTADO\}/);
+    // E NENHUMA segunda lista no mesmo elemento — era isso que partia.
+    // Os comentários saem primeiro: a prosa deste ficheiro CITA a lista antiga
+    // para explicar a avaria, e sem isto o próprio texto que a conta chumbava.
+    const semProsa = GUARDAR.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const listas = [...semProsa.matchAll(/transition-\[[^\]]+\]/g)].map((m) => m[0]);
+    expect(new Set(listas).size, `mais do que uma lista no botão: ${listas.join(" · ")}`).toBe(1);
+    // Controlo positivo: o toque continua a ser o gesto da casa.
+    expect(GUARDAR).toMatch(/\$\{PRESSAO\}/);
   });
 
   it("a `.bo-entrada` continua a ser 240 ms e a calar-se com movimento reduzido", () => {

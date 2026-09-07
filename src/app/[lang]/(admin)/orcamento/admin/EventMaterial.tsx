@@ -9,6 +9,7 @@ import { useToast } from "./Toast";
 import { Button, PerguntaDestrutiva, SectionCard } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * A CHECKLIST DE MATERIAL DESTE EVENTO.
@@ -312,7 +313,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
                único que se usa mesmo no telemóvel, de pé ao lado da carrinha.
                O `min-h-[32px]` fica: é a altura com rato, e os 44 do `.alvo-toque`
                (fora de camadas, de propósito) ganham-lhe sob `pointer: coarse`. */
-            className="alvo-toque bo-btn-ghost inline-flex min-h-[32px] items-center rounded-xl px-3 text-xs"
+            className={`alvo-toque bo-btn-ghost inline-flex min-h-[32px] items-center rounded-xl px-3 text-xs ${ESTADO} ${PRESSAO}`}
           >
             Abrir para carregar
           </a>

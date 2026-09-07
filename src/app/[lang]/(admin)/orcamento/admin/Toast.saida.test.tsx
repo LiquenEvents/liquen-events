@@ -251,20 +251,52 @@ describe("a `.bo-saida` é vocabulário da casa", () => {
   });
 
   it("sai pelo sítio por onde entrou — os mesmos números da `.bo-entrada`", () => {
+    // Desde que a escada do percurso subiu (10 / 18 / 28 px), os dois lados
+    // deixaram de ter o número escrito e passaram a ler o mesmo degrau. É mais
+    // forte do que comparar dois literais: agora não podem divergir, em vez de
+    // divergirem e serem apanhados.
     const saida =
-      /@keyframes bo-saida\s*\{[\s\S]*?translateY\(var\(--bo-saida-y,\s*(-?[\d.]+px)\)\)/.exec(css);
+      /@keyframes bo-saida\s*\{[\s\S]*?translateY\(var\(--bo-saida-y,\s*([^)]+\)\))\)/.exec(css);
     const entrada =
-      /@keyframes bo-entrada\s*\{[\s\S]*?translateY\(var\(--bo-entrada-y,\s*(-?[\d.]+px)\)\)/.exec(
+      /@keyframes bo-entrada\s*\{[\s\S]*?translateY\(var\(--bo-entrada-y,\s*([^)]+\)\))\)/.exec(
         css,
       );
-    expect(saida).not.toBeNull();
+    expect(saida, "a `@keyframes bo-saida` deixou de ler o degrau da escada").not.toBeNull();
     expect(entrada).not.toBeNull();
     expect(saida![1]).toBe(entrada![1]);
+    expect(saida![1]).toContain("--bo-percurso-rotulo");
 
-    // E as variantes espelham-se uma a uma: 8 px para uma folha ou um aviso,
-    // 0 px para um fundo, que não vem nem vai a sítio nenhum.
-    expect(css).toMatch(/\.bo-saida-folha\s*\{\s*--bo-saida-y:\s*8px/);
+    // E as variantes espelham-se uma a uma: o degrau da folha para uma folha
+    // ou um aviso, 0 px para um fundo, que não vem nem vai a sítio nenhum.
+    expect(css).toMatch(/\.bo-saida-folha\s*\{\s*--bo-saida-y:\s*var\(--bo-percurso-folha\)/);
+    expect(css).toMatch(/\.bo-entrada-folha\s*\{\s*--bo-entrada-y:\s*var\(--bo-percurso-folha\)/);
     expect(css).toMatch(/\.bo-saida-fundo\s*\{\s*--bo-saida-y:\s*0px/);
+  });
+
+  /**
+   * ── E O QUE NÃO ESPELHA, E PORQUÊ ──────────────────────────────────────────
+   *
+   * A entrada de uma caixa convocada ganhou ESCALA e MOLA. A saída não ganhou
+   * nenhuma das duas, e isso é uma decisão, não um esquecimento — este caso
+   * existe para que ninguém a «complete» por simetria.
+   *
+   * A regra que a casa já tinha escrita para a duração (240 vs 200) e para a
+   * curva (`--ease-out` vs `--ease-in`) é a mesma: quem chega apresenta-se,
+   * quem se vai embora não. A escala é a metade de APRESENTAÇÃO do vocabulário
+   * — é ela que faz uma caixa ganhar presença — e uma caixa a encolher enquanto
+   * se apaga lê-se como sugada. E em 200 ms uma mola não tem onde assentar:
+   * seria um estremecimento.
+   *
+   * O que TEM de espelhar é a direcção, e essa espelha — está no caso acima.
+   */
+  it("mas não leva escala nem mola: quem se vai embora não se apresenta", () => {
+    const saida = css.slice(css.indexOf("@keyframes bo-saida"));
+    const corpo = saida.slice(0, saida.indexOf("\n}"));
+    expect(corpo, "a saída ganhou escala").not.toMatch(/\bscale:/);
+    const regra = css.slice(css.indexOf(".bo-saida {"));
+    expect(regra.slice(0, regra.indexOf("}")), "a saída ganhou mola").not.toContain(
+      "--bo-mola-chegada",
+    );
   });
 
   it("desliga-se para quem pediu menos movimento", () => {

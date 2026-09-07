@@ -113,6 +113,155 @@
      transições da casa são de estado (cor, contorno, sombra) e não têm entrada
      nem saída. Esta pede-se onde há mesmo uma coisa a desaparecer. */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     A ESCADA DO PERCURSO — TRÊS DEGRAUS, E O NÚMERO VIVE AQUI
+     ══════════════════════════════════════════════════════════════════════
+
+     Palavras dela, depois de quatro rondas a pôr movimento em todo o back
+     office: «não vejo que há animações em tudo» e «quero animações
+     espectaculares em tudo, tipo o que a Apple tem no iPhone».
+
+     Ela tem razão, e a causa não era cobertura — era VOCABULÁRIO. O que este
+     ficheiro tinha, e o que estava MEDIDO na aplicação a correr (Web
+     Animations API, geometria em t=0 e em t=fim, 390×844 e 1440×900):
+
+         .bo-entrada        4 px de percurso,  zero de escala
+         .bo-entrada-folha  8 px,              zero de escala
+         .view-in           8 px,              zero de escala
+         .bo-cena          12 px,              zero de escala
+
+     Quatro píxeis num telemóvel é a espessura de um cabelo. Isto foi desenhado
+     para ser discreto («o movimento indica direcção e origem, não chama
+     atenção») e cumpre esse objectivo tão bem que desaparece.
+
+     ── O QUE SE SABE HOJE E NÃO SE SABIA ENTÃO ──────────────────────────────
+
+     O `e2e/60-fotogramas-no-telemovel.mjs` mediu estas animações com o CPU
+     travado 4× e 6×: zero fotogramas perdidos, zero layouts, zero recálculos de
+     estilo nas que são só `transform`/`opacity`. Havia margem e estava a ser
+     gasta em prudência.
+
+     ── OS NÚMEROS NOVOS, E A RAZÃO DE CADA UM ───────────────────────────────
+
+     A escada de PROPORÇÕES fica: rótulo < aviso/folha < cena. É ela que faz
+     isto parecer um sistema, e o topo — 32 px, reservado a uma página inteira a
+     apresentar-se — não se mexe, porque esse já se via. O que muda é que os
+     degraus de baixo sobem para dentro do que o olho lê.
+
+       · **10 px, o RÓTULO** (menus, avisos de campo, o que nasce colado a
+         outra coisa). Duas vezes e meia os quatro de antes. Aos 240 ms com uma
+         curva que só desacelera, os primeiros 100 ms valem ~78% do percurso —
+         ou seja quase 8 px num décimo de segundo. E é mais de metade da altura
+         do menor elemento que usa esta classe (um aviso de campo mede 19 px de
+         alto, medido): no mais pequeno de todos, dez píxeis são inequívocos.
+
+       · **18 px, a FOLHA e o AVISO** (o que vem de fora do ecrã). 1,8× o
+         rótulo, portanto a escada mantém-se. E fica ABAIXO dos 20 px do
+         `--bo-gap-vista` do telemóvel: uma folha nunca parece saltar uma linha
+         da grelha para chegar ao sítio.
+
+       · **28 px, a CENA** (um bloco inteiro a apresentar-se, 600 ms). 1,56× a
+         folha, e continua abaixo dos 32 px de uma página inteira — o degrau de
+         cima da escada não se perde. Aos 600 ms na `--ease-out` isto arranca a
+         ~190 px/s e assenta: lê-se como peso, não como pressa.
+
+     ── E A ESCALA, QUE É O QUE FALTAVA MESMO ────────────────────────────────
+
+     Um percurso é ABSOLUTO: 10 px são 10 px num menu de 65 px e numa folha de
+     390 px. É por isso que uma caixa grande a deslocar-se 8 px não se via —
+     medido, a folha do telemóvel mede 390×743 e oito píxeis são 1,1% dela.
+
+     A escala resolve isso e resolve-o sozinha, porque é PROPORCIONAL por
+     construção. Medido, com `--bo-escala-chegada`:
+
+         folha do telemóvel   390×743  →  5,9 px e 11,1 px de bordo
+         diálogo do portátil  672×736  →  10,1 px e 11,0 px de bordo
+         aviso de campo        65×19   →  1,0 px e 0,3 px  — nada
+
+     É essa última linha que decide ONDE a escala entra: num objecto pequeno ela
+     não vale nada e é o percurso que trabalha; num objecto grande é ela que
+     faz a coisa ganhar presença. Por isso a escala é só das CAIXAS que o
+     utilizador convocou (folhas e diálogos) e o percurso é de toda a gente.
+
+     E é isto que responde à outra pergunta — «não quero só no iPhone, quero
+     também no computador». UM número por degrau serve os dois ecrãs, porque o
+     píxel de CSS é uma medida ANGULAR (a referência da norma são 0,0213° de
+     arco) e não uma medida do écran: 18 px a 390 e 18 px a 1440 percorrem o
+     mesmo ângulo no olho de quem está a olhar. O que muda mesmo entre os dois é
+     o TAMANHO DO OBJECTO — e essa metade é a escala que a carrega, sem um único
+     `@media`.
+
+     3% e não 4%: a 4% um cartão de 1104 px de largura cresce 22 px de cada
+     lado, e isso deixa de se ler como uma caixa a assentar e passa a ler-se
+     como um zoom. */
+  --bo-percurso-rotulo: 10px;
+  --bo-percurso-folha: 18px;
+  --bo-percurso-cena: 28px;
+  --bo-escala-chegada: 0.97;
+
+  /* ── A MOLA DA CHEGADA, E PORQUE É QUE NÃO É UMA TERCEIRA CURVA ──────────
+     Espelha `MOLA_CHEGADA`/`molaEmLinear()` do `lib/motion/tokens.ts`, com o
+     `tokens.coerencia.test.ts` a comparar os dois lados caracter a caracter.
+
+     Estes trinta e um números não foram escolhidos: são a resposta de uma mola
+     de rigidez 2000 e amortecimento 51 (ζ = 0,570), amostrada em 240 ms. Passa
+     11,1% do sítio aos 86 ms, recua 1,4%, e aos 181 ms já está a 1% do destino.
+     Mudar a mola no ficheiro de fichas muda-os a todos de uma vez.
+
+     E 240 ms — o MESMO número da entrada de toda a gente — não é coincidência:
+     a primeira versão desta mola assentava em 360 ms e foi MEDIDA a custar
+     fotogramas num ecrã de computador (A/B na mesma compilação, diálogo a abrir
+     a 1440×900 com o CPU travado 6×: 20 fotogramas perdidos só com o percurso,
+     22 com o percurso e a escala, **35** com a mola de 360 ms). O percurso e a
+     escala saíam de graça; o que custava era a camada composta ficar viva mais
+     120 ms num ecrã com quatro vezes a área do telemóvel. A mola foi
+     endurecida em vez de deitada fora — o mesmo ζ, logo a mesma FORMA, em dois
+     terços do tempo. A conta está no `lib/motion/tokens.ts`.
+
+     A casa RECUSOU por escrito uma terceira `cubic-bezier` — a
+     `cubic-bezier(0.4, 0, 0.2, 1)` simétrica que a análise propunha —, e essa
+     recusa MANTÉM-SE: era uma segunda desaceleração a competir com a
+     assinatura, para o mesmo trabalho. Isto é outra coisa e faz outro trabalho:
+     é a única maneira de uma chegada passar do sítio e assentar, e uma
+     `cubic-bezier` só o faria com um ponto de controlo escolhido ao olho fora
+     do intervalo. Vale para UMA palavra do vocabulário (a caixa que o
+     utilizador convocou) e para mais nenhuma — ver, lá em baixo, onde se
+     recusou. */
+  --bo-mola-chegada: linear(
+    0,
+    0.0555,
+    0.1905,
+    0.3644,
+    0.546,
+    0.7139,
+    0.8552,
+    0.9641,
+    1.0402,
+    1.0865,
+    1.1082,
+    1.1113,
+    1.1017,
+    1.0846,
+    1.0644,
+    1.0441,
+    1.026,
+    1.0111,
+    1,
+    0.9925,
+    0.9882,
+    0.9864,
+    0.9866,
+    0.988,
+    0.9901,
+    0.9924,
+    0.9946,
+    0.9966,
+    0.9981,
+    0.9993,
+    1
+  );
+  --bo-mola-chegada-ms: 240ms;
   /* ── QUANTO TEMPO A CORTINA TAPA A PÁGINA ────────────────────────────────
      O mesmo número que o `Cortina.tsx` escreve no elemento (`MINIMO`), aqui em
      forma de token para o CSS o poder usar. Quem manda continua a ser o
@@ -1499,9 +1648,11 @@ body {
    sites. Com quatro blocos, 70 dá 210 ms do primeiro ao último — a cascata
    lê-se e acaba antes de alguém ter tempo de a achar lenta.
 
-   12 px de deslocação: a regra é «distância proporcional à importância e
-   sempre pequena» (menu 4 px, aviso 8 px, página inteira 32 px). Um bloco
-   dentro de uma página não é a página: 12 px.
+   28 px de deslocação: a regra é «distância proporcional à importância», e a
+   escada do percurso do `:root` dá-lhe o degrau — rótulo 10 px, aviso/folha
+   18 px, cena 28 px, página inteira 32 px. Um bloco dentro de uma página não é
+   a página, mas também não é um rótulo: 28 px. Eram 12, e doze não se viam —
+   está medido na nota da `@keyframes bo-cena` aqui em baixo.
 
    A curva é `cubic-bezier(0, 0, 0.2, 1)` — só desacelera. É quem APRESENTA que
    está a mover-se, e o que apresenta nunca deve ganhar balanço nem passar do
@@ -1514,10 +1665,32 @@ body {
    pendurado criava um bloco contentor e partia qualquer `position: fixed` lá
    dentro. Foi exactamente isso que aconteceu com o `.view-in` e a gaveta de
    detalhe. */
+/* ── VINTE E OITO, E NÃO DOZE ─────────────────────────────────────────────
+   Doze píxeis em 600 ms são vinte píxeis por segundo: mais devagar do que o
+   ponteiro dos segundos de um relógio a atravessar o mostrador. Media-se, mas
+   não se via — que é a razão de tudo isto.
+
+   Vinte e oito é o degrau de CENA da escada do percurso (ver o `:root`): 1,56×
+   a folha, e ainda abaixo dos 32 px que a casa reserva a uma página inteira,
+   portanto o degrau de cima não se perde. Na `--ease-out` os primeiros 120 ms
+   valem ~80% do percurso — arranca a cerca de 190 px/s e assenta.
+
+   ── E PORQUE É QUE ESTA NÃO LEVA ESCALA ──────────────────────────────────
+
+   Porque foi MEDIDO o que ela cobre, e não é só um cartão. Na aplicação a
+   correr, os elementos com `.bo-cena` numa vista vão de 36 px a **9 823 px** de
+   altura (a 390) e a **3 024 px** (a 1440): a classe está no cartão E no
+   invólucro que os empilha. Três por cento de escala num invólucro de 3 024 px
+   são 45 px de bordo a mexer-se — não é uma caixa a ganhar presença, é a
+   página inteira a fazer zoom, e com o centro de transformação fora do ecrã.
+
+   A escala é proporcional e essa é a sua virtude; num contentor sem altura
+   máxima é também o seu perigo. Fica nas caixas convocadas, que são
+   limitadas ao ecrã por construção (`max-h-[88dvh]`). */
 @keyframes bo-cena {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(var(--bo-percurso-cena));
   }
   to {
     opacity: 1;
@@ -2496,10 +2669,19 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 /* ── Back-office: gentle view transition ── */
+/* ── DEZOITO, QUE É O DEGRAU DA FOLHA ─────────────────────────────────────
+   Eram oito. A troca de vista fica no MESMO degrau da folha e do aviso (ver a
+   escada do percurso no `:root`) pela razão que já cá estava escrita: os 32 px
+   são para uma PÁGINA inteira a apresentar-se, e aqui o cromado não sai do
+   sítio — muda o conteúdo dentro dele.
+
+   Escala: não. Medido, o nó que leva a `.view-in` mede 1 184×3 331 px no
+   computador e 390×9 980 px no telemóvel — é o conteúdo TODO da vista, não uma
+   caixa. Ver a nota da `.bo-cena`, que é a mesma razão e o mesmo número. */
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(var(--bo-percurso-folha));
   }
   to {
     opacity: 1;
@@ -2541,15 +2723,17 @@ body[data-menu-open] .whatsapp-fixed {
      240 ms, o mesmo número da `.bo-entrada`: dentro da banda dos estados, e um
      só número para o back office inteiro em vez de dois parecidos.
 
-     Os 8 px ficam. A análise reserva 32 px para uma PÁGINA inteira a
-     apresentar-se; aqui o cromado não sai do sítio — muda o conteúdo dentro
-     dele —, e 8 px é a distância certa para dizer «isto é outro ecrã» sem o
-     atirar de longe. */
+     A DISTÂNCIA subiu de 8 para 18 px, e o DEGRAU é que fica: 32 px continuam
+     reservados a uma PÁGINA inteira a apresentar-se, e aqui o cromado não sai
+     do sítio — muda o conteúdo dentro dele. O que mudou foi o degrau da folha e
+     do aviso, que passou de 8 para 18 na escada do percurso do `:root`, porque
+     oito não se viam. Ver lá a conta, e a `@keyframes view-in` aqui em baixo
+     para a razão de esta não levar escala. */
   animation: view-in 240ms cubic-bezier(0, 0, 0.2, 1) backwards;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   O QUE APARECE, APARECE DE ALGUM SÍTIO — QUATRO PÍXEIS
+   O QUE APARECE, APARECE DE ALGUM SÍTIO — DEZ PÍXEIS
    ══════════════════════════════════════════════════════════════════════════
 
    Palavras dela, a olhar para o back office: «em termos de design e animações
@@ -2567,9 +2751,9 @@ body[data-menu-open] .whatsapp-fixed {
 
    A análise à apple.com e à pixelmatters.com mede a regra e mede a distância:
 
-       um item de menu       4 px
-       um aviso              8 px
-       uma página inteira   32 px
+       um item de menu      10 px   (eram 4)
+       um aviso             18 px   (eram 8)
+       uma página inteira   32 px   (o tecto, que já se via)
 
    «O movimento serve para indicar direcção e origem, não para chamar
    atenção.» E a curva não é qualquer uma: quando é o SISTEMA que apresenta —
@@ -2581,7 +2765,7 @@ body[data-menu-open] .whatsapp-fixed {
 
    Regra dela: «nenhuma animação pode atrasar uma tarefa». Estes 240 ms não
    atrasam: o elemento está no sítio e clicável desde o primeiro fotograma —
-   só chega lá com quatro píxeis de deslocação e a opacidade a subir. Não há
+   só chega lá com dez píxeis de deslocação e a opacidade a subir. Não há
    `animation-fill-mode`, portanto no fim a animação larga o elemento e não
    fica a pesar sobre nada — nem sobre o `transform` que a folha do telemóvel
    usa para o arrasto.
@@ -2591,20 +2775,114 @@ body[data-menu-open] .whatsapp-fixed {
 @keyframes bo-entrada {
   from {
     opacity: 0;
-    transform: translateY(var(--bo-entrada-y, -4px));
+    transform: translateY(var(--bo-entrada-y, calc(-1 * var(--bo-percurso-rotulo))));
+    /* ── O `scale` TEM DE VIR PELO NOME, E JÁ CUSTOU DUAS VEZES ───────────
+       No Tailwind v4 a classe `scale-*` emite a propriedade AUTÓNOMA `scale`,
+       e em CSS puro é igual: `scale` não é `transform`, não entra numa lista
+       `transition-[…,transform]` e não se anima escrevendo `transform:
+       scale(…)` ao lado de um `translateY`. Está aqui pelo nome de propósito.
+
+       É composta na GPU, tal como `transform` e `opacity` — a mesma classe de
+       propriedades que o arnês dos fotogramas mediu a zero layouts.
+
+       O valor por omissão é 1, ou seja NADA: a escala é um privilégio das
+       caixas convocadas (ver a regra da folha e do diálogo aqui em baixo).
+       Num aviso de campo de 19 px, 3% de escala valem três décimos de píxel —
+       pagar-se-ia uma propriedade animada por coisa nenhuma. */
+    scale: var(--bo-entrada-escala, 1);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+    scale: 1;
   }
 }
 .bo-entrada {
   animation: bo-entrada 240ms cubic-bezier(0, 0, 0.2, 1);
 }
-/* A folha do telemóvel sobe, porque é de baixo que ela vem. Oito e não quatro:
+/* ══════════════════════════════════════════════════════════════════════════
+   E A CAIXA QUE FOI CONVOCADA CHEGA COM MOLA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Duas coisas ao mesmo tempo, e as duas só aqui:
+
+     1. **A escala.** Uma folha mede 390×743 e um diálogo 672×736 (medidos). A
+        3% isso são 11 px de bordo — o percurso que uma caixa grande não pode
+        ter em translação sem parecer que foi atirada. É a escala que lhe dá
+        presença, e é proporcional, portanto serve o telemóvel e o computador
+        com um número só.
+     2. **A mola.** Passa 11,3% do sítio aos 132 ms e assenta. É a diferença
+        entre «apareceu» e «chegou», e é a única palavra deste vocabulário que
+        a leva.
+
+   ── PORQUÊ ESTES DOIS SELECTORES, E NÃO A CLASSE TODA ────────────────────
+
+   `.bo-entrada-folha` é a folha do telemóvel. O diálogo do computador NÃO tem
+   classe própria — o `ui/FolhaOuDialogo.tsx` dá-lhe a `.bo-entrada` nua —, e
+   por isso o segundo selector vai buscá-lo pela SEMÂNTICA: ele PRÓPRIO é
+   `aria-modal="true"`, que é exactamente a definição de «o utilizador convocou
+   isto e ele tomou conta do ecrã».
+
+   No próprio elemento e não num antepassado, e isto foi MEDIDO antes de se
+   escrever: nesta casa o `aria-modal` está na mesma etiqueta que a
+   `.bo-entrada` (o `ui/FolhaOuDialogo.tsx`, a `CommandPalette.tsx` e a gaveta
+   do `AdminClient.tsx` fazem-no todos assim). A primeira versão desta regra
+   dizia `[aria-modal="true"] > .bo-entrada` e não apanhava caixa nenhuma no
+   computador — a folha do telemóvel passava pela outra metade do selector e
+   escondia a falha. O `:not(.bo-entrada-fundo)` fica porque o véu é irmão da
+   caixa e um véu que encolhesse mostrava o ecrã à volta dele.
+
+   ── E QUEM DECLARA A SUA PRÓPRIA DISTÂNCIA NÃO LEVA ESCALA ───────────────
+
+   O `:not([style*="--bo-entrada-y"])` é o ponto mais importante desta regra, e
+   não é uma esperteza: é um contrato. Um elemento que escreve o
+   `--bo-entrada-y` no `style` está a dizer «a minha geometria é minha, não é a
+   escada da casa» — e nesta casa há exactamente dois, os dois com a razão
+   escrita ao lado no `AdminClient.tsx`:
+
+     · a **gaveta do pedido**, que declara zero. É `fixed inset-y-0`, encosta às
+       duas arestas do ecrã, e o comentário dela traz a medição
+       (`e2e/entrada-da-gaveta.mjs`): qualquer deslocação abre uma fresta por
+       onde a página espreita, e um `transform` vivo cria bloco de contenção e
+       arrasta consigo o cabeçalho `sticky` de dentro e a barra do estúdio. Uma
+       `scale` faz as duas coisas exactamente da mesma maneira — encolher uma
+       gaveta de sangria inteira é mostrar o que ela existe para tapar.
+     · o **lote novo da lista**, que declara uma distância positiva porque as
+       linhas nascem em baixo. Um lote de linhas não é uma caixa convocada.
+
+   Sem este `:not`, a gaveta ganhava 3% de escala e voltava atrás numa correcção
+   que já custou uma medição a encontrar.
+
+   ── E NÃO DEMORA UM MILISSEGUNDO A MAIS DO QUE O RESTO ───────────────────
+
+   A regra dela manda em tudo: «nenhuma animação pode atrasar uma tarefa». Esta
+   caixa demora exactamente os mesmos 240 ms que qualquer outra entrada do back
+   office — e aos 86 ms já passou o sítio, ou seja já lá está. O que vem depois
+   é assentamento, e o elemento está no sítio e clicável desde o primeiro
+   fotograma. O `PRESSAO` (20 ms) não é tocado por nada disto.
+
+   Houve uma versão com 360 ms. Foi medida a custar fotogramas a 1440 e
+   devolvida — a conta está no token da mola, lá em cima. */
+.bo-entrada-folha:not([style*="--bo-entrada-y"]),
+.bo-entrada[aria-modal="true"]:not(.bo-entrada-fundo):not([style*="--bo-entrada-y"]) {
+  --bo-entrada-escala: var(--bo-escala-chegada);
+  animation-duration: var(--bo-mola-chegada-ms);
+}
+/* O `linear()` é de 2023 e não está em todo o lado. Fora de um `@supports` a
+   declaração inválida derrubava a `animation-timing-function` inteira e a
+   caixa ficava sem curva nenhuma; aqui, quem não o entende fica com a
+   `cubic-bezier(0, 0, 0.2, 1)` do atalho lá em cima — sem mola, mas com a
+   entrada da casa. Degrada para o que já havia, e não para nada. */
+@supports (animation-timing-function: linear(0, 1)) {
+  .bo-entrada-folha:not([style*="--bo-entrada-y"]),
+  .bo-entrada[aria-modal="true"]:not(.bo-entrada-fundo):not([style*="--bo-entrada-y"]) {
+    animation-timing-function: var(--bo-mola-chegada);
+  }
+}
+/* A folha do telemóvel sobe, porque é de baixo que ela vem. Dezoito e não dez:
    é a distância de um aviso, e a folha é maior do que um menu. */
 .bo-entrada-folha {
-  --bo-entrada-y: 8px;
+  --bo-entrada-y: var(--bo-percurso-folha);
 }
 /* ── E O FUNDO VEM COM A CAIXA ────────────────────────────────────────────
    Cinco superfícies desta casa escurecem o ecrã por trás do que se abriu — o
@@ -2631,6 +2909,12 @@ body[data-menu-open] .whatsapp-fixed {
   .bo-entrada {
     animation: none;
   }
+  /* A folha e o diálogo não precisam de linha própria: as regras que lhes dão
+     a mola só mexem em `animation-duration` e `animation-timing-function`, e o
+     `animation: none` daqui de cima apaga o `animation-name` — sem nome não há
+     animação nenhuma para durar nem para curvar. Não se acredita: o
+     `e2e/60-fotogramas-no-telemovel.mjs --reduzido` pergunta ao browser o que
+     ele tem MESMO a correr (`document.getAnimations()`). */
 }
 /* ══════════════════════════════════════════════════════════════════════════
    E O QUE DESAPARECE, DESAPARECE PARA ALGUM SÍTIO — A SAÍDA
@@ -2680,8 +2964,8 @@ body[data-menu-open] .whatsapp-fixed {
 
    ── E SAI PELO SÍTIO POR ONDE ENTROU ─────────────────────────────────────
 
-   O `--bo-saida-y` espelha o `--bo-entrada-y`, valor a valor: quatro píxeis
-   para um menu, oito para uma folha ou um aviso, zero para um fundo — que não
+   O `--bo-saida-y` espelha o `--bo-entrada-y`, valor a valor: dez píxeis
+   para um menu, dezoito para uma folha ou um aviso, zero para um fundo — que não
    vem de sítio nenhum e portanto também não vai para sítio nenhum. Não é
    simetria por gosto: um elemento que entra de cima e sai por baixo lê-se
    como dois elementos diferentes.
@@ -2702,6 +2986,19 @@ body[data-menu-open] .whatsapp-fixed {
    `pointer-events` larga-se antes de o browser pintar o primeiro fotograma da
    saída. Aplicá-la num `setTimeout` ou no fim da animação abre exactamente a
    janela que ela existe para fechar. */
+/* ── E A SAÍDA SOBE COM A ENTRADA, MAS NÃO LEVA ESCALA NEM MOLA ───────────
+   O `--bo-saida-y` continua a espelhar o `--bo-entrada-y` valor a valor —
+   dez píxeis para um menu, dezoito para uma folha ou um aviso, zero para um
+   fundo. Isso é a DIRECÇÃO, e a direcção tem de espelhar: um elemento que
+   entra de cima e sai por baixo lê-se como dois elementos diferentes.
+
+   O que NÃO espelha é a escala nem a mola, e é de propósito. A regra que a
+   casa já tinha escrita para a duração e para a curva é a mesma aqui: «quem
+   chega apresenta-se; quem se vai embora não». A escala é a metade de
+   APRESENTAÇÃO do vocabulário — é ela que faz uma caixa ganhar presença — e
+   uma caixa a encolher enquanto se apaga lê-se como sugada, não como
+   arrumada. Em 200 ms, além disso, uma mola não tem onde assentar: seria um
+   estremecimento, não um gesto. */
 @keyframes bo-saida {
   from {
     opacity: 1;
@@ -2709,17 +3006,17 @@ body[data-menu-open] .whatsapp-fixed {
   }
   to {
     opacity: 0;
-    transform: translateY(var(--bo-saida-y, -4px));
+    transform: translateY(var(--bo-saida-y, calc(-1 * var(--bo-percurso-rotulo))));
   }
 }
 .bo-saida {
   animation: bo-saida 200ms var(--ease-in) forwards;
   pointer-events: none;
 }
-/* Oito e não quatro: uma folha do telemóvel, ou um aviso. Espelha a
+/* Dezoito e não dez: uma folha do telemóvel, ou um aviso. Espelha a
    `.bo-entrada-folha`. */
 .bo-saida-folha {
-  --bo-saida-y: 8px;
+  --bo-saida-y: var(--bo-percurso-folha);
 }
 /* Um fundo não vem de sítio nenhum nem vai para sítio nenhum — só apaga.
    Espelha a `.bo-entrada-fundo`. */

@@ -404,7 +404,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                     // `!justify-end` mantém a hora encostada à direita (a
                     // classe centra por omissão) e `pt-0.5` sai porque a
                     // centragem vertical passa a ser dela.
-                    className="alvo-toque !justify-end w-12 shrink-0 rounded-md text-right text-xs font-semibold tabular-nums text-[#4d6350] decoration-dotted underline-offset-2 hover:underline"
+                    className={`alvo-toque !justify-end w-12 shrink-0 rounded-md text-right text-xs font-semibold tabular-nums text-[#4d6350] decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                   >
                     {i.time}
                   </button>
@@ -429,7 +429,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                       type="button"
                       onClick={() => startEdit(i.id, "title", i.title)}
                       title="Editar momento"
-                      className="alvo-toque !justify-start w-full rounded-md text-left text-sm leading-snug text-[var(--bo-text)] decoration-dotted underline-offset-2 hover:underline"
+                      className={`alvo-toque !justify-start w-full rounded-md text-left text-sm leading-snug text-[var(--bo-text)] decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                     >
                       {i.title}
                     </button>
@@ -454,7 +454,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => startEdit(i.id, "owner", i.owner ?? "")}
                         title="Editar responsável"
-                        className="alvo-toque !justify-start mt-0.5 w-full rounded-md text-left text-xs text-foreground/45 decoration-dotted underline-offset-2 hover:underline"
+                        className={`alvo-toque !justify-start mt-0.5 w-full rounded-md text-left text-xs text-foreground/45 decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                       >
                         {i.owner}
                       </button>

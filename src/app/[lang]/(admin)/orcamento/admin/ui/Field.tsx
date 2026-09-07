@@ -8,6 +8,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import { cn } from "./cn";
+import { Escolha } from "./Escolha";
 import { ESTADO } from "./movimento";
 
 /**
@@ -19,6 +20,23 @@ import { ESTADO } from "./movimento";
  * Pick the control with `as` (`"input"` default, `"textarea"`, `"select"`); any
  * native prop for that element is forwarded. For a select, pass `<option>`s as
  * children.
+ *
+ * ── E `as="select"` JÁ NÃO É UM `<select>` COM RATO ─────────────────────────
+ *
+ * A caixa que se abria era desenhada pelo SISTEMA OPERATIVO, fora do documento,
+ * e nenhum CSS lhe chegava: o azul de selecção era o do Windows, e a lista não
+ * tinha raio, nem tinta, nem entrada nenhuma. Quem desenha agora é o
+ * `ui/Escolha` — com o teclado completo, o `role="combobox"`/`listbox` e o
+ * formulário que o nativo dava de graça, e com o `<select>` do sistema mantido
+ * onde ele é bom: no dedo (a justificação está no cabeçalho do `Escolha.tsx`).
+ *
+ * **A API não mudou uma vírgula**, e é isso que faz esta troca valer por vinte
+ * campos ao mesmo tempo: continua a receber `value`, um `onChange` que lê
+ * `e.target.value`, e `<option>`/`<optgroup>` como filhos. O que muda é o que
+ * se abre.
+ *
+ * O aspecto também não muda: o `Escolha` entra com a pele `nua` e a cadeia de
+ * classes que se desenha aqui em baixo continua a ser a única que pinta.
  *
  * The error is never signalled by colour alone: the border thickens, an
  * `⚠`-prefixed message appears, and `aria-invalid` exposes it to assistive tech.
@@ -106,6 +124,11 @@ export function Field(props: FieldProps) {
   } & Record<string, unknown>;
 
   const id = useId();
+  // O `<label for>` nomeia um `<input>`, um `<textarea>` e um `<select>` por
+  // ser nativo. Um `role="combobox"` recebe o nome do AUTOR — e é por isso que
+  // o rótulo passa a ter `id`: sem ele, o campo de escolher ficava sem nome
+  // para quem ouve o ecrã, que é a maneira mais silenciosa de estragar isto.
+  const labelId = `${id}-label`;
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   // Only reference the hint node when it is actually rendered below (the hint is
@@ -155,7 +178,7 @@ export function Field(props: FieldProps) {
 
   return (
     <div className={cn("flex flex-col gap-1.5", containerClassName)}>
-      <label htmlFor={id} className={cn("bo-eyebrow", hideLabel && "sr-only")}>
+      <label id={labelId} htmlFor={id} className={cn("bo-eyebrow", hideLabel && "sr-only")}>
         {label}
         {required && (
           <span aria-hidden="true" className="ml-1 text-[#8a2a22]/80">
@@ -167,7 +190,59 @@ export function Field(props: FieldProps) {
       {as === "textarea" ? (
         <textarea {...(shared as TextareaHTMLAttributes<HTMLTextAreaElement> & { id: string })} />
       ) : as === "select" ? (
-        <select {...(shared as SelectHTMLAttributes<HTMLSelectElement> & { id: string })} />
+        /* ── A PONTE ENTRE O `onChange` DE SEMPRE E O `aoMudar` NOVO ────────
+           O `Escolha` devolve o VALOR e não um evento — é a API honesta, porque
+           não há `<select>` nenhum de onde o evento pudesse vir. Mas vinte
+           chamadores desta casa escrevem `onChange={(e) => …e.target.value}`, e
+           reescrevê-los todos à mão era vinte oportunidades de trocar um valor
+           por um rótulo em silêncio.
+
+           Por isso a ponte é aqui, uma vez, à vista: monta-se o objecto mínimo
+           que esses vinte lêem. Está tudo verificado — os vinte usam
+           `e.target.value` e mais nada (nem `currentTarget`, nem `target.name`,
+           nem `preventDefault`), e o `Field.escolha.test.tsx` ao lado prende
+           esse contrato para que o dia em que alguém precise de mais não seja
+           um `undefined` calado.
+
+           A pele é `nua`: o desenho continua a ser a cadeia que se calculou
+           aqui em cima, portanto nenhum dos vinte campos muda de aspecto. */
+        <Escolha
+          id={id}
+          aria-labelledby={labelId}
+          aria-describedby={describedBy}
+          aria-invalid={error ? true : undefined}
+          variante="nua"
+          /* A largura vive na caixa (ver `containerClassName` no `Escolha`): o
+             `w-full` do `controlClass` veste o controlo, e este veste a caixa
+             que o segura — senão a seta ficava a flutuar à direita do campo. */
+          containerClassName="w-full"
+          className={controlClass}
+          required={required}
+          disabled={control.disabled as boolean | undefined}
+          name={control.name as string | undefined}
+          valor={
+            control.value === undefined || control.value === null
+              ? undefined
+              : String(control.value)
+          }
+          /* Sem `value` o campo é NÃO-CONTROLADO, como um `<select>` sem
+             `value`: o `defaultValue` continua a valer e o estado é de lá
+             dentro. Sem esta linha, um campo assim ficava preso no vazio — e
+             preso em silêncio, que é o pior modo de falhar. */
+          valorInicial={
+            control.defaultValue === undefined || control.defaultValue === null
+              ? undefined
+              : String(control.defaultValue)
+          }
+          aoMudar={(v) => {
+            const aoMudar = control.onChange as
+              | ((e: { target: { value: string; name?: string } }) => void)
+              | undefined;
+            aoMudar?.({ target: { value: v, name: control.name as string | undefined } });
+          }}
+        >
+          {control.children as ReactNode}
+        </Escolha>
       ) : (
         <input {...(shared as InputHTMLAttributes<HTMLInputElement> & { id: string })} />
       )}

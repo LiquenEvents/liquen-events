@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { dataCurta } from "@/lib/data-curta";
 import type { Quote } from "@/lib/orcamento/types";
 import { choquesDeData, gravidade, type Choque } from "@/lib/orcamento/choque-de-datas";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * O QUE JÁ ESTÁ MARCADO NAQUELE DIA.
@@ -142,7 +143,7 @@ export default function AvisoDataOcupada({
                         <button
                           type="button"
                           onClick={() => onAbrir(c.outro.id)}
-                          className="alvo-toque text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+                          className={`alvo-toque text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60 ${ESTADO} ${PRESSAO}`}
                         >
                           {linha}
                         </button>

@@ -275,7 +275,13 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 className={`alvo-toque flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${ESTADO} ${PRESSAO} ${
                   aqui
                     ? "bg-[#4d6350]/[0.08]"
-                    : "bg-[var(--bo-tinta-6)] hover:bg-[var(--bo-tinta-6)] @min-[40rem]/estudio:bg-transparent @min-[40rem]/estudio:hover:bg-[var(--bo-tinta-6)]"
+                    : /* O fundo sob o rato tem de ser UM DEGRAU MAIS FUNDO do que o
+                         fundo em repouso, e na tira não era: `bg-…-6` em repouso e
+                         `hover:bg-…-6` — o mesmo token. Aproximar o rato de um
+                         destino não pintava nada, e o item onde ela ESTÁ ficava a
+                         competir com um realce que não existia. A escada de tinta
+                         da casa é 3 / 6 / 10; o realce é o degrau seguinte. */
+                      "bg-[var(--bo-tinta-6)] hover:bg-[var(--bo-tinta-10)] @min-[40rem]/estudio:bg-transparent @min-[40rem]/estudio:hover:bg-[var(--bo-tinta-6)]"
                 }`}
               >
                 <span
@@ -366,7 +372,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                 <button
                   type="button"
                   onClick={() => saltarPara(f.seccao)}
-                  className="flex w-full items-start gap-1.5 text-left text-[11px] leading-snug text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
+                  className={`flex w-full items-start gap-1.5 text-left text-[11px] leading-snug text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                 >
                   <span
                     aria-hidden

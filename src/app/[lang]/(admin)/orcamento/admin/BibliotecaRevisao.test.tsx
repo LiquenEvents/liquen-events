@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { escolher } from "../../../../../../test/escolher";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import { ToastProvider } from "./Toast";
 
@@ -80,6 +82,14 @@ const abrir = () =>
   );
 
 const fotos = () => screen.getAllByRole("button", { name: /^Foto / });
+
+/* Os dois campos da barra deixaram de ser `<select>` — são o `ui/Escolha` (ver o
+   cabeçalho desse ficheiro), portanto não há `fireEvent.change`: abre-se e
+   carrega-se na etiqueta. E cada um tem hoje o seu nome, que é o que este ecrã
+   ganhou na migração: eram dois controlos debaixo de um `<label>` só. */
+const porEtiqueta = () => screen.getByRole("combobox", { name: /Pôr etiqueta/ });
+const tirarEtiqueta = () => screen.getByRole("combobox", { name: /Tirar etiqueta/ });
+
 const consultas = () => pedidos.filter((p) => p.url.startsWith("/api/biblioteca/fotos"));
 /** O contador da barra de selecção. Há mais `role="status"` no ecrã (os avisos
  *  do Toast também o são), por isso escolhe-se pelo texto. */
@@ -143,9 +153,7 @@ describe("rever etiquetas", () => {
     await waitFor(() => expect(fotos()).toHaveLength(3));
     fireEvent.click(fotos()[0]);
     fireEvent.click(fotos()[1]);
-    fireEvent.change(screen.getByLabelText("Etiqueta a aplicar"), {
-      target: { value: "tipo:bouquet" },
-    });
+    await escolher(userEvent, porEtiqueta(), "bouquet");
     await waitFor(() => {
       const escrita = pedidos.find((p) => p.url.startsWith("/api/biblioteca/etiquetar"));
       expect(escrita?.body).toEqual({
@@ -167,9 +175,7 @@ describe("rever etiquetas", () => {
     fireEvent.click(fotos()[0]);
     fireEvent.click(fotos()[1], { shiftKey: true });
     fireEvent.click(fotos()[2], { shiftKey: true });
-    fireEvent.change(screen.getByLabelText("Etiqueta a aplicar"), {
-      target: { value: "tipo:bouquet" },
-    });
+    await escolher(userEvent, porEtiqueta(), "bouquet");
     expect(await screen.findByText(/2 fotos etiquetadas com “bouquet”/)).toBeInTheDocument();
   });
 
@@ -178,9 +184,7 @@ describe("rever etiquetas", () => {
     abrir();
     await waitFor(() => expect(fotos()).toHaveLength(3));
     fireEvent.click(fotos()[0]);
-    fireEvent.change(screen.getByLabelText("Etiqueta a aplicar"), {
-      target: { value: "tipo:bouquet" },
-    });
+    await escolher(userEvent, porEtiqueta(), "bouquet");
     await waitFor(() =>
       expect(pedidos.some((p) => p.url.startsWith("/api/biblioteca/etiquetar"))).toBe(true),
     );
@@ -374,9 +378,7 @@ describe("etiquetar em bloco, com o ecrã a dizer o que está a acontecer", () =
     fireEvent.click(fotos()[2], { shiftKey: true });
     await waitFor(() => expect(contador()?.textContent).toBe("3 fotos escolhidas"));
 
-    fireEvent.change(screen.getByLabelText("Etiqueta a aplicar"), {
-      target: { value: "tipo:bouquet" },
-    });
+    await escolher(userEvent, porEtiqueta(), "bouquet");
 
     // Quantas vão no lote é o que ela sabe ANTES da resposta — e é o que se lê.
     expect(await screen.findByText("A etiquetar 3 fotos…")).toBeInTheDocument();
@@ -405,11 +407,11 @@ describe("etiquetar em bloco, com o ecrã a dizer o que está a acontecer", () =
     fireEvent.click(fotos()[0]);
     await waitFor(() => expect(contador()?.textContent).toBe("1 foto escolhida"));
 
-    // O segundo `select` da barra é o "Tirar etiqueta…" (os dois vivem debaixo
-    // do mesmo rótulo, que é do primeiro).
-    fireEvent.change(screen.getAllByRole("combobox")[1], {
-      target: { value: "paleta:terracotta" },
-    });
+    // Os dois campos desta barra viviam debaixo do MESMO `<label>` — e um
+    // `<label>` nomeia um só, portanto o de tirar não tinha nome nenhum e
+    // apanhava-se aqui pelo índice. Agora cada um diz o que faz, e apanha-se
+    // pelo nome.
+    await escolher(userEvent, tirarEtiqueta(), "terracotta");
     expect(await screen.findByText("A tirar a etiqueta a 1 foto…")).toBeInTheDocument();
   });
 });

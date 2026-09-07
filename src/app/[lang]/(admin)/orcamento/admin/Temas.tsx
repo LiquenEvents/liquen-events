@@ -31,6 +31,7 @@ import {
   PerguntaDestrutiva,
   Toolbar,
   type AccaoDeItem,
+  Escolha,
 } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
@@ -1424,24 +1425,30 @@ export default function Temas() {
             {/* ── VER: como a lista se mostra ─────────────────────────── */}
             {themes.length > 2 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <label className="flex items-center">
-                  <span className="sr-only">Ordenar os temas</span>
-                  <select
-                    value={ordem}
-                    onChange={(e) => {
-                      const o = e.target.value as Ordem;
+                {/* Era um `<label>` a embrulhar o `<select>`, com o nome num
+                    `sr-only` lá dentro. Um rótulo implícito nomeia um `<select>`
+                    porque ele é nativo; NÃO nomeia um `role="combobox"`, que
+                    recebe o nome do autor. Ficava um campo sem nome nenhum para
+                    quem ouve o ecrã — e sem ninguém dar por isso. */}
+                <div className="flex items-center">
+                  <Escolha
+                    aria-label="Ordenar os temas"
+                    valor={ordem}
+                    aoMudar={(v) => {
+                      const o = v as Ordem;
                       setOrdem(o);
                       guardarOrdem(o);
                     }}
-                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-[var(--bo-tinta-72)]"
+                    containerClassName="w-auto"
+                    className="py-2 pl-3 text-xs text-[var(--bo-tinta-72)]"
                   >
                     {ORDENS.map((o) => (
                       <option key={o.valor} value={o.valor}>
                         {o.rotulo}
                       </option>
                     ))}
-                  </select>
-                </label>
+                  </Escolha>
+                </div>
                 <div
                   role="group"
                   aria-label="Tamanho dos cartões"
@@ -1847,7 +1854,7 @@ export default function Temas() {
                 <button
                   type="button"
                   onClick={() => setAFundir(t)}
-                  className="alvo-toque mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs text-[#8a6d3b] hover:bg-[#8a6d3b]/[0.07]"
+                  className={`alvo-toque mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs text-[#8a6d3b] hover:bg-[#8a6d3b]/[0.07] ${ESTADO} ${PRESSAO}`}
                 >
                   <span className="truncate">{avisoDeTemaParecido(parecidos.get(t.id))}</span>
                   <span className="shrink-0 underline decoration-dotted underline-offset-2">
@@ -3572,7 +3579,7 @@ function ThemeFolder({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className="alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-[#4d6350]"
+              className={`alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
               title="Renomear tema"
             >
               {theme.name}
@@ -4126,7 +4133,7 @@ function ThemeFolder({
                         e.preventDefault();
                         moveTo(i, Math.max(0, Math.min(images.length - 1, to)));
                       }}
-                      className="absolute inset-0 h-full w-full"
+                      className={`absolute inset-0 h-full w-full ${ESTADO} ${PRESSAO}`}
                     >
                       <span
                         aria-hidden

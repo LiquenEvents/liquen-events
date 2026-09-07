@@ -295,7 +295,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                         </Button>
                         <button
                           onClick={() => setARenomear(null)}
-                          className="alvo-toque shrink-0 rounded-md px-2 py-1 text-xs text-foreground/50 hover:text-[var(--bo-text)]"
+                          className={`alvo-toque shrink-0 rounded-md px-2 py-1 text-xs text-foreground/50 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                         >
                           Cancelar
                         </button>

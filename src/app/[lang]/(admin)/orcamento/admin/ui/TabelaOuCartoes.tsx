@@ -463,7 +463,7 @@ export function TabelaOuCartoes<T>({
                           : { chave: c.chave, ascendente: true },
                       )
                     }
-                    className="inline-flex items-center gap-1 hover:text-[var(--bo-tinta-72)]"
+                    className={`inline-flex items-center gap-1 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
                   >
                     {c.cabecalho}
                     <span aria-hidden className="text-[9px]">
@@ -515,7 +515,7 @@ export function TabelaOuCartoes<T>({
                         e.stopPropagation();
                         aoAbrir(item);
                       }}
-                      className="text-left hover:underline focus-visible:underline"
+                      className={`text-left hover:underline focus-visible:underline ${ESTADO} ${PRESSAO}`}
                     >
                       {c.celula(item)}
                     </button>

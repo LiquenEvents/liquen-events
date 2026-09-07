@@ -2315,7 +2315,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded
                       aria-label="Fechar a procura"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+                      className={`alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                     >
                       <svg
                         width="15"
@@ -2338,7 +2338,7 @@ export default function ThemePicker({
                       onClick={abrirOuFecharProcura}
                       aria-expanded={false}
                       aria-label="Procurar tema"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
+                      className={`alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                     >
                       <svg
                         width="16"

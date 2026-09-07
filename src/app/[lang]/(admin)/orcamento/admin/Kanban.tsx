@@ -12,6 +12,7 @@ import { Card, EmptyState } from "./ui";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novo", color: "#8a8a82" },
@@ -156,9 +157,9 @@ const KanbanCard = memo(function KanbanCard({
          `transform` sai da lista porque não havia mais nada a usá-lo — vigiá-lo
          era pedir ao browser que olhasse para uma propriedade que este cartão
          nunca muda. */
-      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,rotate] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,rotate,scale] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
         aterrar ? "bo-entrada " : ""
-      }${dragging ? "opacity-40 motion-safe:rotate-1" : ""}`}
+      }${dragging ? "opacity-40 motion-safe:rotate-1" : ""} ${PRESSAO}`}
     >
       <div className="flex items-start gap-2">
         <span className="mt-1 w-1 h-8 rounded-full shrink-0" style={{ background: colColor }} />
@@ -260,7 +261,7 @@ const KanbanCard = memo(function KanbanCard({
                   onMove(q, -1);
                 }}
                 aria-label="Mover para a coluna anterior"
-                className="alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--bo-tinta-6)] text-foreground/40 active:bg-[var(--bo-tinta-10)]"
+                className={`alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--bo-tinta-6)] text-foreground/40 active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
               >
                 <svg
                   width="11"
@@ -283,7 +284,7 @@ const KanbanCard = memo(function KanbanCard({
                   onMove(q, 1);
                 }}
                 aria-label="Mover para a coluna seguinte"
-                className="alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20"
+                className={`alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20 ${ESTADO} ${PRESSAO}`}
               >
                 <svg
                   width="11"

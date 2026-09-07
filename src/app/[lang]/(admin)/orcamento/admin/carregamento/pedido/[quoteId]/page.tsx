@@ -5,6 +5,7 @@ import AdminLogin from "../../../AdminLogin";
 import { ADMIN_COOKIE, readSession } from "@/lib/admin-auth";
 import { getForQuote } from "@/lib/event-material-store";
 import { getQuote } from "@/lib/quotes-store";
+import { ESTADO, PRESSAO } from "../../../ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -83,7 +84,7 @@ export default async function CarregamentoDoPedido({
       </p>
       <a
         href={`${raiz}/orcamento/admin`}
-        className="alvo-toque mx-auto inline-flex items-center rounded-xl border border-foreground/20 px-4 text-sm text-[var(--bo-tinta-72)]"
+        className={`alvo-toque mx-auto inline-flex items-center rounded-xl border border-foreground/20 px-4 text-sm text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
       >
         Ir para o back office
       </a>

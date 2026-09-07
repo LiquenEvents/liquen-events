@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { eur } from "@/lib/money";
 import { useGaveta } from "./ui/gaveta";
 import type { Excluido, MotivoExclusao } from "@/lib/meta/conversoes-fecho";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -171,7 +172,7 @@ export default function FechosMeta() {
               setFalhouALeitura(false);
               void ler();
             }}
-            className="alvo-toque mt-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)]"
+            className={`alvo-toque mt-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
           >
             Tentar outra vez
           </button>
@@ -226,7 +227,7 @@ export default function FechosMeta() {
               type="button"
               disabled={!relatorio.configurada || aEnviar}
               onClick={() => setAPerguntar(true)}
-              className="alvo-toque mt-4 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11"
+              className={`alvo-toque mt-4 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
             >
               {aEnviar ? "A enviar…" : "Enviar à Meta"}
             </button>
@@ -244,14 +245,14 @@ export default function FechosMeta() {
                 <button
                   type="button"
                   onClick={() => void enviar()}
-                  className="alvo-toque rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#415440] pointer-coarse:min-h-11"
+                  className={`alvo-toque rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
                 >
                   Enviar
                 </button>
                 <button
                   type="button"
                   onClick={() => setAPerguntar(false)}
-                  className="alvo-toque rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-muted)] transition-colors hover:bg-[var(--bo-tinta-6)] pointer-coarse:min-h-11"
+                  className={`alvo-toque rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
                 >
                   Cancelar
                 </button>
@@ -320,7 +321,7 @@ export default function FechosMeta() {
                 estava. */}
             <summary
               onClick={gaveta.aoTocarNoResumo}
-              className="cursor-pointer text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3"
+              className={`cursor-pointer text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3 ${ESTADO} ${PRESSAO}`}
             >
               {relatorio.examinados}{" "}
               {relatorio.examinados === 1 ? "fecho examinado" : "fechos examinados"} — ver o que

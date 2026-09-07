@@ -299,7 +299,9 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium ${ESTADO} ${PRESSAO} ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#8a6420] "
-                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
+                  : /* Mesmo defeito das pastilhas de filtro: o fundo sob o rato
+                       repetia o fundo em repouso. Um degrau acima. */
+                    "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)]"
               }`}
             >
               <span aria-hidden="true">★</span>

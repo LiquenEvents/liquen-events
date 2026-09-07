@@ -816,7 +816,7 @@ const QuoteCard = memo(function QuoteCard({
       <button
         type="button"
         onClick={() => onOpen(q)}
-        className="w-full text-left p-5 pl-12 rounded-xl"
+        className={`w-full text-left p-5 pl-12 rounded-xl ${ESTADO} ${PRESSAO}`}
       >
         {/* ── A HIERARQUIA, E PORQUE É QUE ELA NÃO EXISTIA ─────────────────
             Palavras dela: «o nome do casal tem o mesmo peso visual que o email,
@@ -1692,8 +1692,29 @@ export default function AdminClient({
   const [navEhGaveta, setNavEhGaveta] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
-  // Focus trap for the mobile detail drawer — active only while it's the overlay.
-  const drawerRef = useFocusTrap<HTMLDivElement>(!!selected && isDetailOverlay);
+  /**
+   * Focus trap for the mobile detail drawer — active only while it's the overlay.
+   *
+   * ── E DESARMA-SE NO GESTO, NÃO 200 ms DEPOIS ────────────────────────────
+   *
+   * O `&& !painelASair` não é cosmético. A armadilha só larga o foco quando
+   * `active` passa a falso, e `active` dependia do `selected` — que só cai ao
+   * FIM dos 200 ms da saída. MEDIDO logo a seguir ao gesto de fechar: o foco
+   * ficava dentro de uma gaveta que já está a desaparecer, e o `previouslyFocused
+   * ?.focus?.()` da limpeza só corria um quinto de segundo mais tarde. Quem
+   * fecha com Escape ficava esse tempo sem sítio para o teclado.
+   *
+   * É a regra desta ronda dita ao caso mais sensível que ela tem: nenhuma
+   * animação pode ATRASAR uma tarefa, e devolver o foco é a tarefa. O
+   * `painelASair` levanta-se no instante do gesto (é ele que põe a classe de
+   * saída), portanto a armadilha larga no mesmo fotograma em que a gaveta
+   * começa a sair — a saída continua a ver-se, só que já não prende ninguém.
+   *
+   * É o que catorze dos dezasseis sítios equivalentes da casa já fazem; o
+   * `ui/FolhaOuDialogo` é o modelo mais próximo. A varredura que nomeia esta
+   * gaveta é o `a-saida-sai-da-arvore.test.ts`.
+   */
+  const drawerRef = useFocusTrap<HTMLDivElement>(!!selected && isDetailOverlay && !painelASair);
   // Focus management for the inline (desktop, non-overlay) detail workspace. The
   // mobile overlay already traps + restores focus via useFocusTrap; for the inline
   // panel we manually move focus to the panel heading on open and hand it back to
@@ -3990,16 +4011,36 @@ export default function AdminClient({
            `--default-transition-duration` do Tailwind copiado à mão — o número
            que sai quando ninguém escolhe. O degrau da casa para passar o rato e
            focar é o `micro`, 120. E `PRESSAO` porque num item de menu carrega-se. */
+        /* ── ONDE ELA ESTÁ ≠ ONDE ELA PODE IR ──────────────────────────────
+           O activo e o hover pintavam-se IGUAL: os dois com
+           `bg-[var(--bo-surface-hover)]` e `text-[var(--bo-text)]`, e a única
+           diferença que sobrava era o `font-medium`. Num relance, o destino
+           onde ela ESTÁ e o destino que o dedo está prestes a escolher eram a
+           mesma pastilha cinzenta — quem distinguia de facto era o filete, e o
+           filete vivia FORA da pastilha, encostado à margem, a ler-se como
+           outro objecto.
+
+           O activo passa a ter a cor da casa: a lavagem de acento
+           (`--bo-accent-ring`, que já existia para o anel de foco) e tinta de
+           acento no rótulo e no ícone. O hover fica como estava — lavagem
+           cinzenta neutra. São duas lavagens diferentes em luminosidade E em
+           matiz, e o `font-medium` continua lá como segunda pista, portanto a
+           distinção não depende só da cor.
+
+           MEDIDO, sobre o branco desta coluna: o acento sobre a sua própria
+           lavagem dá **5,19:1**, e texto normal pede 4,5:1 — passa AA. A
+           lavagem de acento contra o branco dá 1,26:1 contra os 1,10:1 da
+           cinzenta, ou seja também se distinguem uma da outra. */
         className={`alvo-toque !justify-start group ${soNoComputador} items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] ${ESTADO} ${PRESSAO} ${
           active
-            ? "bg-[var(--bo-surface-hover)] text-[var(--bo-text)] font-medium"
+            ? "bg-[var(--bo-accent-ring)] text-[var(--bo-accent)] font-medium"
             : "text-[var(--bo-text-muted)] font-normal hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)]"
         }`}
       >
         <span
           className={`shrink-0 ${ESTADO} ${
             active
-              ? "text-[var(--bo-text)]"
+              ? "text-[var(--bo-accent)]"
               : "text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
           }`}
         >
@@ -4024,9 +4065,17 @@ export default function AdminClient({
                 quando havia dados: um teste que passa no vazio e parte na
                 vida real. */}
             <span className="sr-only">, {pendingCount} por responder</span>
+            {/* `ESTADO` porque esta bolha MUDA DE COR ao trocar de destino
+                (acento com branco quando activa, cinzenta quando não) e não
+                tinha transição nenhuma: era um corte seco de 0 ms ao lado de
+                uma pastilha que se esbate em 120 ms. É a avaria nº 2 do censo
+                do `ui/movimento.ts` — «transições em falta» — e não um tempo
+                novo: são os MESMOS 120 ms do resto do item. O que NÃO se faz
+                aqui é pulsar o número quando ele muda: nesta casa a pulsação
+                já quer dizer «está a acontecer agora» (`ui/EmCurso`). */}
             <span
               aria-hidden="true"
-              className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
+              className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${ESTADO} ${
                 active
                   ? "bg-[var(--bo-accent)] text-white"
                   : "bg-[var(--bo-surface-hover)] text-[var(--bo-text-muted)]"
@@ -4331,11 +4380,55 @@ export default function AdminClient({
             >
               {/* O filete que anda. `aria-hidden` porque não diz nada que o
                   `aria-current="page"` de cada destino não diga melhor — é
-                  desenho, não informação. Ver `marcaDoDestino` lá em cima. */}
+                  desenho, não informação. Ver `marcaDoDestino` lá em cima.
+
+                  ── DUAS CORRECÇÕES, E AS DUAS SÃO DE PERTENÇA ──────────────
+
+                  1. **A COR ERA UM HEX À MÃO, E ERA O TOKEN ERRADO POR UM
+                     DÍGITO.** Estava escrito `bg-[#4d6350]`; o acento da casa é
+                     `--bo-accent: #4c6350`. Um `d` por um `c` — perto o
+                     suficiente para ninguém ver, longe o suficiente para o
+                     filete deixar de acompanhar o acento no dia em que ele
+                     mudar. Passa a ser o token, que é o que a pastilha activa
+                     usa agora: os dois pintam-se da MESMA variável e não podem
+                     divergir.
+
+                  2. **VIVIA FORA DA PASTILHA.** Estava em `left-1` (4 px) e a
+                     pastilha começa aos 12 px (o `px-3` desta coluna), portanto
+                     havia 8 px de branco entre os dois e o filete lia-se como
+                     um segundo objecto encostado à margem. Passa a `left-3` —
+                     a borda esquerda da própria pastilha —, onde é o rebordo
+                     dela e não um vizinho.
+
+                  O QUE NÃO MUDA, de propósito: continua a ser UM `span` filho
+                  directo do `<nav>`, continua a andar por `translate` e
+                  continua a ter a altura do destino marcado. É isso que o
+                  passeio `e2e/admin-views.spec.ts` («a marca do destino
+                  activo») mede — que há um só, e que ele PÁRA à altura do
+                  `[aria-current="page"]`.
+
+                  ── E OS DOIS TEMPOS NÃO SÃO UMA HESITAÇÃO ──────────────────
+
+                  Fica escrito porque já foi lido como avaria: a pastilha
+                  esbate-se em 120 ms (`ESTADO`) e o filete desliza em 250 ms
+                  (`MARCA`), e isso parece o mesmo acontecimento contado a dois
+                  ritmos. É deliberado, e a razão está por extenso na ficha do
+                  `MARCA` em `ui/movimento.ts`: o sinal («ouvi-te») chega no
+                  degrau `micro` e o movimento («e agora mostro-te») no degrau
+                  `elemento`. Com os dois iguais, o clique parece LENTO — a cor
+                  ficaria à espera do percurso. É a mesma assimetria que o
+                  `Segmented` usa, com os mesmos dois degraus da casa.
+
+                  Não são «duas velocidades de interacção» a competir: o
+                  `movimento.ts` diz que essas são duas (20 ms e 120 ms) e que
+                  os 250 ms NÃO são uma terceira — são o degrau de «uma coisa a
+                  mover-se», que é literalmente o que o filete é. Por isso aqui
+                  não se soma tempo nenhum: o gesto que indica direcção e origem
+                  já existe, e é este. */}
               {marcaDoDestino && (
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none absolute left-1 top-0 w-[3px] rounded-full bg-[#4d6350] ${
+                  className={`pointer-events-none absolute left-3 top-0 w-[3px] rounded-full bg-[var(--bo-accent)] ${
                     marcaPodeAndar ? MARCA : ""
                   }`}
                   style={{ translate: `0 ${marcaDoDestino.y}px`, height: marcaDoDestino.altura }}
@@ -4416,7 +4509,34 @@ export default function AdminClient({
                 </svg>
                 Ajuda e glossário
               </button>
-              <div className="flex gap-1 pointer-coarse:gap-2">
+              {/* ── QUATRO ACÇÕES NUMA LINHA SÓ NÃO CABEM ────────────────────
+                  Estavam as quatro — Atalhos · Backup · Repor · Sair — em
+                  `flex`, cada uma `flex-1`, com o ícone e o rótulo LADO A LADO,
+                  ícones de 11 px e letra de 9 px. MEDIDO na gaveta do telemóvel
+                  (390 px de ecrã): sobram ~320 px de gaveta, ou seja ~78 px por
+                  célula para um ícone mais uma palavra em maiúsculas com
+                  `tracking` — e num ecrã de toque o «Atalhos» esconde-se
+                  (`pointer-coarse:hidden`), portanto a fila fica com três
+                  larguras de ~105 px e um buraco onde estava a quarta.
+
+                  Passam a EMPILHAR: o ícone por cima do rótulo. A palavra deixa
+                  de disputar a largura com o ícone, e por isso o ícone pode
+                  crescer de 11 para 14 px sem apertar nada — é o mesmo tamanho
+                  que a fila ao lado já usa para o cadeado dos dispositivos.
+                  E ficam numa LINHA SÓ, nas duas larguras. Houve aqui um
+                  `min-w-[4.5rem]` por meio caminho, e MEDIDO a 1440 ele partia
+                  a fila em duas: 4 × 72 px não cabem nos 236 px úteis da
+                  coluna, e o «Sair» — o mais importante dos quatro, o que ela
+                  toca ao fim do dia — ficava sozinho numa segunda linha. Com o
+                  ícone POR CIMA, a célula só precisa da largura do rótulo
+                  (~50 px o mais comprido), portanto os quatro cabem em 236 px
+                  sem mínimo nenhum. O `flex-wrap` fica como rede, não como
+                  plano.
+
+                  Este é o sítio onde ela carrega em «Sair» ao fim do dia e em
+                  «Backup» quando desconfia. Nenhum dos quatro muda de sítio,
+                  de nome ou de ordem — só passam a ter onde caber. */}
+              <div className="flex flex-wrap gap-1 pointer-coarse:gap-2">
                 {/* A LISTA DE ATALHOS DE TECLADO NÃO APARECE NUM ECRÃ DE TOQUE.
                   É uma folha inteira a ensinar teclas — ⌘K, ?, G depois P — a
                   quem não tem teclado. Ocupava metade da gaveta de navegação
@@ -4425,12 +4545,12 @@ export default function AdminClient({
                   continua lá no computador. */}
                 <button
                   onClick={() => setShortcutsOpen(true)}
-                  className={`alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque pointer-coarse:hidden flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Atalhos de teclado"
                 >
                   <svg
-                    width="11"
-                    height="11"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -4449,12 +4569,12 @@ export default function AdminClient({
                 {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a
                   href="/api/backup"
-                  className={`alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Exportar backup"
                 >
                   <svg
-                    width="11"
-                    height="11"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -4473,12 +4593,12 @@ export default function AdminClient({
                   uma cópia sem forma de a repor nunca foi uma cópia. */}
                 <button
                   onClick={() => setRestoreOpen(true)}
-                  className={`alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Repor cópia de segurança"
                 >
                   <svg
-                    width="11"
-                    height="11"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -4494,12 +4614,12 @@ export default function AdminClient({
                 </button>
                 <button
                   onClick={pedirParaSair}
-                  className={`alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Terminar sessão"
                 >
                   <svg
-                    width="11"
-                    height="11"
+                    width="14"
+                    height="14"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -5492,7 +5612,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -5502,7 +5622,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -5516,7 +5636,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-6)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -5797,9 +5917,30 @@ export default function AdminClient({
                   />
                   <div
                     ref={drawerRef}
-                    role={isDetailOverlay ? "dialog" : undefined}
-                    aria-modal={isDetailOverlay ? true : undefined}
-                    aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
+                    /* ── A SAÍDA SAI TAMBÉM DA ÁRVORE DE ACESSIBILIDADE ─────
+                       O `inert` aqui em baixo já largava os toques e o Tab. O
+                       que faltava era a outra metade: `isDetailOverlay` é a
+                       LARGURA DO ECRÃ e não muda quando ela fecha, portanto
+                       durante os 200 ms da saída esta caixa continuava a ser um
+                       `role="dialog"` com `aria-modal="true"` e com nome — e o
+                       `getByRole("dialog")` ainda a encontrava por ele. Um
+                       diálogo modal que já não está lá é pior do que nenhum: a
+                       promessa do `aria-modal` é «só isto conta», e a caixa que
+                       a fazia está a desaparecer.
+
+                       `painelASair` levanta-se no instante do gesto, portanto
+                       os três atributos caem no mesmo fotograma em que a saída
+                       começa. O `aria-hidden` acompanha-os pela mesma razão —
+                       é a frase dita ao leitor de ecrã, como o `inert` é a
+                       frase dita ao teclado. Guardado pelo
+                       `a-saida-sai-da-arvore.test.ts`, de cuja lista de dívida
+                       este ficheiro sai com esta alteração. */
+                    role={isDetailOverlay && !painelASair ? "dialog" : undefined}
+                    aria-modal={isDetailOverlay && !painelASair ? true : undefined}
+                    aria-labelledby={
+                      isDetailOverlay && !painelASair ? "detail-drawer-title" : undefined
+                    }
+                    aria-hidden={painelASair || undefined}
                     /* ── O PAINEL É UMA MOLDURA: CABEÇA, MEIO QUE ROLA, PÉ ───
                        O que rola passou a ser a caixa de DENTRO. Antes rolava
                        o painel inteiro e a barra de gravação ia lá dentro,
@@ -6758,7 +6899,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`mailto:${selected.email}`}
-                                className="alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline"
+                                className={`alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline ${ESTADO} ${PRESSAO}`}
                               >
                                 {selected.email}
                               </a>
@@ -6787,7 +6928,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`tel:${selected.phone}`}
-                                className="alvo-toque text-xs text-[var(--bo-tinta-72)] hover:text-[var(--bo-text)]"
+                                className={`alvo-toque text-xs text-[var(--bo-tinta-72)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                               >
                                 {selected.phone}
                               </a>
@@ -6909,10 +7050,10 @@ export default function AdminClient({
                                       );
                                     tabs?.[nextIdx]?.focus();
                                   }}
-                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,translate] motion-safe:duration-[120ms] ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
                                       ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
-                                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] "
+                                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-6)] "
                                   }`}
                                 >
                                   <span
@@ -7037,7 +7178,7 @@ export default function AdminClient({
                                   >
                                     <summary
                                       onClick={gavetaDoPlano.aoTocarNoResumo}
-                                      className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]"
+                                      className={`alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <svg
                                         className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}
@@ -7357,7 +7498,7 @@ export default function AdminClient({
                                   >
                                     <summary
                                       onClick={gavetaDoHistorico.aoTocarNoResumo}
-                                      className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)]"
+                                      className={`alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <svg
                                         className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}

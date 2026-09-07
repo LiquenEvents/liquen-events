@@ -37,6 +37,14 @@ export type { EmptyStateProps } from "./EmptyState";
 export { Toolbar } from "./Toolbar";
 export type { ToolbarProps } from "./Toolbar";
 
+// ── Escolher, sem a caixa do sistema operativo ─────────────────────────────
+// A lista de um `<select>` é desenhada FORA do documento e nenhum CSS lhe
+// chega. Este é o substituto da casa — com o teclado, o leitor de ecrã e o
+// formulário que o nativo dava de graça, e com o nativo mantido no dedo (a
+// justificação está no cabeçalho do ficheiro).
+export { Escolha } from "./Escolha";
+export type { EscolhaProps, OpcaoDeEscolha } from "./Escolha";
+
 export { Segmented } from "./Segmented";
 export type { SegmentedProps, SegmentedOption } from "./Segmented";
 

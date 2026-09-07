@@ -11,6 +11,7 @@ import { useDefinicoesDaProposta } from "./definicoes-da-proposta";
 import { foraDoPadrao, padraoPara, paxDaProposta } from "@/lib/orcamento/padrao-de-preco";
 import { chaveDoServico, type Historico, type Omissao } from "@/lib/orcamento/memoria-de-precos";
 import { Button } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -299,7 +300,7 @@ export default function PainelInterno({
         // baixo. Com a quebra ligada e o título protegido (linha a seguir),
         // quem sobra sem espaço é a explicação — que pode dar-se ao luxo de
         // descer para a linha de baixo, e não de se partir a meio.
-        className="alvo-toque !justify-start flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 text-left"
+        className={`alvo-toque !justify-start flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 text-left ${ESTADO} ${PRESSAO}`}
       >
         <span aria-hidden="true" className="text-foreground/35">
           {aberto ? "▾" : "▸"}

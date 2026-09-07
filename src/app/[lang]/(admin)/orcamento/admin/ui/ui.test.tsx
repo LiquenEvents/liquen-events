@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Button } from "./Button";
 import { Card, SectionCard } from "./Card";
 import { Field } from "./Field";
@@ -96,16 +97,41 @@ describe("Field", () => {
     erro.mockRestore();
   });
 
-  it("renders a select with forwarded options", () => {
+  /**
+   * ── ISTO JÁ NÃO É UM `<select>`, E O TESTE MUDOU POR ISSO ────────────────
+   *
+   * A caixa que o `as="select"` abria era desenhada pelo SISTEMA OPERATIVO,
+   * fora do documento: nenhum CSS lhe chegava. Quem desenha agora é o
+   * `ui/Escolha` (a decisão, e o porquê de no DEDO se manter o nativo, estão no
+   * cabeçalho desse ficheiro). Com rato, o controlo é um `role="combobox"`.
+   *
+   * O que este teste guarda é o que NÃO podia mudar na troca: a API dos
+   * chamadores (os mesmos `<option>` como filhos, o mesmo `defaultValue`) e o
+   * nome acessível vir do `<label>` — que num `combobox` deixa de ser o
+   * `for`/`id` do nativo e passa a ter de ser dito por `aria-labelledby`.
+   */
+  it('as="select" abre uma lista NOSSA, com os mesmos `<option>` e o mesmo nome', async () => {
+    const u = userEvent.setup();
     render(
       <Field as="select" label="Estado" defaultValue="novo">
         <option value="novo">Novo</option>
         <option value="cotado">Proposta enviada</option>
       </Field>,
     );
-    const select = screen.getByLabelText("Estado") as HTMLSelectElement;
-    expect(select.tagName).toBe("SELECT");
-    expect(select.value).toBe("novo");
+    const campo = screen.getByLabelText("Estado");
+    // O sinal de que a caixa do sistema saiu: já não é um `<select>`.
+    expect(campo.tagName).toBe("BUTTON");
+    expect(campo).toHaveAttribute("role", "combobox");
+    // Não-controlado: o `defaultValue` continua a mandar, como no nativo.
+    expect(campo).toHaveTextContent("Novo");
+
+    await u.click(campo);
+    expect(screen.getAllByRole("option").map((o) => o.textContent?.replace("✓", ""))).toEqual([
+      "Novo",
+      "Proposta enviada",
+    ]);
+    await u.click(screen.getByRole("option", { name: /Proposta enviada/ }));
+    expect(campo).toHaveTextContent("Proposta enviada");
   });
 
   it("underline variant swaps the boxed look for a bottom hairline, keeping a11y wiring", () => {

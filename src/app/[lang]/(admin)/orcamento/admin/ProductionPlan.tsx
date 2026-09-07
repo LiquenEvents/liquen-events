@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
 import { metaFor } from "./status-meta";
-import { Button, EmptyState } from "./ui";
+import { Escolha, Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import {
@@ -404,7 +404,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         role="checkbox"
                         aria-checked={i.done}
                         aria-label={i.label}
-                        className="alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55"
+                        className={`alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           className={`w-4 h-4 rounded border flex items-center justify-center ${ESTADO} ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
@@ -455,18 +455,19 @@ export default function ProductionPlan({ quote, onChange }: Props) {
 
       {/* Adicionar uma tarefa própria a qualquer fase do plano. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select
-          value={newPhase}
-          onChange={(e) => setNewPhase(e.target.value)}
+        <Escolha
+          valor={newPhase}
+          aoMudar={setNewPhase}
           aria-label="Fase"
-          className="bo-input w-auto px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
+          containerClassName="w-auto"
+          className="px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]"
         >
           {DECOR_PRODUCTION.map((p) => (
             <option key={p.key} value={p.key}>
               {p.label}
             </option>
           ))}
-        </select>
+        </Escolha>
         <input
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}

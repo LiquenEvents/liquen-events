@@ -278,7 +278,7 @@ export default function EditorDeEscolhas({
           </span>
           <button
             type="button"
-            className="alvo-toque shrink-0 text-[12px] font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            className={`alvo-toque shrink-0 text-[12px] font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={() => {
               onChange(anulavel.escolhas);
               setAnulavel(null);

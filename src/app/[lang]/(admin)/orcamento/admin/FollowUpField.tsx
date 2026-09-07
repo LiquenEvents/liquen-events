@@ -5,6 +5,7 @@ import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 interface Props {
   quote: Quote;
@@ -109,7 +110,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
         {value && (
           <button
             onClick={() => void persist(undefined)}
-            className="alvo-toque px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-[var(--bo-text-muted)] transition-colors"
+            className={`alvo-toque px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
           >
             Limpar
           </button>
@@ -124,7 +125,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
           <button
             key={p.label}
             onClick={() => void persist(plusDays(p.days))}
-            className="alvo-toque px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] transition-colors"
+            className={`alvo-toque px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
           >
             {p.label}
           </button>

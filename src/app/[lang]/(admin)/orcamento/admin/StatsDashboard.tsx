@@ -10,8 +10,18 @@ import { eur0 as eur } from "@/lib/money";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import AnalisePropostas from "./AnalisePropostas";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
-import { ESTADO, PROGRESSO } from "./ui/movimento";
+import { ESTADO, PROGRESSO, PRESSAO } from "./ui/movimento";
 import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
+import {
+  MarcaDaOrigem,
+  OrigensQueChegam,
+  agruparOrigens,
+  detalheDaOrigem,
+  tituloDaOrigem,
+  useGestoQueApresenta,
+  type ChaveDeMarca,
+  type LinhaDeOrigem,
+} from "./origem-do-pedido";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
 // the back office (Overview, Kanban): Novo / Aguardar resposta / Proposta enviada /
@@ -150,19 +160,50 @@ function VBars({
   );
 }
 
-function HBars({ data }: { data: { label: string; value: number; color?: string }[] }) {
+/**
+ * ── A MARCA É OPCIONAL, E A LINHA DE DETALHE TAMBÉM ────────────────────────
+ *
+ * As `HBars` servem quatro quadros («Por estado», «Por categoria», «Tipos de
+ * evento», «Como nos conheceram») e só o último tem origens. Por isso os três
+ * campos novos são opcionais e os outros três quadros não mudam um pixel:
+ *
+ *   · `marca` — o glifo à esquerda do rótulo, na origem da barra;
+ *   · `detalhe` — do que é feito o número, quando a linha juntou etiquetas;
+ *   · `titulo` — a conta toda, para quem tem rato.
+ */
+type BarraH = {
+  label: string;
+  value: number;
+  color?: string;
+  marca?: ChaveDeMarca;
+  detalhe?: string | null;
+  titulo?: string;
+};
+
+function HBars({ data }: { data: BarraH[] }) {
   const max = Math.max(1, ...data.map((d) => d.value));
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   return (
     <div className="flex flex-col gap-3">
       {data.map((d, i) => (
-        <div key={i}>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[var(--bo-text-muted)] text-xs">{d.label}</span>
-            <span className="text-foreground/35 text-[10px] tabular-nums">
+        <div key={i} title={d.titulo}>
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <span className="flex items-center gap-2 min-w-0">
+              {d.marca && <MarcaDaOrigem marca={d.marca} nome={d.label} />}
+              <span className="text-[var(--bo-text-muted)] text-xs truncate">{d.label}</span>
+            </span>
+            <span className="text-foreground/35 text-[10px] tabular-nums shrink-0">
               {d.value} · {Math.round((d.value / total) * 100)}%
             </span>
           </div>
+          {/* Do que é feito o número. À VISTA e não só no `title`: no telemóvel
+              o `title` não existe, e um agregado que não se pode abrir é um
+              agregado em que não se pode confiar. */}
+          {d.detalhe && (
+            <p className="text-foreground/35 text-[10px] leading-snug mb-1.5 break-words">
+              {d.detalhe}
+            </p>
+          )}
           <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
             <div
               className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
@@ -211,6 +252,15 @@ function Section({
    * degrau só. Uma escada por linha não é uma cascata, é um tremor.
    */
   const gaveta = useGaveta();
+  /**
+   * E a viagem das marcas de origem é armada PELO MESMO gesto — o da gaveta.
+   * Não é um segundo movimento a competir com a `.bo-entrada` do corpo: é o
+   * mesmo instante, e as marcas viajam no eixo da barra (X) enquanto o corpo
+   * assenta no seu (Y). Fora do gesto — sem JavaScript, com movimento
+   * reduzido, ou numa gaveta reaberta pelo «localizar na página» — o estado é
+   * «quieto e visível». O porquê inteiro está em `origem-do-pedido.tsx`.
+   */
+  const gesto = useGestoQueApresenta(gaveta.aAbrir);
   return (
     <details
       open={defaultOpen}
@@ -219,7 +269,7 @@ function Section({
     >
       <summary
         onClick={gaveta.aoTocarNoResumo}
-        className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden"
+        className={`flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
       >
         <div className="min-w-0">
           <span className="text-[var(--bo-text-muted)] text-[10px] tracking-[0.3em] uppercase font-medium">
@@ -247,7 +297,9 @@ function Section({
           <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </summary>
-      <div className={`px-6 pb-6 pt-1 ${gaveta.corpo}`}>{children}</div>
+      <div className={`px-6 pb-6 pt-1 ${gaveta.corpo}`}>
+        <OrigensQueChegam gesto={gesto}>{children}</OrigensQueChegam>
+      </div>
     </details>
   );
 }
@@ -314,7 +366,6 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     const byStatus: Record<string, number> = {};
     const byCategory: Record<string, number> = {};
     const byEventType: Record<string, number> = {};
-    const byReferral: Record<string, number> = {};
     let guestsSum = 0,
       guestsCount = 0;
     let pipelineSum = 0,
@@ -339,8 +390,23 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     // Days-to-close tracking (submittedAt → lastUpdated for accepted quotes)
     let closeSum = 0,
       closeCount = 0;
-    // Referral source conversion
-    const byReferralConv: Record<string, { total: number; accepted: number }> = {};
+    /**
+     * ── AS ORIGENS SAEM DO CICLO, E É ESSA A CORRECÇÃO ──────────────────────
+     *
+     * Estavam aqui dois acumuladores — `byReferral` (o quadro «Como nos
+     * conheceram») e `byReferralConv` («Conversão por fonte») — e AMBOS
+     * agrupavam pela cadeia CRUA do `referralSource`. Como essa cadeia é
+     * composta pelo `LeadSourceCapture` com o que cada visita calhou de trazer,
+     * o mesmo Instagram entrava com três etiquetas diferentes e contava três
+     * vezes: 9 + 6 + 3 em vez de 18. O quadro dizia que o Instagram valia menos
+     * do que o Google quando vale quase o dobro, e a conversão da mesma origem
+     * aparecia duas vezes na mesma lista, com duas taxas diferentes.
+     *
+     * Passam os dois a sair de UMA função partilhada, `agruparOrigens`
+     * (`origem-do-pedido.tsx`), que reconhece a origem e devolve a chave por
+     * que se conta. Uma função só, e não uma normalização em cada sítio: dois
+     * quadros a discordar um do outro é pior do que dois quadros errados.
+     */
 
     for (const q of filteredQuotes) {
       byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
@@ -348,14 +414,6 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         (byCategory[CATEGORIES.find((c) => c.id === q.category)?.label ?? "Outro"] ?? 0) + 1;
       const et = eventTypeLabel(q);
       byEventType[et] = (byEventType[et] ?? 0) + 1;
-      const ref = q.referralSource?.trim() || "Não indicado";
-      byReferral[ref] = (byReferral[ref] ?? 0) + 1;
-
-      // Referral conversion tracking
-      if (!byReferralConv[ref]) byReferralConv[ref] = { total: 0, accepted: 0 };
-      byReferralConv[ref].total++;
-      if (q.status === "aceite") byReferralConv[ref].accepted++;
-
       if (q.guests > 0) {
         guestsSum += q.guests;
         guestsCount++;
@@ -529,15 +587,13 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     const avgDaysClose = closeCount > 0 ? Math.round(closeSum / closeCount) : 0;
     const forecastRevenue = conversion > 0 ? Math.round(pipelineSum * (conversion / 100)) : 0;
 
-    const referralConvRows = Object.entries(byReferralConv)
-      .map(([label, { total, accepted }]) => ({
-        label,
-        total,
-        accepted,
-        rate: total > 0 ? Math.round((accepted / total) * 100) : 0,
-      }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 8);
+    // UMA agregação para os dois quadros — ver o comentário lá em cima.
+    const origens = agruparOrigens(
+      filteredQuotes.map((q) => ({
+        origem: q.referralSource ?? "",
+        aceite: q.status === "aceite",
+      })),
+    );
 
     return {
       total,
@@ -574,8 +630,14 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         .filter((d) => d.value > 0),
       categoryBars: toSorted(byCategory),
       eventTypeBars: toSorted(byEventType).slice(0, 6),
-      referralBars: toSorted(byReferral).slice(0, 6),
-      referralConvRows,
+      referralBars: origens.slice(0, 6).map((o) => ({
+        label: o.nome,
+        value: o.total,
+        marca: o.marca,
+        detalhe: detalheDaOrigem(o),
+        titulo: tituloDaOrigem(o),
+      })),
+      referralConvRows: origens.slice(0, 8),
       lostReasonRows: Object.entries(
         filteredQuotes.reduce<Record<string, number>>((acc, q) => {
           if (q.status === "rejeitado" && q.lostReason?.trim()) {
@@ -982,36 +1044,47 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
             hint="Leads que se tornaram evento ganho, por origem."
           >
             <div className="flex flex-col gap-3">
-              {stats.referralConvRows.map((row) => (
-                <div key={row.label}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[var(--bo-text-muted)] text-xs truncate max-w-[55%]">
-                      {row.label}
+              {stats.referralConvRows.map((row: LinhaDeOrigem) => (
+                <div key={row.chave} title={tituloDaOrigem(row)}>
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
+                    {/* A MESMA marca e o MESMO nome do quadro de cima: os dois
+                        quadros bebem da mesma `agruparOrigens`, portanto não há
+                        maneira de a origem aqui ser outra coisa do que ali. */}
+                    <span className="flex items-center gap-2 min-w-0">
+                      <MarcaDaOrigem marca={row.marca} nome={row.nome} />
+                      <span className="text-[var(--bo-text-muted)] text-xs truncate">
+                        {row.nome}
+                      </span>
                     </span>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-foreground/30 text-[10px] tabular-nums">
-                        {row.accepted}/{row.total} leads
+                        {row.aceites}/{row.total} leads
                       </span>
                       <span
                         className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
                         style={{
                           // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
                           color: corDeTexto(
-                            row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                            row.taxa >= 50 ? "#4d6350" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
                           ),
                         }}
                       >
-                        {row.rate}%
+                        {row.taxa}%
                       </span>
                     </div>
                   </div>
+                  {detalheDaOrigem(row) && (
+                    <p className="text-foreground/35 text-[10px] leading-snug mb-1.5 break-words">
+                      {detalheDaOrigem(row)}
+                    </p>
+                  )}
                   <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                     <div
                       className={`h-full w-full origin-left rounded-full ${PROGRESSO}`}
                       style={{
-                        transform: `scaleX(${fraccaoDaBarra(row.rate, 100)})`,
+                        transform: `scaleX(${fraccaoDaBarra(row.taxa, 100)})`,
                         background:
-                          row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
+                          row.taxa >= 50 ? "#4d6350" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
                       }}
                     />
                   </div>

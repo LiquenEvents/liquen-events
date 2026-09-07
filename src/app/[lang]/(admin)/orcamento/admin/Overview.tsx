@@ -433,13 +433,13 @@ function AvisoConflito({
       <div className="flex flex-wrap gap-2 mt-2.5">
         <button
           onClick={() => onEscolher("meu")}
-          className={`px-3 py-1.5 rounded-full bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+          className={`px-3 py-1.5 rounded-full bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
         >
           {doBrowser ? "Guardar as deste browser" : "Guardar a minha por cima"}
         </button>
         <button
           onClick={() => onEscolher("servidor")}
-          className={`px-3 py-1.5 rounded-lg border border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING}`}
+          className={`px-3 py-1.5 rounded-lg border border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
         >
           Ficar com a do servidor
         </button>
@@ -486,7 +486,7 @@ function LinhaEstado({
         Não foi possível guardar — o texto está só neste ecrã. {estado.mensagem}{" "}
         <button
           onClick={() => onTentarDeNovo(texto)}
-          className={`underline font-semibold rounded ${FOCUS_RING}`}
+          className={`underline font-semibold rounded ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
         >
           Tentar de novo
         </button>
@@ -513,7 +513,7 @@ function AvisoLeitura({ onRecarregar }: { onRecarregar: () => void }) {
   return (
     <p role="alert" className="text-[#8a2a22] text-xs leading-relaxed">
       Não foi possível ler o que está guardado no servidor.{" "}
-      <button onClick={onRecarregar} className={`underline font-semibold rounded ${FOCUS_RING}`}>
+      <button onClick={onRecarregar} className={`underline font-semibold rounded ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}>
         Tentar de novo
       </button>
     </p>
@@ -998,7 +998,7 @@ function AEsperaDeResposta({
               type="button"
               onClick={() => onOpen(quote)}
               aria-label={`Abrir o pedido de ${quote.name}`}
-              className={`alvo-toque !justify-between w-full flex items-center justify-between gap-3 text-left rounded ${FOCUS_RING}`}
+              className={`alvo-toque !justify-between w-full flex items-center justify-between gap-3 text-left rounded ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
             >
               <span className="min-w-0">
                 <span className="block text-[var(--bo-tinta-72)] text-sm font-medium truncate">

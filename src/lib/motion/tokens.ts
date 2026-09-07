@@ -206,3 +206,116 @@ export const PHOTO_REVEAL_FULL_S = 1.15;
 export const PHOTO_REVEAL_LARGE_S = 0.9;
 /** Mosaico e tiles pequenos — o mesmo tempo de qualquer outra entrada. */
 export const PHOTO_REVEAL_TILE_S = REVEAL_S;
+
+/**
+ * ── A MOLA DA CHEGADA ───────────────────────────────────────────────────────
+ *
+ * A SEGUNDA mola, e a razão de ser segunda está na primeira: a `MOLA` aqui em
+ * cima é para o que se ARRASTA, e por isso tem o amortecimento a 95% do crítico
+ * — assenta e fica, com um recuo de centésimos de píxel. Num painel onde se
+ * arrastam quarenta fotografias, uma que oscilasse parecia que o programa não
+ * estava seguro do que tinha feito.
+ *
+ * Uma CHEGADA é o problema oposto. Uma caixa que o utilizador convocou — uma
+ * folha do telemóvel, um diálogo — não está a obedecer a um dedo: está a
+ * apresentar-se. E uma coisa que pára exactamente onde devia, à primeira, lê-se
+ * como um fotograma final que apareceu; uma que passa ligeiramente do sítio e
+ * assenta lê-se como um objecto que CHEGOU. É a diferença que se sente num
+ * telefone da Apple ao abrir uma folha.
+ *
+ * ── OS NÚMEROS, E A CONTA ─────────────────────────────────────────────────
+ *
+ *   rigidez 2000, massa 1    →  ωn = √(2000/1) = 44,72 rad/s
+ *   amortecimento 51         →  ζ  = 51 / (2·√(2000·1)) = 0,570
+ *   ωd = ωn·√(1−ζ²) = 36,74 rad/s
+ *
+ * Daí saem, por conta e não por gosto:
+ *
+ *   · **ultrapassagem de 11,1%** — e(−πζ/√(1−ζ²)). Num percurso de 18 px são
+ *     2,0 px para lá do sítio, e o recuo seguinte é de 0,25 px. Vê-se como
+ *     assentamento, não como saltinho.
+ *   · **o pico aos 86 ms** — π/ωd. Ou seja o gesto já CHEGOU a meio da
+ *     animação; o que vem depois é a assentar.
+ *   · **assenta a 1% aos 181 ms** — −ln(0,01)/(ζ·ωn), e a 0,2% aos 240.
+ *
+ * ── E PORQUE É QUE ESTA MOLA É TÃO DURA: FOI MEDIDA A CUSTAR ─────────────
+ *
+ * A primeira versão era 900/34, que assenta em 360 ms — e 360 ms foi o que
+ * este vocabulário teve de devolver. MEDIDO, A/B na mesma compilação, diálogo
+ * a abrir a 1440×900 com o CPU travado 6×, mediana de sete repetições:
+ *
+ *     percurso só (10/18 px, 240 ms)               20 fotogramas perdidos
+ *     percurso + escala 0,97 (240 ms)              22
+ *     percurso + mola de 360 ms (sem escala)       35   ← o custo está aqui
+ *     percurso + escala + mola de 360 ms           28
+ *     (e o que lá estava antes, 4 px, 240 ms)      30
+ *
+ * Ou seja: a DISTÂNCIA e a ESCALA são de graça — o percurso maior até saiu
+ * melhor do que o que lá estava. O que custava era a caixa ficar 120 ms a mais
+ * com uma camada composta viva, num ecrã com quatro vezes a área do telemóvel.
+ * A regra da casa não hesita: a fluidez ganha à espectacularidade, sempre.
+ *
+ * A mola não foi deitada fora — foi ENDURECIDA até assentar dentro dos 240 ms
+ * que o resto do vocabulário já usava. É a mesma mola: ωn multiplicado por 1,5
+ * (rigidez ×2,25, amortecimento ×1,5) mantém o ζ e portanto mantém a FORMA —
+ * a mesma ultrapassagem de 11%, o mesmo recuo, tudo em dois terços do tempo. E
+ * o vocabulário fica com UMA duração para o que aparece, em vez de duas.
+ *
+ * A `MOLA` do arrasto, com ζ = 0,95, dá uma ultrapassagem de 0,007% — sete
+ * centésimos de milésimo. Usá-la aqui era escrever «mola» e não ter mola
+ * nenhuma; foi medido antes de se acrescentar esta.
+ */
+export const MOLA_CHEGADA = {
+  /** A força com que puxa para o sítio. */
+  rigidez: 2000,
+  /** O travão. Mais fraco do que o do arrasto de propósito: é o que deixa passar. */
+  amortecimento: 51,
+  massa: 1,
+} as const;
+
+/**
+ * Quanto dura uma chegada com mola — e é, de propósito, o MESMO número da
+ * `.bo-entrada` de toda a gente. Ver acima a medição que o obrigou a sê-lo.
+ */
+export const CHEGADA_MS = 240;
+
+/** Quantos degraus tem o `linear()` que o CSS lê. */
+export const CHEGADA_PASSOS = 30;
+
+/**
+ * A MOLA ESCRITA EM CSS — e porque é que isto não é uma terceira curva.
+ *
+ * Uma `cubic-bezier` não sabe ultrapassar sem que alguém escolha à mão um ponto
+ * de controlo fora do intervalo, e isso seria mesmo uma curva nova, inventada
+ * ao olho, a competir com as duas que a casa escolheu. O `linear()` não é isso:
+ * é a resposta da `MOLA_CHEGADA` aqui em cima, AMOSTRADA. Os números não se
+ * escolhem — calculam-se a partir da rigidez e do amortecimento, e mudar a mola
+ * muda-os a todos de uma vez.
+ *
+ * x(t) = 1 − e^(−ζ·ωn·t)·(cos(ωd·t) + (ζ·ωn/ωd)·sin(ωd·t))
+ *
+ * Normaliza-se por x(D) para o último degrau ser exactamente 1: uma curva de
+ * animação que não acabe em 1 deixa o elemento a dois décimos de píxel do sítio
+ * para sempre.
+ *
+ * O `tokens.coerencia.test.ts` regenera esta cadeia e compara-a, caracter a
+ * caracter, com a que está no `globals.css` — pelo mesmo motivo por que já o
+ * faz com as duas curvas: dois sítios, um valor.
+ */
+export function molaEmLinear(
+  mola: { rigidez: number; amortecimento: number; massa: number } = MOLA_CHEGADA,
+  duracaoMs: number = CHEGADA_MS,
+  passos: number = CHEGADA_PASSOS,
+): string {
+  const wn = Math.sqrt(mola.rigidez / mola.massa);
+  const z = mola.amortecimento / (2 * Math.sqrt(mola.rigidez * mola.massa));
+  const wd = wn * Math.sqrt(1 - z * z);
+  const x = (t: number) =>
+    1 - Math.exp(-z * wn * t) * (Math.cos(wd * t) + ((z * wn) / wd) * Math.sin(wd * t));
+  const fim = x(duracaoMs / 1000);
+  const pontos: number[] = [];
+  for (let i = 0; i <= passos; i++) {
+    pontos.push(Number((x(((duracaoMs / 1000) * i) / passos) / fim).toFixed(4)));
+  }
+  return `linear(${pontos.join(", ")})`;
+}

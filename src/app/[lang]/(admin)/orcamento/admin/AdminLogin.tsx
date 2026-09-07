@@ -688,7 +688,7 @@ export default function AdminLogin() {
                 // palavra-passe falhou, e reescrever o email é atrito a mais.
                 setEmailRecuperacao(email);
               }}
-              className="alvo-toque mt-4 w-full text-center text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)]"
+              className={`alvo-toque mt-4 w-full text-center text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
             >
               Esqueceste-te da palavra-passe?
             </button>
@@ -741,7 +741,7 @@ export default function AdminLogin() {
                     setARecuperar(false);
                     setRespostaRecuperacao(null);
                   }}
-                  className="alvo-toque text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)]"
+                  className={`alvo-toque text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
                 >
                   Voltar
                 </button>
