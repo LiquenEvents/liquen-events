@@ -2,6 +2,12 @@ import "../../admin.css";
 import { Geist } from "next/font/google";
 import { normalizeLocale } from "@/lib/i18n";
 import { Cortina } from "@/components/Cortina";
+import { cookies } from "next/headers";
+import {
+  COOKIE_APARENCIA,
+  aparenciaValida,
+  atributoDaAparencia,
+} from "./orcamento/admin/ui/aparencia";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -151,8 +157,32 @@ export default async function AdminLayout({
 }) {
   const { lang } = await params;
 
+  /*
+    ── A APARÊNCIA CHEGA NO HTML, E NÃO NUM `useEffect` ────────────────────
+
+    É a mesma lição que este ficheiro já conta duas vezes, aplicada uma
+    terceira. O menu do sítio piscava porque a classe `admin-mode` só entrava
+    num `useEffect`; o `padding-top` custava 0,128 de CLS pela mesma razão. A
+    cura foi a mesma das duas vezes: pôr no HTML do servidor o que tem de valer
+    no primeiro pixel.
+
+    Uma aparência lida do `localStorage` seria exactamente o mesmo defeito com
+    outra roupa — e a pior versão dele, porque o que pisca é o ecrã inteiro a
+    branco na cara de quem escolheu escuro. Vem de um cookie, que o servidor lê
+    aqui, e o CSS encontra o atributo já pintado.
+
+    No automático não há atributo nenhum: o `color-scheme: light dark` do
+    `globals.css` deixa o sistema operativo decidir. Ver `ui/aparencia.ts`.
+  */
+  const aparencia = aparenciaValida((await cookies()).get(COOKIE_APARENCIA)?.value);
+
   return (
-    <main id="conteudo" data-admin-mode className={`flex-1 ${geist.variable}`}>
+    <main
+      id="conteudo"
+      data-admin-mode
+      data-aparencia={atributoDaAparencia(aparencia)}
+      className={`flex-1 ${geist.variable}`}
+    >
       {/*
         A MESMA CORTINA DA PROPOSTA, À ENTRADA DO BACK OFFICE.
 

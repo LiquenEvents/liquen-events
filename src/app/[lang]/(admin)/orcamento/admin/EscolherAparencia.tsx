@@ -1,0 +1,88 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Segmented } from "./ui/Segmented";
+import {
+  APARENCIAS,
+  COOKIE_APARENCIA,
+  VALIDADE_APARENCIA_S,
+  aparenciaValida,
+} from "./ui/aparencia";
+import type { Aparencia } from "./ui/aparencia";
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CLARO, ESCURO, OU O QUE O COMPUTADOR DISSER
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Três estados, com Automático por omissão — é o que a Parte 5.3 do
+ * `docs/DESIGN-SYSTEM.md` manda, e a razão está lá: a Apple desaconselha que
+ * uma aplicação imponha uma aparência, porque quem põe o computador em escuro
+ * ao fim da tarde quer que TUDO acompanhe, e não ter de ir a cada aplicação.
+ *
+ * ── O QUE ESTE COMPONENTE FAZ, E O QUE NÃO FAZ ────────────────────────────
+ *
+ * Não troca cor nenhuma. Escreve um cookie e põe um atributo — e quem troca as
+ * cores é o `globals.css`, com `light-dark()` e `color-scheme`. É de propósito:
+ * uma troca feita em JavaScript teria de conhecer as trinta e tal cores, e
+ * ficariam duas listas a discordar no dia em que uma mudasse.
+ *
+ * ── PORQUE É QUE O ATRIBUTO É POSTO AQUI *E* VEM DO SERVIDOR ──────────────
+ *
+ * O cookie é para a PRÓXIMA vez: o `layout.tsx` lê-o e serve o atributo já no
+ * HTML, para não haver clarão a abrir o painel. Mas um cookie sozinho só teria
+ * efeito depois de recarregar, e carregar em «Escuro» e não acontecer nada é
+ * um botão avariado.
+ *
+ * Por isso escreve-se nos dois sítios: o atributo no elemento que já cá está,
+ * para a mudança ser IMEDIATA, e o cookie para ela ficar. O elemento é o mesmo
+ * que o servidor marca — o `<main data-admin-mode>` —, portanto não há dois
+ * sítios a discordar, há o mesmo sítio escrito por dois lados.
+ */
+export function EscolherAparencia() {
+  /*
+    ── PORQUE É QUE ISTO COMEÇA EM `auto` E SÓ DEPOIS LÊ O QUE ESTÁ ─────────
+
+    O servidor não sabe, ao desenhar ESTE componente, qual dos três segmentos
+    fica aceso — o cookie é lido no layout, lá em cima, e não desce até aqui.
+    Se este arrancasse a ler o DOM, o servidor desenhava «Automático» e o
+    browser desenhava «Escuro» no mesmo sítio: uma discordância de hidratação,
+    que o React resolve deitando fora o que o servidor fez.
+
+    Começa em `auto` — o mesmo dos dois lados — e alinha-se no primeiro efeito,
+    lendo o atributo que o servidor JÁ PINTOU. O que se vê é, quando muito, o
+    segmento certo a acender um fotograma depois; as CORES não piscam, porque
+    quem manda nelas é o atributo, e esse chegou no HTML.
+  */
+  const [aparencia, setAparencia] = useState<Aparencia>("auto");
+
+  useEffect(() => {
+    const alvo = document.querySelector<HTMLElement>("[data-admin-mode]");
+    setAparencia(aparenciaValida(alvo?.dataset.aparencia));
+  }, []);
+
+  function escolher(nova: Aparencia) {
+    setAparencia(nova);
+
+    // Imediato: o mesmo elemento que o servidor marca.
+    const alvo = document.querySelector<HTMLElement>("[data-admin-mode]");
+    if (alvo) {
+      if (nova === "auto") delete alvo.dataset.aparencia;
+      else alvo.dataset.aparencia = nova;
+    }
+
+    // E fica: `SameSite=Lax` porque isto nunca precisa de viajar num pedido de
+    // outro sítio, e `path=/` para valer em todo o back office.
+    document.cookie =
+      `${COOKIE_APARENCIA}=${nova}; path=/; max-age=${VALIDADE_APARENCIA_S}; SameSite=Lax`;
+  }
+
+  return (
+    <Segmented<Aparencia>
+      ariaLabel="Aparência do back office"
+      value={aparencia}
+      onChange={escolher}
+      options={APARENCIAS.map(({ id, rotulo }) => ({ value: id, label: rotulo }))}
+    />
+  );
+}
