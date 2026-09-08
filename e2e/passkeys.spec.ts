@@ -57,8 +57,54 @@ async function entrarComSenha(page: Page): Promise<boolean> {
   }
 }
 
+/**
+ * ── «OS MEUS DISPOSITIVOS» MUDOU DE SÍTIO, E NÃO DE NOME ──────────────────
+ *
+ * Vivia na coluna da esquerda, que estava sempre à vista no computador — daí
+ * este passeio carregar-lhe directamente. A coluna acabou: «a barra substitui
+ * o menu». Os destinos passaram para a cápsula que flutua em baixo, e o que
+ * NÃO é navegação — o logótipo, a conta, a ajuda, as quatro acções e este
+ * botão — ficou numa gaveta, que se abre.
+ *
+ * Abre-se primeiro, portanto. E a porta é a mesma nas duas larguras: a peça
+ * redonda «Mais destinos», ao lado da cápsula.
+ *
+ * `.first()`: «Mais destinos» é de propósito o nome de duas coisas — o botão
+ * que abre e a lista que ele abre —, para quem ouve saber o que vai encontrar.
+ * Papéis diferentes, mas a busca por nome apanha o botão do cabeçalho também
+ * quando ele existe.
+ *
+ * ── E ABRE-SE SEMPRE, SEM PERGUNTAR SE JÁ ESTÁ ABERTA ────────────────────
+ *
+ * A primeira versão perguntava com um `isVisible()` e só abria se fosse
+ * preciso. Não funciona, e a razão é subtil: a gaveta FECHADA vive em
+ * `-translate-x-full`, ou seja está fora do ecrã mas continua no DOM, com
+ * tamanho e sem `display:none`. Para o Playwright isso é VISÍVEL — o guarda
+ * dava-se por satisfeito, não abria nada, e o clique morria trinta segundos
+ * depois com «element is outside of the viewport».
+ *
+ * O abridor só abre (`setNavOpen(true)`), nunca alterna. Chamá-lo com a gaveta
+ * já aberta não faz mal nenhum, e uma pergunta que se pode enganar vale menos
+ * do que um gesto que não se engana.
+ */
+/**
+ * Carrega num botão que vive NA GAVETA, abrindo-a primeiro.
+ *
+ * «Os meus dispositivos» e «Sair» viviam os dois na coluna da esquerda, que
+ * estava sempre à vista no computador. A coluna acabou e eles ficaram na
+ * gaveta — juntos, porque nenhum dos dois é navegação.
+ */
+async function naGaveta(page: Page, nome: RegExp) {
+  await page
+    .getByRole("button", { name: /^Mais destinos$/ })
+    .first()
+    .click();
+  const botao = page.getByRole("button", { name: nome });
+  await botao.click();
+}
+
 async function abrirDispositivos(page: Page) {
-  await page.getByRole("button", { name: /Os meus dispositivos/i }).click();
+  await naGaveta(page, /Os meus dispositivos/i);
   await expect(page.getByRole("dialog", { name: /Os meus dispositivos/i })).toBeVisible();
 }
 
@@ -100,7 +146,7 @@ test.describe("Passkeys", () => {
 
     // ── 2. Sair ────────────────────────────────────────────────────────────
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: /^Sair$/i }).click();
+    await naGaveta(page, /^Sair$/i);
     await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
 
     // ── 3. Entrar SEM palavra-passe ────────────────────────────────────────
@@ -117,7 +163,7 @@ test.describe("Passkeys", () => {
     await expect(dialogo.getByText("Portátil da bancada")).toHaveCount(0, { timeout: 10_000 });
 
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: /^Sair$/i }).click();
+    await naGaveta(page, /^Sair$/i);
     await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
 
     // O aparelho ainda tem a chave; o servidor é que já não a conhece. Entrar
