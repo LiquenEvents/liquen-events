@@ -911,7 +911,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       else openAdd(key);
                     }
                   }}
-                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
+                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
                     isSelected
                       ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
                       : isToday

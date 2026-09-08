@@ -502,7 +502,7 @@ export default function EmailDoEnvio({
       >
         <summary
           onClick={gaveta.aoTocarNoResumo}
-          className={`cursor-pointer list-none px-3 py-2 text-xs text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
+          className={` list-none px-3 py-2 text-xs text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
         >
           <span aria-hidden="true">▸ </span>Ver como o cliente o recebe
         </summary>

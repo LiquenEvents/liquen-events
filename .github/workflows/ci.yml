@@ -287,7 +287,11 @@ jobs:
       # continuam a parecer bem, só deixam de se mexer — e um passo que avisa e
       # deixa passar é um passo que se ignora. Não grava nada, portanto corre
       # contra o servidor de produção deste job sem precisar de Supabase.
-      - name: As molas chegam ao elemento (bloqueante)
+      # O `@movimento` cresceu para lá do nome: além das molas, leva agora o modo
+      # escuro (fase 03) e os cursores semânticos (fase 07). Todos partilham a
+      # mesma assinatura de avaria — o CSS fica com a regra e sem o efeito, e só
+      # um browser a que se pergunte os vê — e por isso partilham o passo.
+      - name: O que só um browser vê — molas, modo escuro, ponteiro (bloqueante)
         run: npx playwright test --grep "@movimento"
         env:
           CI: "true"

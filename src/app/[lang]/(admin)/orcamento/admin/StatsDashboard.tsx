@@ -269,7 +269,7 @@ function Section({
     >
       <summary
         onClick={gaveta.aoTocarNoResumo}
-        className={`flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
+        className={`flex list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
       >
         <div className="min-w-0">
           <span className="text-[var(--bo-text-muted)] text-[10px] tracking-[0.3em] uppercase font-medium">

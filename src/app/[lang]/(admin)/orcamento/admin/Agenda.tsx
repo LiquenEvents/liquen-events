@@ -349,7 +349,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                       <div key={i} className="relative">
                         <Wrap
                           onClick={it.onClick}
-                          className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? `hover:bg-[var(--bo-tinta-3)] cursor-pointer ${ESTADO} ${PRESSAO}` : ""}`}
+                          className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? `hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}` : ""}`}
                         >
                           <span
                             className="w-1.5 h-1.5 rounded-full shrink-0"

@@ -736,7 +736,7 @@ export default function ServicesEditor({
       <details className="pointer-coarse:hidden group -mt-2 mb-3" onToggle={gaveta.aoAlternar}>
         <summary
           onClick={gaveta.aoTocarNoResumo}
-          className={`marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
+          className={`marker:content-none inline-flex list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
         >
           <span
             aria-hidden

@@ -434,7 +434,7 @@ export default function SessaoExpirada() {
               className="text-center text-lg tracking-[0.4em]"
             />
           )}
-          <label className="alvo-toque flex cursor-pointer items-start gap-2.5 text-left">
+          <label className="alvo-toque flex items-start gap-2.5 text-left">
             <input
               type="checkbox"
               name="manterSessao"

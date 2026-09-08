@@ -814,7 +814,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               a classe centra por omissão. */}
           <summary
             onClick={gaveta.aoTocarNoResumo}
-            className={`alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque !justify-start bo-eyebrow inline-flex list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="12"

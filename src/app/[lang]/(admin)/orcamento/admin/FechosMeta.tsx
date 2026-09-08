@@ -321,7 +321,7 @@ export default function FechosMeta() {
                 estava. */}
             <summary
               onClick={gaveta.aoTocarNoResumo}
-              className={`cursor-pointer text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3 ${ESTADO} ${PRESSAO}`}
+              className={` text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3 ${ESTADO} ${PRESSAO}`}
             >
               {relatorio.examinados}{" "}
               {relatorio.examinados === 1 ? "fecho examinado" : "fechos examinados"} — ver o que

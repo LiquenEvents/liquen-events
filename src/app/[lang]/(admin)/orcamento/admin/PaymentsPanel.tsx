@@ -868,7 +868,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             Cresce o RÓTULO, não o quadrado: o HTML manda o toque no rótulo
             activar o controlo, e o desenho fica igual. `alvo-toque` só age sob
             `(pointer: coarse)`. */}
-        <label className="alvo-toque !justify-start inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-[var(--bo-text-muted)]">
+        <label className="alvo-toque !justify-start inline-flex select-none items-center gap-1.5 text-[11px] text-[var(--bo-text-muted)]">
           <input
             type="checkbox"
             checked={paidOnAdd}

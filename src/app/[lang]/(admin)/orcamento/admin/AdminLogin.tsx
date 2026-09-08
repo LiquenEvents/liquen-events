@@ -627,7 +627,7 @@ export default function AdminLogin() {
                 custavam 54 px que empurravam o botão de submeter para baixo da
                 dobra do telemóvel (medido a 390x844). Quem desliga vê logo o
                 que trocou. */}
-            <label className="alvo-toque flex cursor-pointer items-start gap-2.5 text-left">
+            <label className="alvo-toque flex items-start gap-2.5 text-left">
               <input
                 type="checkbox"
                 name="manterSessao"
@@ -776,7 +776,7 @@ export default function AdminLogin() {
                   no sublinhado. Passa a 232×44. */}
               <summary
                 onClick={gaveta.aoTocarNoResumo}
-                className={`alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
+                className={`alvo-toque list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
               >
                 Mudaste de telemóvel ou de computador?
               </summary>

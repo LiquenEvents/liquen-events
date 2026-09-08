@@ -2514,7 +2514,8 @@ body {
    browser mesmo fechado. */
 .bo-mais > summary {
   list-style: none;
-  cursor: pointer;
+  /* O cursor sai daqui: é a seta, como em tudo o que não é um link, e quem o
+     diz é o bloco «O PONTEIRO TEM SIGNIFICADO» mais abaixo neste ficheiro. */
 }
 .bo-mais > summary::-webkit-details-marker {
   display: none;
@@ -5904,4 +5905,65 @@ body:has(.barra-consentimento) footer {
 
   --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.34);
   --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O PONTEIRO TEM SIGNIFICADO — E É ISTO QUE SEPARA UMA APP DE UM SITE
+   ══════════════════════════════════════════════════════════════════════════
+
+   Fase 07 do `docs/DESIGN-SYSTEM.md`. A Parte 12.1 abre com a frase que
+   justifica o trabalho: «esta é a parte que mais distingue uma app de Mac de
+   um site, e a que quase nunca se faz».
+
+   ── A REGRA, QUE É CONTRA-INTUITIVA PARA QUEM VEM DA WEB ──────────────────
+
+   **Um botão não leva a mãozinha.** Leva a seta.
+
+   O `cursor: pointer` da web significa «isto leva-te a outro sítio» — é o
+   cursor do LINK, e nasceu com o hipertexto. Num sistema operativo, um botão
+   não te leva a lado nenhum: faz uma coisa, ali mesmo. Por isso o macOS
+   desenha a seta em cima de todos os botões, de todas as caixas de selecção,
+   de todos os menus. Abre o Finder e passa o rato por cima de um botão: seta.
+
+   É por isso que o documento a proíbe por escrito na lista da Parte 18
+   («`cursor: pointer` em botões») e a Parte 12.1 diz, letra por letra:
+   «`default` (seta) em **botões** — não `pointer`, que é para links; `pointer`
+   só em links de navegação».
+
+   MEDIDO antes desta ronda: 21 `cursor-pointer` no back office, e nem um deles
+   num `<a>`. Estavam em nove `<summary>`, seis `<label>`, um `<div>` e um
+   `<button>` — ou seja, a mãozinha aparecia exactamente onde não devia e em
+   nenhum sítio onde devia.
+
+   ── PORQUÊ AQUI E NÃO EM CADA COMPONENTE ─────────────────────────────────
+
+   Porque um cursor escrito componente a componente é um cursor que o próximo
+   componente esquece. Estas seis regras cobrem o back office inteiro, incluindo
+   o que ainda não foi escrito, e o sítio público não é tocado — o selector
+   pede o marcador que só o painel tem.
+
+   Os cursores de GESTO (`grab`, `grabbing`, `col-resize`, `not-allowed`)
+   ficam onde estão, nas classes dos componentes que os usam: esses dependem
+   do estado, e não do tipo do elemento.
+   ══════════════════════════════════════════════════════════════════════════ */
+body:has([data-admin-mode]) :is(button, [role="button"], [role="tab"], [role="option"], summary, label, select) {
+  cursor: default;
+}
+
+/* O link continua a ser a mãozinha. É o único que a merece. */
+body:has([data-admin-mode]) a[href] {
+  cursor: pointer;
+}
+
+/* Onde se escreve, o cursor diz que se escreve — incluindo as células
+   editáveis de uma tabela, que é onde isto mais falta faz. */
+body:has([data-admin-mode])
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, [contenteditable="true"]) {
+  cursor: text;
+}
+
+/* O que não se pode fazer diz-se antes do clique, e não depois. */
+body:has([data-admin-mode]) :is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
 }

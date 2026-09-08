@@ -587,14 +587,14 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       largura: "w-10",
       celula: (q) => (
         <label
-          className="flex cursor-pointer items-center justify-center"
+          className="flex items-center justify-center"
           onClick={(e) => e.stopPropagation()}
         >
           <input
             type="checkbox"
             checked={ctx.selectedIds.has(q.id)}
             onChange={() => ctx.toggleSelect(q.id)}
-            className="h-4 w-4 cursor-pointer accent-sage-600"
+            className="h-4 w-4 accent-sage-600"
             aria-label={`Selecionar pedido de ${q.name}`}
           />
         </label>
@@ -814,14 +814,14 @@ const QuoteCard = memo(function QuoteCard({
           para o dedo; `alvo-toque` leva-o a 44 px no telemóvel sem mexer no
           quadrado desenhado, que continua a ser o de 16 px. */}
       <label
-        className="alvo-toque absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px] cursor-pointer"
+        className="alvo-toque absolute left-2 top-3.5 z-10 flex items-center justify-center min-w-[24px] min-h-[24px]"
         onClick={(e) => e.stopPropagation()}
       >
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggle(q.id)}
-          className="w-4 h-4 accent-sage-600 cursor-pointer"
+          className="w-4 h-4 accent-sage-600"
           aria-label={`Selecionar pedido de ${q.name}`}
         />
       </label>
@@ -7335,7 +7335,7 @@ export default function AdminClient({
                                   >
                                     <summary
                                       onClick={gavetaDoPlano.aoTocarNoResumo}
-                                      className={`alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                                      className={`alvo-toque !justify-start flex list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <svg
                                         className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}
@@ -7655,7 +7655,7 @@ export default function AdminClient({
                                   >
                                     <summary
                                       onClick={gavetaDoHistorico.aoTocarNoResumo}
-                                      className={`alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                                      className={`alvo-toque !justify-start flex list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--bo-text-muted)] marker:content-none [&::-webkit-details-marker]:hidden hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                                     >
                                       <svg
                                         className={`shrink-0 text-foreground/40 group-open:rotate-90 ${SETA_DA_GAVETA}`}

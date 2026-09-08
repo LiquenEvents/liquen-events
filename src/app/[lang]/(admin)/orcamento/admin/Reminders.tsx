@@ -245,7 +245,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
             <button
               onClick={() => r.quote && onOpen(r.quote)}
               disabled={!r.quote}
-              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 ${r.quote ? "hover:bg-[var(--bo-tinta-3)] cursor-pointer" : "cursor-default"} ${ESTADO} ${PRESSAO}`}
+              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 ${r.quote ? "hover:bg-[var(--bo-tinta-3)]" : "cursor-default"} ${ESTADO} ${PRESSAO}`}
             >
               <span style={{ color: r.urgent ? "#8a2a22" : "#9aa36a" }}>{icon(r.kind)}</span>
               <div className="min-w-0 flex-1">

@@ -544,7 +544,7 @@ export default function DefinicoesProposta() {
 
             Não foi apanhado antes porque o passeio do telemóvel nunca visitava
             as Definições — passou a visitar (ver `e2e/admin-mobile.spec.ts`). */}
-        <label className="alvo-toque !justify-start mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-[var(--bo-text-muted)]">
+        <label className="alvo-toque !justify-start mt-3 inline-flex items-center gap-2.5 py-1.5 text-[var(--bo-text-muted)]">
           <input
             type="checkbox"
             checked={d.idaEVolta}

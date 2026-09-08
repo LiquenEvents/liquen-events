@@ -12232,7 +12232,7 @@ function DobraDaDisposicao({
          board ao abrir a do seguinte, e o que se quer é poder comparar duas
          páginas lado a lado. */
     >
-      <summary className={`marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}>
+      <summary className={`marker:content-none inline-flex list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}>
         {/* A MESMA seta, e o mesmo tempo, do cabeçalho das secções e das duas
             setas irmãs da casa (`Overview.tsx`, `Tarefas.tsx:810`): 200 ms na
             `cubic-bezier(0, 0, 0.2, 1)`. Estava sem duração, ou seja nos 150 ms
