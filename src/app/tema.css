@@ -204,12 +204,15 @@
 
      Os NOMES DE CLASSE são os do brief (`duration-instant`, `duration-fast`,
      …). Só o prefixo do token é que muda, para elas existirem mesmo. */
-  --transition-duration-instant: 80ms;
-  --transition-duration-fast: 140ms;
-  --transition-duration-base: 200ms;
-  --transition-duration-slow: 280ms;
-  --transition-duration-sheet: 320ms;
-  --transition-duration-exit: 120ms;
+  /* ── AS SEIS DA PRIMEIRA VERSÃO SAÍRAM, E NENHUMA ESTAVA EM USO ────────
+     Eram `instant · fast · base · slow · sheet · exit`, do primeiro documento.
+     Entraram na fase 01 e MEDIDO: zero chamadas em todo o repositório, fora
+     este ficheiro. O documento novo traz dez durações com nomes de uso e as
+     molas a que pertencem, e duas famílias de durações a viver lado a lado é
+     exactamente o que a Parte −1 manda não fazer — sobretudo com um `sheet`
+     em cada uma, a dizer 320 ms e 345 ms sobre o mesmo gesto.
+
+     Ficam as do documento, aqui em baixo. */
 
   /* ---------- AS CURVAS ----------
      A `--ease-out` e a `--ease-in` da casa JÁ SÃO, dígito por dígito, as que o
@@ -254,6 +257,238 @@
     0.9998 88.9%,
     1
   );
+
+  /* ══════════════════════════════════════════════════════════════════════
+     AS MOLAS DA APPLE, RESOLVIDAS PARA CSS
+     ══════════════════════════════════════════════════════════════════════
+
+     Desde o iOS 17 a animação por omissão do SwiftUI é uma MOLA, não uma
+     curva de Bézier. Uma Bézier não passa dos 100%, portanto não há como
+     fazer ultrapassagem com ela — e sem ultrapassagem não há mola. O que
+     substitui é a `linear()`, que amostra a curva em pontos.
+
+     Vêm do `docs/DESIGN-SYSTEM.md` (Parte 2.3) e foram VERIFICADAS aqui, não
+     copiadas: integrei a equação da mola amortecida a partir das fórmulas que
+     a Apple publica —
+
+         stiffness = (2π / duration)²
+         damping   = (1 − bounce) · 4π / duration
+         ζ         = damping / (2·√(stiffness · mass)) = 1 − bounce
+
+     — e comparei os 24 pontos de cada uma. O maior desvio em toda a família é
+     **0,0023** (0,23% do percurso), e é o arredondamento do tempo de assentar.
+     O `molas-da-apple.test.ts` refaz essa conta a cada corrida: se alguém
+     «arrumar» um número, fica vermelho com o desvio escrito.
+
+     ── SEIS FORMAS, DEZ NOMES ────────────────────────────────────────────
+
+     A forma de uma mola depende SÓ do amortecimento (ζ); a duração é o eixo
+     do tempo. Medido: os dez presets do documento têm seis ζ distintos —
+
+         ζ = 1.00   smooth · default · press · reposition
+         ζ = 0.95   nav
+         ζ = 0.86   interactive
+         ζ = 0.85   snappy · quick
+         ζ = 0.80   sheet
+         ζ = 0.70   bouncy
+
+     Escrever dez `linear()` quando há seis formas é escrever quatro cópias
+     que um dia divergem. Ficam as seis, nomeadas pelo que as distingue, e os
+     nomes de uso do documento apontam para elas. Quem escreve
+     `ease-snappy` continua a escrever `ease-snappy`.
+
+     ── E O PREFIXO, OUTRA VEZ ────────────────────────────────────────────
+
+     As durações entram como `--transition-duration-*` pela razão que este
+     ficheiro já explica em cima. Os nomes de CLASSE são os do documento. */
+
+  /* As seis formas, pelo amortecimento. */
+  --ease-mola-100: linear(
+    0,
+    0.0392 4.2%,
+    0.1285 8.3%,
+    0.2385 12.5%,
+    0.3517 16.7%,
+    0.4587 20.8%,
+    0.5547 25%,
+    0.638 29.2%,
+    0.7085 33.3%,
+    0.7672 37.5%,
+    0.8153 41.7%,
+    0.8543 45.8%,
+    0.8856 50%,
+    0.9106 54.2%,
+    0.9304 58.3%,
+    0.946 62.5%,
+    0.9582 66.7%,
+    0.9677 70.8%,
+    0.9752 75%,
+    0.9809 79.2%,
+    0.9854 83.3%,
+    0.9888 87.5%,
+    0.9915 91.7%,
+    0.9935 95.8%,
+    1
+  );
+  --ease-mola-95: linear(
+    0,
+    0.0307 4.2%,
+    0.1039 8.3%,
+    0.1984 12.5%,
+    0.3004 16.7%,
+    0.4011 20.8%,
+    0.4952 25%,
+    0.5802 29.2%,
+    0.6548 33.3%,
+    0.7191 37.5%,
+    0.7735 41.7%,
+    0.8188 45.8%,
+    0.8563 50%,
+    0.8868 54.2%,
+    0.9115 58.3%,
+    0.9313 62.5%,
+    0.9471 66.7%,
+    0.9595 70.8%,
+    0.9693 75%,
+    0.9768 79.2%,
+    0.9827 83.3%,
+    0.9872 87.5%,
+    0.9906 91.7%,
+    0.9931 95.8%,
+    1
+  );
+  --ease-mola-86: linear(
+    0,
+    0.0295 4.2%,
+    0.1015 8.3%,
+    0.1968 12.5%,
+    0.3016 16.7%,
+    0.4067 20.8%,
+    0.5062 25%,
+    0.5968 29.2%,
+    0.6766 33.3%,
+    0.7453 37.5%,
+    0.803 41.7%,
+    0.8506 45.8%,
+    0.8892 50%,
+    0.9198 54.2%,
+    0.9438 58.3%,
+    0.9621 62.5%,
+    0.9759 66.7%,
+    0.986 70.8%,
+    0.9932 75%,
+    0.9982 79.2%,
+    1.0014 83.3%,
+    1.0034 87.5%,
+    1.0045 91.7%,
+    1.005 95.8%,
+    1
+  );
+  --ease-mola-85: linear(
+    0,
+    0.0339 4.2%,
+    0.1156 8.3%,
+    0.2218 12.5%,
+    0.3364 16.7%,
+    0.449 20.8%,
+    0.5534 25%,
+    0.646 29.2%,
+    0.7256 33.3%,
+    0.7921 37.5%,
+    0.8463 41.7%,
+    0.8896 45.8%,
+    0.9232 50%,
+    0.9489 54.2%,
+    0.968 58.3%,
+    0.9819 62.5%,
+    0.9916 66.7%,
+    0.9981 70.8%,
+    1.0023 75%,
+    1.0047 79.2%,
+    1.0059 83.3%,
+    1.0063 87.5%,
+    1.0061 91.7%,
+    1.0056 95.8%,
+    1
+  );
+  --ease-mola-80: linear(
+    0,
+    0.0386 4.2%,
+    0.131 8.3%,
+    0.2502 12.5%,
+    0.3773 16.7%,
+    0.5003 20.8%,
+    0.6119 25%,
+    0.7086 29.2%,
+    0.7891 33.3%,
+    0.8539 37.5%,
+    0.9044 41.7%,
+    0.9424 45.8%,
+    0.97 50%,
+    0.9891 54.2%,
+    1.0018 58.3%,
+    1.0094 62.5%,
+    1.0135 66.7%,
+    1.0151 70.8%,
+    1.0149 75%,
+    1.0138 79.2%,
+    1.0121 83.3%,
+    1.0102 87.5%,
+    1.0083 91.7%,
+    1.0065 95.8%,
+    1
+  );
+  --ease-mola-70: linear(
+    0,
+    0.037 4.2%,
+    0.1284 8.3%,
+    0.2496 12.5%,
+    0.3822 16.7%,
+    0.5132 20.8%,
+    0.634 25%,
+    0.7397 29.2%,
+    0.828 33.3%,
+    0.8987 37.5%,
+    0.9527 41.7%,
+    0.9918 45.8%,
+    1.0184 50%,
+    1.0348 54.2%,
+    1.0433 58.3%,
+    1.046 62.5%,
+    1.0445 66.7%,
+    1.0405 70.8%,
+    1.035 75%,
+    1.0289 79.2%,
+    1.0229 83.3%,
+    1.0173 87.5%,
+    1.0123 91.7%,
+    1.0082 95.8%,
+    1
+  );
+
+  /* Os dez nomes de uso do documento, apontados às formas de cima. */
+  --ease-smooth: var(--ease-mola-100);
+  --ease-default: var(--ease-mola-100);
+  --ease-press: var(--ease-mola-100);
+  --ease-reposition: var(--ease-mola-100);
+  --ease-nav: var(--ease-mola-95);
+  --ease-interactive: var(--ease-mola-86);
+  --ease-snappy: var(--ease-mola-85);
+  --ease-quick: var(--ease-mola-85);
+  --ease-sheet: var(--ease-mola-80);
+  --ease-bouncy: var(--ease-mola-70);
+
+  /* E as dez durações — o tempo real até assentar a 0,5% do valor final. */
+  --transition-duration-smooth: 590ms;
+  --transition-duration-snappy: 540ms;
+  --transition-duration-bouncy: 555ms;
+  --transition-duration-default: 650ms;
+  --transition-duration-interactive: 150ms;
+  --transition-duration-quick: 325ms;
+  --transition-duration-press: 260ms;
+  --transition-duration-sheet: 345ms;
+  --transition-duration-reposition: 475ms;
+  --transition-duration-nav: 515ms;
 }
 
 @custom-variant com-rato (@media (hover: hover) and (pointer: fine));
