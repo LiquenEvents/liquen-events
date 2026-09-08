@@ -93,6 +93,7 @@ import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, vistaValida, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
+import { Escolha } from "./ui/Escolha";
 import {
   Button,
   EmCurso,
@@ -111,6 +112,18 @@ import {
    global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
    três sítios muito concretos, e nenhum deles é este ficheiro. */
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+
+/**
+ * A pele dos seis filtros da lista de pedidos, escrita UMA vez.
+ *
+ * Era a mesma cadeia copiada seis vezes, e seis cópias de uma pele são seis
+ * sítios onde ela se afasta — foi exactamente isso que aconteceu com as
+ * alturas da barra de baixo. A `Escolha` leva `variante="nua"` porque a caixa
+ * é esta, e não a do formulário.
+ */
+const FILTRO_CLASSES =
+  "bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 " +
+  "text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 /* A outra metade do vocabulário: a `.bo-saida` é a palavra em CSS, e este hook
    é a parte que o CSS não pode fazer sozinho — segurar o nó montado os 200 ms
@@ -5596,90 +5609,104 @@ export default function AdminClient({
                   </svg>
                   Atribuídos a mim
                 </button>
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
+                {/* ── OS FILTROS DEIXARAM DE ABRIR O MENU DO SISTEMA ───────
+                    Palavras dela, com uma captura da lista azul do sistema
+                    aberta por cima da tabela: «aqui também quero com o mesmo
+                    design da apple».
+
+                    Um `<select>` nativo desenha-se com o CSS da casa mas ABRE
+                    a lista do sistema operativo — azul, com a letra dele, sem
+                    raio nem material. Não há folha de estilo que lhe chegue: a
+                    lista é desenhada pelo sistema, fora da página.
+
+                    A `Escolha` é a saída que esta casa já tinha: rende um
+                    `<select>` REAL antes da hidratação (o filtro funciona sem
+                    JavaScript) e passa a combobox do APG depois de montar — com
+                    o menu de material, teclado do padrão e o rótulo pelo
+                    `aria-label`, que um `role="combobox"` não herda de um
+                    `<label for>`. */}
+                <Escolha
+                  variante="nua"
+                  className={FILTRO_CLASSES}
+                  valor={filterCategory}
+                  aoMudar={setFilterCategory}
                   aria-label="Filtrar por categoria"
-                  className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                >
-                  <option value="all">Todas as categorias</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={filterEspera}
-                  onChange={(e) => setFilterEspera(e.target.value as typeof filterEspera)}
+                  opcoes={[
+                    { valor: "all", rotulo: "Todas as categorias" },
+                    ...CATEGORIES.map((c) => ({ valor: c.id, rotulo: c.label })),
+                  ]}
+                />
+                <Escolha
+                  variante="nua"
+                  className={FILTRO_CLASSES}
+                  valor={filterEspera}
+                  aoMudar={(v) => setFilterEspera(v as typeof filterEspera)}
                   aria-label="Filtrar por tempo de espera"
-                  className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                >
-                  <option value="all">Qualquer espera</option>
-                  <option value="3">Espera há 3+ dias</option>
-                  <option value="7">Espera há 7+ dias</option>
-                </select>
+                  opcoes={[
+                    { valor: "all", rotulo: "Qualquer espera" },
+                    { valor: "3", rotulo: "Espera há 3+ dias" },
+                    { valor: "7", rotulo: "Espera há 7+ dias" },
+                  ]}
+                />
                 {mesesDisponiveis.length > 1 && (
-                  <select
-                    value={filterMes}
-                    onChange={(e) => setFilterMes(e.target.value)}
+                  <Escolha
+                    variante="nua"
+                    className={FILTRO_CLASSES}
+                    valor={filterMes}
+                    aoMudar={setFilterMes}
                     aria-label="Filtrar por mês do evento"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                  >
-                    <option value="all">Todos os meses</option>
-                    {mesesDisponiveis.map((m) => (
-                      <option key={m} value={m}>
-                        {mesLegivel(m)}
-                      </option>
-                    ))}
-                  </select>
+                    opcoes={[
+                      { valor: "all", rotulo: "Todos os meses" },
+                      ...mesesDisponiveis.map((m) => ({ valor: m, rotulo: mesLegivel(m) })),
+                    ]}
+                  />
                 )}
                 {regioesDisponiveis.length > 1 && (
-                  <select
-                    value={filterRegiao}
-                    onChange={(e) => setFilterRegiao(e.target.value)}
+                  <Escolha
+                    variante="nua"
+                    className={FILTRO_CLASSES}
+                    valor={filterRegiao}
+                    aoMudar={setFilterRegiao}
                     aria-label="Filtrar por região"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                  >
-                    <option value="all">Todas as regiões</option>
-                    {regioesDisponiveis.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
+                    opcoes={[
+                      { valor: "all", rotulo: "Todas as regiões" },
+                      ...regioesDisponiveis.map((r) => ({ valor: r, rotulo: r })),
+                    ]}
+                  />
                 )}
                 {plannersDisponiveis.length > 0 && (
-                  <select
-                    value={filterPlanner}
-                    onChange={(e) => setFilterPlanner(e.target.value)}
+                  <Escolha
+                    variante="nua"
+                    className={FILTRO_CLASSES}
+                    valor={filterPlanner}
+                    aoMudar={setFilterPlanner}
                     aria-label="Filtrar por planner"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                  >
-                    <option value="all">Todas as planners</option>
-                    {plannersDisponiveis.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
+                    opcoes={[
+                      { valor: "all", rotulo: "Todas as planners" },
+                      ...plannersDisponiveis.map((n) => ({ valor: n, rotulo: n })),
+                    ]}
+                  />
                 )}
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as typeof sort)}
-                  aria-label="Ordenar pedidos"
+                <Escolha
+                  variante="nua"
                   /* `col-span-2` no telemóvel: «Quem espera há mais tempo» não
                      cabe em meia largura, e um selector com o rótulo cortado
-                     não diz por que ordem a lista está. */
-                  className="col-span-2 flex-1 lg:flex-none bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                >
-                  <option value="espera">Quem espera há mais tempo</option>
-                  <option value="recent">Mais recentes</option>
-                  <option value="old">Mais antigos</option>
-                  <option value="value">Maior valor</option>
-                  <option value="followup">Seguimentos primeiro</option>
-                  <option value="eventdate">Data do evento</option>
-                </select>
+                     não diz por que ordem a lista está. Vai no `containerClassName`
+                     porque quem ocupa a célula da grelha é a caixa, não o botão. */
+                  containerClassName="col-span-2 flex-1 lg:flex-none"
+                  className={`w-full ${FILTRO_CLASSES}`}
+                  valor={sort}
+                  aoMudar={(v) => setSort(v as typeof sort)}
+                  aria-label="Ordenar pedidos"
+                  opcoes={[
+                    { valor: "espera", rotulo: "Quem espera há mais tempo" },
+                    { valor: "recent", rotulo: "Mais recentes" },
+                    { valor: "old", rotulo: "Mais antigos" },
+                    { valor: "value", rotulo: "Maior valor" },
+                    { valor: "followup", rotulo: "Seguimentos primeiro" },
+                    { valor: "eventdate", rotulo: "Data do evento" },
+                  ]}
+                />
                 <button
                   onClick={() => {
                     downloadCsv(`pedidos-${dateStamp()}`, quotesToCsvRows(filtered));
