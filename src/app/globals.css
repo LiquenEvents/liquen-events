@@ -558,7 +558,30 @@ body:is(.admin-mode, :has([data-admin-mode])) {
 
      São duas ideias diferentes que por acaso tinham o mesmo valor. Separá-las
      é o que permite mudar uma sem mexer na outra. */
-  --bo-chao: #ffffff;
+  /* ── E DEPOIS ELA PEDIU O VIDRO, QUE EXIGE ALGUMA COISA POR TRÁS ────────
+     O chão era branco por pedido dela — «eu quero branco», a olhar para a
+     referência. Continuou branco enquanto isso não colidiu com mais nada.
+
+     Colidiu quando ela pediu o back office no material da Apple. Vidro só
+     existe se houver o que atravessar: uma superfície translúcida por cima de
+     branco liso vê-se EXACTAMENTE como branco. A barra de topo escapou — é
+     `sticky` e o conteúdo passa mesmo por baixo dela ao rolar —, mas a coluna
+     da esquerda é uma coluna AO LADO do conteúdo, e por trás dela só está o
+     chão.
+
+     Foi-lhe posta a escolha com as duas metades escritas, e ela respondeu
+     «tinta o chão, quero o vidro». O valor é o `--bg-base` do sistema de
+     design que ela aprovou.
+
+     MEDIDO, e é o que torna isto melhor e não só diferente:
+
+         chão       cartão branco sobre ele   --bo-text   muted
+         #ffffff          1,000               14,35       5,49
+         #f7f8f7          1,065               13,63       5,38
+
+     O cartão branco não se distinguia do chão de todo — 1,000 é a definição de
+     invisível. Quem separava as coisas era só o fio. Agora há fio E degrau. */
+  --bo-chao: #f7f8f7;
 
   --bo-surface-sunken: #f7f7f8; /* insets, list stripes — neutral ChatGPT grey */
   --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
@@ -3542,15 +3565,18 @@ body[data-menu-open] .whatsapp-fixed {
    quem chama. O desfoque continua a ser pedido à parte
    (`.bo-material-desfoque`), como em todo o lado.
 
-   ── PORQUE É QUE ISTO SE VÊ NA BARRA DE TOPO E NÃO SE VERIA NA COLUNA ────
+   ── SERVE A BARRA DE TOPO E A COLUNA DA ESQUERDA, E A ORDEM IMPORTOU ────
 
    Vidro só existe se houver alguma coisa por trás. A barra de topo é
    `sticky top-0` e o conteúdo passa MESMO por baixo dela ao rolar — há o que
-   atravessar, e o material lê-se. A coluna da esquerda é uma coluna ao LADO do
-   conteúdo: por trás dela está o chão da aplicação, que nesta casa é branco
-   por pedido dela. Vidro translúcido sobre branco liso vê-se exactamente como
-   branco, e é por isso que a coluna não entra aqui sem uma decisão sobre o
-   chão. Está escrito para não se voltar a tentar. */
+   atravessar, e o material leu-se logo.
+
+   A coluna da esquerda é uma coluna ao LADO do conteúdo: por trás dela só está
+   o chão, e o chão era branco por pedido dela. Sobre branco liso, vidro vê-se
+   exactamente como branco — pô-lo ali era trabalho invisível.
+
+   Ela decidiu tingir o chão («tinta o chão, quero o vidro»), o `--bo-chao`
+   passou a `#f7f8f7`, e a coluna entrou. As duas usam esta classe. */
 .bo-material-faixa {
   background-image: linear-gradient(
     to bottom,

@@ -14,19 +14,21 @@ import { join } from "node:path";
  * paleta de comandos. O que ela olha o dia inteiro continuava a ser cor sólida:
  * a coluna da esquerda em `--bo-chao` e a barra de topo em `--bo-surface`.
  *
- * ── PORQUE É QUE ENTRA A BARRA E NÃO ENTRA A COLUNA ──────────────────────
+ * ── A BARRA ENTROU PRIMEIRO, E A COLUNA TEVE DE ESPERAR PELO CHÃO ───────
  *
  * Vidro só existe se houver alguma coisa por trás para atravessar.
  *
  * A barra de topo é `sticky top-0` e o conteúdo passa MESMO por baixo dela ao
- * rolar. Há o que compor, e o material lê-se — sem tocar em mais nada.
+ * rolar. Há o que compor, e o material leu-se logo — sem tocar em mais nada.
  *
- * A coluna da esquerda é uma coluna ao LADO do conteúdo. Por trás dela está o
- * chão da aplicação, que nesta casa é branco POR PEDIDO DELA — está escrito no
- * `chao-do-painel.test.ts`: «Pedido dela, a olhar para a referência: eu quero
- * branco». Vidro translúcido sobre branco liso vê-se exactamente como branco.
- * Pôr material na coluna sem decidir primeiro o chão seria trabalho invisível,
- * e desfazer o chão sem lho perguntar seria desfazer uma decisão dela.
+ * A coluna da esquerda é uma coluna ao LADO do conteúdo: por trás dela só está
+ * o chão, e o chão era branco por pedido dela. Vidro sobre branco liso vê-se
+ * exactamente como branco, portanto pôr material na coluna era trabalho
+ * invisível — e mudar o chão sem lho perguntar era desfazer uma decisão dela.
+ *
+ * Foi-lhe posta a escolha com as duas metades escritas, e ela respondeu «tinta
+ * o chão, quero o vidro». O `--bo-chao` passou a `#f7f8f7`, e a coluna entrou
+ * logo a seguir. As duas levam a faixa; o teste de cada uma está aqui em baixo.
  *
  * ── PORQUE É QUE A FAIXA É UMA CLASSE E NÃO A `.bo-material` COM AJUDAS ──
  *
@@ -96,6 +98,36 @@ describe("a faixa do cabeçalho", () => {
     const bloco = semComentarios.slice(i, fim);
     expect(bloco, "a faixa não entra neste recuo e fica translúcida contra a vontade").toMatch(
       /\.bo-material-faixa/,
+    );
+  });
+
+  /**
+   * ── E A COLUNA DA ESQUERDA, DEPOIS DE O CHÃO DEIXAR DE SER BRANCO ───────
+   *
+   * O cabeçalho deste ficheiro explicava porque é que a coluna NÃO entrava: por
+   * trás dela só está o chão, e o chão era branco — vidro sobre branco liso
+   * vê-se exactamente como branco.
+   *
+   * Essa condição deixou de valer. Posta a escolha, ela respondeu «tinta o
+   * chão, quero o vidro», e o `--bo-chao` passou a `#f7f8f7` (ver
+   * `chao-do-painel.test.ts`). Com alguma coisa por trás, a coluna passa a ler
+   * como material em vez de como uma parede branca ao lado de outra.
+   *
+   * Leva a FAIXA e não a `.bo-material`, pela mesma razão que o cabeçalho: uma
+   * coluna de ecrã inteiro não tem cantos, e o único fio que lhe faz sentido é
+   * o da direita — que ela já acende sozinha.
+   */
+  it("a coluna da esquerda também, agora que há chão por trás dela", () => {
+    const linha = ADMIN.split("\n").find(
+      (l) => l.includes("fixed lg:sticky top-0") && l.includes("h-screen w-64"),
+    );
+    expect(linha, "não encontrei a coluna — o selector desta busca envelheceu").toBeDefined();
+    expect(linha, "a coluna deixou de levar a faixa").toContain("bo-material-faixa");
+    expect(linha, "a faixa sem desfoque não é vidro, é uma cor mais clara").toContain(
+      "bo-material-desfoque",
+    );
+    expect(linha, "a coluna voltou a pintar-se de sólido por cima do material").not.toContain(
+      "bg-[var(--bo-chao)]",
     );
   });
 
