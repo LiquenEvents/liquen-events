@@ -139,7 +139,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
    * Este índice fazia o trabalho da barra lateral e trocava de sítio a corte
    * seco: o fundo acendia num chip e apagava-se noutro, ao mesmo tempo, e nada
    * dizia que se veio de uma secção e se foi para outra. Passa a haver o mesmo
-   * filete que desliza, com os mesmos 250 ms (`MARCA`) — a mesma constante, e
+   * filete que desliza, com a mesma constante (`MARCA`) — a mesma constante, e
    * não um segundo tempo escrito outra vez.
    *
    * `useMarcaQueAnda` é a medida da barra lateral extraída, com o eixo `x` a

@@ -7,6 +7,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { fingirDisposicao, reporDisposicao } from "../../../../../../test/disposicao-fingida";
 import NavEstudio from "./NavEstudio";
 import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
+import { MARCA } from "./ui/movimento";
 
 /**
  * O índice do estúdio: onde estou, o que já está feito, e — desde agora — o que
@@ -351,8 +352,9 @@ describe("o que a tira deixa de fora, deixa-o de propósito", () => {
  * O índice fazia o trabalho da barra lateral e trocava de sítio A CORTE SECO: o
  * fundo do chip acendia num sítio e apagava-se noutro, ao mesmo tempo, e nada
  * dizia que se veio de uma secção e se foi para outra. Passa a haver o mesmo
- * filete de 3 px que desliza, com a mesma constante (`MARCA`, 250 ms) — e não
- * um segundo tempo escrito outra vez.
+ * filete de 3 px que desliza, com a mesma constante (`MARCA`) — e não um
+ * segundo tempo escrito outra vez. Quanto tempo ela vale é assunto do
+ * `ui/movimento.ts`; aqui só se exige que seja ELA.
  *
  * ── O QUE SE PROVA AQUI E O QUE SE PROVA NUM BROWSER ──────────────────────
  *
@@ -477,8 +479,9 @@ describe("a secção actual marca-se com um filete que anda", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     const classes = filete.className.split(/\s+/);
-    expect(classes).toContain("motion-safe:transition-[translate,width]");
-    expect(classes).toContain("motion-safe:duration-[250ms]");
+    // Comparado com a constante e não com uma cópia dos seus valores: era a
+    // cópia (`250ms`) que chumbava quando a `MARCA` mudou de degrau.
+    for (const classe of MARCA.split(/\s+/)) expect(classes).toContain(classe);
   });
 
   it("vive DENTRO da lista que rola de lado, e não pendurado no `<nav>`", async () => {

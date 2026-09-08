@@ -203,7 +203,7 @@ jobs:
         # `@propostas` corre no seu próprio passo bloqueante, com config e
         # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
         # este servidor é o de produção e recusa escritas sem Supabase.
-        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho"
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -262,6 +262,37 @@ jobs:
         run: npx playwright test --grep "@galeria"
         env:
           CI: "true"
+
+      # BLOQUEANTE. AS MOLAS CHEGAM MESMO AO ELEMENTO — ou não chegam, e nada
+      # nesta casa dava por isso.
+      #
+      # O movimento do back office tem quatro elos: a constante em
+      # `ui/movimento.ts`, a classe que o Tailwind gera a partir do TEXTO do
+      # ficheiro, a variável que essa classe lê no `:root`, e o que o browser
+      # calcula. A suite de unidade só vê o primeiro. Numa única ronda
+      # partiram-se o segundo e o terceiro, um a seguir ao outro:
+      #
+      #   · uma classe montada por interpolação — o valor certo em memória, e o
+      #     Tailwind (que varre o texto, não corre o código) a não ver candidato
+      #     nenhum: zero regras;
+      #   · e, corrigida essa, `transition-duration: 0s` num botão real, porque
+      #     o `@theme` poda o que ninguém usa e o `globals.css` — a única folha
+      #     que emite `:root` — não varre a pasta do back office.
+      #
+      # Nenhum dos dois deu erro de compilação, aviso do lint ou teste vermelho.
+      # Os dois têm a mesma assinatura: o CSS fica com a REGRA e sem o VALOR, e
+      # só um browser a que se pergunte os vê.
+      #
+      # Bloqueante e não informativo porque a avaria é MUDA — os botões
+      # continuam a parecer bem, só deixam de se mexer — e um passo que avisa e
+      # deixa passar é um passo que se ignora. Não grava nada, portanto corre
+      # contra o servidor de produção deste job sem precisar de Supabase.
+      - name: As molas chegam ao elemento (bloqueante)
+        run: npx playwright test --grep "@movimento"
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
       # Config própria porque estes passeios CRIAM um pedido — precisam de um
       # cliente na lista para chegar ao estúdio — e o servidor de produção do

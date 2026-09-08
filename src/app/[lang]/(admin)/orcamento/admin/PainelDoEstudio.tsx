@@ -165,7 +165,7 @@ export default function PainelDoEstudio({
    * aqui que ele difere: a pílula do `Segmented` é `rounded-full` e branca
    * numa calha de 1 px; esta é o `rounded-[6px]` que os botões já usavam.
    *
-   * O tempo é o `MARCA` da casa (250 ms, o degrau «elemento»), e a assimetria
+   * O tempo é o `MARCA` da casa (o degrau `quick` do documento), e a assimetria
    * é a que o `Segmented` explica: o texto acende nos 120 ms do `ESTADO` e a
    * marca chega aos 250. Não se escreve aqui um segundo número.
    */
