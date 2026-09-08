@@ -62,11 +62,35 @@ export function PageHeader({
     >
       <div className="min-w-0">
         {eyebrow && <p className="bo-eyebrow mb-1.5 sm:mb-2.5">{eyebrow}</p>}
-        <Heading className="font-display text-2xl leading-tight text-[var(--bo-text)] sm:text-3xl">
+        {/* ── A ESCALA, E O PESO QUE NÃO MUDA ──────────────────────────────
+            Do sistema de design: título de página em `title1`, e o leading é
+            ABSOLUTO — «nunca uses `line-height` unitless nesta escala». Por
+            isso sai o `leading-tight` (1,25 sem unidade) e sai o `text-2xl`,
+            que dava o tamanho certo e mais nada: o que a escala traz por cima
+            é a entrelinha em píxeis e o TRACKING, que é o detalhe que faz um
+            título grande parecer desenhado em vez de esticado.
+
+            Os dois tamanhos ficam ao milímetro onde estavam — `title1` são os
+            24 px do `text-2xl`, `display` são os 30 px do `text-3xl` —, e por
+            isso a conta de altura escrita aqui em cima continua a valer.
+
+            ── O QUE O DOCUMENTO PEDE E NÃO SE FAZ, E PORQUÊ ────────────────
+
+            O mapeamento fixo diz «título de página `title1/600`». O peso NÃO
+            muda, e não é distracção: há uma instrução dela, anterior e mais
+            específica, escrita no `globals.css` com as palavras dela — foi ver
+            qual era a letra que queria, trouxe o nome (Geist, a da Vercel) e
+            descreveu-a como «tracking negativo forte nos títulos e PESO NORMAL
+            em vez de negrito».
+
+            Um documento geral não desfaz uma instrução dela sobre o caso
+            exacto. O que a escala traz é precisamente a metade que ela pediu —
+            o aperto —, e essa entra. */}
+        <Heading className="font-display text-title1 text-[var(--bo-text)] sm:text-display">
           {title}
         </Heading>
         {subtitle && (
-          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[var(--bo-text-muted)] sm:mt-2">
+          <p className="mt-1.5 max-w-prose text-callout text-[var(--bo-text-muted)] sm:mt-2">
             {subtitle}
           </p>
         )}

@@ -89,9 +89,19 @@ describe("o cabeçalho de uma vista", () => {
 
   it("não mexe no título, que já sabia encolher", () => {
     desenhar();
-    // `text-2xl … sm:text-3xl` já estava certo antes deste trabalho.
+    /**
+     * O título já sabia encolher antes deste trabalho, e continua a saber —
+     * mudou de NOME, não de tamanho. A fase 02 do sistema de design pôs a
+     * escala nos títulos, e nela os dois degraus chamam-se `title1` e
+     * `display`: ao milímetro os 24 px do `text-2xl` e os 30 px do
+     * `text-3xl` que aqui estavam.
+     *
+     * O que entrou a mais foi a entrelinha em píxeis e o aperto — a metade
+     * que ela pediu quando escolheu a letra («tracking negativo forte nos
+     * títulos»). A conta de altura que este ficheiro guarda não se mexeu.
+     */
     const titulo = screen.getByRole("heading", { level: 1, name: "Visão geral" });
-    expect(titulo).toHaveClass("text-2xl", "sm:text-3xl");
+    expect(titulo).toHaveClass("text-title1", "sm:text-display");
   });
 });
 

@@ -107,13 +107,14 @@ export function SectionCard({
         <div className="mb-3.5 flex items-start justify-between gap-3 sm:mb-5 sm:gap-4">
           <div className="min-w-0">
             {eyebrow && <p className="bo-eyebrow mb-2">{eyebrow}</p>}
-            {title && (
-              <h2 className="font-display text-lg leading-tight text-[var(--bo-text)]">{title}</h2>
-            )}
+            {/* `title3` é o degrau que o mapeamento dá a um título de secção,
+                e é onde este já estava: 17 px contra os 18 do `text-lg`. O que
+                entra a mais é a entrelinha em píxeis e o aperto de −0,025em —
+                sai o `leading-tight`, que é um rácio, e a escala do sistema é
+                absoluta. O peso fica, pela razão escrita no `PageHeader`. */}
+            {title && <h2 className="font-display text-title3 text-[var(--bo-text)]">{title}</h2>}
             {description && (
-              <p className="mt-1.5 text-sm leading-relaxed text-[var(--bo-text-muted)]">
-                {description}
-              </p>
+              <p className="mt-1.5 text-callout text-[var(--bo-text-muted)]">{description}</p>
             )}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
