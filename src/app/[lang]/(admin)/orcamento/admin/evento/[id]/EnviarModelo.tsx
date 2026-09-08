@@ -235,7 +235,7 @@ export default function EnviarModelo({ quote, onEnviado }: Props) {
               <dt className="text-foreground/40 w-16 shrink-0">Para</dt>
               <dd className="text-[var(--bo-tinta-72)] truncate">
                 {previsao.destinatario || (
-                  <span className="text-[#8a2a22]">este pedido não tem email</span>
+                  <span className="text-[var(--bo-perigo)]">este pedido não tem email</span>
                 )}
               </dd>
             </div>
@@ -289,7 +289,7 @@ export default function EnviarModelo({ quote, onEnviado }: Props) {
       )}
 
       {erro && (
-        <p className="text-[#8a2a22] text-xs mb-1 leading-relaxed" role="alert">
+        <p className="text-[var(--bo-perigo)] text-xs mb-1 leading-relaxed" role="alert">
           {erro}
         </p>
       )}

@@ -8,6 +8,7 @@ import { fingirDisposicao, reporDisposicao } from "../../../../../../test/dispos
 import PainelDoEstudio, { type PaginaParaOPainel } from "./PainelDoEstudio";
 import { CORTES } from "./ui/adaptativo";
 import type { MoodBoard } from "@/lib/proposal-doc";
+import { MARCA } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -312,10 +313,12 @@ describe("a barra de separadores do painel", () => {
     await desenharMedido();
     await passarUmFotograma();
     const classes = marcas()[0].className.split(/\s+/);
-    // `MARCA` traz `motion-safe:` nas duas: quem pediu para não animar vê a
-    // marca mudar de sítio de um fotograma para o outro.
-    expect(classes).toContain("motion-safe:transition-[translate,width]");
-    expect(classes).toContain("motion-safe:duration-[250ms]");
+    // O nome deste teste diz «com a constante da casa, não com um tempo escrito
+    // outra vez» — e ele próprio escrevia o tempo outra vez: `250ms` copiado
+    // para aqui. No dia em que a `MARCA` passou para o degrau `quick` do
+    // documento, o que chumbou foi a cópia, não o componente. Agora compara-se
+    // com a constante, que é o que a frase sempre quis dizer.
+    for (const classe of MARCA.split(/\s+/)) expect(classes).toContain(classe);
   });
 
   it("o primeiro fotograma não anda — a marca não desliza do canto ao abrir", async () => {
@@ -335,7 +338,7 @@ describe("a barra de separadores do painel", () => {
     expect(
       screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
       "o separador activo ficou com fundo branco POR BAIXO da marca branca",
-    ).not.toContain("bg-white");
+    ).not.toContain("bg-[var(--bo-surface)]");
   });
 
   it("e nunca há nenhum — sem medida, o fundo do botão é a rede", () => {
@@ -347,7 +350,7 @@ describe("a barra de separadores do painel", () => {
     expect(
       screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
       "sem marca medida, o separador activo ficou sem se distinguir",
-    ).toContain("bg-white");
+    ).toContain("bg-[var(--bo-surface)]");
   });
 
   it("e uma medida de tamanho ZERO conta como nenhuma — o fundo do botão fica", async () => {
@@ -383,7 +386,7 @@ describe("a barra de separadores do painel", () => {
     expect(
       screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
       "o separador activo ficou sem marca E sem fundo — invisível na sua própria barra",
-    ).toContain("bg-white");
+    ).toContain("bg-[var(--bo-surface)]");
   });
 
   it("o painel que chega apresenta-se — e num nó NOVO, para a animação recomeçar", async () => {

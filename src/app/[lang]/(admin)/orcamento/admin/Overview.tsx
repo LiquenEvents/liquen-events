@@ -57,7 +57,7 @@ const FUNNEL: { id: QuoteStatus; label: string }[] = [
 // place so every interactive card/button in the dashboard picks up the same
 // visible focus state (WCAG 2.4.7).
 const FOCUS_RING =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bo-marca)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
@@ -108,7 +108,7 @@ function Delta({ now, prev }: { now: number; prev: number }) {
     <span
       aria-label={`${up ? "a subir" : "a descer"} ${Math.abs(pct)}% face ao mês anterior`}
       className={`inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums ${
-        up ? "text-sage-600" : "text-[#8a6420]"
+        up ? "text-sage-600" : "text-[var(--bo-aviso)]"
       }`}
     >
       <svg
@@ -405,9 +405,9 @@ function AvisoConflito({
   return (
     <div
       role="alert"
-      className="mt-3 rounded-xl border border-[#8a2a22]/30 bg-[#8a2a22]/[0.06] p-3 text-left"
+      className="mt-3 rounded-xl border border-[var(--bo-perigo)]/30 bg-[var(--bo-perigo)]/[0.06] p-3 text-left"
     >
-      <p className="text-[#8f4a33] text-xs font-semibold leading-snug">
+      <p className="text-[var(--bo-perigo)] text-xs font-semibold leading-snug">
         {doBrowser
           ? `Havia ${rotulo} guardadas só neste browser, diferentes das que estão no servidor. Nada foi apagado.`
           : `${rotulo} foram alteradas noutro dispositivo. O que escreveste NÃO foi gravado.`}
@@ -417,7 +417,7 @@ function AvisoConflito({
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
             {doBrowser ? "Neste browser" : "O que escreveste"}
           </p>
-          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-[var(--bo-surface)]/60 rounded-lg p-2">
             {conflito.meu || "(vazio)"}
           </p>
         </div>
@@ -425,7 +425,7 @@ function AvisoConflito({
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
             No servidor
           </p>
-          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
+          <p className="text-[var(--bo-tinta-72)] text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-[var(--bo-surface)]/60 rounded-lg p-2">
             {conflito.servidor.value || "(vazio)"}
           </p>
         </div>
@@ -433,7 +433,7 @@ function AvisoConflito({
       <div className="flex flex-wrap gap-2 mt-2.5">
         <button
           onClick={() => onEscolher("meu")}
-          className={`px-3 py-1.5 rounded-full bg-[#1b2119] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
+          className={`px-3 py-1.5 rounded-full bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
         >
           {doBrowser ? "Guardar as deste browser" : "Guardar a minha por cima"}
         </button>
@@ -482,7 +482,7 @@ function LinhaEstado({
        decisão, e o dia em que a gravação deixar de ser automática é o dia em
        que ela se revê. */
     return (
-      <span role="alert" className="text-[#8a2a22] text-[10px] leading-snug">
+      <span role="alert" className="text-[var(--bo-perigo)] text-[10px] leading-snug">
         Não foi possível guardar — o texto está só neste ecrã. {estado.mensagem}{" "}
         <button
           onClick={() => onTentarDeNovo(texto)}
@@ -494,7 +494,7 @@ function LinhaEstado({
     );
   }
   if (estado.tipo === "conflito") {
-    return <span className="text-[#8a2a22] text-[10px]">Duas versões por resolver.</span>;
+    return <span className="text-[var(--bo-perigo)] text-[10px]">Duas versões por resolver.</span>;
   }
   if (porGravar) return <span className="text-foreground/40 text-[10px]">Por guardar…</span>;
   if (estado.tipo === "a-guardar")
@@ -511,7 +511,7 @@ function LinhaEstado({
 /** A leitura falhou: dizê-lo é obrigatório — um "Sem notas." seria outra mentira. */
 function AvisoLeitura({ onRecarregar }: { onRecarregar: () => void }) {
   return (
-    <p role="alert" className="text-[#8a2a22] text-xs leading-relaxed">
+    <p role="alert" className="text-[var(--bo-perigo)] text-xs leading-relaxed">
       Não foi possível ler o que está guardado no servidor.{" "}
       <button onClick={onRecarregar} className={`underline font-semibold rounded ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}>
         Tentar de novo
@@ -613,7 +613,7 @@ const MetaReceita = memo(function MetaReceita({
             <button
               onClick={() => void saveGoal()}
               disabled={estado.tipo === "a-guardar"}
-              className={`px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] whitespace-nowrap disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
+              className={`px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] whitespace-nowrap disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
             >
               {estado.tipo === "a-guardar" ? "A guardar…" : "Guardar"}
             </button>
@@ -672,7 +672,7 @@ const MetaReceita = memo(function MetaReceita({
             />
           </div>
           {wonThisMonth >= goal && (
-            <p className="text-[#3a5c39] text-[10px] tracking-[0.12em] uppercase font-semibold mt-2">
+            <p className="text-[var(--bo-sucesso)] text-[10px] tracking-[0.12em] uppercase font-semibold mt-2">
               Meta atingida ✓
             </p>
           )}
@@ -976,7 +976,7 @@ function AEsperaDeResposta({
         </div>
         <div className="text-right">
           <p
-            className="text-[#8a6420] font-light leading-none"
+            className="text-[var(--bo-aviso)] font-light leading-none"
             style={{ fontSize: "clamp(16px, 2vw, 22px)" }}
           >
             {eur(pendurado)}
@@ -1593,7 +1593,7 @@ export default function Overview({
                    de 44 px do dedo: media 37 px de altura, e é o único caminho
                    para sair de um ecrã que não tem mais nada. Só cresce com
                    dedo — com rato fica exactamente como está desenhado. */
-                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] ${ESTADO} ${PRESSAO} mb-3 ${FOCUS_RING}`}
+                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[var(--bo-seleccao)] text-white/90 hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} mb-3 ${FOCUS_RING}`}
               >
                 <svg
                   width="13"
@@ -1614,8 +1614,8 @@ export default function Overview({
                  ficarem da mesma altura quando aparecem juntos. */
               className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium ${ESTADO} ${PRESSAO} ${
                 tudoArquivado && onVerArquivados
-                  ? "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
-                  : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
+                  ? "bg-[var(--bo-surface)] border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
+                  : "bg-[var(--bo-seleccao)] text-white/90 hover:bg-[var(--bo-seleccao-hover)]"
               } ${FOCUS_RING}`}
             >
               <svg
@@ -1702,8 +1702,8 @@ export default function Overview({
               onClick={a.onClick}
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium ${ESTADO} ${PRESSAO} ${FOCUS_RING} ${
                 i === 0
-                  ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] "
-                  : "bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
+                  ? "bg-[var(--bo-seleccao)] text-white/90 hover:bg-[var(--bo-seleccao-hover)] "
+                  : "bg-[var(--bo-surface)] border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
               }`}
             >
               <svg
@@ -1729,7 +1729,7 @@ export default function Overview({
           style={{ "--cena": 1 } as React.CSSProperties}
           className={`bo-cena w-full text-left rounded-2xl p-5 border ${ESTADO} ${PRESSAO} ${FOCUS_RING} ${
             data.nextEventDays <= 3
-              ? "bg-[#8a2a22]/[0.07] border-[#8a2a22]/25 hover:border-[#8a2a22]/40"
+              ? "bg-[var(--bo-perigo)]/[0.07] border-[var(--bo-perigo)]/25 hover:border-[var(--bo-perigo)]/40"
               : data.nextEventDays <= 7
                 ? "bg-amber-500/[0.05] border-amber-500/20 hover:border-amber-500/35"
                 : "bg-sage-600/[0.05] border-sage-600/20 hover:border-sage-600/35"
@@ -2048,7 +2048,7 @@ export default function Overview({
               <h3 className="bo-eyebrow">Fases dos pedidos</h3>
               <button
                 onClick={() => onGo("kanban")}
-                className={`alvo-toque text-sage-600 hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
+                className={`alvo-toque text-sage-600 hover:text-[var(--bo-accent-hover)] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
               >
                 Abrir →
               </button>
@@ -2100,7 +2100,7 @@ export default function Overview({
               <h3 className="bo-eyebrow">Dinheiro — recebido e a receber</h3>
               <button
                 onClick={onGoStats}
-                className={`alvo-toque text-sage-600 hover:text-[#415440] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
+                className={`alvo-toque text-sage-600 hover:text-[var(--bo-accent-hover)] text-[10px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
               >
                 Ver tudo →
               </button>
@@ -2135,7 +2135,7 @@ export default function Overview({
                     style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
                   />
                   <div
-                    className={`absolute inset-0 origin-left bg-[#c0a060]/70 ${PROGRESSO}`}
+                    className={`absolute inset-0 origin-left bg-[var(--bo-aviso-tom)]/70 ${PROGRESSO}`}
                     style={{
                       transform: `translateX(${fraccaoDaBarra(data.received, data.billed) * 100}%) scaleX(${fraccaoDaBarra(data.outstanding, data.billed)})`,
                     }}
@@ -2146,7 +2146,7 @@ export default function Overview({
                     <span className="w-2 h-2 rounded-full bg-sage-600" /> Recebido
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#c0a060]/70" /> Por receber
+                    <span className="w-2 h-2 rounded-full bg-[var(--bo-aviso-tom)]/70" /> Por receber
                   </span>
                 </div>
               </>
@@ -2286,7 +2286,7 @@ export default function Overview({
                   </p>
                   <button
                     onClick={onNew}
-                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] ${ESTADO} ${PRESSAO} ${FOCUS_RING}`}
+                    className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[var(--bo-surface)] border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] ${ESTADO} ${PRESSAO} ${FOCUS_RING}`}
                   >
                     <svg
                       width="12"

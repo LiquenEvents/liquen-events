@@ -143,7 +143,7 @@ export default function PreviaDaPagina({
   return (
     <figure className="m-0">
       <div
-        className="relative w-full overflow-hidden rounded-md border border-[var(--bo-hairline-strong)] bg-white"
+        className="relative w-full overflow-hidden rounded-md border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]"
         style={{
           aspectRatio: `${PAGINA_W} / ${PAGINA_H}`,
           // Sem isto, os `cqw` de baixo medem-se à JANELA. Ver o cabeçalho.

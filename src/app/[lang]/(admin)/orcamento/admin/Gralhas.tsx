@@ -52,7 +52,7 @@ export default function Gralhas({
   return (
     <section
       aria-labelledby="gralhas-titulo"
-      className="mt-5 rounded-2xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.05] p-4"
+      className="mt-5 rounded-2xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.05] p-4"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3
@@ -65,7 +65,7 @@ export default function Gralhas({
           <button
             type="button"
             onClick={onCorrigirTudo}
-            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
           >
             Corrigir as {gralhas.length}
           </button>
@@ -89,7 +89,7 @@ export default function Gralhas({
                 duas à vista, «corrigir» é um botão que faz uma coisa que não
                 se viu — e num campo que vai impresso isso não chega. */}
             <span className="text-[var(--bo-tinta-72)]">
-              <span className="line-through decoration-[#8a2a22]/60">{g.escrita}</span>
+              <span className="line-through decoration-[var(--bo-perigo)]/60">{g.escrita}</span>
               <span aria-hidden="true" className="mx-1 text-foreground/30">
                 →
               </span>
@@ -107,7 +107,7 @@ export default function Gralhas({
             <button
               type="button"
               onClick={() => onIr(g)}
-              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${ESTADO} ${PRESSAO}`}
             >
               Ver no campo
             </button>

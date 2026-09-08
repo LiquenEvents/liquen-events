@@ -155,7 +155,7 @@ const TaskRow = memo(function TaskRow({
         </p>
         <div className="text-[10px] mt-0.5 flex items-center gap-2 flex-wrap">
           {t.dueDate && (
-            <span className={overdue ? "text-[#8a2a22]" : "text-foreground/30"}>
+            <span className={overdue ? "text-[var(--bo-perigo)]" : "text-foreground/30"}>
               {overdue ? "Atrasada · " : ""}
               {new Date(t.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
                 day: "numeric",
@@ -257,7 +257,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onRemove(t.id)}
             // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
             // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[var(--bo-perigo)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
             aria-label="Eliminar"
           >
             {CaixoteIcon}
@@ -814,7 +814,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               a classe centra por omissão. */}
           <summary
             onClick={gaveta.aoTocarNoResumo}
-            className={`alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque !justify-start bo-eyebrow inline-flex list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
           >
             <svg
               width="12"

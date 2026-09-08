@@ -60,9 +60,9 @@ export function AvisoDeFalha({
   return (
     <div
       role="alert"
-      className="mt-6 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-4 text-sm"
+      className="mt-6 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-4 text-sm"
     >
-      <p className="font-medium text-[#8a2a22]">{titulo}</p>
+      <p className="font-medium text-[var(--bo-perigo)]">{titulo}</p>
       <p className="bo-text-muted mt-1">
         {mensagem ||
           falha?.mensagem ||

@@ -768,7 +768,7 @@ export default function Inventario() {
       {/* Totals — the grand total leads; the per-category breakdown folds away */}
       {!loading && filtered.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eef1e6] px-2.5 py-1 text-[11px] font-medium text-[#525a2f]">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bo-sucesso-lavagem)] px-2.5 py-1 text-[11px] font-medium text-[var(--bo-aviso)]">
             Total: {filtered.length} {filtered.length === 1 ? "item" : "itens"} · {totalQty} un.
           </span>
           {totals.length > 1 && (
@@ -914,7 +914,7 @@ export default function Inventario() {
                      nome · categoria · quantidade e estado na mesma linha ·
                      localização. As acções em baixo, por extenso — no dedo não
                      há hover, e dois ícones de 14 px não são um alvo. */
-                  <div className="rounded-xl border border-[var(--bo-hairline)] bg-white p-4">
+                  <div className="rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-[var(--bo-text)]">{i.name}</p>
@@ -1087,7 +1087,7 @@ export default function Inventario() {
                           </button>
                           <button
                             onClick={() => perguntarSeRemove(i)}
-                            className={`alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 rounded-md p-1 ${ESTADO} ${PRESSAO}`}
+                            className={`alvo-toque text-foreground/25 sem-rato:text-[var(--bo-text-muted)] hover:text-[var(--bo-perigo)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 rounded-md p-1 ${ESTADO} ${PRESSAO}`}
                             aria-label="Remover"
                           >
                             {CruzIcon}

@@ -1901,7 +1901,7 @@ describe("o painel a 390 px", () => {
     );
     // Escuro que chegue para o título «Fazer proposta» deixar de se ler nítido
     // por trás da folha.
-    expect(veu.className).toMatch(/bg-\[#1b2119\]\/40/);
+    expect(veu.className).toMatch(/bg-\[var\(--bo-seleccao\)\]\/40/);
   });
 
   it("e o rodapé não fica debaixo da barra de gestos do iPhone", async () => {

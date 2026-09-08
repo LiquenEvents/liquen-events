@@ -115,15 +115,36 @@ export async function entrarNoBackOffice(page: Page): Promise<boolean> {
     }
 
     await clienteVivo;
-    const email = page.getByLabel(/O teu email/i);
+
+    /*
+      ── O FORMULÁRIO PASSOU A ESTAR FECHADO ──────────────────────────────
+
+      O `docs/LOGIN.md` deu ao ecrã de entrada dois estados: por omissão só a
+      chave de acesso, e a palavra-passe atrás de um link. É a correcção que
+      tira os dois botões de largura total a competir — mas para quem entra por
+      aqui muda o percurso: já não se preenche um formulário que está à vista,
+      abre-se primeiro.
+
+      O link só existe quando o browser sabe o que é uma chave de acesso. Onde
+      não sabe, o formulário é a única porta e já está aberto — daí o `count()`.
+    */
+    await page
+      .getByRole("button", { name: /^Entrar com palavra-passe$/ })
+      .click({ timeout: 5_000 })
+      .catch(() => {});
+
+    // «Email» e não «O teu email»: o rótulo encurtou na mesma ronda. O `^…$`
+    // evita casar com «Email da tua conta», do formulário de recuperação.
+    const email = page.getByLabel(/^Email$/i);
     if ((await email.count()) === 0) continue;
 
     await email.fill("catarina@liquen-events.com");
-    // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado
-    // com o botão de mostrar/ocultar, e o botão de entrar diz por que caminho
-    // se entra (a passkey passou a ser o primeiro).
+    // Pelo `name` e não pelo rótulo: «Palavra-passe» é partilhado com o botão
+    // de mostrar/ocultar.
     await page.locator('input[name="password"]').fill("liquen2026");
-    await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
+    // «Entrar», e não «Entrar com palavra-passe» — esse nome é agora do link
+    // que abre o formulário, e o botão que submete diz só o verbo.
+    await page.getByRole("button", { name: /^Entrar$/ }).click();
 
     const dentro = await painel
       .waitFor({ state: "visible", timeout: 30_000 })

@@ -216,7 +216,7 @@ export default function AnalisePropostas() {
                 </span>
                 <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--bo-tinta-6)]">
                   <span
-                    className="block h-full rounded-full bg-[#8a6420]/45"
+                    className="block h-full rounded-full bg-[var(--bo-aviso)]/45"
                     style={{ width: `${Math.max(2, m.pct)}%` }}
                   />
                 </span>

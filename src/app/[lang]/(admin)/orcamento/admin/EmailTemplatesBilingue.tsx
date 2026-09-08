@@ -594,7 +594,7 @@ export default function EmailTemplatesBilingue() {
                 key={m.chave}
                 onClick={() => abrir(m, idioma)}
                 className={`w-full text-left px-4 py-3 ${ESTADO} ${PRESSAO} ${
-                  activo ? "bg-[#5F7C66]/10" : "hover:bg-[var(--bo-tinta-3)]"
+                  activo ? "bg-[var(--bo-marca)]/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
                 <p
@@ -602,7 +602,7 @@ export default function EmailTemplatesBilingue() {
                 >
                   {m.nome}
                   {!temIngles && (
-                    <span className="ml-1.5 rounded-full bg-[#c98a2e]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#8a5d13] align-middle">
+                    <span className="ml-1.5 rounded-full bg-[var(--bo-aviso-tom)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--bo-aviso)] align-middle">
                       sem EN
                     </span>
                   )}
@@ -671,7 +671,7 @@ export default function EmailTemplatesBilingue() {
               {marcaDaLingua && (
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none absolute left-0 top-0 rounded-md bg-[#5F7C66] ${
+                  className={`pointer-events-none absolute left-0 top-0 rounded-md bg-[var(--bo-marca)] ${
                     linguaPodeAndar ? MARCA : ""
                   }`}
                   style={{
@@ -700,8 +700,8 @@ export default function EmailTemplatesBilingue() {
                           // Sai no instante em que ela está no sítio: nunca há
                           // dois fundos, e nunca há nenhum. É a manobra do
                           // `Segmented`, contada lá por extenso.
-                          `text-white ${marcaDaLingua ? "" : "bg-[#5F7C66]"}`
-                        : "bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20"
+                          `text-white ${marcaDaLingua ? "" : "bg-[var(--bo-marca)]"}`
+                        : "bg-[var(--bo-marca)]/10 text-sage-600 hover:bg-[var(--bo-marca)]/20"
                     }`}
                   >
                     {l === "pt" ? "Português" : "English"}
@@ -712,7 +712,7 @@ export default function EmailTemplatesBilingue() {
             </div>
 
             {ladoVazio && (
-              <p className="mb-4 rounded-lg bg-[#c98a2e]/10 px-3 py-2 text-[11px] leading-relaxed text-[#8a5d13]">
+              <p className="mb-4 rounded-lg bg-[var(--bo-aviso-tom)]/10 px-3 py-2 text-[11px] leading-relaxed text-[var(--bo-aviso)]">
                 Este modelo ainda não tem versão inglesa. Enquanto não a escreveres, um pedido em
                 inglês não recebe este modelo — em vez de receber português, não recebe nada e o
                 envio diz-te porquê. Não traduzimos o teu texto à máquina.
@@ -753,8 +753,8 @@ export default function EmailTemplatesBilingue() {
                         title={v.dica}
                         className={`px-2.5 py-1 rounded-md text-[11px] ${ESTADO} ${PRESSAO} ${
                           grupo.grupo === "remetente"
-                            ? "bg-[#8a5d13]/10 text-[#8a5d13] hover:bg-[#8a5d13]/20"
-                            : "bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20"
+                            ? "bg-[var(--bo-aviso)]/10 text-[var(--bo-aviso)] hover:bg-[var(--bo-aviso)]/20"
+                            : "bg-[var(--bo-marca)]/10 text-sage-600 hover:bg-[var(--bo-marca)]/20"
                         }`}
                       >
                         {v.rotulo}
@@ -776,7 +776,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(false)}
-                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
+                className={`px-2.5 py-1 rounded-md text-[11px] bg-[var(--bo-marca)]/10 text-sage-600 hover:bg-[var(--bo-marca)]/20 ${ESTADO} ${PRESSAO}`}
               >
                 só se houver data
               </button>
@@ -784,7 +784,7 @@ export default function EmailTemplatesBilingue() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => inserirBloco(true)}
-                className={`px-2.5 py-1 rounded-md text-[11px] bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20 ${ESTADO} ${PRESSAO}`}
+                className={`px-2.5 py-1 rounded-md text-[11px] bg-[var(--bo-marca)]/10 text-sage-600 hover:bg-[var(--bo-marca)]/20 ${ESTADO} ${PRESSAO}`}
               >
                 só se NÃO houver data
               </button>
@@ -812,7 +812,7 @@ export default function EmailTemplatesBilingue() {
             {erros.length > 0 && (
               <ul className="mt-2 space-y-1" aria-live="polite">
                 {erros.map((e) => (
-                  <li key={e} className="text-[11px] leading-snug text-[#a33]">
+                  <li key={e} className="text-[11px] leading-snug text-[var(--bo-perigo)]">
                     {e}
                   </li>
                 ))}
@@ -916,7 +916,7 @@ export default function EmailTemplatesBilingue() {
             {falhaNosPedidos !== null && (
               <div
                 role="alert"
-                className="bo-entrada mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[#f6e6df]/60 px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]"
+                className="bo-entrada mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[var(--bo-perigo-lavagem)]/60 px-3 py-2 text-[11px] leading-relaxed text-[var(--bo-perigo)]"
               >
                 <span>
                   Não foi possível ler os pedidos para pré-visualizar
@@ -947,7 +947,7 @@ export default function EmailTemplatesBilingue() {
                 title="Pré-visualização do email"
                 srcDoc={previsualizacao}
                 sandbox=""
-                className="w-full block bg-[#f7f4ee]"
+                className="w-full block bg-[var(--bo-chao)]"
                 style={{ height: 420, border: "none" }}
               />
             </div>

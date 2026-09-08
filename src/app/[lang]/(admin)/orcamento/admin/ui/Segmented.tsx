@@ -198,7 +198,7 @@ export function Segmented<T extends string>({
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute left-0 top-0 rounded-full bg-white shadow-[var(--bo-sombra-suspensa)]",
+            "pointer-events-none absolute left-0 top-0 rounded-full bg-[var(--bo-surface)] shadow-[var(--bo-sombra-suspensa)]",
             podeAnimar && MARCA,
           )}
           style={{
@@ -227,7 +227,7 @@ export function Segmented<T extends string>({
                 ? // O fundo próprio é a rede de antes de a pílula existir. Sai
                   // no instante em que ela está medida e no sítio — nunca há
                   // dois fundos, e nunca há nenhum.
-                  cn("text-[var(--bo-text)]", !temMarca && "bg-white")
+                  cn("text-[var(--bo-text)]", !temMarca && "bg-[var(--bo-surface)]")
                 : "text-foreground/50 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-6)]",
             )}
           >

@@ -157,7 +157,7 @@ const KanbanCard = memo(function KanbanCard({
          `transform` sai da lista porque não havia mais nada a usá-lo — vigiá-lo
          era pedir ao browser que olhasse para uma propriedade que este cartão
          nunca muda. */
-      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-white p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,rotate,scale] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#637a5f]/60 ${
+      className={`group cursor-grab active:cursor-grabbing rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-3.5 motion-safe:transition-[box-shadow,border-color,opacity,rotate,scale] motion-safe:duration-[120ms] hover:border-[var(--bo-hairline-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bo-marca)]/60 ${
         aterrar ? "bo-entrada " : ""
       }${dragging ? "opacity-40 motion-safe:rotate-1" : ""} ${PRESSAO}`}
     >
@@ -173,8 +173,8 @@ const KanbanCard = memo(function KanbanCard({
           <span
             className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] tracking-[0.1em] uppercase font-semibold ${
               q.followUpAt < todayKey
-                ? "bg-[#8a2a22]/15 text-[#8a2a22]"
-                : "bg-[#637a5f]/15 text-sage-600"
+                ? "bg-[var(--bo-perigo)]/15 text-[var(--bo-perigo)]"
+                : "bg-[var(--bo-marca)]/15 text-sage-600"
             }`}
             title={q.followUpAt < todayKey ? "Seguimento em atraso" : "Seguimento hoje"}
           >
@@ -220,7 +220,7 @@ const KanbanCard = memo(function KanbanCard({
         <div className="flex items-center gap-2">
           {q.date && (
             <span
-              className={`text-[10px] ${soon ? "text-[#8a2a22] font-medium" : "text-foreground/30"}`}
+              className={`text-[10px] ${soon ? "text-[var(--bo-perigo)] font-medium" : "text-foreground/30"}`}
               title={cd ? cd.label : undefined}
             >
               {new Date(q.date + "T12:00:00").toLocaleDateString("pt-PT", {
@@ -702,7 +702,7 @@ export default function Kanban({
                  `transition-all` punha o browser a vigiar tudo o resto. */
               className={`flex-shrink-0 w-[276px] rounded-2xl border motion-safe:transition-[background-color,border-color,box-shadow] motion-safe:duration-200 ${
                 overCol === col.id
-                  ? "border-[#637a5f]/50 bg-[#637a5f]/[0.05] ring-2 ring-[#637a5f]/20"
+                  ? "border-[var(--bo-marca)]/50 bg-[var(--bo-marca)]/[0.05] ring-2 ring-[var(--bo-marca)]/20"
                   : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
               }`}
             >

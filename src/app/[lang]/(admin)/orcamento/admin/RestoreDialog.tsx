@@ -376,7 +376,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
              o nó deixar de existir no fotograma a seguir aos 200 ms — senão
              ficava um `transform` pendurado a criar bloco de contenção. */
           aSair ? SAIDA : "bo-entrada",
-          "relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]",
+          "relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] shadow-[var(--bo-sombra-modal)]",
         )}
       >
         {/* Cabeçalho */}
@@ -408,9 +408,9 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
           {erros.length > 0 && (
             <div
               role="alert"
-              className="mb-4 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3"
+              className="mb-4 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3"
             >
-              <p className="text-sm font-medium text-[#8a2a22]">Nada foi alterado.</p>
+              <p className="text-sm font-medium text-[var(--bo-perigo)]">Nada foi alterado.</p>
               <ul className="mt-1 list-disc space-y-0.5 pl-5">
                 {erros.map((e, i) => (
                   <li key={i} className="text-sm text-[var(--bo-tinta-72)]">
@@ -441,7 +441,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                     const f = e.target.files?.[0];
                     if (f) void escolherFicheiro(f);
                   }}
-                  className="block w-full text-sm text-[var(--bo-tinta-72)] file:mr-3 file:rounded-full file:border-0 file:bg-sage-600 file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[#415440]"
+                  className="block w-full text-sm text-[var(--bo-tinta-72)] file:mr-3 file:rounded-full file:border-0 file:bg-sage-600 file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-[var(--bo-accent-hover)]"
                 />
               </label>
               {ocupado && <p className="bo-text-muted mt-3 text-sm">A ler a cópia…</p>}
@@ -460,9 +460,9 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                 <div
                   key={i}
                   role="alert"
-                  className="rounded-xl border border-[#8a2a22]/30 bg-[#f6e6df]/60 px-4 py-3"
+                  className="rounded-xl border border-[var(--bo-perigo)]/30 bg-[var(--bo-perigo-lavagem)]/60 px-4 py-3"
                 >
-                  <p className="text-sm leading-relaxed text-[#8a2a22]">{w.message}</p>
+                  <p className="text-sm leading-relaxed text-[var(--bo-perigo)]">{w.message}</p>
                 </div>
               ))}
 
@@ -501,7 +501,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                       >
                         Substituídos
                       </th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium text-[#8a2a22]">
+                      <th scope="col" className="px-3 py-2 text-right font-medium text-[var(--bo-perigo)]">
                         Apagados
                       </th>
                     </tr>
@@ -534,7 +534,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                         </td>
                         <td
                           className={`px-3 py-2 text-right tabular-nums ${
-                            d.removed > 0 ? "font-medium text-[#8a2a22]" : "text-foreground/40"
+                            d.removed > 0 ? "font-medium text-[var(--bo-perigo)]" : "text-foreground/40"
                           }`}
                         >
                           {d.skipped ? "—" : d.removed}
@@ -556,7 +556,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                       <li key={c.year} className="text-sm text-[var(--bo-tinta-72)]">
                         {c.year}: fica em <strong>{c.willBe}</strong>
                         {c.raised && (
-                          <span className="text-[#8a2a22]">
+                          <span className="text-[var(--bo-perigo)]">
                             {" "}
                             — elevado (a cópia dizia {c.inFile ?? 0}; o número mais alto já emitido
                             foi {c.highestIssued}, e um contador nunca pode recuar)
@@ -576,7 +576,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
 
               {/* A frase */}
               {!bloqueado && (
-                <div className="rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/30 px-4 py-4">
+                <div className="rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/30 px-4 py-4">
                   <label
                     htmlFor="restore-frase"
                     className="block text-sm leading-relaxed text-[var(--bo-text)]"
@@ -615,7 +615,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
                 className={`rounded-xl px-4 py-3 ${
                   resultado.ok
                     ? "border border-sage-600/30 bg-sage-600/[0.07]"
-                    : "border border-[#8a2a22]/30 bg-[#f6e6df]/60"
+                    : "border border-[var(--bo-perigo)]/30 bg-[var(--bo-perigo-lavagem)]/60"
                 }`}
               >
                 <p className="text-sm font-medium text-[var(--bo-text)]">
@@ -630,7 +630,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
               </div>
 
               {copiaPorGuardar != null && (
-                <div className="rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/40 px-4 py-3">
+                <div className="rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40 px-4 py-3">
                   <p className="text-sm text-[var(--bo-text)]">
                     O download automático da cópia anterior não passou. Guarda-a à mão:
                   </p>
@@ -650,7 +650,7 @@ function RestoreDialogInner({ aSair, onClose, toast }: Omit<Props, "open"> & { a
               )}
 
               {resultado.failed.length > 0 && (
-                <div className="rounded-xl border border-[#8a2a22]/25 px-4 py-3">
+                <div className="rounded-xl border border-[var(--bo-perigo)]/25 px-4 py-3">
                   <p className="text-foreground/30 text-[10px] uppercase tracking-[0.25em]">
                     Conjuntos por repor
                   </p>

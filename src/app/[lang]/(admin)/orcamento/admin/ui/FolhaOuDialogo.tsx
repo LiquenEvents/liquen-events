@@ -349,12 +349,12 @@ export function FolhaOuDialogo({
           da opacidade em que o véu está, e não de um nó novo. */}
       {aSairAgora ? (
         <div
-          className={cn(SAIDA_FUNDO, "absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]")}
+          className={cn(SAIDA_FUNDO, "absolute inset-0 bg-[var(--bo-seleccao)]/40 backdrop-blur-[2px]")}
           aria-hidden
         />
       ) : (
         <div
-          className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]"
+          className="bo-entrada bo-entrada-fundo absolute inset-0 bg-[var(--bo-seleccao)]/40 backdrop-blur-[2px]"
           aria-hidden
         />
       )}

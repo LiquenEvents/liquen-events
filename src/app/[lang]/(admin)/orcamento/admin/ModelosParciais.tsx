@@ -79,9 +79,9 @@ const ROTULO = {
  * garantia, em CSS, de que o que está escrito lá dentro se lê inteiro.
  */
 /* ── E O MATERIAL DELE ─────────────────────────────────────────────────────
-   Era `rounded-xl border … bg-white`. O `rounded-xl` media 8 px como todo o
+   Era `rounded-xl border … bg-[var(--bo-surface)]`. O `rounded-xl` media 8 px como todo o
    resto do conteúdo — o bloco dos raios do `globals.css` colapsa a escala do
-   Tailwind de propósito — e o `bg-white` era branco opaco escrito à mão, nem
+   Tailwind de propósito — e o `bg-[var(--bo-surface)]` era branco opaco escrito à mão, nem
    sequer o token da superfície.
 
    A `.bo-material` vive fora de camadas e escapa a esse colapso: traz os 12 px,
@@ -295,7 +295,7 @@ export default function ModelosParciais({
           inert={aSairAgora}
         >
           {naoDeuParaLer ? (
-            <p className="px-2.5 py-2 text-xs text-[#8a2a22]">
+            <p className="px-2.5 py-2 text-xs text-[var(--bo-perigo)]">
               Não deu para ler os modelos guardados. Volta a tentar — os que tinhas continuam lá.
             </p>
           ) : modelos.length === 0 ? (

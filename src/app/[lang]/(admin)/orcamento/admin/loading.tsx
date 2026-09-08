@@ -39,7 +39,7 @@ export default function AdminLoading() {
       aria-label="A carregar o back office"
     >
       {/* ── Sidebar (matches the real light w-64 rail) ── */}
-      <aside className="hidden lg:flex sticky top-0 z-40 h-screen w-64 shrink-0 bg-[#f7f7f8] border-r border-black/[0.08] flex-col">
+      <aside className="hidden lg:flex sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] border-r border-black/[0.08] flex-col">
         {/* Brand block */}
         <div className="px-5 pt-8 pb-5 flex flex-col items-center">
           <div className="h-24 w-32 rounded-md bg-black/[0.05]" />
@@ -60,7 +60,7 @@ export default function AdminLoading() {
       {/* ── Main column ── */}
       <div className="flex-1 min-w-0">
         {/* Header (matches the sticky white bar) */}
-        <header className="sticky top-0 z-20 bg-white/97 border-b border-[var(--bo-hairline)] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
+        <header className="sticky top-0 z-20 bg-[var(--bo-surface)]/97 border-b border-[var(--bo-hairline)] px-4 sm:px-6 lg:px-10 py-4 flex items-center gap-4">
           <div className="min-w-0">
             <div className="bo-skeleton h-2 w-28 mb-3" />
             <div className="bo-skeleton h-6 w-52" />

@@ -130,12 +130,12 @@ describe("a marca que anda do Segmented", () => {
     const vista = render(desenhar("list"));
     const activo = () => screen.getByRole("radio", { name: "Lista" });
     expect(pilula()).toBeNull();
-    expect(activo().className.split(/\s+/)).toContain("bg-white");
+    expect(activo().className.split(/\s+/)).toContain("bg-[var(--bo-surface)]");
 
     ligarAsMedidas();
     await act(async () => vista.rerender(desenhar("list")));
 
     expect(pilula()).not.toBeNull();
-    expect(activo().className.split(/\s+/)).not.toContain("bg-white");
+    expect(activo().className.split(/\s+/)).not.toContain("bg-[var(--bo-surface)]");
   });
 });

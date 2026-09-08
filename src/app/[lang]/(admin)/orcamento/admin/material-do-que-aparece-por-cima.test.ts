@@ -101,6 +101,21 @@ const hexParaRgb = (h: string): RGB => {
 
 /** `rgba(255, 255, 255, 0.88)` → `{ cor, alpha }`. */
 function corComAlpha(valor: string): { cor: RGB; alpha: number } {
+  /*
+    A tinta desta casa passou a derivar de um canal — `rgb(var(--bo-tinta-rgb)
+    / 0.13)` — para o modo escuro trocar uma linha em vez de nove. Sem esta
+    leitura, o `parseFloat` de «var(--bo-tinta-rgb)» dava `NaN` e o teste
+    dizia «o fio mede NaN:1»: um leitor que não conhece uma forma nova não dá
+    erro, dá um número que não é número.
+  */
+  const comCanal = valor.match(/rgba?\(\s*var\(\s*(--[a-z0-9-]+)\s*\)\s*\/\s*([\d.]+)\s*\)/i);
+  if (comCanal) {
+    const nums = token(comCanal[1]).match(/\d+/g);
+    if (!nums || nums.length < 3) throw new Error(`o canal ${comCanal[1]} não tem três componentes`);
+    const [r, g, b] = nums.slice(0, 3).map(Number);
+    return { cor: [r, g, b], alpha: parseFloat(comCanal[2]) };
+  }
+
   const rgba = valor.match(/rgba?\(([^)]+)\)/);
   if (rgba) {
     const p = rgba[1].split(",").map((x) => parseFloat(x.trim()));
@@ -514,7 +529,16 @@ describe("os cantos são generosos, e a pastilha é concêntrica com a moldura",
     const conteudo = parseFloat(CSS.match(/--radius-lg:\s*([\d.]+)rem/)![1]);
     const menu = parseFloat(token("--bo-material-raio").match(/([\d.]+)rem/)![1]);
     const grande = parseFloat(token("--bo-material-raio-grande").match(/([\d.]+)rem/)![1]);
-    expect(conteudo).toBe(0.5); // 8 px, a régua do conteúdo
+    // A régua do conteúdo é o degrau do CONTROLO (`--radius-lg`). Esteve nos
+    // 8 px enquanto a escala do back office foi um valor só; a Parte 3.7 do
+    // sistema de design devolveu-lhe uma escada concêntrica e ele passou aos
+    // 10. O valor exacto é assunto do `raios-do-back-office.test.ts`, que o
+    // guarda com a conta toda — aqui o que interessa é a ORDEM, que é o que o
+    // nome deste caso diz: o material é mais redondo do que o conteúdo.
+    //
+    // Prender aqui o número era ter a mesma régua escrita em dois sítios, e
+    // foi por isso que este caso chumbou numa mudança que não era dele.
+    expect(conteudo, "a régua do conteúdo desapareceu do `--radius-lg`").toBeGreaterThan(0);
     expect(menu).toBeGreaterThan(conteudo);
     expect(grande).toBeGreaterThan(menu);
   });

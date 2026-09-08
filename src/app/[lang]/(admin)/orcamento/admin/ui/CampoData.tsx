@@ -102,7 +102,7 @@ export function CampoData({
         className="bo-input py-2.5 text-base"
       />
       {lida && (
-        <p className={cn("text-xs", foraDoEsperado !== null ? "text-[#8a6d2f]" : "bo-text-muted")}>
+        <p className={cn("text-xs", foraDoEsperado !== null ? "text-[var(--bo-aviso)]" : "bo-text-muted")}>
           {lida.texto}
           {foraDoEsperado !== null && ` — é uma ${DIAS[foraDoEsperado]}, confirma`}
         </p>

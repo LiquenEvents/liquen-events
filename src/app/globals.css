@@ -430,11 +430,76 @@ body:has([data-admin-mode]) {
      É um terceiro valor e digo-o: a própria Apple, além da pílula, tem «5, 6,
      8 e 14 px em casos pontuais». A regra que este bloco fecha é a das
      SUPERFÍCIES e dos CONTROLOS; a miudez sub-20 px é outra escala. */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.5rem;
-  --radius-2xl: 0.5rem;
+  /* ══════════════════════════════════════════════════════════════════════
+     E AGORA A ESCADA VOLTA — MAS CONCÊNTRICA, E NÃO SOLTA
+     ══════════════════════════════════════════════════════════════════════
+
+     O bloco aqui em cima colapsou as cinco escadas num valor só (8 px) por uma
+     razão que continua boa: os raios estavam soltos, sem ninguém a decidi-los,
+     e dois raios diferentes lado a lado leem-se como um erro.
+
+     A Parte 3.7 do `docs/DESIGN-SYSTEM.md` traz a peça que faltava, e não é
+     uma escala nova — é uma REGRA que gera a escala:
+
+         raio_interior = raio_do_container − distância_entre_os_cantos
+         se raio_interior < 0  →  0
+
+     Não são seis números escolhidos ao gosto: são seis números que casam. Uma
+     folha a 26 com 8 px de folga dá cartões a 18; um cartão a 16 com 12 de
+     folga dá controlos a 4 — «o que provavelmente indica que o padding é
+     demasiado grande; corrige o padding, não o raio», diz o documento, e é
+     essa a leitura que um raio único nunca dá.
+
+     ── PORQUE É QUE O ARGUMENTO DE CIMA NÃO CAI ───────────────────────────
+
+     Ele dizia: CONTEÚDO 8 px · ACÇÃO pílula. A segunda metade fica intacta —
+     `rounded-full` continua a ser a acção, e é a regra que a Apple e a
+     Pixelmatters partilham. O que muda é a primeira: o conteúdo deixa de ser
+     um valor e passa a ser uma escada com uma conta por trás.
+
+     E continuam a ser CINCO LINHAS e não 456 edições, pela mesma razão de
+     sempre: no Tailwind v4 o `.rounded-lg` compila para
+     `border-radius: var(--radius-lg)`.
+
+     ── O MAPA ─────────────────────────────────────────────────────────────
+
+         rounded-sm   →   6 px   distintivo, etiqueta
+         rounded-md   →  10 px   controlo (campo, botão pequeno, item de menu)
+         rounded-lg   →  10 px   controlo
+         rounded-xl   →  16 px   cartão
+         rounded-2xl  →  20 px   painel
+
+     O `rounded` seco fica nos 4 px por onde estava — a miudez sub-20 px é
+     outra escala, e a razão está escrita aqui em cima. */
+  --radius-sm: 0.375rem; /* 6px  — distintivo */
+  --radius-md: 0.625rem; /* 10px — controlo */
+  --radius-lg: 0.625rem; /* 10px — controlo */
+  --radius-xl: 1rem; /* 16px — cartão */
+  --radius-2xl: 1.25rem; /* 20px — painel */
+
+  /* Os nomes de PAPEL do documento, para quem vier do brief encontrar o que
+     procura. Os utilitários do Tailwind ficam nas cinco linhas de cima; estes
+     servem o CSS escrito à mão e o `.bo-concentrico`. */
+  --bo-raio-janela: 1.125rem; /* 18px — a moldura da aplicação */
+  --bo-raio-painel: 1.25rem; /* 20px */
+  --bo-raio-folha: 1.625rem; /* 26px */
+  --bo-raio-cartao: 1rem; /* 16px */
+  --bo-raio-controlo: 0.625rem; /* 10px */
+  --bo-raio-distintivo: 0.375rem; /* 6px */
+}
+
+/* ── O FILHO CONCÊNTRICO ─────────────────────────────────────────────────
+   A conta da Parte 3.7, escrita uma vez. Quem a usa declara o raio e a folga
+   do PAI, e o filho sai com o raio que o mantém concêntrico:
+
+       <div style={{ "--pai-raio": "26px", "--pai-folga": "8px" }}>
+         <div className="bo-concentrico"> … </div>
+
+   O `max(0px, …)` é a segunda metade da regra: um raio interior negativo não
+   existe, e sem ele um filho com folga maior do que o raio do pai ficaria com
+   um `border-radius` inválido — que o browser ignora em silêncio. */
+.bo-concentrico {
+  border-radius: max(0px, calc(var(--pai-raio, 0px) - var(--pai-folga, 0px)));
 }
 
 /* Back office: clean white surface. */
@@ -520,10 +585,22 @@ body:is(.admin-mode, :has([data-admin-mode])) {
 
      Os três nomes de PAPEL ficam, como apelidos: estão em centenas de sítios,
      dizem o que a coisa é, e têm o contraste medido escrito ao lado. */
-  --bo-tinta-82: rgba(13, 13, 13, 0.82);
-  --bo-tinta-72: rgba(13, 13, 13, 0.72);
-  --bo-tinta-64: rgba(13, 13, 13, 0.64);
-  --bo-tinta-58: rgba(13, 13, 13, 0.58);
+  /* ── A TINTA PASSA A TER UM CANAL, E É ISSO QUE FAZ O MODO ESCURO ───────
+     Os nove degraus da tinta escreviam `rgba(13, 13, 13, α)` cada um por si.
+     Nove sítios com o mesmo `13, 13, 13` significa que o modo escuro obrigava
+     a reescrever nove linhas — e a esquecer-se de uma era ter um cinzento
+     claro sobre fundo escuro, sem ninguém dar por isso.
+
+     Passa a haver UM canal. Os degraus derivam dele, e o modo escuro troca só
+     o canal. É a mesma ideia que já estava aqui («eles não têm paleta de
+     cinzentos nenhuma; têm UMA cor e uma escala de opacidades»), levada até ao
+     fim: agora a cor também é uma variável. */
+  --bo-tinta-rgb: 13 13 13;
+
+  --bo-tinta-82: rgb(var(--bo-tinta-rgb) / 0.82);
+  --bo-tinta-72: rgb(var(--bo-tinta-rgb) / 0.72);
+  --bo-tinta-64: rgb(var(--bo-tinta-rgb) / 0.64);
+  --bo-tinta-58: rgb(var(--bo-tinta-rgb) / 0.58);
 
   --bo-text: var(--bo-tinta-82);
   --bo-text-muted: var(--bo-tinta-64);
@@ -584,7 +661,7 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-chao: #f7f8f7;
 
   --bo-surface-sunken: #f7f7f8; /* insets, list stripes — neutral ChatGPT grey */
-  --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
+  --bo-surface-hover: rgb(var(--bo-tinta-rgb) / 0.045); /* row / item hover wash */
   --bo-tint-accent: rgba(76, 99, 80, 0.1); /* soft moss call-out fill */
 
   /* ── UMA TINTA, CINCO DEGRAUS COM O NÚMERO NO NOME ───────────────────────
@@ -627,11 +704,11 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      escurecer para 4% ao passar o rato. Editar a chamada é o único sítio onde
      isto fica verdadeiro — e tem a vantagem de quem lê o código passar a ver o
      nome do degrau em vez de um número mágico. */
-  --bo-tinta-3: rgba(13, 13, 13, 0.03);
-  --bo-tinta-6: rgba(13, 13, 13, 0.06);
-  --bo-tinta-8: rgba(13, 13, 13, 0.08);
-  --bo-tinta-10: rgba(13, 13, 13, 0.1);
-  --bo-tinta-13: rgba(13, 13, 13, 0.13);
+  --bo-tinta-3: rgb(var(--bo-tinta-rgb) / 0.03);
+  --bo-tinta-6: rgb(var(--bo-tinta-rgb) / 0.06);
+  --bo-tinta-8: rgb(var(--bo-tinta-rgb) / 0.08);
+  --bo-tinta-10: rgb(var(--bo-tinta-rgb) / 0.1);
+  --bo-tinta-13: rgb(var(--bo-tinta-rgb) / 0.13);
 
   /* ── A ESCADA DE ENTRADA: DEGRAUS DE 20 ms, SEIS, E PÁRA ─────────────────
      A Apple tem esta escada ESCRITA no CSS, e mede-se: 0,20 / 0,22 / 0,24 /
@@ -686,7 +763,7 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-hairline: var(--bo-tinta-10); /* card / divider hairline */
   --bo-hairline-strong: var(--bo-tinta-13); /* clearer separator */
   /* ≥3:1 non-text contrast so a field boundary is identifiable (WCAG 1.4.11). */
-  --bo-control-border: rgba(13, 13, 13, 0.55);
+  --bo-control-border: rgb(var(--bo-tinta-rgb) / 0.55);
 
   /* ── O MESMO RAIO, PEDIDO POR TRÊS NOMES ────────────────────────────────
      Eram 10, 12 e 16 px — «chips», «controlos», «cartões». Três degraus para
@@ -752,10 +829,17 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      Isto vale para a família toda do token — menus, avisos, barras coladas, o
      cartão em arrasto —, e é de propósito: são todos «o que flutua e volta a
      fechar». A MODAL não se toca: já era larga (48 px) porque tapa a página. */
+  /* A cor sai para tokens próprios (`--bo-sombra-tinta-*`) porque é ela — e
+     não a geometria — que o modo escuro tem de trocar. Ver o bloco do
+     `light-dark()` no fim do ficheiro. */
+  --bo-sombra-tinta-1: rgba(13, 13, 13, 0.16);
+  --bo-sombra-tinta-2: rgba(13, 13, 13, 0.08);
+  --bo-sombra-tinta-3: rgba(13, 13, 13, 0.18);
+  --bo-sombra-tinta-4: rgba(13, 13, 13, 0.1);
   --bo-sombra-suspensa:
-    0 12px 32px -8px rgba(13, 13, 13, 0.16), 0 4px 10px -4px rgba(13, 13, 13, 0.08);
+    0 12px 32px -8px var(--bo-sombra-tinta-1), 0 4px 10px -4px var(--bo-sombra-tinta-2);
   --bo-sombra-modal:
-    0 24px 48px -12px rgba(13, 13, 13, 0.18), 0 8px 16px -8px rgba(13, 13, 13, 0.1);
+    0 24px 48px -12px var(--bo-sombra-tinta-3), 0 8px 16px -8px var(--bo-sombra-tinta-4);
 
   /* ══════════════════════════════════════════════════════════════════════
      O MATERIAL DO QUE APARECE POR CIMA
@@ -1034,6 +1118,107 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      baixo. */
   --bo-accent-lavagem: #e2e6e3;
 
+  /* ══════════════════════════════════════════════════════════════════════
+     OS QUATRO ESTADOS, QUE ATÉ AQUI NÃO EXISTIAM COMO TOKENS
+     ══════════════════════════════════════════════════════════════════════
+
+     A Parte 5.2 do `docs/DESIGN-SYSTEM.md` dá-lhes nome e valor. Não estavam
+     aqui: viviam escritos à mão nos ecrãs, e o mais usado — o vermelho do erro
+     — aparecia MEDIDO 247 vezes em 74 valores distintos de cor, sempre no
+     mesmo papel (texto de erro, contorno, fundo esbatido, `hover`). Um terço
+     de todos os literais de cor do back office era esta cor.
+
+     ── OS NÚMEROS DO DOCUMENTO, REFEITOS E NÃO ACREDITADOS ────────────────
+
+     Calculados aqui pela fórmula da WCAG 2.1, sobre as duas superfícies onde
+     este texto assenta mesmo (o cartão branco e o chão `#f7f8f7`) e sobre as
+     duas do modo escuro:
+
+                        branco     chão    #171b17   #101310
+       --bo-perigo      5,90 ✓    5,54 ✓
+       --bo-sucesso     6,14 ✓    5,77 ✓
+       --bo-aviso       5,91 ✓    5,55 ✓
+       --bo-info        6,80 ✓    6,39 ✓
+       escuros                              9,0 ✓     9,7 ✓
+
+     Todos passam o mínimo de 4,5:1 para texto pequeno, que é onde estes vivem.
+
+     ── E UM SÍTIO ONDE O DOCUMENTO SE ENGANA, POR MEIO DÉCIMO ─────────────
+
+     A tabela da Parte 5.2 dá `--fg-tertiary: #6B766C` com «4.7:1». Está certo
+     — SOBRE BRANCO. Sobre o chão do back office dá **4,45**, e o chão é onde
+     esse texto assenta na maior parte do produto. Fica a chumbar por cinco
+     centésimas, que é a pior maneira de chumbar: ninguém repara.
+
+     Escurece-se dois passos, para `#69746a` — 4,88 sobre branco, 4,58 sobre o
+     chão. É o primeiro valor da rampa que passa nos DOIS. O matiz é o mesmo.
+
+     ── PORQUE É QUE SÃO HEXADECIMAIS E NÃO `var()` ────────────────────────
+
+     Pela mesma razão que o `--bo-accent` aqui em cima explica por extenso: os
+     testes de contraste desta casa LÊEM estes tokens do CSS e fazem a conta
+     com eles, e `hexParaRgb()` não segue uma indirecção. O modo escuro troca
+     o valor no seu próprio bloco, e o teste sabe ler os dois. */
+  --bo-perigo: #b23b2e;
+  --bo-sucesso: #2f6d4f;
+  --bo-aviso: #8a5a12;
+  --bo-info: #2c5f86;
+
+  /* As lavagens — o fundo esbatido de um aviso, de um erro, de uma etiqueta.
+     Ficam como `color-mix` sobre a superfície, e não como um hexadecimal
+     achatado, porque no modo escuro a superfície por baixo é outra e uma cor
+     achatada sobre branco ficava a brilhar em cima do escuro. */
+  --bo-perigo-lavagem: color-mix(in oklab, var(--bo-perigo) 12%, transparent);
+  --bo-sucesso-lavagem: color-mix(in oklab, var(--bo-sucesso) 12%, transparent);
+  --bo-aviso-lavagem: color-mix(in oklab, var(--bo-aviso) 12%, transparent);
+  --bo-info-lavagem: color-mix(in oklab, var(--bo-info) 12%, transparent);
+
+  /* ── A TINTA QUE ASSENTA *EM CIMA* DA COR, QUE NÃO É SEMPRE BRANCO ──────
+     Um botão destrutivo cheio escrevia `bg-[#8a2a22] text-white`, e estava
+     certo: branco sobre aquele vermelho dá 8,62:1.
+
+     Em modo escuro deixa de estar. A cor de perigo inverte — passa a ser o
+     `#f4a79d`, claro, para se ler sobre um fundo escuro — e branco sobre ela
+     dá **1,93:1**. Um botão ilegível, exactamente no botão que apaga coisas.
+
+     É a armadilha própria de uma paleta que inverte: não basta trocar a cor
+     de fundo, tem de se trocar o que assenta nela. Estes dois tokens são essa
+     tinta. Medido: `#171b17` sobre `#f4a79d` dá 9,01:1. */
+  --bo-sobre-perigo: #ffffff;
+  --bo-sobre-acento: #ffffff;
+
+  /* O acento ao passar o rato, e o tom cheio do aviso (as bolinhas, os fundos
+     e os contornos — o `--bo-aviso` é a versão de TEXTO, mais escura). */
+  --bo-accent-hover: #415440;
+  --bo-aviso-tom: #c98a2e;
+
+  /* ── A SELECÇÃO CHEIA — a pastilha de filtro activa ────────────────────
+     Era um `#1b2119` quase preto com texto branco. Em modo escuro isso é uma
+     pastilha preta sobre um fundo preto: o estado activo desaparecia.
+     Inverte, e a tinta por cima com ela. */
+  --bo-seleccao: #1b2119;
+  --bo-seleccao-hover: #2a3227;
+  --bo-sobre-seleccao: #ffffff;
+
+  /* O verde da marca (`sage-500`). Nunca como texto sobre branco — dá 4,6:1 e
+     a Parte 18 proíbe-o por escrito. Serve para contornos, fundos e realces. */
+  --bo-marca: #5f7c66;
+
+  /* Os três papéis de texto do documento, apelidados na língua da casa. O
+     `--bo-text` / `-muted` / `-faint` que já cá estavam continuam a valer —
+     estes são os nomes do documento a apontar para o mesmo sítio, para quem
+     vier do brief encontrar o que procura. */
+  --bo-texto-terciario: #69746a;
+
+  /* ── A ELEVAÇÃO, QUE EM CLARO NÃO SE VÊ E EM ESCURO É TUDO ──────────────
+     Em modo claro os três níveis são todos brancos e quem separa é a SOMBRA;
+     em modo escuro não há sombra que se veja sobre preto, e quem separa é a
+     LUMINOSIDADE. É a regra da Parte 5.3, e é a razão de haver quatro fundos
+     em vez de um. Em claro estes dois valem branco de propósito — não é
+     esquecimento, é a regra. */
+  --bo-elevado: #ffffff;
+  --bo-elevado-2: #ffffff;
+
   /* ── Type scale (documented reference for the whole back office). Sizes the
      screens already reach for via Tailwind, unified here into one calm ramp.
         caption 12/1.5 · label 13 caps · body 15/1.6 · lead 17/1.6
@@ -1202,6 +1387,184 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      mission-control look this interface used to force on every element. */
   letter-spacing: var(--bo-tracking-tight);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O MODO ESCURO — TRÊS ESTADOS, E `light-dark()` A FAZER O TRABALHO
+   ══════════════════════════════════════════════════════════════════════════
+
+   A Parte 5.3 do documento pede três estados de aparência: **Automático**
+   (segue o sistema, e é o que vem por omissão), **Claro** e **Escuro** — e diz
+   porquê: a Apple desaconselha que uma aplicação imponha uma preferência
+   exclusiva, e três estados com Automático por omissão é o compromisso certo.
+
+   ── PORQUE `light-dark()` E NÃO DOIS BLOCOS COPIADOS ────────────────────
+
+   A maneira habitual é escrever a paleta escura duas vezes: uma dentro de
+   `@media (prefers-color-scheme: dark)` para o automático, e outra numa classe
+   para a escolha explícita. São duas listas de trinta linhas a dizer o mesmo,
+   e no dia em que uma mudar sem a outra fica um modo escuro com uma cor do
+   claro no meio — o género de avaria que ninguém vê porque quase ninguém abre
+   os dois modos lado a lado.
+
+   Com `light-dark()` escreve-se UMA vez o par, e quem escolhe é a propriedade
+   `color-scheme`. Os três estados passam a ser três linhas:
+
+     · automático → `color-scheme: light dark`  (o valor de base, aqui em baixo)
+     · claro      → `color-scheme: light`
+     · escuro     → `color-scheme: dark`
+
+   E `color-scheme` faz de borla uma coisa que se esquece sempre: as barras de
+   deslocamento, os campos e os controlos nativos do sistema passam a ser
+   desenhados no modo certo. Sem ela, um `<input type="date">` continua branco
+   e brilhante no meio de um painel escuro.
+
+   ── E O RECURSO, QUE NÃO É OPCIONAL NESTA CASA ─────────────────────────
+
+   Um browser sem `light-dark()` não dá erro: a declaração fica inválida e o
+   token cai para o valor herdado ou para nada. É EXACTAMENTE a avaria que o
+   `tema.css` conta por extenso ter custado um dia inteiro — a regra sem o
+   valor. Por isso as declarações de cima (as literais, claras) ficam onde
+   estão, e este bloco só as substitui DENTRO de um `@supports`. Quem não
+   souber `light-dark()` fica com o back office claro de sempre, inteiro.
+
+   As lavagens, os fios, a tinta e as sombras não aparecem aqui: derivam todas
+   do `--bo-tinta-rgb`, que muda na primeira linha. Era esse o objectivo de lhe
+   dar um canal próprio.
+   ══════════════════════════════════════════════════════════════════════════ */
+@supports (color: light-dark(#fff, #000)) {
+  body:is(.admin-mode, :has([data-admin-mode])) {
+    /* Automático por omissão: os dois esquemas declarados, e o sistema decide. */
+    color-scheme: light dark;
+
+    /* A TINTA NÃO ESTÁ AQUI — e a razão está escrita no bloco a seguir a
+       este. `light-dark()` só aceita CORES, e o canal são três números. */
+
+    /* AS SUPERFÍCIES. Em claro os três níveis são brancos e quem separa é a
+       sombra; em escuro a sombra não se vê e quem separa é a luminosidade. */
+    --bo-chao: light-dark(#f7f8f7, #101310);
+    --bo-surface: light-dark(#ffffff, #171b17);
+    --bo-surface-sunken: light-dark(#f7f7f8, #1e241e);
+    --bo-elevado: light-dark(#ffffff, #1e241e);
+    --bo-elevado-2: light-dark(#ffffff, #262d26);
+
+    /* O ACENTO. Em escuro sobe para o sage-300: o 600 sobre `#171b17` dá
+       2,79:1 e seria ilegível. Medido, o `#abc4b1` dá 9,34:1. */
+    --bo-accent: light-dark(#4c6752, #abc4b1);
+    --bo-accent-lavagem: light-dark(#e2e6e3, #2a3c2f);
+    --bo-accent-ring: light-dark(rgba(76, 99, 80, 0.16), rgba(126, 160, 134, 0.55));
+    --bo-tint-accent: light-dark(rgba(76, 99, 80, 0.1), rgba(171, 196, 177, 0.12));
+
+    /* OS QUATRO ESTADOS. Os escuros são os do documento, e medi-os: 9,0 · 8,8
+       · 9,2 · 9,0 sobre `#171b17`. */
+    --bo-perigo: light-dark(#b23b2e, #f4a79d);
+    --bo-sucesso: light-dark(#2f6d4f, #7fc7a0);
+    --bo-aviso: light-dark(#8a5a12, #e8b45c);
+    --bo-info: light-dark(#2c5f86, #8fc0e6);
+    --bo-texto-terciario: light-dark(#69746a, #8a968a);
+    --bo-accent-hover: light-dark(#415440, #d0e1d4);
+    --bo-aviso-tom: light-dark(#c98a2e, #e8b45c);
+    --bo-seleccao: light-dark(#1b2119, #e9f2eb);
+    --bo-seleccao-hover: light-dark(#2a3227, #d0e1d4);
+    --bo-sobre-seleccao: light-dark(#ffffff, #171b17);
+    --bo-marca: light-dark(#5f7c66, #7ea086);
+
+    /* ── E A TINTA DO SÍTIO, QUE O BACK OFFICE HERDA ────────────────────
+       MEDIDO: o back office usa `text-foreground` **584 vezes**, mais 50 de
+       `border-foreground`, 13 de `placeholder-`, 10 de `bg-` e 8 de
+       `decoration-`. Seiscentas e sessenta e cinco.
+
+       O `text-foreground` compila para `color: var(--color-foreground)` — ou
+       seja, resolve-se no sítio de uso. Redefinir o token aqui inverte as 665
+       de uma vez, sem abrir um único componente. É a diferença entre uma
+       tarde e uma semana, e não deixa nenhuma para trás por distracção.
+
+       O valor claro é o `#0d0d0d` que o bloco do back office já lhe dá; o
+       escuro é o `--fg-primary` da Parte 5.2. */
+    --color-foreground: light-dark(#0d0d0d, #f1f5f1);
+
+    /* A tinta que assenta na cor. Em claro é branco; em escuro é o fundo,
+       porque a cor por baixo passou a ser clara. */
+    --bo-sobre-perigo: light-dark(#ffffff, #171b17);
+    --bo-sobre-acento: light-dark(#ffffff, #171b17);
+
+    /* O VIDRO. O material claro assenta em branco a 80%; o escuro num verde
+       quase preto a 52%, que é o que a Parte 5.2 dá. */
+    --bo-material: light-dark(rgba(255, 255, 255, 0.8), rgba(26, 34, 28, 0.52));
+    --bo-material-opaco: light-dark(#ffffff, #1a221c);
+    --bo-vidro-claro: light-dark(rgba(255, 255, 255, 0.1), rgba(20, 28, 22, 0.16));
+    --bo-vidro-claro-veu: light-dark(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.62));
+    --bo-vidro-claro-opaco: light-dark(#4d4d4d, #2a322c);
+
+    /* AS SOMBRAS. Em escuro têm de ser mais opacas para se verem de todo — uma
+       sombra a 16% de preto sobre `#101310` é invisível.
+
+       Só a COR entra no `light-dark()`; a geometria fica de fora. Uma sombra
+       inteira não é uma cor, e `light-dark()` de uma sombra é uma declaração
+       inválida — que não dá erro, dá uma sombra que desaparece. */
+    --bo-sombra-tinta-1: light-dark(rgba(13, 13, 13, 0.16), rgba(0, 0, 0, 0.55));
+    --bo-sombra-tinta-2: light-dark(rgba(13, 13, 13, 0.08), rgba(0, 0, 0, 0.4));
+    --bo-sombra-tinta-3: light-dark(rgba(13, 13, 13, 0.18), rgba(0, 0, 0, 0.62));
+    --bo-sombra-tinta-4: light-dark(rgba(13, 13, 13, 0.1), rgba(0, 0, 0, 0.45));
+  }
+
+  /* AS DUAS ESCOLHAS EXPLÍCITAS. Ganham ao sistema nos dois sentidos: quem
+     escolher Claro fica claro mesmo com o computador em escuro, e ao
+     contrário. É só isto — o `light-dark()` lá em cima faz o resto. */
+  /* ── ONDE VIVE O ATRIBUTO, E PORQUE É QUE NÃO É NO `<body>` ───────────
+     O `data-admin-mode` é servido pelo SERVIDOR, no `<main>` do layout do
+     grupo `(admin)` — é a razão de o back office não piscar com as cores do
+     sítio ao carregar, e está contada por extenso nesse ficheiro.
+
+     A aparência escolhida segue-o para o mesmo elemento, e pela mesma razão:
+     vem de um cookie que o servidor lê, portanto chega no HTML e vale já no
+     primeiro pixel. Pô-la no `<body>` obrigava a um script inline a correr
+     antes da pintura — mais uma coisa a poder falhar, para o mesmo resultado.
+
+     O `:has()` já é como o `data-admin-mode` é lido aqui em cima; isto é a
+     mesma leitura com o segundo atributo no mesmo elemento. */
+  body:has([data-admin-mode][data-aparencia="claro"]) {
+    color-scheme: light;
+  }
+  body:has([data-admin-mode][data-aparencia="escuro"]) {
+    color-scheme: dark;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   E O CANAL DA TINTA, QUE NÃO CABE NO `light-dark()`
+   ══════════════════════════════════════════════════════════════════════════
+
+   Esta é a excepção, e custou uma imagem a ver. O canal estava assim:
+
+       --bo-tinta-rgb: light-dark(13 13 13, 241 245 241);
+
+   `light-dark()` aceita duas **cores**. `13 13 13` não é uma cor — são três
+   números, que só se tornam cor lá dentro do `rgb(… / α)` onde o canal é
+   usado. A declaração fica inválida e o canal nunca troca.
+
+   E fica inválida em silêncio, como tudo nesta família: o CSS não dá erro, o
+   build passa, os três passeios do modo escuro passaram todos — porque mediam
+   o chão, o cartão e o perigo, que são cores a sério e trocaram bem. O que
+   não trocou foi a TINTA, ou seja o texto. Vi-o num retrato do painel: o
+   «Boa tarde, Catarina.» quase invisível, cinzento-escuro sobre fundo escuro.
+
+   Por isso o canal faz os três estados à mão. São três regras para uma
+   variável, e é a única do ficheiro que precisa disto — todas as outras são
+   cores e ficam no `light-dark()`.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  /* Automático: só quando não há escolha explícita de Claro. */
+  body:has([data-admin-mode]):not(:has([data-admin-mode][data-aparencia="claro"])) {
+    --bo-tinta-rgb: 241 245 241;
+  }
+}
+body:has([data-admin-mode][data-aparencia="escuro"]) {
+  --bo-tinta-rgb: 241 245 241;
+}
+body:has([data-admin-mode][data-aparencia="claro"]) {
+  --bo-tinta-rgb: 13 13 13;
+}
+
 
 /* ── O GEIST, E PORQUE É QUE ESTA REGRA NÃO ESTÁ NO `body` ────────────────
    A letra é carregada pelo `layout.tsx` do grupo `(admin)`, e o `next/font`
@@ -2151,7 +2514,8 @@ body {
    browser mesmo fechado. */
 .bo-mais > summary {
   list-style: none;
-  cursor: pointer;
+  /* O cursor sai daqui: é a seta, como em tudo o que não é um link, e quem o
+     diz é o bloco «O PONTEIRO TEM SIGNIFICADO» mais abaixo neste ficheiro. */
 }
 .bo-mais > summary::-webkit-details-marker {
   display: none;
@@ -5541,4 +5905,65 @@ body:has(.barra-consentimento) footer {
 
   --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.34);
   --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O PONTEIRO TEM SIGNIFICADO — E É ISTO QUE SEPARA UMA APP DE UM SITE
+   ══════════════════════════════════════════════════════════════════════════
+
+   Fase 07 do `docs/DESIGN-SYSTEM.md`. A Parte 12.1 abre com a frase que
+   justifica o trabalho: «esta é a parte que mais distingue uma app de Mac de
+   um site, e a que quase nunca se faz».
+
+   ── A REGRA, QUE É CONTRA-INTUITIVA PARA QUEM VEM DA WEB ──────────────────
+
+   **Um botão não leva a mãozinha.** Leva a seta.
+
+   O `cursor: pointer` da web significa «isto leva-te a outro sítio» — é o
+   cursor do LINK, e nasceu com o hipertexto. Num sistema operativo, um botão
+   não te leva a lado nenhum: faz uma coisa, ali mesmo. Por isso o macOS
+   desenha a seta em cima de todos os botões, de todas as caixas de selecção,
+   de todos os menus. Abre o Finder e passa o rato por cima de um botão: seta.
+
+   É por isso que o documento a proíbe por escrito na lista da Parte 18
+   («`cursor: pointer` em botões») e a Parte 12.1 diz, letra por letra:
+   «`default` (seta) em **botões** — não `pointer`, que é para links; `pointer`
+   só em links de navegação».
+
+   MEDIDO antes desta ronda: 21 `cursor-pointer` no back office, e nem um deles
+   num `<a>`. Estavam em nove `<summary>`, seis `<label>`, um `<div>` e um
+   `<button>` — ou seja, a mãozinha aparecia exactamente onde não devia e em
+   nenhum sítio onde devia.
+
+   ── PORQUÊ AQUI E NÃO EM CADA COMPONENTE ─────────────────────────────────
+
+   Porque um cursor escrito componente a componente é um cursor que o próximo
+   componente esquece. Estas seis regras cobrem o back office inteiro, incluindo
+   o que ainda não foi escrito, e o sítio público não é tocado — o selector
+   pede o marcador que só o painel tem.
+
+   Os cursores de GESTO (`grab`, `grabbing`, `col-resize`, `not-allowed`)
+   ficam onde estão, nas classes dos componentes que os usam: esses dependem
+   do estado, e não do tipo do elemento.
+   ══════════════════════════════════════════════════════════════════════════ */
+body:has([data-admin-mode]) :is(button, [role="button"], [role="tab"], [role="option"], summary, label, select) {
+  cursor: default;
+}
+
+/* O link continua a ser a mãozinha. É o único que a merece. */
+body:has([data-admin-mode]) a[href] {
+  cursor: pointer;
+}
+
+/* Onde se escreve, o cursor diz que se escreve — incluindo as células
+   editáveis de uma tabela, que é onde isto mais falta faz. */
+body:has([data-admin-mode])
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, [contenteditable="true"]) {
+  cursor: text;
+}
+
+/* O que não se pode fazer diz-se antes do clique, e não depois. */
+body:has([data-admin-mode]) :is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
 }

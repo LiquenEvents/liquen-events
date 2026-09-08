@@ -1328,10 +1328,10 @@ export default function Temas() {
         />
       )}
       {blocked && (
-        <Card padding="sm" className="mb-6 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
+        <Card padding="sm" className="mb-6 border-[var(--bo-aviso)]/30 bg-[var(--bo-aviso-lavagem)]/60">
           {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
               tem é o projecto em pausa manda-a correr o schema por nada. */}
-          <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">{blocked.titulo}</p>
+          <p className="bo-eyebrow mb-1.5 text-[var(--bo-aviso)]">{blocked.titulo}</p>
           <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">{blocked.texto}</p>
         </Card>
       )}
@@ -1685,7 +1685,7 @@ export default function Temas() {
                          onde há rato, que é onde o `group-hover` os pode trazer
                          de volta. */
                       /* ── O CHIP QUE POUSA NA FOTOGRAFIA ────────────────
-                         Era `bg-white/85` com `backdrop-blur-sm` e tinta a
+                         Era `bg-[var(--bo-surface)]/85` com `backdrop-blur-sm` e tinta a
                          `text-foreground/45`. Três coisas erradas de uma vez,
                          e as três medidas:
 
@@ -1749,7 +1749,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left hover:border-sage-600/40 ${ESTADO} ${PRESSAO}`}
+                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] text-left hover:border-sage-600/40 ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -1856,7 +1856,7 @@ export default function Temas() {
                       remédio a um toque, um tema com poucas fotos é uma nota de
                       curadoria, e a nota é contexto. */}
                   {parecidos.get(t.id) ? null : temPoucasFotos(t) ? (
-                    <p className="mt-0.5 truncate text-xs text-[#8a6d3b]">
+                    <p className="mt-0.5 truncate text-xs text-[var(--bo-aviso)]">
                       Ainda com poucas fotos para escolher
                     </p>
                   ) : t.notes ? (
@@ -1881,7 +1881,7 @@ export default function Temas() {
                 <button
                   type="button"
                   onClick={() => setAFundir(t)}
-                  className={`alvo-toque mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs text-[#8a6d3b] hover:bg-[#8a6d3b]/[0.07] ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs text-[var(--bo-aviso)] hover:bg-[var(--bo-aviso)]/[0.07] ${ESTADO} ${PRESSAO}`}
                 >
                   <span className="truncate">{avisoDeTemaParecido(parecidos.get(t.id))}</span>
                   <span className="shrink-0 underline decoration-dotted underline-offset-2">
@@ -3771,7 +3771,7 @@ function ThemeFolder({
       )}
 
       {failed.length > 0 && (
-        <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
+        <Card padding="sm" className="mb-4 border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40">
           <p className="text-sm text-[var(--bo-text)]">
             {plural(failed.length, "foto não subiu", "fotos não subiram")}. Os ficheiros ficaram
             guardados — não é preciso voltar a escolhê-los.
@@ -3845,7 +3845,7 @@ function ThemeFolder({
       {/* O QUE NÃO FOI LEVADO para outro tema. Vermelho e persistente: é um
           número em que ela tem de agir, e as fotos continuam aqui. */}
       {copyReport && (
-        <Card padding="sm" className="mb-4 border-[#8a2a22]/25 bg-[#f6e6df]/40">
+        <Card padding="sm" className="mb-4 border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40">
           <p className="text-sm text-[var(--bo-text)]">
             {copyReport.failed.length > 0
               ? `${copyReport.failed.length} de ${
@@ -3893,7 +3893,7 @@ function ThemeFolder({
       {(selectedCount > 0 || emBloco) && (
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-sage-600/25 bg-white/95 px-4 py-3 backdrop-blur">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-sage-600/25 bg-[var(--bo-surface)]/95 px-4 py-3 backdrop-blur">
               <p className="text-sm text-[var(--bo-text)]">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
@@ -3948,7 +3948,7 @@ function ThemeFolder({
             /* Fundo opaco por baixo: o cartão da espera é translúcido de
                propósito (é um tom sobre o papel), e colado ao topo passava a
                ter as fotos a rolar por trás. */
-            <div className="rounded-xl bg-white/95 backdrop-blur">
+            <div className="rounded-xl bg-[var(--bo-surface)]/95 backdrop-blur">
               <EmCurso
                 titulo={
                   emBloco.tipo === "transferir" ? "A transferir as fotos…" : "A remover as fotos…"

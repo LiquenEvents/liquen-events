@@ -696,19 +696,19 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           <div
             className={`${QUADRADO} ${
               outstanding > 0
-                ? "@min-[26rem]:border-[#8a2a22]/35 @min-[26rem]:bg-[#8a2a22]/[0.05]"
+                ? "@min-[26rem]:border-[var(--bo-perigo)]/35 @min-[26rem]:bg-[var(--bo-perigo)]/[0.05]"
                 : NEUTRO
             }`}
           >
             <p
               className={`${VALOR} ${
-                outstanding > 0 ? "text-lg text-[#8a2a22]" : "text-base text-foreground/45"
+                outstanding > 0 ? "text-lg text-[var(--bo-perigo)]" : "text-base text-foreground/45"
               }`}
             >
               {eur2(outstanding)}
             </p>
             <p
-              className={`${ROTULO} ${outstanding > 0 ? "text-[#8a2a22]/70" : "text-foreground/40"}`}
+              className={`${ROTULO} ${outstanding > 0 ? "text-[var(--bo-perigo)]/70" : "text-foreground/40"}`}
             >
               Em falta
             </p>
@@ -763,10 +763,10 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       {overReceived && (
         <div
           role="alert"
-          className="bo-entrada flex items-start gap-2.5 rounded-lg border border-[#c99a3a]/40 bg-[#c99a3a]/[0.08] px-3.5 py-2.5 mb-4"
+          className="bo-entrada flex items-start gap-2.5 rounded-lg border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.08] px-3.5 py-2.5 mb-4"
         >
           <svg
-            className="text-[#8a6420] shrink-0 mt-0.5"
+            className="text-[var(--bo-aviso)] shrink-0 mt-0.5"
             width="15"
             height="15"
             viewBox="0 0 24 24"
@@ -781,7 +781,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             />
           </svg>
           <div className="min-w-0">
-            <p className="text-[#8a6420] text-xs font-medium leading-snug">
+            <p className="text-[var(--bo-aviso)] text-xs font-medium leading-snug">
               Recebido excede o total contratado ({eur2(headlinePaid)} de {eur2(total)}).
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
@@ -868,7 +868,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             Cresce o RÓTULO, não o quadrado: o HTML manda o toque no rótulo
             activar o controlo, e o desenho fica igual. `alvo-toque` só age sob
             `(pointer: coarse)`. */}
-        <label className="alvo-toque !justify-start inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-[var(--bo-text-muted)]">
+        <label className="alvo-toque !justify-start inline-flex select-none items-center gap-1.5 text-[11px] text-[var(--bo-text-muted)]">
           <input
             type="checkbox"
             checked={paidOnAdd}
@@ -895,7 +895,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       {/* Linha de altura fixa para o erro / atalho de teclado. */}
       <p
         className={`min-h-[1.1rem] leading-[1.1rem] text-[10px] mt-1.5 ${
-          formError ? "text-[#8a2a22]" : "text-foreground/35"
+          formError ? "text-[var(--bo-perigo)]" : "text-foreground/35"
         }`}
         role={formError ? "alert" : undefined}
       >
@@ -974,7 +974,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               key={p.id}
               className={`group ${GRID} rounded-lg px-2 py-1.5 ${ESTADO} ${
                 isFailed
-                  ? "border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06]"
+                  ? "border border-[var(--bo-perigo)]/50 bg-[var(--bo-perigo)]/[0.06]"
                   : "border border-transparent hover:bg-[var(--bo-tinta-3)]"
               }`}
             >
@@ -1028,7 +1028,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               )}
 
               <span
-                className={`text-[11px] tabular-nums truncate ${overdue ? "text-[#8a2a22]" : "text-foreground/45"}`}
+                className={`text-[11px] tabular-nums truncate ${overdue ? "text-[var(--bo-perigo)]" : "text-foreground/45"}`}
                 title={overdue ? "Em atraso" : undefined}
               >
                 {fmtRowDate(p.date)}
@@ -1063,7 +1063,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   <button
                     type="button"
                     onClick={retryFailed}
-                    className={`rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10 ${ESTADO} ${PRESSAO}`}
+                    className={`rounded-md border border-[var(--bo-perigo)]/50 px-1.5 py-0.5 text-[10px] text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)]/10 ${ESTADO} ${PRESSAO}`}
                   >
                     Repetir
                   </button>
@@ -1085,7 +1085,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                       // apagar dinheiro do registo, e é o alvo mais pequeno da
                       // linha — aqui a centragem do `alvo-toque` é a certa,
                       // porque o conteúdo é um símbolo.
-                      className={`alvo-toque text-foreground/45 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 p-1 ${ESTADO} ${PRESSAO}`}
+                      className={`alvo-toque text-foreground/45 hover:text-[var(--bo-perigo)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 p-1 ${ESTADO} ${PRESSAO}`}
                       aria-label={`Remover ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
                     >
                       ×
@@ -1101,7 +1101,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             com "Repetir" — em vez de desaparecer com um toast. */}
         {ghostFailed && failed?.ghost && (
           <div
-            className={`${GRID} rounded-lg border border-[#8a2a22]/50 bg-[#8a2a22]/[0.06] px-2 py-1.5`}
+            className={`${GRID} rounded-lg border border-[var(--bo-perigo)]/50 bg-[var(--bo-perigo)]/[0.06] px-2 py-1.5`}
           >
             <span className="text-[var(--bo-text-muted)] text-xs truncate">
               {KIND_LABEL[failed.ghost.kind]}
@@ -1112,13 +1112,13 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
             <span className="text-foreground/45 text-[11px] tabular-nums truncate">
               {fmtRowDate(failed.ghost.date)}
             </span>
-            <span className="text-[#8a2a22] text-[11px] truncate">Não guardado</span>
+            <span className="text-[var(--bo-perigo)] text-[11px] truncate">Não guardado</span>
             <span className="text-foreground/40 text-[9px] tracking-[0.1em] uppercase">—</span>
             <div className="flex items-center justify-end gap-0.5">
               <button
                 type="button"
                 onClick={retryFailed}
-                className={`rounded-md border border-[#8a2a22]/50 px-1.5 py-0.5 text-[10px] text-[#8a2a22] hover:bg-[#8a2a22]/10 ${ESTADO} ${PRESSAO}`}
+                className={`rounded-md border border-[var(--bo-perigo)]/50 px-1.5 py-0.5 text-[10px] text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)]/10 ${ESTADO} ${PRESSAO}`}
               >
                 Repetir
               </button>
@@ -1126,7 +1126,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 type="button"
                 onClick={() => setFailed(null)}
                 aria-label="Descartar registo não guardado"
-                className={`text-foreground/45 hover:text-[#8a2a22] p-1 ${ESTADO} ${PRESSAO}`}
+                className={`text-foreground/45 hover:text-[var(--bo-perigo)] p-1 ${ESTADO} ${PRESSAO}`}
               >
                 ×
               </button>

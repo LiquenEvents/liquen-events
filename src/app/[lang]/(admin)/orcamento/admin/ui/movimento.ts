@@ -1,4 +1,25 @@
-import { DUR_MICRO_MS, DUR_ELEMENTO_MS } from "@/lib/motion/tokens";
+/**
+ * ── PORQUE É QUE ISTO DEIXOU DE IMPORTAR A FICHA DO SÍTIO ──────────────────
+ *
+ * Havia aqui um `import { DUR_MICRO_MS, DUR_ELEMENTO_MS } from
+ * "@/lib/motion/tokens"`, e era a decisão certa enquanto o back office não
+ * tinha escala própria: melhor emprestar a do sítio do que inventar uma
+ * terceira.
+ *
+ * Passou a ter. O `docs/DESIGN-SYSTEM.md` manda no back office — está escrito
+ * no `CLAUDE.md` — e traz dez durações com nomes de uso e as molas a que
+ * pertencem. Continuar a ler o degrau `micro` do sítio era ter duas escalas a
+ * decidir a mesma coisa.
+ *
+ * E não custa nada ao sítio: MEDIDO, o `DUR_MICRO_MS` e o `DUR_ELEMENTO_MS`
+ * tinham UM consumidor em todo o repositório — este ficheiro. O que o sítio
+ * usa da ficha partilhada são as curvas (`EASE_OUT`, `EASE_IN`) e as escalas
+ * das fotografias, e nada disso se toca.
+ *
+ * Os números vivem agora onde o Tailwind os lê: `--transition-duration-*` no
+ * `@theme` do `tema.css`, com o `molas-da-apple.test.ts` a refazer a física de
+ * cada curva a partir das fórmulas da Apple.
+ */
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -153,17 +174,48 @@ import { DUR_MICRO_MS, DUR_ELEMENTO_MS } from "@/lib/motion/tokens";
  * vez de os deixar a discordar em silêncio.
  */
 
-/** O toque, em milissegundos. Verbatim da análise: 0,02 s nos estados activos. */
-export const TOQUE_MS = 20;
+/**
+ * A IDA do toque, em milissegundos. O documento é explícito: «a ida é seca; só
+ * o regresso é mola». 80 ms com a curva de saída.
+ *
+ * Eram 20. Vinte é imperceptível como animação — e era essa a intenção escrita
+ * aqui: «tira o corte seco sem pôr latência nenhuma». O documento escolhe
+ * outra coisa, e a diferença tem nome: aos 20 ms o dedo não sente que a peça
+ * cedeu, sente que ela piscou. 80 ms ainda é instantâneo para quem carrega
+ * (o limiar de «não houve espera» é 100) e já é matéria a afundar.
+ */
+export const TOQUE_MS = 80;
 
 /**
- * O estado, em milissegundos. Não é um valor local: é o degrau `micro` da casa,
- * importado para que não possa divergir dele sem um teste dar por isso.
+ * O ESTADO — passar o rato, focar, mudar de cor, de contorno, de sombra.
+ *
+ * 150 ms e a mola `interactive` (ζ = 0,86), que é o preset `.interactiveSpring`
+ * do SwiftUI: `response .15, damping .86`. Eram 120 ms e a curva de omissão.
+ *
+ * O censo deste ficheiro argumentou, com razão, que «aos 20 e aos 120 ms a
+ * curva é indiscutivelmente invisível». Continua a ser quase invisível aos
+ * 150 — e é por isso que a mudança que se SENTE não é esta, é a de baixo.
+ * Esta entra por coerência: é o degrau que o documento dá a este trabalho, e
+ * ter um número próprio ao lado do dele era manter as duas escalas que este
+ * commit veio juntar.
  */
-export const ESTADO_MS = DUR_MICRO_MS;
+export const ESTADO_MS = 150;
+
+/**
+ * O REGRESSO do toque. É aqui que se sente.
+ *
+ * 260 ms com a mola `press` (ζ = 1, sem ressalto) contra os 120 ms de antes.
+ * Duzentos e sessenta milissegundos VEEM-SE — e é de propósito: o botão
+ * carrega instantâneo e assenta com peso, que é a assimetria que este ficheiro
+ * já procurava («carrega instantâneo, assenta com peso») e só conseguia
+ * exprimir com uma diferença de 20 para 120.
+ *
+ * Sem ressalto, porque um botão que salta ao ser largado lê-se como um erro.
+ */
+export const REGRESSO_MS = 260;
 
 /** A barra a encher. O degrau `elemento` da casa — uma coisa a mover-se. */
-export const PROGRESSO_MS = DUR_ELEMENTO_MS;
+export const PROGRESSO_MS = 250;
 
 /**
  * A transição de ESTADO de qualquer primitivo em que se toque.
@@ -183,38 +235,94 @@ export const PROGRESSO_MS = DUR_ELEMENTO_MS;
  * arrasto da `FolhaOuDialogo`, que segue o dedo e não pode ter transição
  * nenhuma por baixo.
  */
-export const ESTADO =
-  "motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale] " +
-  "motion-safe:duration-[120ms]";
 
 /**
- * O TOQUE — o carregar, a 20 ms.
+ * ── PORQUE É QUE ISTO ESTÁ ESCRITO POR EXTENSO, E NÃO MONTADO ─────────────
  *
- * Duas classes e uma assimetria deliberada. O `active:duration-[20ms]` só vale
- * enquanto o dedo está em baixo (o selector `:active` tem mais especificidade
- * do que a duração de base, portanto ganha sem depender de ordem nenhuma);
- * ao largar, o elemento deixa de estar `:active` e volta aos 120 ms do
- * `ESTADO`. Isto é o que se quer, e não um descuido: carrega instantâneo,
- * assenta com peso.
+ * Porque montado NÃO FUNCIONA, e não funciona em silêncio. Isto chegou a
+ * estar assim:
  *
- * O gesto é `scale-[0.98]` — 2%, e não um salto. É o que o `Button` já fazia; o
- * que muda é passar a ser o MESMO gesto em todos os primitivos em que se toca,
- * em vez de um só o ter. Um por cento de escala é composto na GPU e não mexe
+ *     const PROPRIEDADES = "background-color,…,scale";
+ *     const CINCO = Array(5).fill("var(--transition-duration-interactive)")…
+ *     export const ESTADO = `motion-safe:transition-[${PROPRIEDADES}] …`;
+ *
+ * — que lê bem, compila em TypeScript, passa nos testes de unidade e não gera
+ * UMA ÚNICA REGRA de CSS. O Tailwind v4 não executa o código: varre o texto do
+ * ficheiro à procura de candidatos, e o texto que lá está é
+ * `transition-[${PROPRIEDADES}]`, que não é classe nenhuma. Medido no CSS
+ * compilado desta casa com o próprio `@tailwindcss/postcss`: das dez classes
+ * `motion-safe:transition-[…]` que saem, a lista de seis propriedades deste
+ * ficheiro não estava lá, e `transition-duration-interactive`,
+ * `transition-duration-press` e `ease-press` apareciam ZERO vezes. No browser
+ * dava `transition-property: all`, `transition-duration: 0s` — ou seja, os
+ * botões todos sem transição nenhuma, exactamente a avaria que esta pasta
+ * existe para não ter.
+ *
+ * Só o `ESTADO` e a `PRESSAO` tinham interpolação, e foram só esses dois que
+ * desapareceram; o `PROGRESSO` e a `MARCA`, escritos por extenso, compilaram.
+ *
+ * Fica feio repetir `var(--transition-duration-interactive)` cinco vezes. Fica.
+ * O `movimento.test.ts` tem um teste que lê o TEXTO deste ficheiro e exige que
+ * cada classe exportada apareça nele letra por letra — é o que apanha esta
+ * avaria da próxima vez que alguém tentar arrumá-la.
+ *
+ * ── DURAÇÕES POR PROPRIEDADE, E PORQUE É QUE NÃO HÁ ATALHO ────────────────
+ *
+ * O documento pede duas velocidades DIFERENTES no mesmo elemento: 150 ms para
+ * o que se pinta (cor, contorno, sombra) e 260 ms para o regresso do toque. Um
+ * `duration-*` só escreve UM número para todas as propriedades da lista, e as
+ * duas coisas não cabem lá.
+ *
+ * A saída é a que o CSS já tem: `transition-duration` aceita uma LISTA que
+ * casa, posição a posição, com a `transition-property`. Cinco vezes o degrau
+ * interactivo e uma vez o do regresso. O mesmo para as curvas. As seis
+ * propriedades estão POR ESTA ORDEM e a ordem importa: trocar duas em cima sem
+ * trocar as duas em baixo dá um botão a mudar de cor ao ritmo do toque.
+ *
+ * A lista de propriedades continua fechada e nenhuma delas força *layout* — a
+ * regra da casa para 60 fps num telemóvel em 4G. `scale` tem de estar cá
+ * porque no Tailwind v4 a classe `scale-*` emite a propriedade autónoma
+ * `scale`, e não `transform`; `transform` continua FORA, porque quem o usa
+ * nesta pasta é o arrasto da folha, que segue o dedo.
+ */
+export const ESTADO =
+  "motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale] " +
+  "motion-safe:[transition-duration:var(--transition-duration-interactive),var(--transition-duration-interactive),var(--transition-duration-interactive),var(--transition-duration-interactive),var(--transition-duration-interactive),var(--transition-duration-press)] " +
+  "motion-safe:[transition-timing-function:var(--ease-interactive),var(--ease-interactive),var(--ease-interactive),var(--ease-interactive),var(--ease-interactive),var(--ease-press)]";
+
+/**
+ * O TOQUE — a IDA, a 80 ms e seca.
+ *
+ * Três classes e uma assimetria deliberada, que é o coração deste ficheiro. O
+ * `:active` tem mais especificidade do que a duração de base, portanto estas
+ * três ganham sem depender de ordem nenhuma enquanto o dedo está em baixo; ao
+ * largar, o elemento deixa de estar `:active`, cai para a lista do `ESTADO` e
+ * o `scale` volta ao sítio nos 260 ms da mola `press`.
+ *
+ * É por isso que a ida escreve UM número para todas as propriedades e a volta
+ * escreve seis: à ida não há nada a distinguir — carrega tudo ao mesmo tempo,
+ * depressa e sem curva de mola. É o documento, letra por letra: «a ida é seca;
+ * só o regresso é mola».
+ *
+ * O gesto é `scale-[0.97]` — 3%, e não um salto. Compõe-se na GPU e não mexe
  * com quem está à volta.
  *
  * Onde a variante já tem uma tinta no vocabulário (os fantasmas, os itens de
  * menu), cada primitivo junta-lhe o seu `active:bg-…` um degrau mais fundo —
- * mesma cor, opacidade seguinte. Estes 20 ms cobrem-na, porque a duração do
+ * mesma cor, opacidade seguinte. Estes 80 ms cobrem-na, porque a duração do
  * `:active` vale para todas as propriedades da lista.
  */
-export const PRESSAO = "motion-safe:active:scale-[0.98] motion-safe:active:duration-[20ms]";
+export const PRESSAO =
+  "motion-safe:active:scale-[0.97] " +
+  "motion-safe:active:[transition-duration:80ms] " +
+  "motion-safe:active:[transition-timing-function:var(--ease-out)]";
 
 /**
  * Uma barra de progresso a avançar. Substitui o `duration-elemento` morto —
  * mesmo tempo pretendido (250 ms), só que agora o Tailwind gera mesmo a regra.
  */
 export const PROGRESSO =
-  "motion-safe:transition-transform motion-safe:duration-[250ms] motion-safe:ease-out";
+  "motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out";
 
 /**
  * A MARCA QUE ANDA — o indicador deslizante do `Segmented`.
@@ -237,6 +345,14 @@ export const PROGRESSO =
  * porque «Todas · 2» e «Aceites» não medem o mesmo — e não custa quadro nenhum,
  * porque a marca é `absolute` e não faz remedir ninguém à volta.
  */
-export const MARCA_MS = DUR_ELEMENTO_MS;
+/**
+ * 325 ms — o degrau `quick` do documento, que a Parte 9.5 dá por nome ao
+ * indicador de um segmentado: «o indicador desliza com `--ease-quick`».
+ *
+ * A assimetria que este bloco defende não só se mantém como CRESCE: o texto
+ * acende aos 150 ms do estado e a marca só chega aos 325. Era 120 contra 250.
+ */
+export const MARCA_MS = 325;
 
-export const MARCA = "motion-safe:transition-[translate,width] motion-safe:duration-[250ms]";
+export const MARCA =
+  "motion-safe:transition-[translate,width] motion-safe:duration-quick motion-safe:ease-quick";

@@ -194,7 +194,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
   const zone = zoneFor(next.kind);
 
   return (
-    <header className="sticky top-0 z-20 bg-white/97 border-b border-[var(--bo-hairline)]">
+    <header className="sticky top-0 z-20 bg-[var(--bo-surface)]/97 border-b border-[var(--bo-hairline)]">
       <div
         className={`px-4 sm:px-6 lg:px-10 flex flex-col ${
           desceu ? "py-2 gap-2" : "py-[var(--bo-p-vista)] gap-[var(--bo-gap-vista)]"
@@ -490,7 +490,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                      `Button`, viva neste ficheiro.
                      O `ESTADO` traz a lista certa (com `scale`) e o degrau da
                      casa; o `PRESSAO` traz os 20 ms do toque. */
-                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[var(--bo-marca)] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                   <svg
@@ -521,7 +521,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                      `Button`, viva neste ficheiro.
                      O `ESTADO` traz a lista certa (com `scale`) e o degrau da
                      casa; o `PRESSAO` traz os 20 ms do toque. */
-                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[var(--bo-marca)] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                   <svg
@@ -542,7 +542,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   type="button"
                   disabled
                   title="Disponível na fase de ações rápidas"
-                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed ${ESTADO} ${PRESSAO}`}
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[var(--bo-surface)]/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                 </button>
@@ -559,8 +559,8 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
           className="flex items-stretch gap-0 overflow-x-auto pb-1 -mx-1 px-1"
         >
           {stage === "perdido" ? (
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#8a2a22]/12 text-[#8a2a22] text-[11px] tracking-[0.12em] uppercase font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8a2a22]" />
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bo-perigo)]/12 text-[var(--bo-perigo)] text-[11px] tracking-[0.12em] uppercase font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--bo-perigo)]" />
               Negócio perdido
             </span>
           ) : (

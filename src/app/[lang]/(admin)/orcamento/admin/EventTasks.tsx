@@ -407,7 +407,7 @@ export default function EventTasks({ quote, userName }: Props) {
               className={`group flex items-start gap-3 rounded-xl border p-3 ${ESTADO} ${
                 task.done
                   ? "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] opacity-60"
-                  : "border-[var(--bo-hairline)] bg-white hover:shadow"
+                  : "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:shadow"
               }`}
             >
               {/* 18×18 medidos a 375 px. É a caixa que fecha uma tarefa do
@@ -467,7 +467,7 @@ export default function EventTasks({ quote, userName }: Props) {
                     <span
                       className={`text-[11px] tabular-nums ${
                         task.dueDate < todayStr
-                          ? "font-medium text-[#8a2a22]"
+                          ? "font-medium text-[var(--bo-perigo)]"
                           : "text-foreground/45"
                       }`}
                     >
@@ -497,7 +497,7 @@ export default function EventTasks({ quote, userName }: Props) {
                   aparecia, media 13×13 px contra os 44 da casa. */}
               <button
                 onClick={() => perguntarSeElimina(task)}
-                className={`alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[var(--bo-perigo)] ${ESTADO} ${PRESSAO}`}
                 aria-label="Remover tarefa"
               >
                 <svg

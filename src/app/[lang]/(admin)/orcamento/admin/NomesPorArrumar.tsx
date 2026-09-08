@@ -80,7 +80,7 @@ export function NomesPorArrumar({
   };
 
   return (
-    <div className="mb-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60 px-4 py-3 text-sm">
+    <div className="mb-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-chao)]/60 px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="text-[var(--bo-tinta-72)]">
           {arrumos.length === 1
@@ -101,7 +101,7 @@ export function NomesPorArrumar({
           {arrumos.map((a) => (
             <li
               key={a.tema.id}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg bg-white/70 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg bg-[var(--bo-surface)]/70 px-3 py-2"
             >
               <p className="min-w-0 text-sm">
                 {/* O antes riscado e o depois em cheio: a diferença lê-se sem

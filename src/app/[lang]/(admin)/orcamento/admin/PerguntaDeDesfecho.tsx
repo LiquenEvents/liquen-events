@@ -319,7 +319,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
               type="button"
               onClick={confirmarGanho}
               disabled={fase.tipo === "a-gravar"}
-              className={`${botao} border-sage-600 bg-sage-600 text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
+              className={`${botao} border-sage-600 bg-sage-600 text-white hover:bg-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
             >
               {fase.tipo === "a-gravar"
                 ? "A marcar…"
@@ -361,7 +361,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
               setAviso(null);
               setFase({ tipo: "quanto" });
             }}
-            className={`${botao} border-sage-600 bg-sage-600 text-white hover:bg-[#3f5343] ${ESTADO} ${PRESSAO}`}
+            className={`${botao} border-sage-600 bg-sage-600 text-white hover:bg-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
           >
             Ganho
           </button>
@@ -391,7 +391,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
           entrada no painel: o aviso monta sozinho, depois de o campo estar
           parado e focado, e nunca mexe no que está por cima dele. */}
       {aviso && (
-        <p role="alert" className="bo-entrada mt-2 text-[#8a2a22] text-[11px] leading-snug">
+        <p role="alert" className="bo-entrada mt-2 text-[var(--bo-perigo)] text-[11px] leading-snug">
           {aviso}
         </p>
       )}

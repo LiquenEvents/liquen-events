@@ -106,13 +106,13 @@ export default function MedidorDeTransbordo() {
 
   return (
     <div
-      className="fixed bottom-24 left-2 right-2 z-[100] max-h-[45vh] overflow-auto rounded-xl border border-[#8a2a22] bg-white/95 p-3 text-[11px] leading-tight shadow-[var(--bo-sombra-suspensa)]"
+      className="fixed bottom-24 left-2 right-2 z-[100] max-h-[45vh] overflow-auto rounded-xl border border-[var(--bo-perigo)] bg-[var(--bo-surface)]/95 p-3 text-[11px] leading-tight shadow-[var(--bo-sombra-suspensa)]"
       style={{ backdropFilter: "blur(4px)" }}
     >
       <button
         type="button"
         onClick={() => setResultado(medir())}
-        className={`min-h-[44px] w-full rounded-lg bg-[#5F7C66] px-3 font-semibold text-white ${ESTADO} ${PRESSAO}`}
+        className={`min-h-[44px] w-full rounded-lg bg-[var(--bo-marca)] px-3 font-semibold text-white ${ESTADO} ${PRESSAO}`}
       >
         Medir o que está a passar da margem
       </button>

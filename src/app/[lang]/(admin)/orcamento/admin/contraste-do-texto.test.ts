@@ -153,6 +153,31 @@ function lerCor(valor: string, css: string = CSS): { cor: RGB; alpha: number } {
     ).toBe(false);
     return lerCor(dentro, css);
   }
+  /*
+    ── A TINTA COM CANAL: `rgb(var(--bo-tinta-rgb) / 0.64)` ─────────────────
+
+    A fase 03 do sistema de design tirou a cor de dentro dos nove degraus da
+    tinta: há um canal (`--bo-tinta-rgb`) e os degraus derivam dele, para o
+    modo escuro poder trocar UMA linha em vez de nove.
+
+    Este leitor não conhecia a forma. E o que aconteceu não foi um erro claro:
+    devolveu `NaN`, e o teste do fio do material passou a dizer «mede NaN:1
+    sobre branco». Um leitor de CSS que não sabe ler uma forma nova cala-se com
+    um número que não é número.
+  */
+  const comCanal = valor.match(/rgba?\(\s*var\(\s*(--[a-z0-9-]+)\s*\)\s*\/\s*([\d.]+)\s*\)/i);
+  if (comCanal) {
+    const canal = css.match(new RegExp(`${comCanal[1]}\\s*:\\s*([^;]+);`));
+    expect(
+      canal,
+      `o canal ${comCanal[1]}, de onde ${valor} tira a cor, não existe no globals.css`,
+    ).not.toBeNull();
+    const nums = canal![1].match(/\d+/g);
+    expect(nums?.length, `o canal ${comCanal[1]} não tem três componentes`).toBeGreaterThanOrEqual(3);
+    const [r, g, b] = nums!.slice(0, 3).map(Number);
+    return { cor: [r, g, b], alpha: parseFloat(comCanal[2]) };
+  }
+
   const rgba = valor.match(/rgba?\(([^)]+)\)/);
   if (rgba) {
     const partes = rgba[1].split(",").map((p) => parseFloat(p.trim()));

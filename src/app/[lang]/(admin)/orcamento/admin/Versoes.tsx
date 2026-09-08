@@ -356,7 +356,7 @@ export default function Versoes({
               <button
                 type="button"
                 onClick={() => onInserirNaMensagem(paragrafo)}
-                className={`alvo-toque mt-2 text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[#415440] hover:underline ${MOV_ESTADO} ${PRESSAO}`}
+                className={`alvo-toque mt-2 text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${MOV_ESTADO} ${PRESSAO}`}
               >
                 Inserir na mensagem para o cliente
               </button>
@@ -464,7 +464,7 @@ export default function Versoes({
           </>
         )}
         {erroDoCorte && (
-          <p className="mt-2 text-xs leading-relaxed text-[#8a2a22]">{erroDoCorte}</p>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--bo-perigo)]">{erroDoCorte}</p>
         )}
       </div>
 
@@ -480,7 +480,7 @@ export default function Versoes({
         rotuloConfirmar={aCortar ? "A cortar…" : "Cortar os links"}
         onConfirmar={cortarOsLinks}
       />
-      {erro && <p className="mt-2 text-xs text-[#8a2a22]">Alguma coisa falhou. Tenta outra vez.</p>}
+      {erro && <p className="mt-2 text-xs text-[var(--bo-perigo)]">Alguma coisa falhou. Tenta outra vez.</p>}
     </section>
   );
 }

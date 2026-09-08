@@ -488,7 +488,7 @@ function ContractDetails({ c }: { c: Contract }) {
         </div>
       </div>
       <p className="bo-eyebrow text-foreground/40 mb-2">Termos aceites (cópia guardada)</p>
-      <div className="max-h-72 overflow-y-auto rounded-lg border border-[var(--bo-hairline-strong)] bg-white p-4">
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] p-4">
         <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-[var(--bo-text-muted)]">
           {c.termsSnapshot || "Sem cópia dos termos guardada."}
         </pre>
@@ -540,7 +540,7 @@ function CartaoDeContrato({
 }) {
   return (
     <div
-      className={`rounded-xl border border-[var(--bo-hairline)] bg-white p-4 ${
+      className={`rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-4 ${
         c.status === "pendente" ? "opacity-70" : ""
       }`}
     >

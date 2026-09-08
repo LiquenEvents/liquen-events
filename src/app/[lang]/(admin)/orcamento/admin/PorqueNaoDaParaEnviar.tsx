@@ -69,7 +69,7 @@ export default function PorqueNaoDaParaEnviar({
           dentro — ensina-se a ignorar. */}
       <p
         className={`max-w-lg text-right text-[11px] leading-relaxed ${
-          destino.aviso ? "text-[#8a6420]" : "text-foreground/45"
+          destino.aviso ? "text-[var(--bo-aviso)]" : "text-foreground/45"
         }`}
       >
         {destino.endereco ? (
@@ -103,11 +103,11 @@ function PorqueTrava({
       // não a meio de uma frase que esteja a escrever.
       role="status"
       aria-live="polite"
-      className="max-w-lg rounded-xl border border-[#8a2a22]/30 bg-[#8a2a22]/[0.05] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+      className="max-w-lg rounded-xl border border-[var(--bo-perigo)]/30 bg-[var(--bo-perigo)]/[0.05] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
     >
       {travam.length > 0 ? (
         <>
-          <p className="font-medium text-[#8a2a22]">
+          <p className="font-medium text-[var(--bo-perigo)]">
             {travam.length === 1
               ? "Não dá para enviar: falta uma coisa."
               : `Não dá para enviar: faltam ${travam.length} coisas.`}

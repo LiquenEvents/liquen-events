@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import EmailTemplates from "./EmailTemplates";
 import { fingirDisposicao, reporDisposicao } from "../../../../../../test/disposicao-fingida";
+import { MARCA } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -169,7 +170,7 @@ describe("a barra «Modelos / Editor clássico»", () => {
     await montar();
     const activo = within(barraDe("Editor de modelos")).getByRole("tab", { name: "Modelos" });
     expect(activo.getAttribute("aria-selected")).toBe("true");
-    expect(activo.classList.contains("bg-[#5F7C66]")).toBe(false);
+    expect(activo.classList.contains("bg-[var(--bo-marca)]")).toBe(false);
     // E o rótulo fica POR CIMA da pílula, que é um irmão absoluto desenhado
     // antes dele.
     expect(activo.className).toMatch(/\brelative\b/);
@@ -190,11 +191,13 @@ describe("a barra «Modelos / Editor clássico»", () => {
 
     await passarUmFotograma();
     const depois = pilulaDe(barraDe("Editor de modelos"))!;
-    // E quando anda, anda com a `MARCA` da casa — 250 ms, o degrau «elemento»,
-    // e `motion-safe:` para quem pediu para não animar a ver mudar de sítio num
-    // fotograma.
-    expect(depois.className).toMatch(/motion-safe:transition-\[translate,width\]/);
-    expect(depois.className).toMatch(/motion-safe:duration-\[250ms\]/);
+    // E quando anda, anda com a `MARCA` da casa — hoje o degrau `quick` do
+    // documento — e com `motion-safe:` nas suas classes, para quem pediu para
+    // não animar a ver mudar de sítio num fotograma. Compara-se com a
+    // constante: escrever aqui os seus valores era ter o número em dois
+    // sítios, e foi a cópia que chumbou quando o degrau mudou.
+    const classes = depois.className.split(/\s+/);
+    for (const classe of MARCA.split(/\s+/)) expect(classes).toContain(classe);
   });
 });
 
@@ -248,7 +251,7 @@ describe("a barra da língua «Português / English»", () => {
     await abrirModelo();
     const activo = within(barraDe("Língua do modelo")).getByRole("tab", { name: /Português/ });
     expect(activo.getAttribute("aria-selected")).toBe("true");
-    expect(activo.classList.contains("bg-[#5F7C66]")).toBe(false);
+    expect(activo.classList.contains("bg-[var(--bo-marca)]")).toBe(false);
     expect(activo.className).toMatch(/\brelative\b/);
   });
 });

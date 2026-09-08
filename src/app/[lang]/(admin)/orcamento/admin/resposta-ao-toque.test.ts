@@ -168,7 +168,11 @@ const SEM_AFUNDAR: { ficheiro: string; marca: string; porque: string }[] = [
   },
   {
     ficheiro: "orcamento/admin/AdminClient.tsx",
-    marca: "flex cursor-pointer items-center justify-center",
+    // A marca deixou de trazer `cursor-pointer`: a fase 07 do sistema de design
+    // tirou a mãozinha de todos os 21 sítios onde ela estava no back office, e
+    // este `<label>` era um deles. Um botão leva a SETA — o `pointer` é do
+    // link. Ver `e2e/o-ponteiro-tem-significado.spec.ts`.
+    marca: "flex items-center justify-center",
     porque: "label que só trava a bolha — dono noutra ronda",
   },
   {

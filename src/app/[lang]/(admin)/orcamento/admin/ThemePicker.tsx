@@ -970,8 +970,8 @@ function ImportChip({ job }: { job: ImportJob }) {
     <div
       role="group"
       aria-label="Fotos a caminho da proposta"
-      className={`pointer-events-auto rounded-xl border bg-white px-4 py-3 shadow-[var(--bo-sombra-suspensa)] ${
-        settled && failed > 0 ? "border-[#8a2a22]/25" : "border-[var(--bo-hairline-strong)]"
+      className={`pointer-events-auto rounded-xl border bg-[var(--bo-surface)] px-4 py-3 shadow-[var(--bo-sombra-suspensa)] ${
+        settled && failed > 0 ? "border-[var(--bo-perigo)]/25" : "border-[var(--bo-hairline-strong)]"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -983,7 +983,7 @@ function ImportChip({ job }: { job: ImportJob }) {
               key={p.path}
               className={`block h-7 w-7 overflow-hidden rounded-md border-2 border-white bg-[var(--bo-tinta-6)] ${
                 p.state === "pending" ? "opacity-55" : ""
-              } ${p.state === "failed" ? "ring-2 ring-[#8a2a22]/60" : ""}`}
+              } ${p.state === "failed" ? "ring-2 ring-[var(--bo-perigo)]/60" : ""}`}
             >
               {p.thumb && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -2699,7 +2699,7 @@ export default function ThemePicker({
                              a célula sem ela colapsar. */
                                 className={`relative block h-full w-full overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO} ${
                                   failed
-                                    ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
+                                    ? "border-[var(--bo-perigo)]/60 ring-2 ring-[var(--bo-perigo)]/25"
                                     : on
                                       ? "border-sage-600 ring-2 ring-sage-600/35"
                                       : "border-[var(--bo-hairline-strong)] hover:border-sage-600/45"
@@ -2735,7 +2735,7 @@ export default function ThemePicker({
                                   <span
                                     aria-hidden
                                     title={`Já usada em ${noutra}`}
-                                    className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[#8a6420]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
+                                    className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[var(--bo-aviso)]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
                                   >
                                     {noutra}
                                   </span>
@@ -2837,7 +2837,7 @@ export default function ThemePicker({
         // `shrink-0`: o corpo é uma coluna flex e a grelha ao lado tem
         // `flex-1` — sem isto, este aviso era o que encolhia para dar altura à
         // grelha, e a frase ficava cortada a meio.
-        <div className="shrink-0 border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
+        <div className="shrink-0 border-t border-[var(--bo-perigo)]/20 bg-[var(--bo-perigo-lavagem)]/40 px-5 py-3">
           <p className="text-sm text-[var(--bo-text)]">
             {plural(failedPaths.length, "foto não entrou", "fotos não entraram")} na proposta.
           </p>
@@ -3028,7 +3028,7 @@ function Preview({
          persistente aqui criava um bloco de contenção e partia qualquer
          `position: fixed` que viesse a nascer lá dentro — a mesma lição que
          está escrita ao pé da regra no `globals.css`. */
-      className="view-in absolute inset-0 z-10 flex flex-col bg-white"
+      className="view-in absolute inset-0 z-10 flex flex-col bg-[var(--bo-surface)]"
     >
       <div className="flex items-center justify-between gap-3 border-b border-[var(--bo-hairline)] px-5 py-3">
         <p className="bo-text-muted text-xs">

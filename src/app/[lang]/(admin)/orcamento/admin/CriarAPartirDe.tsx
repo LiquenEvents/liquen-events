@@ -361,7 +361,7 @@ export default function CriarAPartirDe({
          (senão ficava um `transform` pendurado a criar bloco de contenção
          por cima da lista). */
         aSair ? SAIDA : "bo-entrada",
-        "flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-modal)]",
+        "flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] shadow-[var(--bo-sombra-modal)]",
       )}
       onKeyDown={aSair ? undefined : teclas}
     >
@@ -392,7 +392,7 @@ export default function CriarAPartirDe({
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {aCarregar && <p className="p-4 text-sm text-foreground/50">A carregar…</p>}
         {!aCarregar && naoDeuParaLer && linhas.length === 0 && (
-          <p className="p-4 text-sm text-[#8a2a22]">
+          <p className="p-4 text-sm text-[var(--bo-perigo)]">
             Não deu para ler as propostas anteriores. Fecha e volta a abrir — o que já fizeste
             continua guardado.
           </p>

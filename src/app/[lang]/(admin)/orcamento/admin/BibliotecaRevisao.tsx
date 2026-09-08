@@ -320,8 +320,8 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
       </div>
 
       {blocked && (
-        <Card padding="sm" className="mb-5 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
-          <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">Falta um passo de instalação</p>
+        <Card padding="sm" className="mb-5 border-[var(--bo-aviso)]/30 bg-[var(--bo-aviso-lavagem)]/60">
+          <p className="bo-eyebrow mb-1.5 text-[var(--bo-aviso)]">Falta um passo de instalação</p>
           <p className="text-sm leading-relaxed text-[var(--bo-tinta-72)]">{blocked}</p>
         </Card>
       )}
@@ -493,7 +493,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                     Discreto de propósito: é uma pista, não um alarme. */}
                 {f.porConfirmar && !escolhida && (
                   <span
-                    className="absolute left-1 top-1 h-2 w-2 rounded-full bg-[#8a6d2f]"
+                    className="absolute left-1 top-1 h-2 w-2 rounded-full bg-[var(--bo-aviso)]"
                     title="Etiqueta por confirmar"
                   />
                 )}

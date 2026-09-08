@@ -111,13 +111,8 @@
 
      O nome do token muda; o nome da CLASSE não — `duration-micro` continua a
      escrever-se igual nos componentes, e passa a fazer o que sempre prometeu. */
-  --transition-duration-micro: 120ms;
-  --transition-duration-elemento: 250ms;
-  --transition-duration-vista: 350ms;
-  /* O toque: 20 ms, e só para o `:active`. Ver `ui/movimento.ts` — a assimetria
-     é deliberada (carrega a 20, larga a 120), e o número vem de uma medição na
-     apple.com: imperceptível como animação, perceptível como suavidade. */
-  --transition-duration-toque: 20ms;
+  /* Os degraus da casa (`micro`, `elemento`, `vista`, `toque`) estão no
+     `@theme static` do fim do ficheiro, com os dez do documento. */
 
   /* ══════════════════════════════════════════════════════════════════════
      FASE 01 DO SISTEMA DE DESIGN — A PARTE 1 DO BRIEF, PALAVRA POR PALAVRA
@@ -218,45 +213,23 @@
      A `--ease-out` e a `--ease-in` da casa JÁ SÃO, dígito por dígito, as que o
      brief pede — estão no `:root` do `globals.css` e não se tocou nelas.
 
-     Estas duas são novas. E vêm para o `@theme` e não para o `:root` por uma
-     razão que a sonda apanhou em flagrante: postas no `:root`, a VARIÁVEL
-     existe mas as classes `ease-inout` e `ease-spring` não geram regra
-     nenhuma. É a mesma família de armadilha do prefixo das durações aqui em
-     cima — o Tailwind gera utilitários a partir do `@theme`, e mais nada.
-     Compilado para confirmar, nos dois sentidos.
+     ── E AS DUAS DA PRIMEIRA VERSÃO SAÍRAM, PELA MESMA RAZÃO QUE AS SEIS ──
 
-     A casa recusava uma terceira curva, e a razão mantém-se: existia para
-     nenhum componente escolher à sorte. O que muda é que passam a estar
-     nomeadas, com um uso declarado cada — A→B, e a mola do `:active`.
+     Estiveram aqui uma `--ease-inout` (`cubic-bezier(0.65, 0, 0.35, 1)`) e uma
+     `--ease-spring` (uma `linear()` com ultrapassagem), do primeiro documento.
+     MEDIDO: zero chamadas em todo o repositório, fora este ficheiro — o mesmo
+     que se mediu às seis durações da primeira versão, dez linhas acima, e a
+     mesma conclusão. O documento novo traz seis molas nomeadas pelo
+     amortecimento (aqui em baixo) e dez nomes de uso apontados a elas; a
+     `--ease-spring` era uma sétima forma a fazer o trabalho da `--ease-mola-70`
+     e a `--ease-inout` uma terceira desaceleração ao lado das duas da casa.
+     Duas famílias lado a lado é o que a Parte −1 manda não fazer.
 
-     A `--ease-spring` é uma `linear()` e não uma `cubic-bezier` porque uma
-     curva de Bézier não passa dos 100%: não há como fazer ultrapassagem com
-     ela, e sem ultrapassagem não há mola. */
-  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: linear(
-    0,
-    0.0067,
-    0.0265,
-    0.0587 5.5%,
-    0.1281,
-    0.2004 11.4%,
-    0.3427,
-    0.4938 20.9%,
-    0.6314,
-    0.7553,
-    0.8598 30.3%,
-    0.9481,
-    1.0128 36.4%,
-    1.0508,
-    1.0623 41.1%,
-    1.06,
-    1.0483 45.9%,
-    1.0179 53.3%,
-    1.0009 61.1%,
-    0.9964 69.4%,
-    0.9998 88.9%,
-    1
-  );
+     Quem as apanhou foi o passeio `e2e/o-movimento-chega-ao-elemento.spec.ts`,
+     que exige que TODA a curva e TODA a duração declaradas aqui cheguem ao
+     `:root` do browser. Elas não chegavam — o `@theme` poda o que ninguém usa,
+     e não usava. O teste podia ter-se afrouxado para as deixar passar; em vez
+     disso ficam as que servem para alguma coisa, e a regra fica com dentes. */
 
   /* ══════════════════════════════════════════════════════════════════════
      AS MOLAS DA APPLE, RESOLVIDAS PARA CSS
@@ -478,7 +451,62 @@
   --ease-sheet: var(--ease-mola-80);
   --ease-bouncy: var(--ease-mola-70);
 
-  /* E as dez durações — o tempo real até assentar a 0,5% do valor final. */
+  /* As dez durações do documento mudaram-se para o `@theme static` lá em
+     baixo. A razão está escrita lá, e é uma armadilha desta casa. */
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS DURAÇÕES VIVEM NUM `@theme static`, E ISSO NÃO É ARRUMAÇÃO
+   ══════════════════════════════════════════════════════════════════════════
+
+   MEDIDO no CSS enviado ao browser, e é uma armadilha só desta casa.
+
+   O `@theme` normal do Tailwind v4 é PODADO: só chegam ao `:root` as
+   variáveis que ele vê alguém usar. E quem decide o que é «alguém» é o
+   `@source` — ora o `globals.css`, que é a ÚNICA folha que emite `:root`
+   nesta casa, diz `@source not "./[lang]/(admin)"`. O `admin.css` refere o
+   tema com `@reference`, e um `@reference` não emite variável nenhuma, de
+   propósito.
+
+   Junta-se assim: uma variável que só o BACK OFFICE usa não é vista por
+   ninguém que emita, e desaparece do `:root` — mas as classes que a lêem
+   continuam a ser geradas. O CSS fica com a regra e sem o valor.
+
+   Foi exactamente o que aconteceu com a `--transition-duration-interactive`.
+   Contado no `chunk` de produção: `press`, `quick`, `elemento`, `micro`,
+   `vista`, `nav` e `snappy` chegavam ao `:root`; `interactive`, `smooth`,
+   `bouncy`, `default`, `sheet` e `reposition` apareciam ZERO vezes. Medido
+   num botão real, no browser, com o servidor de produção a correr:
+
+       transition-property:        background-color, …, scale   ✓
+       transition-timing-function: linear(…) ×6                 ✓
+       transition-duration:        0s                           ✗
+
+   Uma `var()` sem valor invalida a declaração e a duração cai a zero. Ou
+   seja: as curvas certas a correr em tempo nenhum — um corte seco com uma
+   mola escrita ao lado. Nada disto dá erro, aviso do lint ou teste vermelho.
+
+   O `static` desliga a poda: as variáveis deste bloco vão para o `:root` quer
+   alguém as use, quer não. Custa as seis declarações que faltavam — umas
+   dezenas de bytes — e paga o único sítio onde a divisão entre as duas folhas
+   de estilos falha em silêncio.
+
+   As curvas não precisam do mesmo remédio HOJE (contadas uma a uma no
+   `chunk`: as dezasseis lá estão), mas estão aqui pela mesma razão que as
+   durações — são o mesmo sistema, e ter metade dele protegido e a outra
+   metade à sorte é ter a armadilha à espera do próximo token.
+   ══════════════════════════════════════════════════════════════════════════ */
+@theme static {
+  /* Os degraus antigos da casa. O nome da CLASSE é o de sempre
+     (`duration-micro`); o prefixo `--transition-duration-*` é o único espaço
+     de nomes de onde o Tailwind v4 gera utilitários `duration-*`. */
+  --transition-duration-micro: 120ms;
+  --transition-duration-elemento: 250ms;
+  --transition-duration-vista: 350ms;
+  /* O toque: 20 ms, e só para o `:active`. Ver `ui/movimento.ts`. */
+  --transition-duration-toque: 20ms;
+
+  /* E as dez do documento — o tempo real até assentar a 0,5% do valor final. */
   --transition-duration-smooth: 590ms;
   --transition-duration-snappy: 540ms;
   --transition-duration-bouncy: 555ms;

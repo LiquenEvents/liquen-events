@@ -137,7 +137,12 @@ async function tocar(alvo) {
 async function entrar() {
   await page.goto(URL_BASE + "/orcamento/admin", { waitUntil: "domcontentloaded" });
   const barra = page.locator('nav[aria-label="Navegação do back office"]');
-  const email = page.getByLabel(/O teu email/i);
+  // O formulário está fechado por omissão (dois estados — `docs/LOGIN.md`).
+  await page
+    .getByRole("button", { name: /^Entrar com palavra-passe$/ })
+    .click({ timeout: 5_000 })
+    .catch(() => {});
+  const email = page.getByLabel(/^Email$/i);
   await Promise.race([
     email.waitFor({ timeout: 90_000 }).catch(() => {}),
     barra.waitFor({ timeout: 90_000 }).catch(() => {}),
@@ -151,7 +156,7 @@ async function entrar() {
     const cred = credenciais();
     await email.fill(cred.email);
     await page.locator('input[name="password"]').fill(cred.palavraPasse);
-    await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
+    await page.getByRole("button", { name: /^Entrar$/ }).click();
   }
   let dentro = await barra
     .waitFor({ timeout: 40_000 })

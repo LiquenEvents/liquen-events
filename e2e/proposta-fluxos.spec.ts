@@ -213,7 +213,12 @@ test.describe("Fazer uma proposta @propostas", () => {
     await expect(page.getByText("Catarina Martins", { exact: true })).toBeHidden();
 
     // ── E ficou marcado o que ela tem de confirmar ───────────────────────
-    const marcados = page.locator(".ring-\\[\\#c98a2e\\]\\/45");
+    // Procura-se pela MARCA e não pela tinta. A versão anterior procurava
+    // `.ring-\[\#c98a2e\]\/45` — a cor — e chumbou no dia em que a fase 03 do
+    // sistema de design trocou esse literal por um token. O realce estava lá; o
+    // teste é que estava a apontar para o sítio errado. A `bo-por-confirmar`
+    // não pinta nada e existe só para isto (ver `ProposalStudio.tsx`).
+    const marcados = page.locator(".bo-por-confirmar");
     expect(await marcados.count(), "os campos copiados ficam assinalados").toBeGreaterThan(0);
   });
 });

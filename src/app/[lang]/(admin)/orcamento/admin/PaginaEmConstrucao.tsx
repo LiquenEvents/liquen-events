@@ -132,19 +132,19 @@ export function PaginaEmConstrucao({
         type="button"
         onClick={alternar}
         aria-expanded={false}
-        className={`z-10 flex items-center gap-1.5 rounded-full border border-[var(--bo-hairline-strong)] bg-white/95 px-3 py-1.5 text-xs backdrop-blur ${flutuante} ${ESTADO} ${PRESSAO}`}
+        className={`z-10 flex items-center gap-1.5 rounded-full border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]/95 px-3 py-1.5 text-xs backdrop-blur ${flutuante} ${ESTADO} ${PRESSAO}`}
       >
         <span className="tabular-nums text-[var(--bo-tinta-72)]">
           {total} {total === 1 ? "foto" : "fotos"}
         </span>
-        {aMais > 0 && <span className="text-[#8a6420]">· {aMais} a mais</span>}
+        {aMais > 0 && <span className="text-[var(--bo-aviso)]">· {aMais} a mais</span>}
       </button>
     );
   }
 
   return (
     <div
-      className={`z-10 rounded-xl border border-[var(--bo-hairline-strong)] bg-white/95 p-2 shadow-[var(--bo-sombra-suspensa)] backdrop-blur ${
+      className={`z-10 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]/95 p-2 shadow-[var(--bo-sombra-suspensa)] backdrop-blur ${
         ancorada ? "w-full" : "w-[7.5rem]"
       } ${flutuante}`}
       aria-label="A página em construção"
@@ -216,7 +216,7 @@ export function PaginaEmConstrucao({
         /* O aviso que faz esta miniatura valer a pena: a página do PDF imprime
            `maximo`, e o que passa disso não sai. Descobrir isto aqui é uma
            escolha a menos; descobri-lo no PDF é uma proposta a refazer. */
-        <p className="mt-0.5 text-[10px] leading-snug text-[#8a6420]">
+        <p className="mt-0.5 text-[10px] leading-snug text-[var(--bo-aviso)]">
           {aMais === 1 ? "1 não entra na página" : `${aMais} não entram na página`}
         </p>
       )}

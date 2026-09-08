@@ -266,9 +266,16 @@ export async function entrar(page: Page): Promise<boolean> {
     return true;
   }
 
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
+    /* O formulário passou a estar fechado por omissão — dois estados, com a
+       palavra-passe atrás de um link (`docs/LOGIN.md`). Abre-se primeiro; o link
+       só existe onde o browser sabe o que é uma chave de acesso. */
+    await page
+      .getByRole("button", { name: /^Entrar com palavra-passe$/ })
+      .click({ timeout: 5_000 })
+      .catch(() => {});
+  await page.getByLabel(/^Email$/i).fill("catarina@liquen-events.com");
   await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
+  await page.getByRole("button", { name: /^Entrar$/ }).click();
 
   const dentro = await painel
     .isVisible({ timeout: 10_000 })

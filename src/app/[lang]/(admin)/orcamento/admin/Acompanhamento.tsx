@@ -425,7 +425,7 @@ export default function Acompanhamento({
         <Card padding="sm">
           <p className="bo-eyebrow mb-1">Prazo a acabar</p>
           <p
-            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[#8a2a22]" : "text-[var(--bo-text)]"}`}
+            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[var(--bo-perigo)]" : "text-[var(--bo-text)]"}`}
           >
             {expirando.length}
           </p>
@@ -439,7 +439,7 @@ export default function Acompanhamento({
         <Card padding="sm" className="col-span-2 @min-[26rem]:col-span-1">
           <p className="bo-eyebrow mb-1">Seguimentos devidos</p>
           <p
-            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[#8a6420]" : "text-[var(--bo-text)]"}`}
+            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[var(--bo-aviso)]" : "text-[var(--bo-text)]"}`}
           >
             {devidos.length}
           </p>
@@ -620,9 +620,9 @@ function LinhaCartao({
 
   const borda =
     urgencia === "expirada"
-      ? "border-[#8a2a22]/45"
+      ? "border-[var(--bo-perigo)]/45"
       : urgencia === "expira-ja"
-        ? "border-[#c08a3e]/45"
+        ? "border-[var(--bo-aviso-tom)]/45"
         : "border-[var(--bo-hairline)]";
 
   return (
@@ -649,9 +649,9 @@ function LinhaCartao({
           <span
             className={
               validade < 0
-                ? "text-[#8a2a22]"
+                ? "text-[var(--bo-perigo)]"
                 : validade <= 7
-                  ? "text-[#8a6420]"
+                  ? "text-[var(--bo-aviso)]"
                   : "text-foreground/50"
             }
           >
@@ -662,7 +662,7 @@ function LinhaCartao({
         )}
         {evento !== null && <span className="text-foreground/50">Casamento {emDias(evento)}</span>}
         {seguimento !== null && (
-          <span className={seguimento <= 0 ? "text-[#8a6420]" : "text-foreground/50"}>
+          <span className={seguimento <= 0 ? "text-[var(--bo-aviso)]" : "text-foreground/50"}>
             Seguimento {emDias(seguimento)}
             {p.followUpNote && ` — ${p.followUpNote}`}
           </span>

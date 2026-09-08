@@ -579,9 +579,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
       {colisoes.length > 0 && (
         <div
           role="alert"
-          className="mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="mb-5 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-[#8a2a22]">
+          <p className="font-medium text-[var(--bo-perigo)]">
             Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o guião mudou noutro sítio
             entretanto.
           </p>
@@ -612,9 +612,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
       {dia.choques.length > 0 && (
         <div
           role="alert"
-          className="mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="mb-5 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-[#8a2a22]">
+          <p className="font-medium text-[var(--bo-perigo)]">
             {dia.choques.length === 1
               ? "Há uma pessoa em dois sítios ao mesmo tempo."
               : `Há ${dia.choques.length} momentos com a mesma pessoa em dois sítios ao mesmo tempo.`}
@@ -899,8 +899,8 @@ function BlocoLi({
                 ? "border border-dashed border-[var(--bo-tinta-13)] text-[var(--bo-text-muted)]"
                 : "text-[var(--bo-text-faint)]"
               : emChoque
-                ? "bg-[#f6e6df]/70 text-[#8a2a22]"
-                : "bg-[#b5894a]/12 text-[#7a5c2e]"
+                ? "bg-[var(--bo-perigo-lavagem)]/70 text-[var(--bo-perigo)]"
+                : "bg-[var(--bo-aviso-tom)]/12 text-[var(--bo-aviso)]"
           }`}
         >
           <span className="tabular-nums">
@@ -935,7 +935,7 @@ function BlocoLi({
           aria-hidden="true"
           className={`absolute inset-y-1 left-0 w-[3px] rounded-full ${
             emChoque
-              ? "bg-[#8a2a22]"
+              ? "bg-[var(--bo-perigo)]"
               : instante
                 ? "bg-[repeating-linear-gradient(to_bottom,#4c6752_0_3px,transparent_3px_6px)]"
                 : "bg-sage-600"
@@ -1019,7 +1019,7 @@ function BlocoLi({
               os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
           <button
             onClick={() => remove(i.id)}
-            className={`alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 com-rato:group-hover:opacity-100 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque shrink-0 rounded-md p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 hover:text-[var(--bo-perigo)] com-rato:focus-visible:opacity-100 com-rato:group-hover:opacity-100 ${ESTADO} ${PRESSAO}`}
             aria-label={`Remover ${i.time} ${i.title}`}
           >
             <svg

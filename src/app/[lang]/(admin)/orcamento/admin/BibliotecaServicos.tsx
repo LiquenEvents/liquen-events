@@ -101,7 +101,7 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
         </Button>
       </div>
 
-      {erro && <p className="mt-2 text-[11px] leading-relaxed text-[#8a2a22]">{erro}</p>}
+      {erro && <p className="mt-2 text-[11px] leading-relaxed text-[var(--bo-perigo)]">{erro}</p>}
 
       {!erro && servicos === null && (
         <p className="mt-2 text-[11px] text-foreground/40">A carregar…</p>
@@ -151,7 +151,7 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
                         e uma proposta em inglês com metade dos serviços em
                         português lê-se como descuido. */}
                     {!s.nomeEn && (
-                      <span className="mt-0.5 block text-[10px] text-[#8a6420]">
+                      <span className="mt-0.5 block text-[10px] text-[var(--bo-aviso)]">
                         sem versão inglesa
                       </span>
                     )}

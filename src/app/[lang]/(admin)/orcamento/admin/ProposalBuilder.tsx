@@ -870,7 +870,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           <p
             className={
               estado === "so-neste-computador"
-                ? "mt-2 inline-flex rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
+                ? "mt-2 inline-flex rounded-full bg-[var(--bo-perigo)]/12 px-2 py-0.5 text-[11px] font-semibold text-[var(--bo-perigo)]"
                 : "mt-2 text-[11px] text-foreground/35"
             }
             aria-live={estado === "so-neste-computador" ? "assertive" : "polite"}
@@ -922,7 +922,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           role="alertdialog"
           aria-live="assertive"
           aria-label="Confirmar substituição das linhas"
-          className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+          className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/45 bg-[var(--bo-aviso-tom)]/[0.08] px-3 py-2.5"
         >
           <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-[var(--bo-text)]">
             {modeloAConfirmar.pergunta}
@@ -955,7 +955,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           mesma frase dez vezes seguidas. Isso não é anunciar — é tapar o que
           quer que ela estivesse a ouvir a seguir. */}
       {linhaRemovida && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2">
           <span className="min-w-0 flex-1 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
             {linhaRemovida.frase} Pode anular durante {linhaRemovida.segundos}s.
           </span>
@@ -1061,7 +1061,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         size="sm"
         onClick={addRow}
         iconLeft={<span aria-hidden="true">+</span>}
-        className="mt-2 mb-5 text-sage-600 hover:text-[#415440]"
+        className="mt-2 mb-5 text-sage-600 hover:text-[var(--bo-accent-hover)]"
       >
         Adicionar linha
       </Button>
@@ -1084,7 +1084,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               valor={String(vatRate)}
               aoMudar={(v) => setVatRate(Number(v))}
               variante="nua"
-              className="rounded-lg border border-foreground/20 bg-white px-2 py-1 text-xs text-[var(--bo-tinta-72)] focus:border-foreground/40 focus:outline-none"
+              className="rounded-lg border border-foreground/20 bg-[var(--bo-surface)] px-2 py-1 text-xs text-[var(--bo-tinta-72)] focus:border-foreground/40 focus:outline-none"
             >
               <option value={0.23}>23%</option>
               <option value={0.13}>13%</option>
@@ -1123,7 +1123,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         <p
           role="alert"
           aria-live="assertive"
-          className="mb-4 flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22]"
+          className="mb-4 flex items-start gap-1.5 text-sm leading-relaxed text-[var(--bo-perigo)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>{error}</span>

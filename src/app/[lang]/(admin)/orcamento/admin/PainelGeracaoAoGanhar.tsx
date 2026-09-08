@@ -158,7 +158,7 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
 
       {estado.fase === "erro" && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-[#8a4632]">{estado.mensagem}</p>
+          <p className="text-xs text-[var(--bo-perigo)]">{estado.mensagem}</p>
           <Button variant="secondary" size="sm" onClick={tentarOutraVez}>
             Tentar outra vez
           </Button>

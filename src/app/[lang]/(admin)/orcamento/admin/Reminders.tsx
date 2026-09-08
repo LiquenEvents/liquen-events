@@ -245,19 +245,19 @@ export default function Reminders({ quotes, onOpen }: Props) {
             <button
               onClick={() => r.quote && onOpen(r.quote)}
               disabled={!r.quote}
-              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 ${r.quote ? "hover:bg-[var(--bo-tinta-3)] cursor-pointer" : "cursor-default"} ${ESTADO} ${PRESSAO}`}
+              className={`w-full text-left px-5 sm:px-6 py-3.5 flex items-center gap-3 ${r.quote ? "hover:bg-[var(--bo-tinta-3)]" : "cursor-default"} ${ESTADO} ${PRESSAO}`}
             >
               <span style={{ color: r.urgent ? "#8a2a22" : "#9aa36a" }}>{icon(r.kind)}</span>
               <div className="min-w-0 flex-1">
                 <p className="text-[var(--bo-tinta-72)] text-xs truncate font-medium">{r.text}</p>
                 <p
-                  className={`text-[10px] truncate ${r.urgent ? "text-[#8a2a22]" : "text-foreground/40"}`}
+                  className={`text-[10px] truncate ${r.urgent ? "text-[var(--bo-perigo)]" : "text-foreground/40"}`}
                 >
                   {r.sub}
                 </p>
               </div>
               {r.urgent && (
-                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[#8a2a22]/12 text-[#8a2a22]">
+                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[var(--bo-perigo)]/12 text-[var(--bo-perigo)]">
                   Urgente
                 </span>
               )}

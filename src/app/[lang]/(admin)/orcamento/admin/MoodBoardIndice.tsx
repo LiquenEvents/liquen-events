@@ -248,7 +248,7 @@ function EntradaDoIndice({
         {porAcabar && (
           <span
             aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#c98a2e]"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bo-aviso-tom)]"
             title={oQueFalta}
           />
         )}

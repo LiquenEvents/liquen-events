@@ -153,9 +153,9 @@ function ValidadeChip({ p }: { p: Proposal }) {
     <span
       className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${
         exp.tone === "expired"
-          ? "bg-[#8a2a22]/10 text-[#8a2a22]"
+          ? "bg-[var(--bo-perigo)]/10 text-[var(--bo-perigo)]"
           : exp.tone === "soon"
-            ? "bg-[#b5894a]/12 text-[#8a6420]"
+            ? "bg-[var(--bo-aviso-tom)]/12 text-[var(--bo-aviso)]"
             : "bg-[var(--bo-tinta-6)] text-foreground/45"
       }`}
     >
@@ -463,7 +463,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
   if (loadError) {
     return (
       <Card padding="md" className="flex flex-col items-center gap-4 text-center py-10">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8a2a22]/10 text-[#8a2a22]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bo-perigo)]/10 text-[var(--bo-perigo)]">
           <svg
             width="20"
             height="20"
@@ -639,9 +639,9 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         fazer uma coisa.
       */}
       {porEnviar > 0 && (
-        <div className="flex items-start gap-3 rounded-2xl border border-[#8a2a22]/25 bg-[#8a2a22]/[0.06] px-4 py-3">
+        <div className="flex items-start gap-3 rounded-2xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo)]/[0.06] px-4 py-3">
           <svg
-            className="mt-0.5 shrink-0 text-[#8a2a22]"
+            className="mt-0.5 shrink-0 text-[var(--bo-perigo)]"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -654,7 +654,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
             <path d="M3 5h18v14H3z" />
             <path d="m3 6 9 7 9-7" />
           </svg>
-          <p className="text-[#8a2a22] text-sm leading-snug">
+          <p className="text-[var(--bo-perigo)] text-sm leading-snug">
             <strong className="font-semibold">
               {porEnviar} proposta{porEnviar !== 1 ? "s" : ""} gerada
               {porEnviar !== 1 ? "s" : ""} mas por enviar
@@ -667,9 +667,9 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
 
       {/* Pending alert */}
       {pending > 0 && (
-        <div className="flex items-center gap-3 rounded-2xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] px-4 py-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-[var(--bo-aviso-tom)]/25 bg-[var(--bo-aviso-tom)]/[0.06] px-4 py-3">
           <svg
-            className="shrink-0 text-[#8a6420]"
+            className="shrink-0 text-[var(--bo-aviso)]"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -682,7 +682,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4M12 16h.01" />
           </svg>
-          <p className="text-[#8a6420] text-sm leading-snug">
+          <p className="text-[var(--bo-aviso)] text-sm leading-snug">
             <strong className="font-semibold">
               {pending} proposta{pending !== 1 ? "s" : ""} enviada{pending !== 1 ? "s" : ""}
             </strong>{" "}

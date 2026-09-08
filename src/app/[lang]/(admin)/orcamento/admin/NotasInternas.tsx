@@ -69,7 +69,7 @@ export default function NotasInternas({
 
   return (
     <div
-      className={`rounded-xl border border-[#c9a227]/30 bg-[#f6efd8]/60 ${
+      className={`rounded-xl border border-[var(--bo-aviso-tom)]/30 bg-[var(--bo-aviso-lavagem)]/60 ${
         compacta ? "mt-3 p-3" : "mt-4 p-4"
       }`}
     >
@@ -93,11 +93,11 @@ export default function NotasInternas({
           apertar, isto lê-se. */}
       <label
         htmlFor={id}
-        className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[#7a6420]"
+        className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[var(--bo-aviso)]"
       >
         <span aria-hidden="true">✎</span>
         <span className="min-w-0">{titulo}</span>
-        <span className="font-normal normal-case tracking-normal text-[#7a6420]/70">
+        <span className="font-normal normal-case tracking-normal text-[var(--bo-aviso)]/70">
           — só para ti, nunca sai na proposta
         </span>
       </label>
@@ -109,7 +109,7 @@ export default function NotasInternas({
         rows={compacta ? 1 : 2}
         maxLength={4000}
         placeholder={placeholder}
-        className="mt-2 w-full resize-none rounded-lg border border-[#c9a227]/25 bg-white/70 px-2.5 py-2 text-xs leading-relaxed text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-[#c9a227]/60 focus:outline-none"
+        className="mt-2 w-full resize-none rounded-lg border border-[var(--bo-aviso-tom)]/25 bg-[var(--bo-surface)]/70 px-2.5 py-2 text-xs leading-relaxed text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-[var(--bo-aviso-tom)]/60 focus:outline-none"
       />
     </div>
   );

@@ -130,7 +130,7 @@ export function Ajuda({
           className={cn(
             aSairAgora ? SAIDA : "bo-entrada",
             /* ── O MATERIAL ────────────────────────────────────────────────
-               Era `rounded-xl border … bg-white`, e o `rounded-xl` media 8 px
+               Era `rounded-xl border … bg-[var(--bo-surface)]`, e o `rounded-xl` media 8 px
                como todo o resto do conteúdo — o bloco dos raios do
                `globals.css` colapsa a escala do Tailwind de propósito. A
                `.bo-material` vive fora de camadas e escapa-lhe: traz os 12 px,

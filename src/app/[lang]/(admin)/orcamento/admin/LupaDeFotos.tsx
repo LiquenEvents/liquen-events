@@ -109,7 +109,7 @@ export default function LupaDeFotos({
           type="button"
           onClick={onFechar}
           aria-label="Fechar"
-          className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 ${ESTADO} ${PRESSAO}`}
+          className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bo-surface)]/10 text-lg leading-none text-white hover:bg-[var(--bo-surface)]/20 ${ESTADO} ${PRESSAO}`}
         >
           ×
         </button>
@@ -121,7 +121,7 @@ export default function LupaDeFotos({
             type="button"
             onClick={() => onMudar((indice - 1 + total) % total)}
             aria-label="Fotografia anterior"
-            className={`alvo-toque absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bo-surface)]/10 text-white hover:bg-[var(--bo-surface)]/25 ${ESTADO} ${PRESSAO}`}
           >
             <span aria-hidden="true">‹</span>
           </button>
@@ -141,7 +141,7 @@ export default function LupaDeFotos({
             type="button"
             onClick={() => onMudar((indice + 1) % total)}
             aria-label="Fotografia seguinte"
-            className={`alvo-toque absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bo-surface)]/10 text-white hover:bg-[var(--bo-surface)]/25 ${ESTADO} ${PRESSAO}`}
           >
             <span aria-hidden="true">›</span>
           </button>

@@ -114,7 +114,7 @@ export default function FolhaDaProposta({
          folha que não é a que sai. */
       data-folha-do-cliente=""
       className={`relative w-full overflow-hidden rounded-md border ${
-        daCapa ? "border-transparent" : "border-[var(--bo-hairline-strong)] bg-white"
+        daCapa ? "border-transparent" : "border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]"
       }`}
       style={{
         aspectRatio: `${PAGINA_W} / ${PAGINA_H}`,

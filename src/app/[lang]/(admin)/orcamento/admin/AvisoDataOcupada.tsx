@@ -71,15 +71,15 @@ export default function AvisoDataOcupada({
       aria-labelledby="aviso-data-titulo"
       className={`rounded-2xl border p-4 ${
         haGrave
-          ? "border-[#8a2a22]/45 bg-[#8a2a22]/[0.07]"
-          : "border-[#c08a3e]/40 bg-[#c08a3e]/[0.06]"
+          ? "border-[var(--bo-perigo)]/45 bg-[var(--bo-perigo)]/[0.07]"
+          : "border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.06]"
       }`}
     >
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={`mt-0.5 text-base leading-none ${
-            haGrave ? "text-[#8a2a22]" : "text-[#8a6420]"
+            haGrave ? "text-[var(--bo-perigo)]" : "text-[var(--bo-aviso)]"
           }`}
         >
           ▲
@@ -153,7 +153,7 @@ export default function AvisoDataOcupada({
                     </p>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${
-                        grave ? "bg-[#8a2a22]/15 text-[#8a4632]" : "bg-[#c08a3e]/15 text-[#8a6420]"
+                        grave ? "bg-[var(--bo-perigo)]/15 text-[var(--bo-perigo)]" : "bg-[var(--bo-aviso-tom)]/15 text-[var(--bo-aviso)]"
                       }`}
                     >
                       {grave ? "difícil de conciliar" : "conciliável"}

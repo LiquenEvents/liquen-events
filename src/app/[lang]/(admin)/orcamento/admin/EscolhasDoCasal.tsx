@@ -101,7 +101,7 @@ export default function EscolhasDoCasal({
               // Não é «não responderam»: responderam, e a opção que escolheram
               // saiu do documento depois disso. Dizê-lo é o que evita a
               // conversa em que ela jura que eles nunca disseram nada.
-              <p className="mt-1 text-[#8a4632] text-[13px] leading-snug">
+              <p className="mt-1 text-[var(--bo-perigo)] text-[13px] leading-snug">
                 Escolheram uma opção que já não está na proposta ({dia(estado.em)}). Vale a pena
                 confirmar com eles antes de comprar.
               </p>

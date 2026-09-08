@@ -476,7 +476,7 @@ export function CelulaDeFoto({
         {historia && (
           <span
             className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 truncate px-1 py-0.5 text-[8px] leading-tight text-white ${
-              historia.grave ? "bg-[#8a2a22]/85" : "bg-black/55"
+              historia.grave ? "bg-[var(--bo-perigo)]/85" : "bg-black/55"
             }`}
           >
             {historia.texto}

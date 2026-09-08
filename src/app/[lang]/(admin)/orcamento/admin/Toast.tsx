@@ -752,7 +752,7 @@ function ToastItem({
           : `pointer-events-auto ${ENTRADA_DO_AVISO} ${
               shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
             }`
-      } flex items-center gap-3 min-w-[260px] max-w-sm bg-white border border-[var(--bo-hairline-strong)] rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)]`}
+      } flex items-center gap-3 min-w-[260px] max-w-sm bg-[var(--bo-surface)] border border-[var(--bo-hairline-strong)] rounded-xl pl-4 pr-3 py-3 shadow-[var(--bo-sombra-suspensa)]`}
     >
       <span
         className="w-2 h-2 rounded-full flex-shrink-0"

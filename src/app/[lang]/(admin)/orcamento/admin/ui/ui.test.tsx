@@ -150,7 +150,7 @@ describe("Field", () => {
     render(<Field variant="underline" label="Email" error="Email inválido" />);
     const input = screen.getByLabelText(/Email/);
     expect(input).toHaveAttribute("aria-invalid", "true");
-    expect(input.className).toContain("border-[#8a2a22]");
+    expect(input.className).toContain("border-[var(--bo-perigo)]");
   });
 });
 
@@ -304,7 +304,7 @@ describe("Segmented", () => {
     );
     const activo = screen.getByRole("radio", { name: "Lista" });
     expect(activo.className, "o segmento activo ficou sem fundo e sem pílula").toContain(
-      "bg-white",
+      "bg-[var(--bo-surface)]",
     );
     // E nenhuma pílula: sem medição ela não existe, em vez de existir no canto
     // superior esquerdo à espera de deslizar para o sítio.
@@ -331,7 +331,7 @@ describe("Button (extended)", () => {
 
   it("danger variant uses the audited dark-red token", () => {
     render(<Button variant="danger">Eliminar</Button>);
-    expect(screen.getByRole("button", { name: "Eliminar" })).toHaveClass("bg-[#8a2a22]");
+    expect(screen.getByRole("button", { name: "Eliminar" })).toHaveClass("bg-[var(--bo-perigo)]");
   });
 
   it("disabled blocks clicks and reflects the disabled attribute", () => {

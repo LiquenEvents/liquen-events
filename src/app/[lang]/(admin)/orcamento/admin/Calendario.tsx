@@ -266,7 +266,7 @@ function AddEventModal({
              deixar de existir no fotograma a seguir aos 200 ms — senão ficava
              um `transform` pendurado a criar bloco de contenção. */
           aberto ? "bo-entrada" : SAIDA,
-          "relative w-full max-w-md bg-white border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]",
+          "relative w-full max-w-md bg-[var(--bo-surface)] border border-[var(--bo-hairline-strong)] rounded-2xl p-6 shadow-[var(--bo-sombra-modal)]",
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -847,7 +847,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                   <div
                     key={c.key}
                     aria-hidden="true"
-                    className="min-h-[52px] sm:min-h-[80px] bg-white p-1.5 sm:p-2"
+                    className="min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1.5 sm:p-2"
                   >
                     <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
                       {c.day}
@@ -911,7 +911,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       else openAdd(key);
                     }
                   }}
-                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
+                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
                     isSelected
                       ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
                       : isToday
@@ -1178,7 +1178,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                     <button
                       onClick={() => pedirParaRemover(ev.id, ev.title)}
                       aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
-                      className={`text-foreground/35 hover:text-[#8a2a22] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
+                      className={`text-foreground/35 hover:text-[var(--bo-perigo)] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
                     >
                       Remover
                     </button>

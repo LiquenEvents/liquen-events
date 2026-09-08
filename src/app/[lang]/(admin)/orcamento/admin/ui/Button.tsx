@@ -106,7 +106,7 @@ const BASE =
  */
 const VARIANTS: Record<ButtonVariant, string> = {
   // Moss-dark solid — the affirmative primary action.
-  primary: "bg-sage-600 text-white hover:bg-[#415440]",
+  primary: "bg-sage-600 text-white hover:bg-[var(--bo-accent-hover)]",
   // Outline on white — secondary emphasis.
   //
   // Era `border-[var(--bo-hairline-strong)]` com `text-[var(--bo-text)]`, e lia-se como
@@ -119,7 +119,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // os 10,2:1 de antes). Continua a ser claramente secundário ao lado do verde
   // cheio do passkey — o que muda é ler-se como disponível.
   secondary:
-    "bg-white text-[var(--bo-text)] border border-foreground/28 hover:border-foreground/45 hover:bg-[var(--bo-tinta-3)] hover:text-foreground " +
+    "bg-[var(--bo-surface)] text-[var(--bo-text)] border border-foreground/28 hover:border-foreground/45 hover:bg-[var(--bo-tinta-3)] hover:text-foreground " +
     // A pressão aprofunda a MESMA tinta do hover (0,03 → 0,07). Sem cor nova:
     // é o passo de opacidade que o `DESIGN.md` já usa para hierarquia.
     "active:bg-[var(--bo-tinta-6)]",
@@ -130,7 +130,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // Soft moss tint — an in-context "yes, this one" without full weight.
   subtle: "bg-sage-600/10 text-sage-600 hover:bg-sage-600/[0.16] active:bg-sage-600/[0.24]",
   // Dark red solid (~5:1 on white) — destructive actions.
-  danger: "bg-[#8a2a22] text-white hover:bg-[#73211b]",
+  danger: "bg-[var(--bo-perigo)] text-white hover:bg-[var(--bo-perigo)]",
 };
 
 /**
