@@ -40,16 +40,6 @@ const FICHEIROS = ["ProposalStudio.tsx", "NavEstudio.tsx", "PainelDoEstudio.tsx"
  */
 const COM_MOTIVO: Record<string, string> = {
   /**
-   * LEGÍTIMA: esta pergunta é MESMO sobre a janela.
-   *
-   * A barra de navegação do back office é `fixed` — está presa ao ecrã, não a
-   * nenhuma caixa. Abaixo de `lg` ela existe e a barra de acção do estúdio tem
-   * de pousar em cima dela; a partir de `lg` passa a barra lateral e não há
-   * nada por baixo. Quem decide isto é a janela porque quem está lá é a janela.
-   */
-  "lg:bottom-0": "a navegação por baixo é `fixed` — vive na janela, não numa caixa",
-
-  /**
    * DÍVIDA CONHECIDA, e escrita para não se esquecer.
    *
    * `sm:` é 640 de janela. Dentro do painel de detalhe a fila tem 712 e o
@@ -108,7 +98,14 @@ describe("o estúdio pergunta à caixa onde vive, e não à janela", () => {
    */
   it("o instrumento encontra mesmo as perguntas que existem", () => {
     const todas = FICHEIROS.flatMap(perguntasAJanela);
-    expect(todas).toContain("lg:bottom-0");
+    /**
+     * A âncora deste controlo era o `lg:bottom-0`, e ele deixou de existir: a
+     * navegação de baixo passou a estar nas duas larguras («a barra substitui o
+     * menu»), portanto nenhum sítio a ignora a partir de `lg`. Uma âncora tem
+     * de ser uma classe que esteja mesmo lá — escolhe-se outra que esteja, e o
+     * mínimo aqui em baixo continua a guardar a segunda metade.
+     */
+    expect(todas).toContain("sm:flex-row");
     expect(todas.length).toBeGreaterThan(5);
   });
 

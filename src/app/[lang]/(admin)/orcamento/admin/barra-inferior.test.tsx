@@ -97,13 +97,60 @@ describe("a barra de destinos do telemóvel", () => {
     const TOAST = readFileSync(join(RAIZ, "Toast.tsx"), "utf8");
     const ESTUDIO = readFileSync(join(RAIZ, "ProposalStudio.tsx"), "utf8");
 
-    // Quem lê: as duas posições do aviso (telemóvel e `lg`) somam a variável.
+    /**
+     * ── E DEIXOU DE HAVER DUAS POSIÇÕES ─────────────────────────────────
+     *
+     * O aviso tinha duas: uma que somava a barra de baixo e uma `lg:` que a
+     * ignorava, porque no computador a barra não existia — lá a navegação era
+     * a coluna da esquerda.
+     *
+     * Deixou de ser. «A barra substitui o menu»: a cápsula que flutua passou a
+     * estar nas duas larguras, e a coluna passou a gaveta. A posição `lg:` do
+     * aviso descrevia um ecrã que já não há — e o que ela fazia era pousar o
+     * aviso em cima da barra, no computador, exactamente por cima dos destinos.
+     *
+     * Fica UMA posição, a que soma as duas barras. É a mesma correcção que os
+     * outros três sítios levaram (o `<main>` do `AdminClient`, a barra de acção
+     * do estúdio e o fundo da lista da biblioteca), e por isso está guardada
+     * aqui em baixo para os quatro de uma vez.
+     */
     expect(TOAST).toMatch(/bottom-\[calc\(var\(--bo-barra-inferior\)\+var\(--bo-barra-accao,0px\)/);
-    expect(TOAST).toMatch(/lg:bottom-\[calc\(var\(--bo-barra-accao,0px\)/);
+    expect(TOAST, "o aviso voltou a ter uma posição `lg:` que ignora a barra").not.toMatch(
+      /lg:bottom-/,
+    );
 
     // Quem escreve: o estúdio publica a altura medida, e limpa-a ao sair.
     expect(ESTUDIO).toContain('setProperty("--bo-barra-accao"');
     expect(ESTUDIO).toContain('removeProperty("--bo-barra-accao")');
+  });
+
+  /**
+   * ── E NENHUM DOS QUATRO VOLTA A DESLIGAR A RESERVA NO COMPUTADOR ────────
+   *
+   * Os quatro sítios que guardam espaço à barra tinham todos o mesmo `lg:` a
+   * anular a reserva, e estava certo enquanto a barra era só do telemóvel.
+   * Agora a barra está nas duas larguras; um `lg:` que a ignore põe a última
+   * linha de uma lista — ou um aviso, ou o botão «Pré-visualizar» — por baixo
+   * dos destinos, no ecrã em que ela trabalha o dia inteiro.
+   *
+   * Procura-se pela FORMA e não por uma lista escrita à mão: qualquer `lg:` a
+   * pôr a zero uma distância ao fundo, no mesmo ficheiro que lê o token.
+   */
+  it("e nenhum dos quatro desliga a reserva a partir de `lg`", () => {
+    const QUATRO = ["AdminClient.tsx", "Toast.tsx", "ProposalStudio.tsx", "BibliotecaRevisao.tsx"];
+    const reincidentes: string[] = [];
+    for (const nome of QUATRO) {
+      // Sem comentários: esta casa explica a avaria por escrito ao lado do
+      // sítio onde ela esteve, e uma varredura que os leia acusa a explicação.
+      const fonte = readFileSync(join(RAIZ, nome), "utf8").replace(/\/\*[\s\S]*?\*\//g, " ");
+      if (!fonte.includes("--bo-barra-inferior")) continue;
+      const m = fonte.match(/lg:(?:bottom-0|pb-0|bottom-\[calc\((?![^)]*--bo-barra-inferior))/);
+      if (m) reincidentes.push(`${nome} (${m[0]})`);
+    }
+    expect(
+      reincidentes,
+      `a reserva da barra volta a ser desligada no computador em: ${reincidentes.join(", ")}`,
+    ).toEqual([]);
   });
 
   /**

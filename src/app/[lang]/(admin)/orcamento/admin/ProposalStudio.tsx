@@ -10847,7 +10847,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            `--bo-barra-accao` (ver o `ResizeObserver` lá em cima) e o
            `Toast.tsx` soma-a à distância a que já se punha do fundo. Ficam os
            dois visíveis, e nenhum tapa o outro. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3 lg:bottom-0"
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3"
       >
         {step === "conteudo" && (
           <>

@@ -117,16 +117,29 @@ describe("a faixa do cabeçalho", () => {
    * coluna de ecrã inteiro não tem cantos, e o único fio que lhe faz sentido é
    * o da direita — que ela já acende sozinha.
    */
-  it("a coluna da esquerda também, agora que há chão por trás dela", () => {
+  it("a gaveta da esquerda também, agora que há chão por trás dela", () => {
+    /**
+     * ── E A COLUNA DEIXOU DE SER COLUNA ─────────────────────────────────
+     *
+     * O `lg:sticky` saiu do selector porque saiu do código: posta a escolha
+     * entre conviver com a barra de vidro ou ser substituída por ela, ela
+     * respondeu «a barra substitui o menu». Os destinos passaram todos para a
+     * cápsula que flutua em baixo, e esta peça passou a ser uma GAVETA nas duas
+     * larguras — com o logótipo, a conta, a ajuda e as quatro acções.
+     *
+     * O MATERIAL fica, e é por isso que este teste fica: uma gaveta que se abre
+     * por cima do trabalho tem ainda mais razões para ser vidro do que uma
+     * coluna encostada tinha.
+     */
     const linha = ADMIN.split("\n").find(
-      (l) => l.includes("fixed lg:sticky top-0") && l.includes("h-screen w-64"),
+      (l) => l.includes("fixed top-0") && l.includes("h-screen w-64"),
     );
-    expect(linha, "não encontrei a coluna — o selector desta busca envelheceu").toBeDefined();
-    expect(linha, "a coluna deixou de levar a faixa").toContain("bo-material-faixa");
+    expect(linha, "não encontrei a gaveta — o selector desta busca envelheceu").toBeDefined();
+    expect(linha, "a gaveta deixou de levar a faixa").toContain("bo-material-faixa");
     expect(linha, "a faixa sem desfoque não é vidro, é uma cor mais clara").toContain(
       "bo-material-desfoque",
     );
-    expect(linha, "a coluna voltou a pintar-se de sólido por cima do material").not.toContain(
+    expect(linha, "a gaveta voltou a pintar-se de sólido por cima do material").not.toContain(
       "bg-[var(--bo-chao)]",
     );
   });

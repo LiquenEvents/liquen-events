@@ -525,7 +525,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
           estúdio já usa, escrito no mesmo token; era só propagá-lo. `lg:bottom-0`
           porque acima de 1024 a navegação é lateral e não há nada por baixo. */}
       {seleccionadas.size > 0 && (
-        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[var(--bo-sombra-suspensa)] lg:bottom-0">
+        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[var(--bo-sombra-suspensa)]">
           <div className="flex flex-wrap items-center gap-3">
             {/* `role="status"` porque o número muda com o teclado e com o
                 Shift+clique, e quem não vê o ecrã tem de ouvir quantas leva —

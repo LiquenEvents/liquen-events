@@ -11,6 +11,7 @@ import {
   useCallback,
   useDeferredValue,
   memo,
+  Fragment,
   type ReactNode,
 } from "react";
 import Image from "next/image";
@@ -433,8 +434,6 @@ export const VIEW_COOKIE = "liquen-admin-view";
  * e um endereço que se lê ao telefone vale mais do que um que se explica.
  */
 export const PARAM_VISTA = "v";
-/** A barra lateral recolhida no computador — por aparelho, como o resto. */
-const CHAVE_MENU_RECOLHIDO = "liquen-admin-menu-recolhido";
 
 interface Props {
   /**
@@ -1361,11 +1360,6 @@ export default function AdminClient({
    * dois comportamentos — juntá-los fazia fechar a gaveta no telemóvel
    * esconder a barra no computador da próxima vez que lá voltasse.
    */
-  const [menuRecolhido, setMenuRecolhido] = useState(false);
-  /** Já se recolheu sozinho nesta visita ao estúdio? Sem isto, voltar a abrir a
-   *  barra à mão e continuar a trabalhar fazia-a fechar-se outra vez a cada
-   *  render — ela abria e o ecrã fechava-lhe. */
-  const recolhidoPeloEstudio = useRef(false);
   /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
   const desceu = useDesceu();
   /** Pedido escolhido na vista "Fazer proposta".
@@ -2412,39 +2406,25 @@ export default function AdminClient({
    * era custava mais do que valia.
    */
 
-  /** A escolha dela sobrevive ao recarregar — é por aparelho, como o resto. */
-  useEffect(() => {
-    try {
-      const cru = localStorage.getItem(CHAVE_MENU_RECOLHIDO);
-      if (cru != null) setMenuRecolhido(cru === "1");
-    } catch {
-      /* sem `localStorage` abre como sempre abriu */
-    }
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(CHAVE_MENU_RECOLHIDO, menuRecolhido ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [menuRecolhido]);
-
   /**
-   * ENTRAR EM «FAZER PROPOSTA» RECOLHE A BARRA. Uma vez, e não a cada render:
-   * o `recolhidoPeloEstudio` é o que faz a abertura à mão sobreviver — sem ele,
-   * carregar na cruz para a trazer de volta era ver o ecrã fechá-la outra vez.
-   * Sair do estúdio arma-o de novo, e a barra NÃO é reaberta: o que ela escolheu
-   * enquanto lá estava é a escolha dela.
+   * ── O MENU RECOLHIDO SAIU DAQUI, E O PEDIDO DELE FICOU CUMPRIDO ─────────
+   *
+   * Havia um estado (`menuRecolhido`), duas gravações por aparelho, um efeito
+   * que o ligava ao entrar em «Fazer proposta» e duas cruzes para o ligar e
+   * desligar à mão. Existia por palavras dela: «quando carregamos em fazer
+   * proposta o menu oculte-se automaticamente», porque a coluna de 256 px
+   * comia o ecrã do estúdio — que já vive dentro de outras três.
+   *
+   * Deixou de fazer falta, e não por se ter desistido: a coluna ACABOU. «A
+   * barra substitui o menu» — os destinos passaram todos para a cápsula que
+   * flutua em baixo, e o estúdio tem agora a largura toda em TODAS as vistas,
+   * sempre, sem estado nenhum para guardar nem cruz nenhuma para carregar.
+   *
+   * Um estado que ninguém pode mudar é um estado que mente a quem o lê a
+   * seguir; por isso saiu inteiro, com a chave de `localStorage` e o teste que
+   * o guardava (`AdminClient.menu-recolhido.test.tsx`). O que ele prometia
+   * está guardado noutro sítio — `a-barra-e-o-menu.test.tsx`.
    */
-  useEffect(() => {
-    if (view !== "fazer-proposta") {
-      recolhidoPeloEstudio.current = false;
-      return;
-    }
-    if (recolhidoPeloEstudio.current) return;
-    recolhidoPeloEstudio.current = true;
-    setMenuRecolhido(true);
-  }, [view]);
 
   // Restore the Pedidos status filter + sort the team last used (per device).
   useEffect(() => {
@@ -4273,48 +4253,30 @@ export default function AdminClient({
             duas animações — a gaveta passava a aparecer e desaparecer de um
             fotograma para o outro. Isto corrige o arrasto e não mexe no que
             já estava bem. */}
-        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
+        {/* ── E A COLUNA DEIXOU DE SER UMA COLUNA ──────────────────────────
+            «A barra substitui o menu». No computador já não há coluna encostada
+            ao conteúdo: o que resta desta peça é uma GAVETA, igual em todas as
+            larguras, e o que ela guarda deixou de ser navegação — é o
+            logótipo, a conta, a ajuda e as quatro acções (Atalhos, Backup,
+            Repor, Sair). Os destinos vivem todos na barra de baixo.
+
+            Por isso caíram daqui os `lg:` que a faziam coluna (`lg:sticky`,
+            `lg:translate-x-0`, `lg:shadow-none`, a largura zero do recolher) e
+            o `lg:contents` do invólucro — sem ele, o invólucro volta a ser o
+            bloco contentor que impede a página de se arrastar para o lado, e
+            agora também no computador. */}
+        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)]">
           <aside
-            inert={navEhGaveta && !navOpen}
-            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform motion-safe:duration-300 ${
-              navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-            } ${
-              /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
-                 a ocupar a largura toda. `overflow-hidden` porque o que está lá
-                 dentro continua a medir 256 px — não se desmonta, para a
-                 abertura seguinte não ter de o montar outra vez. E `border-r-0`
-                 porque um risco de 1 px sem nada de um dos lados lê-se como uma
-                 coluna vazia. O `transform` desta transição não é o mesmo que o
-                 da gaveta: aqui anima-se a LARGURA, que é a única coisa que
-                 empurra o conteúdo. */
-              menuRecolhido ? "lg:w-0 lg:overflow-hidden lg:border-r-0" : ""
-            } motion-safe:lg:transition-[width] motion-safe:lg:duration-200`}
+            inert={!navOpen}
+            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] motion-safe:transition-transform motion-safe:duration-300 ${
+              navOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
           >
-            {/* A CRUZ DO COMPUTADOR — recolhe a coluna e devolve os 256 px ao
-                trabalho. É irmã da de baixo, não a mesma: aquela fecha a GAVETA
-                do telemóvel (um estado que se perde ao sair), esta recolhe uma
-                COLUNA (um estado que fica). Por isso são dois botões, cada um
-                visível exactamente onde o seu estado existe. */}
+            {/* A cruz que fecha a gaveta. Deixou de ser «do telemóvel»: a
+                coluna acabou e isto é uma gaveta nas duas larguras, portanto a
+                porta de saída tem de existir onde quer que ela a abra. */}
             <button
-              className={`hidden lg:flex absolute top-3 right-3 w-11 h-11 items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
-              onClick={() => setMenuRecolhido(true)}
-              aria-label="Recolher o menu"
-              title="Recolher o menu"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
-              </svg>
-            </button>
-            {/* Mobile close */}
-            <button
-              className={`lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+              className={`absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
               onClick={() => setNavOpen(false)}
               aria-label="Fechar menu"
             >
@@ -4376,7 +4338,12 @@ export default function AdminClient({
             <nav
               ref={colunaDosDestinos}
               aria-label="Navegação do back office"
-              className="relative flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
+              /* `lg:hidden`: no computador os destinos estão TODOS na barra de
+                 baixo, e o mesmo destino em dois sítios do mesmo ecrã é a
+                 confusão que a regra do `soNoComputador` já evitava do outro
+                 lado. Abaixo de `lg` a barra só leva quatro, e esta lista
+                 continua a ser onde os outros vivem. */
+              className="relative lg:hidden flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
             >
               {/* O filete que anda. `aria-hidden` porque não diz nada que o
                   `aria-current="page"` de cada destino não diga melhor — é
@@ -4641,7 +4608,7 @@ export default function AdminClient({
         {/* Backdrop (mobile nav drawer) */}
         {navOpen && (
           <div
-            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
+            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px]"
             onClick={() => setNavOpen(false)}
           />
         )}
@@ -4722,7 +4689,7 @@ export default function AdminClient({
           // um leitor de ecrã anuncia "navegação" duas vezes e não há como
           // saber qual é qual — nem para quem ouve, nem para um teste.
           aria-label="Destinos principais"
-          className={`lg:hidden pointer-events-none fixed bottom-0 inset-x-0 z-30 flex items-end justify-center gap-2 px-[var(--bo-barra-folga)] motion-safe:transition-transform motion-safe:duration-300 ${
+          className={`pointer-events-none fixed bottom-0 inset-x-0 z-30 flex items-end justify-center gap-2 px-[var(--bo-barra-folga)] motion-safe:transition-transform motion-safe:duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
           // A folga por baixo SOMA-SE ao entalhe: no iPhone há a barra de
@@ -4744,18 +4711,58 @@ export default function AdminClient({
               o rótulo mais comprido («Fazer proposta») estica a célula dele e
               as quatro deixam de ter a mesma largura. */}
           <div
-            className="bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)]"
+            /* No telemóvel a cápsula ocupa a faixa toda e reparte-a por
+               quatro (`flex-1`). No computador tem DOZE destinos lá dentro e
+               não pode esticar-se de margem a margem: mede o que tem
+               (`lg:flex-none`), e se um dia não couber, rola por dentro em vez
+               de rebentar a cápsula (`lg:overflow-x-auto`). */
+            className="bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] lg:flex-none lg:max-w-full lg:overflow-x-auto"
             style={{ height: "var(--bo-barra-capsula)" }}
           >
-            {BARRA_INFERIOR.map((id) => {
+            {/* ── QUATRO NO TELEMÓVEL, TODOS NO COMPUTADOR ─────────────────
+                Pedido dela, com a captura da Dock do Mac e da barra do iOS:
+                «quero que o menu fique igual ao do mac ios em baixo com a barra
+                liquid glass». Posta a escolha entre conviver com a coluna da
+                esquerda ou substituí-la, ela respondeu «a barra substitui o
+                menu» — portanto no computador não há coluna, há a barra, e a
+                barra tem de ter TUDO. Uma barra com quatro destinos ao lado de
+                nenhuma coluna seria tirar-lhe oito sítios do dia.
+
+                A ordem é a da COLUNA que ela conhece — `CORE_NAV` e depois
+                `MORE_NAV`, com o fio a separar o dia de trabalho do resto —, e
+                não a ordem de declaração do `NAV`. Não é o mesmo: medido no
+                browser, percorrer o `NAV` dava «Visão Geral · Pedidos ·
+                Calendário · Fazer proposta», e na coluna o «Fazer proposta» é o
+                terceiro. Mudar de sítio os destinos que ela toca de olhos
+                fechados era o custo mais caro desta mudança toda. Os que não são
+                dos quatro do dia nascem `hidden` e só aparecem a partir de
+                `lg`. É a mesma regra que a gaveta já usava ao contrário
+                (`soNoComputador`, mais acima) — nenhum destino aparece duas
+                vezes no mesmo ecrã. */}
+            {[...CORE_NAV, ...MORE_NAV].map((id, i) => {
               const navItem = NAV.find((n) => n.id === id)!;
+              const noTelemovel = BARRA_INFERIOR.includes(id);
               const isActive = view === id;
+              /* O FIO QUE A COLUNA JÁ TINHA, no mesmo sítio. Palavras dela
+                 quando a dobra do «Mais» saiu: «retira o mais e deixa tudo à
+                 vista» — e o que ficou lá foi um fio a dizer onde acaba o dia
+                 de trabalho e começa o resto. Não esconde nada, não tem estado,
+                 não se abre. A Dock do Mac da captura dela tem o mesmo, pela
+                 mesma razão. Só no computador, porque só lá a barra tem os
+                 dois grupos. */
+              const abreOResto = i === CORE_NAV.length;
               return (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  aria-current={isActive ? "page" : undefined}
-                  /* ── A PASTILHA DO DESTINO ONDE ELA ESTÁ ──────────────────
+                <Fragment key={id}>
+                  {abreOResto && (
+                    <span
+                      aria-hidden
+                      className="hidden lg:block my-2 w-px shrink-0 self-stretch bg-[var(--bo-hairline)]"
+                    />
+                  )}
+                  <button
+                    onClick={() => setView(id)}
+                    aria-current={isActive ? "page" : undefined}
+                    /* ── A PASTILHA DO DESTINO ONDE ELA ESTÁ ──────────────────
                      A MESMA que a coluna da esquerda usa (ver `renderNavItem`):
                      lavagem de acento e tinta de acento. Duas navegações da
                      mesma casa que marcassem a escolha de maneiras diferentes
@@ -4772,37 +4779,60 @@ export default function AdminClient({
 
                      E não é só cor: a pastilha é uma FORMA que aparece, e o
                      `font-medium` fica como terceira pista (WCAG 1.4.1). */
-                  className={`alvo-toque relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
-                    isActive
-                      ? "bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] font-medium"
-                      : "text-[var(--bo-text-muted)] font-normal"
-                  }`}
-                >
-                  {id === "pedidos" && pendingCount > 0 && (
-                    <span className="absolute top-1.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
-                  )}
-                  {/* 120 ms e não 150 — e é o `ESTADO` que serve, apesar de aqui só
+                    /* ── A PASTILHA LEVANTA-SE DO VIDRO ────────────────────────
+                     A segunda captura dela é a barra do iOS 26: o destino onde
+                     se está não é uma mancha de cor pintada no vidro — é uma
+                     peça que SOBE dele, com moldura própria e sombra por baixo.
+
+                     A cor de fundo NÃO muda, e é de propósito: a lavagem opaca
+                     (`--bo-accent-lavagem`) é o que faz o acento medir 5,19:1
+                     por cima dela mesmo quando o que passa através do vidro é
+                     uma fotografia escura, e essa conta está prendida no
+                     `barra-que-flutua.test.ts`. O que se acrescenta é RELEVO —
+                     um fio à volta e uma sombra —, que não mexe em contraste
+                     nenhum. Levantar sem repintar. */
+                    className={`alvo-toque relative ${
+                      noTelemovel ? "flex" : "hidden lg:flex"
+                    } min-w-0 flex-1 lg:w-20 lg:flex-none flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
+                      isActive
+                        ? "bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] font-medium shadow-[var(--bo-sombra-suspensa)] ring-1 ring-inset ring-[var(--bo-hairline)]"
+                        : "text-[var(--bo-text-muted)] font-normal"
+                    }`}
+                  >
+                    {id === "pedidos" && pendingCount > 0 && (
+                      <span className="absolute top-1.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
+                    )}
+                    {/* 120 ms e não 150 — e é o `ESTADO` que serve, apesar de aqui só
                       mudar a escala: no Tailwind v4 a classe `scale-110` emite a
                       propriedade autónoma `scale`, e `scale` está de propósito na
                       lista do `ESTADO` (ver `ui/movimento.ts`). Um degrau a menos
                       para a casa manter. */}
-                  <span className={`${ESTADO} ${isActive ? "scale-110" : ""}`}>{navItem.icon}</span>
-                  {/* DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
+                    <span className={`${ESTADO} ${isActive ? "scale-110" : ""}`}>
+                      {navItem.icon}
+                    </span>
+                    {/* DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
                       e não só na que parte. Sem isso, a célula mais alta empurra
                       o seu ícone para cima e os ícones da barra deixam de estar à
                       mesma altura — lê-se como um desalinhamento, que é
                       exactamente a queixa que trouxe este trabalho. Reservar o
                       espaço em todas custa uns píxeis e devolve a linha direita. */}
-                  {/* `2.5em` e não `2.2em`: a reserva tem de ser a altura REAL
+                    {/* `2.5em` e não `2.2em`: a reserva tem de ser a altura REAL
                       de duas linhas, e no telemóvel o chão da letra desta casa
                       é 12 px (`escala-movel.test.ts`) — duas linhas a
                       `leading-tight` são 30 px, ou seja 2,5em. Com 2,2em a
                       reserva mentia e o rótulo transbordava a cápsula por
                       baixo: medido, 2 px em «Visão Geral» e «Fazer proposta». */}
-                  <span className="text-[8px] tracking-wide uppercase leading-tight text-center min-h-[2.5em] flex items-start justify-center">
-                    {navItem.label}
-                  </span>
-                </button>
+                    {/* 8 px é o rótulo do telemóvel, onde a cápsula tem 390 px
+                      para repartir por quatro. No computador a barra passou a
+                      ser O MENU — o que ela lê o dia inteiro — e há largura para
+                      o dizer: 10 px a partir de `lg`. A reserva de duas linhas
+                      fica, porque «Propostas Aceites» continua a precisar
+                      delas. */}
+                    <span className="text-[8px] lg:text-[10px] tracking-wide uppercase leading-tight text-center min-h-[2.5em] flex items-start justify-center">
+                      {navItem.label}
+                    </span>
+                  </button>
+                </Fragment>
               );
             })}
           </div>
@@ -4853,7 +4883,13 @@ export default function AdminClient({
             assim que os rótulos da barra subiram ao chão de 12 px (a barra
             passou a 71, o conteúdo continuou a guardar 56). Ver
             `barra-inferior.test.tsx`. */}
-        <div className="flex-1 min-w-0 flex flex-col pb-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] lg:pb-0">
+        {/* O `lg:pb-0` caiu: a barra passou a estar no computador também, e o
+            espaço que ela ocupa tem de ser guardado nas duas larguras — senão a
+            última linha de qualquer lista fica por baixo dela. Os outros três
+            sítios que leem o `--bo-barra-inferior` (o aviso do `Toast`, a barra
+            do estúdio e o fundo da lista da biblioteca) perderam o seu pelo
+            mesmo motivo. */}
+        <div className="flex-1 min-w-0 flex flex-col pb-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))]">
           {/* Top bar */}
           {/* A ESCADA DE PLANOS do back office, escrita uma vez para não voltar
               a colidir:
@@ -4929,36 +4965,11 @@ export default function AdminClient({
                   Por isso este aparece exactamente quando a outra sai, e nunca
                   ao mesmo tempo: continua a haver UM abridor de cada vez, que
                   é a regra que esta arrumação existe para cumprir. */}
-              {/* ── E A PORTA DE VOLTA ────────────────────────────────────
-                  Uma coluna que se recolhe e não se pode trazer de volta é uma
-                  coluna que se perde. Este botão existe EXACTAMENTE enquanto ela
-                  está recolhida e só no computador — que é onde o estado existe.
-                  No telemóvel a barra nunca foi uma coluna, e quem abre a gaveta
-                  é a barra de baixo. */}
-              {menuRecolhido && (
-                <button
-                  onClick={() => setMenuRecolhido(false)}
-                  aria-label="Mostrar o menu"
-                  title="Mostrar o menu"
-                  className={`hidden lg:flex -ml-1 h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  >
-                    <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
-                  </svg>
-                </button>
-              )}
               {selected && (
                 <button
                   onClick={() => setNavOpen(true)}
                   aria-label="Abrir menu"
-                  className={`lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                  className={`-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                 >
                   <svg
                     width="20"

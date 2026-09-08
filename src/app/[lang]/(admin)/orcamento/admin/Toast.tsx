@@ -584,7 +584,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={pilhaRef}
         data-acima-dos-modais=""
-        className="fixed bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-accao,0px)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-[calc(var(--bo-barra-accao,0px)+1.5rem)]"
+        className="fixed bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-accao,0px)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none"
       >
         {/* `relative` porque o aviso que sai passa a `absolute` DENTRO da sua
             região, no sítio exacto onde estava (ver o FLIP acima). Sem isto o
