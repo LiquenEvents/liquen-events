@@ -225,15 +225,17 @@ describe("e o estado do grupo não ficou pendurado", () => {
     expect(chave, "sobrou a dobra na chave que manda remedir").not.toContain("moreNavOpen");
   });
 
-  it("a coluna continua a rolar quando os onze não couberem", () => {
-    // Com tudo à vista a lista ficou mais alta, e num portátil baixo ela passa
-    // a rolar. Quem rola é o `<nav>`, e o rodapé (quem está com a sessão, os
+  it("a lista da gaveta continua a rolar quando os onze não couberem", () => {
+    // Com tudo à vista a lista ficou mais alta, e num ecrã baixo ela passa a
+    // rolar. Quem rola é o `<nav>`, e o rodapé (quem está com a sessão, os
     // dispositivos, sair) fica FORA dele — senão o botão de sair desaparecia
     // pelo fundo em vez de ficar onde está sempre.
-    const nav = CODIGO.match(
-      /aria-label="Navegação do back office"[\s\S]{0,200}?className="([^"]+)"/,
-    );
-    expect(nav, "a coluna dos destinos mudou de forma").not.toBeNull();
+    //
+    // «Mais destinos» e não «Navegação do back office»: os nomes trocaram de
+    // peça quando a coluna acabou. Esta é a lista DA GAVETA — a que no
+    // telemóvel leva os destinos que não cabem nos quatro da barra.
+    const nav = CODIGO.match(/aria-label="Mais destinos"[\s\S]{0,300}?className="([^"]+)"/);
+    expect(nav, "a lista de destinos da gaveta mudou de forma").not.toBeNull();
     expect(nav![1]).toContain("flex-1");
     expect(nav![1]).toContain("overflow-y-auto");
   });

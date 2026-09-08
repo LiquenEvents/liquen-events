@@ -344,7 +344,8 @@ describe("a saída da gaveta do pedido", () => {
        `setAttribute` (fica no DOM) e o segundo pela PROPRIEDADE
        (`sibling.inert = true`), e o jsdom não reflecte essa propriedade em
        atributo nenhum — um `[inert]` aqui media o jsdom e não o produto. */
-    const barraDeBaixo = () => document.querySelector('nav[aria-label="Destinos principais"]')!;
+    const barraDeBaixo = () =>
+      document.querySelector('nav[aria-label="Navegação do back office"]')!;
     expect(
       barraDeBaixo().getAttribute("aria-hidden"),
       "com a gaveta aberta o fundo tem de estar fora do alcance — sem isso este caso não mede nada",

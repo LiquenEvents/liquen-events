@@ -206,7 +206,13 @@ describe("a barra de destinos do telemóvel", () => {
    * passa a medir o comprimento dos comentários.
    */
   const barra = (): string => {
-    const i = ADMIN.indexOf('aria-label="Destinos principais"');
+    /**
+     * O nome trocou de peça. A barra chamava-se «Destinos principais» e a
+     * coluna da esquerda «Navegação do back office»; a coluna acabou, a barra
+     * passou a ser a navegação do back office nas duas larguras, e o nome
+     * seguiu a coisa. Ver `a-barra-e-o-menu.test.tsx`.
+     */
+    const i = ADMIN.indexOf('aria-label="Navegação do back office"');
     expect(i, "a barra de destinos desapareceu").toBeGreaterThan(-1);
     const f = ADMIN.indexOf("</nav>", i);
     expect(f, "a `<nav>` da barra não fecha").toBeGreaterThan(-1);
@@ -243,7 +249,21 @@ describe("a barra de destinos do telemóvel", () => {
     // A regra escrita em `nav.tsx`: os quatro destinos do dia vivem só na
     // barra, o resto só na gaveta, e há um abridor de cada vez. A peça redonda
     // é esse abridor — não é um quinto destino, e o «Mais» não volta.
-    expect((ADMIN.match(/aria-label="Mais destinos"/g) ?? []).length).toBe(1);
+    //
+    // ── E CONTA-SE PELO `aria-expanded`, NÃO PELO NOME ────────────────────
+    //
+    // «Mais destinos» passou a ser DUAS coisas com o mesmo nome, e de
+    // propósito: o botão que abre, e a lista que ele abre. Um leitor de ecrã
+    // beneficia disso — o botão anuncia exactamente o que vai encontrar. Mas
+    // contar o nome passou a contar dois, e o que este teste guarda é que há um
+    // ABRIDOR só. O `aria-expanded` é o que distingue um botão que abre uma
+    // coisa de tudo o resto, e só o abridor o tem.
+    const abridores = ADMIN.split("\n").filter(
+      (l, i, ls) =>
+        l.includes('aria-label="Mais destinos"') &&
+        (ls[i + 1] ?? "").includes("aria-expanded"),
+    );
+    expect(abridores.length, "há mais do que um abridor da gaveta").toBe(1);
   });
 });
 

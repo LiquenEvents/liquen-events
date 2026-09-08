@@ -205,8 +205,15 @@ afterEach(() => {
 /** A barra lateral. É `role="complementary"` — o `<aside>`. */
 const barra = () => screen.getByRole("complementary");
 
-/** A cápsula que flutua: é a `<nav aria-label="Destinos principais">`. */
-const barraDeBaixo = () => screen.getByRole("navigation", { name: "Destinos principais" });
+/**
+ * A cápsula que flutua. Chama-se «Navegação do back office» porque É a
+ * navegação do back office — a coluna acabou, e o nome mudou-se atrás do
+ * papel. Vinte sítios dos passeios do Playwright usam este nome para dizer
+ * «já estou dentro»; deixá-lo na lista que passou a `lg:hidden` punha-os
+ * todos à espera de uma coisa invisível.
+ */
+const barraDeBaixo = () =>
+  screen.getByRole("navigation", { name: "Navegação do back office" });
 /** A gaveta. É `role="complementary"` — o `<aside>`. */
 const gaveta = () => screen.getByRole("complementary");
 
@@ -271,7 +278,7 @@ describe("a barra de baixo é o menu do back office", () => {
    */
   it("a lista de destinos da gaveta esconde-se no computador", () => {
     montar(makeQuote());
-    const lista = within(gaveta()).getByRole("navigation", { name: "Navegação do back office" });
+    const lista = within(gaveta()).getByRole("navigation", { name: "Mais destinos" });
     expect(
       lista.className,
       "a gaveta voltou a mostrar destinos no computador — a barra já os tem",

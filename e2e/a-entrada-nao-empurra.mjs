@@ -260,7 +260,7 @@ function relatar(nome, r) {
 
 try {
   await page.goto(URL_BASE + "/orcamento/admin", { waitUntil: "domcontentloaded" });
-  const barra = page.locator('nav[aria-label="Destinos principais"]');
+  const barra = page.locator('nav[aria-label="Navegação do back office"]');
   const email = page.getByLabel(/O teu email/i);
   await Promise.race([
     email.waitFor({ timeout: 90_000 }).catch(() => {}),

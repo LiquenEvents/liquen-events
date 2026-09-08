@@ -4337,7 +4337,11 @@ export default function AdminClient({
                 que mede o filete (ver a nota dele lá em cima). */}
             <nav
               ref={colunaDosDestinos}
-              aria-label="Navegação do back office"
+              /* «Mais destinos», que é o nome do ⋯ que a abre — e é o que ela
+                 é: no telemóvel a barra leva quatro e o resto vive aqui. O
+                 nome «Navegação do back office» passou para a barra, que é
+                 quem faz agora esse trabalho nas duas larguras. */
+              aria-label="Mais destinos"
               /* `lg:hidden`: no computador os destinos estão TODOS na barra de
                  baixo, e o mesmo destino em dois sítios do mesmo ecrã é a
                  confusão que a regra do `soNoComputador` já evitava do outro
@@ -4685,10 +4689,25 @@ export default function AdminClient({
             Continua escondida enquanto uma gaveta de detalhe está aberta: é
             uma superfície modal, e a barra só lhe sobreporia o rodapé. */}
         <nav
-          // Duas navegações no mesmo ecrã precisam de dois nomes: sem isto,
-          // um leitor de ecrã anuncia "navegação" duas vezes e não há como
-          // saber qual é qual — nem para quem ouve, nem para um teste.
-          aria-label="Destinos principais"
+          /**
+           * ── O NOME SEGUE A COISA ────────────────────────────────────────
+           *
+           * Duas navegações no mesmo ecrã precisam de dois nomes: sem isto, um
+           * leitor de ecrã anuncia «navegação» duas vezes e não há como saber
+           * qual é qual — nem para quem ouve, nem para um teste.
+           *
+           * Esta chamava-se «Destinos principais» e a coluna da esquerda
+           * chamava-se «Navegação do back office». Trocaram de papel: a coluna
+           * acabou, e a navegação do back office é ESTA — em todas as
+           * larguras. O nome mudou-se atrás do papel, e não ao contrário.
+           *
+           * Não é só arrumação: vinte sítios dos passeios do Playwright usam
+           * este nome para dizer «já estou dentro do back office», incluindo o
+           * arranque que abre a sessão de toda a passagem. Deixá-lo pendurado
+           * na lista que passou a `lg:hidden` punha-os todos à espera de uma
+           * coisa invisível — o que aconteceu, e é o que isto fecha.
+           */
+          aria-label="Navegação do back office"
           className={`pointer-events-none fixed bottom-0 inset-x-0 z-30 flex items-end justify-center gap-2 px-[var(--bo-barra-folga)] motion-safe:transition-transform motion-safe:duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}

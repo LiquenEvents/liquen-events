@@ -798,7 +798,7 @@ async function entrar(page) {
   // office não abre». Quem manda a 1440 é a coluna lateral.
   const barra = DESKTOP
     ? page.locator('nav[aria-label="Navegação do back office"]')
-    : page.locator('nav[aria-label="Destinos principais"]');
+    : page.locator('nav[aria-label="Navegação do back office"]');
   let limitado = false;
   page.on("response", (r) => {
     if (r.url().includes("/api/admin/login") && r.status() === 429) limitado = true;
@@ -913,7 +913,7 @@ async function aVista(page, alvo) {
   await dormir(500);
 }
 
-const barraDeBaixo = (page) => page.locator('nav[aria-label="Destinos principais"]');
+const barraDeBaixo = (page) => page.locator('nav[aria-label="Navegação do back office"]');
 const listaDePedidos = (page) => page.locator("ul.flex.flex-col.divide-y").first();
 
 /** Leva o ecrã à lista de Pedidos, com a lista toda aberta. */

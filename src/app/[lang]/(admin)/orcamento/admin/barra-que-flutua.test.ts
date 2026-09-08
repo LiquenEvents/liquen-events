@@ -97,7 +97,9 @@ function semComentarios(fonte: string): string {
 /** Só o bloco da `<nav>` da barra, sem a prosa. */
 function barra(): string {
   const fonte = semComentarios(readFileSync(join(RAIZ, "AdminClient.tsx"), "utf8"));
-  const i = fonte.indexOf('aria-label="Destinos principais"');
+  // O nome trocou de peça quando a coluna acabou: a barra passou a ser a
+  // navegação do back office nas duas larguras. Ver `a-barra-e-o-menu.test.tsx`.
+  const i = fonte.indexOf('aria-label="Navegação do back office"');
   expect(i, "a barra de destinos desapareceu").toBeGreaterThan(-1);
   const f = fonte.indexOf("</nav>", i);
   expect(f, "a `<nav>` da barra não fecha").toBeGreaterThan(-1);

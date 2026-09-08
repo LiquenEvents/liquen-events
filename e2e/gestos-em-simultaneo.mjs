@@ -1048,7 +1048,7 @@ if (quer(8)) {
     // No telemóvel a barra lateral é uma gaveta fechada; os quatro destinos do
     // dia vivem na barra de baixo, que tem nome próprio (ver `nav.tsx`).
     await page
-      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("navigation", { name: /Navegação do back office/i })
       .getByRole("button", { name: /^Pedidos/ })
       .click();
     await page.waitForTimeout(2500);

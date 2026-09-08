@@ -268,7 +268,7 @@ test.describe("D1 · e no telemóvel continua bem", () => {
     exigirLogin(await entrarNoBackOffice(page));
     await garantirPedido(page);
     await page
-      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("navigation", { name: /Navegação do back office/i })
       .getByRole("button", { name: "Pedidos", exact: true })
       .click();
     await page.locator("li button, article button").first().click();
@@ -454,7 +454,7 @@ test.describe("D4 · a barra de baixo na Biblioteca de Temas", () => {
 
     const m = await page.evaluate(() => {
       const de = document.documentElement;
-      const barra = document.querySelector('nav[aria-label="Destinos principais"]');
+      const barra = document.querySelector('nav[aria-label="Navegação do back office"]');
       const r = barra?.getBoundingClientRect() ?? null;
       // Qual é a fila culpada? A que NÃO QUEBRA e cujo lado direito já passou a
       // margem do ecrã. As mais fundas primeiro: a casca da página também passa

@@ -430,7 +430,7 @@ test.describe("Back office — mobile", () => {
       // um destino estivesse escrito nos dois sítios.
       const naBarra = NA_BARRA.has(view.nav.source.replace(/[$^]/g, ""));
       if (naBarra) {
-        const barra = page.getByRole("navigation", { name: /Destinos principais/i });
+        const barra = page.getByRole("navigation", { name: /Navegação do back office/i });
         const item = barra.getByRole("button", { name: view.nav });
         await expect(
           item,
@@ -440,7 +440,7 @@ test.describe("Back office — mobile", () => {
       } else {
         // A gaveta abre no hambúrguer do cabeçalho — o único abridor.
         await abrirGaveta(page);
-        const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
+        const sidebar = page.getByRole("navigation", { name: /Mais destinos/i });
         await expect(sidebar).toBeVisible();
         const item = sidebar.getByRole("button", { name: view.nav });
         // Diz qual é a etiqueta que falta em vez de esperar 30s pelo clique:
@@ -559,7 +559,7 @@ test.describe("Back office — mobile", () => {
     }
 
     await page
-      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("navigation", { name: /Navegação do back office/i })
       .getByRole("button", { name: /^Pedidos/ })
       .tap();
     await expect(page.getByRole("heading", { level: 1, name: /^Pedidos$/ })).toBeVisible();
@@ -718,7 +718,7 @@ test.describe("Back office — mobile", () => {
     await expect(aviso).not.toContainText(/algo correu mal|erro interno|500/i);
 
     // 2. NÃO TAPA A BARRA DE BAIXO.
-    const barra = page.getByRole("navigation", { name: /Destinos principais/i });
+    const barra = page.getByRole("navigation", { name: /Navegação do back office/i });
     const caixaAviso = await aviso.boundingBox();
     const caixaBarra = await barra.boundingBox();
     expect(
@@ -802,7 +802,7 @@ test.describe("Back office — mobile", () => {
 
     // ── A folha de atalhos não se oferece a quem não tem teclas ───────────
     await abrirGaveta(page);
-    const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
+    const sidebar = page.getByRole("navigation", { name: /Mais destinos/i });
     await expect(sidebar).toBeVisible();
     await expect(
       sidebar.getByRole("button", { name: /^Atalhos$/ }),
@@ -814,7 +814,7 @@ test.describe("Back office — mobile", () => {
     // arrumação das duas navegações, já não está na gaveta.
     await page.getByRole("button", { name: /Fechar menu/i }).tap();
     await page
-      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("navigation", { name: /Navegação do back office/i })
       .getByRole("button", { name: /Fazer proposta/i })
       .tap();
     await expect(page.getByRole("heading", { level: 1, name: /^Fazer proposta$/ })).toBeVisible();
@@ -951,7 +951,7 @@ test.describe("Back office — mobile", () => {
       test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
     }
 
-    const barra = page.getByRole("navigation", { name: /Destinos principais/i });
+    const barra = page.getByRole("navigation", { name: /Navegação do back office/i });
 
     /**
      * ── PORQUE É QUE O ABRIDOR JÁ NÃO SE CONTA PELO TEXTO ────────────────
@@ -984,7 +984,7 @@ test.describe("Back office — mobile", () => {
     ).toHaveCount(1);
 
     await abrirGaveta(page);
-    const gaveta = page.getByRole("navigation", { name: /Navegação do back office/i });
+    const gaveta = page.getByRole("navigation", { name: /Mais destinos/i });
     await expect(gaveta).toBeVisible();
     const naGaveta = (await gaveta.getByRole("button").allInnerTexts()).map((t) => t.trim());
 
