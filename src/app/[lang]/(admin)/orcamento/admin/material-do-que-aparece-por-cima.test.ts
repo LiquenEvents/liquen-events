@@ -529,7 +529,16 @@ describe("os cantos são generosos, e a pastilha é concêntrica com a moldura",
     const conteudo = parseFloat(CSS.match(/--radius-lg:\s*([\d.]+)rem/)![1]);
     const menu = parseFloat(token("--bo-material-raio").match(/([\d.]+)rem/)![1]);
     const grande = parseFloat(token("--bo-material-raio-grande").match(/([\d.]+)rem/)![1]);
-    expect(conteudo).toBe(0.5); // 8 px, a régua do conteúdo
+    // A régua do conteúdo é o degrau do CONTROLO (`--radius-lg`). Esteve nos
+    // 8 px enquanto a escala do back office foi um valor só; a Parte 3.7 do
+    // sistema de design devolveu-lhe uma escada concêntrica e ele passou aos
+    // 10. O valor exacto é assunto do `raios-do-back-office.test.ts`, que o
+    // guarda com a conta toda — aqui o que interessa é a ORDEM, que é o que o
+    // nome deste caso diz: o material é mais redondo do que o conteúdo.
+    //
+    // Prender aqui o número era ter a mesma régua escrita em dois sítios, e
+    // foi por isso que este caso chumbou numa mudança que não era dele.
+    expect(conteudo, "a régua do conteúdo desapareceu do `--radius-lg`").toBeGreaterThan(0);
     expect(menu).toBeGreaterThan(conteudo);
     expect(grande).toBeGreaterThan(menu);
   });

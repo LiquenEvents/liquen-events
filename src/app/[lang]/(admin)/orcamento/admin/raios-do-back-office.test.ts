@@ -88,14 +88,83 @@ function bloco(selector: string): string {
 }
 
 describe("os raios do back office", () => {
-  it("colapsa a escala do Tailwind num só valor, e no primeiro pixel", () => {
+  /**
+   * ── E A ESCADA VOLTOU, MAS COM UMA CONTA POR TRÁS ────────────────────────
+   *
+   * Este caso exigia os cinco degraus todos em `0.5rem`, e a razão estava
+   * certa para o dia em que nasceu: o censo tinha achado NOVE valores, o que é
+   * o mesmo que valor nenhum. Colapsar tudo num só tirou o ruído.
+   *
+   * A Parte 3.7 do `docs/DESIGN-SYSTEM.md` traz a peça que faltava — e não é
+   * uma escala nova, é uma REGRA que gera a escala:
+   *
+   *     raio_interior = raio_do_container − distância_entre_os_cantos
+   *
+   * A diferença face aos nove valores de então é que estes CASAM: uma folha a
+   * 26 com 8 de folga dá cartões a 18; um cartão a 16 com 12 de folga dá
+   * controlos a 4 — e é aí que se percebe que a folga é grande de mais.
+   * Nenhuma dessas leituras existe com um valor único.
+   *
+   * O que este caso passa a guardar não é «um valor», é que os cinco degraus
+   * estão declarados NO MESMO SÍTIO (para as 456 chamadas mudarem juntas), que
+   * sobem sem nunca descer, e que os degraus do meio são o mesmo — porque um
+   * controlo é um controlo, quer se escreva `rounded-md` ou `rounded-lg`.
+   *
+   * A segunda metade da regra antiga fica intacta e continua guardada aqui em
+   * baixo: a pílula é da ACÇÃO, e só dela.
+   */
+  it("declara a escada concêntrica num sítio só, e no primeiro pixel", () => {
     // `body:has([data-admin-mode])` e NÃO `body.admin-mode`: a classe só entra
     // num efeito, e um raio que muda depois do primeiro desenho é o mesmo
     // piscar que o `data-admin-mode` veio cá tirar.
     const b = bloco("body:has([data-admin-mode])");
-    for (const degrau of ["sm", "md", "lg", "xl", "2xl"]) {
-      expect(b, `--radius-${degrau} não está colapsado`).toContain(`--radius-${degrau}: 0.5rem;`);
+
+    const rem = (degrau: string): number => {
+      const m = b.match(new RegExp(`--radius-${degrau}:\\s*([\\d.]+)rem;`));
+      expect(m, `--radius-${degrau} não está declarado no bloco do back office`).not.toBeNull();
+      return Number(m![1]);
+    };
+
+    const escada = ["sm", "md", "lg", "xl", "2xl"].map(rem);
+    // Sobe, e nunca desce. Um degrau menor do que o anterior é a hierarquia ao
+    // contrário — um cartão mais redondo do que o painel que o contém.
+    for (let i = 1; i < escada.length; i += 1) {
+      expect(
+        escada[i],
+        `a escada desce entre o degrau ${i - 1} e o ${i}: ${escada[i - 1]} → ${escada[i]}`,
+      ).toBeGreaterThanOrEqual(escada[i - 1]);
     }
+
+    // `md` e `lg` são o mesmo degrau — o do CONTROLO. Dois nomes para a mesma
+    // coisa é o que se quer aqui: quem escreve `rounded-md` num campo e
+    // `rounded-lg` noutro não está a pedir dois raios, está a escrever o mesmo
+    // de duas maneiras.
+    expect(rem("md"), "`md` e `lg` deixaram de ser o mesmo degrau (o do controlo)").toBe(rem("lg"));
+
+    // E os extremos são os do documento: 6 px no distintivo, 20 px no painel.
+    expect(rem("sm") * 16, "o degrau do distintivo saiu dos 6 px").toBe(6);
+    expect(rem("2xl") * 16, "o degrau do painel saiu dos 20 px").toBe(20);
+  });
+
+  /**
+   * A CONTA DA CONCENTRICIDADE, ESCRITA UMA VEZ SÓ NO CSS.
+   *
+   * `max(0px, …)` não é defensivo: é a segunda metade da regra do documento
+   * («se raio_interior < 0 → 0»). Sem ele, um filho com folga maior do que o
+   * raio do pai pede um `border-radius` negativo — que o browser ignora em
+   * silêncio, e o canto fica a 90° sem ninguém perceber porquê.
+   */
+  it("tem o filho concêntrico, com o chão a zero", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    const m = css.match(/\.bo-concentrico\s*\{([^}]*)\}/);
+    expect(m, "a classe `.bo-concentrico` desapareceu").not.toBeNull();
+    const corpo = m![1];
+    expect(corpo, "a conta da concentricidade deixou de subtrair a folga do pai").toMatch(
+      /calc\(\s*var\(--pai-raio[^)]*\)\s*-\s*var\(--pai-folga/,
+    );
+    expect(corpo, "o chão a zero saiu — um raio negativo é ignorado em silêncio").toContain(
+      "max(0px",
+    );
   });
 
   it("põe os três tokens próprios no mesmo valor", () => {

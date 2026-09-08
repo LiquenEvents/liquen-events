@@ -430,11 +430,76 @@ body:has([data-admin-mode]) {
      É um terceiro valor e digo-o: a própria Apple, além da pílula, tem «5, 6,
      8 e 14 px em casos pontuais». A regra que este bloco fecha é a das
      SUPERFÍCIES e dos CONTROLOS; a miudez sub-20 px é outra escala. */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.5rem;
-  --radius-2xl: 0.5rem;
+  /* ══════════════════════════════════════════════════════════════════════
+     E AGORA A ESCADA VOLTA — MAS CONCÊNTRICA, E NÃO SOLTA
+     ══════════════════════════════════════════════════════════════════════
+
+     O bloco aqui em cima colapsou as cinco escadas num valor só (8 px) por uma
+     razão que continua boa: os raios estavam soltos, sem ninguém a decidi-los,
+     e dois raios diferentes lado a lado leem-se como um erro.
+
+     A Parte 3.7 do `docs/DESIGN-SYSTEM.md` traz a peça que faltava, e não é
+     uma escala nova — é uma REGRA que gera a escala:
+
+         raio_interior = raio_do_container − distância_entre_os_cantos
+         se raio_interior < 0  →  0
+
+     Não são seis números escolhidos ao gosto: são seis números que casam. Uma
+     folha a 26 com 8 px de folga dá cartões a 18; um cartão a 16 com 12 de
+     folga dá controlos a 4 — «o que provavelmente indica que o padding é
+     demasiado grande; corrige o padding, não o raio», diz o documento, e é
+     essa a leitura que um raio único nunca dá.
+
+     ── PORQUE É QUE O ARGUMENTO DE CIMA NÃO CAI ───────────────────────────
+
+     Ele dizia: CONTEÚDO 8 px · ACÇÃO pílula. A segunda metade fica intacta —
+     `rounded-full` continua a ser a acção, e é a regra que a Apple e a
+     Pixelmatters partilham. O que muda é a primeira: o conteúdo deixa de ser
+     um valor e passa a ser uma escada com uma conta por trás.
+
+     E continuam a ser CINCO LINHAS e não 456 edições, pela mesma razão de
+     sempre: no Tailwind v4 o `.rounded-lg` compila para
+     `border-radius: var(--radius-lg)`.
+
+     ── O MAPA ─────────────────────────────────────────────────────────────
+
+         rounded-sm   →   6 px   distintivo, etiqueta
+         rounded-md   →  10 px   controlo (campo, botão pequeno, item de menu)
+         rounded-lg   →  10 px   controlo
+         rounded-xl   →  16 px   cartão
+         rounded-2xl  →  20 px   painel
+
+     O `rounded` seco fica nos 4 px por onde estava — a miudez sub-20 px é
+     outra escala, e a razão está escrita aqui em cima. */
+  --radius-sm: 0.375rem; /* 6px  — distintivo */
+  --radius-md: 0.625rem; /* 10px — controlo */
+  --radius-lg: 0.625rem; /* 10px — controlo */
+  --radius-xl: 1rem; /* 16px — cartão */
+  --radius-2xl: 1.25rem; /* 20px — painel */
+
+  /* Os nomes de PAPEL do documento, para quem vier do brief encontrar o que
+     procura. Os utilitários do Tailwind ficam nas cinco linhas de cima; estes
+     servem o CSS escrito à mão e o `.bo-concentrico`. */
+  --bo-raio-janela: 1.125rem; /* 18px — a moldura da aplicação */
+  --bo-raio-painel: 1.25rem; /* 20px */
+  --bo-raio-folha: 1.625rem; /* 26px */
+  --bo-raio-cartao: 1rem; /* 16px */
+  --bo-raio-controlo: 0.625rem; /* 10px */
+  --bo-raio-distintivo: 0.375rem; /* 6px */
+}
+
+/* ── O FILHO CONCÊNTRICO ─────────────────────────────────────────────────
+   A conta da Parte 3.7, escrita uma vez. Quem a usa declara o raio e a folga
+   do PAI, e o filho sai com o raio que o mantém concêntrico:
+
+       <div style={{ "--pai-raio": "26px", "--pai-folga": "8px" }}>
+         <div className="bo-concentrico"> … </div>
+
+   O `max(0px, …)` é a segunda metade da regra: um raio interior negativo não
+   existe, e sem ele um filho com folga maior do que o raio do pai ficaria com
+   um `border-radius` inválido — que o browser ignora em silêncio. */
+.bo-concentrico {
+  border-radius: max(0px, calc(var(--pai-raio, 0px) - var(--pai-folga, 0px)));
 }
 
 /* Back office: clean white surface. */
