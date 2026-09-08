@@ -136,6 +136,7 @@ import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
+import SafeImage from "@/components/SafeImage";
 import {
   faltaADataDoEvento,
   AVISO_SEM_DATA,
@@ -4980,10 +4981,66 @@ export default function AdminClient({
                valor inicial — `all` — e ficava `all 150ms ease`. Ou seja, quem
                pedia MENOS movimento recebia MAIS, e com a curva errada. Medido
                num Chromium, não deduzido. */
-            className={`bo-material-faixa bo-material-desfoque sticky top-0 z-30 border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
+            className={`bo-material-faixa bo-material-desfoque sticky top-0 z-30 border-b pt-safe relative motion-safe:transition-colors motion-safe:duration-150 ${
               desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
             }`}
           >
+            {/*
+              ── A MARCA, AO MEIO DA BARRA ─────────────────────────────────
+
+              Pedido dela, a olhar para o vazio entre o título e os botões:
+              «quero o logo da liquen aqui ao meio».
+
+              ── PORQUE É QUE ISTO É ABSOLUTO E NÃO UM TERCEIRO BLOCO ──────
+
+              Porque «ao meio» tem de ser ao meio da BARRA, e não a meio do que
+              sobra entre os dois lados. Num `flex`, um terceiro filho fica
+              centrado no espaço restante — e esse espaço muda de tamanho a cada
+              vista: «Visão Geral» e «Propostas Aceites» não medem o mesmo, e o
+              bloco da direita cresce quando aparece o «Novo pedido». A marca
+              andava de um lado para o outro ao mudar de separador, que é
+              exactamente o tipo de movimento que ninguém pede e toda a gente vê.
+
+              Absoluta e centrada na barra, fica no mesmo sítio sempre.
+
+              ── E PORQUE É QUE NÃO SE PODE CLICAR ─────────────────────────
+
+              `pointer-events-none` porque esta camada atravessa a barra de um
+              lado ao outro: sem ele, tapava o «Pesquisar» e o «Novo» com um
+              rectângulo invisível. É decoração — a marca diz de quem é o
+              painel, não leva a lado nenhum —, portanto vai `aria-hidden` e não
+              entra na ordem de tabulação nem é lida em voz alta. Quem quer ir à
+              Visão Geral tem o destino na barra de baixo.
+
+              ── E SÓ NO COMPUTADOR ────────────────────────────────────────
+
+              Abaixo de `lg` não há vazio nenhum ao meio: o título e os quatro
+              botões ocupam a barra toda, e a marca ficaria por cima deles.
+            */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"
+            >
+              <SafeImage
+                src="/logo-liquen.png"
+                alt=""
+                width={300}
+                height={179}
+                /*
+                  h-12 e não h-8. A marca desta casa é EMPILHADA — o símbolo por
+                  cima e a palavra por baixo —, e num logótipo assim a palavra
+                  fica com menos de um quinto da altura total. Medido no
+                  retrato: a 32 px de altura, «LÍQUEN EVENTS» saía com 6 px e não
+                  se lia; era uma mancha.
+
+                  48 px é o que a barra dá sem a marca tocar nos limites (a faixa
+                  mede ~84 px com o `lg:py-5`), e põe a palavra nos ~9 px em que
+                  ela volta a ler-se. O ecrã de entrada usa `h-24` pela mesma
+                  razão, e diz-o: «a marca estava pequena para o espaço que tem».
+                */
+                className="h-12 w-auto object-contain opacity-90"
+              />
+            </div>
             <div
               className={`mx-auto flex w-full max-w-[1600px] items-center gap-3 sm:gap-4 px-4 sm:px-6 lg:px-10 lg:py-5  ${
                 desceu ? "py-1.5" : "py-2.5"
