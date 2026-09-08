@@ -44,9 +44,33 @@ async function entrarComSenha(page: Page): Promise<boolean> {
   // O campo pelo `name` e não pelo rótulo: o rótulo «Palavra-passe» passou a ter
   // ao lado o botão de mostrar/ocultar, cujo nome acessível também o contém.
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
+
+  /*
+    ── O FORMULÁRIO PASSOU A ESTAR FECHADO ────────────────────────────────
+    O `docs/LOGIN.md` deu ao ecrã de entrada dois estados: por omissão só a
+    chave de acesso, e a palavra-passe atrás de um link. Aqui, onde o que se
+    quer é entrar pela palavra-passe para depois registar o aparelho, abre-se
+    primeiro. O link só existe onde o browser sabe o que é uma chave de acesso.
+  */
+  /*
+    ── E PORQUE É QUE ISTO ESPERA EM VEZ DE CONTAR ──────────────────────────
+    `if (await x.count())` pergunta AGORA e responde 0 se o React ainda não
+    pintou — e nesse caso o formulário fica fechado. E fechado ele é
+    `aria-hidden`, portanto o `getByRole` a seguir não encontra os campos: o
+    passeio morre a esperar por um botão que está ali, invisível para a árvore
+    de acessibilidade. Um `click` com tecto próprio espera o que for preciso e
+    segue em frente se o link não existir de todo (o caso do browser sem chaves
+    de acesso, em que o formulário já está aberto).
+  */
+  await page
+      .getByRole("button", { name: /^Entrar com palavra-passe$/ })
+      .click({ timeout: 5_000 })
+      .catch(() => {});
+
+  await page.getByLabel(/^Email$/i).fill("catarina@liquen-events.com");
   await page.locator('input[name="password"]').fill(SENHA);
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
+  // «Entrar»: esse outro nome é agora do link que abre o formulário.
+  await page.getByRole("button", { name: /^Entrar$/ }).click();
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
       timeout: 8000,
@@ -151,7 +175,7 @@ test.describe("Passkeys", () => {
 
     // ── 3. Entrar SEM palavra-passe ────────────────────────────────────────
     // Nenhum campo é preenchido: é o aparelho que se identifica.
-    await page.getByRole("button", { name: /Entrar com este dispositivo/i }).click();
+    await page.getByRole("button", { name: /Entrar com a chave de acesso/i }).click();
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
       timeout: 15_000,
     });
@@ -168,7 +192,7 @@ test.describe("Passkeys", () => {
 
     // O aparelho ainda tem a chave; o servidor é que já não a conhece. Entrar
     // tem de falhar — se passasse, remover um dispositivo não removia nada.
-    await page.getByRole("button", { name: /Entrar com este dispositivo/i }).click();
+    await page.getByRole("button", { name: /Entrar com a chave de acesso/i }).click();
     // Pelo texto, e não por `role=alert`: o Next mantém sempre no DOM um
     // anunciador de rotas que também é `role=alert`, e o selector apanhava dois.
     await expect(page.getByText(/Não foi possível entrar/i)).toBeVisible({ timeout: 15_000 });

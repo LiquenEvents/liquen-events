@@ -5033,12 +5033,20 @@ export default function AdminClient({
                   retrato: a 32 px de altura, «LÍQUEN EVENTS» saía com 6 px e não
                   se lia; era uma mancha.
 
-                  48 px é o que a barra dá sem a marca tocar nos limites (a faixa
-                  mede ~84 px com o `lg:py-5`), e põe a palavra nos ~9 px em que
-                  ela volta a ler-se. O ecrã de entrada usa `h-24` pela mesma
-                  razão, e diz-o: «a marca estava pequena para o espaço que tem».
+                  48 punha a palavra nos ~9 px em que ela volta a ler-se — e
+                  ela olhou para isso e disse «tem que estar bem maior». Sobe
+                  para 64.
+
+                  É o tecto físico desta faixa: ela mede ~84 px (com o
+                  `lg:py-5`), e 64 deixam 10 px de folga em cima e em baixo. Mais
+                  do que isto obriga a barra a crescer, e a barra é a moldura do
+                  painel inteiro — cresce em todos os ecrãs, todos os dias, para
+                  a marca ficar maior num sítio.
+
+                  A opacidade saiu: estava a 90% para a marca não competir com o
+                  título, e a 64 px o que ela quer é precisamente que se veja.
                 */
-                className="h-12 w-auto object-contain opacity-90"
+                className="h-16 w-auto object-contain"
               />
             </div>
             <div

@@ -21,3 +21,8 @@ A **Parte −1** regista a única alteração ao documento, e é dela: o ponto 3
 a barra de destinos do fundo desaparecer em favor de uma coluna à esquerda, e ela
 respondeu **«Fica a barra de baixo»** quando lhe pus a escolha à frente. A fase
 01 desse documento não se faz; tudo o resto vale.
+
+# E o ecrã de entrada tem outro
+
+`docs/LOGIN.md` reconstrói `/orcamento/admin/login`. Tem no topo uma tabela com
+o que já está feito e o que falta — lê-a antes de refazer seja o que for.

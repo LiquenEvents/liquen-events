@@ -49,9 +49,16 @@ const IGNORADOS = [
 async function entrar(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin");
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
+    /* O formulário passou a estar fechado por omissão — dois estados, com a
+       palavra-passe atrás de um link (`docs/LOGIN.md`). Abre-se primeiro; o link
+       só existe onde o browser sabe o que é uma chave de acesso. */
+    await page
+      .getByRole("button", { name: /^Entrar com palavra-passe$/ })
+      .click({ timeout: 5_000 })
+      .catch(() => {});
+  await page.getByLabel(/^Email$/i).fill("catarina@liquen-events.com");
   await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
+  await page.getByRole("button", { name: /^Entrar$/ }).click();
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
       timeout: 8000,

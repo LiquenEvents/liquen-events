@@ -71,6 +71,24 @@ type BaseProps = {
    * the value that darkens to moss on focus. Same a11y wiring either way.
    */
   variant?: "box" | "underline";
+  /**
+   * ── QUANDO O ASTERISCO NÃO INFORMA NADA ─────────────────────────────────
+   *
+   * O asterisco existe para DISTINGUIR: diz «este é obrigatório e aquele não».
+   * Num formulário em que TODOS os campos são obrigatórios, ele deixa de
+   * distinguir seja o que for — e passa a ser cor a carregar significado
+   * sozinha, que é a coisa que o sistema de design proíbe por escrito.
+   *
+   * O ecrã de entrada é exactamente esse caso: email e palavra-passe, os dois
+   * obrigatórios, os dois com asterisco vermelho. O `docs/LOGIN.md` manda-os
+   * fora e põe a informação onde ela serve — o botão desactivado até os campos
+   * estarem preenchidos, com o `title` a dizer o que falta.
+   *
+   * Isto NÃO tira o `required` do input: a validação do browser e o que os
+   * leitores de ecrã anunciam ficam na mesma. Tira só a marca visual, e só
+   * onde ela não distingue nada.
+   */
+  semMarcaDeObrigatorio?: boolean;
 };
 
 type InputFieldProps = BaseProps & { as?: "input" } & Omit<
@@ -116,11 +134,13 @@ export function Field(props: FieldProps) {
     as = "input",
     className,
     required,
+    semMarcaDeObrigatorio,
     ...control
   } = props as BaseProps & {
     as?: "input" | "textarea" | "select";
     className?: string;
     required?: boolean;
+    semMarcaDeObrigatorio?: boolean;
   } & Record<string, unknown>;
 
   const id = useId();
@@ -200,7 +220,7 @@ export function Field(props: FieldProps) {
         )}
       >
         {label}
-        {required && (
+        {required && !semMarcaDeObrigatorio && (
           <span aria-hidden="true" className="ml-1 text-[var(--bo-perigo)]/80">
             *
           </span>

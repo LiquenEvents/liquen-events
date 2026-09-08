@@ -86,6 +86,28 @@ function montar() {
 }
 
 /**
+ * ── O FORMULÁRIO PASSOU A ESTAR FECHADO ────────────────────────────────────
+ *
+ * O `docs/LOGIN.md` deu a este ecrã dois estados, e a razão está lá: «Entrar
+ * com este dispositivo» e «Entrar com palavra-passe» tinham a MESMA largura e
+ * a MESMA altura, e dois caminhos com o mesmo peso não são uma recomendação —
+ * são uma pergunta. A regra da Apple é distinguir a opção preferida por
+ * ESTILO, nunca por tamanho.
+ *
+ * Por omissão só se vê a chave de acesso; a palavra-passe está atrás de um
+ * link. Quase todos os casos deste ficheiro mexem no formulário, portanto
+ * quase todos precisam de o abrir primeiro.
+ *
+ * O link só existe quando o browser sabe o que é uma chave de acesso. Onde não
+ * sabe (`sem passkeys`), o formulário é a única porta e já está aberto — daí a
+ * verificação antes de clicar, em vez de um clique cego.
+ */
+async function abrirOFormulario(u: ReturnType<typeof userEvent.setup>) {
+  const link = screen.queryByRole("button", { name: /^Entrar com palavra-passe$/ });
+  if (link) await u.click(link);
+}
+
+/**
  * O campo da palavra-passe, pelo `name`.
  *
  * Não por `getByLabelText(/Palavra-passe/)`: o botão de mostrar/ocultar tem
@@ -122,45 +144,90 @@ afterEach(() => {
 // ── Bloco 2: o aparelho é o caminho principal ──────────────────────────────
 
 describe("a ordem dos dois caminhos", () => {
-  it("o aparelho vem ANTES da palavra-passe no documento", () => {
+  it("a chave de acesso vem ANTES do caminho da palavra-passe", () => {
     montar();
-    const aparelho = screen.getByRole("button", { name: /Entrar com este dispositivo/i });
-    const senha = screen.getByRole("button", { name: /Entrar com palavra-passe/i });
+    const chave = screen.getByRole("button", { name: /Entrar com a chave de acesso/i });
+    const link = screen.getByRole("button", { name: /^Entrar com palavra-passe$/i });
     // `DOCUMENT_POSITION_FOLLOWING` = o segundo vem depois do primeiro. É a
     // ordem do DOM, que é a que manda para o teclado e para o leitor de ecrã —
     // e não a ordem visual, que uma folha de estilos pode desmentir.
-    expect(aparelho.compareDocumentPosition(senha) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chave.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("o botão do aparelho é o principal e o da palavra-passe o secundário", () => {
-    montar();
-    const aparelho = screen.getByRole("button", { name: /Entrar com este dispositivo/i });
-    const senha = screen.getByRole("button", { name: /Entrar com palavra-passe/i });
-    // A cor cheia (`bg-sage-600`) é o peso de primário desta casa; a
-    // alternativa fica com o contorno.
-    expect(aparelho.className).toContain("bg-sage-600");
-    // 28% e não 15%: a 15% o contorno lia-se como DESACTIVADO (o estado
-    // desactivado é este mesmo desenho com `opacity-45` por cima). Ver a nota
-    // no `Button.tsx`.
-    expect(senha.className).toContain("border-foreground/28");
+  /**
+   * ── A REGRA QUE ESTE CASO PASSA A GUARDAR ────────────────────────────────
+   *
+   * Ele exigia que o aparelho fosse `bg-sage-600` e a palavra-passe tivesse
+   * `border-foreground/28` — ou seja, um botão cheio e um botão contornado, da
+   * mesma largura, um ao lado do outro.
+   *
+   * É exactamente a avaria que o `docs/LOGIN.md` abre a descrever: «têm a MESMA
+   * largura e a MESMA altura; lêem-se como duas acções de igual peso». A regra
+   * da Apple é distinguir a opção preferida por ESTILO, nunca por tamanho — e
+   * dois botões de largura total não são dois estilos, são dois pesos iguais.
+   *
+   * O caso deixa de guardar a APARÊNCIA de cada um e passa a guardar a regra:
+   * **em qualquer dos dois estados há exactamente um botão cheio**. É mais
+   * forte do que era, porque não depende de nomes de classe — e é a única coisa
+   * que não pode voltar a partir-se sem a avaria voltar.
+   */
+  it("há exactamente UM botão cheio, em cada um dos dois estados", async () => {
+    const u = userEvent.setup();
+    const { container } = montar();
+
+    /*
+      Só o que está À VISTA. O formulário do estado B continua no DOM quando
+      está fechado — é uma grelha a `0fr` com `overflow-hidden`, e é isso que
+      lhe permite ANIMAR a altura em vez de aparecer de repente. Mas está
+      `inert` e `aria-hidden`, portanto não existe nem para o rato, nem para o
+      teclado, nem para um leitor de ecrã.
+
+      A primeira versão deste caso contava o DOM e acusou dois botões cheios no
+      estado A. Tinha razão sobre o DOM e estava errada sobre a regra: o que o
+      documento proíbe é dois botões cheios a COMPETIR aos olhos de quem está a
+      decidir, e um botão dentro de uma caixa fechada não compete com nada.
+    */
+    const escondido = (el: HTMLElement) =>
+      el.closest("[inert], [aria-hidden='true']") !== null;
+
+    const cheios = () =>
+      Array.from(container.querySelectorAll<HTMLElement>("button")).filter(
+        (b) => b.className.includes("bg-sage-600") && !escondido(b),
+      );
+
+    // Estado A: o cheio é a chave de acesso.
+    expect(cheios().map((b) => b.textContent?.trim())).toEqual([
+      expect.stringMatching(/Entrar com a chave de acesso/i),
+    ]);
+
+    await u.click(screen.getByRole("button", { name: /^Entrar com palavra-passe$/i }));
+
+    // Estado B: o cheio é o «Entrar», e a chave de acesso recuou para link.
+    expect(cheios().map((b) => b.textContent?.trim())).toEqual([
+      expect.stringMatching(/^Entrar$/i),
+    ]);
+    expect(
+      screen.queryByRole("button", { name: /Entrar com a chave de acesso/i })?.className,
+      "a chave de acesso devia ter recuado para link — um botão cheio não recua",
+    ).not.toContain("bg-sage-600");
   });
 
   it("sem passkeys no browser, a palavra-passe volta a ser o botão principal", () => {
     passkeys.suporta = false;
     montar();
     expect(
-      screen.queryByRole("button", { name: /Entrar com este dispositivo/i }),
+      screen.queryByRole("button", { name: /Entrar com a chave de acesso/i }),
     ).not.toBeInTheDocument();
     // É a única porta que resta: não pode estar desenhada como alternativa de
     // coisa nenhuma.
-    expect(screen.getByRole("button", { name: /Entrar com palavra-passe/i }).className).toContain(
+    expect(screen.getByRole("button", { name: /^Entrar$/i }).className).toContain(
       "bg-sage-600",
     );
   });
 
   it("a explicação do aparelho cabe numa linha", () => {
     montar();
-    const linha = screen.getByText(/Com o rosto, a impressão digital ou o PIN/i);
+    const linha = screen.getByText(/Usa o rosto, a impressão digital ou o PIN/i);
     // Eram três frases. O tecto aqui é do TAMANHO do texto, que é a medida que
     // não depende de quem o escreve.
     expect(linha.textContent!.length).toBeLessThan(70);
@@ -172,7 +239,7 @@ describe("a passkey proposta sem se carregar em nada", () => {
     montar();
     // `webauthn` TEM de ser o último valor: fora do fim, a norma manda o browser
     // ignorá-lo, e a proposta nunca aparece.
-    expect(screen.getByLabelText(/O teu email/i)).toHaveAttribute(
+    expect(screen.getByLabelText(/^Email$/i)).toHaveAttribute(
       "autocomplete",
       "username webauthn",
     );
@@ -187,18 +254,20 @@ describe("a passkey proposta sem se carregar em nada", () => {
   it("não arma nada onde o browser não a sabe fazer", async () => {
     passkeys.autofill = false;
     montar();
-    await waitFor(() => expect(screen.getByLabelText(/O teu email/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText(/^Email$/i)).toBeInTheDocument());
     expect(passkeys.armado).toHaveLength(0);
   });
 });
 
 describe("o caminho inverso: registar um aparelho novo", () => {
-  it("a página de entrada diz como se regista um telemóvel novo", () => {
+  it("a página de entrada diz como se regista um telemóvel novo", async () => {
     montar();
-    expect(screen.getByText(/Mudaste de telemóvel ou de computador/i)).toBeInTheDocument();
+    const uAbrir = userEvent.setup();
+    await abrirOFormulario(uAbrir);
+    expect(screen.getByText(/^Mudei de aparelho$/i)).toBeInTheDocument();
     // As duas metades da resposta: entra-se pela palavra-passe, e o sítio tem
     // nome. Sem a segunda, «entra e regista» não diz onde.
-    const bloco = screen.getByText(/Mudaste de telemóvel/i).parentElement!;
+    const bloco = screen.getByText(/^Mudei de aparelho$/i).parentElement!;
     expect(bloco.textContent).toMatch(/palavra-passe/i);
     expect(bloco.textContent).toMatch(/Os meus dispositivos/i);
   });
@@ -210,13 +279,14 @@ describe("o formulário", () => {
   it("os dois campos obrigatórios estão marcados como obrigatórios", () => {
     montar();
     // Era só a palavra-passe a ter asterisco, com os dois a serem obrigatórios.
-    expect(screen.getByLabelText(/O teu email/i)).toBeRequired();
+    expect(screen.getByLabelText(/^Email$/i)).toBeRequired();
     expect(campoDaSenha()).toBeRequired();
   });
 
   it("mostrar/ocultar troca o tipo do campo da palavra-passe", async () => {
     const u = userEvent.setup();
     montar();
+    await abrirOFormulario(u);
     const campo = campoDaSenha();
     expect(campo).toHaveAttribute("type", "password");
     await u.click(screen.getByRole("button", { name: /Mostrar a palavra-passe/i }));
@@ -227,17 +297,17 @@ describe("o formulário", () => {
 
   it("o foco começa no primeiro campo", () => {
     montar();
-    expect(document.activeElement).toBe(screen.getByLabelText(/O teu email/i));
+    expect(document.activeElement).toBe(screen.getByLabelText(/^Email$/i));
   });
 
   it("o Enter no campo do email submete", async () => {
     const u = userEvent.setup();
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer");
     // De volta ao PRIMEIRO campo, e Enter dali: é o gesto de quem corrige o
     // email depois de escrever tudo.
-    screen.getByLabelText(/O teu email/i).focus();
+    screen.getByLabelText(/^Email$/i).focus();
     await u.keyboard("{Enter}");
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].url).toBe("/api/admin/login");
@@ -255,7 +325,8 @@ describe("o formulário", () => {
       }),
     );
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await abrirOFormulario(u);
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(pedidos).toHaveLength(1));
     await u.keyboard("{Enter}");
@@ -276,18 +347,21 @@ describe("manter a sessão iniciada", () => {
    * por acidente — numa ferramenta com dados de clientes, isso é uma alteração
    * de segurança que tem de ser deliberada e não um efeito lateral.
    */
-  it("vem DESLIGADA, com a duração escrita por extenso", () => {
+  it("vem DESLIGADA, com a duração escrita por extenso", async () => {
     montar();
+    const uAbrir = userEvent.setup();
+    await abrirOFormulario(uAbrir);
     const caixa = screen.getByRole("checkbox", { name: /Manter a sessão iniciada/i });
     expect(caixa).not.toBeChecked();
     // O número, e não «manter-me com sessão iniciada» — uma promessa sem número
     // é lida por cada pessoa como lhe apetecer.
-    expect(screen.getByText(/Manter a sessão iniciada 30 dias/i)).toBeInTheDocument();
+    expect(screen.getByText(/Manter a sessão iniciada neste aparelho durante 30 dias/i)).toBeInTheDocument();
   });
 
   it("explica o que se escolhe, e só isso — a omissão não gasta linhas", async () => {
     const u = userEvent.setup();
     montar();
+    await abrirOFormulario(u);
     // Desligada é a omissão: não leva explicação nenhuma. As linhas custam
     // ~36 px, e o botão de submeter está a 831 px de uma dobra de 844 no
     // telemóvel — ver a nota no componente.
@@ -300,7 +374,7 @@ describe("manter a sessão iniciada", () => {
   it("desligada, é isso que vai no pedido de entrada", async () => {
     const u = userEvent.setup();
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].body.manterSessao).toBe(false);
@@ -309,8 +383,9 @@ describe("manter a sessão iniciada", () => {
   it("ligá-la vai no pedido de entrada", async () => {
     const u = userEvent.setup();
     montar();
+    await abrirOFormulario(u);
     await u.click(screen.getByRole("checkbox", { name: /Manter a sessão iniciada/i }));
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].body.manterSessao).toBe(true);
@@ -319,7 +394,7 @@ describe("manter a sessão iniciada", () => {
   it("e vale também na entrada pelo aparelho", async () => {
     const u = userEvent.setup();
     montar();
-    await u.click(screen.getByRole("button", { name: /Entrar com este dispositivo/i }));
+    await u.click(screen.getByRole("button", { name: /Entrar com a chave de acesso/i }));
     await waitFor(() => expect(passkeys.entrar).toHaveBeenCalled());
     expect(passkeys.entrar).toHaveBeenCalledWith({ manterSessao: false });
   });
@@ -330,7 +405,7 @@ describe("voltar à página que se tentava abrir", () => {
     const u = userEvent.setup();
     irPara("/pt/orcamento/admin?destino=%2Fpt%2Forcamento%2Fadmin%2Fevento%2FLQ-7");
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(router.replace).toHaveBeenCalled());
     expect(router.replace).toHaveBeenCalledWith("/pt/orcamento/admin/evento/LQ-7");
@@ -342,7 +417,7 @@ describe("voltar à página que se tentava abrir", () => {
     // um trampolim de phishing e nada no ecrã o denuncia.
     irPara("/pt/orcamento/admin?destino=https%3A%2F%2Fliquen-eventos.com%2Fentrar");
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
     expect(router.replace).not.toHaveBeenCalled();
@@ -351,7 +426,7 @@ describe("voltar à página que se tentava abrir", () => {
   it("sem destino, fica onde está e volta a pedir a página ao servidor", async () => {
     const u = userEvent.setup();
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(screen.getByLabelText(/^Email$/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
     expect(router.replace).not.toHaveBeenCalled();
@@ -380,7 +455,8 @@ describe("o que o Bloco 1 deixou, e continua de pé", () => {
     const u = userEvent.setup();
     servir({ ok: false, status: 401, body: { error: "Credenciais incorretas" } });
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "ninguem@exemplo.pt");
+    await abrirOFormulario(u);
+    await u.type(screen.getByLabelText(/^Email$/i), "ninguem@exemplo.pt");
     await u.type(campoDaSenha(), "errada-de-certeza{Enter}");
     const aviso = await screen.findByRole("alert");
     expect(aviso).toHaveTextContent("Credenciais incorretas");
@@ -390,10 +466,11 @@ describe("o que o Bloco 1 deixou, e continua de pé", () => {
   it("o painel de recuperação continua FORA do formulário de entrada", async () => {
     const u = userEvent.setup();
     montar();
-    await u.click(screen.getByRole("button", { name: /Esqueceste-te da palavra-passe/i }));
+    await abrirOFormulario(u);
+    await u.click(screen.getByRole("button", { name: /^Esqueci-me da palavra-passe$/i }));
     const campo = await screen.findByLabelText(/Email da tua conta/i);
     const formularioDaRecuperacao = campo.closest("form")!;
-    const campoDaEntrada = screen.getByLabelText(/O teu email/i);
+    const campoDaEntrada = screen.getByLabelText(/^Email$/i);
     // Formulários encaixados são HTML inválido, e o Enter submetia a coisa
     // errada. São dois `<form>` irmãos, e têm de continuar a sê-lo.
     expect(formularioDaRecuperacao).not.toBe(campoDaEntrada.closest("form"));
@@ -479,9 +556,11 @@ describe("o teclado do telemóvel não pode tapar o que se vai tocar a seguir", 
 });
 
 describe("o caminho de quem trocou de telemóvel abre-se com o dedo", () => {
-  it("o resumo «Mudaste de telemóvel?» tem o alvo de 44 px da casa", () => {
+  it("o resumo «Mudei de aparelho» tem o alvo de 44 px da casa", async () => {
     montar();
-    const resumo = screen.getByText(/Mudaste de telemóvel ou de computador\?/i);
+    const uAbrir = userEvent.setup();
+    await abrirOFormulario(uAbrir);
+    const resumo = screen.getByText(/^Mudei de aparelho$/i);
     // Media 293×16 px a 375×667 — a altura da própria letra —, e é a única
     // porta para as instruções de registo de um aparelho novo.
     expect(resumo.tagName).toBe("SUMMARY");
@@ -496,7 +575,7 @@ describe("a recusa aparece onde os olhos já estão", () => {
       Object.assign(new Error("Serviço de passkeys indisponível."), { name: "Error" }),
     );
     montar();
-    await u.click(screen.getByRole("button", { name: /Entrar com este dispositivo/i }));
+    await u.click(screen.getByRole("button", { name: /Entrar com a chave de acesso/i }));
     const aviso = await screen.findByRole("alert");
     expect(aviso).toHaveTextContent(/indisponível/i);
     // Medido: no sítio antigo — dentro do formulário — a mensagem nascia aos
@@ -512,12 +591,13 @@ describe("a recusa aparece onde os olhos já estão", () => {
     const u = userEvent.setup();
     servir({ ok: false, status: 401, body: { error: "Credenciais incorretas" } });
     montar();
-    await u.type(screen.getByLabelText(/O teu email/i), "ninguem@exemplo.pt");
+    await abrirOFormulario(u);
+    await u.type(screen.getByLabelText(/^Email$/i), "ninguem@exemplo.pt");
     await u.type(campoDaSenha(), "errada-de-certeza{Enter}");
     const aviso = await screen.findByRole("alert");
     const formulario = campoDaSenha().closest("form")!;
     expect(formulario.contains(aviso)).toBe(true);
-    const submeter = screen.getByRole("button", { name: /Entrar com palavra-passe/i });
+    const submeter = screen.getByRole("button", { name: /^Entrar$/i });
     expect(aviso.compareDocumentPosition(submeter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -525,10 +605,22 @@ describe("a recusa aparece onde os olhos já estão", () => {
     const u = userEvent.setup();
     passkeys.entrar.mockRejectedValueOnce(new Error("Serviço de passkeys indisponível."));
     montar();
-    await u.click(screen.getByRole("button", { name: /Entrar com este dispositivo/i }));
+
+    /*
+      A ORDEM importa, e mudou. Antes os dois caminhos estavam abertos ao mesmo
+      tempo e dava para tentar a chave com o formulário à vista. Agora são dois
+      estados: tenta-se a chave no A, e só depois se abre o B.
+
+      Escrito ao contrário, o clique em «Entrar com a chave de acesso» apanhava
+      o LINK de regresso do estado B em vez do botão do estado A — e voltava
+      para trás em vez de tentar entrar.
+    */
+    await u.click(screen.getByRole("button", { name: /Entrar com a chave de acesso/i }));
     await screen.findByRole("alert");
+
+    await abrirOFormulario(u);
     servir({ ok: false, status: 401, body: { error: "Credenciais incorretas" } });
-    await u.type(screen.getByLabelText(/O teu email/i), "ninguem@exemplo.pt");
+    await u.type(screen.getByLabelText(/^Email$/i), "ninguem@exemplo.pt");
     await u.type(campoDaSenha(), "errada{Enter}");
     const aviso = await screen.findByRole("alert");
     expect(aviso).toHaveTextContent("Credenciais incorretas");

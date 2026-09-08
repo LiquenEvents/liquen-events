@@ -150,6 +150,34 @@ export default function AdminLogin() {
   const [manterSessao, setManterSessao] = useState(MANTER_SESSAO_POR_OMISSAO);
   // Recuperação: painel fechado por omissão, para a página continuar a ser uma
   // página de ENTRADA. Só abre a quem o pedir.
+  /**
+   * ── DOIS ESTADOS, E SÓ UM BOTÃO CHEIO EM CADA ─────────────────────────
+   *
+   * O `docs/LOGIN.md` abre com a avaria: «Entrar com este dispositivo»
+   * (preenchido) e «Entrar com palavra-passe →» (contornado) tinham a MESMA
+   * largura e a MESMA altura. Dois caminhos com o mesmo peso não são uma
+   * recomendação — são uma pergunta —, e a regra da Apple é distinguir a
+   * opção preferida por ESTILO e nunca por tamanho.
+   *
+   * E o formulário estava sempre aberto, mesmo para quem ia usar a chave de
+   * acesso. Era isso que obrigava ao separador «ou» e criava a competição.
+   *
+   * Passa a haver dois estados:
+   *
+   *   · `chave`  — a chave de acesso é o botão cheio; a palavra-passe é um
+   *                link de texto;
+   *   · `senha`  — o formulário abre, «Entrar» é o botão cheio, e a chave de
+   *                acesso recua para link.
+   *
+   * Nunca há dois cheios. O caminho não escolhido é sempre um link.
+   *
+   * O de omissão é `chave` quando o browser sabe o que é uma chave de acesso;
+   * onde não sabe, o formulário é a única porta e abre já — é o ponto do
+   * documento sobre «chave de acesso indisponível neste aparelho: abre-se
+   * directamente no estado B».
+   */
+  const [caminho, setCaminho] = useState<"chave" | "senha">("chave");
+
   const [aRecuperar, setARecuperar] = useState(false);
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
   const [aEnviarLigacao, setAEnviarLigacao] = useState(false);
@@ -196,6 +224,13 @@ export default function AdminLogin() {
     suportaPasskeys,
     () => false,
   );
+
+  /**
+   * Estamos no estado A? Só quando o browser sabe o que é uma chave de acesso
+   * E ela ainda não foi recusada em favor da palavra-passe. O `needs2fa`
+   * força o estado B: pedido um código, o formulário é o único caminho.
+   */
+  const noEstadoDaChave = temPasskeys && caminho === "chave" && !needs2fa;
 
   /**
    * ── PARA ONDE SE VOLTA DEPOIS DE ENTRAR ───────────────────────────────────
@@ -412,15 +447,19 @@ export default function AdminLogin() {
         {/* Login card */}
         <Card padding="lg" className="w-full">
           <div className="mb-5 text-center">
-            <p className="bo-eyebrow mb-2">Área Restrita</p>
+            <p className="bo-eyebrow mb-2">Área restrita</p>
             <h1 className="font-display text-2xl leading-tight text-[var(--bo-text)]">
               Painel de Gestão
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-[var(--bo-text-muted)]">
-              {/* «Bem-vinda» presumia que quem entra é mulher. Hoje é verdade e
-                  amanhã deixa de ser — e a frase não ganha nada com o género:
-                  o que ela faz é dizer o que se segue. */}
-              Bem-vindo de volta. Escolhe como queres entrar.
+              {/* «Escolhe como queres entrar» saiu: com os dois estados já não
+                  se pede escolha nenhuma — a chave de acesso é a recomendação e
+                  a palavra-passe é um link para quem precisar dela. Uma frase
+                  que pede uma decisão que já não existe é ruído.
+
+                  «Bem-vinda» presumia que quem entra é mulher. Hoje é verdade e
+                  amanhã deixa de ser — e a frase não ganha nada com o género. */}
+              Bem-vindo de volta.
             </p>
           </div>
 
@@ -439,8 +478,13 @@ export default function AdminLogin() {
             </p>
           )}
 
-          {/* ── 1. O APARELHO, que é o caminho principal ─────────────────── */}
-          {temPasskeys && (
+          {/* ── 1. A CHAVE DE ACESSO, que é o caminho principal ────────────
+              Só no estado A. Escolhida a palavra-passe, este bloco inteiro
+              recua — e o caminho de volta fica no link do fundo do formulário.
+              A regra é uma só e vale nos dois sentidos: **nunca dois botões
+              cheios ao mesmo tempo**, e o caminho não escolhido é sempre um
+              link de texto. */}
+          {noEstadoDaChave && (
             <div className="mb-4">
               <Button
                 type="button"
@@ -463,7 +507,7 @@ export default function AdminLogin() {
                   </svg>
                 }
               >
-                {aEntrarComDispositivo ? "A confirmar…" : "Entrar com este dispositivo"}
+                {aEntrarComDispositivo ? "A confirmar…" : "Entrar com a chave de acesso"}
               </Button>
 
               {/* A recusa do aparelho fica AQUI, e não lá em baixo no
@@ -472,22 +516,54 @@ export default function AdminLogin() {
               {error && erroNoDispositivo && <AvisoDeRecusa texto={error} className="mt-2" />}
 
               {/* Uma linha, e não três. O que a pessoa precisa de saber para
-                  decidir se carrega é o gesto que lhe vai ser pedido. */}
+                  decidir se carrega é o gesto que lhe vai ser pedido. Voz
+                  activa: «Usa o rosto», e não «Com o rosto». */}
               <p className="mt-2 text-center text-xs leading-relaxed text-foreground/45">
-                Com o rosto, a impressão digital ou o PIN deste aparelho.
+                Usa o rosto, a impressão digital ou o PIN deste aparelho.
               </p>
 
-              <div className="my-4 flex items-center gap-3" aria-hidden="true">
-                <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
-                <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35">
-                  ou
-                </span>
-                <span className="h-px flex-1 bg-[var(--bo-tinta-10)]" />
-              </div>
+              {/* ── E O SEPARADOR «OU» SAIU ────────────────────────────────
+                  Ele existia para separar duas opções simultâneas. Com o
+                  formulário fechado já não há duas — há uma recomendação e um
+                  link para quem precisar de outra coisa. O separador deixou de
+                  ter o que separar.
+
+                  O caminho da palavra-passe é um LINK e não um botão de largura
+                  total: dois botões da mesma largura leem-se como duas acções
+                  de igual peso, e não são. */}
+              <button
+                type="button"
+                onClick={() => setCaminho("senha")}
+                className={`alvo-toque mt-6 w-full text-center text-sm text-[var(--bo-accent)] underline underline-offset-[3px] hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
+              >
+                Entrar com palavra-passe
+              </button>
             </div>
           )}
 
-          {/* ── 2. A PALAVRA-PASSE, a alternativa ────────────────────────── */}
+          {/* ── 2. A PALAVRA-PASSE, a alternativa ──────────────────────────
+
+              ── PORQUE É QUE ISTO COLAPSA COM `grid-template-rows` ──────────
+
+              Porque `height: auto` não anima. As saídas habituais são medir a
+              altura em JavaScript (que obriga a um `ResizeObserver` e a um
+              fotograma de atraso) ou pôr um `max-height` fixo (que é um número
+              inventado que parte no dia em que o conteúdo cresce).
+
+              Uma grelha de UMA linha anima de `0fr` a `1fr` sem saber a altura
+              de nada, e o browser trata do resto. O `overflow-hidden` do filho
+              é o que faz o conteúdo ser cortado enquanto a linha ainda não
+              abriu — sem ele, o formulário aparece todo e a animação não se vê.
+
+              `aria-hidden` e `inert` quando fechado: um formulário invisível
+              mas tabulável é uma armadilha para quem navega com o teclado.
+          */}
+          <div
+            className={`grid ${noEstadoDaChave ? "grid-rows-[0fr]" : "grid-rows-[1fr]"} motion-safe:transition-[grid-template-rows] motion-safe:duration-quick motion-safe:ease-quick`}
+            aria-hidden={noEstadoDaChave || undefined}
+            inert={noEstadoDaChave || undefined}
+          >
+          <div className="overflow-hidden">
           <form
             onSubmit={submit}
             className="flex flex-col gap-3.5"
@@ -495,7 +571,8 @@ export default function AdminLogin() {
             onBlur={aoSairDoCampo}
           >
             <Field
-              label="O teu email"
+              label="Email"
+              semMarcaDeObrigatorio
               name="email"
               /**
                * ── PORQUE É QUE ISTO É UM EMAIL E NÃO UM NOME ─────────────
@@ -545,6 +622,7 @@ export default function AdminLogin() {
             <div className="relative">
               <Field
                 label="Palavra-passe"
+                semMarcaDeObrigatorio
                 name="password"
                 type={mostrarSenha ? "text" : "password"}
                 autoComplete="current-password"
@@ -553,7 +631,10 @@ export default function AdminLogin() {
                 onKeyUp={aoTeclar}
                 onKeyDown={aoTeclar}
                 required
-                placeholder="••••••••"
+                /* SEM placeholder. Os oito pontinhos que aqui estavam faziam um
+                   campo VAZIO parecer preenchido — e num campo de palavra-passe
+                   isso é a diferença entre «esqueci-me de escrever» e «escrevi e
+                   não guardou». O placeholder só serve onde comunica FORMATO. */
                 /* O aviso do Caps Lock vive fora do `Field` (senão empurrava o
                    olho para baixo ao aparecer); a ligação para quem usa leitor
                    de ecrã faz-se à mão. */
@@ -636,7 +717,7 @@ export default function AdminLogin() {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
               />
               <span className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
-                Manter a sessão iniciada 30 dias neste aparelho.
+                Manter a sessão iniciada neste aparelho durante 30 dias
                 {/* A CONSEQUÊNCIA APARECE NO ESTADO QUE SE ESCOLHE, não na
                     omissão — que é a MESMA regra de antes, virada ao contrário
                     porque a omissão mudou de lado.
@@ -660,19 +741,38 @@ export default function AdminLogin() {
               </span>
             </label>
 
+            {/* ── UM BOTÃO CHEIO, E É ESTE ────────────────────────────────
+                Era `secondary` quando havia chaves de acesso, porque os dois
+                caminhos estavam abertos ao mesmo tempo e um deles tinha de
+                recuar. Já não estão: chegado aqui, a palavra-passe É o caminho,
+                e a chave de acesso é que recuou para o link lá em baixo.
+
+                A seta «→» saiu. Não é convenção da Apple — a convenção são
+                reticências, e só quando o botão abre outra vista que pede mais
+                alguma coisa. Este não abre nada: entra.
+
+                Desactivado até haver as duas coisas, que é o que substitui os
+                asteriscos: em vez de marcar o que falta com cor, o botão diz
+                que ainda não dá, e o `title` diz porquê. */}
             <Button
               type="submit"
-              /* Secundário porque a passkey é que é o caminho principal — mas
-                 só quando ela existe. Onde o browser não sabe o que é uma
-                 passkey, isto é a única porta e tem de ter o peso de uma. */
-              variant={temPasskeys ? "secondary" : "primary"}
+              variant="primary"
               size="lg"
               fullWidth
               loading={loading}
               className="mt-1"
-              iconRight={<span aria-hidden="true">→</span>}
+              disabled={!needs2fa && (!email.trim() || !password)}
+              title={
+                !needs2fa && (!email.trim() || !password)
+                  ? !email.trim() && !password
+                    ? "Escreve o email e a palavra-passe"
+                    : !email.trim()
+                      ? "Falta o email"
+                      : "Falta a palavra-passe"
+                  : undefined
+              }
             >
-              {loading ? "A verificar…" : needs2fa ? "Verificar" : "Entrar com palavra-passe"}
+              {loading ? "A verificar…" : needs2fa ? "Verificar" : "Entrar"}
             </Button>
           </form>
 
@@ -690,7 +790,7 @@ export default function AdminLogin() {
               }}
               className={`alvo-toque mt-4 w-full text-center text-xs text-foreground/50 underline underline-offset-4 hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
             >
-              Esqueceste-te da palavra-passe?
+              Esqueci-me da palavra-passe
             </button>
           ) : (
             <form
@@ -749,6 +849,25 @@ export default function AdminLogin() {
             </form>
           )}
 
+          {/* ── E O CAMINHO DE VOLTA À CHAVE DE ACESSO ─────────────────────
+              O que não está escolhido é sempre um link, nunca um botão de
+              largura total. Aqui o cheio é o «Entrar»; a chave de acesso, que
+              era o cheio no outro estado, recua para isto. */}
+          {temPasskeys && !needs2fa && (
+            <button
+              type="button"
+              onClick={() => {
+                setCaminho("chave");
+                setError(null);
+              }}
+              className={`alvo-toque mt-4 w-full text-center text-sm text-[var(--bo-accent)] underline underline-offset-[3px] hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
+            >
+              Entrar com a chave de acesso
+            </button>
+          )}
+          </div>
+          </div>
+
           {/* ── O CAMINHO INVERSO: registar um aparelho novo ────────────────
               Isto é o que faltava. Um botão «entrar com este dispositivo» num
               telemóvel novo não faz nada, e não havia uma palavra sobre porquê
@@ -778,7 +897,7 @@ export default function AdminLogin() {
                 onClick={gaveta.aoTocarNoResumo}
                 className={`alvo-toque list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
               >
-                Mudaste de telemóvel ou de computador?
+                Mudei de aparelho
               </summary>
               {/* ── E ESTA GAVETA VALE MESMO O TRABALHO ────────────────────
                   O levantamento marcou-a «por confirmar» — leu o markup e não
