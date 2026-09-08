@@ -109,12 +109,39 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    # 45 e não 30. Este job foi CANCELADO aos 30 minutos, a meio do passo das
-    # imagens e com tudo o que já tinha corrido a passar — não por um teste
-    # falhar, mas porque o build à frente ficou ~13 minutos mais lento quando o
-    # AVIF entrou. A cache abaixo trata da causa; este tecto é a folga para a
-    # corrida em que ela não acerta.
-    timeout-minutes: 45
+    # ── 60, E É A SEGUNDA VEZ QUE ESTE NÚMERO SOBE ────────────────────────
+    #
+    # A primeira foi 30 → 45: o job foi cancelado aos 30 minutos, a meio do
+    # passo das imagens e com tudo o que já tinha corrido a passar, porque o
+    # build à frente ficou ~13 minutos mais lento quando o AVIF entrou.
+    #
+    # Agora 45 → 60, e a avaria é a mesma com outra causa. O job foi cancelado
+    # aos 45 minutos e 17 segundos, no teste 117 de 118 do passo das imagens,
+    # com TODOS os 116 anteriores a verde. Não falhou nada: acabou o tempo.
+    #
+    # Os números que o dizem, das últimas seis corridas no `main`:
+    #
+    #     5a815c4c ... 41m38   ← a última antes desta
+    #     e9c58e55 ... 39m51
+    #     86726b58 ... 36m39
+    #     3266b9f7 ... 36m58
+    #     7a71d0ce ... 38m07
+    #     21fb653b ... 31m36
+    #
+    # A suite cresce porque é assim que esta casa trabalha: cada avaria que
+    # escapou deixa cá um guarda. Em três dias subiu de 31 para 41 minutos, e o
+    # guarda que veio com este ramo — o texto sobre a fotografia da entrada —
+    # foi o que a levou a passar dos 45.
+    #
+    # ── E PORQUE É QUE ISTO NÃO É UMA SOLUÇÃO, É UMA FOLGA ────────────────
+    #
+    # Levantar o tecto compra tempo, não o resolve: ao ritmo destes três dias,
+    # os 60 chegam outra vez. O que resolve é reduzir o CUSTO, e a peça óbvia é
+    # o passo das imagens — 118 passeios de ~3,5 s que abrem página a página,
+    # sempre as mesmas. Isso é trabalho de outro ramo, não deste: um `timeout`
+    # é uma linha, e refazer a estratégia do passo das imagens é uma mudança
+    # que merece ser medida por si.
+    timeout-minutes: 60
     # O `continue-on-error` DESCEU DO JOB PARA O PASSO informativo, e é a única
     # razão por que este ficheiro foi tocado.
     #

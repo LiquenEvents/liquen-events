@@ -1293,8 +1293,19 @@ body:is(.admin-mode, :has([data-admin-mode])) {
          alvo de cada destino .... 52   ← acima dos 44 do `.alvo-toque`
 
      A conta da LARGURA está no `AdminClient.tsx`, ao lado da barra. */
-  --bo-barra-inferior: 76px;
-  --bo-barra-capsula: 3.875rem; /* 62px — a altura da cápsula que flutua */
+  /* ── A CÁPSULA CRESCEU, E FOI POR COMPARAÇÃO DIRECTA ──────────────────
+     Ela mandou a barra do Instagram e a do WhatsApp e disse «o menu no
+     telemóvel não está assim». Pus as três lado a lado e a diferença não era o
+     material — era a GEOMETRIA. A cápsula tinha 62 px para ícones de 20 px mais
+     um rótulo, e as duas referências dão ao mesmo conteúdo perto de 72.
+
+     Com 62, o ícone e o rótulo ficam encostados um ao outro e às bordas: lê-se
+     como uma lista apertada, não como uma barra que flutua. Os 10 px que faltam
+     são o ar que faz a diferença entre as duas coisas.
+
+     A barra inteira sobe com ela (76 → 86), senão o ar sai de outro lado. */
+  --bo-barra-inferior: 86px;
+  --bo-barra-capsula: 4.5rem; /* 72px — a altura da cápsula que flutua */
   --bo-barra-folga: 0.75rem; /* 12px — o ar por baixo e dos lados dela */
   --bo-lh-tight: 1.3;
   --bo-lh-body: 1.6;
@@ -2035,13 +2046,45 @@ body:is(.admin-mode, :has([data-admin-mode])) :is(.text-foreground\/50, .text-fo
   background: #637a5f;
 }
 
-/* ── Focus: refined, accessible, on-brand ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   O ANEL DE FOCO SEGUE A FORMA DO QUE FOCA
+   ══════════════════════════════════════════════════════════════════════════
+
+   ── O QUE ESTAVA ERRADO, E ELA VIU-O TRÊS VEZES ────────────────────────
+
+   Esta regra escrevia `border-radius: 2px` no ELEMENTO focado. Não no anel —
+   no elemento. Ou seja: ao receber foco, um campo `rounded-lg` (10 px) e um
+   botão de pesquisa `rounded-lg` passavam a ter cantos de 2 px, e o anel era
+   desenhado nessa forma nova.
+
+   O que se vê disso não é «um anel»: é um rectângulo de canto vivo colado a um
+   controlo redondo — e nos sítios onde algum ascendente corta (`overflow`),
+   sobram dois riscos verdes soltos, um por cima e outro por baixo. Foi
+   exactamente isso que ela apontou no campo do email, no `⌘K` e na pesquisa:
+   «retira esta linha», «retira o anel».
+
+   ── PORQUE É QUE A CORRECÇÃO NÃO É TIRAR O ANEL ───────────────────────
+
+   Porque sem ele quem navega por teclado deixa de saber onde está, e os dois
+   documentos dela dizem-no por escrito: o `docs/DESIGN-SYSTEM.md` proíbe
+   «`outline: none` sem substituto» na lista da Parte 18, e o `docs/LOGIN.md`
+   pede um anel «adaptado aos cantos arredondados, nunca cortado por
+   `overflow`». O defeito era o anel ser QUADRADO, não o anel existir.
+
+   ── E PORQUE É QUE UM `outline` RESOLVE O QUE UMA SOMBRA NÃO RESOLVIA ──
+
+   Um `box-shadow` não sabe o raio de quem o recebe — daí o `border-radius`
+   forçado, que era a tentativa de o fazer coincidir e acabava por deformar o
+   controlo. Um `outline` moderno SEGUE o `border-radius` do próprio elemento,
+   sozinho, e o `outline-offset` afasta-o sem tocar no layout.
+
+   Resultado: o anel passa a abraçar a forma do que foca — pílula num botão,
+   10 px num campo, redondo num ícone — e o controlo deixa de mudar de forma ao
+   ser focado. É o que a Parte 10 do `docs/LOGIN.md` pede à letra.
+   ══════════════════════════════════════════════════════════════════════════ */
 :focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--color-surface),
-    0 0 0 4px rgba(76, 97, 80, 0.95);
-  border-radius: 2px;
+  outline: 2px solid rgba(76, 97, 80, 0.95);
+  outline-offset: 2px;
   /* O anel era o único estado do sítio inteiro sem movimento nenhum: aparecia e
      desaparecia de repente, num sítio onde tudo o resto assenta. E é o estado
      MAIS visto por quem navega por teclado.
@@ -2055,7 +2098,7 @@ body:is(.admin-mode, :has([data-admin-mode])) :is(.text-foreground\/50, .text-fo
      transição desaparece com ele e o anel apaga-se no mesmo instante — que é o
      que se quer (ninguém precisa de ver um anel a encolher num sítio onde já
      não está o foco). */
-  transition: box-shadow 150ms var(--ease-out);
+  transition: outline-color 150ms var(--ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   :focus-visible {

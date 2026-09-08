@@ -91,7 +91,15 @@ import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
-import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, vistaValida, type View } from "./nav";
+import {
+  NAV,
+  CORE_NAV,
+  MORE_NAV,
+  BARRA_INFERIOR,
+  ROTULO_CURTO,
+  vistaValida,
+  type View,
+} from "./nav";
 import { useDesceu } from "./ui/adaptativo";
 import { Escolha } from "./ui/Escolha";
 import {
@@ -4795,6 +4803,19 @@ export default function AdminClient({
                   <button
                     onClick={() => setView(id)}
                     aria-current={isActive ? "page" : undefined}
+                    /*
+                      ── O NOME ACESSÍVEL É SEMPRE O INTEIRO ────────────────
+                      O rótulo visível encurta no telemóvel («Visão» em vez de
+                      «Visão Geral») para caber numa linha. O nome que um leitor
+                      de ecrã anuncia NÃO pode encurtar com ele: quem não vê o
+                      ícone tem só a palavra, e «Visão» não é um destino.
+
+                      Foi a suite de telemóvel que o apanhou — «A barra de baixo
+                      não tem "^Visão Geral$"» — e ela tinha razão pela razão
+                      certa: procura os destinos pelo nome acessível, que é o
+                      que uma pessoa com leitor de ecrã ouve.
+                    */
+                    aria-label={navItem.label}
                     /* ── A PASTILHA DO DESTINO ONDE ELA ESTÁ ──────────────────
                      A MESMA que a coluna da esquerda usa (ver `renderNavItem`):
                      lavagem de acento e tinta de acento. Duas navegações da
@@ -4855,14 +4876,48 @@ export default function AdminClient({
                       `leading-tight` são 30 px, ou seja 2,5em. Com 2,2em a
                       reserva mentia e o rótulo transbordava a cápsula por
                       baixo: medido, 2 px em «Visão Geral» e «Fazer proposta». */}
-                    {/* 8 px é o rótulo do telemóvel, onde a cápsula tem 390 px
-                      para repartir por quatro. No computador a barra passou a
-                      ser O MENU — o que ela lê o dia inteiro — e há largura para
-                      o dizer: 10 px a partir de `lg`. A reserva de duas linhas
-                      fica, porque «Propostas Aceites» continua a precisar
-                      delas. */}
-                    <span className="text-[8px] lg:text-[10px] tracking-wide uppercase leading-tight text-center min-h-[2.5em] flex items-start justify-center">
-                      {navItem.label}
+                    {/* ── O RÓTULO CRESCE, E SAI DA CAIXA ALTA ────────────────
+                      Ela mandou duas referências do vidro do iOS 26 — a barra do
+                      Instagram e a do WhatsApp — e disse «eu queria algo neste
+                      liquid glass e não está». Fui compará-las com esta barra.
+
+                      O material já cá estava, e é o mesmo: cápsula a flutuar,
+                      desfoque, fio especular no bordo de cima, pastilha
+                      levantada no destino activo. O que NÃO estava era a
+                      escala. Nas referências o rótulo lê-se de relance —
+                      «Atualizações», «Conversas», em caixa normal, com o
+                      tamanho de texto de interface. Aqui eram 8 px em
+                      MAIÚSCULAS, que é a tipografia de uma etiqueta de campo,
+                      não a de um menu.
+
+                      E a caixa alta não é detalhe: o `docs/DESIGN-SYSTEM.md`
+                      proíbe-a em cabeçalhos por escrito (Parte 18), com a razão
+                      da Apple atrás — «o sistema novo abandonou a caixa alta».
+                      Um rótulo de navegação é um cabeçalho.
+
+                      11 px no telemóvel (a cápsula tem 390 px para quatro
+                      células) e 12 px a partir de `lg`, onde a barra é O MENU.
+                      A reserva de duas linhas fica, porque «Propostas Aceites»
+                      continua a precisar delas. */}
+                    {/* ── UMA LINHA, E O RÓTULO CURTO ONDE É PRECISO ──────────
+                      A reserva de duas linhas (`min-h-[2.5em]`) existia porque
+                      «Visão Geral» e «Fazer proposta» partiam — e servia para os
+                      ícones das outras células não subirem. Resolvia o
+                      desalinhamento e criava outro problema: uma barra com
+                      rótulos de duas linhas não se lê como barra, lê-se como
+                      uma lista apertada. Nas duas referências que ela mandou
+                      (Instagram e WhatsApp) o rótulo é sempre UMA linha, ou não
+                      existe.
+
+                      Agora não parte nenhum: no telemóvel usa-se o rótulo curto
+                      (`ROTULO_CURTO`) onde o inteiro não cabe, e a reserva de
+                      duas linhas deixa de fazer falta — todas as células têm
+                      exactamente uma. */}
+                    <span className="text-[11px] lg:text-[12px] leading-tight text-center whitespace-nowrap flex items-start justify-center">
+                      <span className="lg:hidden">
+                        {ROTULO_CURTO[id] ?? navItem.label}
+                      </span>
+                      <span className="hidden lg:inline">{navItem.label}</span>
                     </span>
                   </button>
                 </Fragment>

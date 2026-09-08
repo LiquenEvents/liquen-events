@@ -165,14 +165,40 @@ export const MORE_NAV: View[] = ["contratos", "material", "temas", "estatisticas
  */
 export const BARRA_INFERIOR: View[] = ["overview", "pedidos", "fazer-proposta", "propostas"];
 
+/**
+ * ── O RÓTULO CURTO DA BARRA, E PORQUE É QUE ELE EXISTE ────────────────────
+ *
+ * Ela mandou a barra do Instagram e a do WhatsApp e disse «o menu no telemóvel
+ * não está assim». Fui pôr as três lado a lado.
+ *
+ * O material já era o mesmo — cápsula a flutuar, desfoque, fio de luz no bordo,
+ * pastilha levantada no destino activo. A diferença estava noutro sítio, e é
+ * geométrica: nas duas referências o rótulo é UMA LINHA (ou não existe de
+ * todo, no Instagram). Aqui «Visão Geral» e «Fazer proposta» partiam em duas,
+ * e uma barra com rótulos de duas linhas não se lê como uma barra — lê-se como
+ * uma lista apertada.
+ *
+ * Numa cápsula de 390 px repartida por quatro células sobram ~90 px por
+ * rótulo. Estes cabem lá numa linha; os outros já cabiam.
+ *
+ * Só no telemóvel: no computador a barra é O MENU, tem largura, e o nome
+ * inteiro é o que ela lê o dia todo.
+ */
+export const ROTULO_CURTO: Partial<Record<View, string>> = {
+  overview: "Visão",
+  "fazer-proposta": "Proposta",
+  contratos: "Aceites",
+  estatisticas: "Números",
+};
+
 export const NAV: { id: View; label: string; icon: ReactNode }[] = [
   {
     id: "overview",
     label: "Visão Geral",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -190,8 +216,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Pedidos",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -208,8 +234,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Calendário",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -225,8 +251,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Fazer proposta",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -243,8 +269,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Propostas",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -260,8 +286,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Definições",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -277,8 +303,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Tarefas",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -295,8 +321,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     // Caixa de ferramentas: a pega e o corpo. É o que vai na carrinha.
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -313,8 +339,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Temas",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -334,8 +360,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Estatísticas",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -351,8 +377,8 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
     label: "Propostas Aceites",
     icon: (
       <svg
-        width="16"
-        height="16"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
