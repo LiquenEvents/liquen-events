@@ -6911,9 +6911,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * são deste casal, estão certos, e ela lê-os no ecrã de qualquer maneira. O
    * perigo é o outro caso, e esse continua marcado.
    */
+  /**
+   * ── E UMA MARCA QUE NÃO É TINTA ────────────────────────────────────────
+   *
+   * A `bo-por-confirmar` não pinta nada — não tem regra nenhuma no CSS. É um
+   * GANCHO, e existe por uma avaria concreta: o passeio
+   * `e2e/proposta-fluxos.spec.ts` procurava estes campos por
+   * `.ring-\[\#c98a2e\]\/45`, ou seja, pela COR. Quando a fase 03 do sistema
+   * de design trocou o literal pelo token `--bo-aviso-tom`, o selector deixou
+   * de casar, o passeio contou zero campos marcados e o CI ficou vermelho — não
+   * porque o realce tivesse desaparecido, mas porque o teste estava a apontar
+   * para a tinta em vez de apontar para o significado.
+   *
+   * Um teste amarrado à cor chumba a cada mudança de cor. Esta classe é o que
+   * ele passa a procurar, e sobrevive à próxima.
+   */
   const realce = (campo: CampoAMudar) =>
     porConfirmar.has(campo)
-      ? "rounded-lg ring-2 ring-[var(--bo-aviso-tom)]/45 ring-offset-2 ring-offset-white"
+      ? "bo-por-confirmar rounded-lg ring-2 ring-[var(--bo-aviso-tom)]/45 ring-offset-2 ring-offset-white"
       : undefined;
   const confirmado = (campo: CampoAMudar) => {
     // Tocar-lhe É a confirmação. Um botão "confirmar" ao lado de cada campo
