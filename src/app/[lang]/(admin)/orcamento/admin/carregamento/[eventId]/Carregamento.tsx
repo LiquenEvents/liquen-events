@@ -351,14 +351,14 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
   return (
     <div
       ref={caixa}
-      className="mx-auto min-h-dvh w-full max-w-[640px] bg-white pb-28"
+      className="mx-auto min-h-dvh w-full max-w-[640px] bg-[var(--bo-surface)] pb-28"
       style={{ "--carregamento-cabecalho": `${alturaDoCabecalho}px` } as React.CSSProperties}
     >
       {/* Cabeçalho fixo: o contador é a única coisa que se olha a meio do
           carregamento, por isso nunca sai do ecrã. */}
       <header
         ref={cabecalho}
-        className="sticky top-0 z-10 border-b border-[var(--bo-hairline-strong)] bg-white/95 px-4 py-3 backdrop-blur"
+        className="sticky top-0 z-10 border-b border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]/95 px-4 py-3 backdrop-blur"
       >
         <p className="truncate text-sm text-[var(--bo-tinta-72)]">{titulo}</p>
         <p className="text-2xl font-medium tabular-nums">
@@ -384,7 +384,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         </div>
         {(!online || pendentesDeste > 0) && (
           <p
-            className={`mt-2 text-xs ${envioFalhou && online ? "text-[#8a2a22]" : "text-[var(--bo-text-muted)]"}`}
+            className={`mt-2 text-xs ${envioFalhou && online ? "text-[var(--bo-perigo)]" : "text-[var(--bo-text-muted)]"}`}
           >
             {!online && "Sem rede. "}
             {pendentesDeste > 0 &&
@@ -457,7 +457,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         <div role="group" aria-label="Material a carregar">
           {porCategoria.map(([categoria, linhas]) => (
             <section key={categoria}>
-              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-white/95 px-4 py-2 text-footnote font-semibold text-[var(--bo-text-muted)] backdrop-blur">
+              <h2 className="sticky top-[var(--carregamento-cabecalho,5.75rem)] bg-[var(--bo-surface)]/95 px-4 py-2 text-footnote font-semibold text-[var(--bo-text-muted)] backdrop-blur">
                 {categoria}
               </h2>
               <ul>
@@ -488,7 +488,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                           <span
                             className={`block truncate ${carregado ? "text-foreground/45 line-through" : ""}`}
                           >
-                            {i.critical && <span className="text-[#8a2a22]">▲ </span>}
+                            {i.critical && <span className="text-[var(--bo-perigo)]">▲ </span>}
                             {i.name}
                           </span>
                           {i.note && (
@@ -514,7 +514,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
       {/* Barra fixa: o gesto que fecha o carregamento fica sempre ao alcance do
           polegar, sem ter de rolar até ao fim de 41 linhas. */}
       {itens.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-[var(--bo-hairline-strong)] bg-white/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]/95 p-4 backdrop-blur">
           {fechada ? (
             /* O DESFECHO À VISTA, e uma saída.
                Uma acção que não deixa marca é indistinguível de uma que não

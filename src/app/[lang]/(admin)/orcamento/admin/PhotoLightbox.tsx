@@ -189,7 +189,7 @@ export default function PhotoLightbox({
             // 36×36 medidos a 375 px. As setas ao lado já têm 44 (`h-11 w-11`)
             // e esta — a única forma de sair de um ecrã preto inteiro — tinha
             // menos. `.alvo-toque` iguala-a a elas, só ao dedo.
-            className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bo-surface)]/10 text-lg leading-none text-white hover:bg-[var(--bo-surface)]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
           >
             ×
           </button>

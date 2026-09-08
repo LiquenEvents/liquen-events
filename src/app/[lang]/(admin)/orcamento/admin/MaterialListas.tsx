@@ -452,7 +452,7 @@ export default function MaterialListas() {
                     {lista.name}
                   </button>
                   {lista.isDefault && (
-                    <span className="rounded-md bg-[#e7efe4] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[#3a5c39] uppercase">
+                    <span className="rounded-md bg-[var(--bo-sucesso-lavagem)] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[var(--bo-sucesso)] uppercase">
                       Vai sempre
                     </span>
                   )}
@@ -498,11 +498,11 @@ export default function MaterialListas() {
                               key={l.id}
                               className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2"
                             >
-                              <span className={item ? "" : "text-[#8a2a22]"}>
+                              <span className={item ? "" : "text-[var(--bo-perigo)]"}>
                                 {item?.name ?? "(item removido do catálogo)"}
                               </span>
                               {l.critical && (
-                                <span className="rounded bg-[#f6e6df] px-1.5 text-[10px] font-medium tracking-wide text-[#8a2a22] uppercase">
+                                <span className="rounded bg-[var(--bo-perigo-lavagem)] px-1.5 text-[10px] font-medium tracking-wide text-[var(--bo-perigo)] uppercase">
                                   crítico
                                 </span>
                               )}

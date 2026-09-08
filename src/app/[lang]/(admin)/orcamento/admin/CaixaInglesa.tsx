@@ -177,9 +177,9 @@ export default function CaixaInglesa({
     "aria-label": `${rotulo} (inglês)`,
     className: `${className ?? ""} ${
       desactualizada
-        ? "border-[#8a2a22]/50 bg-[#8a2a22]/[0.05]"
+        ? "border-[var(--bo-perigo)]/50 bg-[var(--bo-perigo)]/[0.05]"
         : porTraduzir
-          ? "border-dashed border-[#c08a3e]/60 bg-sage-600/[0.04]"
+          ? "border-dashed border-[var(--bo-aviso-tom)]/60 bg-sage-600/[0.04]"
           : "bg-sage-600/[0.04]"
     }`.trim(),
   };
@@ -211,7 +211,7 @@ export default function CaixaInglesa({
           <input {...comuns} type="text" />
         )}
         {desactualizada && (
-          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px] leading-snug text-[#8a2a22]">
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px] leading-snug text-[var(--bo-perigo)]">
             <span>O português mudou depois desta tradução.</span>
             {aoConfirmar && (
               <button

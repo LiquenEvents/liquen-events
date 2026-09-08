@@ -149,7 +149,7 @@ function Numero({
             emitido.current = leitura.valor;
             onChange(leitura.valor);
           }}
-          className={`bo-input w-24 px-2.5 py-2 text-xs${erro ? " border-[#8a2a22]" : ""}`}
+          className={`bo-input w-24 px-2.5 py-2 text-xs${erro ? " border-[var(--bo-perigo)]" : ""}`}
         />
         <span className="text-[11px] text-foreground/45">{unidade}</span>
       </span>
@@ -171,7 +171,7 @@ function Numero({
        * assumido.
        */}
       {erro ? (
-        <span id={idErro} className="text-[10px] leading-relaxed text-[#8a2a22]">
+        <span id={idErro} className="text-[10px] leading-relaxed text-[var(--bo-perigo)]">
           {erro}
         </span>
       ) : (
@@ -229,11 +229,11 @@ function Texto({
           onErro(escrito.trim() ? null : "Escreve a terra de onde parte a carrinha (ex.: Évora).");
           onChange(escrito);
         }}
-        className={`bo-input w-56 px-2.5 py-2 text-xs${erro ? " border-[#8a2a22]" : ""}`}
+        className={`bo-input w-56 px-2.5 py-2 text-xs${erro ? " border-[var(--bo-perigo)]" : ""}`}
       />
       {/* A mesma troca do campo de número, e pela mesma razão — ver lá. */}
       {erro ? (
-        <span id={idErro} className="text-[10px] leading-relaxed text-[#8a2a22]">
+        <span id={idErro} className="text-[10px] leading-relaxed text-[var(--bo-perigo)]">
           {erro}
         </span>
       ) : (
@@ -360,7 +360,7 @@ export default function DefinicoesProposta() {
   if (erro) {
     return (
       <Card padding="md">
-        <p className="text-xs leading-relaxed text-[#8a2a22]">{erro}</p>
+        <p className="text-xs leading-relaxed text-[var(--bo-perigo)]">{erro}</p>
       </Card>
     );
   }
@@ -440,7 +440,7 @@ export default function DefinicoesProposta() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-[var(--bo-text)]">Deslocação</h2>
           <span
-            className={`text-[11px] ${desactualizado ? "text-[#8a2a22]" : "text-foreground/45"}`}
+            className={`text-[11px] ${desactualizado ? "text-[var(--bo-perigo)]" : "text-foreground/45"}`}
           >
             {idade(p.definidoEm.deslocacao)}
           </span>
@@ -452,7 +452,7 @@ export default function DefinicoesProposta() {
         </p>
 
         {desactualizado && (
-          <p className="mt-3 rounded-xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.06] p-3 text-[11px] leading-relaxed text-[#8a6420]">
+          <p className="mt-3 rounded-xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.06] p-3 text-[11px] leading-relaxed text-[var(--bo-aviso)]">
             {p.definidoEm.deslocacao?.startsWith("1970")
               ? "Estes valores nunca foram confirmados — são um ponto de partida escrito por quem não abastece a carrinha. Confirma o preço do gasóleo antes de a próxima proposta o usar."
               : "O preço do gasóleo já tem algumas semanas. Vale a pena confirmá-lo: o desvio já se nota numa viagem ao Porto."}
@@ -474,7 +474,7 @@ export default function DefinicoesProposta() {
             ajuda="De onde a carrinha parte. É a partir daqui que se contam os quilómetros de cada proposta — e é à volta daqui que vale a isenção."
           />
           {!sedeConhecida && d.base.trim() && (
-            <p className="mt-2 max-w-prose rounded-xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.06] p-3 text-[11px] leading-relaxed text-[#8a6420]">
+            <p className="mt-2 max-w-prose rounded-xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.06] p-3 text-[11px] leading-relaxed text-[var(--bo-aviso)]">
               Fica gravado, mas não conheço essa terra na tabela de distâncias — por isso não
               consigo sugerir quilómetros sozinho. Em cada proposta escreves tu os quilómetros no
               painel da deslocação, e a conta faz-se na mesma. Se preferires que sugira, escreve

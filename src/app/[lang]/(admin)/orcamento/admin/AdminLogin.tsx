@@ -432,7 +432,7 @@ export default function AdminLogin() {
           {sessaoExpirou && (
             <p
               role="status"
-              className="mb-5 rounded-xl bg-[#fbf7ec] px-3.5 py-3 text-sm leading-relaxed text-[#6b5720]"
+              className="mb-5 rounded-xl bg-[var(--bo-aviso-lavagem)] px-3.5 py-3 text-sm leading-relaxed text-[var(--bo-aviso)]"
             >
               A tua sessão expirou. Entra outra vez — tudo o que já tinha sido guardado está
               guardado.
@@ -588,7 +588,7 @@ export default function AdminLogin() {
               <p
                 id={capsId}
                 role="status"
-                className="-mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#6b5720]"
+                className="-mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-aviso)]"
               >
                 <span aria-hidden="true">⇪</span>
                 <span>O Caps Lock está ligado.</span>
@@ -724,7 +724,7 @@ export default function AdminLogin() {
                   className={
                     respostaRecuperacao.tipo === "ok"
                       ? "text-xs leading-relaxed text-[var(--bo-tinta-72)]"
-                      : "flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
+                      : "flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]"
                   }
                 >
                   {respostaRecuperacao.tipo === "erro" && <span aria-hidden="true">⚠</span>}
@@ -839,7 +839,7 @@ function AvisoDeRecusa({ texto, className = "" }: { texto: string; className?: s
          dentro do `prefers-reduced-motion` do `globals.css`, e o `aria-live`
          nunca dependeu da animação — para quem ouve o ecrã, isto lê-se na
          mesma, na mesma altura. */
-      className={`bo-entrada flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22] ${className}`}
+      className={`bo-entrada flex items-start gap-1.5 text-sm leading-relaxed text-[var(--bo-perigo)] ${className}`}
     >
       <span aria-hidden="true">⚠</span>
       <span>{texto}</span>

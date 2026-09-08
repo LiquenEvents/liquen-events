@@ -198,7 +198,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
           distância no arranque, portanto a frase está legível bem antes de a
           animação acabar — que é a regra que manda num aviso de erro. */}
       {error && (
-        <p className="bo-entrada text-[#8a2a22] text-xs mb-3 leading-relaxed" role="alert">
+        <p className="bo-entrada text-[var(--bo-perigo)] text-xs mb-3 leading-relaxed" role="alert">
           {error}
         </p>
       )}

@@ -298,7 +298,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
               // esta barra quer no portátil.
               className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium ${ESTADO} ${PRESSAO} ${
                 vipOnly
-                  ? "bg-[#d6ab3a]/15 text-[#8a6420] "
+                  ? "bg-[var(--bo-aviso-tom)]/15 text-[var(--bo-aviso)] "
                   : /* Mesmo defeito das pastilhas de filtro: o fundo sob o rato
                        repetia o fundo em repouso. Um degrau acima. */
                     "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)]"
@@ -465,7 +465,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
 function Avatar({ c }: { c: Client }) {
   return (
     <div
-      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[#d6ab3a]/20 text-[#8a6420] ring-[#d6ab3a]/20" : "bg-sage-600 text-white ring-sage-600/10"}`}
+      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ring-2 ${c.vip ? "bg-[var(--bo-aviso-tom)]/20 text-[var(--bo-aviso)] ring-[var(--bo-aviso-tom)]/20" : "bg-sage-600 text-white ring-sage-600/10"}`}
     >
       {c.name.slice(0, 1).toUpperCase()}
     </div>
@@ -557,7 +557,7 @@ function CartaoDeCliente({
           <p className="text-[var(--bo-text)] text-sm font-semibold truncate flex items-center gap-2">
             <span className="truncate">{c.name}</span>
             {c.vip && (
-              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#d6ab3a]/15 text-[#8a6420] text-[8px] tracking-[0.12em] uppercase font-bold">
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[var(--bo-aviso-tom)]/15 text-[var(--bo-aviso)] text-[8px] tracking-[0.12em] uppercase font-bold">
                 ★ VIP
               </span>
             )}
@@ -605,7 +605,7 @@ function colunasDeClientes(aberto: string | null, alternar: (c: Client) => void)
           <span className="min-w-0">
             <span className="block truncate text-[var(--bo-text)]">{c.name}</span>
             {c.vip && (
-              <span className="mt-0.5 inline-flex items-center rounded-full bg-[#d6ab3a]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8a6420]">
+              <span className="mt-0.5 inline-flex items-center rounded-full bg-[var(--bo-aviso-tom)]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[var(--bo-aviso)]">
                 ★ VIP
               </span>
             )}

@@ -260,7 +260,7 @@ export default function PainelDoEstudio({
               {marca && (
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none absolute left-0 top-0 rounded-[6px] bg-white ${
+                  className={`pointer-events-none absolute left-0 top-0 rounded-[6px] bg-[var(--bo-surface)] ${
                     podeAndar ? MARCA : ""
                   }`}
                   style={{
@@ -289,7 +289,7 @@ export default function PainelDoEstudio({
                            medida. Sai no instante em que ela está no sítio:
                            nunca há dois fundos, e nunca há nenhum. É a mesma
                            regra que o `Segmented` explica por extenso. */
-                        `text-[var(--bo-text)] ${marca ? "" : "bg-white"}`
+                        `text-[var(--bo-text)] ${marca ? "" : "bg-[var(--bo-surface)]"}`
                       : "text-[var(--bo-text-muted)] hover:text-[var(--bo-text)]"
                   }`}
                 >

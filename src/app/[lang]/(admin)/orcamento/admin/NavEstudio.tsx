@@ -309,7 +309,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                       não interessa. E cor própria, a mesma do que está por
                       rever: é uma falta, não uma descrição. */}
                   {porFazer > 0 && (
-                    <span className="hidden truncate text-[10px] text-[#8a6420] @min-[40rem]/estudio:block">
+                    <span className="hidden truncate text-[10px] text-[var(--bo-aviso)] @min-[40rem]/estudio:block">
                       {frase}
                     </span>
                   )}
@@ -331,7 +331,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                     role="img"
                     aria-label={frase}
                     title={frase}
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#c98a2e] @min-[40rem]/estudio:hidden"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bo-aviso-tom)] @min-[40rem]/estudio:hidden"
                   />
                 )}
               </button>
@@ -377,7 +377,7 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
                   <span
                     aria-hidden
                     className={`mt-1 h-1 w-1 shrink-0 rounded-full ${
-                      f.trava ? "bg-[#c98a2e]" : "bg-foreground/25"
+                      f.trava ? "bg-[var(--bo-aviso-tom)]" : "bg-foreground/25"
                     }`}
                   />
                   <span className="underline-offset-2 hover:underline">{f.texto}</span>

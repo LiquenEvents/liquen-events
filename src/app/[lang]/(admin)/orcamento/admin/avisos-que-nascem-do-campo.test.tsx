@@ -65,22 +65,22 @@ const CSS = readFileSync("src/app/globals.css", "utf8");
 const AVISOS: { ficheiro: string; marca: RegExp; oQue: string }[] = [
   {
     ficheiro: "EventCosts.tsx",
-    marca: /className="bo-entrada mb-5 rounded-xl border border-\[#8a2a22\]\/25/,
+    marca: /className="bo-entrada mb-5 rounded-xl border border-\[var\(--bo-perigo\)\]\/25/,
     oQue: "o custo que colidiu",
   },
   {
     ficheiro: "ClientMessenger.tsx",
-    marca: /className="bo-entrada text-\[#8a2a22\] text-xs mb-3 leading-relaxed" role="alert"/,
+    marca: /className="bo-entrada text-\[var\(--bo-perigo\)\] text-xs mb-3 leading-relaxed" role="alert"/,
     oQue: "a mensagem que não foi ao cliente",
   },
   {
     ficheiro: "PaymentsPanel.tsx",
-    marca: /className="bo-entrada flex items-start gap-2\.5 rounded-lg border border-\[#c99a3a\]/,
+    marca: /className="bo-entrada flex items-start gap-2\.5 rounded-lg border border-\[var\(--bo-aviso-tom\)\]/,
     oQue: "o recebido acima do contratado",
   },
   {
     ficheiro: "PerguntaDeDesfecho.tsx",
-    marca: /role="alert" className="bo-entrada mt-2 text-\[#8a2a22\]/,
+    marca: /role="alert" className="bo-entrada mt-2 text-\[var\(--bo-perigo\)\]/,
     oQue: "o valor de desfecho que não se percebe",
   },
   {

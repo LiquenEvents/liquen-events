@@ -114,7 +114,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
       <div className="@container">
         <div className="grid grid-cols-1 gap-x-4 gap-y-5 @min-[26rem]:grid-cols-2">
           {duplicates.length > 0 && (
-            <div className="@min-[26rem]:col-span-2 flex items-start gap-3 rounded-xl border border-[#b5894a]/25 bg-[#b5894a]/[0.06] p-3.5">
+            <div className="@min-[26rem]:col-span-2 flex items-start gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/25 bg-[var(--bo-aviso-tom)]/[0.06] p-3.5">
               <svg
                 width="16"
                 height="16"
@@ -130,7 +130,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
                 <path d="M12 9v4M12 17h.01" />
               </svg>
               <div className="min-w-0">
-                <p className="text-[#8a6420] text-xs font-semibold mb-0.5">
+                <p className="text-[var(--bo-aviso)] text-xs font-semibold mb-0.5">
                   Este e-mail já tem {duplicates.length} pedido{duplicates.length !== 1 ? "s" : ""}{" "}
                   registado{duplicates.length !== 1 ? "s" : ""}
                 </p>

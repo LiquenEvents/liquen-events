@@ -284,7 +284,7 @@ export default function CommandPalette({
       <div
         className={`${
           aSairAgora ? SAIDA_FUNDO : "bo-entrada bo-entrada-fundo"
-        } absolute inset-0 bg-[#1b2119]/50 backdrop-blur-sm`}
+        } absolute inset-0 bg-[var(--bo-seleccao)]/50 backdrop-blur-sm`}
       />
       <div
         ref={dialogRef}
@@ -297,7 +297,7 @@ export default function CommandPalette({
         aria-hidden={aSairAgora || undefined}
         inert={aSairAgora}
         /* ── O MATERIAL, E O DESFOQUE QUE AQUI SE RECUSA ──────────────────
-           Era `rounded-2xl border … bg-white`: o `rounded-2xl` media 8 px como
+           Era `rounded-2xl border … bg-[var(--bo-surface)]`: o `rounded-2xl` media 8 px como
            todo o resto do conteúdo (ver o bloco dos raios do `globals.css`) e o
            branco era opaco e escrito à mão.
 
@@ -434,7 +434,7 @@ export default function CommandPalette({
                            que é menos de metade do que a norma pede. */
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
                           isActive
-                            ? "bg-white/20 text-white"
+                            ? "bg-[var(--bo-surface)]/20 text-white"
                             : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                         }`}
                         aria-hidden="true"

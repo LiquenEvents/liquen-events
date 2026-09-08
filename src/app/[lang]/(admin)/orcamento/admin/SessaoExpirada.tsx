@@ -355,7 +355,7 @@ export default function SessaoExpirada() {
            primeiro fotograma, e o foco entra na caixa por cima da animação. */
         className={cn(
           aSair ? SAIDA : "bo-entrada",
-          "relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-white p-6 shadow-[var(--bo-sombra-modal)]",
+          "relative flex max-h-[88dvh] w-full max-w-sm flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] p-6 shadow-[var(--bo-sombra-modal)]",
         )}
       >
         <p className="bo-eyebrow">Sessão</p>
@@ -449,7 +449,7 @@ export default function SessaoExpirada() {
           {erro && (
             <p
               role="alert"
-              className="flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22]"
+              className="flex items-start gap-1.5 text-sm leading-relaxed text-[var(--bo-perigo)]"
             >
               <span aria-hidden="true">⚠</span>
               <span>{erro}</span>

@@ -38,20 +38,38 @@ import path from "node:path";
 const CSS = fs.readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
 const RAIZ = path.join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin");
 
-/** Os cinco degraus, e o valor exacto de cada um. */
+/**
+ * ── A TINTA PASSOU A TER UM CANAL, E ESTA LISTA MUDOU DE FORMA ────────────
+ *
+ * Os degraus escreviam-se `rgba(13, 13, 13, α)`, cada um com o seu `13, 13,
+ * 13` repetido. A fase 03 do sistema de design tirou de lá a cor: há UM canal,
+ * `--bo-tinta-rgb`, e os nove degraus derivam dele.
+ *
+ * Não é arrumação. Era isso que fazia o modo escuro custar nove reescritas em
+ * vez de uma — e esquecer UMA delas era ficar com um cinzento claro sobre
+ * fundo escuro, num degrau só, sem ninguém dar por isso.
+ *
+ * O que este teste guarda continua a ser o mesmo: que os degraus existem, que
+ * são estes, e que ninguém escreve o valor de um deles à mão noutro sítio. Só
+ * que agora também guarda que **derivam todos do mesmo canal** — que é a
+ * propriedade nova, e a que interessa.
+ */
+const CANAL = "--bo-tinta-rgb";
+
+/** Os cinco degraus, e a opacidade exacta de cada um. */
 const ESCADA: Record<string, string> = {
   // Riscos e fundos.
-  "--bo-tinta-3": "rgba(13, 13, 13, 0.03)",
-  "--bo-tinta-6": "rgba(13, 13, 13, 0.06)",
-  "--bo-tinta-8": "rgba(13, 13, 13, 0.08)",
-  "--bo-tinta-10": "rgba(13, 13, 13, 0.1)",
-  "--bo-tinta-13": "rgba(13, 13, 13, 0.13)",
+  "--bo-tinta-3": "0.03",
+  "--bo-tinta-6": "0.06",
+  "--bo-tinta-8": "0.08",
+  "--bo-tinta-10": "0.1",
+  "--bo-tinta-13": "0.13",
   // Texto. São QUATRO e não os seis da análise, e a norma é que decide: sobre
   // branco, 48% de preto dá ~3,5:1 e chumba. O último que passa é o 58.
-  "--bo-tinta-58": "rgba(13, 13, 13, 0.58)",
-  "--bo-tinta-64": "rgba(13, 13, 13, 0.64)",
-  "--bo-tinta-72": "rgba(13, 13, 13, 0.72)",
-  "--bo-tinta-82": "rgba(13, 13, 13, 0.82)",
+  "--bo-tinta-58": "0.58",
+  "--bo-tinta-64": "0.64",
+  "--bo-tinta-72": "0.72",
+  "--bo-tinta-82": "0.82",
 };
 
 function ficheirosDeEcra(dir: string, saco: string[] = []): string[] {
@@ -65,9 +83,16 @@ function ficheirosDeEcra(dir: string, saco: string[] = []): string[] {
 
 describe("a escada da tinta do back office", () => {
   it("tem os cinco degraus, com o número do degrau no nome", () => {
-    for (const [nome, valor] of Object.entries(ESCADA)) {
-      expect(CSS, `falta o degrau \`${nome}\` no globals.css`).toContain(`${nome}: ${valor}`);
+    for (const [nome, alfa] of Object.entries(ESCADA)) {
+      expect(CSS, `falta o degrau \`${nome}\` no globals.css`).toContain(
+        `${nome}: rgb(var(${CANAL}) / ${alfa})`,
+      );
     }
+
+    // E o canal existe mesmo, com a tinta do modo claro. Sem esta linha, os
+    // nove degraus podiam apontar todos para um nome que não existe — nove
+    // cores invisíveis e nenhum erro.
+    expect(CSS, `o canal \`${CANAL}\` não está declarado`).toContain(`${CANAL}: 13 13 13`);
   });
 
   it("e os dois nomes de papel são apelidos de degraus, não valores à parte", () => {

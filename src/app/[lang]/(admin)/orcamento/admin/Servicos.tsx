@@ -147,7 +147,7 @@ export default function Servicos() {
   if (erro && servicos === null) {
     return (
       <Card padding="md">
-        <p className="text-xs leading-relaxed text-[#8a2a22]">{erro}</p>
+        <p className="text-xs leading-relaxed text-[var(--bo-perigo)]">{erro}</p>
       </Card>
     );
   }
@@ -176,7 +176,7 @@ export default function Servicos() {
               {servicos.filter((s) => !s.arquivado).length} serviços na biblioteca
             </p>
             {semIngles > 0 && (
-              <p className="mt-1 text-[11px] text-[#8a6420]">
+              <p className="mt-1 text-[11px] text-[var(--bo-aviso)]">
                 {semIngles === 1 ? "1 sem versão inglesa" : `${semIngles} sem versão inglesa`} — uma
                 proposta para um casal estrangeiro com metade dos serviços em português lê-se como
                 descuido.
@@ -255,7 +255,7 @@ export default function Servicos() {
                         {s.nomeEn ? (
                           <span className="text-foreground/40">EN: {s.nomeEn}</span>
                         ) : (
-                          <span className="rounded-full bg-[#c08a3e]/15 px-2 py-0.5 tracking-[0.08em] uppercase text-[#8a6420]">
+                          <span className="rounded-full bg-[var(--bo-aviso-tom)]/15 px-2 py-0.5 tracking-[0.08em] uppercase text-[var(--bo-aviso)]">
                             sem versão inglesa
                           </span>
                         )}

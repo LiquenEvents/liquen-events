@@ -186,7 +186,7 @@ export default function ValoresSuspeitos() {
                   {enviadas > 0 && (
                     <>
                       {" "}
-                      <span className="text-[#8a2a22]">
+                      <span className="text-[var(--bo-perigo)]">
                         {enviadas === 1
                           ? "Uma já seguiu para o cliente."
                           : `${enviadas} já seguiram para o cliente.`}
@@ -196,7 +196,7 @@ export default function ValoresSuspeitos() {
                 </p>
               )}
               {naoFecham.length > 0 && (
-                <div className="mt-4 rounded-lg border border-[#c98a2e]/40 bg-[#c98a2e]/[0.07] p-3">
+                <div className="mt-4 rounded-lg border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.07] p-3">
                   <p className="text-[var(--bo-text)]">
                     <strong>
                       {naoFecham.length}{" "}
@@ -213,7 +213,7 @@ export default function ValoresSuspeitos() {
                         <p className="font-medium text-[var(--bo-text)]">
                           {c.nome}
                           {c.enviada && (
-                            <span className="ml-2 text-[#8a2a22]">já seguiu para o cliente</span>
+                            <span className="ml-2 text-[var(--bo-perigo)]">já seguiu para o cliente</span>
                           )}
                         </p>
                         <p className="mt-1 leading-relaxed text-[var(--bo-tinta-72)]">
@@ -253,7 +253,7 @@ export default function ValoresSuspeitos() {
                         <span className="font-medium text-[var(--bo-text)]">{s.nome}</span>
                         <span className="text-[11px] text-foreground/45">{s.quoteId}</span>
                         {s.enviada ? (
-                          <span className="rounded-full bg-[#8a2a22]/10 px-2 py-0.5 text-[10px] tracking-[0.06em] uppercase text-[#8a2a22]">
+                          <span className="rounded-full bg-[var(--bo-perigo)]/10 px-2 py-0.5 text-[10px] tracking-[0.06em] uppercase text-[var(--bo-perigo)]">
                             enviada {dia(s.quando)}
                           </span>
                         ) : (

@@ -772,7 +772,7 @@ function EditorClassico() {
                       passa a ser só uma questão de tempo. Não é só cor: é uma
                       palavra, e vai também no nome acessível do botão. */}
                   {porPublicar.has(t.key) && (
-                    <span className="ml-1.5 rounded-full bg-[#c98a2e]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#8a5d13] align-middle">
+                    <span className="ml-1.5 rounded-full bg-[var(--bo-aviso-tom)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--bo-aviso)] align-middle">
                       por publicar
                     </span>
                   )}
@@ -831,7 +831,7 @@ function EditorClassico() {
                 vermelho: isto é um estado normal do trabalho, não um alarme. */}
             {dirty && (
               <p
-                className="mb-4 -mt-1 inline-flex rounded-full bg-[#c98a2e]/15 px-2 py-0.5 text-[11px] font-medium text-[#8a5d13]"
+                className="mb-4 -mt-1 inline-flex rounded-full bg-[var(--bo-aviso-tom)]/15 px-2 py-0.5 text-[11px] font-medium text-[var(--bo-aviso)]"
                 aria-live="polite"
               >
                 {rascunhoEm
@@ -895,7 +895,7 @@ function EditorClassico() {
                 <button
                   type="button"
                   onClick={switchToVisual}
-                  className={`text-[11px] text-sage-600 hover:text-[#415440] underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                  className={`text-[11px] text-sage-600 hover:text-[var(--bo-accent-hover)] underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                 >
                   ← Voltar ao editor visual
                 </button>
@@ -965,7 +965,7 @@ function EditorClassico() {
                 title="Pré-visualização do email"
                 srcDoc={previewSrcDoc}
                 sandbox=""
-                className="w-full block bg-[#f7f4ee]"
+                className="w-full block bg-[var(--bo-chao)]"
                 style={{ height: 460, border: "none" }}
               />
             </div>
@@ -1074,8 +1074,8 @@ export default function EmailTemplates() {
             // Sai no instante em que a pílula está no sítio: nunca há dois
             // fundos ao mesmo tempo, e nunca há nenhum. É a manobra do
             // `Segmented`, e a razão está escrita lá por extenso.
-            `text-white ${temMarca ? "" : "bg-[#5F7C66]"}`
-          : "bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20"
+            `text-white ${temMarca ? "" : "bg-[var(--bo-marca)]"}`
+          : "bg-[var(--bo-marca)]/10 text-sage-600 hover:bg-[var(--bo-marca)]/20"
       }`}
     >
       {rotulo}
@@ -1103,7 +1103,7 @@ export default function EmailTemplates() {
         {marca && (
           <span
             aria-hidden="true"
-            className={`pointer-events-none absolute left-0 top-0 rounded-md bg-[#5F7C66] ${
+            className={`pointer-events-none absolute left-0 top-0 rounded-md bg-[var(--bo-marca)] ${
               podeAndar ? MARCA : ""
             }`}
             style={{

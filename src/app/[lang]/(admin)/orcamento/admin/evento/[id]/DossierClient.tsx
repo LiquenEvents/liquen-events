@@ -178,9 +178,9 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
         {recusadas.length > 0 && (
           <div
             role="alert"
-            className="rounded-xl border border-[#8a2a22]/40 bg-[#8a2a22]/[0.07] px-4 py-3"
+            className="rounded-xl border border-[var(--bo-perigo)]/40 bg-[var(--bo-perigo)]/[0.07] px-4 py-3"
           >
-            <p className="text-[#8a4632] text-xs font-medium leading-snug">
+            <p className="text-[var(--bo-perigo)] text-xs font-medium leading-snug">
               {recusadas.length === 1
                 ? "Esta entrada do registo não ficou guardada no servidor:"
                 : `Estas ${recusadas.length} entradas do registo não ficaram guardadas no servidor:`}
@@ -200,7 +200,7 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
               type="button"
               onClick={tentarGravarDeNovo}
               disabled={aTentar}
-              className={`alvo-toque mt-2.5 rounded-lg border border-[#8a2a22]/40 px-3 py-1.5 text-[11px] font-medium text-[#8a4632] hover:bg-[#8a2a22]/10 disabled:opacity-45 ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque mt-2.5 rounded-lg border border-[var(--bo-perigo)]/40 px-3 py-1.5 text-[11px] font-medium text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)]/10 disabled:opacity-45 ${ESTADO} ${PRESSAO}`}
             >
               {aTentar ? "A tentar…" : "Tentar de novo"}
             </button>

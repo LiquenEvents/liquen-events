@@ -52,11 +52,11 @@ export default function NotaDaProposta({ quoteId }: { quoteId: string }) {
   if (!nota) return null;
 
   return (
-    <div className="mt-2 rounded-xl border border-[#c9a227]/30 bg-[#f6efd8]/60 p-3">
-      <p className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[#7a6420]">
+    <div className="mt-2 rounded-xl border border-[var(--bo-aviso-tom)]/30 bg-[var(--bo-aviso-lavagem)]/60 p-3">
+      <p className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[var(--bo-aviso)]">
         <span aria-hidden="true">✎</span>
         Nota da proposta
-        <span className="font-normal normal-case tracking-normal text-[#7a6420]/70">
+        <span className="font-normal normal-case tracking-normal text-[var(--bo-aviso)]/70">
           — escreve-se no estúdio, nunca sai na proposta
         </span>
       </p>

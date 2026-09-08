@@ -105,7 +105,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
   for (const f of suspeitas) porSuspeita.set(f.motivo, [...(porSuspeita.get(f.motivo) ?? []), f]);
 
   const aviso = suspeitas.length > 0 && (
-    <div className={`${CAIXA} bg-[#8a6420]/10 text-[#7a5a1c]`}>
+    <div className={`${CAIXA} bg-[var(--bo-aviso)]/10 text-[var(--bo-aviso)]`}>
       <p className="font-semibold">
         {suspeitas.length === 1
           ? "1 fotografia vai sair pior do que devia."
@@ -141,7 +141,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
   if (r.emFalta.length === 0) {
     return (
       <>
-        <p className="mt-3 text-[12px] text-[#3c5140]">
+        <p className="mt-3 text-[12px] text-[var(--bo-accent-hover)]">
           As {r.total} fotografias estão todas no sítio.
           {r.naoVerificaveis > 0 &&
             ` (${r.naoVerificaveis} ${r.naoVerificaveis === 1 ? "vem de um endereço de fora e não dá para confirmar daqui" : "vêm de endereços de fora e não dão para confirmar daqui"}.)`}
@@ -158,7 +158,7 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
 
   return (
     <>
-      <div className={`${CAIXA} bg-[#8a2a22]/10 text-[#8a2a22]`} role="alert">
+      <div className={`${CAIXA} bg-[var(--bo-perigo)]/10 text-[var(--bo-perigo)]`} role="alert">
         <p className="font-semibold">
           {r.emFalta.length === 1
             ? "1 fotografia não vai aparecer ao casal."

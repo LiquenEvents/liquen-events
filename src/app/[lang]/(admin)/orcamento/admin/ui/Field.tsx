@@ -92,7 +92,7 @@ export type FieldProps = InputFieldProps | TextareaFieldProps | SelectFieldProps
 // escrever quando lhe tocam seria movimento a fingir que houve um botão. O que
 // um campo tem é foco e contorno, e isso é estado — 120 ms.
 const CONTROL =
-  "w-full rounded-xl bg-white border text-sm text-[var(--bo-text)] placeholder:text-foreground/35 " +
+  "w-full rounded-xl bg-[var(--bo-surface)] border text-sm text-[var(--bo-text)] placeholder:text-foreground/35 " +
   " " +
   ESTADO +
   " focus:outline-none px-3.5 py-2.5";
@@ -139,7 +139,7 @@ export function Field(props: FieldProps) {
   const controlClass = cn(
     variant === "underline" ? CONTROL_UNDERLINE : CONTROL,
     error
-      ? "border-[#8a2a22]/70 focus:border-[#8a2a22]"
+      ? "border-[var(--bo-perigo)]/70 focus:border-[var(--bo-perigo)]"
       : variant === "underline"
         ? "border-foreground/20 focus:border-sage-600 hover:border-foreground/40"
         : "border-foreground/50 focus:border-foreground/75",
@@ -201,7 +201,7 @@ export function Field(props: FieldProps) {
       >
         {label}
         {required && (
-          <span aria-hidden="true" className="ml-1 text-[#8a2a22]/80">
+          <span aria-hidden="true" className="ml-1 text-[var(--bo-perigo)]/80">
             *
           </span>
         )}
@@ -298,7 +298,7 @@ export function Field(props: FieldProps) {
       {error && (
         <p
           id={errorId}
-          className="bo-entrada flex items-start gap-1 text-xs leading-relaxed text-[#8a2a22]"
+          className="bo-entrada flex items-start gap-1 text-xs leading-relaxed text-[var(--bo-perigo)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>{error}</span>

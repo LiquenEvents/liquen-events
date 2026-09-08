@@ -162,9 +162,9 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
           aria-hidden={aSairAgora || undefined}
           inert={aSairAgora}
           /* ── O MATERIAL ──────────────────────────────────────────────────
-             Era `rounded-2xl border … bg-white p-1.5`. O `rounded-2xl` media
+             Era `rounded-2xl border … bg-[var(--bo-surface)] p-1.5`. O `rounded-2xl` media
              8 px como todo o resto (o bloco dos raios do `globals.css` colapsa
-             a escala do Tailwind para o conteúdo), e o `bg-white` era branco
+             a escala do Tailwind para o conteúdo), e o `bg-[var(--bo-surface)]` era branco
              opaco escrito à mão — nem sequer o token da superfície.
 
              A `.bo-material` traz o raio de 12 px, o fio e a superfície

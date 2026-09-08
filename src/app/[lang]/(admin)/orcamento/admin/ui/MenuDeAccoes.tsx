@@ -147,7 +147,7 @@ export function MenuDeAccoes({
             // continua a esbater-se — agora nos 120 ms da escala.
             `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
             a.destrutiva
-              ? "text-[#8a3d2f] active:bg-[#8a3d2f]/[0.12]"
+              ? "text-[var(--bo-perigo)] active:bg-[var(--bo-perigo)]/[0.12]"
               : "text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
             // O coração deste componente: só se esconde onde há mesmo rato.
             "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
@@ -263,7 +263,7 @@ export function MenuDeAccoes({
                            num item do telemóvel não pintava nada e só ficava o
                            afundar. */
                         a.destrutiva
-                          ? "text-[#8a3d2f] hover:bg-[#8a3d2f] hover:text-white active:bg-[#8a3d2f] active:text-white"
+                          ? "text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)] hover:text-white active:bg-[var(--bo-perigo)] active:text-white"
                           : "text-[var(--bo-tinta-72)] hover:bg-[var(--bo-accent)] hover:text-white active:bg-[var(--bo-accent)] active:text-white",
                       )}
                     >

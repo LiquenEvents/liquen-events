@@ -1,8 +1,28 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+
+/**
+ * ── PORQUE É QUE ISTO PRECISA DE FINGIR OS COOKIES ────────────────────────
+ *
+ * O layout passou a LER um cookie — a aparência escolhida (Automático, Claro,
+ * Escuro), para o atributo chegar no HTML do servidor e o modo escuro não dar
+ * um clarão branco a abrir o painel. A razão está por extenso no `layout.tsx`.
+ *
+ * `cookies()` do Next só funciona dentro do âmbito de um pedido, e aqui não há
+ * pedido nenhum: isto renderiza o layout à mão para lhe ver a estrutura. Sem
+ * este `vi.mock`, o teste rebenta com «`cookies` was called outside a request
+ * scope» — e o que ele guarda (haver um `<main>`, não haver `pt-24`) não tem
+ * nada a ver com cookies.
+ *
+ * Devolve vazio de propósito: é o caso «Automático», que é o de omissão.
+ */
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+
 import AdminLayout from "./layout";
 
 /**

@@ -200,7 +200,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
       {erro && (
         <p
           role="alert"
-          className="mb-4 flex items-start gap-1.5 rounded-lg bg-[#fdf1ef] px-3 py-2 text-sm leading-relaxed text-[#8a2a22]"
+          className="mb-4 flex items-start gap-1.5 rounded-lg bg-[var(--bo-perigo-lavagem)] px-3 py-2 text-sm leading-relaxed text-[var(--bo-perigo)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>{erro}</span>
@@ -208,7 +208,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
       )}
 
       {indisponivel && (
-        <p className="mb-4 rounded-lg bg-[#fbf7ec] px-3 py-2 text-sm leading-relaxed text-[#6b5720]">
+        <p className="mb-4 rounded-lg bg-[var(--bo-aviso-lavagem)] px-3 py-2 text-sm leading-relaxed text-[var(--bo-aviso)]">
           A tabela das passkeys ainda não existe na base de dados. Corre o{" "}
           <code className="text-xs">db/schema.sql</code> no Supabase e volta aqui.
         </p>
@@ -317,7 +317,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                           </button>
                           <button
                             onClick={() => remover(d)}
-                            className={`alvo-toque rounded-md px-2 py-1 text-xs text-[#8a2a22] ${ESTADO} ${PRESSAO} hover:bg-[#fdf1ef]`}
+                            className={`alvo-toque rounded-md px-2 py-1 text-xs text-[var(--bo-perigo)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-perigo-lavagem)]`}
                           >
                             Remover
                           </button>

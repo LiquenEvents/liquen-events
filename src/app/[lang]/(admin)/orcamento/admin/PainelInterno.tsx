@@ -137,12 +137,12 @@ function CampoKm({
             emitido.current = leitura.valor;
             onKm(leitura.valor);
           }}
-          className={`bo-input w-20 px-2 py-1.5 text-xs${erro ? " border-[#8a2a22]" : ""}`}
+          className={`bo-input w-20 px-2 py-1.5 text-xs${erro ? " border-[var(--bo-perigo)]" : ""}`}
         />
         <span className="text-[11px] text-foreground/45">km, num sentido</span>
       </label>
       {erro ? (
-        <span id={idErro} className="text-[10px] leading-relaxed text-[#8a2a22]">
+        <span id={idErro} className="text-[10px] leading-relaxed text-[var(--bo-perigo)]">
           {erro}
         </span>
       ) : (
@@ -316,12 +316,12 @@ export default function PainelInterno({
         {/* Os dois sinais que valem um olhar mesmo com o painel fechado. */}
         <span className="ml-auto flex items-center gap-1.5">
           {magra && (
-            <span className="rounded-full bg-[#8a2a22]/15 px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase text-[#8a4632]">
+            <span className="rounded-full bg-[var(--bo-perigo)]/15 px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase text-[var(--bo-perigo)]">
               margem {total!.percentagem}%
             </span>
           )}
           {fora && (
-            <span className="rounded-full bg-[#c08a3e]/15 px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase text-[#8a6420]">
+            <span className="rounded-full bg-[var(--bo-aviso-tom)]/15 px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase text-[var(--bo-aviso)]">
               valor fora do habitual
             </span>
           )}
@@ -436,7 +436,7 @@ export default function PainelInterno({
                             l?.percentagem === null
                               ? "text-foreground/25"
                               : l!.percentagem! < margemMinima
-                                ? "text-[#8a2a22]"
+                                ? "text-[var(--bo-perigo)]"
                                 : "text-[var(--bo-text-muted)]"
                           }`}
                         >
@@ -465,7 +465,7 @@ export default function PainelInterno({
 
               {total && (
                 <p
-                  className={`mt-3 text-xs leading-relaxed ${magra ? "text-[#8a2a22]" : "text-[var(--bo-text-muted)]"}`}
+                  className={`mt-3 text-xs leading-relaxed ${magra ? "text-[var(--bo-perigo)]" : "text-[var(--bo-text-muted)]"}`}
                 >
                   Margem de {eur(total.margem)} em {eur(total.precoComparavel)} —{" "}
                   <strong className="font-semibold">{total.percentagem}%</strong>
@@ -531,7 +531,7 @@ export default function PainelInterno({
                   </strong>{" "}
                   <span className="text-foreground/45">— {deslocacao.formula}</span>
                   {deslocacao.provavelAlojamento && (
-                    <span className="block text-[11px] text-[#8a6420]">
+                    <span className="block text-[11px] text-[var(--bo-aviso)]">
                       A esta distância conte com dormir fora. O alojamento cobra-se à parte e não
                       está neste número.
                     </span>
@@ -561,7 +561,7 @@ export default function PainelInterno({
 
           {/* ── O total está dentro do habitual? ─────────────────────── */}
           {fora && (
-            <p className="mt-4 rounded-xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.06] p-3 text-[11px] leading-relaxed text-[#8a6420]">
+            <p className="mt-4 rounded-xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.06] p-3 text-[11px] leading-relaxed text-[var(--bo-aviso)]">
               {paxDaqui} pax costuma ficar entre {eur(fora.padrao.min)} e {eur(fora.padrao.max)}
               {fora.padrao.regiao ? ` na zona de ${fora.padrao.regiao}` : " (média do país)"}, com
               mediana de {eur(fora.padrao.mediana)} em {fora.padrao.casos} eventos. Esta está{" "}

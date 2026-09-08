@@ -323,9 +323,9 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       {colisoes.length > 0 && (
         <div
           role="alert"
-          className="mb-4 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="mb-4 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-[#8a2a22]">
+          <p className="font-medium text-[var(--bo-perigo)]">
             Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o plano mudou noutro sítio
             entretanto.
           </p>
@@ -440,7 +440,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => removeItem(i.id)}
                         aria-label="Remover tarefa"
-                        className={`alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque shrink-0 p-1 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[var(--bo-perigo)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                       >
                         ×
                       </button>

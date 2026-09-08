@@ -206,9 +206,12 @@ describe("A coluna de destinos — o activo tem a cor da casa", () => {
     expect(CLASSE_DO_FILETE, "não encontrei o filete do destino activo").toBeTruthy();
     expect(
       CLASSE_DO_FILETE,
-      "o filete voltou a ter a cor escrita à mão — e o hex que lá estava (#4d6350) " +
-        "nem sequer era o acento da casa (#4c6350)",
-    ).not.toContain("#4d6350");
+      "o filete voltou a ter a cor escrita à mão. O hex que lá esteve (`#4d6350`) nem " +
+        "sequer era o acento da casa (`#4c6350`) — um dígito ao lado, perto o suficiente " +
+        "para ninguém ver. Agora a proibição é de QUALQUER hex, e não só daquele: a fase " +
+        "03 do sistema de design tirou os literais de cor do back office todo, e um hex " +
+        "novo aqui seria o primeiro a voltar.",
+    ).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(CLASSE_DO_FILETE, "o filete deixou de usar o token do acento").toContain(
       "bg-[var(--bo-accent)]",
     );

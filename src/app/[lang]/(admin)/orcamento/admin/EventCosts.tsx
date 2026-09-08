@@ -385,9 +385,9 @@ export default function EventCosts({ quote, onChange }: Props) {
       {colisoes.length > 0 && (
         <div
           role="alert"
-          className="bo-entrada mb-5 rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+          className="bo-entrada mb-5 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-[#8a2a22]">
+          <p className="font-medium text-[var(--bo-perigo)]">
             Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: os custos mudaram noutro sítio
             entretanto.
           </p>
@@ -435,17 +435,17 @@ export default function EventCosts({ quote, onChange }: Props) {
           <p className={NOTA}>c/ IVA {eur2(amounts.gross)}</p>
         </div>
         <div className={QUADRADO}>
-          <p className={`${VALOR} text-[#8a6420]`}>{eur2(totals.actualNet)}</p>
+          <p className={`${VALOR} text-[var(--bo-aviso)]`}>{eur2(totals.actualNet)}</p>
           <p className={ROTULO}>Custos (s/ IVA)</p>
           <p className={NOTA}>c/ IVA {eur2(totals.actual)}</p>
         </div>
         <div className={QUADRADO}>
-          <p className={`${VALOR} ${totals.margin >= 0 ? "text-sage-600" : "text-[#8a2a22]"}`}>
+          <p className={`${VALOR} ${totals.margin >= 0 ? "text-sage-600" : "text-[var(--bo-perigo)]"}`}>
             {eur2(totals.margin)}
           </p>
           <p className={ROTULO}>Margem{totals.revenueNet > 0 ? ` · ${totals.marginPct}%` : ""}</p>
           {totals.margin < 0 && (
-            <p className="order-3 mt-1 w-full text-[9px] uppercase leading-tight tracking-[0.12em] text-[#8a2a22] @min-[26rem]:w-auto">
+            <p className="order-3 mt-1 w-full text-[9px] uppercase leading-tight tracking-[0.12em] text-[var(--bo-perigo)] @min-[26rem]:w-auto">
               Prejuízo
             </p>
           )}
@@ -458,7 +458,7 @@ export default function EventCosts({ quote, onChange }: Props) {
           {items.map((it) => (
             <div
               key={it.id}
-              className="group rounded-xl border border-[var(--bo-hairline)] bg-white px-3.5 py-3 "
+              className="group rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] px-3.5 py-3 "
             >
               <div className="flex items-center gap-2.5">
                 <div className="min-w-0 flex-1">
@@ -502,7 +502,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                       os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(it.id)}
-                  className={`alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque shrink-0 p-1 text-foreground/25 sem-rato:text-[var(--bo-text-muted)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[var(--bo-perigo)] ${ESTADO} ${PRESSAO}`}
                   aria-label="Remover"
                 >
                   <svg
@@ -578,7 +578,7 @@ export default function EventCosts({ quote, onChange }: Props) {
             // Sem esta linha, o formulário de quem não conseguiu ler o
             // diretório é igual ao de quem ainda não tem nenhum fornecedor
             // guardado — e o nome escrito à mão nasce solto do diretório.
-            <p className="text-[11px] text-[#8a2a22]">
+            <p className="text-[11px] text-[var(--bo-perigo)]">
               Não deu para ler o diretório de fornecedores. Podes escrever o nome à mão, ou
               atualizar a página para o voltar a tentar.
             </p>

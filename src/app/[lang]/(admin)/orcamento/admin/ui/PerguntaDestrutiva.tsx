@@ -129,7 +129,7 @@ export function PerguntaDestrutiva({
         </>
       )}
       {aviso && (
-        <p className={`text-sm text-[#8a2a22] ${oQueSePerde.length > 0 ? "mt-3" : ""}`}>{aviso}</p>
+        <p className={`text-sm text-[var(--bo-perigo)] ${oQueSePerde.length > 0 ? "mt-3" : ""}`}>{aviso}</p>
       )}
     </FolhaOuDialogo>
   );

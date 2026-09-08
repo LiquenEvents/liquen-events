@@ -101,6 +101,21 @@ const hexParaRgb = (h: string): RGB => {
 
 /** `rgba(255, 255, 255, 0.88)` → `{ cor, alpha }`. */
 function corComAlpha(valor: string): { cor: RGB; alpha: number } {
+  /*
+    A tinta desta casa passou a derivar de um canal — `rgb(var(--bo-tinta-rgb)
+    / 0.13)` — para o modo escuro trocar uma linha em vez de nove. Sem esta
+    leitura, o `parseFloat` de «var(--bo-tinta-rgb)» dava `NaN` e o teste
+    dizia «o fio mede NaN:1»: um leitor que não conhece uma forma nova não dá
+    erro, dá um número que não é número.
+  */
+  const comCanal = valor.match(/rgba?\(\s*var\(\s*(--[a-z0-9-]+)\s*\)\s*\/\s*([\d.]+)\s*\)/i);
+  if (comCanal) {
+    const nums = token(comCanal[1]).match(/\d+/g);
+    if (!nums || nums.length < 3) throw new Error(`o canal ${comCanal[1]} não tem três componentes`);
+    const [r, g, b] = nums.slice(0, 3).map(Number);
+    return { cor: [r, g, b], alpha: parseFloat(comCanal[2]) };
+  }
+
   const rgba = valor.match(/rgba?\(([^)]+)\)/);
   if (rgba) {
     const p = rgba[1].split(",").map((x) => parseFloat(x.trim()));

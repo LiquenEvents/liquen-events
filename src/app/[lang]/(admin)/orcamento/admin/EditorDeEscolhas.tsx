@@ -84,7 +84,7 @@ export interface FotoDisponivel {
 }
 
 const CAIXA =
-  "w-full rounded-md border border-[var(--bo-hairline)] bg-white px-2.5 py-1.5 text-sm text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-sage-600 focus:outline-none";
+  "w-full rounded-md border border-[var(--bo-hairline)] bg-[var(--bo-surface)] px-2.5 py-1.5 text-sm text-[var(--bo-text)] placeholder:text-foreground/30 focus:border-sage-600 focus:outline-none";
 const BOTAO_MAGRO =
   "alvo-toque rounded-md border border-[var(--bo-hairline)] px-2.5 py-1.5 text-[11px] " +
   `text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`;
@@ -272,7 +272,7 @@ export default function EditorDeEscolhas({
           mesma frase dez vezes seguidas. Isso não é anunciar — é tapar o que
           quer que ela estivesse a ouvir a seguir. */}
       {anulavel && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2">
           <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-[var(--bo-tinta-72)]">
             {anulavel.frase} Pode anular durante {anulavel.segundos}s.
           </span>
@@ -344,7 +344,7 @@ export default function EditorDeEscolhas({
                     // À VISTA no telemóvel — é a regra desta casa desde o «×»
                     // das fotos: um botão que apaga não pode ser invisível e
                     // continuar a apanhar o dedo.
-                    className={`alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-muted)] hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] pointer-coarse:h-8 pointer-coarse:w-8 ${ESTADO} ${PRESSAO}`}
+                    className={`alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-[var(--bo-text-muted)] hover:bg-[var(--bo-perigo)]/10 hover:text-[var(--bo-perigo)] pointer-coarse:h-8 pointer-coarse:w-8 ${ESTADO} ${PRESSAO}`}
                     onClick={() => pedirParaApagarEscolha(i)}
                   >
                     ×
@@ -365,7 +365,7 @@ export default function EditorDeEscolhas({
                     role="alertdialog"
                     aria-live="assertive"
                     aria-label="Confirmar apagar a alternativa"
-                    className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+                    className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--bo-aviso-tom)]/45 bg-[var(--bo-aviso-tom)]/[0.08] px-3 py-2.5"
                   >
                     <span className="min-w-[12rem] flex-1 text-[12px] leading-relaxed text-[var(--bo-text)]">
                       {perguntaSobre(escolha, i)}
@@ -377,7 +377,7 @@ export default function EditorDeEscolhas({
                     </button>
                     <button
                       type="button"
-                      className={`${BOTAO_MAGRO} border-[#8a2a22]/35 text-[#8a2a22] hover:bg-[#8a2a22]/10`}
+                      className={`${BOTAO_MAGRO} border-[var(--bo-perigo)]/35 text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)]/10`}
                       onClick={() => {
                         onChange(lista.filter((e) => e.id !== escolha.id));
                         setAApagar(null);
@@ -547,7 +547,7 @@ export default function EditorDeEscolhas({
                   {/* O aviso é sobre o que o CASAL vai ver, e não sobre o que
                       está escrito aqui: é a única pergunta que interessa. */}
                   {!pronta && (
-                    <span className="text-[11px] text-[#8a4632]">
+                    <span className="text-[11px] text-[var(--bo-perigo)]">
                       Ainda não aparece ao casal — falta o título ou a segunda opção.
                     </span>
                   )}

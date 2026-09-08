@@ -338,7 +338,7 @@ describe("a barra de separadores do painel", () => {
     expect(
       screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
       "o separador activo ficou com fundo branco POR BAIXO da marca branca",
-    ).not.toContain("bg-white");
+    ).not.toContain("bg-[var(--bo-surface)]");
   });
 
   it("e nunca há nenhum — sem medida, o fundo do botão é a rede", () => {
@@ -350,7 +350,7 @@ describe("a barra de separadores do painel", () => {
     expect(
       screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
       "sem marca medida, o separador activo ficou sem se distinguir",
-    ).toContain("bg-white");
+    ).toContain("bg-[var(--bo-surface)]");
   });
 
   it("e uma medida de tamanho ZERO conta como nenhuma — o fundo do botão fica", async () => {
@@ -386,7 +386,7 @@ describe("a barra de separadores do painel", () => {
     expect(
       screen.getByRole("tab", { name: "Esta página" }).className.split(/\s+/),
       "o separador activo ficou sem marca E sem fundo — invisível na sua própria barra",
-    ).toContain("bg-white");
+    ).toContain("bg-[var(--bo-surface)]");
   });
 
   it("o painel que chega apresenta-se — e num nó NOVO, para a animação recomeçar", async () => {

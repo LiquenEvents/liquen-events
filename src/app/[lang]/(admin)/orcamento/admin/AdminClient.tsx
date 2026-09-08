@@ -122,7 +122,7 @@ import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
  * é esta, e não a do formulário.
  */
 const FILTRO_CLASSES =
-  "bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 " +
+  "bg-[var(--bo-surface)] border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 " +
   "text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 /* A outra metade do vocabulário: a `.bo-saida` é a palavra em CSS, e este hook
@@ -672,7 +672,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
                 seguir). */}
             {faltaADataDoEvento(q) ? (
               <span
-                className="inline-flex items-center rounded-full bg-[#c98a2e]/12 px-2 py-0.5 text-[11px] font-medium text-[#8a6420]"
+                className="inline-flex items-center rounded-full bg-[var(--bo-aviso-tom)]/12 px-2 py-0.5 text-[11px] font-medium text-[var(--bo-aviso)]"
                 title={PORQUE_FALTA_A_DATA}
               >
                 {AVISO_SEM_DATA}
@@ -684,7 +684,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
               <span
                 className={`ml-1.5 text-[10px] ${
                   cd.tone === "today" || cd.tone === "soon"
-                    ? "font-medium text-[#8a2a22]"
+                    ? "font-medium text-[var(--bo-perigo)]"
                     : "text-foreground/45"
                 }`}
               >
@@ -806,7 +806,7 @@ const QuoteCard = memo(function QuoteCard({
           ? "border-sage-600/45 bg-sage-600/[0.05] "
           : isSelected
             ? "border-sage-600/30 bg-sage-600/[0.03]"
-            : "border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] bg-white "
+            : "border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] "
       }`}
     >
       {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
@@ -873,9 +873,9 @@ const QuoteCard = memo(function QuoteCard({
               <span
                 className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-semibold tracking-[0.1em] uppercase ${
                   tom === "urgente"
-                    ? "bg-[#8a2a22]/15 text-[#8a2a22]"
+                    ? "bg-[var(--bo-perigo)]/15 text-[var(--bo-perigo)]"
                     : tom === "aviso"
-                      ? "bg-[#c08a3e]/15 text-[#8a6420]"
+                      ? "bg-[var(--bo-aviso-tom)]/15 text-[var(--bo-aviso)]"
                       : "bg-[var(--bo-tinta-6)] text-foreground/45"
                 }`}
                 title={`Entrou ${esperaEmPalavras(espera)} e ainda não teve resposta`}
@@ -899,8 +899,8 @@ const QuoteCard = memo(function QuoteCard({
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
                     q.followUpAt < todayStr
-                      ? "bg-[#8a2a22]/15 text-[#8a2a22]"
-                      : "bg-[#637a5f]/15 text-sage-600"
+                      ? "bg-[var(--bo-perigo)]/15 text-[var(--bo-perigo)]"
+                      : "bg-[var(--bo-marca)]/15 text-sage-600"
                   }`}
                   title={q.followUpAt < todayStr ? "Seguimento em atraso" : "Seguimento hoje"}
                 >
@@ -965,7 +965,7 @@ const QuoteCard = memo(function QuoteCard({
                 <span
                   className={
                     cd.tone === "today" || cd.tone === "soon"
-                      ? "text-[#8a2a22] font-semibold"
+                      ? "text-[var(--bo-perigo)] font-semibold"
                       : "text-[var(--bo-text)] font-medium"
                   }
                 >
@@ -986,7 +986,7 @@ const QuoteCard = memo(function QuoteCard({
         {faltaADataDoEvento(q) && (
           <div className="mt-2.5">
             <span
-              className="inline-flex items-center rounded-full bg-[#c98a2e]/12 px-2 py-0.5 text-[11px] font-medium text-[#8a6420]"
+              className="inline-flex items-center rounded-full bg-[var(--bo-aviso-tom)]/12 px-2 py-0.5 text-[11px] font-medium text-[var(--bo-aviso)]"
               title={PORQUE_FALTA_A_DATA}
             >
               {AVISO_SEM_DATA}
@@ -5155,7 +5155,7 @@ export default function AdminClient({
                   <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
-                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[#2a3227] ${ESTADO} ${PRESSAO} `}
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
                     title="Criar pedido manualmente"
                   >
                     <svg
@@ -5516,7 +5516,7 @@ export default function AdminClient({
                        se pode procurar continua dito por inteiro no
                        `aria-label`, que é quem serve o leitor de ecrã. */
                     placeholder="Procurar pedidos…"
-                    className={`w-full bg-white border border-[var(--bo-hairline)] rounded-xl pl-10 pr-3 py-2.5 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22 focus:outline-none focus:border-foreground/25 ${ESTADO}`}
+                    className={`w-full bg-[var(--bo-surface)] border border-[var(--bo-hairline)] rounded-xl pl-10 pr-3 py-2.5 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22 focus:outline-none focus:border-foreground/25 ${ESTADO}`}
                   />
                   <kbd className="pointer-coarse:hidden absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] text-[var(--bo-text-faint)] lg:block">
                     /
@@ -5532,7 +5532,7 @@ export default function AdminClient({
                   className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium ${ESTADO} ${PRESSAO} ${
                     filtrosActivos > 0
                       ? "bg-sage-600 border-sage-600 text-white"
-                      : "bg-white border-[var(--bo-hairline)] text-[var(--bo-text-muted)]"
+                      : "bg-[var(--bo-surface)] border-[var(--bo-hairline)] text-[var(--bo-text-muted)]"
                   }`}
                 >
                   <svg
@@ -5548,7 +5548,7 @@ export default function AdminClient({
                   </svg>
                   Filtros
                   {filtrosActivos > 0 && (
-                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-white/25 px-1 text-[12px] font-semibold">
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-[var(--bo-surface)]/25 px-1 text-[12px] font-semibold">
                       {filtrosActivos}
                     </span>
                   )}
@@ -5592,7 +5592,7 @@ export default function AdminClient({
                   className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border ${ESTADO} ${PRESSAO} ${
                     mineOnly
                       ? "bg-sage-600 border-sage-600 text-white"
-                      : "bg-white border-[var(--bo-hairline)] text-foreground/45 hover:text-[var(--bo-text-muted)]"
+                      : "bg-[var(--bo-surface)] border-[var(--bo-hairline)] text-foreground/45 hover:text-[var(--bo-text-muted)]"
                   }`}
                 >
                   <svg
@@ -5719,7 +5719,7 @@ export default function AdminClient({
                   // Media 85x38 e passava despercebido porque, a 375 px, ficava
                   // fora da margem — os filtros novos mudaram a dobra da barra
                   // e trouxeram-no para dentro do ecrã, onde a régua o apanhou.
-                  className={`alvo-toque flex items-center gap-2 px-3 py-2.5 bg-white border border-[var(--bo-hairline)] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO} whitespace-nowrap`}
+                  className={`alvo-toque flex items-center gap-2 px-3 py-2.5 bg-[var(--bo-surface)] border border-[var(--bo-hairline)] text-foreground/40 text-[10px] tracking-[0.12em] uppercase rounded-xl hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO} whitespace-nowrap`}
                   title="Exportar a lista atual para CSV (Excel)"
                 >
                   <svg
@@ -5769,7 +5769,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -5779,7 +5779,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -5793,7 +5793,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[#1b2119] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -5888,7 +5888,7 @@ export default function AdminClient({
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bo-surface)] border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
                 >
                   Exportar seleção
                 </button>
@@ -5900,7 +5900,7 @@ export default function AdminClient({
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bo-surface)] border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -5912,7 +5912,7 @@ export default function AdminClient({
                 <button
                   onClick={() => deleteSelected(seleccionadosAVista)}
                   disabled={bulkBusy}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#8a2a22]/25 text-[#8a2a22]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#8a2a22]/10 hover:text-[#8a2a22] ${ESTADO} ${PRESSAO} disabled:opacity-50`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bo-surface)] border border-[var(--bo-perigo)]/25 text-[var(--bo-perigo)]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[var(--bo-perigo)]/10 hover:text-[var(--bo-perigo)] ${ESTADO} ${PRESSAO} disabled:opacity-50`}
                 >
                   Apagar ({seleccionadosAVista.length})
                 </button>
@@ -6042,7 +6042,7 @@ export default function AdminClient({
                       setInicioDoLote(visibleCount);
                       setVisibleCount((c) => c + LIST_PAGE_SIZE);
                     }}
-                    className={`w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-[var(--bo-tinta-72)] bg-white border border-[var(--bo-hairline)] rounded-xl hover:border-foreground/20 ${ESTADO} ${PRESSAO}`}
+                    className={`w-full py-3.5 text-[11px] tracking-[0.2em] uppercase text-foreground/45 hover:text-[var(--bo-tinta-72)] bg-[var(--bo-surface)] border border-[var(--bo-hairline)] rounded-xl hover:border-foreground/20 ${ESTADO} ${PRESSAO}`}
                   >
                     Mostrar mais ({filtered.length - visibleCount} restante
                     {filtered.length - visibleCount !== 1 ? "s" : ""})
@@ -6150,7 +6150,7 @@ export default function AdminClient({
                        fotograma a fotograma. */
                     className={`${
                       painelASair ? SAIDA : "bo-entrada"
-                    } fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]`}
+                    } fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-[var(--bo-surface)] shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]`}
                     /* A saída larga os toques dentro da própria classe; o
                        `inert` é a mesma frase dita ao teclado e ao leitor de
                        ecrã. Sem ele, durante 200 ms havia um painel a
@@ -6169,7 +6169,7 @@ export default function AdminClient({
                     }
                   >
                     <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-                      <div className="sticky top-0 z-10 border-b border-[var(--bo-hairline)] bg-white px-3.5 pt-3.5 sm:px-7 sm:pt-5">
+                      <div className="sticky top-0 z-10 border-b border-[var(--bo-hairline)] bg-[var(--bo-surface)] px-3.5 pt-3.5 sm:px-7 sm:pt-5">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <h2
@@ -6447,7 +6447,7 @@ export default function AdminClient({
                       {rascunhoPorRepor && (
                         <div
                           role="status"
-                          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#8a6420]/25 bg-[#8a6420]/[0.07] px-3.5 py-2.5"
+                          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--bo-aviso)]/25 bg-[var(--bo-aviso)]/[0.07] px-3.5 py-2.5"
                         >
                           <p className="min-w-0 flex-1 text-xs leading-snug text-[var(--bo-tinta-72)]">
                             Ficou por gravar {fraseDoQueMudou(rascunhoPorRepor.mudou)} deste pedido
@@ -6554,7 +6554,7 @@ export default function AdminClient({
                                     rolarAteVer(toolsRef.current, { block: "start" });
                                   }
                                 }}
-                                className={`flex w-full items-center gap-3 rounded-full bg-sage-600 px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
+                                className={`flex w-full items-center gap-3 rounded-full bg-sage-600 px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-accent-hover)]`}
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
@@ -6759,7 +6759,7 @@ export default function AdminClient({
                                         Custos {formatPrice(costs)} · Margem{" "}
                                         <span
                                           className={
-                                            margin >= 0 ? "text-sage-600" : "text-[#8a2a22]"
+                                            margin >= 0 ? "text-sage-600" : "text-[var(--bo-perigo)]"
                                           }
                                         >
                                           {formatPrice(margin)}
@@ -6784,7 +6784,7 @@ export default function AdminClient({
                                       const cd = eventCountdown(editDate);
                                       return cd ? (
                                         <p
-                                          className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[#8a2a22]" : "text-foreground/40"}`}
+                                          className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[var(--bo-perigo)]" : "text-foreground/40"}`}
                                         >
                                           {cd.label}
                                         </p>
@@ -6809,7 +6809,7 @@ export default function AdminClient({
                                     }
                                     onChange={(e) => setEditGuests(e.target.value)}
                                     className={`bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full${
-                                      erroDeConvidados ? " border-[#8a2a22]" : ""
+                                      erroDeConvidados ? " border-[var(--bo-perigo)]" : ""
                                     }`}
                                   />
                                   {/* O `min={0}` do input não trava nada — o
@@ -6819,7 +6819,7 @@ export default function AdminClient({
                                   {erroDeConvidados && (
                                     <p
                                       id="erro-dos-convidados"
-                                      className="mt-1 text-[10px] leading-relaxed text-[#8a2a22]"
+                                      className="mt-1 text-[10px] leading-relaxed text-[var(--bo-perigo)]"
                                     >
                                       {erroDeConvidados}
                                     </p>
@@ -6903,7 +6903,7 @@ export default function AdminClient({
                                     obrigatório» — porque não é: há pedidos que
                                     só têm telefone, e isso é legítimo. */}
                                   {!editEmail.trim() && (
-                                    <p className="mt-1 text-[10px] leading-relaxed text-[#8a2a22]">
+                                    <p className="mt-1 text-[10px] leading-relaxed text-[var(--bo-perigo)]">
                                       Sem email, a proposta é gravada e o link continua a servir,
                                       mas não é enviada a ninguém.
                                     </p>
@@ -7732,7 +7732,7 @@ export default function AdminClient({
                               : "Guardado";
                         const haQueFazer = alteracoesPorConfirmar || alarme || gravacao.porGravar;
                         return (
-                          <div className="shrink-0 border-t border-[var(--bo-hairline)] bg-white">
+                          <div className="shrink-0 border-t border-[var(--bo-hairline)] bg-[var(--bo-surface)]">
                             {/* A mesma medida e o mesmo respiro do corpo
                                   (`max-w-3xl px-5 sm:px-7`), para o botão ficar
                                   alinhado com o que está por cima dele. */}
@@ -7745,7 +7745,7 @@ export default function AdminClient({
                                 aria-live={alarme ? "assertive" : "polite"}
                                 className={
                                   alarme
-                                    ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[#8a2a22]"
+                                    ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[var(--bo-perigo)]"
                                     : "flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
                                 }
                               >

@@ -477,13 +477,13 @@ export default function Miniaturas() {
             </>
           )}
           {contagem.avisos.length > 0 && (
-            <p className="mt-2 text-[#8a2a22]">{contagem.avisos.join(" · ")}</p>
+            <p className="mt-2 text-[var(--bo-perigo)]">{contagem.avisos.join(" · ")}</p>
           )}
         </div>
       )}
 
       {falhadas.length > 0 && (
-        <div className="mt-3 text-xs text-[#8a2a22]">
+        <div className="mt-3 text-xs text-[var(--bo-perigo)]">
           {/* As que falharam ficam à vista: uma foto por gerar é uma foto que
               continua a servir o original, e saber QUAIS permite voltar a
               correr só para essas. */}

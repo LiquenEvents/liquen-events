@@ -31,7 +31,7 @@ const PASTA = new URL(".", import.meta.url).pathname;
 
 /** Um véu: uma classe com `inset-0` e uma tinta escura translúcida. */
 const VEU = /className=\{?"([^"]*\binset-0\b[^"]*)"/g;
-const ESCURO = /bg-(?:black|\[#1b2119\])\/\d+/;
+const ESCURO = /bg-(?:black|\[var\(--bo-seleccao\)\])\/\d+/;
 
 /**
  * ── OS QUE NÃO SÃO VÉUS, E PORQUÊ ─────────────────────────────────────────

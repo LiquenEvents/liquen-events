@@ -170,7 +170,7 @@ describe("a barra «Modelos / Editor clássico»", () => {
     await montar();
     const activo = within(barraDe("Editor de modelos")).getByRole("tab", { name: "Modelos" });
     expect(activo.getAttribute("aria-selected")).toBe("true");
-    expect(activo.classList.contains("bg-[#5F7C66]")).toBe(false);
+    expect(activo.classList.contains("bg-[var(--bo-marca)]")).toBe(false);
     // E o rótulo fica POR CIMA da pílula, que é um irmão absoluto desenhado
     // antes dele.
     expect(activo.className).toMatch(/\brelative\b/);
@@ -251,7 +251,7 @@ describe("a barra da língua «Português / English»", () => {
     await abrirModelo();
     const activo = within(barraDe("Língua do modelo")).getByRole("tab", { name: /Português/ });
     expect(activo.getAttribute("aria-selected")).toBe("true");
-    expect(activo.classList.contains("bg-[#5F7C66]")).toBe(false);
+    expect(activo.classList.contains("bg-[var(--bo-marca)]")).toBe(false);
     expect(activo.className).toMatch(/\brelative\b/);
   });
 });

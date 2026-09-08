@@ -391,7 +391,7 @@ export default function FazerProposta({
               aria-pressed={filtro === f.id}
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] ${MOV_ESTADO} ${PRESSAO} ${
                 filtro === f.id
-                  ? "bg-[#1b2119] text-white "
+                  ? "bg-[var(--bo-seleccao)] text-white "
                   : /* `hover:bg-…-6` era o MESMO token do fundo em repouso: a
                        pastilha não escolhida não mudava de fundo ao passar o
                        rato. Sobe um degrau na escada de tinta da casa (3/6/10). */
@@ -444,7 +444,7 @@ export default function FazerProposta({
                   onClick={() => onSelect(q.id)}
                   className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left ${MOV_ESTADO} ${PRESSAO} ${
                     espera
-                      ? "border-[var(--bo-hairline)] bg-white hover:border-sage-600/40"
+                      ? "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:border-sage-600/40"
                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"
                   }`}
                 >
@@ -466,8 +466,8 @@ export default function FazerProposta({
                         <span
                           className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] uppercase ring-1 ring-inset ${
                             choque === "grave"
-                              ? "bg-[#8a2a22]/15 text-[#8a4632] ring-[#8a2a22]/45"
-                              : "bg-[#c08a3e]/18 text-[#8a6420] ring-[#c08a3e]/45"
+                              ? "bg-[var(--bo-perigo)]/15 text-[var(--bo-perigo)] ring-[var(--bo-perigo)]/45"
+                              : "bg-[var(--bo-aviso-tom)]/18 text-[var(--bo-aviso)] ring-[var(--bo-aviso-tom)]/45"
                           }`}
                         >
                           Data ocupada

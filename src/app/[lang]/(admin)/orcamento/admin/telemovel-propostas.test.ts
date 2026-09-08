@@ -109,7 +109,7 @@ describe("as linhas de pagamento no telemóvel", () => {
      * ficou vermelho por uma alteração que não lhe tocou no tamanho.
      */
     expect(PAGAMENTOS).toMatch(
-      /className=(?:"|\{`)alvo-toque text-foreground\/45 hover:text-\[#8a2a22\]/,
+      /className=(?:"|\{`)alvo-toque text-foreground\/45 hover:text-\[var\(--bo-perigo\)\]/,
     );
   });
 });

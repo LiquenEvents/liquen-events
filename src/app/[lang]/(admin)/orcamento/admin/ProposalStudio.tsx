@@ -324,9 +324,9 @@ function esperaDaCopiaDeFotos(fotos: number): number {
 
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-[var(--bo-text)]";
 const ADD_BTN =
-  "alvo-toque !justify-start gap-1 text-xs font-medium text-sage-600 hover:text-[#415440] inline-flex items-center";
+  "alvo-toque !justify-start gap-1 text-xs font-medium text-sage-600 hover:text-[var(--bo-accent-hover)] inline-flex items-center";
 const REMOVE_BTN =
-  "alvo-toque text-foreground/30 hover:text-[#8a2a22] text-base leading-none shrink-0";
+  "alvo-toque text-foreground/30 hover:text-[var(--bo-perigo)] text-base leading-none shrink-0";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -4272,7 +4272,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         role="alertdialog"
         aria-live="assertive"
         aria-label={rotulo}
-        className="mb-2 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+        className="mb-2 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/45 bg-[var(--bo-aviso-tom)]/[0.08] px-3 py-2.5"
       >
         <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-[var(--bo-text)]">
           {aRemover.pergunta}
@@ -6913,7 +6913,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const realce = (campo: CampoAMudar) =>
     porConfirmar.has(campo)
-      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-white"
+      ? "rounded-lg ring-2 ring-[var(--bo-aviso-tom)]/45 ring-offset-2 ring-offset-white"
       : undefined;
   const confirmado = (campo: CampoAMudar) => {
     // Tocar-lhe É a confirmação. Um botão "confirmar" ao lado de cada campo
@@ -7200,7 +7200,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
              `role="alert"` neste ecrã, e um leitor que anuncie «alerta» sem
              dizer de quê obriga a ir procurar. */
           aria-label="O valor não é o que seguiu para o cliente"
-          className="mb-4 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+          className="mb-4 rounded-xl border border-[var(--bo-aviso-tom)]/45 bg-[var(--bo-aviso-tom)]/[0.08] px-3 py-2.5"
         >
           <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
             Esta proposta já seguiu para o cliente{" "}
@@ -7260,7 +7260,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       )}
 
       {limpo && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2">
           <span className="text-xs text-[var(--bo-tinta-72)]">
             {limpo.motivo} Pode anular durante {limpo.segundos}s.
           </span>
@@ -7290,7 +7290,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           role="alertdialog"
           aria-live="assertive"
           aria-label="Confirmar alteração ao valor"
-          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/45 bg-[var(--bo-aviso-tom)]/[0.08] px-3 py-2.5"
         >
           <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-[var(--bo-text)]">
             {confirmacaoDeDinheiro.pergunta}
@@ -7879,7 +7879,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             refDoc={path}
                           />
                           {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                            <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                            <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]">
                               A tira da capa é quase duas vezes mais alta do que larga:{" "}
                               <strong className="font-medium">
                                 esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
@@ -8395,7 +8395,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         o que viu, cita o outro título, e deixa-a
                                         decidir. */}
                                       {avisosDeTitulo[bi] && (
-                                        <p className={`${AVISO_DO_BOARD} text-[#8a6420]`}>
+                                        <p className={`${AVISO_DO_BOARD} text-[var(--bo-aviso)]`}>
                                           {avisosDeTitulo[bi]}
                                         </p>
                                       )}
@@ -8418,7 +8418,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           extenso a seguir — em vez de desaparecerem caladas no
                           PDF. */}
                                       {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                                        <p className={`${AVISO_DO_BOARD} text-[#8a2a22]`}>
+                                        <p className={`${AVISO_DO_BOARD} text-[var(--bo-perigo)]`}>
                                           A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES}{" "}
                                           fotos:{" "}
                                           {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
@@ -8861,7 +8861,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         );
                                       })()}
                                       {cortadas.length > 0 && (
-                                        <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                                        <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]">
                                           Nesta disposição{" "}
                                           {cortadas.length === 1
                                             ? "1 fotografia é cortada"
@@ -9486,7 +9486,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       está errado por baixo — e é a partir dele que o aviso de
                       desalinhamento e o botão que arruma o total falam. */}
                     {contagem.incompleta && (
-                      <p className="flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                      <p className="flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
                         <span aria-hidden="true">⚠</span>
                         <span>
                           {contagem.semPreco === 1
@@ -9527,7 +9527,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             </strong>
                           </p>
                           {v.extrasSemPreco > 0 && (
-                            <p className="mt-0.5 text-[11px] leading-relaxed text-[#8a6420]">
+                            <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--bo-aviso)]">
                               {v.extrasSemPreco === 1
                                 ? "Um dos extras não tem preço, por isso não desce da versão base — e enquanto assim for o PDF não mostra o segundo valor."
                                 : `${v.extrasSemPreco} extras não têm preço, por isso não descem da versão base — e enquanto assim for o PDF não mostra o segundo valor.`}
@@ -10063,7 +10063,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 {/* O aviso e o atalho para o corrigir andam juntos: dizer que está
                 errado sem dar o gesto que o arruma é meio trabalho. */}
                 {desvio && (
-                  <div className="@min-[26rem]:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+                  <div className="@min-[26rem]:col-span-2 -mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2">
                     <span className="text-xs text-[var(--bo-tinta-72)]">
                       O total está escrito à mão e difere da soma das linhas em{" "}
                       <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
@@ -10298,7 +10298,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     de o PDF sair, não depois de o casal perguntar. As frases
                     vêm feitas de `totaisDaProposta`. */}
                   {!totais.fecha && (
-                    <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[#8a2a22]">
+                    <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[var(--bo-perigo)]/35 bg-[var(--bo-perigo)]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[var(--bo-perigo)]">
                       {totais.porQueNaoFecha.map((porque) => (
                         <li key={porque}>⚠ As contas não fecham: {porque}.</li>
                       ))}
@@ -10498,7 +10498,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Agora está antes do dedo, e diz ONDE se resolve — no painel do
                   pedido, que passou a deixar corrigir os contactos. */}
               {!emailDoCliente && (
-                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
                   <span aria-hidden="true">⚠</span>
                   <span>
                     Este pedido não tem email de cliente. A proposta é gravada e o link continua a
@@ -10613,7 +10613,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 {/\{[^}\s]{1,24}\}/.test(mensagemAoCliente) && (
                   <p
                     aria-live="polite"
-                    className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
+                    className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]"
                   >
                     <span aria-hidden="true">⚠</span>
                     <span>
@@ -10637,7 +10637,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   !corpoDoEmail.includes(mensagemAoCliente.trim()) && (
                     <p
                       aria-live="polite"
-                      className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#8a6420]"
+                      className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-aviso)]"
                     >
                       <span aria-hidden="true">⚠</span>
                       <span>
@@ -10690,7 +10690,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               {fotosPorConfirmar > 0 && (
                 <p
                   aria-live="polite"
-                  className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
+                  className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]"
                 >
                   <span aria-hidden="true">⏳</span>
                   <span>
@@ -10950,7 +10950,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               */}
               {precoPorChegar && (
                 <span
-                  className="ml-2 inline-flex first:ml-0 items-center gap-1.5 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
+                  className="ml-2 inline-flex first:ml-0 items-center gap-1.5 rounded-full bg-[var(--bo-perigo)]/12 px-2 py-0.5 text-[11px] font-semibold text-[var(--bo-perigo)]"
                   aria-live="assertive"
                   title={
                     precoPorChegar.porque ??
@@ -10997,7 +10997,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       // também seja anunciado a quem não olha para aqui.
                       className={
                         alarme
-                          ? "ml-2 first:ml-0 rounded-full bg-[#8a2a22]/12 px-2 py-0.5 text-[11px] font-semibold text-[#8a2a22]"
+                          ? "ml-2 first:ml-0 rounded-full bg-[var(--bo-perigo)]/12 px-2 py-0.5 text-[11px] font-semibold text-[var(--bo-perigo)]"
                           : "ml-2 first:ml-0 text-[11px] text-foreground/35"
                       }
                       aria-live={alarme ? "assertive" : "polite"}
@@ -11319,7 +11319,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   return (
                     <p
                       aria-live="polite"
-                      className="w-full text-right text-[11px] leading-snug text-[#8a6420]"
+                      className="w-full text-right text-[11px] leading-snug text-[var(--bo-aviso)]"
                     >
                       {faltam.length > 0 &&
                         (faltam.length === 1
@@ -11384,7 +11384,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 usa; o que muda é a altura em que aparece. */
             cortesPorConfirmar ? (
               <div className="ml-auto flex flex-col items-end gap-2">
-                <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                <div className="max-w-lg rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
                   <p className="font-medium">O documento sai com conteúdo cortado:</p>
                   <ul className="mt-1 flex flex-col gap-0.5">
                     {cortesPorConfirmar.map((c) => (
@@ -12063,7 +12063,7 @@ function AccoesDaFoto({
                 }}
                 className={`alvo-toque !justify-start flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm  disabled:opacity-30 ${
                   a.destrutiva
-                    ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07]"
+                    ? "text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)]/[0.07]"
                     : "text-[var(--bo-text)] hover:bg-[var(--bo-tinta-6)]"
                 } ${primeiraDestrutiva ? "mt-1 border-t border-[var(--bo-hairline)] pt-3" : ""} ${ESTADO} ${PRESSAO}`}
               >
@@ -12504,7 +12504,7 @@ function StepNav({
             >
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
-                  active ? "bg-white/25 text-white" : "bg-[var(--bo-tinta-10)] text-foreground/50"
+                  active ? "bg-[var(--bo-surface)]/25 text-white" : "bg-[var(--bo-tinta-10)] text-foreground/50"
                 }`}
               >
                 {sent && s.id === "enviar" ? "✓" : s.n}
@@ -12581,7 +12581,7 @@ function CopiarResumo({ texto }: { texto: string }) {
         Copiar resumo
       </Button>
       {falhou && (
-        <div className="mt-2 max-w-md rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] p-3">
+        <div className="mt-2 max-w-md rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] p-3">
           <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
             Não foi possível copiar automaticamente. O texto está seleccionado: copia com
             Cmd/Ctrl+C.
@@ -12798,7 +12798,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         <span className="bo-eyebrow">Só para si</span>
         <span className="text-xs text-[var(--bo-tinta-72)]">
           Margem{" "}
-          <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-sage-600"}`}>
+          <strong className={`font-semibold ${magra ? "text-[var(--bo-perigo)]" : "text-sage-600"}`}>
             {eur(total.margem)} · {Math.round(total.percentagem)}%
           </strong>
         </span>
@@ -12810,7 +12810,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         Não sai no PDF nem em nada que vá para o cliente.
       </p>
       {magra && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[var(--bo-tinta-72)]">
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[var(--bo-tinta-72)]">
           <span aria-hidden="true">⚠</span>
           <span>
             Abaixo dos {limite}% que definiu
@@ -12859,7 +12859,7 @@ function CustoDaGeracao({
         {medido ? ", pelas últimas gerações neste computador" : ""}.
       </p>
       {pesado && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
           <span aria-hidden="true">⚠</span>
           <span>
             Um anexo deste tamanho pode ser recusado pelo servidor de email do cliente — muitos
@@ -12870,7 +12870,7 @@ function CustoDaGeracao({
         </p>
       )}
       {orcamento.aperta && (
-        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
           <span aria-hidden="true">⚠</span>
           <span>
             Com esta quantidade de fotografias, o servidor demora{" "}
@@ -12923,7 +12923,7 @@ function PreviewSummary({
       {/* O resumo mostra as fotos a caminho esbatidas; dizer quantas são evita
           que um PDF gerado agora — que não as leva — pareça um erro. */}
       {fotosPorConfirmar > 0 && (
-        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[#8a2a22]">
+        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-perigo)]">
           {fotosPorConfirmar === 1
             ? "1 foto ainda está a entrar na proposta e não entra num PDF gerado agora."
             : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}
@@ -13251,10 +13251,10 @@ function SelectorDeLayout({
               className={`w-[5.75rem] rounded-lg border p-1.5 text-left  ${
                 activo
                   ? "border-sage-600/70 bg-sage-600/[0.07] "
-                  : "border-[var(--bo-hairline-strong)] bg-white hover:border-sage-600/40"
+                  : "border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] hover:border-sage-600/40"
               } ${ESTADO} ${PRESSAO}`}
             >
-              <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-white">
+              <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-[var(--bo-surface)]">
                 <DiagramaDeLayout
                   layout={op ?? sugerido}
                   aspectos={aspectos}
@@ -13283,7 +13283,7 @@ function SelectorDeLayout({
           tem de ser dito aqui, no instante da escolha, e não descoberto no PDF
           já enviado. É o mesmo princípio do aviso das fotos a mais. */}
       {(valor ?? sugerido) === "texto-e-imagem" && aspectos.length > 1 && (
-        <p className="mt-2 text-xs leading-relaxed text-[#8a2a22]">
+        <p className="mt-2 text-xs leading-relaxed text-[var(--bo-perigo)]">
           «Texto e imagem» desenha só a primeira foto ao lado da descrição:{" "}
           {aspectos.length - 1 === 1
             ? "a outra não é impressa"
@@ -13735,7 +13735,7 @@ function Thumb({
       // exactamente o contrário do que se quer aqui.
       style={aspeto ? { aspectRatio: String(aspeto) } : undefined}
       className={`group relative overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] motion-safe:transition-opacity motion-safe:duration-500 ${
-        foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-[var(--bo-hairline-strong)]"
+        foraDoPdf ? "border-[var(--bo-perigo)]/60 opacity-60" : "border-[var(--bo-hairline-strong)]"
       } ${pendente ? "opacity-45" : ""} ${aspeto ? "self-start" : ""} ${className}`}
     >
       {desenhaImagem ? (
@@ -13917,7 +13917,7 @@ function Thumb({
         </span>
       )}
       {foraDoPdf && !pendente && (
-        <span className="absolute inset-x-0 bottom-0 bg-[#8a2a22]/85 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
+        <span className="absolute inset-x-0 bottom-0 bg-[var(--bo-perigo)]/85 px-1 py-0.5 text-center text-[8px] tracking-[0.12em] uppercase text-white">
           fora do PDF
         </span>
       )}

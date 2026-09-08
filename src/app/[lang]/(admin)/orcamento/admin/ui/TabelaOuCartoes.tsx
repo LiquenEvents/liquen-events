@@ -363,7 +363,7 @@ export function TabelaOuCartoes<T>({
         ref={(n) => {
           bloco.current = n;
         }}
-        className="flex flex-col divide-y divide-[var(--bo-hairline)] overflow-hidden rounded-xl border border-[var(--bo-hairline)] bg-white"
+        className="flex flex-col divide-y divide-[var(--bo-hairline)] overflow-hidden rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)]"
         aria-label={legenda}
       >
         {ordenados.map((item) => (
@@ -428,7 +428,7 @@ export function TabelaOuCartoes<T>({
       tabIndex={rolavel ? 0 : undefined}
       role={rolavel ? "region" : undefined}
       aria-label={rolavel ? legenda : undefined}
-      className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)] bg-white"
+      className="overflow-x-auto rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)]"
     >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{legenda}</caption>

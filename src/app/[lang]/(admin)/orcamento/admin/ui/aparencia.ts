@@ -22,10 +22,28 @@
  * ── E PORQUE É QUE O AUTOMÁTICO NÃO ESCREVE ATRIBUTO NENHUM ───────────────
  *
  * Porque o automático não é uma terceira cor: é a AUSÊNCIA de escolha. O CSS
- * declara `color-scheme: light dark` por omissão e o sistema operativo decide;
- * os dois atributos só existem para uma escolha explícita ganhar ao sistema.
- * Escrever `data-aparencia="auto"` seria um estado a mais a ter de ser
- * ignorado em todo o lado.
+ * declara `color-scheme: light dark` e o sistema operativo decide; os dois
+ * atributos só existem para uma escolha explícita ganhar ao sistema. Escrever
+ * `data-aparencia="auto"` seria um estado a mais a ter de ser ignorado em todo
+ * o lado.
+ *
+ * ── E O DE OMISSÃO É O CLARO, E NÃO O AUTOMÁTICO ─────────────────────────
+ *
+ * Aqui o documento e a dona discordam, e ganha a dona.
+ *
+ * A Parte 5.3 do `docs/DESIGN-SYSTEM.md` diz, com a Apple atrás: «três estados
+ * com Automático por omissão é o compromisso correto». Ela disse, a olhar para
+ * o painel já em escuro: **«eu quero o fundo branco atenção!»** — e não é a
+ * primeira vez: o `--bo-chao` deste ficheiro passou a branco por um pedido
+ * igual, «eu quero branco», e a razão está escrita ao lado dele.
+ *
+ * Com Automático por omissão, ter o computador em modo escuro ao fim do dia
+ * punha-lhe o painel escuro sem ela ter pedido nada. Não é o que ela quer, e
+ * quem trabalha aqui todos os dias é ela.
+ *
+ * Portanto: **sem cookie, o painel é CLARO**. Os três estados continuam todos
+ * a existir e o Automático continua a fazer o que promete — é uma escolha, e
+ * não a omissão. O escuro fica em Definições → Aparência para quem o quiser.
  */
 
 /** Os três estados. `auto` é o de omissão e não escreve atributo nenhum. */
@@ -49,7 +67,11 @@ export const VALIDADE_APARENCIA_S = 60 * 60 * 24 * 365;
  * correcto para um cookie corrompido ou de uma versão antiga.
  */
 export function aparenciaValida(valor: string | undefined | null): Aparencia {
-  return valor === "claro" || valor === "escuro" ? valor : "auto";
+  if (valor === "escuro" || valor === "auto") return valor;
+  // Tudo o resto — sem cookie, cookie de uma versão antiga, cookie estragado —
+  // dá CLARO. É o de omissão por decisão dela, e é também o comportamento
+  // seguro: um valor que não se percebe nunca escurece o painel a ninguém.
+  return "claro";
 }
 
 /**

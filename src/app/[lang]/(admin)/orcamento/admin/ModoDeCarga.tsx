@@ -139,7 +139,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
               {feitos} de {total} carregados
             </p>
             {semRede && (
-              <p className="text-xs text-[#8a6d2f]">Sem rede — a lista continua a funcionar</p>
+              <p className="text-xs text-[var(--bo-aviso)]">Sem rede — a lista continua a funcionar</p>
             )}
           </div>
           {feitos > 0 && (
@@ -168,7 +168,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
       </div>
 
       {completo && (
-        <p className="mb-3 rounded-xl bg-[#e7efe4] px-4 py-3 text-sm text-[#3a5c39]">
+        <p className="mb-3 rounded-xl bg-[var(--bo-sucesso-lavagem)] px-4 py-3 text-sm text-[var(--bo-sucesso)]">
           Está tudo carregado.
         </p>
       )}
@@ -188,8 +188,8 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                 aria-pressed={feito}
                 className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left ${ESTADO} ${PRESSAO} ${
                   feito
-                    ? "border-sage-600/40 bg-[#e7efe4]"
-                    : "border-[var(--bo-hairline-strong)] bg-white active:bg-[var(--bo-tinta-6)]"
+                    ? "border-sage-600/40 bg-[var(--bo-sucesso-lavagem)]"
+                    : "border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] active:bg-[var(--bo-tinta-6)]"
                 }`}
                 // 64 px: bem acima do mínimo de 44, porque aqui não se está
                 // sentado nem a olhar com atenção.

@@ -151,7 +151,7 @@ export default function FechosMeta() {
   const perdidos = (relatorio?.excluidos ?? []).filter((e) => e.motivo === "fora-da-janela");
 
   return (
-    <section className="rounded-2xl border border-[var(--bo-hairline)] bg-white p-6 ">
+    <section className="rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-6 ">
       <h3 className="text-title3 font-semibold text-[var(--bo-text-muted)]">
         Casamentos fechados · Meta
       </h3>
@@ -164,7 +164,7 @@ export default function FechosMeta() {
 
       {falhouALeitura && (
         <div className="mt-4">
-          <p className="text-xs text-[#8a2a22]">Não foi possível contar os casamentos fechados.</p>
+          <p className="text-xs text-[var(--bo-perigo)]">Não foi possível contar os casamentos fechados.</p>
           <button
             type="button"
             onClick={() => {
@@ -198,7 +198,7 @@ export default function FechosMeta() {
               mudar o que ela faz a seguir, por isso é a que dá nas vistas. */}
           {quantos > 0 && maisUrgente <= 2 && (
             <p
-              className="mt-2 rounded-lg bg-[#8a2a22]/10 px-3 py-2 text-[12px] font-semibold text-[#8a2a22]"
+              className="mt-2 rounded-lg bg-[var(--bo-perigo)]/10 px-3 py-2 text-[12px] font-semibold text-[var(--bo-perigo)]"
               // Anunciado a quem não olha para aqui: é um prazo, não decoração.
               aria-live="polite"
             >
@@ -227,7 +227,7 @@ export default function FechosMeta() {
               type="button"
               disabled={!relatorio.configurada || aEnviar}
               onClick={() => setAPerguntar(true)}
-              className={`alvo-toque mt-4 rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque mt-4 rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[var(--bo-accent-hover)] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
             >
               {aEnviar ? "A enviar…" : "Enviar à Meta"}
             </button>
@@ -245,7 +245,7 @@ export default function FechosMeta() {
                 <button
                   type="button"
                   onClick={() => void enviar()}
-                  className={`alvo-toque rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[var(--bo-accent-hover)] pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
                 >
                   Enviar
                 </button>
@@ -266,8 +266,8 @@ export default function FechosMeta() {
             <p
               className={`mt-4 rounded-lg px-3 py-2 text-[12px] leading-snug ${
                 desfecho.enviados > 0
-                  ? "bg-sage-600/10 text-[#3c5140]"
-                  : "bg-[#8a2a22]/10 text-[#8a2a22]"
+                  ? "bg-sage-600/10 text-[var(--bo-accent-hover)]"
+                  : "bg-[var(--bo-perigo)]/10 text-[var(--bo-perigo)]"
               }`}
               role="status"
             >
@@ -292,7 +292,7 @@ export default function FechosMeta() {
               janela»: esse número é dinheiro que a conta da Meta já não vai
               contar, e é a prova de que a rotina falhou — não um detalhe. */}
           {perdidos.length > 0 && (
-            <p className="mt-4 text-[12px] leading-snug text-[#8a2a22]">
+            <p className="mt-4 text-[12px] leading-snug text-[var(--bo-perigo)]">
               {perdidos.length}{" "}
               {perdidos.length === 1
                 ? "casamento fechado já não pode ser enviado"

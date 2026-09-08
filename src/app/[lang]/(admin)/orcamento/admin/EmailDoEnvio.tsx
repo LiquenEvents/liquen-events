@@ -277,7 +277,7 @@ export default function EmailDoEnvio({
   return (
     <section
       aria-labelledby="email-do-envio-titulo"
-      className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-white/70 p-4"
+      className="mt-5 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)]/70 p-4"
     >
       <h3 id="email-do-envio-titulo" className="font-display text-base text-[var(--bo-text)]">
         O email que o cliente vai receber
@@ -332,7 +332,7 @@ export default function EmailDoEnvio({
       {erro && (
         <p
           aria-live="polite"
-          className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#8a2a22]/35 bg-[#8a2a22]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+          className="mt-3 flex items-start gap-1.5 rounded-xl border border-[var(--bo-perigo)]/35 bg-[var(--bo-perigo)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>
@@ -407,7 +407,7 @@ export default function EmailDoEnvio({
       {porPreencher.length > 0 && (
         <p
           aria-live="polite"
-          className="mt-4 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/40 bg-[#c98a2e]/[0.07] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+          className="mt-4 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.07] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>
@@ -421,7 +421,7 @@ export default function EmailDoEnvio({
       {avisos.map((a) => (
         <p
           key={a}
-          className="mt-2 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+          className="mt-2 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
         >
           <span aria-hidden="true">⚠</span>
           <span>{a}</span>
@@ -497,7 +497,7 @@ export default function EmailDoEnvio({
           fecho da casa que entra sozinho. Fechado por omissão porque o caminho
           curto é enviar, e aberto num toque para quem quiser confirmar. */}
       <details
-        className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[#f7f4ee]/60"
+        className="mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-chao)]/60"
         onToggle={gaveta.aoAlternar}
       >
         <summary

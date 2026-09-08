@@ -89,7 +89,7 @@ const ROW_INPUT =
  *  de texto que tem de ficar alinhada à esquerda com o resto da coluna. */
 const ADD_BTN =
   "alvo-toque !justify-start gap-1 text-xs font-medium inline-flex items-center " +
-  `text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`;
+  `text-sage-600 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`;
 /** Ações da linha: presentes SEMPRE no layout (nunca há salto), visíveis só em
  *  hover/foco — e sempre visíveis onde não há hover nenhum (tablet). */
 const ROW_ACTIONS =
@@ -1121,13 +1121,13 @@ export default function ServicesEditor({
       {removal && (
         <div
           role="status"
-          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-[var(--bo-hairline-strong)] bg-white px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
+          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
         >
           <span className="text-[var(--bo-tinta-72)]">{removal.label}</span>
           <button
             type="button"
             onClick={undoRemoval}
-            className={`font-medium text-sage-600 underline underline-offset-2 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`font-medium text-sage-600 underline underline-offset-2 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
           >
             Anular
           </button>
@@ -1175,7 +1175,7 @@ function SortableRow({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${className ?? ""} ${
         isDragging
-          ? "relative z-10 bg-white opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-sage-600"
+          ? "relative z-10 bg-[var(--bo-surface)] opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-sage-600"
           : ""
       }`}
     >
@@ -1248,7 +1248,7 @@ function IconBtn({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={`${ICON_BTN} ${danger ? "hover:text-[#8a2a22]" : ""}`}
+      className={`${ICON_BTN} ${danger ? "hover:text-[var(--bo-perigo)]" : ""}`}
     >
       {children}
     </button>

@@ -132,7 +132,7 @@ export default function ValorEnviado() {
                com o canto do cartão apaga a distinção. Foi o
                `raios-do-back-office.test.ts` a apanhar-me — escrevi a regra
                ontem e hoje ia desfazê-la. */
-            className={`min-h-11 rounded-full bg-sage-600 px-4 text-sm font-medium text-white hover:bg-[#415440] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
+            className={`min-h-11 rounded-full bg-sage-600 px-4 text-sm font-medium text-white hover:bg-[var(--bo-accent-hover)] disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
           >
             {aCorrigir
               ? "A corrigir…"

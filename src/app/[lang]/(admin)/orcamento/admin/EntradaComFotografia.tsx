@@ -321,7 +321,7 @@ export function EntradaComFotografia({ children }: { children: ReactNode }) {
         <div
           data-painel-foto
           aria-hidden="true"
-          className="relative isolate h-40 sm:h-52 lg:h-auto overflow-hidden bg-[#141210]"
+          className="relative isolate h-40 sm:h-52 lg:h-auto overflow-hidden bg-[var(--bo-seleccao)]"
         >
           <picture
             className="absolute inset-0 block"

@@ -255,7 +255,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
             completa — e a diferença entre as duas é uma tarefa que ninguém faz
             hoje. Fica em cima do primeiro dia, que é onde o olho começa. */}
         {falha && days.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-2.5 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bo-perigo)]/20 bg-[var(--bo-perigo-lavagem)]/40 px-5 py-2.5 sm:px-6">
             <p className="bo-text-muted min-w-0 flex-1 text-[11px] leading-snug">
               Falta aqui o que não deu para ler — {oQueFaltou}. O que está em baixo vem dos pedidos,
               e está certo.
@@ -378,7 +378,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                         {it.atalho && (
                           <a
                             href={it.atalho.href}
-                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-sage-600/30 bg-white px-2.5 text-[11px] font-medium text-sage-600 hover:bg-sage-600/[0.06] ${ESTADO} ${PRESSAO}`}
+                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-sage-600/30 bg-[var(--bo-surface)] px-2.5 text-[11px] font-medium text-sage-600 hover:bg-sage-600/[0.06] ${ESTADO} ${PRESSAO}`}
                           >
                             {it.atalho.rotulo}
                           </a>

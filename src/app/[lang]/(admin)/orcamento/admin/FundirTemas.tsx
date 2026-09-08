@@ -317,7 +317,7 @@ export default function FundirTemas({
           )}
 
           {error && !running && (
-            <div className="rounded-lg border border-[#8a2a22]/20 bg-[#f6e6df]/40 px-3 py-2">
+            <div className="rounded-lg border border-[var(--bo-perigo)]/20 bg-[var(--bo-perigo-lavagem)]/40 px-3 py-2">
               <p className="text-sm text-[var(--bo-text)]">{error}</p>
               <p className="bo-text-muted mt-0.5 text-xs">
                 O que já passou está em “{dest?.name ?? "…"}”; o resto continua aqui. Podes tentar

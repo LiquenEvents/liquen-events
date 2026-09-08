@@ -764,10 +764,17 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      Isto vale para a família toda do token — menus, avisos, barras coladas, o
      cartão em arrasto —, e é de propósito: são todos «o que flutua e volta a
      fechar». A MODAL não se toca: já era larga (48 px) porque tapa a página. */
+  /* A cor sai para tokens próprios (`--bo-sombra-tinta-*`) porque é ela — e
+     não a geometria — que o modo escuro tem de trocar. Ver o bloco do
+     `light-dark()` no fim do ficheiro. */
+  --bo-sombra-tinta-1: rgba(13, 13, 13, 0.16);
+  --bo-sombra-tinta-2: rgba(13, 13, 13, 0.08);
+  --bo-sombra-tinta-3: rgba(13, 13, 13, 0.18);
+  --bo-sombra-tinta-4: rgba(13, 13, 13, 0.1);
   --bo-sombra-suspensa:
-    0 12px 32px -8px rgba(13, 13, 13, 0.16), 0 4px 10px -4px rgba(13, 13, 13, 0.08);
+    0 12px 32px -8px var(--bo-sombra-tinta-1), 0 4px 10px -4px var(--bo-sombra-tinta-2);
   --bo-sombra-modal:
-    0 24px 48px -12px rgba(13, 13, 13, 0.18), 0 8px 16px -8px rgba(13, 13, 13, 0.1);
+    0 24px 48px -12px var(--bo-sombra-tinta-3), 0 8px 16px -8px var(--bo-sombra-tinta-4);
 
   /* ══════════════════════════════════════════════════════════════════════
      O MATERIAL DO QUE APARECE POR CIMA
@@ -1101,6 +1108,37 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   --bo-aviso-lavagem: color-mix(in oklab, var(--bo-aviso) 12%, transparent);
   --bo-info-lavagem: color-mix(in oklab, var(--bo-info) 12%, transparent);
 
+  /* ── A TINTA QUE ASSENTA *EM CIMA* DA COR, QUE NÃO É SEMPRE BRANCO ──────
+     Um botão destrutivo cheio escrevia `bg-[#8a2a22] text-white`, e estava
+     certo: branco sobre aquele vermelho dá 8,62:1.
+
+     Em modo escuro deixa de estar. A cor de perigo inverte — passa a ser o
+     `#f4a79d`, claro, para se ler sobre um fundo escuro — e branco sobre ela
+     dá **1,93:1**. Um botão ilegível, exactamente no botão que apaga coisas.
+
+     É a armadilha própria de uma paleta que inverte: não basta trocar a cor
+     de fundo, tem de se trocar o que assenta nela. Estes dois tokens são essa
+     tinta. Medido: `#171b17` sobre `#f4a79d` dá 9,01:1. */
+  --bo-sobre-perigo: #ffffff;
+  --bo-sobre-acento: #ffffff;
+
+  /* O acento ao passar o rato, e o tom cheio do aviso (as bolinhas, os fundos
+     e os contornos — o `--bo-aviso` é a versão de TEXTO, mais escura). */
+  --bo-accent-hover: #415440;
+  --bo-aviso-tom: #c98a2e;
+
+  /* ── A SELECÇÃO CHEIA — a pastilha de filtro activa ────────────────────
+     Era um `#1b2119` quase preto com texto branco. Em modo escuro isso é uma
+     pastilha preta sobre um fundo preto: o estado activo desaparecia.
+     Inverte, e a tinta por cima com ela. */
+  --bo-seleccao: #1b2119;
+  --bo-seleccao-hover: #2a3227;
+  --bo-sobre-seleccao: #ffffff;
+
+  /* O verde da marca (`sage-500`). Nunca como texto sobre branco — dá 4,6:1 e
+     a Parte 18 proíbe-o por escrito. Serve para contornos, fundos e realces. */
+  --bo-marca: #5f7c66;
+
   /* Os três papéis de texto do documento, apelidados na língua da casa. O
      `--bo-text` / `-muted` / `-faint` que já cá estavam continuam a valer —
      estes são os nomes do documento a apontar para o mesmo sítio, para quem
@@ -1333,9 +1371,8 @@ body:is(.admin-mode, :has([data-admin-mode])) {
     /* Automático por omissão: os dois esquemas declarados, e o sistema decide. */
     color-scheme: light dark;
 
-    /* A TINTA. Muda aqui, e com ela os nove degraus, os fios, o `hover` das
-       linhas e o contorno dos controlos. */
-    --bo-tinta-rgb: light-dark(13 13 13, 241 245 241);
+    /* A TINTA NÃO ESTÁ AQUI — e a razão está escrita no bloco a seguir a
+       este. `light-dark()` só aceita CORES, e o canal são três números. */
 
     /* AS SUPERFÍCIES. Em claro os três níveis são brancos e quem separa é a
        sombra; em escuro a sombra não se vê e quem separa é a luminosidade. */
@@ -1359,6 +1396,31 @@ body:is(.admin-mode, :has([data-admin-mode])) {
     --bo-aviso: light-dark(#8a5a12, #e8b45c);
     --bo-info: light-dark(#2c5f86, #8fc0e6);
     --bo-texto-terciario: light-dark(#69746a, #8a968a);
+    --bo-accent-hover: light-dark(#415440, #d0e1d4);
+    --bo-aviso-tom: light-dark(#c98a2e, #e8b45c);
+    --bo-seleccao: light-dark(#1b2119, #e9f2eb);
+    --bo-seleccao-hover: light-dark(#2a3227, #d0e1d4);
+    --bo-sobre-seleccao: light-dark(#ffffff, #171b17);
+    --bo-marca: light-dark(#5f7c66, #7ea086);
+
+    /* ── E A TINTA DO SÍTIO, QUE O BACK OFFICE HERDA ────────────────────
+       MEDIDO: o back office usa `text-foreground` **584 vezes**, mais 50 de
+       `border-foreground`, 13 de `placeholder-`, 10 de `bg-` e 8 de
+       `decoration-`. Seiscentas e sessenta e cinco.
+
+       O `text-foreground` compila para `color: var(--color-foreground)` — ou
+       seja, resolve-se no sítio de uso. Redefinir o token aqui inverte as 665
+       de uma vez, sem abrir um único componente. É a diferença entre uma
+       tarde e uma semana, e não deixa nenhuma para trás por distracção.
+
+       O valor claro é o `#0d0d0d` que o bloco do back office já lhe dá; o
+       escuro é o `--fg-primary` da Parte 5.2. */
+    --color-foreground: light-dark(#0d0d0d, #f1f5f1);
+
+    /* A tinta que assenta na cor. Em claro é branco; em escuro é o fundo,
+       porque a cor por baixo passou a ser clara. */
+    --bo-sobre-perigo: light-dark(#ffffff, #171b17);
+    --bo-sobre-acento: light-dark(#ffffff, #171b17);
 
     /* O VIDRO. O material claro assenta em branco a 80%; o escuro num verde
        quase preto a 52%, que é o que a Parte 5.2 dá. */
@@ -1368,16 +1430,16 @@ body:is(.admin-mode, :has([data-admin-mode])) {
     --bo-vidro-claro-veu: light-dark(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.62));
     --bo-vidro-claro-opaco: light-dark(#4d4d4d, #2a322c);
 
-    /* AS SOMBRAS. Em escuro têm de ser mais fundas e mais opacas para se verem
-       de todo — uma sombra a 16% de preto sobre `#101310` é invisível. */
-    --bo-sombra-suspensa: light-dark(
-      0 12px 32px -8px rgba(13, 13, 13, 0.16),
-      0 12px 38px -8px rgba(0, 0, 0, 0.55)
-    );
-    --bo-sombra-modal: light-dark(
-      0 24px 48px -12px rgba(13, 13, 13, 0.18),
-      0 24px 52px -12px rgba(0, 0, 0, 0.62)
-    );
+    /* AS SOMBRAS. Em escuro têm de ser mais opacas para se verem de todo — uma
+       sombra a 16% de preto sobre `#101310` é invisível.
+
+       Só a COR entra no `light-dark()`; a geometria fica de fora. Uma sombra
+       inteira não é uma cor, e `light-dark()` de uma sombra é uma declaração
+       inválida — que não dá erro, dá uma sombra que desaparece. */
+    --bo-sombra-tinta-1: light-dark(rgba(13, 13, 13, 0.16), rgba(0, 0, 0, 0.55));
+    --bo-sombra-tinta-2: light-dark(rgba(13, 13, 13, 0.08), rgba(0, 0, 0, 0.4));
+    --bo-sombra-tinta-3: light-dark(rgba(13, 13, 13, 0.18), rgba(0, 0, 0, 0.62));
+    --bo-sombra-tinta-4: light-dark(rgba(13, 13, 13, 0.1), rgba(0, 0, 0, 0.45));
   }
 
   /* AS DUAS ESCOLHAS EXPLÍCITAS. Ganham ao sistema nos dois sentidos: quem
@@ -1401,6 +1463,41 @@ body:is(.admin-mode, :has([data-admin-mode])) {
   body:has([data-admin-mode][data-aparencia="escuro"]) {
     color-scheme: dark;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   E O CANAL DA TINTA, QUE NÃO CABE NO `light-dark()`
+   ══════════════════════════════════════════════════════════════════════════
+
+   Esta é a excepção, e custou uma imagem a ver. O canal estava assim:
+
+       --bo-tinta-rgb: light-dark(13 13 13, 241 245 241);
+
+   `light-dark()` aceita duas **cores**. `13 13 13` não é uma cor — são três
+   números, que só se tornam cor lá dentro do `rgb(… / α)` onde o canal é
+   usado. A declaração fica inválida e o canal nunca troca.
+
+   E fica inválida em silêncio, como tudo nesta família: o CSS não dá erro, o
+   build passa, os três passeios do modo escuro passaram todos — porque mediam
+   o chão, o cartão e o perigo, que são cores a sério e trocaram bem. O que
+   não trocou foi a TINTA, ou seja o texto. Vi-o num retrato do painel: o
+   «Boa tarde, Catarina.» quase invisível, cinzento-escuro sobre fundo escuro.
+
+   Por isso o canal faz os três estados à mão. São três regras para uma
+   variável, e é a única do ficheiro que precisa disto — todas as outras são
+   cores e ficam no `light-dark()`.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  /* Automático: só quando não há escolha explícita de Claro. */
+  body:has([data-admin-mode]):not(:has([data-admin-mode][data-aparencia="claro"])) {
+    --bo-tinta-rgb: 241 245 241;
+  }
+}
+body:has([data-admin-mode][data-aparencia="escuro"]) {
+  --bo-tinta-rgb: 241 245 241;
+}
+body:has([data-admin-mode][data-aparencia="claro"]) {
+  --bo-tinta-rgb: 13 13 13;
 }
 
 

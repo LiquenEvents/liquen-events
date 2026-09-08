@@ -51,7 +51,7 @@ export default function PorTraduzir({
   return (
     <section
       aria-labelledby="por-traduzir-titulo"
-      className="mt-5 rounded-2xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.05] p-4"
+      className="mt-5 rounded-2xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.05] p-4"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3
@@ -64,7 +64,7 @@ export default function PorTraduzir({
           <button
             type="button"
             onClick={onFicarTodosEmPortugues}
-            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
           >
             Ficar em português nos {faltam.length}
           </button>
@@ -100,7 +100,7 @@ export default function PorTraduzir({
             <button
               type="button"
               onClick={() => onIr(c)}
-              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${ESTADO} ${PRESSAO}`}
             >
               Traduzir
             </button>

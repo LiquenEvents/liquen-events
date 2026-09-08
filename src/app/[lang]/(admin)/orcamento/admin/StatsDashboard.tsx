@@ -80,7 +80,7 @@ function Kpi({
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
-        accent ? "bg-sage-600/[0.05] border-sage-600/20" : "bg-white border-[var(--bo-hairline)] "
+        accent ? "bg-sage-600/[0.05] border-sage-600/20" : "bg-[var(--bo-surface)] border-[var(--bo-hairline)] "
       }`}
     >
       <p
@@ -265,7 +265,7 @@ function Section({
     <details
       open={defaultOpen}
       onToggle={gaveta.aoAlternar}
-      className="group rounded-2xl border border-[var(--bo-hairline)] bg-white overflow-hidden"
+      className="group rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] overflow-hidden"
     >
       <summary
         onClick={gaveta.aoTocarNoResumo}
@@ -828,7 +828,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         }}
                       />
                       <div
-                        className={`absolute inset-0 origin-left bg-[#b5894a]/70 ${PROGRESSO}`}
+                        className={`absolute inset-0 origin-left bg-[var(--bo-aviso-tom)]/70 ${PROGRESSO}`}
                         style={{
                           transform: `translateX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding) * 100}%) scaleX(${fraccaoDaBarra(stats.outstanding, stats.received + stats.outstanding)})`,
                         }}
@@ -839,7 +839,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         <span className="w-2 h-2 rounded-full bg-moss" /> Recebido
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#b5894a]/70" /> A receber
+                        <span className="w-2 h-2 rounded-full bg-[var(--bo-aviso-tom)]/70" /> A receber
                       </span>
                     </div>
                   </div>
@@ -1024,7 +1024,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                     </div>
                     <div className="h-1.5 bg-[var(--bo-tinta-6)] rounded-full overflow-hidden">
                       <div
-                        className={`h-full w-full origin-left rounded-full bg-[#8a8a82]/60 ${PROGRESSO}`}
+                        className={`h-full w-full origin-left rounded-full bg-[var(--bo-text-faint)]/60 ${PROGRESSO}`}
                         style={{
                           transform: `scaleX(${fraccaoDaBarra(row.value, stats.lostReasonRows[0].value)})`,
                         }}

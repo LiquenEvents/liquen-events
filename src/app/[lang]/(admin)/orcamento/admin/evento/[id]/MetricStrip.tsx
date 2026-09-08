@@ -61,11 +61,11 @@ export default function MetricStrip({ metrics }: Props) {
   if (countdownDays !== null) {
     if (countdownDays === 0) {
       cdValue = "Hoje";
-      cdTone = "text-[#8a2a22]";
+      cdTone = "text-[var(--bo-perigo)]";
     } else if (countdownDays > 0) {
       cdValue = String(countdownDays);
       cdSub = countdownDays === 1 ? "dia" : "dias";
-      cdTone = countdownDays <= 7 ? "text-[#8a2a22]" : undefined;
+      cdTone = countdownDays <= 7 ? "text-[var(--bo-perigo)]" : undefined;
     } else {
       cdValue = String(Math.abs(countdownDays));
       cdSub = Math.abs(countdownDays) === 1 ? "dia (passou)" : "dias (passou)";
@@ -82,7 +82,7 @@ export default function MetricStrip({ metrics }: Props) {
         sub={
           supplierCosts > 0 ? `custos s/ IVA ${eur0(supplierCostsNet)}` : "sem custos registados"
         }
-        tone={supplierCosts > 0 ? (margin >= 0 ? "text-sage-600" : "text-[#8a2a22]") : undefined}
+        tone={supplierCosts > 0 ? (margin >= 0 ? "text-sage-600" : "text-[var(--bo-perigo)]") : undefined}
       />
       {/* «% Recebido», e já não «% Pago».
           Esta célula lia o livro de faturas: era a fatia do contratado que

@@ -251,13 +251,13 @@ export default function Reminders({ quotes, onOpen }: Props) {
               <div className="min-w-0 flex-1">
                 <p className="text-[var(--bo-tinta-72)] text-xs truncate font-medium">{r.text}</p>
                 <p
-                  className={`text-[10px] truncate ${r.urgent ? "text-[#8a2a22]" : "text-foreground/40"}`}
+                  className={`text-[10px] truncate ${r.urgent ? "text-[var(--bo-perigo)]" : "text-foreground/40"}`}
                 >
                   {r.sub}
                 </p>
               </div>
               {r.urgent && (
-                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[#8a2a22]/12 text-[#8a2a22]">
+                <span className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0 bg-[var(--bo-perigo)]/12 text-[var(--bo-perigo)]">
                   Urgente
                 </span>
               )}

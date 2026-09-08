@@ -150,7 +150,7 @@ export default function BotaoGuardarTudo() {
            para o canto e as cores chegarem juntos. */
         className={`motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,border-radius] motion-safe:duration-[120ms] ${
           quantos > 0
-            ? `alvo-toque flex items-center gap-2 rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${PRESSAO} hover:bg-[#415440] pointer-coarse:min-h-11`
+            ? `alvo-toque flex items-center gap-2 rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white ${PRESSAO} hover:bg-[var(--bo-accent-hover)] pointer-coarse:min-h-11`
             : `alvo-toque flex items-center gap-2 rounded-lg border border-[var(--bo-hairline)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--bo-text-faint)] ${PRESSAO} hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text-muted)] pointer-coarse:min-h-11`
         }`}
       >
@@ -220,14 +220,14 @@ export default function BotaoGuardarTudo() {
           // sempre, que é o problema de origem.
           role={frases.tudoBem ? "status" : "alert"}
           aria-live={frases.tudoBem ? "polite" : "assertive"}
-          className="bo-entrada absolute right-0 pointer-coarse:right-4 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--bo-hairline)] bg-white p-3 text-left shadow-[var(--bo-sombra-suspensa)]"
+          className="bo-entrada absolute right-0 pointer-coarse:right-4 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-3 text-left shadow-[var(--bo-sombra-suspensa)]"
         >
           <div className="flex items-start gap-2">
             <p
               className={
                 frases.tudoBem
                   ? "flex-1 text-[12px] font-semibold text-[var(--bo-text)]"
-                  : "flex-1 text-[12px] font-semibold text-[#8a2a22]"
+                  : "flex-1 text-[12px] font-semibold text-[var(--bo-perigo)]"
               }
             >
               {frases.titulo}
@@ -264,7 +264,7 @@ export default function BotaoGuardarTudo() {
                   key={l.nome}
                   className={
                     l.mau
-                      ? "text-[11px] leading-snug text-[#8a2a22]"
+                      ? "text-[11px] leading-snug text-[var(--bo-perigo)]"
                       : "text-[11px] leading-snug text-[var(--bo-text-muted)]"
                   }
                 >
