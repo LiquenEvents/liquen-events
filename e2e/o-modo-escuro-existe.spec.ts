@@ -71,12 +71,55 @@ async function chao(page: import("@playwright/test").Page) {
   });
 }
 
+/** Põe (ou tira) a escolha de aparência no elemento que o servidor marca. */
+async function escolher(
+  page: import("@playwright/test").Page,
+  qual: "auto" | "claro" | "escuro",
+) {
+  await page.evaluate((q) => {
+    const alvo = document.querySelector("[data-admin-mode]") as HTMLElement;
+    if (q === "auto") delete alvo.dataset.aparencia;
+    else alvo.dataset.aparencia = q;
+  }, qual);
+}
+
 test.describe("os três estados de aparência @movimento", () => {
-  test("automático segue o sistema, nos dois sentidos", async ({ browser }) => {
+  /**
+   * ── O DE OMISSÃO É O CLARO, E ISSO É UM PEDIDO DELA ──────────────────────
+   *
+   * Este passeio existe por causa de uma frase: **«eu quero o fundo branco
+   * atenção!»**, dita a olhar para o painel já em escuro.
+   *
+   * A Parte 5.3 do `docs/DESIGN-SYSTEM.md` pede o contrário — «Automático por
+   * omissão», com a Apple atrás — e este caso é o sítio onde fica registado
+   * que ganha ela. Com Automático, ter o computador em escuro ao fim do dia
+   * punha-lhe o painel escuro sem ela ter pedido nada.
+   *
+   * A prova tem de ser feita com o sistema em ESCURO: em claro passaria por
+   * acidente, e um teste que passa por acidente não guarda nada.
+   */
+  test("sem escolha nenhuma o painel é CLARO — mesmo com o computador em escuro", async ({
+    browser,
+  }) => {
+    const ctx = await browser.newContext({ colorScheme: "dark" });
+    const page = await ctx.newPage();
+    await page.goto("/pt/orcamento/admin");
+    const m = await chao(page);
+    expect(
+      luminosidade(m.chao),
+      `o computador está em escuro e o painel devia estar branco — o chão saiu ${m.chao}`,
+    ).toBeGreaterThan(0.7);
+    await ctx.close();
+  });
+
+  test("escolhido o automático, segue o sistema nos dois sentidos", async ({ browser }) => {
     for (const esquema of ["light", "dark"] as const) {
       const ctx = await browser.newContext({ colorScheme: esquema });
       const page = await ctx.newPage();
       await page.goto("/pt/orcamento/admin");
+      // Sem atributo é o que o servidor manda quando o cookie diz «auto» — o
+      // automático não é uma terceira cor, é a AUSÊNCIA de escolha.
+      await escolher(page, "auto");
       const m = await chao(page);
 
       expect(m.chao, `--bo-chao não resolveu em ${esquema}`).not.toBe("");
@@ -95,9 +138,7 @@ test.describe("os três estados de aparência @movimento", () => {
     const claro = await browser.newContext({ colorScheme: "light" });
     const p1 = await claro.newPage();
     await p1.goto("/pt/orcamento/admin");
-    await p1.evaluate(() => {
-      (document.querySelector("[data-admin-mode]") as HTMLElement).dataset.aparencia = "escuro";
-    });
+    await escolher(p1, "escuro");
     const escuroForcado = await chao(p1);
     expect(
       luminosidade(escuroForcado.chao),
@@ -109,9 +150,7 @@ test.describe("os três estados de aparência @movimento", () => {
     const escuro = await browser.newContext({ colorScheme: "dark" });
     const p2 = await escuro.newPage();
     await p2.goto("/pt/orcamento/admin");
-    await p2.evaluate(() => {
-      (document.querySelector("[data-admin-mode]") as HTMLElement).dataset.aparencia = "claro";
-    });
+    await escolher(p2, "claro");
     const claroForcado = await chao(p2);
     expect(
       luminosidade(claroForcado.chao),
@@ -126,6 +165,9 @@ test.describe("os três estados de aparência @movimento", () => {
     const ctx = await browser.newContext({ colorScheme: "dark" });
     const page = await ctx.newPage();
     await page.goto("/pt/orcamento/admin");
+    // Escolhe-se o escuro, e não se conta com o sistema: o de omissão passou a
+    // ser o CLARO, por pedido dela (ver o primeiro caso deste ficheiro).
+    await escolher(page, "escuro");
     const m = await chao(page);
 
     // O vermelho de erro claro (`#b23b2e`) dá 2,95:1 sobre o fundo escuro —
