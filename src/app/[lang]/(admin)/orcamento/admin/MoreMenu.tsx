@@ -49,6 +49,13 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const menuId = useId();
 
+  /* ── A COLUNA SÓ EXISTE SE HOUVER ÍCONES ─────────────────────────────────
+     A fila alinhada é o que impede um menu misto de ficar com os rótulos em
+     duas colunas. Num menu em que NENHUMA acção tem ícone ela não alinha nada:
+     é uma goteira de 26 px à esquerda de tudo, e um menu mais estreito por
+     causa dela. Por isso pergunta-se ao menu, e não ao item. */
+  const temIcones = items.some((i) => i.icon);
+
   /**
    * ── O MENU ENTRAVA E DESAPARECIA ──────────────────────────────────────────
    *
@@ -154,9 +161,19 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
           aria-label={aSairAgora ? undefined : "Mais ações"}
           aria-hidden={aSairAgora || undefined}
           inert={aSairAgora}
+          /* ── O MATERIAL ──────────────────────────────────────────────────
+             Era `rounded-2xl border … bg-white p-1.5`. O `rounded-2xl` media
+             8 px como todo o resto (o bloco dos raios do `globals.css` colapsa
+             a escala do Tailwind para o conteúdo), e o `bg-white` era branco
+             opaco escrito à mão — nem sequer o token da superfície.
+
+             A `.bo-material` traz o raio de 12 px, o fio e a superfície
+             translúcida; o desfoque vem à parte, para se poder baixar num
+             sítio só. E a folga passa de 6 px para os 4 px do token, que é o
+             número de que o raio da pastilha aqui em baixo é subtraído. */
           className={`${
             aSairAgora ? SAIDA : "bo-entrada"
-          } absolute right-0 z-30 mt-2 w-60 origin-top-right rounded-2xl border border-[var(--bo-hairline)] bg-white p-1.5 shadow-[var(--bo-sombra-suspensa)]`}
+          } absolute right-0 z-30 mt-2 w-60 origin-top-right bo-material bo-material-desfoque p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)]`}
         >
           {items.map((item, idx) => (
             <button
@@ -183,17 +200,46 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
                 triggerRef.current?.focus();
                 item.onClick();
               }}
-              className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]`}
+              /* ── A LINHA SOB O RATO É UMA PASTILHA CHEIA ──────────────────
+                 Era `hover:bg-[var(--bo-tinta-6)]`: seis por cento de preto.
+                 Sobre um material translúcido, seis por cento não chega a ser
+                 um estado — lê-se como sujidade do fundo.
+
+                 Preenchimento de acento com texto invertido, que é o gesto das
+                 capturas. Medido: branco sobre `--bo-accent` dá 6,55:1.
+
+                 O `active:` repete a pastilha porque o `hover:` do Tailwind
+                 vive dentro de `@media (hover: hover)` e no dedo não existe.
+                 E o `group` está aqui para a dica de baixo poder virar-se
+                 também — senão ficava cinzenta em cima de verde. */
+              className={`group flex w-full items-start gap-2.5 rounded-[var(--bo-material-raio-pastilha)] px-2.5 py-2.5 text-left text-sm text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO} hover:bg-[var(--bo-accent)] hover:text-white active:bg-[var(--bo-accent)] active:text-white`}
             >
-              {item.icon && (
-                <span className="mt-0.5 shrink-0 text-foreground/45" aria-hidden="true">
+              {/* A COLUNA DOS ÍCONES, SEMPRE COM A MESMA LARGURA — e presente
+                  mesmo quando o item não traz ícone, senão os rótulos de um
+                  menu misto ficam em duas colunas.
+
+                  Sem cor própria, de propósito: o `text-foreground/45` que
+                  aqui estava media 3,11:1 sobre branco (chumbava) e, sobre a
+                  pastilha cheia, ficava um cinzento em cima de verde. A herança
+                  do `currentColor` resolve as duas — o ícone acompanha o
+                  rótulo, que é o que as capturas mostram. */}
+              {temIcones && (
+                <span
+                  className="flex w-[var(--bo-material-coluna)] shrink-0 items-center justify-center pt-0.5"
+                  aria-hidden="true"
+                >
                   {item.icon}
                 </span>
               )}
               <span className="min-w-0">
                 <span className="block truncate font-medium">{item.label}</span>
                 {item.hint && (
-                  <span className="mt-0.5 block text-xs leading-snug text-foreground/45">
+                  /* `--bo-text-muted` e não o `foreground/45` de antes: aquele
+                     media 3,11:1 sobre branco e 2,95:1 sobre o pior material —
+                     chumbava nos dois. Este mede 5,91:1 e 5,32:1. Sobre a
+                     pastilha passa a branco a 85%, que dá 5,28:1 contra o
+                     acento. */
+                  <span className="mt-0.5 block text-xs leading-snug text-[var(--bo-text-muted)] group-hover:text-white/85 group-active:text-white/85">
                     {item.hint}
                   </span>
                 )}

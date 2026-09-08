@@ -80,11 +80,11 @@ function Kpi({
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
-        accent ? "bg-[#4d6350]/[0.05] border-[#4d6350]/20" : "bg-white border-[var(--bo-hairline)] "
+        accent ? "bg-sage-600/[0.05] border-sage-600/20" : "bg-white border-[var(--bo-hairline)] "
       }`}
     >
       <p
-        className={`font-light leading-none mb-2 relative ${accent ? "text-[#4d6350]" : "text-[var(--bo-text)]"}`}
+        className={`font-light leading-none mb-2 relative ${accent ? "text-sage-600" : "text-[var(--bo-text)]"}`}
         style={{
           fontSize: small ? "clamp(18px, 1.9vw, 24px)" : "clamp(22px, 2.6vw, 34px)",
         }}
@@ -92,7 +92,7 @@ function Kpi({
         {value}
       </p>
       <p
-        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-[#4d6350]/60" : "text-foreground/30"}`}
+        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-sage-600/60" : "text-foreground/30"}`}
       >
         {label}
       </p>
@@ -327,7 +327,7 @@ const QUADRADOS_DE_NUMERO = "grid grid-cols-1 min-[22rem]:grid-cols-2 gap-3";
 function Sub({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-foreground/45 text-[10px] tracking-[0.25em] uppercase mb-5 font-medium">
+      <h3 className="mb-5 text-title3 font-semibold text-[var(--bo-text-muted)]">
         {title}
       </h3>
       {children}
@@ -928,7 +928,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                       const pct = Math.round(row.marginPct);
                       // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
                       const color = corDeTexto(
-                        pct >= 50 ? "#4d6350" : pct >= 20 ? "#7c854b" : "#8a8a82",
+                        pct >= 50 ? "#4c6752" : pct >= 20 ? "#7c854b" : "#8a8a82",
                       );
                       return (
                         <div key={row.label}>
@@ -1065,7 +1065,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         style={{
                           // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
                           color: corDeTexto(
-                            row.taxa >= 50 ? "#4d6350" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
+                            row.taxa >= 50 ? "#4c6752" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
                           ),
                         }}
                       >
@@ -1084,7 +1084,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                       style={{
                         transform: `scaleX(${fraccaoDaBarra(row.taxa, 100)})`,
                         background:
-                          row.taxa >= 50 ? "#4d6350" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
+                          row.taxa >= 50 ? "#4c6752" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
                       }}
                     />
                   </div>

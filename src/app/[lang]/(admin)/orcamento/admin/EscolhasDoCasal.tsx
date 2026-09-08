@@ -66,7 +66,7 @@ export default function EscolhasDoCasal({
           pergunta errada; `flex-wrap` sozinho responde à certa — «cabe?» — e a
           contagem passa para a linha de baixo exactamente quando não cabe. */}
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="text-[var(--bo-tinta-72)] text-[11px] uppercase tracking-[0.18em]">
+        <h3 className="text-title3 font-semibold text-[var(--bo-tinta-72)]">
           À escolha do casal
         </h3>
         {porResponder > 0 && (
@@ -86,7 +86,7 @@ export default function EscolhasDoCasal({
 
             {estado.tipo === "escolhida" && (
               <p className="mt-1 text-sm">
-                <span className="font-medium text-[#4d6350]">{estado.opcao.rotulo}</span>
+                <span className="font-medium text-sage-600">{estado.opcao.rotulo}</span>
                 <span className="text-foreground/40"> · {dia(estado.em)}</span>
               </p>
             )}

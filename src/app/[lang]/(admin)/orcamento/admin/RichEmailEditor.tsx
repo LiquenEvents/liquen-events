@@ -286,7 +286,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
               <span aria-hidden>A</span>
               <span
                 aria-hidden
-                className="ml-0.5 inline-block h-2.5 w-2.5 rounded-full border border-foreground/20 bg-[#4d6350]"
+                className="ml-0.5 inline-block h-2.5 w-2.5 rounded-full border border-foreground/20 bg-sage-600"
               />
             </TbButton>
             {colorOpen && (
@@ -346,7 +346,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
             <button
               type="button"
               onClick={confirmButton}
-              className={`px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440] ${ESTADO} ${PRESSAO}`}
+              className={`px-3 py-1.5 rounded-full text-xs bg-sage-600 text-white hover:bg-[#415440] ${ESTADO} ${PRESSAO}`}
             >
               Inserir botão
             </button>
@@ -373,7 +373,7 @@ export const RichEmailEditor = forwardRef<RichEmailEditorHandle, Props>(function
         onFocus={onFocus}
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
-        className="bo-input w-full min-h-[320px] px-3.5 py-3 text-sm leading-relaxed text-[var(--bo-text)] [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_a]:text-[#4d6350] [&_a]:underline"
+        className="bo-input w-full min-h-[320px] px-3.5 py-3 text-sm leading-relaxed text-[var(--bo-text)] [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_a]:text-sage-600 [&_a]:underline"
       />
     </div>
   );
@@ -454,7 +454,7 @@ function MiniForm({
         <button
           type="button"
           onClick={onConfirm}
-          className={`px-3 py-1.5 rounded-full text-xs bg-[#4d6350] text-white hover:bg-[#415440] ${ESTADO} ${PRESSAO}`}
+          className={`px-3 py-1.5 rounded-full text-xs bg-sage-600 text-white hover:bg-[#415440] ${ESTADO} ${PRESSAO}`}
         >
           {confirmLabel}
         </button>

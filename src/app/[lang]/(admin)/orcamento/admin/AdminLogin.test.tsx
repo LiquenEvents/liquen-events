@@ -136,9 +136,9 @@ describe("a ordem dos dois caminhos", () => {
     montar();
     const aparelho = screen.getByRole("button", { name: /Entrar com este dispositivo/i });
     const senha = screen.getByRole("button", { name: /Entrar com palavra-passe/i });
-    // A cor cheia (`bg-[#4d6350]`) é o peso de primário desta casa; a
+    // A cor cheia (`bg-sage-600`) é o peso de primário desta casa; a
     // alternativa fica com o contorno.
-    expect(aparelho.className).toContain("bg-[#4d6350]");
+    expect(aparelho.className).toContain("bg-sage-600");
     // 28% e não 15%: a 15% o contorno lia-se como DESACTIVADO (o estado
     // desactivado é este mesmo desenho com `opacity-45` por cima). Ver a nota
     // no `Button.tsx`.
@@ -154,7 +154,7 @@ describe("a ordem dos dois caminhos", () => {
     // É a única porta que resta: não pode estar desenhada como alternativa de
     // coisa nenhuma.
     expect(screen.getByRole("button", { name: /Entrar com palavra-passe/i }).className).toContain(
-      "bg-[#4d6350]",
+      "bg-sage-600",
     );
   });
 

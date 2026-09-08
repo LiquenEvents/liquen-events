@@ -152,7 +152,7 @@ export default function FechosMeta() {
 
   return (
     <section className="rounded-2xl border border-[var(--bo-hairline)] bg-white p-6 ">
-      <h3 className="text-[var(--bo-text-muted)] text-[10px] font-medium uppercase tracking-[0.3em]">
+      <h3 className="text-title3 font-semibold text-[var(--bo-text-muted)]">
         Casamentos fechados · Meta
       </h3>
       <p className="mt-1 text-[11px] leading-snug text-foreground/35">
@@ -227,7 +227,7 @@ export default function FechosMeta() {
               type="button"
               disabled={!relatorio.configurada || aEnviar}
               onClick={() => setAPerguntar(true)}
-              className={`alvo-toque mt-4 rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque mt-4 rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
             >
               {aEnviar ? "A enviar…" : "Enviar à Meta"}
             </button>
@@ -245,7 +245,7 @@ export default function FechosMeta() {
                 <button
                   type="button"
                   onClick={() => void enviar()}
-                  className={`alvo-toque rounded-full bg-[#4d6350] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
+                  className={`alvo-toque rounded-full bg-sage-600 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-white hover:bg-[#415440] pointer-coarse:min-h-11 ${ESTADO} ${PRESSAO}`}
                 >
                   Enviar
                 </button>
@@ -266,7 +266,7 @@ export default function FechosMeta() {
             <p
               className={`mt-4 rounded-lg px-3 py-2 text-[12px] leading-snug ${
                 desfecho.enviados > 0
-                  ? "bg-[#4d6350]/10 text-[#3c5140]"
+                  ? "bg-sage-600/10 text-[#3c5140]"
                   : "bg-[#8a2a22]/10 text-[#8a2a22]"
               }`}
               role="status"

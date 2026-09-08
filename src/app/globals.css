@@ -115,6 +115,59 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* ══════════════════════════════════════════════════════════════════════
+     TOKENS SEMÂNTICOS — A PARTE 1 DO BRIEF
+     ══════════════════════════════════════════════════════════════════════
+
+     Definidos por FUNÇÃO e não por aparência, que é a regra que os torna
+     úteis: `--fg-secondary` diz para que serve; `#596959` não diz nada.
+
+     Vivem aqui e não no `@theme` do `tema.css` porque não são para gerar
+     utilitários — são variáveis CSS, e uma variável CSS desce a árvore toda
+     independentemente do que o Tailwind varre. O `globals.css` é carregado
+     em todas as páginas, back office incluído (`[lang]/layout.tsx`), logo
+     estas chegam a todo o lado sem depender do `@source`.
+
+     Os rácios ao lado são os do brief. Nenhum componente os usa ainda: a
+     fase 01 cria a fonte de verdade e mais nada.
+     ══════════════════════════════════════════════════════════════════════ */
+  --bg-base: #f7f8f7;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-elevated-2: #ffffff;
+  --bg-subtle: #eef1ee;
+
+  --fg-primary: #1e241e; /* 15,8:1 sobre branco */
+  --fg-secondary: #596959; /* 5,9:1 */
+  --fg-tertiary: #6b766c; /* 4,7:1 */
+  --fg-placeholder: #8a968a; /* só placeholder, nunca conteúdo */
+
+  --border: #dee3de;
+  --border-strong: #c3ccc3;
+
+  --accent: #4c6752; /* 6,2:1 sobre branco; branco sobre ele: 6,2:1 */
+  --accent-hover: #39513f;
+  --accent-subtle: #e9f2eb;
+  --focus-ring: #4c6752;
+
+  --success: #2f6d4f; /* 6,1:1 */
+  --warning: #8a5a12; /* 5,9:1 */
+  --danger: #b23b2e; /* 5,9:1 */
+  --info: #2c5f86; /* 6,8:1 */
+
+  /* material */
+  --glass-bg: rgb(255 255 255 / 0.55);
+  --glass-bg-clear: rgb(255 255 255 / 0.1);
+  --glass-border: rgb(255 255 255 / 0.62);
+  --glass-hi: rgb(255 255 255 / 0.92);
+  --glass-lo: rgb(255 255 255 / 0.16);
+  --glass-shadow: 0 10px 34px rgb(16 28 20 / 0.17);
+  --glass-blur: 24px;
+  --glass-sat: 180%;
+
+  --shadow-raised: 0 1px 2px rgb(16 28 20 / 0.06), 0 1px 3px rgb(16 28 20 / 0.04);
+  --shadow-overlay: 0 10px 30px rgb(16 28 20 / 0.16);
+
+  /* ══════════════════════════════════════════════════════════════════════
      A ESCADA DO PERCURSO — TRÊS DEGRAUS, E O NÚMERO VIVE AQUI
      ══════════════════════════════════════════════════════════════════════
 
@@ -505,7 +558,30 @@ body:is(.admin-mode, :has([data-admin-mode])) {
 
      São duas ideias diferentes que por acaso tinham o mesmo valor. Separá-las
      é o que permite mudar uma sem mexer na outra. */
-  --bo-chao: #ffffff;
+  /* ── E DEPOIS ELA PEDIU O VIDRO, QUE EXIGE ALGUMA COISA POR TRÁS ────────
+     O chão era branco por pedido dela — «eu quero branco», a olhar para a
+     referência. Continuou branco enquanto isso não colidiu com mais nada.
+
+     Colidiu quando ela pediu o back office no material da Apple. Vidro só
+     existe se houver o que atravessar: uma superfície translúcida por cima de
+     branco liso vê-se EXACTAMENTE como branco. A barra de topo escapou — é
+     `sticky` e o conteúdo passa mesmo por baixo dela ao rolar —, mas a coluna
+     da esquerda é uma coluna AO LADO do conteúdo, e por trás dela só está o
+     chão.
+
+     Foi-lhe posta a escolha com as duas metades escritas, e ela respondeu
+     «tinta o chão, quero o vidro». O valor é o `--bg-base` do sistema de
+     design que ela aprovou.
+
+     MEDIDO, e é o que torna isto melhor e não só diferente:
+
+         chão       cartão branco sobre ele   --bo-text   muted
+         #ffffff          1,000               14,35       5,49
+         #f7f8f7          1,065               13,63       5,38
+
+     O cartão branco não se distinguia do chão de todo — 1,000 é a definição de
+     invisível. Quem separava as coisas era só o fio. Agora há fio E degrau. */
+  --bo-chao: #f7f8f7;
 
   --bo-surface-sunken: #f7f7f8; /* insets, list stripes — neutral ChatGPT grey */
   --bo-surface-hover: rgba(13, 13, 13, 0.045); /* row / item hover wash */
@@ -651,14 +727,312 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      não haver sombra — pagava-se o desenho e não se recebia nada. Noventa
      vezes. O que se vê é a página deixar de ser um mar de caixas todas ao
      mesmo nível e passar a ter dois: o chão, e o que está em cima dele. */
+  /* ── E A SUSPENSA ABRIU-SE, PORQUE ERA UM CONTORNO E NÃO UMA SOMBRA ──────
+     Era `0 4px 12px -2px / 0.10` mais `0 2px 4px -2px / 0.06`. Doze píxeis de
+     desfoque a quatro de queda desenham uma orla ESCURA E CURTA colada ao
+     bordo — a olho lê-se como uma segunda moldura por baixo do fio, e não como
+     um objecto levantado da página. É o defeito que as capturas do macOS não
+     têm: lá a sombra é larga, difusa e quase não se vê onde acaba.
+
+     Passa a `0 12px 32px -8px / 0.16` mais `0 4px 10px -4px / 0.08`. Os três
+     números mudaram pela mesma razão:
+
+       queda    4 → 12 px   um menu está mais alto do que a página, e a queda é
+                            a única coisa que diz quanto.
+       desfoque 12 → 32 px  é o que apaga a aresta da sombra. Abaixo de ~24 px
+                            ela tem contorno; a partir daí é penumbra.
+       tinta    0,10 → 0,16 um desfoque três vezes mais largo espalha a mesma
+                            tinta por três vezes mais área e desaparece — a
+                            subida devolve-lhe o peso que o alargamento tirou.
+
+     O recuo (`-8px` e `-4px`) fica e cresce com o desfoque: é ele que impede a
+     penumbra de sair pelos lados e de pousar sobre o vizinho. Uma sombra que
+     assoma à esquerda e à direita de um menu de 200 px lê-se como sujidade.
+
+     Isto vale para a família toda do token — menus, avisos, barras coladas, o
+     cartão em arrasto —, e é de propósito: são todos «o que flutua e volta a
+     fechar». A MODAL não se toca: já era larga (48 px) porque tapa a página. */
   --bo-sombra-suspensa:
-    0 4px 12px -2px rgba(13, 13, 13, 0.1), 0 2px 4px -2px rgba(13, 13, 13, 0.06);
+    0 12px 32px -8px rgba(13, 13, 13, 0.16), 0 4px 10px -4px rgba(13, 13, 13, 0.08);
   --bo-sombra-modal:
     0 24px 48px -12px rgba(13, 13, 13, 0.18), 0 8px 16px -8px rgba(13, 13, 13, 0.1);
 
+  /* ══════════════════════════════════════════════════════════════════════
+     O MATERIAL DO QUE APARECE POR CIMA
+     ══════════════════════════════════════════════════════════════════════
+
+     Pedido dela, com duas capturas de menus do macOS por baixo: «eu quero que
+     fique assim com este aspecto no back office quando vamos seleccionar
+     alguma coisa».
+
+     O que dá àquilo o aspecto que tem não é a cor — é o MATERIAL: uma
+     superfície que deixa perceber que há página por baixo, com cantos
+     generosos, uma sombra larga e difusa, e a linha escolhida como uma
+     pastilha CHEIA em vez de uma linha cinzenta.
+
+     A paleta é deles e fica lá. O azul daquelas capturas é o acento do sistema
+     da Apple; o desta casa é o `--bo-accent`, verde-musgo. Não entra azul
+     nenhum — ver a lista do que se recusou, no fim deste bloco.
+
+     ── 1. A OPACIDADE NÃO É UM GOSTO: É O QUE O CONTRASTE DEIXA ───────────
+
+     Um material translúcido põe texto por cima de um fundo VARIÁVEL, e é o
+     modo mais fácil que há de partir a legibilidade sem dar por isso. O pior
+     caso não é o fundo branco do painel — é uma fotografia escura por baixo
+     de um menu, que nesta casa existe (as grelhas de material e de temas).
+
+     Portanto mede-se contra PRETO, que é o pior caso possível, e não contra o
+     branco, que é o mais generoso. Material branco a α sobre preto dá uma
+     superfície de `255·α`; a tinta da casa assenta nela e mede-se aí:
+
+         α      superfície   tinta-82   tinta-72   tinta-64   tinta-58
+         0,74   #bdbdbd        7,35       5,66       4,54       3,85
+         0,78   #c7c7c7        7,97       6,03       4,77       4,01
+         0,80   #cccccc        8,29       6,21       4,88       4,09
+         0,84   #d6d6d6        8,94       6,58       5,10       4,24
+         0,88   #e0e0e0        9,60       6,93       5,32       4,38
+         0,92   #ebebeb       10,27       7,29       5,52       4,52
+
+     **0,80.** Desceu de 0,88, e o número tem duas contas por trás.
+
+     A PRIMEIRA é a tinta, e é a que esta tabela mostra: o chão de tinta do
+     material é o `--bo-text-muted` (0,64), e a 0,80 ele mede 4,88:1 — 8,4%
+     acima dos 4,5:1 exigidos. A tinta sozinha deixava ir até 0,74 (4,54:1),
+     e é aí que a folga acaba: quatro centésimos de rácio não são folga
+     nenhuma.
+
+     A SEGUNDA quase passou despercebida, e é a que decidiu o número. O que
+     mede pior sobre este material NÃO é a tinta — é o VERDE. O visto do
+     `ui/Escolha` era pintado com o `--bo-accent` (#4c6350), e um verde escuro
+     sobre um material que escurece com o fundo desce muito mais depressa do
+     que um cinzento:
+
+         α      superfície   --bo-accent sobre ela
+         0,80   #cccccc        4,08:1   ← chumbava AA a texto
+         0,84   #d6d6d6        4,51:1   ← passava por uma centésima
+         0,88   #e0e0e0        4,98:1
+
+     Ou seja: com o visto a verde, o piso do material não era 0,74 — era 0,84,
+     e a 0,84 não havia folga para ninguém mexer no verde da casa. A saída não
+     foi parar em 0,86: foi **tirar o verde da tinta**. O visto passa a ser
+     `--bo-text` (tinta-82), que mede 8,29:1 sobre o pior material — e é, de
+     caminho, o que o sistema que estas capturas mostram faz mesmo: nos menus
+     do macOS o visto é da COR DO RÓTULO, e o acento aparece na pastilha cheia
+     do realce. O verde da casa não se perdeu; mudou-se para onde ele já era o
+     gesto.
+
+     Depois disso, o pior caso do material inteiro volta a ser o chão de tinta:
+     **4,88:1**, com 8,4% de folga sobre o mínimo, num fundo (preto absoluto)
+     que nenhuma fotografia atinge de facto — e que o desfoque ainda clareia,
+     porque um `blur` de 20 px mistura o escuro com o que está à volta dele.
+
+     A conclusão não foi subir a opacidade até o degrau mais fraco caber. Foi
+     a contrária, e é a decisão que este bloco fixa: **o material tem um chão
+     de tinta, e esse chão é o `--bo-text-muted` (0,64).** O `faint` não sobe
+     para cá. Os painéis que o usavam — e os `text-foreground/45` e `/40` que
+     andavam pelo meio, que já chumbavam a 3,11:1 e a 2,67:1 SOBRE BRANCO —
+     subiram um degrau. `material-do-que-aparece-por-cima.test.ts` corre a
+     conta na CI, a partir dos tokens, e varre os sete ficheiros à procura de
+     tinta abaixo do chão — verde incluído.
+
+     ── 1b. A FRONTEIRA SOBRE FUNDO CLARO NÃO PIOROU, E A CONTA DIZ PORQUÊ ──
+
+     A pergunta certa antes de baixar a opacidade: uma superfície mais
+     transparente deixa de ter fronteira sobre um painel branco?
+
+     Não. E a razão é aritmética: a superfície é BRANCA. Composta a qualquer α
+     sobre um fundo branco dá branco outra vez — 255 a 0,80, 255 a 0,88, 255 a
+     0,60. A fronteira sobre claro nunca foi feita pela superfície; é feita
+     pelo FIO e pela SOMBRA, e nenhum dos dois depende do α do material.
+
+     Medido, com o fio em `--bo-hairline-strong` (0,13) por cima da superfície
+     (o fundo estende-se por baixo da borda — `background-clip: border-box`):
+
+         fio sobre painel branco ............... 1,326:1   (igual a 0,88 e a 0,80)
+         sombra suspensa, bordo inferior ....... 1,332:1
+         sombra suspensa, lados ................ 1,148:1
+
+     São números baixos e ficam escritos. Não sobem para 3:1 porque 3:1 exigia
+     um fio a 0,45 de preto — um contorno preto à volta de um menu, que é o
+     desenho oposto ao destas capturas. E o 1.4.11 do WCAG pede os 3:1 para o
+     que é preciso para IDENTIFICAR um controlo e o seu estado: aqui os
+     controlos são as LINHAS do menu, que se identificam pelo seu próprio texto
+     e pela pastilha cheia do realce. A caixa à volta delas é moldura, não é o
+     controlo. O que este ficheiro promete é que estes três números não descem
+     em silêncio — o teste mede-os.
+
+     ── 2. O DESFOQUE É A ÚNICA COISA DESTA LISTA QUE PODE CUSTAR CARO ─────
+
+     Este ficheiro tem escrito, e por medição, que o `backdrop-filter` fica
+     FORA das animações: um desfoque em transição repinta o ecrã inteiro a
+     cada fotograma. Um desfoque ESTÁTICO é outra conversa — não há
+     recomposição por fotograma enquanto nada se mexe —, mas continua a ser
+     trabalho numa superfície grande, e ela trabalha num iPhone, em 4G, dentro
+     de quintas.
+
+     Por isso o desfoque é UM NÚMERO (`--bo-material-desfoque`) e uma classe
+     à parte (`.bo-material-desfoque`), e não uma propriedade cozida na
+     superfície: baixar a intensidade — ou desligá-la — passa a ser mudar um
+     valor aqui, e não caçar sete ficheiros. Quem NÃO leva a segunda classe
+     fica com a superfície translúcida sem desfoque, que continua a ler-se.
+
+     20 px e não mais: é o raio a partir do qual o que está por baixo deixa de
+     se reconhecer (letras de 15 px desaparecem enquanto a mancha de cor fica),
+     e cada píxel acima disso é área de amostragem paga a troco de nada.
+
+     A saturação a 180% é o resto do truque da Apple: um desfoque puro
+     acinzenta o que passa, e a saturação devolve-lhe a cor. Não custa
+     amostragem nenhuma — vai no mesmo passo de filtro.
+
+     ── 3. OS RAIOS SÃO CONCÊNTRICOS, E É POR ISSO QUE SÃO TRÊS ────────────
+
+     O bloco dos raios lá em cima colapsou a escala do Tailwind toda em 8 px,
+     de propósito: nove valores para conteúdo não eram hierarquia nenhuma. O
+     que aparece POR CIMA é outra escala, e é a que as capturas mostram.
+
+     Três valores, e o terceiro é uma CONTA e não uma escolha:
+
+       --bo-material-raio        12 px  a moldura de um menu ou de uma lista
+       --bo-material-raio-grande 18 px  uma folha ou um diálogo — é maior, e um
+                                        raio que não cresce com a caixa
+                                        lê-se como apertado
+       --bo-material-raio-pastilha      = raio − folga
+
+     A regra dos raios concêntricos: uma pastilha desenhada dentro de uma
+     moldura com `folga` de afastamento só fica paralela à moldura se o raio
+     dela for `raio − folga`. Com 12 e 4, dá 8. Escrito como `calc()` e não
+     como um quarto número, para que mexer no raio da moldura arraste a
+     pastilha atrás dele em vez de as descolar.
+
+     ── 4. O QUE SE RECUSOU DAQUELAS CAPTURAS ─────────────────────────────
+
+     · **O azul.** É o acento do sistema deles. Aqui a pastilha é
+       `--bo-accent`, e a diferença entre «inspirado» e «um painel de
+       definições do Mac com o nome errado» é essa.
+     · **O material nas folhas e nos diálogos.** Levam o raio e a sombra, e
+       ficam OPACOS. Uma folha ocupa 390×743 no telemóvel dela: desfocar isso
+       é o oposto da promessa deste ficheiro, e ver a página a atravessar uma
+       caixa que existe para a TAPAR não é material, é ruído.
+     · **O desfoque dentro da paleta de comandos.** O véu dela já desfoca o
+       ecrã inteiro; um segundo `backdrop-filter` por cima amostra o que o
+       primeiro já compôs, e paga-o outra vez.
+     · **A vibrância do texto.** O macOS pinta os rótulos dos menus com modos
+       de mistura (`plus-darker`), que é o que lhe permite ser mais
+       translúcido do que isto sem partir a leitura. Em CSS não há equivalente
+       fiável, e imitar o aspecto sem o mecanismo é exactamente como se chumba
+       um contraste sem dar por isso.
+     · **O separador a toda a largura.** Nas capturas o filete vai de bordo a
+       bordo; aqui a pastilha tem folga lateral, e um filete que passe por fora
+       dela desalinha as duas fronteiras verticais que o olho lê. Fica com a
+       mesma folga da pastilha. */
+  --bo-material: rgba(255, 255, 255, 0.8);
+  /* O recuo de quem não tem `backdrop-filter` e de quem pediu menos
+     transparência. Branco puro — a superfície que a casa já tinha. */
+  --bo-material-opaco: #ffffff;
+  --bo-material-desfoque: 20px;
+  --bo-material-saturacao: 180%;
+  --bo-material-raio: 0.75rem; /* 12px — menus, listas, notas */
+  --bo-material-raio-grande: 1.125rem; /* 18px — folhas e diálogos */
+  --bo-material-folga: 0.25rem; /* 4px — a folga da moldura à pastilha */
+  --bo-material-raio-pastilha: calc(var(--bo-material-raio) - var(--bo-material-folga));
+  /* A coluna dos ícones e do visto: uma fila alinhada à esquerda, todos do
+     mesmo tamanho — e a MESMA largura mesmo quando o item não tem ícone
+     nenhum, senão os rótulos de um menu misto ficam em duas colunas. */
+  --bo-material-coluna: 1rem;
+
+  /* ── A VARIANTE CLARA, PARA CONTROLOS SOBRE FOTOGRAFIAS ─────────────────
+     Os números e a conta do véu estão na `.bo-vidro-claro`, lá em baixo.
+     Aqui ficam os três valores, para se poderem mexer num sítio só. */
+  --bo-vidro-claro: rgba(255, 255, 255, 0.1);
+  --bo-vidro-claro-veu: rgba(0, 0, 0, 0.5);
+  --bo-vidro-claro-opaco: #4d4d4d;
+
+  /* ══════════════════════════════════════════════════════════════════════
+     A ESCALA DE RAIOS, COM NOME — E DERIVADA, QUE É O QUE A FAZ ESCALA
+     ══════════════════════════════════════════════════════════════════════
+
+     Os valores já existiam todos; o que faltava era poder CHAMÁ-LOS pelo
+     papel. Um ecrã novo escrevia `rounded-xl` sem saber que isso já não são
+     12 px (o bloco lá em cima colapsa a escala do Tailwind em 8), e uma
+     superfície que flutua tinha de saber o nome do token do material para
+     apanhar os 12.
+
+     Cinco degraus, e nenhum é um número novo — cada um APONTA para o token
+     que já mandava. Mexer no material continua a arrastar a escala atrás
+     dele, que é a diferença entre uma escala e uma lista de números iguais:
+
+       --bo-raio-miudeza     4 px   o que tem menos de 20 px de altura: teclas
+                                    de atalho, pegas de arrasto, etiquetas de
+                                    9 px, barras do esqueleto. A 8 px uma
+                                    etiqueta de 16 px fica quase pílula.
+       --bo-raio-conteudo    8 px   cartões, painéis, campos, tabelas — o chão
+                                    do back office (= `--bo-radius`)
+       --bo-raio-flutuante  12 px   o que aparece POR CIMA e volta a fechar:
+                                    menus, listas, notas (= material)
+       --bo-raio-tapa       18 px   o que TAPA a página: folhas e diálogos
+       --bo-raio-pastilha          a pastilha dentro de uma moldura, pelos
+                                    cantos concêntricos (= raio − folga)
+       --bo-raio-pilula            a ACÇÃO, e a cápsula que flutua
+
+     ── OS CANTOS CONCÊNTRICOS, E O CASO EM QUE ELES SE RESOLVEM SOZINHOS ──
+
+     A regra: uma pastilha desenhada a `folga` da moldura só fica paralela a
+     ela se o raio dela for `raio − folga`. É o que o `--bo-raio-pastilha`
+     faz, e é uma conta e não um quarto número.
+
+     O caso especial vale a pena escrever porque parece uma excepção e não é:
+     numa CÁPSULA (pílula) a pastilha interior também é pílula. `999px`
+     saturado menos a folga continua a dar o semicírculo da altura interior —
+     ou seja, a pílula é o ponto fixo da regra concêntrica. É por isso que a
+     barra de destinos do telemóvel pede `--bo-raio-pilula` nos dois sítios e
+     não fica torta. */
+  --bo-raio-miudeza: 0.25rem;
+  --bo-raio-conteudo: var(--bo-radius);
+  --bo-raio-flutuante: var(--bo-material-raio);
+  --bo-raio-tapa: var(--bo-material-raio-grande);
+  --bo-raio-pastilha: var(--bo-material-raio-pastilha);
+  --bo-raio-pilula: 999px;
+
   /* ── Single accent: Líquen moss ── */
-  --bo-accent: #4c6350; /* moss-dark — primary actions / active states */
+  /* ── O VERDE DESTA CASA, UM SÓ ────────────────────────────────────────────
+     Era `#4c6350` aqui e `#4d6350` escrito à mão em 458 sítios — dois verdes
+     a um dígito de distância, invisíveis ao olho (6,55:1 contra 6,53:1) e
+     indistinguíveis para quem lê o código. Uma bifurcação assim já custou um
+     defeito nesta sessão.
+
+     Passa a ser o acento do sistema de design que ela aprovou, e passa a haver
+     UM valor: as classes usam `sage-600` (o `@theme` do `tema.css`), o
+     JavaScript que não pode usar `var()` usa o mesmo hexadecimal, e este token
+     aponta para o mesmo sítio. Medido: 6,23:1 sobre branco.
+
+     ── E PORQUE É QUE ISTO É UM HEXADECIMAL E NÃO UM `var()` ───────────────
+     A primeira versão escrevia `var(--color-sage-600, …)`. Ficava elegante e
+     partia três testes de contraste desta casa, que LÊEM este token do CSS e
+     fazem a conta da norma com ele: `hexParaRgb(token("--bo-accent"))` não tem
+     como seguir uma indirecção.
+
+     Podia ter-se ensinado os três testes a resolver o `var()`. Fica o valor
+     literal, e um guarda a exigir que ele seja igual ao `--color-sage-600` do
+     `tema.css` — porque o que interessa não é a forma como está escrito, é não
+     haver dois valores. Um guarda vale mais do que três leitores espertos. */
+  --bo-accent: #4c6752; /* = --color-sage-600. Guardado por `um-verde-so.test.ts` */
   --bo-accent-ring: rgba(76, 99, 80, 0.16); /* focus / active soft ring */
+  /* ── A LAVAGEM DE ACENTO, JÁ COMPOSTA SOBRE BRANCO ──────────────────────
+     O `--bo-accent-ring` é translúcido, e é isso que se quer na coluna da
+     esquerda: assenta no branco do painel e dá os 5,19:1 medidos ao acento
+     que lhe fica por cima.
+
+     Numa superfície TRANSLÚCIDA essa mesma lavagem deixa de ter um fundo
+     conhecido: sobre o material assente numa fotografia escura ela escurece
+     com ela, e o acento por cima perde os 4,5:1 sem ninguém dar por isso.
+
+     Este token é a MESMA cor já achatada sobre branco — `0,16·(76,99,80) +
+     0,84·(255,255,255)` = `rgb(226, 230, 227)` —, opaca de propósito, para a
+     pastilha do destino activo poder viver em cima do vidro e continuar a
+     medir o que mede. É o mesmo motivo por que a pastilha dos menus é opaca.
+     Medido: `--bo-accent` sobre ela dá 5,19:1, e não depende do que passa por
+     baixo. */
+  --bo-accent-lavagem: #e2e6e3;
 
   /* ── Type scale (documented reference for the whole back office). Sizes the
      screens already reach for via Tailwind, unified here into one calm ramp.
@@ -687,8 +1061,56 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      em TODOS os ficheiros em vez de nos que eu já conhecia.
 
      72 px é a altura com os rótulos legíveis. Quem precisar dela lê ESTE
-     token — `barra-inferior.test.tsx` falha se alguém voltar a copiá-lo. */
-  --bo-barra-inferior: 72px;
+     token — `barra-inferior.test.tsx` falha se alguém voltar a copiá-lo.
+
+     ── E DEPOIS A BARRA PASSOU A FLUTUAR, E OS 72 FICARAM ─────────────────
+
+     Pedido dela, com a terceira captura: uma barra que não encosta ao fundo —
+     flutua, com folga por baixo e dos lados, os destinos numa CÁPSULA e o
+     abridor da gaveta numa peça REDONDA à parte.
+
+     A altura ocupada passou a ser uma soma, e a soma tinha de continuar a
+     caber nos 72 px, senão mexia-se em quatro sítios de uma vez (o `<main>`,
+     o `Toast`, a barra do estúdio, a lista da biblioteca):
+
+         cápsula ................. 62 px   (--bo-barra-capsula)
+         folga por baixo ......... 12 px   (--bo-barra-folga)
+         ────────────────────────────────
+         ocupado ................. 74 px
+         reservado ............... 76 px   ← 2 px de ar por cima da cápsula
+
+     O reservado subiu de 72 para 76, e são quatro píxeis que ninguém tem de
+     ir procurar: os QUATRO sítios que guardam espaço à barra — o `<main>` do
+     `AdminClient`, o aviso do `Toast`, a barra de acção do estúdio e o fundo
+     da lista da biblioteca — leem TODOS este token, e foi para isto que ele
+     existe. `barra-inferior.test.tsx` guarda a desigualdade
+     (`cápsula + folga ≤ barra-inferior`), que é a parte que se pode partir sem
+     dar por isso, e a medição no browser está no relatório.
+
+     ── E OS 62 PX DA CÁPSULA SÃO UMA CONTA, NÃO UM GOSTO ──────────────────
+
+     A cápsula começou por ter 56, que era o que a captura sugeria, e o browser
+     desmentiu: os rótulos transbordavam 2 px por baixo. A razão é o CHÃO DA
+     LETRA — no telemóvel esta casa não deixa texto abaixo de 12 px
+     (`escala-movel.test.ts`), portanto um rótulo de duas linhas mede 30 px e
+     não os 17,6 que um `text-[8px]` faria supor.
+
+         ícone ................... 16 px
+         folga ícone/rótulo ......  2
+         rótulo, 2 linhas a 12/1,25  30
+         ─────────────────────────────
+         conteúdo ................ 48
+
+         cápsula ................. 62
+         fio da moldura × 2 ......  2
+         folga do material × 2 ...  8
+         ─────────────────────────────
+         alvo de cada destino .... 52   ← acima dos 44 do `.alvo-toque`
+
+     A conta da LARGURA está no `AdminClient.tsx`, ao lado da barra. */
+  --bo-barra-inferior: 76px;
+  --bo-barra-capsula: 3.875rem; /* 62px — a altura da cápsula que flutua */
+  --bo-barra-folga: 0.75rem; /* 12px — o ar por baixo e dos lados dela */
   --bo-lh-tight: 1.3;
   --bo-lh-body: 1.6;
   /* ── A ENTRELINHA DA LEGENDA ─────────────────────────────────────────────
@@ -3034,6 +3456,261 @@ body[data-menu-open] .whatsapp-fixed {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   O MATERIAL, EM DUAS CLASSES — E PORQUE É QUE SÃO DUAS
+   ══════════════════════════════════════════════════════════════════════════
+
+   Os números e a conta do contraste estão nos tokens, lá em cima. Aqui só se
+   arruma o que cada superfície do back office pede:
+
+     `.bo-material`           a SUPERFÍCIE — translúcida, com o fio e o raio
+                              generoso. É o que faz a família toda parecer a
+                              mesma coisa.
+     `.bo-material-desfoque`  o DESFOQUE, que se pede à parte.
+
+   São duas porque o desfoque é a única coisa desta lista que pode custar caro,
+   e uma superfície que o traga cozido não se pode desligar sem se desfazer.
+   Quem NÃO o pede — a paleta de comandos, que já tem um véu desfocado por
+   baixo — fica com a superfície na mesma.
+
+   ── E FICA FORA DE `@layer` DE PROPÓSITO ────────────────────────────────
+   Neste ficheiro todo o CSS escrito à mão está fora de camadas, e no Tailwind
+   v4 isso ganha sempre à `@layer utilities`. É o que se quer aqui: o bloco dos
+   raios lá em cima colapsa `rounded-xl` e `rounded-2xl` em 8 px para o
+   CONTEÚDO, e uma superfície que aparece por cima tem de escapar a esse
+   colapso sem ter de gritar `!important` em sete ficheiros.
+
+   A consequência a saber: um `rounded-*` ou um `bg-*` escrito ao lado de
+   `bo-material` na mesma etiqueta não vale nada. É a mesma armadilha que a
+   largura do `.bo-input` já documenta vinte linhas abaixo. */
+.bo-material {
+  /* ── A LINHA ESPECULAR, E PORQUE É QUE ELA É UM FUNDO E NÃO UMA SOMBRA ───
+     A investigação que ela mandou chama-lhe «a linha que faz a diferença entre
+     vidro e película colorida»: um fio de luz de 1,5 px no bordo de cima, que
+     é o que um material real faz quando apanha a luz de frente.
+
+     Vem como CAMADA DE FUNDO e não como `box-shadow: inset`, e a razão é a
+     cascata desta casa: esta regra está FORA de camadas e ganha sempre à
+     `@layer utilities`. Um `box-shadow` aqui apagava o
+     `shadow-[var(--bo-sombra-suspensa)]` de todas as superfícies que o pedem —
+     ou seja, tirava a sombra a todos os menus para acrescentar um fio.
+
+     Como fundo não há conflito nenhum, e ainda por cima ela acerta sozinha no
+     sítio: a linha é branca sobre uma superfície que JÁ é branca, portanto não
+     se vê sobre um painel claro (onde não teria sentido nenhum) e acende-se
+     sobre uma fotografia escura, que é onde o material está a deixar passar
+     alguma coisa. `padding-box` para o fio nascer DENTRO do fio da moldura e
+     não por baixo dele.
+
+     E desaparece sozinha quando o material deixa de ser material: as duas
+     regras de recuo aqui em baixo escrevem `background:` na forma curta, que
+     repõe `background-image: none`. Sem vidro não há reflexo. */
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.7),
+    rgba(255, 255, 255, 0) 1.5px
+  );
+  background-color: var(--bo-material, #ffffff);
+  background-clip: padding-box, border-box;
+  border: 1px solid var(--bo-hairline-strong, rgba(13, 13, 13, 0.13));
+  border-radius: var(--bo-material-raio, 0.75rem);
+}
+/* O degrau grande do raio, para o que já não é um menu — uma caixa de 576 px
+   com um raio de menu lê-se apertada. Vem depois da `.bo-material` e com a
+   mesma especificidade, portanto ganha-lhe; e é uma classe e não um
+   `rounded-*` porque a `.bo-material` está fora de camadas e um utilitário não
+   lhe chegava. */
+.bo-material-grande {
+  border-radius: var(--bo-material-raio-grande, 1.125rem);
+}
+/* A CÁPSULA — o terceiro degrau do raio, e o único que não é um número.
+   Uma barra que flutua no fundo do ecrã é uma pílula nas capturas dela, e uma
+   pílula não se pede com um `rounded-full` ao lado da `.bo-material`: esta
+   classe está fora de camadas e ganha ao utilitário (a armadilha está escrita
+   aqui em cima). Vem depois da `.bo-material` e com a mesma especificidade,
+   como a `.bo-material-grande`.
+
+   E é o ponto fixo da regra dos cantos concêntricos: a pastilha interior,
+   desenhada à `--bo-material-folga` da moldura, também é pílula — o
+   semicírculo da altura interior é paralelo ao de fora sem se lhe subtrair
+   nada. Ver o bloco dos raios lá em cima. */
+.bo-material-pilula {
+  border-radius: var(--bo-raio-pilula, 999px);
+}
+.bo-material-desfoque {
+  -webkit-backdrop-filter: blur(var(--bo-material-desfoque, 20px))
+    saturate(var(--bo-material-saturacao, 180%));
+  backdrop-filter: blur(var(--bo-material-desfoque, 20px))
+    saturate(var(--bo-material-saturacao, 180%));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A FAIXA — MATERIAL PARA O QUE ATRAVESSA O ECRÃ DE LADO A LADO
+   ══════════════════════════════════════════════════════════════════════════
+
+   A `.bo-material` desenha uma PEÇA: traz raio e traz moldura dos quatro
+   lados, que é o que um menu ou uma folha querem. Uma barra de topo colada ao
+   cimo da janela não é uma peça — não tem cantos nem lados, e o único fio que
+   lhe faz sentido é o de baixo, que ela já acende sozinha ao rolar.
+
+   Daí uma classe própria em vez de `.bo-material` com utilitários a desfazer o
+   que ela faz: a `.bo-material` vive FORA de camadas e ganha sempre à
+   `@layer utilities`, portanto um `rounded-none` ou um `border-x-0` ao lado
+   dela não lhe chegavam. O que ela partiria é concreto — o fio de baixo do
+   cabeçalho troca entre transparente e visível conforme a página desceu, e um
+   `border: 1px solid var(--bo-hairline-strong)` fora de camadas comia essa
+   troca sem deixar rasto.
+
+   Fica com a superfície e com a linha especular; a moldura e o raio ficam com
+   quem chama. O desfoque continua a ser pedido à parte
+   (`.bo-material-desfoque`), como em todo o lado.
+
+   ── SERVE A BARRA DE TOPO E A COLUNA DA ESQUERDA, E A ORDEM IMPORTOU ────
+
+   Vidro só existe se houver alguma coisa por trás. A barra de topo é
+   `sticky top-0` e o conteúdo passa MESMO por baixo dela ao rolar — há o que
+   atravessar, e o material leu-se logo.
+
+   A coluna da esquerda é uma coluna ao LADO do conteúdo: por trás dela só está
+   o chão, e o chão era branco por pedido dela. Sobre branco liso, vidro vê-se
+   exactamente como branco — pô-lo ali era trabalho invisível.
+
+   Ela decidiu tingir o chão («tinta o chão, quero o vidro»), o `--bo-chao`
+   passou a `#f7f8f7`, e a coluna entrou. As duas usam esta classe. */
+.bo-material-faixa {
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.7),
+    rgba(255, 255, 255, 0) 1.5px
+  );
+  background-color: var(--bo-material, #ffffff);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A SEGUNDA VARIANTE — O VIDRO CLARO, PARA CONTROLOS EM CIMA DE FOTOGRAFIAS
+   ══════════════════════════════════════════════════════════════════════════
+
+   A investigação que ela mandou distingue duas variantes, e só duas: a
+   REGULAR, que é o `.bo-material` aqui em cima e serve tudo o que tem texto a
+   sério; e a CLEAR, muito mais translúcida, para controlos que flutuam sobre
+   média rica — as grelhas de fotografias dos temas.
+
+   Um sítio só, e é este: o «⋯», a estrela e o arquivar que pousam em cima da
+   miniatura de um tema.
+
+   ── O NÚMERO DO VÉU NÃO É O DO DOCUMENTO, E A CONTA DIZ PORQUÊ ───────────
+
+   O documento propõe um véu de escurecimento a 35% por trás do vidro claro
+   quando ele assenta em fundo claro. Medido — glifo BRANCO, sobre o pior caso,
+   que é uma fotografia branca (um vestido ao sol, que nesta casa é a
+   fotografia mais provável que há):
+
+       véu    superfície   glifo branco sobre ela
+       0,35   #afafaf        2,20:1   ← o do documento. Chumba tudo.
+       0,47   #989898        3,07:1   ← o mínimo do 1.4.11
+       0,50   #8c8c8c        3,35:1   ← este, com 12% de folga
+       0,60   #757575        4,59:1   ← seria preciso para TEXTO
+
+   Fica **0,50**. Estes controlos são ícones com `aria-label` e sem texto
+   visível, portanto a barra é a do 1.4.11 (3:1) e não a do 1.4.3 — e a 0,50
+   sobra folga. Se algum dia lá entrar uma PALAVRA, o véu tem de subir a 0,61;
+   está escrito para não se descobrir isso à conta de alguém não conseguir ler.
+
+   ── E NÃO LEVA `backdrop-filter`, QUE É A PARTE QUE CONTRARIA O DOCUMENTO ─
+
+   O documento pede 8 px de desfoque nesta variante. Aqui não, e é o próprio
+   documento que dá a razão: ele fixa um tecto de CINCO superfícies com filtro
+   por ecrã, e a grelha de temas tem um destes controlos POR CARTÃO. Censo
+   medido no browser, a 1440, na vista de Temas com quatro temas: **catorze**
+   superfícies com `backdrop-filter` — duas da barra e DOZE destes chips, cada
+   um com o seu `backdrop-blur-sm`. Com uma biblioteca de trinta temas são
+   noventa filtros num ecrã.
+
+   As duas regras do documento não podem valer ao mesmo tempo neste sítio, e a
+   que se guarda é a do tecto: num chip de 32 px por cima de uma miniatura, os
+   8 px de desfoque não acrescentam legibilidade nenhuma — quem a dá é o véu,
+   e o véu está medido aqui em cima. Sem os doze filtros, a vista de Temas
+   desce de catorze superfícies filtradas para duas.
+
+   ── O QUE ISTO CORRIGE DE CAMINHO ────────────────────────────────────────
+
+   O chip era `bg-white/85` com `text-foreground/45`. Medido: 3,11:1 sobre uma
+   fotografia branca e 2,91:1 sobre uma preta — ou seja chumbava os 3:1 do
+   1.4.11 no segundo caso, e chumbava-os com a estrela que diz se um tema está
+   fixado. */
+.bo-vidro-claro {
+  background-image: linear-gradient(
+    var(--bo-vidro-claro, rgba(255, 255, 255, 0.1)),
+    var(--bo-vidro-claro, rgba(255, 255, 255, 0.1))
+  );
+  background-color: var(--bo-vidro-claro-veu, rgba(0, 0, 0, 0.5));
+}
+/* Sem translucidez o vidro claro é só um chip escuro — e tem de continuar a
+   ter um fundo conhecido por baixo do glifo branco. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .bo-vidro-claro {
+    background: var(--bo-vidro-claro-opaco, #4d4d4d);
+  }
+}
+/* Sem `backdrop-filter` não há material nenhum: o que passava era o que está
+   por baixo, nítido, por trás de um véu branco. Legível — a conta do contraste
+   é a mesma —, mas ilegível de LER. Volta ao branco que a casa já tinha. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bo-material {
+    background: var(--bo-material-opaco, #ffffff);
+  }
+}
+/* ── QUEM PEDE MENOS TRANSPARÊNCIA RECEBE MENOS TRANSPARÊNCIA ────────────
+   `prefers-reduced-transparency` é a irmã do `prefers-reduced-motion`, e a
+   razão dela é a mesma: há quem o desfoque e a translucidez cansem ou
+   desorientem. Custa duas regras e devolve a superfície opaca — que é
+   exactamente o recuo que já existe para quem não tem o filtro.
+
+   E tem um segundo efeito, que não é acidental: desliga o único trabalho de
+   composição por fotograma desta folha para quem o pediu. */
+@media (prefers-reduced-transparency: reduce) {
+  .bo-material,
+  .bo-material-faixa {
+    background: var(--bo-material-opaco, #ffffff);
+  }
+  .bo-material-desfoque {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+/* ── E QUEM PEDE MAIS CONTRASTE RECEBE MAIS CONTRASTE ────────────────────
+   A terceira irmã. `prefers-contrast: more` é o sinal de quem tem o sistema
+   posto em alto contraste, e o que ele pede a uma superfície de vidro é o
+   contrário do que o vidro é: fronteiras nítidas e nada difuso.
+
+   Três coisas, e todas elas medidas pela mesma régua:
+
+     · a superfície fica OPACA — o fundo do texto volta a ser conhecido;
+     · a moldura passa a `currentColor`, ou seja à cor da própria tinta, que é
+       o único valor que garante o contraste da fronteira seja qual for a
+       tinta que a superfície herdou;
+     · as sombras saem. Uma penumbra de 32 px é ruído para quem pediu arestas,
+       e aqui o `box-shadow: none` PODE ser escrito porque é isso mesmo que se
+       quer — ao contrário do bloco de cima, onde ele teria apagado a sombra
+       de toda a gente.
+
+   O `backdrop-filter` sai também: sem translucidez ele não compõe nada e
+   continuava a custar uma amostragem por fotograma. */
+@media (prefers-contrast: more) {
+  .bo-material {
+    background: var(--bo-material-opaco, #ffffff);
+    border-color: currentColor;
+    box-shadow: none;
+  }
+  .bo-material-faixa {
+    background: var(--bo-material-opaco, #ffffff);
+  }
+  .bo-material-desfoque {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* ── Back-office: shared component primitives ──
    The admin tool standardises on white cards with a hairline border + soft
    shadow, forest-green (#1b2119) for dark accents and #4d6350 for the green
@@ -3093,7 +3770,7 @@ body[data-menu-open] .whatsapp-fixed {
 .bo-input:focus {
   outline: none;
   /* Active field borders adopt the single moss accent. */
-  border-color: var(--bo-accent, #4c6350);
+  border-color: var(--bo-accent, #4c6752);
 }
 /* Eyebrow label used atop panels and as the Field <label> — bumped to ~5:1 on
    white (0.66 alpha) so it clears AA as a real label, with a calmer, more
@@ -4807,4 +5484,61 @@ body:has(.barra-consentimento) footer {
   to {
     transform: none;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MODO ESCURO — OS MESMOS TOKENS, OUTROS VALORES
+   ══════════════════════════════════════════════════════════════════════════
+
+   Esta casa não tinha modo escuro nenhum: zero `.dark`, zero
+   `prefers-color-scheme`. Este bloco é inteiramente novo e fica INERTE até
+   alguém pôr a classe `dark` na raiz — nada muda de aspecto com este commit.
+
+   Duas ideias do brief que decidem os valores, e que quase toda a gente falha:
+
+   1. A paleta escura NÃO é a inversão da clara. Alguns valores invertem,
+      outros não.
+   2. Há quatro fundos e não um. Em modo claro a elevação faz-se por SOMBRA (o
+      fundo é sempre branco); em modo escuro faz-se por LUMINOSIDADE, e a
+      sombra quase não se vê. São dois mecanismos diferentes para a mesma
+      hierarquia — daí `--bg-base` → `--bg-elevated-2` subirem de tom.
+
+   Vem depois do `:root` de propósito: `.dark` e `:root` têm a MESMA
+   especificidade (0,1,0), portanto quem ganha é quem vier por último. Trocar
+   a ordem destes dois blocos apaga o modo escuro em silêncio.
+   ══════════════════════════════════════════════════════════════════════════ */
+.dark {
+  --bg-base: #101310;
+  --bg-surface: #171b17;
+  --bg-elevated: #1e241e;
+  --bg-elevated-2: #262d26;
+  --bg-subtle: #1e241e;
+
+  --fg-primary: #f1f5f1; /* 16,4:1 sobre #171b17 */
+  --fg-secondary: #acb9ac; /* 8,5:1 */
+  --fg-tertiary: #8a968a; /* 5,7:1 */
+  --fg-placeholder: #6b776b;
+
+  --border: #2c332c;
+  --border-strong: #3a433a;
+
+  --accent: #abc4b1; /* 9,3:1 sobre #171b17 */
+  --accent-hover: #d0e1d4;
+  --accent-subtle: #2a3c2f;
+  --focus-ring: #7ea086;
+
+  --success: #7fc7a0;
+  --warning: #e8b45c;
+  --danger: #f4a79d;
+  --info: #8fc0e6;
+
+  --glass-bg: rgb(26 34 28 / 0.52);
+  --glass-bg-clear: rgb(20 28 22 / 0.16);
+  --glass-border: rgb(255 255 255 / 0.16);
+  --glass-hi: rgb(255 255 255 / 0.3);
+  --glass-lo: rgb(255 255 255 / 0.06);
+  --glass-shadow: 0 12px 38px rgb(0 0 0 / 0.55);
+
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.34);
+  --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.45);
 }

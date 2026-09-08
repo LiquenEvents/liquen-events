@@ -7,12 +7,12 @@ import { ESTADO, PRESSAO } from "./movimento";
 
 /**
  * The back-office button, redesigned for the calm "ChatGPT-app" direction while
- * staying on the Líquen palette (moss `#4d6350`, forest ink, cream). One button
+ * staying on the Líquen palette (moss `#4c6752`, forest ink, cream). One button
  * so every screen shares the same radii, focus ring, motion and disabled feel.
  *
  * Design notes
  * - Colours come from the existing tokens only — no new palette. `primary` fills
- *   with moss-dark `#4d6350` (≈6:1 on white → WCAG AA); `secondary` is a hairline
+ *   with moss-dark `#4c6752` (≈6:1 on white → WCAG AA); `secondary` is a hairline
  *   outline; `ghost` is quiet until hover; `subtle` is the soft moss tint used for
  *   in-context actions; `danger` is a dark red that also passes AA on white.
  * - Focus ring is inherited from the global `:focus-visible` rule in globals.css
@@ -98,7 +98,7 @@ const BASE =
  *
  * As duas variantes CHEIAS (`primary`, `danger`) ficam só com o gesto de
  * escala, e isto é uma falta assumida e não um esquecimento: escurecer um
- * `#4d6350` cheio obriga a um sexto verde e a um terceiro vermelho, e o
+ * `#4c6752` cheio obriga a um sexto verde e a um terceiro vermelho, e o
  * `DESIGN.md` desta pasta é explícito — «no new palette», «resist inventing a
  * parallel palette». Dois tokens de pressão resolvem-no no dia em que
  * existirem; até lá o corte seco desapareceu na mesma, porque o que o tirou
@@ -106,7 +106,7 @@ const BASE =
  */
 const VARIANTS: Record<ButtonVariant, string> = {
   // Moss-dark solid — the affirmative primary action.
-  primary: "bg-[#4d6350] text-white hover:bg-[#415440]",
+  primary: "bg-sage-600 text-white hover:bg-[#415440]",
   // Outline on white — secondary emphasis.
   //
   // Era `border-[var(--bo-hairline-strong)]` com `text-[var(--bo-text)]`, e lia-se como
@@ -128,7 +128,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
     "bg-transparent text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] " +
     "active:bg-[var(--bo-tinta-10)]",
   // Soft moss tint — an in-context "yes, this one" without full weight.
-  subtle: "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/[0.16] active:bg-[#4d6350]/[0.24]",
+  subtle: "bg-sage-600/10 text-sage-600 hover:bg-sage-600/[0.16] active:bg-sage-600/[0.24]",
   // Dark red solid (~5:1 on white) — destructive actions.
   danger: "bg-[#8a2a22] text-white hover:bg-[#73211b]",
 };
@@ -155,9 +155,21 @@ const VARIANTS: Record<ButtonVariant, string> = {
  * pela qual quase todos os alvos medidos a 375 px davam 32 ou 40 px de altura.
  */
 const SIZES: Record<ButtonSize, string> = {
-  sm: "h-8 pointer-coarse:h-11 px-3 text-xs",
-  md: "h-10 pointer-coarse:h-11 px-4 text-sm",
-  lg: "h-12 px-6 text-[15px]",
+  /* ── AS ALTURAS, E A REGRA QUE ELAS PARECEM QUEBRAR ────────────────────
+     Do sistema de design: 32 · 40 · 52 px, com folgas de 12 · 16 · 24. As
+     duas primeiras alturas e as três folgas já estavam certas; o grande media
+     48 e o tamanho da letra estava escrito à mão.
+
+     Os 52 não constam da lista de espaçamentos da grelha de 4 (4, 8, 12, 16,
+     20, 24, 32, 40, 48, 64) — mas essa lista é de ESPAÇO, e isto é altura. 52
+     é múltiplo de 4 e é o número que o documento dá para este degrau; a
+     mesma distinção que a linha de tabela de 44 px obrigou a fazer.
+
+     O `pointer-coarse:h-11` é o alvo de 44 px no dedo. O degrau grande não
+     precisa dele: 52 já está acima. */
+  sm: "h-8 pointer-coarse:h-11 px-3 text-caption",
+  md: "h-10 pointer-coarse:h-11 px-4 text-callout",
+  lg: "h-13 px-6 text-body",
 };
 
 function Spinner() {

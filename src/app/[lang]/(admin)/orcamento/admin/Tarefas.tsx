@@ -132,7 +132,7 @@ const TaskRow = memo(function TaskRow({
         className={`alvo-toque -m-2 flex shrink-0 items-center justify-center p-2 ${ESTADO} ${PRESSAO}`}
       >
         <span
-          className={`w-5 h-5 rounded-md border flex items-center justify-center ${ESTADO} ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 group-hover:border-[#4d6350]/60"}`}
+          className={`w-5 h-5 rounded-md border flex items-center justify-center ${ESTADO} ${t.done ? "bg-sage-600 border-sage-600" : "border-foreground/25 group-hover:border-sage-600/60"}`}
         >
           {t.done && (
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -186,7 +186,7 @@ const TaskRow = memo(function TaskRow({
             className="hidden sm:flex items-center gap-1.5 shrink-0"
             title={`Responsável: ${t.assignee}`}
           >
-            <span className="w-5 h-5 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-[9px] font-bold">
+            <span className="w-5 h-5 rounded-full bg-sage-600 text-white flex items-center justify-center text-[9px] font-bold">
               {t.assignee.slice(0, 1).toUpperCase()}
             </span>
             <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
@@ -247,7 +247,7 @@ const TaskRow = memo(function TaskRow({
                  desenho de 13 para 25 px SEM crescer a linha (a coluna do título
                  já mede 34) e sem margens negativas, que era o que voltaria a
                  encostar os dois um ao outro. O ícone continua com 13 px. */
-              className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-sage-600 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
               aria-label="Editar tarefa"
             >
               {LapisIcon}
@@ -701,7 +701,14 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                   onChange={(e) =>
                     setEditTaskFields({ ...editTaskFields, assignee: e.target.value })
                   }
-                  placeholder="Responsável"
+                  // O ramo do lado (a `Escolha`, quando a equipa está montada)
+                  // tinha `aria-label`; este não tinha rótulo NENHUM, e o
+                  // `placeholder` era a palavra «Responsável» a fazer de
+                  // rótulo. Regra 7 da «Escrita»: o marcador dá um exemplo,
+                  // não substitui o rótulo — e um rótulo que desaparece ao
+                  // primeiro caracter escrito não é rótulo.
+                  aria-label="Responsável"
+                  placeholder="Ex.: quem fica responsável"
                   className="bo-input px-2 py-1.5 text-xs text-[var(--bo-text-muted)] flex-1 min-w-[100px]"
                 />
               )}

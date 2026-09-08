@@ -393,7 +393,7 @@ export function CuradoriaDeFotos({
         }}
         className={`relative mt-2 flex min-h-0 flex-1 touch-none items-center justify-center overflow-hidden rounded-2xl border-2 bg-[var(--bo-tinta-6)] focus-visible:outline-none ${
           rumo === "incluir"
-            ? "border-[#4d6350]"
+            ? "border-sage-600"
             : rumo === "saltar"
               ? "border-foreground/30"
               : "border-transparent"
@@ -419,7 +419,7 @@ export function CuradoriaDeFotos({
           <span
             aria-hidden
             className={`pointer-events-none absolute top-3 rounded-lg px-3 py-1 text-sm font-medium text-white ${
-              rumo === "incluir" ? "left-3 bg-[#4d6350]" : "right-3 bg-foreground/60"
+              rumo === "incluir" ? "left-3 bg-sage-600" : "right-3 bg-foreground/60"
             }`}
           >
             {rumo === "incluir" ? "Incluir" : "Saltar"}

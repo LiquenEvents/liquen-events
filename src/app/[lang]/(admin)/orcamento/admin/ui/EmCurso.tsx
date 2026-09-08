@@ -132,22 +132,22 @@ export function EmCurso({
       role="status"
       aria-live="polite"
       className={cn(
-        "w-full rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.05] px-3 py-2.5",
+        "w-full rounded-xl border border-sage-600/25 bg-sage-600/[0.05] px-3 py-2.5",
         className,
       )}
     >
       <div className="flex items-center gap-2">
-        <p className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-[#4d6350]">
+        <p className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-sage-600">
           <span
             aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#4d6350] motion-safe:animate-pulse"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 motion-safe:animate-pulse"
           />
           <span className="min-w-0">{titulo}</span>
         </p>
         {/* A contagem à direita e em números tabulares: sem eles, «7 de 312» a
             passar a «8 de 312» empurra a linha meio pixel a cada foto. */}
         {sabida && (
-          <span className="shrink-0 text-[11px] tabular-nums text-[#4d6350]/70">
+          <span className="shrink-0 text-[11px] tabular-nums text-sage-600/70">
             {feito} de {total}
           </span>
         )}
@@ -158,7 +158,7 @@ export function EmCurso({
             // Sem transição nenhuma até aqui — e é o botão que pára uma espera,
             // ou seja aquele em que se carrega com pressa. É onde a resposta ao
             // toque mais se nota que falta.
-            className={`alvo-toque shrink-0 rounded-lg px-2 text-[11px] text-[#4d6350]/75 underline decoration-dotted underline-offset-2 hover:text-[#4d6350] active:bg-[#4d6350]/[0.12] ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque shrink-0 rounded-lg px-2 text-[11px] text-sage-600/75 underline decoration-dotted underline-offset-2 hover:text-sage-600 active:bg-sage-600/[0.12] ${ESTADO} ${PRESSAO}`}
           >
             {rotuloDoParar}
           </button>
@@ -172,7 +172,7 @@ export function EmCurso({
            anunciar a mesma espera duas vezes. */
         <span
           aria-hidden="true"
-          className="mt-2 block h-[3px] w-full overflow-hidden rounded-full bg-[#4d6350]/15"
+          className="mt-2 block h-[3px] w-full overflow-hidden rounded-full bg-sage-600/15"
         >
           <span
             // A marca é para os testes: o traço não tem papel nem nome (é
@@ -185,7 +185,7 @@ export function EmCurso({
             // `--transition-duration-*`, e o `@theme` da casa declara
             // `--duration-elemento`. A barra corria nos 150 ms por omissão em
             // vez dos 250 ms pretendidos. Ver `movimento.ts` (ponto 3).
-            className={`block h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+            className={`block h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
             style={{ transform: `scaleX(${avanco})` }}
           />
         </span>

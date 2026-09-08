@@ -189,7 +189,7 @@ export function PaginaEmConstrucao({
             <span
               key={`${f.path}:${i}`}
               className={`relative block aspect-square overflow-hidden rounded bg-[var(--bo-tinta-6)] ${
-                entrando ? "ring-1 ring-[#4d6350]" : ""
+                entrando ? "ring-1 ring-sage-600" : ""
               } ${excedente ? "opacity-40" : ""}`}
             >
               {f.url && (

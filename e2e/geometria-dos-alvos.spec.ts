@@ -94,16 +94,37 @@ async function quemEstaNoCentro(page: Page, seletor: string) {
   }, seletor);
 }
 
-/** Vai a um destino pelo menu lateral (a coluna do computador). */
+/**
+ * Vai a um destino, esteja ele onde estiver.
+ *
+ * ── PORQUE É QUE ISTO PROCURA EM DOIS SÍTIOS ──────────────────────────────
+ *
+ * Havia uma coluna à esquerda com os onze destinos, e este ajudante procurava
+ * lá. A coluna acabou: «a barra substitui o menu». Hoje os destinos vivem na
+ * CÁPSULA que flutua em baixo — todos, no computador — e, no telemóvel, a
+ * cápsula leva quatro e a GAVETA leva o resto.
+ *
+ * A troca de nomes que veio com isso é o que partiu este ajudante: «Navegação
+ * do back office» passou a ser a barra, e a lista da gaveta passou a «Mais
+ * destinos». Um passeio de telemóvel que abre a gaveta e depois pede «Temas» a
+ * esta função ia procurá-lo na BARRA, onde ele nasce `hidden` abaixo de `lg` —
+ * e ficava à espera de uma coisa invisível. Foi assim que os passeios D3 e D4
+ * ficaram vermelhos.
+ *
+ * Procura-se nas duas e clica-se no que estiver VISÍVEL, que é o que a pessoa
+ * faz. Assim o ajudante deixa de depender de qual das duas navegações tem o
+ * destino a esta largura — que é precisamente a coisa que mudou e pode voltar
+ * a mudar.
+ */
 async function irPara(page: Page, rotulo: RegExp | string) {
-  const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
+  const nav = page.getByRole("navigation", { name: /Navegação do back office|Mais destinos/i });
   // A coluna já não tem dobra nenhuma: os onze destinos estão todos à vista,
   // do outro lado de um fio. O que aqui estava era um `count()` — um
   // instantâneo, sem espera — e, quando a coluna ainda não tinha desenhado,
   // caía no ramo que abria o «Mais». Esse clique funcionava por acidente como
   // uma espera, e era isso que segurava o passeio. Sem a dobra, a corrida
   // ficou à vista: espera-se pelo DESTINO, que é o que se quer mesmo.
-  const item = nav.getByRole("button", { name: rotulo }).first();
+  const item = nav.getByRole("button", { name: rotulo }).locator("visible=true").first();
   await item.waitFor({ state: "visible", timeout: 30000 });
   await item.click();
 }
@@ -268,7 +289,7 @@ test.describe("D1 · e no telemóvel continua bem", () => {
     exigirLogin(await entrarNoBackOffice(page));
     await garantirPedido(page);
     await page
-      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("navigation", { name: /Navegação do back office/i })
       .getByRole("button", { name: "Pedidos", exact: true })
       .click();
     await page.locator("li button, article button").first().click();
@@ -454,7 +475,7 @@ test.describe("D4 · a barra de baixo na Biblioteca de Temas", () => {
 
     const m = await page.evaluate(() => {
       const de = document.documentElement;
-      const barra = document.querySelector('nav[aria-label="Destinos principais"]');
+      const barra = document.querySelector('nav[aria-label="Navegação do back office"]');
       const r = barra?.getBoundingClientRect() ?? null;
       // Qual é a fila culpada? A que NÃO QUEBRA e cujo lado direito já passou a
       // margem do ecrã. As mais fundas primeiro: a casca da página também passa

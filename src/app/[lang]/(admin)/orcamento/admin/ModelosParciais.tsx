@@ -78,9 +78,18 @@ const ROTULO = {
  * Não é posicionamento a sério (isso pedia JavaScript a medir o gatilho); é a
  * garantia, em CSS, de que o que está escrito lá dentro se lê inteiro.
  */
+/* ── E O MATERIAL DELE ─────────────────────────────────────────────────────
+   Era `rounded-xl border … bg-white`. O `rounded-xl` media 8 px como todo o
+   resto do conteúdo — o bloco dos raios do `globals.css` colapsa a escala do
+   Tailwind de propósito — e o `bg-white` era branco opaco escrito à mão, nem
+   sequer o token da superfície.
+
+   A `.bo-material` vive fora de camadas e escapa a esse colapso: traz os 12 px,
+   o fio e a superfície translúcida. O desfoque vem numa classe à parte, para se
+   poder baixar num sítio só. A conta do contraste está no `globals.css`. */
 const PAINEL_SUSPENSO =
   "absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
-  "rounded-xl border border-[var(--bo-hairline-strong)] bg-white shadow-[var(--bo-sombra-suspensa)]";
+  "bo-material bo-material-desfoque shadow-[var(--bo-sombra-suspensa)]";
 
 /**
  * ── UM PAINEL DE CADA VEZ, E UM ESTADO SÓ ─────────────────────────────────
@@ -241,7 +250,7 @@ export default function ModelosParciais({
   // eram links de 16 px de altura, e num ecrã táctil isso é acertar numa linha
   // de texto. No computador continuam a ser o que eram.
   const botao =
-    "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-[var(--bo-text)] hover:underline";
+    "alvo-toque py-2 text-xs text-[var(--bo-text-muted)] underline-offset-2 hover:text-[var(--bo-text)] hover:underline";
 
   const podeInserir = mostrar !== "guardar" && !!onInserir;
   const podeGuardar = mostrar !== "inserir" && !!paraGuardar;
@@ -281,16 +290,16 @@ export default function ModelosParciais({
 
       {aDesenhar === "lista" && (
         <div
-          className={`${aSairAgora ? SAIDA : "bo-entrada"} ${PAINEL_SUSPENSO} p-1`}
+          className={`${aSairAgora ? SAIDA : "bo-entrada"} ${PAINEL_SUSPENSO} p-[var(--bo-material-folga)]`}
           aria-hidden={aSairAgora || undefined}
           inert={aSairAgora}
         >
           {naoDeuParaLer ? (
-            <p className="px-3 py-2 text-xs text-[#8a2a22]">
+            <p className="px-2.5 py-2 text-xs text-[#8a2a22]">
               Não deu para ler os modelos guardados. Volta a tentar — os que tinhas continuam lá.
             </p>
           ) : modelos.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-foreground/50">
+            <p className="px-2.5 py-2 text-xs text-[var(--bo-text-muted)]">
               Ainda não guardaste nenhum {ROTULO[tipo].um}. Monta um e carrega em «Guardar como
               modelo».
             </p>
@@ -300,7 +309,13 @@ export default function ModelosParciais({
                 <li key={m.id}>
                   <button
                     type="button"
-                    className={`w-full rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
+                    /* A LINHA SOB O RATO É UMA PASTILHA CHEIA. Era
+                       `hover:bg-[var(--bo-tinta-6)]` — seis por cento de preto,
+                       que sobre um material translúcido não chega a ser um
+                       estado. Branco sobre `--bo-accent` mede 6,55:1. O
+                       `active:` repete-a porque o `hover:` do Tailwind vive
+                       dentro de `@media (hover: hover)` e no dedo não existe. */
+                    className={`w-full rounded-[var(--bo-material-raio-pastilha)] px-2.5 py-2 text-left text-xs text-[var(--bo-tinta-72)] hover:bg-[var(--bo-accent)] hover:text-white active:bg-[var(--bo-accent)] active:text-white ${ESTADO} ${PRESSAO}`}
                     onClick={() => {
                       const conteudo = tipo === "grupo" ? m.grupo : m.moodboard;
                       // Um modelo sem conteúdo não pode passar por inserção
@@ -356,7 +371,7 @@ export default function ModelosParciais({
             </button>
             <button
               type="button"
-              className={`rounded-full bg-[#4d6350] px-3 py-1.5 text-xs text-white disabled:opacity-40 ${ESTADO} ${PRESSAO}`}
+              className={`rounded-full bg-sage-600 px-3 py-1.5 text-xs text-white disabled:opacity-40 ${ESTADO} ${PRESSAO}`}
               disabled={!nome.trim()}
               onClick={() => void guardar()}
             >

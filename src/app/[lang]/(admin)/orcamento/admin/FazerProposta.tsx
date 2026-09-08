@@ -56,11 +56,11 @@ import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
 const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
   pendente: {
     label: "Novo",
-    classe: "bg-[#4d6350]/10 text-[#4d6350] ring-1 ring-inset ring-[#4d6350]/30",
+    classe: "bg-sage-600/10 text-sage-600 ring-1 ring-inset ring-sage-600/30",
   },
-  em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/18 text-[#4d6350]" },
-  cotado: { label: "Proposta enviada", classe: "bg-[#4d6350]/25 text-[#4d6350]" },
-  aceite: { label: "Ganho", classe: "bg-[#4d6350]/35 text-[#4d6350]" },
+  em_revisao: { label: "Aguardar resposta", classe: "bg-sage-600/18 text-sage-600" },
+  cotado: { label: "Proposta enviada", classe: "bg-sage-600/25 text-sage-600" },
+  aceite: { label: "Ganho", classe: "bg-sage-600/35 text-sage-600" },
   rejeitado: { label: "Perdido", classe: "bg-[var(--bo-tinta-10)] text-foreground/30" },
 };
 
@@ -264,8 +264,30 @@ export default function FazerProposta({
                   espaço mudou), não há maneira de saber qual está certa. Fica o
                   nome, que é a âncora do "para quem é isto", e o botão de
                   trocar. */}
-              <p className="bo-eyebrow mb-1">Proposta para</p>
-              <p className="truncate text-base font-medium text-[var(--bo-text)]">
+              {/* ── ISTO É CONTEÚDO, E POR ISSO NÃO LEVA VIDRO ───────────────
+                  Palavras dela, com uma captura deste cartão: «e isto também»,
+                  a seguir a pedir vidro na barra de acção do estúdio.
+
+                  A barra levou; este NÃO leva, e a razão está no documento que
+                  ela mandou. O sistema tem duas camadas — a FUNCIONAL
+                  (navegação e controlos) e a de CONTEÚDO (dados) — e o material
+                  vive só na primeira. A lista de proibições da Parte 18 abre
+                  com «vidro em cartões, linhas, formulários ou fundo de
+                  página»: um cartão de vidro por cima de conteúdo faz
+                  desaparecer a única pista que diz o que é dado e o que é
+                  comando, e o teste do documento é literal — «num screenshot,
+                  consegues dizer instantaneamente o que é navegação e o que é
+                  dados?».
+
+                  O que este cartão levou foi o tratamento de CONTEÚDO da mesma
+                  casa, que é onde ele estava mesmo errado: a sobrancelha em
+                  caixa alta com 0,14em de tracking. O sistema novo abandonou a
+                  caixa alta em cabeçalhos (Parte 6.4) — passa a legenda em
+                  capitalização normal, e o nome do casal, que é a âncora do
+                  «para quem é isto», sobe de `text-base` para o `title3` que o
+                  mapeamento fixo dá a um título de secção. */}
+              <p className="mb-0.5 text-caption text-[var(--bo-text-muted)]">Proposta para</p>
+              <p className="truncate text-title3 font-semibold text-[var(--bo-text)]">
                 {escolhido.name}
               </p>
             </div>
@@ -422,7 +444,7 @@ export default function FazerProposta({
                   onClick={() => onSelect(q.id)}
                   className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left ${MOV_ESTADO} ${PRESSAO} ${
                     espera
-                      ? "border-[var(--bo-hairline)] bg-white hover:border-[#4d6350]/40"
+                      ? "border-[var(--bo-hairline)] bg-white hover:border-sage-600/40"
                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"
                   }`}
                 >

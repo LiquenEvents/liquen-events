@@ -83,13 +83,13 @@ export interface ServicesEditorProps {
 const ROW_INPUT =
   "min-w-0 rounded-md border border-[var(--bo-control-border,rgba(42,38,32,0.5))] " +
   "bg-[var(--bo-surface,#ffffff)] px-2 py-1.5 text-xs leading-5 text-[var(--bo-text)] " +
-  `focus:border-[var(--bo-accent,#4c6350)] focus:outline-none ${ESTADO}`;
+  `focus:border-[var(--bo-accent,#4c6752)] focus:outline-none ${ESTADO}`;
 /** `alvo-toque`: 44 px no dedo, sem mexer no aspeto com rato (ver globals.css).
  *  `!justify-start` porque a classe centra o conteúdo e este botão é uma linha
  *  de texto que tem de ficar alinhada à esquerda com o resto da coluna. */
 const ADD_BTN =
   "alvo-toque !justify-start gap-1 text-xs font-medium inline-flex items-center " +
-  `text-[#4d6350] hover:text-[#415440] ${ESTADO} ${PRESSAO}`;
+  `text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`;
 /** Ações da linha: presentes SEMPRE no layout (nunca há salto), visíveis só em
  *  hover/foco — e sempre visíveis onde não há hover nenhum (tablet). */
 const ROW_ACTIONS =
@@ -796,7 +796,7 @@ export default function ServicesEditor({
                           onChange={(e) => updateGroup(gi, { letter: e.target.value })}
                           onKeyDown={(e) => onGroupKeyDown(e, gi, "letter")}
                           placeholder={autoLetter(gi)}
-                          title="Marcador do grupo — numera-se sozinho (a, b, c…); escreva por cima para fixar outro."
+                          title="Numera-se sozinho (a, b, c…); escreve por cima para fixar outra letra"
                           aria-label={`Marcador do grupo ${gi + 1} — numera-se sozinho`}
                         />
                         <CampoQueCresce
@@ -1127,7 +1127,7 @@ export default function ServicesEditor({
           <button
             type="button"
             onClick={undoRemoval}
-            className={`font-medium text-[#4d6350] underline underline-offset-2 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`font-medium text-sage-600 underline underline-offset-2 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
           >
             Anular
           </button>
@@ -1175,7 +1175,7 @@ function SortableRow({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${className ?? ""} ${
         isDragging
-          ? "relative z-10 bg-white opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-[#4d6350]"
+          ? "relative z-10 bg-white opacity-95 shadow-[var(--bo-sombra-suspensa)] ring-2 ring-sage-600"
           : ""
       }`}
     >

@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
+import { escolher } from "./ui/escolher.testkit";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -216,7 +217,11 @@ describe("os filtros da lista de pedidos", () => {
     expect(botaoFiltros()).toHaveAccessibleName(/^Filtros$/);
 
     await user.click(botaoFiltros());
-    await user.selectOptions(within(painel()).getByLabelText(/Filtrar por categoria/i), "empresas");
+    await escolher(
+      user,
+      within(painel()).getByLabelText(/Filtrar por categoria/i),
+      /Eventos Empresariais/i,
+    );
     expect(botaoFiltros()).toHaveAccessibleName(/1/);
 
     await user.click(within(painel()).getByRole("button", { name: /Atribuídos a mim/i }));
@@ -229,7 +234,7 @@ describe("os filtros da lista de pedidos", () => {
     irParaPedidos();
 
     await user.click(botaoFiltros());
-    await user.selectOptions(within(painel()).getByLabelText(/Ordenar pedidos/i), "recent");
+    await escolher(user, within(painel()).getByLabelText(/Ordenar pedidos/i), /Mais recentes/i);
     // Mudar a ordem não tira nada da lista: contá-la como filtro activo seria
     // dar um alarme falso, e um alarme falso gasta-se depressa.
     expect(botaoFiltros()).toHaveAccessibleName(/^Filtros$/);
@@ -242,7 +247,11 @@ describe("os filtros da lista de pedidos", () => {
     irParaPedidos();
 
     await user.click(botaoFiltros());
-    await user.selectOptions(within(painel()).getByLabelText(/Filtrar por categoria/i), "empresas");
+    await escolher(
+      user,
+      within(painel()).getByLabelText(/Filtrar por categoria/i),
+      /Eventos Empresariais/i,
+    );
 
     /**
      * Este é o outro lado da moeda do contador do botão, e o mais perigoso.

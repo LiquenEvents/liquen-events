@@ -7,6 +7,13 @@ import type { Quote } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { eur0, round2 } from "@/lib/money";
+import {
+  duracaoDe,
+  horaDoMinuto,
+  minutosDe,
+  ordemNoDia,
+  ordenar,
+} from "@/lib/orcamento/guiao-do-dia";
 import { todayKey } from "./util";
 
 function eventTypeLabel(q: Quote): string {
@@ -382,15 +389,35 @@ export function printRunSheet(q: Quote): void {
     ["Email", q.email || "—"],
   ];
 
-  const timeline = (q.timeline ?? [])
-    .slice()
-    .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  /**
+   * ── O PAPEL PASSA A CONCORDAR COM O ECRÃ ─────────────────────────────────
+   *
+   * Isto ordenava com `localeCompare`, ou seja por ordem alfabética das horas:
+   * o «02:00 Encerramento e desmontagem» aparecia em PRIMEIRO lugar no papel
+   * que se entrega à equipa na manhã do evento — e no ecrã aparecia em último,
+   * porque o `EventTimeline` tem, desde sempre, a regra do dia que passa da
+   * meia-noite. Dois documentos a discordar sobre a ordem do mesmo dia, e o
+   * que a equipa segue é este.
+   *
+   * O `ordenar` é agora a mesma função nos dois (`guiao-do-dia.ts`).
+   *
+   * E a coluna da hora passa a ser um INTERVALO quando o momento tem duração:
+   * «08:00 → 12:00». Num guião de papel, saber quando a montagem ACABA é
+   * metade da informação — sem isso a equipa lê oito instantes e não sabe o
+   * que se sobrepõe ao quê.
+   */
+  const timeline = ordenar(q.timeline ?? []);
   const timelineRows = timeline.length
     ? timeline
-        .map(
-          (t) =>
-            `<tr><td class="t">${t.time || "—"}</td><td>${escapeHtml(t.title)}</td><td class="o">${escapeHtml(t.owner ?? "")}</td></tr>`,
-        )
+        .map((t) => {
+          const inicio = minutosDe(t.time);
+          const dur = duracaoDe(t);
+          const quando =
+            inicio !== null && dur > 0
+              ? `${escapeHtml(t.time)} → ${horaDoMinuto(ordemNoDia(t.time) + dur)}`
+              : escapeHtml(t.time || "—");
+          return `<tr><td class="t">${quando}</td><td>${escapeHtml(t.title)}</td><td class="o">${escapeHtml(t.owner ?? "")}</td></tr>`;
+        })
         .join("")
     : `<tr><td colspan="3" class="empty">Sem cronograma definido.</td></tr>`;
 
@@ -600,18 +627,22 @@ export function printEventDossier(q: Quote): void {
       </section>`
     : "";
 
-  const timeline = (q.timeline ?? [])
-    .slice()
-    .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  // Mesma ordem e mesmo intervalo do guião do dia — ver a nota no `printRunSheet`.
+  const timeline = ordenar(q.timeline ?? []);
   const sectionTimeline = `<section>
     <h2>Cronograma do dia</h2>
     ${
       timeline.length
         ? `<table><tbody>${timeline
-            .map(
-              (t) =>
-                `<tr><td class="t">${escapeHtml(t.time || "—")}</td><td>${escapeHtml(t.title)}</td><td class="grey">${escapeHtml(t.owner ?? "")}</td></tr>`,
-            )
+            .map((t) => {
+              const inicio = minutosDe(t.time);
+              const dur = duracaoDe(t);
+              const quando =
+                inicio !== null && dur > 0
+                  ? `${escapeHtml(t.time)} → ${horaDoMinuto(ordemNoDia(t.time) + dur)}`
+                  : escapeHtml(t.time || "—");
+              return `<tr><td class="t">${quando}</td><td>${escapeHtml(t.title)}</td><td class="grey">${escapeHtml(t.owner ?? "")}</td></tr>`;
+            })
             .join("")}</tbody></table>`
         : "<p class='empty'>Cronograma não definido.</p>"
     }

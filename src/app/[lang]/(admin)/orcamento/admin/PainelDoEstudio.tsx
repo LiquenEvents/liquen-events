@@ -332,7 +332,7 @@ export default function PainelDoEstudio({
                       <button
                         type="button"
                         onClick={() => onEscolherFotos(aVer.bi)}
-                        className={`mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] hover:border-[#4d6350]/40 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                        className={`mt-3 w-full rounded-lg border border-[var(--bo-hairline-strong)] px-3 py-2 text-[12px] text-[var(--bo-text-muted)] hover:border-sage-600/40 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                       >
                         Escolher fotografias para esta página
                       </button>

@@ -227,7 +227,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 letra nem na cor. */}
               <Link
                 href={`/${lang}/orcamento/admin`}
-                className={`alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] ${ESTADO} ${PRESSAO} ${
+                className={`alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-sage-600 ${ESTADO} ${PRESSAO} ${
                   desceu ? "shrink-0" : "mb-3"
                 }`}
               >
@@ -364,7 +364,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 size="sm"
                 className="alvo-toque"
                 onClick={() => printEventDossier(quote)}
-                title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
+                title="Imprimir o dossier completo: contactos, financeiro, cronograma e convidados"
                 iconLeft={
                   <svg
                     width="14"
@@ -456,8 +456,8 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               O enchimento passa a ler `--bo-p-cartao` (14 no telemóvel, 24 a
               partir de 640) em vez dos 20 fixos que vinham de um monitor. */}
           {!desceu && (
-            <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#4d6350]/[0.06] border border-[#4d6350]/20 rounded-2xl p-[var(--bo-p-cartao)]">
-              <p className="text-[#4d6350]/70 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
+            <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-sage-600/[0.06] border border-sage-600/20 rounded-2xl p-[var(--bo-p-cartao)]">
+              <p className="text-sage-600/70 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
                 Próxima ação
               </p>
               <p className="text-[var(--bo-text)] text-sm font-medium leading-snug mb-1.5">
@@ -490,7 +490,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                      `Button`, viva neste ficheiro.
                      O `ESTADO` traz a lista certa (com `scale`) e o degrau da
                      casa; o `PRESSAO` traz os 20 ms do toque. */
-                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                   <svg
@@ -521,7 +521,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                      `Button`, viva neste ficheiro.
                      O `ESTADO` traz a lista certa (com `scale`) e o degrau da
                      casa; o `PRESSAO` traz os 20 ms do toque. */
-                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
+                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
                 >
                   {next.label}
                   <svg
@@ -582,15 +582,15 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                       btns?.[(i + dir + arr.length) % arr.length]?.focus();
                     }}
                     data-step
-                    className={`group flex flex-col items-center gap-1 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/40 rounded-lg ${ESTADO} ${PRESSAO}`}
+                    className={`group flex flex-col items-center gap-1 px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/40 rounded-lg ${ESTADO} ${PRESSAO}`}
                     title={when ? `${STAGE_LABELS[s]} · ${when}` : STAGE_LABELS[s]}
                   >
                     <span
                       className={`w-2.5 h-2.5 rounded-full border ${ESTADO} ${
                         current
-                          ? "bg-[#4d6350] border-[#4d6350] ring-4 ring-[#4d6350]/15"
+                          ? "bg-sage-600 border-sage-600 ring-4 ring-sage-600/15"
                           : reached
-                            ? "bg-[#4d6350] border-[#4d6350]"
+                            ? "bg-sage-600 border-sage-600"
                             : "bg-transparent border-foreground/25"
                       }`}
                     />
@@ -612,7 +612,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   {i < arr.length - 1 && (
                     <span
                       aria-hidden
-                      className={`w-6 sm:w-10 h-px mt-[-14px] ${i < reachedIdx ? "bg-[#4d6350]/50" : "bg-foreground/15"}`}
+                      className={`w-6 sm:w-10 h-px mt-[-14px] ${i < reachedIdx ? "bg-sage-600/50" : "bg-foreground/15"}`}
                     />
                   )}
                 </div>

@@ -64,7 +64,7 @@ export function SugestaoDeNome({
          */
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => onAceitar(arrumado)}
-        className={`font-medium text-[#4d6350] underline decoration-[#4d6350]/35 underline-offset-2 ${ESTADO} ${PRESSAO} hover:decoration-[#4d6350] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
+        className={`font-medium text-sage-600 underline decoration-sage-600/35 underline-offset-2 ${ESTADO} ${PRESSAO} hover:decoration-sage-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
       >
         «{arrumado}»
       </button>

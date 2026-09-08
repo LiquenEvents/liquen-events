@@ -108,8 +108,8 @@ export function Ajuda({
           // para quem pediu para não animar. Ver `movimento.ts`.
           `border text-[10px] leading-none font-medium ${ESTADO} ${PRESSAO}`,
           aberto
-            ? "border-[#4d6350]/60 bg-[#4d6350]/10 text-[#4d6350]"
-            : "border-foreground/25 text-foreground/45 hover:border-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-6)]",
+            ? "border-sage-600/60 bg-sage-600/10 text-sage-600"
+            : "border-foreground/25 text-[var(--bo-text-muted)] hover:border-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-6)]",
         )}
       >
         <span aria-hidden="true">?</span>
@@ -129,7 +129,17 @@ export function Ajuda({
           // lado onde há espaço, que é o que `alinhar` escolhe.
           className={cn(
             aSairAgora ? SAIDA : "bo-entrada",
-            "absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-[var(--bo-hairline-strong)] bg-white p-3 text-[11px] leading-relaxed text-[var(--bo-tinta-72)] normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
+            /* ── O MATERIAL ────────────────────────────────────────────────
+               Era `rounded-xl border … bg-white`, e o `rounded-xl` media 8 px
+               como todo o resto do conteúdo — o bloco dos raios do
+               `globals.css` colapsa a escala do Tailwind de propósito. A
+               `.bo-material` vive fora de camadas e escapa-lhe: traz os 12 px,
+               o fio e a superfície translúcida. O desfoque vem à parte.
+
+               Aqui NÃO entra a folga da pastilha: isto é um parágrafo e não uma
+               lista, e a folga que uma nota pede é a de leitura (`p-3`). */
+            "bo-material bo-material-desfoque",
+            "absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] p-3 text-[11px] leading-relaxed text-[var(--bo-tinta-72)] normal-case tracking-normal shadow-[var(--bo-sombra-suspensa)]",
             alinhar === "direita" ? "right-0" : "left-0",
           )}
         >

@@ -238,6 +238,118 @@ const SO = args.so ? String(args.so).toLowerCase() : null;
 const LARGURA = Number(args.largura ?? 390);
 const ALTURA = Number(args.altura ?? 844);
 const REDUZIDO = !!args.reduzido;
+/**
+ * Acima de `lg` o back office troca de esqueleto: a barra de baixo é
+ * `lg:hidden` e quem navega passa a ser a coluna lateral. Um arnês que só
+ * conhece a barra de baixo morre a 1440 no `waitFor` dela — e a área desfocada
+ * a 1440 é MUITO maior do que a 390, portanto é precisamente onde o vidro tem
+ * de ser medido. O corte é o `lg` do Tailwind (1024), que é o mesmo que o
+ * `AdminClient` usa.
+ */
+const DESKTOP = LARGURA >= 1024;
+
+/**
+ * ── O VIDRO: AS QUATRO PASSAGENS, NA MESMA COMPILAÇÃO ──────────────────────
+ *
+ * `--material=comoEsta|semDesfoque|opaco|dialogoTambem`.
+ *
+ * A razão de a variação ser uma FOLHA INJECTADA e não uma compilação à parte é
+ * a única que interessa a uma medição de antes/depois: com duas compilações, a
+ * diferença que se lê pode ser de qualquer coisa que mudou entre elas.
+ * Injectada, o `.next` é rigorosamente o MESMO nas quatro passagens e a única
+ * variável do ensaio é a folha. É o mesmo princípio do `e2e/saida-do-aviso.mjs`,
+ * que compara três hipóteses na mesma página.
+ *
+ * A folha entra em `addInitScript`, portanto está de pé antes de o React montar:
+ * nenhuma superfície chega a existir sem ela.
+ *
+ *   · `comoEsta`      nada injectado. O material como o `globals.css` o traz:
+ *                     `--bo-material` a 88 % de opacidade e a
+ *                     `.bo-material-desfoque` com `blur(20px) saturate(180%)`.
+ *                     É o que ela vai ter na mão.
+ *   · `semDesfoque`   a MESMA superfície translúcida, sem `backdrop-filter`.
+ *                     Isola exactamente o custo do desfoque — a diferença entre
+ *                     esta passagem e a de cima é a resposta à pergunta toda, e
+ *                     não uma comparação com um back office diferente.
+ *   · `opaco`         o recuo que o `globals.css` JÁ tem escrito para quem pede
+ *                     `prefers-reduced-transparency`: superfície opaca e
+ *                     desfoque nenhum. Serve de chão — é o mais barato possível.
+ *   · `dialogoTambem` o material como está MAIS a caixa grande do
+ *                     `ui/FolhaOuDialogo`, que hoje é opaca. Não é uma proposta:
+ *                     é a maneira de pôr NÚMERO na pergunta «e se o vidro
+ *                     crescer para a superfície grande?», que é onde a área
+ *                     desfocada e a rasterização do que está por baixo mudam de
+ *                     ordem de grandeza.
+ *
+ * Os VÉUS ficam de fora das quatro: já levavam `backdrop-filter` antes deste
+ * material (2 px nos diálogos, 4 px na paleta) e fazem parte do que já se
+ * pagava. Mexer-lhes seria medir outra coisa.
+ */
+const MATERIAL = String(args.material ?? "comoEsta");
+const PASSAGENS = ["comoEsta", "semDesfoque", "opaco", "dialogoTambem"];
+if (!PASSAGENS.includes(MATERIAL)) {
+  throw new Error(`--material=${MATERIAL} não existe. Há: ${PASSAGENS.join(", ")}`);
+}
+/**
+ * ── A CAIXA GRANDE, E A ARMADILHA DE A APANHAR PELO SELECTOR ERRADO ─────────
+ *
+ * A caixa do `ui/FolhaOuDialogo` não tem classe própria, mas tem uma assinatura
+ * que só ela usa: ELA PRÓPRIA é o `[role="dialog"]` e leva `z-10`
+ * (`FolhaOuDialogo.tsx:428`, `"relative z-10 flex flex-col overflow-hidden …"`).
+ *
+ * A primeira versão deste selector dizia `[role="dialog"].bo-material,
+ * [role="dialog"] > .z-10` e estava trocada nas duas metades: a paleta de
+ * comandos leva `.bo-material` na PRÓPRIA caixa (`CommandPalette.tsx:316`),
+ * portanto a primeira metade acertava na paleta — que é justamente a superfície
+ * que se quer deixar quieta; e a segunda metade não acertava em nada, porque o
+ * `.z-10` não é FILHO do diálogo, é o diálogo. Ou seja, a passagem teria
+ * desfocado a paleta e deixado a caixa grande como estava, e o número sairia com
+ * o nome trocado.
+ *
+ * Fica `[role="dialog"].z-10`, e o `:not(.bo-material)` fica escrito ainda que
+ * hoje seja redundante: é o que impede que esta passagem volte a apanhar a
+ * paleta no dia em que alguém lhe puser um `z-10`.
+ */
+const CAIXA_DO_DIALOGO = '[role="dialog"].z-10:not(.bo-material)';
+function folhaDoMaterial() {
+  if (MATERIAL === "comoEsta") return null;
+  /**
+   * `!important` porque a `.bo-material` do `globals.css` vive FORA de camadas
+   * — está escrito lá que é de propósito, para ganhar à `@layer utilities` do
+   * Tailwind v4. Uma regra injectada sem `!important` perdia para ela em
+   * silêncio, e a passagem «sem desfoque» media, afinal, a passagem com
+   * desfoque: o zero mais bonito e mais falso que esta medição podia dar.
+   */
+  if (MATERIAL === "semDesfoque") {
+    return `
+.bo-material-desfoque {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+`;
+  }
+  if (MATERIAL === "opaco") {
+    return `
+.bo-material {
+  background: var(--bo-material-opaco, #ffffff) !important;
+}
+.bo-material-desfoque {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+`;
+  }
+  // dialogoTambem
+  return `
+${CAIXA_DO_DIALOGO} {
+  background: var(--bo-material, rgba(255, 255, 255, 0.88)) !important;
+  -webkit-backdrop-filter: blur(var(--bo-material-desfoque, 20px))
+    saturate(var(--bo-material-saturacao, 180%)) !important;
+  backdrop-filter: blur(var(--bo-material-desfoque, 20px))
+    saturate(var(--bo-material-saturacao, 180%)) !important;
+}
+`;
+}
 
 /**
  * O binário. Neste ambiente o Chromium do Playwright NÃO vive em
@@ -576,6 +688,47 @@ async function contadores(cdp) {
   };
 }
 
+/**
+ * ── A RASTERIZAÇÃO, QUE O `getMetrics` NÃO TEM ─────────────────────────────
+ *
+ * A pergunta que o vidro obriga a fazer não é «recalculou estilo?» — é «obrigou
+ * o que está POR BAIXO a ser rasterizado?». Um `backdrop-filter` promove-se a
+ * camada própria e precisa de LER, como textura, tudo o que está atrás dele;
+ * numa página com uma tabela de 140 linhas atrás, isso é trabalho que um menu
+ * sobre fundo liso nunca mostra.
+ *
+ * `Performance.getMetrics` não tem contador de pintura nenhum (a lista inteira
+ * está impressa com `--metricas`, e não há lá nada de paint). O que há é o
+ * domínio `LayerTree` do CDP, que diz QUANTAS camadas compostas existem, que
+ * ÁREA ocupam e quantas vezes cada uma foi PINTADA (`paintCount`). É por isso
+ * que ele está aqui e o rasto do `Tracing` não: subscrever um evento não custa
+ * thread principal, e o `Tracing` — travado 6× — mediria o instrumento.
+ *
+ * Lê-se assim: `camadas` a subir com o material posto é a promoção a acontecer;
+ * `areaCamadas` diz o TAMANHO do que passou a ser composto à parte; e
+ * `pinturas` a subir durante um gesto é a rasterização a repetir-se — que é o
+ * caso caro, e o único que se paga por fotograma.
+ */
+function ligarCamadas(cdp) {
+  let camadas = [];
+  cdp.on("LayerTree.layerTreeDidChange", (e) => {
+    if (e.layers) camadas = e.layers;
+  });
+  return {
+    async comecar() {
+      await cdp.send("LayerTree.enable").catch(() => {});
+    },
+    instantaneo() {
+      return {
+        camadas: camadas.length,
+        // Em píxeis de camada, que é a unidade em que a rasterização se paga.
+        areaCamadas: camadas.reduce((s, l) => s + (l.width || 0) * (l.height || 0), 0),
+        pinturas: camadas.reduce((s, l) => s + (l.paintCount || 0), 0),
+      };
+    },
+  };
+}
+
 const mediana = (xs) => {
   if (!xs.length) return 0;
   const s = [...xs].sort((a, b) => a - b);
@@ -639,7 +792,13 @@ function credenciaisDeDesenvolvimento() {
 
 async function entrar(page) {
   await page.goto(URL_BASE + "/orcamento/admin", { waitUntil: "domcontentloaded" });
-  const barra = page.locator('nav[aria-label="Destinos principais"]');
+  // A PROVA DE QUE SE ESTÁ DENTRO MUDA COM A LARGURA. Abaixo de `lg` é a barra
+  // de baixo; a 1440 ela é `lg:hidden` — está no DOM e nunca fica visível, e
+  // esperar por ela dava sessenta segundos e um erro que se lia como «o back
+  // office não abre». Quem manda a 1440 é a coluna lateral.
+  const barra = DESKTOP
+    ? page.locator('nav[aria-label="Navegação do back office"]')
+    : page.locator('nav[aria-label="Navegação do back office"]');
   let limitado = false;
   page.on("response", (r) => {
     if (r.url().includes("/api/admin/login") && r.status() === 429) limitado = true;
@@ -727,7 +886,15 @@ async function tocar(page, alvo) {
     caixa = await alvo.boundingBox({ timeout: 10_000 });
     if (!caixa) throw new Error("alvo sem caixa depois de rolar");
   }
-  await page.touchscreen.tap(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+  // A 1440 não há dedo: o contexto nasce sem `hasTouch`, e o
+  // `Input.dispatchTouchEvent` não chega a produzir um clique. O rato do CDP é
+  // o equivalente exacto — desce ao `Input.dispatchMouseEvent` e também não
+  // corre guião nenhum na página, que é a razão de aqui não se usar o
+  // `locator.click()` do Playwright.
+  const x = caixa.x + caixa.width / 2;
+  const y = caixa.y + caixa.height / 2;
+  if (DESKTOP) await page.mouse.click(x, y);
+  else await page.touchscreen.tap(x, y);
 }
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -746,7 +913,7 @@ async function aVista(page, alvo) {
   await dormir(500);
 }
 
-const barraDeBaixo = (page) => page.locator('nav[aria-label="Destinos principais"]');
+const barraDeBaixo = (page) => page.locator('nav[aria-label="Navegação do back office"]');
 const listaDePedidos = (page) => page.locator("ul.flex.flex-col.divide-y").first();
 
 /** Leva o ecrã à lista de Pedidos, com a lista toda aberta. */
@@ -945,6 +1112,166 @@ async function abrirPainelDoPedido(page) {
   await abrir.waitFor({ timeout: 20_000 });
   await aVista(page, abrir);
   return abrir;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// AJUDANTES DO VIDRO — navegar nas duas larguras
+// ══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Levar o ecrã a um destino, seja qual for o esqueleto.
+ *
+ * Abaixo de `lg` os quatro destinos do topo vivem na barra de baixo e os
+ * outros sete dentro da coluna do «Mais»; a 1440 estão os onze na coluna
+ * lateral, sempre aberta. Um cenário de vidro que sirva as duas larguras não
+ * pode saber qual dos dois casos é — pergunta.
+ */
+async function irADestino(page, nome) {
+  const rx = new RegExp("^" + nome);
+  if (DESKTOP) {
+    const col = page.locator('nav[aria-label="Navegação do back office"]');
+    await tocar(page, col.getByRole("button", { name: rx }).first());
+    await dormir(1400);
+    return;
+  }
+  const naBarra = barraDeBaixo(page).getByRole("button", { name: rx });
+  if (await naBarra.count()) {
+    await tocar(page, naBarra.first());
+    await dormir(1200);
+    return;
+  }
+  await abrirColunaDeDestinos(page);
+  await tocar(page, page.locator('nav[aria-label="Navegação do back office"]').getByRole("button", { name: rx }).first());
+  await dormir(1600);
+}
+
+/**
+ * A lista de Pedidos com TUDO aberto — o pior fundo realista que esta casa
+ * tem. É o que o vidro precisa por trás para a pergunta valer: um desfoque
+ * sobre 135 linhas não custa o mesmo que sobre um fundo liso, e é exactamente
+ * essa diferença que se veio medir.
+ */
+async function pedidosComTudoAberto(page) {
+  /**
+   * ── E NÃO SE VOLTA A ABRIR O QUE JÁ ESTÁ ABERTO ──────────────────────────
+   *
+   * Abrir a lista toda são oito toques no «Mostrar mais», e a preparação corre
+   * a cada repetição, em quatro cenários, três taxas e duas passagens. A 6× isso
+   * era mais de uma hora a preparar — e preparação não é o que se mede. Se o
+   * ecrã JÁ é o dos Pedidos e já não sobra «Mostrar mais», o estado por trás do
+   * vidro é exactamente o mesmo e não se lhe toca.
+   */
+  const jaLa = await page
+    .locator("h1", { hasText: /^Pedidos$/ })
+    .isVisible()
+    .catch(() => false);
+  const contar = () =>
+    page.evaluate(
+      () =>
+        document.querySelectorAll("ul.flex.flex-col.divide-y > li").length ||
+        document.querySelectorAll("table tbody tr").length,
+    );
+  if (jaLa && (await page.getByRole("button", { name: /Mostrar mais/ }).count()) === 0) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await dormir(350);
+    return await contar();
+  }
+  await irADestino(page, "Pedidos");
+  await page.locator("h1", { hasText: /^Pedidos$/ }).waitFor({ timeout: 30_000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await dormir(400);
+  const mais = page.getByRole("button", { name: /Mostrar mais/ });
+  for (let i = 0; i < 8 && (await mais.count()); i++) {
+    await tocar(page, mais.first());
+    await dormir(700);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await dormir(400);
+  // Quantas linhas ficaram MESMO por trás do vidro. A 390 são `<li>` de uma
+  // lista; a 1440 o `TabelaOuCartoes` troca para tabela e são `<tr>`. Sem este
+  // número, «o diálogo sobre 140 linhas» é uma afirmação e não uma medida.
+  return await page.evaluate(
+    () =>
+      document.querySelectorAll("ul.flex.flex-col.divide-y > li").length ||
+      document.querySelectorAll("table tbody tr").length,
+  );
+}
+
+/**
+ * ── NÃO SE ACREDITA NA FOLHA: PERGUNTA-SE AO BROWSER ────────────────────────
+ *
+ * A lição mais cara deste ficheiro é a da coluna `animou:` — três leituras de
+ * «zero fotogramas perdidos» que eram, afinal, «não aconteceu nada». Uma
+ * passagem que injecta CSS tem exactamente a mesma armadilha, e pior: se a
+ * regra não pegar, a passagem «sem desfoque» mede o desfoque e a comparação
+ * dá zero de diferença — a conclusão «não custa» sairia de duas medições
+ * iguais.
+ *
+ * Por isso, antes de medir seja o que for, abre-se um menu a sério e
+ * PERGUNTA-SE ao browser o que ele tem posto naquela superfície. O que sai daqui
+ * vai impresso no cabeçalho da passagem, ao lado dos números.
+ */
+async function conferirMaterial(page) {
+  try {
+    await irADestino(page, "Tarefas");
+    await page.locator("h1", { hasText: /^Tarefas$/ }).waitFor({ timeout: 20_000 });
+    await dormir(600);
+    const abrir = page.locator('[aria-haspopup="menu"]').first();
+    await abrir.waitFor({ timeout: 10_000 });
+    await aVista(page, abrir);
+    await tocar(page, abrir);
+    await page.locator('[role="menu"]').first().waitFor({ timeout: 10_000 });
+    await dormir(500);
+    const lido = await page.evaluate(() => {
+      const m = document.querySelector('[role="menu"]');
+      if (!m) return null;
+      const e = getComputedStyle(m);
+      return {
+        fundo: e.backgroundColor,
+        desfoque: e.backdropFilter || e.webkitBackdropFilter || "none",
+        classes: /bo-material/.test(m.className) ? "com .bo-material" : "sem .bo-material",
+      };
+    });
+    await tocar(page, abrir);
+    await dormir(400);
+    /**
+     * E a CAIXA GRANDE à parte, porque a passagem `dialogoTambem` não mexe no
+     * menu nenhum: sem esta segunda leitura, a linha de conferência dizia
+     * exactamente o mesmo nas duas passagens e não provava nada sobre a única
+     * coisa que muda entre elas.
+     */
+    try {
+      await irADestino(page, "Pedidos");
+      const abrirDialogo = page.getByRole("button", { name: /^Novo pedido$/ }).first();
+      await abrirDialogo.waitFor({ timeout: 15_000 });
+      await aVista(page, abrirDialogo);
+      await tocar(page, abrirDialogo);
+      await page.locator('[role="dialog"]').first().waitFor({ timeout: 15_000 });
+      await dormir(700);
+      lido.caixaGrande = await page.evaluate(() => {
+        const d = document.querySelector('[role="dialog"]');
+        if (!d) return "sem caixa";
+        const e = getComputedStyle(d);
+        return `${e.backgroundColor} · ${e.backdropFilter || e.webkitBackdropFilter || "none"}`;
+      });
+      await page.keyboard.press("Escape");
+      await dormir(600);
+    } catch {
+      lido.caixaGrande = "(não abriu)";
+    }
+    return lido;
+  } catch (e) {
+    return { erro: String(e.message).split("\n")[0].slice(0, 70) };
+  }
+}
+
+/** A paleta de comandos, que já tem desfoque hoje e cobre o ecrã inteiro. */
+async function abrirPaleta(page) {
+  await page.keyboard.press("Meta+k");
+  await page
+    .locator('[role="dialog"][aria-label="Pesquisar e navegar"]')
+    .waitFor({ timeout: 15_000 });
+  await dormir(700);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1318,6 +1645,194 @@ const CENARIOS = [
       await tocar(page, this._mover);
     },
   },
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     O VIDRO — QUANTO CUSTA O MATERIAL DOS MENUS DO macOS
+     ══════════════════════════════════════════════════════════════════════════
+
+     Sete cenários que só existem para responder a uma pergunta: pôr superfícies
+     translúcidas com o que está por trás desfocado custa fotogramas no
+     telemóvel dela? Correm-se DUAS vezes na mesma compilação — `--material=nao`
+     e `--material=cheio` — e a diferença é a resposta. `--so=vidro` apanha-os
+     todos e deixa os quinze de cima de fora.
+
+     A ordem é a da pergunta, e não a do uso: primeiro a superfície mais pequena
+     (um menu), depois a maior (um diálogo sobre 135 linhas), depois a que já se
+     paga hoje (a paleta), e por fim a única que se paga POR FOTOGRAMA — rolar
+     com o véu aberto. Se alguma delas custa, é a última.
+     ═════════════════════════════════════════════════════════════════════════ */
+  {
+    /**
+     * O caso mais favorável ao vidro que esta casa tem: 192×102 px de
+     * superfície, sobre a lista de Tarefas. Se o material custar AQUI, não há
+     * conversa a ter sobre o resto.
+     */
+    nome: "vidro 1a · menu pequeno (MenuDeAccoes) a ABRIR",
+    esperaMs: 600,
+    async preparar(page) {
+      await irADestino(page, "Tarefas");
+      await page.locator("h1", { hasText: /^Tarefas$/ }).waitFor({ timeout: 30_000 });
+      await dormir(700);
+      this._abrir = page.locator('[aria-haspopup="menu"]').first();
+      await this._abrir.waitFor({ timeout: 15_000 });
+      await aVista(page, this._abrir);
+    },
+    async accao(page) {
+      await tocar(page, this._abrir);
+    },
+  },
+  {
+    nome: "vidro 1b · menu pequeno a FECHAR",
+    esperaMs: 600,
+    async preparar(page) {
+      await irADestino(page, "Tarefas");
+      await page.locator("h1", { hasText: /^Tarefas$/ }).waitFor({ timeout: 30_000 });
+      await dormir(700);
+      const abrir = page.locator('[aria-haspopup="menu"]').first();
+      await abrir.waitFor({ timeout: 15_000 });
+      await aVista(page, abrir);
+      await tocar(page, abrir);
+      await page.locator('[role="menu"]').first().waitFor({ timeout: 10_000 });
+      await dormir(700);
+      this._abrir = abrir;
+    },
+    async accao(page) {
+      // Fecha-se pelo próprio abridor: um toque fora fechava também, mas caía
+      // numa linha da lista por baixo e abria outra coisa qualquer.
+      await tocar(page, this._abrir);
+    },
+  },
+  {
+    /**
+     * ── E AQUI ESTÁ A DESCOBERTA QUE MUDA A PERGUNTA ────────────────────────
+     *
+     * «Quando vamos seleccionar alguma coisa» — o pedido dela — no telemóvel
+     * NÃO é esta lista. O `ui/Escolha` tem `nativoNoToque` ligado por omissão
+     * (`Escolha.tsx:367`) e `usarNativo = nativoNoToque && (toque || !montado)`
+     * (linha 416): com dedo, o que se abre é o `<select>` do SISTEMA, cromado
+     * do telemóvel, onde não há CSS nosso nenhum para desfocar.
+     *
+     * MEDIDO, e não lido: no ecrã Material a 390 há 7 `<select>` e ZERO
+     * `[aria-haspopup="listbox"]`; a 1440 há 2 `listbox` e a lista abre com
+     * 126×296 px e 8 opções. A superfície translúcida do `Escolha` existe
+     * portanto SÓ no computador.
+     *
+     * O cenário fica nos dois sítios de propósito, e a coluna `animou:` diz
+     * qual dos dois casos apanhou: a 390 dá `NADA` — que aqui não é um vermelho
+     * do arnês, é a resposta.
+     */
+    nome: "vidro 2 · lista do Escolha a ABRIR",
+    esperaMs: 600,
+    async preparar(page) {
+      await irADestino(page, "Material");
+      await page.locator("h1", { hasText: /^Material$/ }).waitFor({ timeout: 30_000 });
+      await dormir(900);
+      this._nativo = await page.evaluate(() => ({
+        listbox: document.querySelectorAll('[aria-haspopup="listbox"]').length,
+        selects: document.querySelectorAll("select").length,
+      }));
+      const lb = page.locator('[aria-haspopup="listbox"]').first();
+      this._temLista = (await lb.count()) > 0 && (await lb.isVisible().catch(() => false));
+      if (this._temLista) {
+        await aVista(page, lb);
+        this._abrir = lb;
+      }
+    },
+    async accao(page) {
+      if (!this._temLista) return; // no telemóvel não há lista nossa para abrir
+      await tocar(page, this._abrir);
+    },
+  },
+  {
+    /**
+     * O PIOR CASO REALISTA, e a armadilha que se veio confirmar: uma caixa
+     * grande com vidro por cima de uma lista de 135 pedidos. Se o
+     * `backdrop-filter` obriga o que está por baixo a ser rasterizado, é aqui
+     * que se vê — e é aqui que NÃO se veria num menu sobre fundo liso.
+     */
+    nome: "vidro 3a · diálogo grande sobre a lista TODA a ABRIR",
+    esperaMs: 800,
+    async preparar(page) {
+      this._linhas = await pedidosComTudoAberto(page);
+      this._abrir = page.getByRole("button", { name: /^Novo pedido$/ }).first();
+      await this._abrir.waitFor({ timeout: 15_000 });
+      await aVista(page, this._abrir);
+    },
+    async accao(page) {
+      await tocar(page, this._abrir);
+    },
+  },
+  {
+    nome: "vidro 3b · diálogo grande sobre a lista TODA a FECHAR",
+    esperaMs: 800,
+    async preparar(page) {
+      this._linhas = await pedidosComTudoAberto(page);
+      const abrir = page.getByRole("button", { name: /^Novo pedido$/ }).first();
+      await abrir.waitFor({ timeout: 15_000 });
+      await aVista(page, abrir);
+      await tocar(page, abrir);
+      await page.locator('[role="dialog"]').first().waitFor({ timeout: 15_000 });
+      await dormir(1200);
+    },
+    async accao(page) {
+      // O Escape e não o «×»: o botão de fechar muda de sítio entre a folha do
+      // telemóvel e o diálogo do computador, e o gesto que se mede tem de ser o
+      // MESMO nas duas larguras para os números se poderem comparar.
+      await page.keyboard.press("Escape");
+    },
+  },
+  {
+    /**
+     * A LINHA DE BASE DO QUE JÁ SE PAGA. A paleta já tem `backdrop-blur-sm`
+     * (4 px) num véu que cobre o ecrã inteiro, nesta compilação e sem ninguém
+     * ter medido. É o número contra o qual todo o resto se lê: se o material
+     * novo custar menos do que isto, já se está a pagar mais caro hoje.
+     */
+    nome: "vidro 4 · paleta de comandos a ABRIR (ecrã inteiro)",
+    esperaMs: 800,
+    async preparar(page) {
+      this._linhas = await pedidosComTudoAberto(page);
+    },
+    async accao(page) {
+      await page.keyboard.press("Meta+k");
+    },
+  },
+  {
+    /**
+     * ── O CASO MAIS CARO QUE HÁ, E O ÚNICO QUE SE PAGA POR FOTOGRAMA ────────
+     *
+     * Um desfoque estático pinta-se uma vez. Um desfoque sobre conteúdo EM
+     * MOVIMENTO tem de ser recomposto a cada fotograma, porque o que está por
+     * trás mudou — é a diferença entre pagar uma vez e pagar sessenta vezes por
+     * segundo.
+     *
+     * MEDIDO que isto é possível nesta casa: com a paleta aberta o `body` fica
+     * `overflow: hidden` e, ainda assim, um `scrollTo` move a página por trás
+     * (scrollY chega a 500). Ou seja, o caso existe e não é hipotético.
+     *
+     * O rolo é `scrollTo` e não uma roda, pela mesma razão do cenário 9: uma
+     * roda traz inércia por cima da medição e não se sabe o que é de quem.
+     */
+    nome: "vidro 5 · ROLAR com o véu aberto (o caso caro)",
+    esperaMs: 900,
+    async preparar(page) {
+      this._linhas = await pedidosComTudoAberto(page);
+      await abrirPaleta(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await dormir(400);
+    },
+    async accao(page) {
+      // Oito degraus, e não um salto: um `scrollTo` único é UM fotograma de
+      // recomposição. O que se quer medir é o desfoque a ser refeito muitas
+      // vezes seguidas, que é o que o dedo dela produz.
+      await page.evaluate(async () => {
+        for (let i = 1; i <= 8; i++) {
+          window.scrollTo(0, i * 90);
+          await new Promise((r) => requestAnimationFrame(r));
+        }
+      });
+    },
+  },
 ];
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1326,31 +1841,93 @@ const CENARIOS = [
 
 async function correr() {
   const browser = await chromium.launch({ executablePath: acharChromium() });
-  const relatorio = { maquina: {}, taxas: {} };
+  // O QUE SE MEDIU, guardado com os números. Um número sem a largura, sem o
+  // material e sem a compilação a que pertence não se pode comparar com nada.
+  const relatorio = {
+    maquina: {},
+    material: MATERIAL,
+    largura: LARGURA,
+    altura: ALTURA,
+    desktop: DESKTOP,
+    repeticoes: REPETICOES,
+    taxas: {},
+  };
 
   for (const taxa of TAXAS) {
     console.log(`\n${"═".repeat(78)}`);
     console.log(
-      `CPU travado ${taxa}×${REDUZIDO ? "  ·  prefers-reduced-motion: reduce" : ""}  ·  ${LARGURA}×${ALTURA}  ·  ${REPETICOES} repetições`,
+      `CPU travado ${taxa}×${REDUZIDO ? "  ·  prefers-reduced-motion: reduce" : ""}  ·  ${LARGURA}×${ALTURA}  ·  material: ${MATERIAL}  ·  ${REPETICOES} repetições`,
     );
     console.log("═".repeat(78));
 
     const ctx = await browser.newContext({
       viewport: { width: LARGURA, height: ALTURA },
-      deviceScaleFactor: 2,
-      isMobile: true,
-      hasTouch: true,
+      // A 1440 isto é um portátil: um píxel por píxel, rato e nenhum dedo. Com
+      // `isMobile` a 1440 o Chromium continua a servir a media query do toque e
+      // o `Escolha` abria o `<select>` do sistema — que é exactamente o caso
+      // que a passagem do computador vem separar.
+      deviceScaleFactor: DESKTOP ? 1 : 2,
+      isMobile: !DESKTOP,
+      hasTouch: !DESKTOP,
       reducedMotion: REDUZIDO ? "reduce" : "no-preference",
       storageState: sessaoGuardada ?? undefined,
     });
     await ctx.addInitScript(AMOSTRADOR);
+    /**
+     * O MATERIAL ENTRA AQUI, e antes de o React montar. `addStyleTag` a meio da
+     * corrida punha a folha depois de as superfícies já existirem — e a primeira
+     * abertura de cada uma seria medida SEM vidro, que é meia medição.
+     */
+    const folha = folhaDoMaterial();
+    if (folha) {
+      await ctx.addInitScript((css) => {
+        const por = () => {
+          const s = document.createElement("style");
+          s.id = "medicao-vidro";
+          s.textContent = css;
+          document.head.appendChild(s);
+        };
+        if (document.head) por();
+        else document.addEventListener("DOMContentLoaded", por, { once: true });
+      }, folha);
+    }
     const page = await ctx.newPage();
     const cdp = await ctx.newCDPSession(page);
     await cdp.send("Performance.enable");
+    const camadas = ligarCamadas(cdp);
 
     await entrar(page);
     if (!sessaoGuardada) sessaoGuardada = await ctx.storageState();
     await dormir(1500);
+    /**
+     * ── O `LayerTree` LIGA-SE DEPOIS DE ENTRAR, E É PRECISO ACORDÁ-LO ───────
+     *
+     * MEDIDO, e custou meia hora: ligado ANTES da primeira navegação, o domínio
+     * perde-se na troca de renderizador e não entrega evento nenhum — a coluna
+     * das camadas dava zero em todos os cenários, incluindo os que abrem a
+     * paleta e os que rolam, que são precisamente os que mudam a árvore. Ligado
+     * DEPOIS de entrar, entrega.
+     *
+     * E entrega só QUANDO A ÁRVORE MUDA: recém-ligado, ainda não disse nada e a
+     * leitura de partida seria zero — um zero que se leria como «não há camadas»
+     * em vez de «ainda não perguntei». Um rolo curto, fora de qualquer janela de
+     * medição, obriga à primeira entrega e dá à coluna um ponto de partida real.
+     */
+    await camadas.comecar();
+    await page.evaluate(() => window.scrollTo(0, 200));
+    await dormir(500);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await dormir(700);
+
+    // A prova de que esta passagem tem MESMO o material que diz ter. Fica
+    // impressa por cima dos números, que é onde quem os lê olha primeiro.
+    const posto = await conferirMaterial(page);
+    console.log(
+      `superfície do menu → fundo: ${posto?.fundo ?? "?"}  ·  backdrop-filter: ${posto?.desfoque ?? "?"}` +
+        `\ncaixa grande      → ${posto?.caixaGrande ?? "?"}` +
+        `${posto?.erro ? "\nERRO na conferência: " + posto.erro : ""}`,
+    );
+    relatorio.superficie = posto;
     // A travagem entra DEPOIS de entrar: o carregamento inicial não é o que se
     // mede, e travá-lo só faz a preparação demorar minutos.
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: taxa });
@@ -1368,6 +1945,7 @@ async function correr() {
           await dormir(400);
           await page.evaluate(() => window.__medComecar());
           const antes = await contadores(cdp);
+          const camadasAntes = camadas.instantaneo();
           const marca = await page.evaluate(() => window.__medMarcar());
           await cenario.accao(page);
           /**
@@ -1389,6 +1967,7 @@ async function correr() {
             await dormir(cenario.esperaMs);
           }
           const depois = await contadores(cdp);
+          const camadasDepois = camadas.instantaneo();
           const { t, loaf, anim } = await page.evaluate(() => window.__medParar());
           const f = resumirFotogramas(t, marca);
           amostras.push({
@@ -1397,6 +1976,13 @@ async function correr() {
             layoutMs: depois.layoutMs - antes.layoutMs,
             estilos: depois.estilos - antes.estilos,
             estiloMs: depois.estiloMs - antes.estiloMs,
+            // Quantas camadas nasceram com o gesto, e quantas vezes o
+            // compositor voltou a PINTAR. É esta a coluna que responde à
+            // pergunta da rasterização — ver `ligarCamadas`.
+            camadas: camadasDepois.camadas - camadasAntes.camadas,
+            camadasFim: camadasDepois.camadas,
+            areaCamadas: camadasDepois.areaCamadas,
+            pinturas: camadasDepois.pinturas - camadasAntes.pinturas,
             loaf: loaf.filter((l) => l.inicio >= marca),
             anim: anim.filter((a) => a.t >= marca),
           });
@@ -1430,9 +2016,18 @@ async function correr() {
         animouOnde: [
           ...new Set(amostras.flatMap((a) => a.anim.map((x) => `${x.nome} @ ${x.classe}`))),
         ],
+        material: MATERIAL,
+        camadasNovas: mediana(amostras.map((a) => a.camadas)),
+        camadasFim: mediana(amostras.map((a) => a.camadasFim)),
+        // Em megapíxeis: a 1440 os números em píxeis passam dos milhões e
+        // deixam de se ler.
+        areaCamadasMpx: mediana(amostras.map((a) => a.areaCamadas)) / 1e6,
+        pinturas: mediana(amostras.map((a) => a.pinturas)),
       };
       if (cenario._blocos) linha.blocos = cenario._blocos;
       if (cenario._linhas) linha.linhas = cenario._linhas;
+      if (cenario._nativo) linha.nativo = cenario._nativo;
+      if (cenario._temLista !== undefined) linha.temListaNossa = cenario._temLista;
       linhas.push(linha);
       console.log(
         cenario.nome.padEnd(48),
@@ -1451,6 +2046,10 @@ async function correr() {
         " LoAF:",
         linha.loafPior.toFixed(0).padStart(4),
         "ms",
+        " camadas:",
+        String(linha.camadasFim).padStart(3),
+        " pinturas:",
+        String(linha.pinturas).padStart(3),
         " animou:",
         linha.animou.join(",") || "NADA",
       );

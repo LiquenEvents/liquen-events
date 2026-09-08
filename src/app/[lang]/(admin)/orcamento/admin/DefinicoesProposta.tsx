@@ -527,7 +527,7 @@ export default function DefinicoesProposta() {
             type="checkbox"
             checked={d.idaEVolta}
             onChange={(e) => setP({ ...p, deslocacao: { ...d, idaEVolta: e.target.checked } })}
-            className="h-4 w-4 accent-[#4d6350]"
+            className="h-4 w-4 accent-sage-600"
           />
           <span className="text-[11px]">Cobrar ida e volta (a carrinha vai e vem)</span>
         </label>

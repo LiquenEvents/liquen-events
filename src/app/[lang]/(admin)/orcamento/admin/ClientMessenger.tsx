@@ -135,7 +135,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
           {messages.map((m, i) => (
             <div
               key={i}
-              className="rounded-2xl bg-[#4d6350]/[0.06] border border-[#4d6350]/15 px-3.5 py-2.5"
+              className="rounded-2xl bg-sage-600/[0.06] border border-sage-600/15 px-3.5 py-2.5"
             >
               <p className="text-[var(--bo-tinta-72)] text-xs leading-relaxed whitespace-pre-wrap">
                 {m.body}

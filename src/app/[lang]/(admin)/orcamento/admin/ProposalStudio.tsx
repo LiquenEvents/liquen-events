@@ -144,7 +144,6 @@ import { depositPercentOf } from "@/lib/proposal-doc";
 import {
   ASPETO_POR_OMISSAO,
   alturaDaLegenda,
-  aspetoDaCaixa,
   aspetoDaCapa,
   caixasDoMoodboard,
   layoutSugerido,
@@ -325,7 +324,7 @@ function esperaDaCopiaDeFotos(fotos: number): number {
 
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-[var(--bo-text)]";
 const ADD_BTN =
-  "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] inline-flex items-center";
+  "alvo-toque !justify-start gap-1 text-xs font-medium text-sage-600 hover:text-[#415440] inline-flex items-center";
 const REMOVE_BTN =
   "alvo-toque text-foreground/30 hover:text-[#8a2a22] text-base leading-none shrink-0";
 
@@ -4559,15 +4558,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     void fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, { method: "DELETE" }).catch(() => {
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
     });
-    setDoc(seedDefaults(initialDoc(quote), quote));
+    const semente = seedDefaults(initialDoc(quote), quote);
+    setDoc(semente);
     // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz é o
     // que ela acabou de pedir para ver. Nada a confirmar.
     setPorConfirmar(new Set());
-    setTotalInput(
-      typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
-        ? textoDoTotal(quote.quotedPrice)
-        : "",
-    );
+    /**
+     * ── E O PREÇO DO PEDIDO ATRAVESSA PELA CONVERSÃO, COMO EM TODO O LADO ──
+     *
+     * Aqui estava `textoDoTotal(quote.quotedPrice)`: o «Preço final» do pedido
+     * — o que o casal paga, adicionais INCLUÍDOS — escrito em cru no campo que
+     * significa só os SERVIÇOS. É a MESMA expressão, letra por letra, que
+     * levou 3.000 a 3.140 a 3.280 a 3.420 na abertura, e que já foi fechada na
+     * montagem, na hidratação do rascunho do servidor e na sincronização com a
+     * Gestão do pedido.
+     *
+     * Neste sítio ela não crescia — mas por acidente, não por desenho: o
+     * `initialDoc` nasce com `budgetExtras: []`, portanto o degrau é zero e a
+     * conversão não tinha nada para tirar. Bastava um dia semear a deslocação
+     * do pedido no documento novo para este ser o quinto sítio da mesma avaria,
+     * e o dinheiro dela paga o preço de descobri-lo em produção.
+     *
+     * Com a conversão, o número deste sítio é hoje exactamente o mesmo e passa
+     * a estar certo por construção. O `o-valor-que-ela-poe-e-o-valor-que-fica`
+     * prende a regra: nenhum caminho leva o preço do pedido ao campo do estúdio
+     * sem passar pelo par.
+     */
+    const doPedidoAoLimpar = quote.quotedPrice;
+    const escritoAoLimpar =
+      typeof doPedidoAoLimpar === "number" && doPedidoAoLimpar > 0
+        ? baseDoPedidoParaOEcra(doPedidoAoLimpar, semente)
+        : null;
+    setTotalInput(escritoAoLimpar != null ? textoDoTotal(escritoAoLimpar) : "");
     setAssetUrls({});
     setAssetOriginais({});
     setAssetMedias({});
@@ -4577,10 +4599,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setConfirmSend(false);
     setSent(false);
     setStep("conteudo");
-    // Limpar deita o total fora com o resto — e o total é o preço do pedido.
-    // Fica no histórico pela mesma razão que o «Usar X €»: um preço que muda
-    // sozinho, visto três semanas depois, tem de ter um sítio onde se explique.
-    const anterior = parseMoneyText(totalInput);
+    /**
+     * Limpar deita o total fora com o resto — e o total é o preço do pedido.
+     * Fica no histórico pela mesma razão que o «Usar X €»: um preço que muda
+     * sozinho, visto três semanas depois, tem de ter um sítio onde se explique.
+     *
+     * ── E OS DOIS LADOS DA CONTA SÃO AGORA A MESMA MOEDA ──────────────────
+     *
+     * Estava `parseMoneyText(totalInput)` contra `quote.quotedPrice`: o campo
+     * do ESCRITO (só serviços) contra o preço do PEDIDO (serviços mais
+     * adicionais). Numa proposta com 140 € de deslocação os dois números
+     * diferem SEMPRE, e limpar o rascunho escrevia no histórico «preço final
+     * de 3.000,00 € para 3.140,00 €» — uma linha sobre dinheiro a dizer que o
+     * preço mudou, num gesto onde o preço do pedido não se mexeu um cêntimo.
+     * Ela lê o histórico para saber onde é que o valor mudou; uma linha falsa
+     * ali gasta-lhe a confiança nas verdadeiras.
+     *
+     * Os dois lados passam a ser lidos na unidade do PEDIDO — que é o número
+     * de que a frase fala.
+     */
+    const escritoAntes = parseMoneyText(totalInput);
+    // Sem nada escrito não há preço para converter: somar-lhe os adicionais
+    // dava um «de 140,00 € para 0,00 €» numa proposta que nunca teve preço.
+    const anterior = escritoAntes > 0 ? baseDoEcraParaOPedido(escritoAntes, doc) : 0;
     const doPedido = typeof quote.quotedPrice === "number" ? quote.quotedPrice : 0;
     if (Math.abs(doPedido - anterior) > 0.01) {
       registarNoHistorico(
@@ -7197,7 +7238,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <div className="mt-2.5 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className={`alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                 onClick={() => void reporOsValoresEnviados()}
               >
                 Repor os valores que seguiram
@@ -7225,7 +7266,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </span>
           <button
             type="button"
-            className={`alvo-toque text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
             onClick={anularLimpeza}
           >
             Anular
@@ -7490,10 +7531,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 aria-pressed={bilingue}
                 className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium  ${
                   bilingue
-                    ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
+                    ? "border-sage-600/40 bg-sage-600/[0.08] text-sage-600"
                     : "border-[var(--bo-hairline-strong)] text-[var(--bo-text-muted)] hover:border-foreground/30 hover:text-[var(--bo-text)]"
                 } ${ESTADO} ${PRESSAO}`}
-                title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
+                title="Acrescenta uma caixa em inglês por baixo de cada campo de texto"
               >
                 <span aria-hidden="true">{bilingue ? "✓" : "+"}</span>
                 Proposta bilingue (PT + EN)
@@ -8060,6 +8101,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                            * cartão discordavam uma da outra.
                            */
                           const alturaLegenda = alturaDaLegenda(linhasDaLegendaAprox(b.annotation));
+                          /**
+                           * As caixas que a página vai MESMO desenhar.
+                           *
+                           * Já não decidem a forma das células da grelha — ver o
+                           * `aspeto` mais abaixo, e a razão por extenso. Ficam
+                           * porque o aviso da última fila (`filaDesequilibrada`)
+                           * as lê, e esse tem de contar as filas da PÁGINA e não
+                           * as do ecrã.
+                           */
                           const caixas = caixasDoMoodboard(
                             layoutDoBoard,
                             aspectos,
@@ -8105,7 +8155,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               // pela da janela — ver o comentário na grelha.
                               className={`@container rounded-2xl border p-4 ${
                                 fechado
-                                  ? "border-[#4d6350]/35 bg-[#4d6350]/[0.04]"
+                                  ? "border-sage-600/35 bg-sage-600/[0.04]"
                                   : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
                               }`}
                             >
@@ -8219,7 +8269,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       }
                                       className={`alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs  ${
                                         fechado
-                                          ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                          ? "bg-sage-600/15 text-sage-600"
                                           : "text-foreground/35 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)]"
                                       } ${ESTADO} ${PRESSAO}`}
                                     >
@@ -8505,20 +8555,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               semRemover
                                               onRemove={() => removeBoardImageAt(bi, ii)}
                                               onMedida={(a) => registarAspeto(path, a)}
-                                              // A forma da célula que ESTA foto vai ocupar na
-                                              // página — sai da caixa que a disposição escolhida
-                                              // lhe dá, e muda com ela e com o número de fotos.
-                                              // Nenhuma delas é quadrada. As que já não são
-                                              // impressas ficam quadradas: não têm caixa nenhuma.
+                                              // ── TODAS AS CÉLULAS COM A MESMA FORMA ──────────
+                                              // Pedido dela, a olhar para a grelha: «as fotos
+                                              // umas são maiores que outras. coloca tudo igual
+                                              // aqui».
                                               //
-                                              // Pela ORDEM DE DESENHO e não pela posição no
-                                              // array: com uma foto marcada como principal, a
-                                              // página troca-a para a caixa grande, e a célula
-                                              // tem de mostrar a forma dessa caixa (ver
-                                              // `ordemDasFotos`).
-                                              aspeto={aspetoDaCaixa(
-                                                caixas[ordemDeDesenho.indexOf(ii)],
-                                              )}
+                                              // O que estava aqui era a forma da CAIXA que esta
+                                              // foto vai ocupar na página: a do destaque é alta,
+                                              // as da grelha da direita são baixas, e por isso a
+                                              // grelha ficava aos degraus. Não era descuido —
+                                              // existia para ela não escolher uma foto pelo que
+                                              // via e o cliente receber a MESMA foto cortada
+                                              // noutro sítio (ver o `aspeto` no `Thumb`).
+                                              //
+                                              // Foi-lhe dito o que se perdia, com estas palavras,
+                                              // e ela escolheu igualar à mesma. Fica escrito
+                                              // porque quem vier a seguir encontra o `aspeto`
+                                              // documentado no `Thumb` e pergunta porque é que
+                                              // este sítio não o usa: não é esquecimento.
+                                              //
+                                              // E igualar aqui não a deixa às cegas: o diagrama
+                                              // da disposição continua a desenhar as caixas
+                                              // verdadeiras, e o `cortadas` aqui em cima continua
+                                              // a dizer, foto a foto, quanto é que cada uma perde
+                                              // no recorte. Perdeu-se ver a forma; não se perdeu
+                                              // ser avisada.
+                                              aspeto={1}
                                               foraDoPdf={
                                                 ordemDeDesenho.indexOf(ii) >= MOOD_BOARD_MAX_IMAGES
                                               }
@@ -8742,7 +8804,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                                           <input
                                             type="checkbox"
-                                            className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                                            className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
                                             checked={semRecorte}
                                             onChange={(e) =>
                                               updateBoard(bi, {
@@ -8902,7 +8964,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <label className="flex items-center gap-2 text-xs text-[var(--bo-text-muted)]">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 shrink-0 accent-[#4d6350]"
+                            className="h-4 w-4 shrink-0 accent-sage-600"
                             checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
                             onChange={(e) =>
                               patch({
@@ -10032,7 +10094,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                      */}
                     <button
                       type="button"
-                      className={`alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                      className={`alvo-toque -my-1 py-2 text-xs font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                       onClick={() =>
                         pedirConfirmacaoDeDinheiro({
                           oQue: "o total",
@@ -10152,7 +10214,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          a apanhá-lo e não a máquina de quem escreveu — só
                          aparece quando a proposta tem uma validade diferente da
                          preferida, e os dados locais não a tinham. */
-                        className={`alvo-toque -my-1 py-2 text-[11px] text-[#4d6350] underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque -my-1 py-2 text-[11px] text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                         onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
                       >
                         Passar a usar {doc.validUntilDays} dias em todas as propostas novas
@@ -10375,8 +10437,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                `prefers-reduced-motion` já tratado no `globals.css`.
 
                Passa a ser o mesmo dos dois lados — ela vê o que o casal vê. */
-            <div className="bo-cena flex flex-col items-start gap-3 rounded-2xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06] p-5">
-              <p className="flex items-center gap-2 font-display text-base text-[#4d6350]">
+            <div className="bo-cena flex flex-col items-start gap-3 rounded-2xl border border-sage-600/25 bg-sage-600/[0.06] p-5">
+              <p className="flex items-center gap-2 font-display text-base text-sage-600">
                 <svg
                   viewBox="0 0 52 52"
                   className="h-5 w-5 shrink-0"
@@ -10785,7 +10847,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            `--bo-barra-accao` (ver o `ResizeObserver` lá em cima) e o
            `Toast.tsx` soma-a à distância a que já se punha do fundo. Ficam os
            dois visíveis, e nenhum tapa o outro. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3 lg:bottom-0"
+        /* ── E PASSOU A SER MATERIAL, COMO TUDO O QUE FLUTUA ──────────────
+           Palavras dela, com uma captura desta barra ao lado da cápsula de
+           vidro: «quero isto com o mesmo design da apple».
+
+           Era uma laje branca de bordo a bordo com um risco por cima — a única
+           superfície do estúdio que continuava a fingir que não flutua. Flutua:
+           está `sticky`, o conteúdo passa mesmo por baixo dela, e é isso que a
+           põe na camada FUNCIONAL do sistema de design, onde vive o material.
+
+           `bo-material` traz o raio, o fio dos quatro lados e a superfície
+           translúcida; `bo-material-desfoque` o desfoque. Sai o `border-t`
+           (um risco de um lado só é o desenho de uma laje encostada, e a peça
+           deixou de o ser) e sai a cor sólida — que se pintava POR CIMA do
+           material e o apagava, como já tinha acontecido na coluna e na barra
+           de topo.
+
+           `mx-1` em vez de `-mx-1`: uma peça que flutua tem ar dos lados. Era
+           negativo de propósito, para a laje ir de bordo a bordo do painel;
+           com raio, ir de bordo a bordo era cortar-lhe os cantos contra a
+           margem.
+
+           Continua a publicar a sua altura em `--bo-barra-accao` para o aviso
+           do `Toast` se afastar dela, e continua a pousar à altura da barra de
+           destinos — as duas coisas que este bloco já garantia. */
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3"
       >
         {step === "conteudo" && (
           <>
@@ -11642,7 +11728,7 @@ function BarraDaSeleccao({
 }) {
   if (quantas === 0) return null;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#4d6350]/35 bg-[#4d6350]/[0.06] px-3 py-2">
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-sage-600/35 bg-sage-600/[0.06] px-3 py-2">
       <p className="text-xs font-medium text-[var(--bo-tinta-72)]">
         {quantas === 1 ? "1 fotografia escolhida" : `${quantas} fotografias escolhidas`}
       </p>
@@ -11985,7 +12071,7 @@ function AccoesDaFoto({
                   aria-hidden="true"
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[13px] ${
                     a.activa
-                      ? "bg-[#4d6350] text-white"
+                      ? "bg-sage-600 text-white"
                       : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                   }`}
                 >
@@ -12412,7 +12498,7 @@ function StepNav({
               aria-current={active ? "step" : undefined}
               className={`alvo-toque gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-xs font-medium  inline-flex items-center ${
                 active
-                  ? "bg-[#4d6350] text-white"
+                  ? "bg-sage-600 text-white"
                   : "text-foreground/50 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]"
               } ${ESTADO} ${PRESSAO}`}
             >
@@ -12712,7 +12798,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         <span className="bo-eyebrow">Só para si</span>
         <span className="text-xs text-[var(--bo-tinta-72)]">
           Margem{" "}
-          <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-[#4d6350]"}`}>
+          <strong className={`font-semibold ${magra ? "text-[#8a2a22]" : "text-sage-600"}`}>
             {eur(total.margem)} · {Math.round(total.percentagem)}%
           </strong>
         </span>
@@ -13078,9 +13164,9 @@ function DiagramaDeLayout({
           width={c.w}
           height={c.h}
           rx={6}
-          fill="#4d6350"
+          fill="#4c6752"
           fillOpacity={0.22}
-          stroke="#4d6350"
+          stroke="#4c6752"
           strokeOpacity={0.45}
           strokeWidth={3}
         />
@@ -13164,8 +13250,8 @@ function SelectorDeLayout({
               onClick={() => onEscolher(op)}
               className={`w-[5.75rem] rounded-lg border p-1.5 text-left  ${
                 activo
-                  ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] "
-                  : "border-[var(--bo-hairline-strong)] bg-white hover:border-[#4d6350]/40"
+                  ? "border-sage-600/70 bg-sage-600/[0.07] "
+                  : "border-[var(--bo-hairline-strong)] bg-white hover:border-sage-600/40"
               } ${ESTADO} ${PRESSAO}`}
             >
               <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-white">
@@ -13967,7 +14053,7 @@ function UploadArea({
       // por cima: duas utilidades da mesma propriedade decidem-se pela ordem na
       // folha de estilo e não pela ordem na string, e um `flex-col` de base
       // ganharia ao `flex-row` da faixa sem nada o denunciar.
-      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${caixa} ${
+      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center  focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/55 ${caixa} ${
         faixa
           ? "flex-row gap-2 p-2"
           : curto
@@ -13977,8 +14063,8 @@ function UploadArea({
               : "flex-col gap-1 p-3"
       } ${
         drag
-          ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
-          : "border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] hover:border-[#4d6350]/45"
+          ? "border-sage-600/60 bg-sage-600/[0.06]"
+          : "border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] hover:border-sage-600/45"
       } ${ESTADO} ${PRESSAO}`}
     >
       <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">{label}</span>

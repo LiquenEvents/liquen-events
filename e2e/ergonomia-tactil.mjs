@@ -491,13 +491,13 @@ export async function abrirGaveta(page) {
 export async function irParaDestinoMovel(page, rotulo) {
   if (NA_BARRA_DE_BAIXO.includes(rotulo)) {
     await page
-      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("navigation", { name: /Navegação do back office/i })
       .getByRole("button", { name: rotulo, exact: true })
       .click();
     return;
   }
   await abrirGaveta(page);
-  const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
+  const nav = page.getByRole("navigation", { name: /Mais destinos/i });
   await nav.waitFor({ state: "visible" });
   // Sem dobra em lado nenhum: espera-se pelo destino, não por um abridor que
   // já não existe. (O `count()` de antes era um instantâneo, e o clique no

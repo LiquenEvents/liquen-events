@@ -5,6 +5,7 @@ import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { eur0 as eur } from "@/lib/money";
 import { todayKey } from "./util";
+import { corDeTexto } from "./status-meta";
 import { Button, Card, EmptyState } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -331,7 +332,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
             {days.map((key) => (
               <div key={key} className="border-b border-[var(--bo-hairline)] last:border-0">
                 <p
-                  className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-[#4d6350]" : "text-foreground/40"}`}
+                  className={`px-5 sm:px-6 pt-4 pb-1.5 text-[10px] tracking-[0.2em] uppercase capitalize font-medium ${key === todayStr ? "text-sage-600" : "text-foreground/40"}`}
                 >
                   {dayLabel(key)}
                 </p>
@@ -369,7 +370,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                           </div>
                           <span
                             className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
-                            style={{ background: `${it.color}1f`, color: it.color }}
+                            style={{ background: `${it.color}1f`, color: corDeTexto(it.color) }}
                           >
                             {KIND_LABEL[it.kind]}
                           </span>
@@ -377,7 +378,7 @@ export default function Agenda({ quotes, onOpen }: Props) {
                         {it.atalho && (
                           <a
                             href={it.atalho.href}
-                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] hover:bg-[#4d6350]/[0.06] ${ESTADO} ${PRESSAO}`}
+                            className={`alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-sage-600/30 bg-white px-2.5 text-[11px] font-medium text-sage-600 hover:bg-sage-600/[0.06] ${ESTADO} ${PRESSAO}`}
                           >
                             {it.atalho.rotulo}
                           </a>

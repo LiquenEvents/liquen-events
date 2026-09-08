@@ -217,7 +217,11 @@ describe("NotificationBell — com a rota em baixo", () => {
     render(<NotificationBell />);
 
     const sino = await screen.findByRole("button");
-    expect(sino.getAttribute("title")).toMatch(/não foi possível saber/i);
+    // O RÓTULO diz o que se sabe (nada) e a DICA diz o que o botão faz: são
+    // dois trabalhos, e a regra 8 da «Escrita» é que a dica não repete o
+    // rótulo. Antes estavam os dois na dica, em 117 caracteres.
+    expect(sino.textContent).toMatch(/sem resposta/i);
+    expect(sino.getAttribute("title")).toMatch(/perguntar outra vez/i);
     // Não inventa um estado que não conhece.
     expect(sino.textContent).not.toMatch(/bloqueadas|ativas/i);
   });
@@ -233,7 +237,7 @@ describe("NotificationBell — com a rota em baixo", () => {
     });
 
     render(<NotificationBell />);
-    const sino = await screen.findByTitle(/não foi possível saber/i);
+    const sino = await screen.findByTitle(/perguntar outra vez/i);
     emBaixo = false;
     await userEvent.click(sino);
 

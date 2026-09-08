@@ -4883,9 +4883,32 @@ describe("a grelha das fotos conta com a legenda", () => {
   );
   const semLegenda = caixasDoMoodboard("mosaico", aspectos, undefined, false);
 
-  it("cada célula tem a forma da caixa que a página lhe dá", async () => {
-    // Se um dia as duas geometrias coincidirem, este teste deixa de medir o
-    // que diz medir — e é melhor falhar aqui do que passar por engano.
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * AS CÉLULAS SÃO TODAS IGUAIS — E ISTO JÁ MEDIU O CONTRÁRIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este teste exigia que cada célula tivesse a forma da CAIXA que aquela
+   * fotografia vai ocupar na página. Estava certo, e media uma coisa que valia
+   * a pena: sem isso, ela escolhia uma foto pelo que via e o cliente recebia a
+   * mesma fotografia cortada noutro sítio.
+   *
+   * Foi-lhe dito exactamente isso, e a decisão dela foi igualar à mesma: «as
+   * fotos umas são maiores que outras. coloca tudo igual aqui». A grelha ficava
+   * aos degraus, porque a caixa do destaque é alta e as da direita são baixas.
+   *
+   * O teste passa a prender a decisão NOVA. E prende também o que a torna
+   * defensável: a geometria verdadeira não desapareceu do ecrã — continua a
+   * alimentar o aviso de quanto é que cada fotografia perde, que é o teste
+   * logo a seguir, e o diagrama do selector de disposição.
+   */
+  it("as células têm todas a mesma forma, mesmo quando as caixas não têm", async () => {
+    // O que dá sentido a igualar: as caixas da página são MESMO diferentes
+    // entre si. Se um dia deixarem de ser, isto deixa de provar alguma coisa.
+    const formasDasCaixas = comLegenda.map((caixa) => aspetoDaCaixa(caixa));
+    expect(new Set(formasDasCaixas).size).toBeGreaterThan(1);
+    // E as duas geometrias continuam a divergir — é o que o teste do aviso,
+    // aqui em baixo, precisa que seja verdade.
     expect(aspetoDaCaixa(comLegenda[0])).not.toBe(aspetoDaCaixa(semLegenda[0]));
 
     seedBoardComLegenda();
@@ -4897,11 +4920,9 @@ describe("a grelha das fotos conta com a legenda", () => {
     });
     const celulas = [...cartao.querySelectorAll<HTMLElement>("[data-foto]")];
     expect(celulas).toHaveLength(4);
-    // `parseFloat` porque o jsdom normaliza o `aspect-ratio` para «0.558 / 1»
-    // — o número é o mesmo, a escrita é que é dele.
-    expect(celulas.map((c) => parseFloat(c.style.aspectRatio))).toEqual(
-      comLegenda.map((caixa) => aspetoDaCaixa(caixa)),
-    );
+    // `parseFloat` porque o jsdom normaliza o `aspect-ratio` para «1 / 1» — o
+    // número é o mesmo, a escrita é que é dele.
+    expect(celulas.map((c) => parseFloat(c.style.aspectRatio))).toEqual([1, 1, 1, 1]);
   });
 
   /**

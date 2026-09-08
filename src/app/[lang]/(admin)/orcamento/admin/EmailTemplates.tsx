@@ -759,11 +759,11 @@ function EditorClassico() {
                 key={t.key}
                 onClick={() => trocarDeModelo(t)}
                 className={`w-full text-left px-4 py-3 ${ESTADO} ${PRESSAO} ${
-                  active ? "bg-[#4d6350]/10" : "hover:bg-[var(--bo-tinta-3)]"
+                  active ? "bg-sage-600/10" : "hover:bg-[var(--bo-tinta-3)]"
                 }`}
               >
                 <p
-                  className={`text-sm truncate ${active ? "text-[#4d6350] font-medium" : "text-[var(--bo-tinta-72)]"}`}
+                  className={`text-sm truncate ${active ? "text-sage-600 font-medium" : "text-[var(--bo-tinta-72)]"}`}
                 >
                   {t.name}
                   {/* A MARCA DO TRABALHO POR PUBLICAR.
@@ -869,7 +869,7 @@ function EditorClassico() {
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMerge(f.key)}
                   title={f.hint}
-                  className={`px-2.5 py-1 rounded-md text-[11px] bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/20 ${ESTADO} ${PRESSAO}`}
+                  className={`px-2.5 py-1 rounded-md text-[11px] bg-sage-600/10 text-sage-600 hover:bg-sage-600/20 ${ESTADO} ${PRESSAO}`}
                 >
                   {f.label}
                 </button>
@@ -895,7 +895,7 @@ function EditorClassico() {
                 <button
                   type="button"
                   onClick={switchToVisual}
-                  className={`text-[11px] text-[#4d6350] hover:text-[#415440] underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                  className={`text-[11px] text-sage-600 hover:text-[#415440] underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                 >
                   ← Voltar ao editor visual
                 </button>
@@ -1075,7 +1075,7 @@ export default function EmailTemplates() {
             // fundos ao mesmo tempo, e nunca há nenhum. É a manobra do
             // `Segmented`, e a razão está escrita lá por extenso.
             `text-white ${temMarca ? "" : "bg-[#5F7C66]"}`
-          : "bg-[#5F7C66]/10 text-[#4d6350] hover:bg-[#5F7C66]/20"
+          : "bg-[#5F7C66]/10 text-sage-600 hover:bg-[#5F7C66]/20"
       }`}
     >
       {rotulo}

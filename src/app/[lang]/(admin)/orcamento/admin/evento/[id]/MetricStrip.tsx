@@ -82,7 +82,7 @@ export default function MetricStrip({ metrics }: Props) {
         sub={
           supplierCosts > 0 ? `custos s/ IVA ${eur0(supplierCostsNet)}` : "sem custos registados"
         }
-        tone={supplierCosts > 0 ? (margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]") : undefined}
+        tone={supplierCosts > 0 ? (margin >= 0 ? "text-sage-600" : "text-[#8a2a22]") : undefined}
       />
       {/* «% Recebido», e já não «% Pago».
           Esta célula lia o livro de faturas: era a fatia do contratado que
@@ -96,7 +96,7 @@ export default function MetricStrip({ metrics }: Props) {
         label="% Recebido"
         value={contracted > 0 ? `${Math.round(pctPaid * 100)}%` : "—"}
         sub={contracted > 0 ? `recebido ${eur0(paid)}` : undefined}
-        tone={pctPaid >= 1 ? "text-[#4d6350]" : undefined}
+        tone={pctPaid >= 1 ? "text-sage-600" : undefined}
       />
       <Cell
         label={countdownDays !== null && countdownDays > 0 ? "Faltam" : "Evento"}

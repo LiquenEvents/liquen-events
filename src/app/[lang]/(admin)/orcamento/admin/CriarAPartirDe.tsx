@@ -418,7 +418,7 @@ export default function CriarAPartirDe({
                   aria-current={i === ativo}
                   className={`w-full rounded-xl border px-4 py-3 text-left ${ESTADO} ${PRESSAO} disabled:opacity-50 ${
                     i === ativo
-                      ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
+                      ? "border-sage-600/40 bg-sage-600/[0.06]"
                       : "border-transparent hover:border-[var(--bo-hairline-strong)]"
                   }`}
                 >
@@ -428,7 +428,7 @@ export default function CriarAPartirDe({
                     </span>
                     <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em]">
                       {sugerida && (
-                        <span className="rounded-full bg-[#4d6350] px-2 py-0.5 text-white">
+                        <span className="rounded-full bg-sage-600 px-2 py-0.5 text-white">
                           já foi teu cliente
                         </span>
                       )}

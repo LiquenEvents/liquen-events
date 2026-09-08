@@ -136,7 +136,7 @@ async function tocar(alvo) {
 
 async function entrar() {
   await page.goto(URL_BASE + "/orcamento/admin", { waitUntil: "domcontentloaded" });
-  const barra = page.locator('nav[aria-label="Destinos principais"]');
+  const barra = page.locator('nav[aria-label="Navegação do back office"]');
   const email = page.getByLabel(/O teu email/i);
   await Promise.race([
     email.waitFor({ timeout: 90_000 }).catch(() => {}),
@@ -245,7 +245,7 @@ try {
 
   // Lista → cartão → estúdio → «Abrir o pedido»: é como ela lá chega, e é o
   // estado em que o painel é uma GAVETA (com o `useFocusTrap` ligado).
-  const barra = page.locator('nav[aria-label="Destinos principais"]');
+  const barra = page.locator('nav[aria-label="Navegação do back office"]');
   await tocar(barra.getByRole("button", { name: /^Pedidos/ }));
   await page.locator("h1", { hasText: /^Pedidos$/ }).waitFor({ timeout: 60_000 });
   await dormir(700);

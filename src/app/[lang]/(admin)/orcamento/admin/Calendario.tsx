@@ -37,6 +37,46 @@ const STATUS_COLOR: Record<string, string> = {
   rejeitado: "#5a5a55",
 };
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ESTADO DE UM PEDIDO NÃO PODE VIVER SÓ NA COR DO PONTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `STATUS_COLOR` acima pinta um ponto de 6 px à frente de cada pedido — na
+ * grelha do mês e no painel do dia — e era o ÚNICO sítio onde o estado
+ * aparecia. O nome acessível do botão dizia «Abrir pedido de Marta Nunes —
+ * Casamento» e mais nada; o ponto do painel do dia é `aria-hidden`. Ou seja:
+ * para quem lê com um leitor de ecrã o estado simplesmente não existia, e para
+ * quem vê ficava dependente de distinguir cinco tons.
+ *
+ * E dois deles não se distinguem mesmo com visão de cor completa: «Novo» é
+ * `#8a8a82` e «Perdido» é `#5a5a55` — dois cinzentos a 6 px, lado a lado no
+ * mesmo mês. Um pedido novo e um pedido perdido são as duas pontas opostas do
+ * funil, e eram o mesmo ponto cinzento.
+ *
+ * A cura é a PALAVRA, e é a mesma palavra do resto da casa (o `STATUS_META` da
+ * Visão Geral): à vista no painel do dia, onde há linha para ela, e no nome
+ * acessível dos dois sítios. A cor do ponto fica como está — continua a ser um
+ * atalho útil para quem já a conhece —, mas deixa de ser a única via.
+ *
+ * Porque é que NÃO leva também um ícone por estado: a etiqueta da grelha é
+ * `text-[9px]` com o nome já truncado, e o ponto tem 6 px. Um glifo diferente
+ * por estado nesse tamanho não se lê — acrescenta ruído sem acrescentar
+ * informação, e a informação que falta já vai na palavra.
+ */
+const STATUS_LABEL: Record<string, string> = {
+  pendente: "Novo",
+  em_revisao: "Aguardar resposta",
+  cotado: "Proposta enviada",
+  aceite: "Ganho",
+  rejeitado: "Perdido",
+};
+
+/** A palavra do estado, ou o valor cru se for um estado que o mapa não conhece. */
+function estadoEmPalavra(status: string): string {
+  return STATUS_LABEL[status] ?? status ?? "—";
+}
+
 const KIND_META: Record<CalendarEventKind, { label: string; color: string }> = {
   reuniao: { label: "Reunião", color: "#7a8caa" },
   evento: { label: "Evento", color: "#7c854b" },
@@ -834,7 +874,19 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
                 ...dayEvents.map((ev) => KIND_META[ev.kind].color),
               ].slice(0, 4);
-              const dayLabel = `${c.day} de ${MONTHS[month]}${isToday ? " (hoje)" : ""} — ${
+              /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
+                 O nome acessível da célula era «9 de Janeiro — 2 eventos», sem
+                 ANO. Num calendário em que se anda para trás e para a frente
+                 mês a mês — e esta casa fecha datas com um ano e meio de
+                 antecedência —, quem o percorre com um leitor de ecrã ouve
+                 «9 de Janeiro» e não tem como saber se está no ano que abriu
+                 ou dois cliques à frente. O cabeçalho diz «Janeiro 2026», mas
+                 fica lá atrás: quando se chega às células já se ouviu, e não
+                 se volta a ouvir a cada dia.
+
+                 O ano vem do `year` que a própria grelha já usa para se
+                 desenhar, portanto não há segunda fonte para discordar. */
+              const dayLabel = `${c.day} de ${MONTHS[month]} de ${year}${isToday ? " (hoje)" : ""} — ${
                 total > 0
                   ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
                   : "Enter para adicionar"
@@ -859,17 +911,17 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       else openAdd(key);
                     }
                   }}
-                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${
+                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-white p-1 sm:p-1.5 cursor-pointer ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
                     isSelected
-                      ? "ring-1 ring-inset ring-[#4d6350]/45 bg-[#4d6350]/[0.04]"
+                      ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
                       : isToday
-                        ? "hover:bg-[#4d6350]/[0.03]"
-                        : "hover:bg-[#4d6350]/[0.025]"
+                        ? "hover:bg-sage-600/[0.03]"
+                        : "hover:bg-sage-600/[0.025]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     {isToday ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white text-[10px] font-semibold tabular-nums">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white text-[10px] font-semibold tabular-nums">
                         {c.day}
                       </span>
                     ) : (
@@ -895,7 +947,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                          `size-6` é só a CAIXA que recebe o clique: o «+» fica
                          com o mesmo `text-sm`, centrado, e como a célula tem
                          `min-h-[80px]` a linha do topo não empurra nada. */
-                      className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none ${ESTADO} ${PRESSAO}`}
+                      className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
                     >
                       +
                     </button>
@@ -910,11 +962,12 @@ export default function Calendario({ quotes, onOpen }: Props) {
                           e.stopPropagation();
                           onOpen(q);
                         }}
-                        aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)}`}
-                        title={`${q.name} — ${eventTypeLabel(q)}`}
-                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
+                        aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                        title={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
+                          aria-hidden="true"
                           className="w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ background: STATUS_COLOR[q.status] }}
                         />
@@ -930,7 +983,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         }}
                         aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
                         title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#4d6350]/60 ${ESTADO} ${PRESSAO}`}
+                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -1090,8 +1143,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
                       <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
                         {q.name}
                       </span>
+                      {/* A palavra do estado À VISTA — aqui há linha para ela.
+                          Na grelha do mês o estado ia só na cor do ponto (ver
+                          o `STATUS_LABEL`); este painel é onde o dia se lê a
+                          sério, e é onde a palavra tem de estar. */}
                       <span className="block text-foreground/40 text-[10px] truncate">
-                        {eventTypeLabel(q)}
+                        {estadoEmPalavra(q.status)}
+                        {` · ${eventTypeLabel(q)}`}
                         {q.guests ? ` · ${q.guests} convidados` : ""}
                       </span>
                     </span>
@@ -1170,8 +1228,8 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 className={`w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-[#4d6350]/[0.06]">
-                    <p className="text-[#4d6350] text-lg font-light leading-none">
+                  <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-sage-600/[0.06]">
+                    <p className="text-sage-600 text-lg font-light leading-none">
                       {new Date(q.date + "T12:00:00").getDate()}
                     </p>
                     {/* O ANO, quando não é este.

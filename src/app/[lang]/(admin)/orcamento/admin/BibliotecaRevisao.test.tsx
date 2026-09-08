@@ -428,8 +428,11 @@ describe("a barra de etiquetas, no telemóvel", () => {
     expect(barraDeAccoes.className).toContain(
       "bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))]",
     );
-    // Acima de 1024 a navegação é lateral e não há nada por baixo.
-    expect(barraDeAccoes.className).toContain("lg:bottom-0");
+    // E NÃO há um `lg:` a desligar a folga: a navegação deixou de ser lateral
+    // acima de 1024 — é a mesma cápsula que flutua em baixo, nas duas larguras,
+    // e ignorá-la no computador punha esta barra por cima dos destinos. Ver
+    // `barra-inferior.test.tsx`, que guarda os quatro sítios de uma vez.
+    expect(barraDeAccoes.className).not.toMatch(/lg:bottom-/);
     // E a folga NÃO é um número escrito à mão: era a quarta cópia do «56px»
     // quando a barra passou a 72, e foi assim que ela ficou a tapar isto.
     expect(barraDeAccoes.className).not.toMatch(/bottom-\[\d+px\]/);

@@ -673,7 +673,7 @@ export default function Fornecedores() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[#4d6350]/70 text-[10px] tracking-[0.15em] uppercase mt-0.5">
+                      <p className="text-sage-600/70 text-[10px] tracking-[0.15em] uppercase mt-0.5">
                         {s.category}
                       </p>
                     </div>
@@ -718,7 +718,7 @@ export default function Fornecedores() {
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-sage-600 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
                         aria-label="Editar"
                       >
                         {LapisIcon}
@@ -794,7 +794,7 @@ export default function Fornecedores() {
                         // dá-lhe 44px de altura só no dedo (`justify-start`
                         // porque, ao contrário dos botões de ícone, este texto
                         // não deve ficar centrado).
-                        className={`alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque !justify-start text-foreground/45 hover:text-sage-600 ${ESTADO} ${PRESSAO}`}
                       >
                         {s.phone}
                       </a>
@@ -807,7 +807,7 @@ export default function Fornecedores() {
                         // trás, na mesma coluna e à distância de um dedo.
                         // `truncate` fica — os emails destes fornecedores
                         // passam da largura da coluna.
-                        className={`alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] truncate ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque !justify-start text-foreground/45 hover:text-sage-600 truncate ${ESTADO} ${PRESSAO}`}
                       >
                         {s.email}
                       </a>

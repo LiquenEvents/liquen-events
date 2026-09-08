@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
 import { SAIDA, useSaidaDeUmSo } from "./saida";
@@ -121,6 +121,13 @@ export function MenuDeAccoes({
     };
   }, [aberto]);
 
+  /* ── A COLUNA SÓ EXISTE SE HOUVER ÍCONES ─────────────────────────────────
+     A fila alinhada é o que impede um menu misto de ficar com os rótulos em
+     duas colunas. Num menu em que NENHUMA acção tem ícone ela não alinha nada:
+     é uma goteira de 26 px à esquerda de tudo. Por isso pergunta-se ao menu, e
+     não ao item. */
+  const temIcones = accoes.some((a) => a.icone);
+
   const soltas = accoes.slice(0, soltasNoEcraGrande);
   const noMenu = accoes.slice(soltas.length);
 
@@ -141,7 +148,7 @@ export function MenuDeAccoes({
             `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
             a.destrutiva
               ? "text-[#8a3d2f] active:bg-[#8a3d2f]/[0.12]"
-              : "text-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
+              : "text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
             // O coração deste componente: só se esconde onde há mesmo rato.
             "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
           )}
@@ -160,7 +167,7 @@ export function MenuDeAccoes({
             aria-expanded={aberto}
             onClick={() => setAberto((v) => !v)}
             className={cn(
-              `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
+              `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
               // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
               // menu deixava o menu a flutuar sem nada que o segurasse.
               aberto
@@ -189,7 +196,18 @@ export function MenuDeAccoes({
               aria-hidden={aSairAgora || undefined}
               inert={aSairAgora}
               className={cn(
-                "absolute right-0 top-full z-30 mt-1 min-w-48 overflow-hidden rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] py-1 shadow-[var(--bo-sombra-suspensa)]",
+                "absolute right-0 top-full z-30 mt-1 min-w-48 overflow-hidden",
+                /* ── O MATERIAL ─────────────────────────────────────────────
+                   Era `rounded-xl border … bg-[var(--bo-surface)] py-1`. O
+                   `rounded-xl` media 8 px (o bloco dos raios do `globals.css`
+                   colapsa a escala do Tailwind para o conteúdo), e o `py-1`
+                   dava folga em cima e em baixo mas nenhuma aos lados — que é
+                   a razão de o realce de uma linha só poder ser uma faixa.
+                   A `.bo-material` traz o raio de 12 px, o fio e a superfície
+                   translúcida; o desfoque vem à parte, para se poder baixar
+                   num sítio só. */
+                "bo-material bo-material-desfoque p-[var(--bo-material-folga)]",
+                "shadow-[var(--bo-sombra-suspensa)]",
                 aSairAgora ? SAIDA : "bo-entrada",
               )}
             >
@@ -200,29 +218,71 @@ export function MenuDeAccoes({
                 const primeiraDestrutiva =
                   a.destrutiva && !noMenu.slice(0, i).some((x) => x.destrutiva);
                 return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    role="menuitem"
-                    disabled={a.desativada}
-                    onClick={() => {
-                      // Devolver o foco ANTES da acção: se ela abrir um
-                      // diálogo, é este botão que a armadilha de foco memoriza
-                      // para devolver no fim (ver `useFocusTrap`).
-                      fecharEDevolverFoco();
-                      a.onAccao();
-                    }}
-                    className={cn(
-                      `alvo-toque flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
-                      a.destrutiva
-                        ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07] active:bg-[#8a3d2f]/[0.14]"
-                        : "text-[var(--bo-tinta-72)] hover:bg-[var(--bo-tinta-6)] active:bg-[var(--bo-tinta-10)]",
-                      primeiraDestrutiva && "mt-1 border-t border-[var(--bo-hairline)] pt-3",
+                  <Fragment key={a.id}>
+                    {/* ── O FILETE SAIU DE DENTRO DO ITEM ───────────────────
+                        Era um `border-t` na própria linha destrutiva. Com o
+                        realce a passar a pastilha isso deixa de funcionar: o
+                        filete ficava a fazer parte da caixa que se pinta de
+                        vermelho ao passar o rato, e desaparecia debaixo dela.
+                        Passa a ser um elemento seu, entre as duas linhas, com
+                        a folga da pastilha — para as três fronteiras verticais
+                        (moldura, filete, pastilha) lerem como uma coluna só. */}
+                    {primeiraDestrutiva && i > 0 && (
+                      <div
+                        aria-hidden="true"
+                        className="mx-2.5 my-1 border-t border-[var(--bo-hairline)]"
+                      />
                     )}
-                  >
-                    {a.icone}
-                    {a.rotulo}
-                  </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={a.desativada}
+                      onClick={() => {
+                        // Devolver o foco ANTES da acção: se ela abrir um
+                        // diálogo, é este botão que a armadilha de foco memoriza
+                        // para devolver no fim (ver `useFocusTrap`).
+                        fecharEDevolverFoco();
+                        a.onAccao();
+                      }}
+                      className={cn(
+                        `alvo-toque flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
+                        "rounded-[var(--bo-material-raio-pastilha)]",
+                        /* ── A LINHA SOB O RATO É UMA PASTILHA CHEIA ────────
+                           Era uma lavagem de 6% de preto (e de 7% de vermelho).
+                           Sobre um material translúcido, seis por cento não
+                           chega a ser um estado: lê-se como sujidade do fundo.
+
+                           Preenchimento e texto invertido, que é o gesto das
+                           capturas. Medido: branco sobre `--bo-accent` dá
+                           6,55:1 e branco sobre o vermelho da casa 7,53:1 — as
+                           duas passam AA com folga.
+
+                           O `active:` repete a pastilha de propósito: o `hover:`
+                           do Tailwind vive dentro de `@media (hover: hover)` e
+                           no dedo não existe. Sem esta segunda metade, tocar
+                           num item do telemóvel não pintava nada e só ficava o
+                           afundar. */
+                        a.destrutiva
+                          ? "text-[#8a3d2f] hover:bg-[#8a3d2f] hover:text-white active:bg-[#8a3d2f] active:text-white"
+                          : "text-[var(--bo-tinta-72)] hover:bg-[var(--bo-accent)] hover:text-white active:bg-[var(--bo-accent)] active:text-white",
+                      )}
+                    >
+                      {/* A COLUNA DOS ÍCONES, COM LARGURA MESMO QUANDO ESTÁ
+                          VAZIA. Sem ela, um menu com três acções com ícone e
+                          duas sem ficava com os rótulos em duas colunas — que
+                          é o que se vê na captura e que aqui não acontecia por
+                          acaso, mas por não haver coluna nenhuma. */}
+                      {temIcones && (
+                        <span
+                          aria-hidden="true"
+                          className="flex w-[var(--bo-material-coluna)] shrink-0 items-center justify-center"
+                        >
+                          {a.icone}
+                        </span>
+                      )}
+                      {a.rotulo}
+                    </button>
+                  </Fragment>
                 );
               })}
             </div>

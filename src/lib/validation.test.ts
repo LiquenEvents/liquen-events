@@ -104,6 +104,52 @@ describe("quoteUpdateSchema — admin PATCH values", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A DURAÇÃO DE UM MOMENTO CHEGA MESMO À BASE DE DADOS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este esquema corre em `.strip()` — o modo por omissão do zod: uma chave que
+   * não esteja DECLARADA no `timelineItemSchema` é apagada em silêncio, sem
+   * erro e sem 400. Sem a linha `duracao` lá, o ecrã mandava a duração, o
+   * servidor respondia 200, e ela voltava no dia seguinte com o guião outra vez
+   * sem durações. É o pior defeito possível: parece que funcionou.
+   */
+  it("mantém a `duracao` de um momento do guião — e não a deita fora em silêncio", () => {
+    const r = quoteUpdateSchema.safeParse({
+      timeline: [{ id: "t1", time: "09:00", title: "Montagem", owner: "Rita", duracao: 180 }],
+    });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.timeline?.[0]).toEqual({
+      id: "t1",
+      time: "09:00",
+      title: "Montagem",
+      owner: "Rita",
+      duracao: 180,
+    });
+  });
+
+  it("um guião do modelo antigo — sem `duracao` — continua a passar como está", () => {
+    const antigo = [{ id: "t1", time: "09:00", title: "Montagem" }];
+    const r = quoteUpdateSchema.safeParse({ timeline: antigo });
+    expect(r.success).toBe(true);
+    // Nem uma chave `duracao` a nascer do nada: o guião que sobe é o que desceu.
+    expect(r.success && r.data.timeline).toEqual(antigo);
+  });
+
+  it("recusa uma duração impossível — minutos com casas decimais, negativa, ou maior que um dia", () => {
+    const com = (duracao: unknown) =>
+      quoteUpdateSchema.safeParse({
+        timeline: [{ id: "t1", time: "09:00", title: "Montagem", duracao }],
+      }).success;
+    expect(com(90)).toBe(true);
+    expect(com(0)).toBe(true);
+    expect(com(90.5)).toBe(false);
+    expect(com(-30)).toBe(false);
+    expect(com(24 * 60 + 1)).toBe(false);
+    expect(com("90")).toBe(false);
+  });
 });
 
 describe("quoteFormSchema", () => {

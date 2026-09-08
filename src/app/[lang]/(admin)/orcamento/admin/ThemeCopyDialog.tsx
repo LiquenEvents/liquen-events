@@ -331,7 +331,7 @@ export default function ThemeCopyDialog({
                     O `PROGRESSO` é o mesmo tempo pretendido (o degrau `elemento`),
                     só que agora escrito num literal que o Tailwind compila mesmo. */}
                 <div
-                  className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+                  className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
                   style={{ transform: `scaleX(${pct / 100})` }}
                 />
               </div>
@@ -406,8 +406,8 @@ export default function ThemeCopyDialog({
                 onClick={() => setDestId(t.id)}
                 className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${ESTADO} ${PRESSAO} disabled:opacity-50 ${
                   on
-                    ? "border-[#4d6350] bg-[#4d6350]/[0.07]"
-                    : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/40"
+                    ? "border-sage-600 bg-sage-600/[0.07]"
+                    : "border-[var(--bo-hairline-strong)] hover:border-sage-600/40"
                 }`}
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--bo-tinta-6)]">

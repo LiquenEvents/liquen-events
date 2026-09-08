@@ -1684,10 +1684,37 @@ export default function Temas() {
                          `opacity-100` em toda a parte. Os outros escondem-se só
                          onde há rato, que é onde o `group-hover` os pode trazer
                          de volta. */
-                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm ${ESTADO} ${PRESSAO} ${
+                      /* ── O CHIP QUE POUSA NA FOTOGRAFIA ────────────────
+                         Era `bg-white/85` com `backdrop-blur-sm` e tinta a
+                         `text-foreground/45`. Três coisas erradas de uma vez,
+                         e as três medidas:
+
+                         · a TINTA. 3,11:1 sobre uma fotografia branca e 2,91:1
+                           sobre uma preta — o segundo chumba até os 3:1 que o
+                           1.4.11 pede a um ícone, e a estrela é o que diz se um
+                           tema está fixado;
+                         · o DESFOQUE. Um por chip, ou seja um por acção e por
+                           cartão: doze numa vista de quatro temas, noventa numa
+                           biblioteca de trinta. A própria investigação que
+                           trouxe o vidro fixa um tecto de cinco superfícies
+                           filtradas por ecrã;
+                         · o FUNDO. Branco a 85% em cima de uma fotografia
+                           clara é invisível — o chip desaparece na foto.
+
+                         Passa à variante CLARA da casa (`.bo-vidro-claro`):
+                         véu de 50% mais vidro a 10%, sem filtro, com o glifo a
+                         branco. Medido: 3,35:1 sobre a pior fotografia. A conta
+                         inteira está no `globals.css`.
+
+                         E o FIXADO deixa de ser uma cor de aviso a mais
+                         (`#8a6d2f`, que nesta casa quer dizer «atenção») e
+                         passa a ser a pastilha cheia de acento — o mesmo gesto
+                         com que os menus, a coluna e a barra de baixo dizem
+                         «esta». Branco sobre `--bo-accent`: 6,55:1. */
+                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-full text-white opacity-100 ${ESTADO} ${PRESSAO} ${
                         fixar && t.favorito
-                          ? "text-[#8a6d2f]"
-                          : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
+                          ? "bg-[var(--bo-accent)]"
+                          : "bo-vidro-claro com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
                       }`}
                     >
                       {a.icone}
@@ -1722,7 +1749,7 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left hover:border-[#4d6350]/40 ${ESTADO} ${PRESSAO}`}
+                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-white text-left hover:border-sage-600/40 ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -3579,7 +3606,7 @@ function ThemeFolder({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className={`alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque font-display text-xl text-[var(--bo-text)] hover:text-sage-600 ${ESTADO} ${PRESSAO}`}
               title="Renomear tema"
             >
               {theme.name}
@@ -3654,7 +3681,7 @@ function ThemeFolder({
                 corria, na prática, nos 150 ms de omissão. O `PROGRESSO` escreve
                 os mesmos 250 ms num utilitário que compila mesmo. */}
             <div
-              className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+              className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
               style={{ transform: `scaleX(${pct / 100})` }}
             />
           </div>
@@ -3691,7 +3718,7 @@ function ThemeFolder({
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bo-tinta-10)]"
               >
                 <div
-                  className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+                  className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
                   style={{ transform: `scaleX(${thumbPct / 100})` }}
                 />
               </div>
@@ -3866,7 +3893,7 @@ function ThemeFolder({
       {(selectedCount > 0 || emBloco) && (
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 backdrop-blur">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-sage-600/25 bg-white/95 px-4 py-3 backdrop-blur">
               <p className="text-sm text-[var(--bo-text)]">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
@@ -3991,7 +4018,7 @@ function ThemeFolder({
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
         // `GRELHA_DE_FOTOS`.
         className={`@container rounded-2xl border border-dashed p-4 ${ESTADO} ${
-          drag ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]" : "border-[var(--bo-hairline-strong)]"
+          drag ? "border-sage-600/60 bg-sage-600/[0.06]" : "border-[var(--bo-hairline-strong)]"
         }`}
       >
         {loading ? (
@@ -4091,11 +4118,11 @@ function ThemeFolder({
                     // isso a barra de deslocamento não mexe. Ver globals.css.
                     className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
                       isSelected
-                        ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
+                        ? "border-sage-600 ring-2 ring-sage-600/40"
                         : "border-[var(--bo-hairline-strong)]"
                     } ${dragFrom === i ? "opacity-40" : ""} ${
                       dragOver === i && dragFrom !== null && dragFrom !== i
-                        ? "ring-2 ring-[#4d6350]"
+                        ? "ring-2 ring-sage-600"
                         : ""
                     }`}
                   >
@@ -4139,7 +4166,7 @@ function ThemeFolder({
                         aria-hidden
                         className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] leading-none ${ESTADO} ${
                           isSelected
-                            ? "border-[#4d6350] bg-[#4d6350] text-white opacity-100"
+                            ? "border-sage-600 bg-sage-600 text-white opacity-100"
                             : "border-white/70 bg-black/35 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
                         }`}
                       >

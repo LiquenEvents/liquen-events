@@ -45,7 +45,7 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
 const MARCA: Record<Severidade, { simbolo: string; cor: string }> = {
   erro: { simbolo: "✕", cor: "text-[#8a2a22]" },
   aviso: { simbolo: "!", cor: "text-[#8a6420]" },
-  ok: { simbolo: "✓", cor: "text-[#4d6350]" },
+  ok: { simbolo: "✓", cor: "text-sage-600" },
 };
 
 interface Props {
@@ -84,7 +84,7 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto, idiom
           ? "border-[#8a2a22]/45 bg-[#8a2a22]/[0.06]"
           : reparos
             ? "border-[#c08a3e]/40 bg-[#c08a3e]/[0.05]"
-            : "border-[#4d6350]/25 bg-[#4d6350]/[0.04]"
+            : "border-sage-600/25 bg-sage-600/[0.04]"
       }`}
     >
       <h3

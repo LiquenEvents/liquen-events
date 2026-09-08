@@ -7,14 +7,14 @@ import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { Button, Field, EmptyState } from "./ui";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },
   confirmado: { label: "Confirmado", color: "#7c854b" },
-  pago: { label: "Pago", color: "#4d6350" },
+  pago: { label: "Pago", color: "#4c6752" },
 };
 
 /**
@@ -440,7 +440,7 @@ export default function EventCosts({ quote, onChange }: Props) {
           <p className={NOTA}>c/ IVA {eur2(totals.actual)}</p>
         </div>
         <div className={QUADRADO}>
-          <p className={`${VALOR} ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}>
+          <p className={`${VALOR} ${totals.margin >= 0 ? "text-sage-600" : "text-[#8a2a22]"}`}>
             {eur2(totals.margin)}
           </p>
           <p className={ROTULO}>Margem{totals.revenueNet > 0 ? ` · ${totals.marginPct}%` : ""}</p>
@@ -486,7 +486,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                     className="rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em]"
                     style={{
                       background: `${metaFor(STATUS_META, it.status).color}18`,
-                      color: metaFor(STATUS_META, it.status).color,
+                      color: corDeTexto(metaFor(STATUS_META, it.status).color),
                     }}
                   >
                     {metaFor(STATUS_META, it.status).label}

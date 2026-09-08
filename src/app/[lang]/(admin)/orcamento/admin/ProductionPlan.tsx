@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
-import { metaFor } from "./status-meta";
+import { corDeTexto, metaFor } from "./status-meta";
 import { Escolha, Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -39,7 +39,7 @@ interface Colisao {
 const STATUS_LABEL: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },
   confirmado: { label: "Confirmado", color: "#7c854b" },
-  pago: { label: "Pago", color: "#4d6350" },
+  pago: { label: "Pago", color: "#4c6752" },
 };
 
 // Separador + transform partilhados com o seed do servidor (production-templates),
@@ -387,7 +387,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                       Os 500 não vinham de nota nenhuma, e esta barra é irmã
                       da do `EventChecklist`: tinham de andar ao mesmo tempo. */}
                   <div
-                    className={`h-full w-full origin-left bg-[#4d6350] rounded-full ${PROGRESSO}`}
+                    className={`h-full w-full origin-left bg-sage-600 rounded-full ${PROGRESSO}`}
                     style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
                   />
                 </div>
@@ -404,10 +404,10 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         role="checkbox"
                         aria-checked={i.done}
                         aria-label={i.label}
-                        className={`alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/55 ${ESTADO} ${PRESSAO}`}
                       >
                         <span
-                          className={`w-4 h-4 rounded border flex items-center justify-center ${ESTADO} ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
+                          className={`w-4 h-4 rounded border flex items-center justify-center ${ESTADO} ${i.done ? "bg-sage-600 border-sage-600" : "border-foreground/25 hover:border-sage-600/60"}`}
                         >
                           {i.done && (
                             <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
@@ -527,7 +527,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                     className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
                     style={{
                       background: `${estado.color}1f`,
-                      color: estado.color,
+                      color: corDeTexto(estado.color),
                     }}
                   >
                     {estado.label}

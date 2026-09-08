@@ -301,7 +301,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
   const chip = (activo: boolean) =>
     `alvo-toque rounded-full px-3 py-1.5 text-xs ${
       activo
-        ? "bg-[#4d6350] text-white"
+        ? "bg-sage-600 text-white"
         : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-10)]"
     }`;
 
@@ -470,7 +470,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                 aria-label={`Foto ${f.path.split("/").pop()}`}
                 onClick={(ev) => tocar(f.path, ev.shiftKey)}
                 className={`relative aspect-square overflow-hidden rounded-lg border-2  ${
-                  escolhida ? "border-[#4d6350]" : "border-transparent hover:border-foreground/20"
+                  escolhida ? "border-sage-600" : "border-transparent hover:border-foreground/20"
                 } ${ESTADO} ${PRESSAO}`}
               >
                 {/* A miniatura, com o ORIGINAL como plano B. Assinar um caminho
@@ -485,7 +485,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                   className="h-full w-full object-cover"
                 />
                 {escolhida && (
-                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-[11px] text-white">
+                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-[11px] text-white">
                     ✓
                   </span>
                 )}
@@ -525,7 +525,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
           estúdio já usa, escrito no mesmo token; era só propagá-lo. `lg:bottom-0`
           porque acima de 1024 a navegação é lateral e não há nada por baixo. */}
       {seleccionadas.size > 0 && (
-        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[var(--bo-sombra-suspensa)] lg:bottom-0">
+        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[var(--bo-sombra-suspensa)]">
           <div className="flex flex-wrap items-center gap-3">
             {/* `role="status"` porque o número muda com o teclado e com o
                 Shift+clique, e quem não vê o ecrã tem de ouvir quantas leva —

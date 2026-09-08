@@ -120,7 +120,7 @@ describe("o cabeçalho do dossier encolhe assim que ela começa a descer", () =>
     expect(titulo().textContent).toBe("Ana e Rui");
     // A barra de ferramentas do cabeçalho: partilhar, imprimir, calendário.
     expect(screen.getByTitle(/Copiar o link privado do portal/)).toBeTruthy();
-    expect(screen.getByTitle(/Imprimir dossier completo/)).toBeTruthy();
+    expect(screen.getByTitle(/Imprimir o dossier completo/)).toBeTruthy();
     expect(screen.getByTitle(/Descarregar .ics/)).toBeTruthy();
   });
 

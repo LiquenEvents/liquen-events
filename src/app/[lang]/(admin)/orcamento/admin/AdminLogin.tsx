@@ -633,7 +633,7 @@ export default function AdminLogin() {
                 name="manterSessao"
                 checked={manterSessao}
                 onChange={(e) => setManterSessao(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
               />
               <span className="text-xs leading-relaxed text-[var(--bo-text-muted)]">
                 Manter a sessão iniciada 30 dias neste aparelho.
@@ -776,7 +776,7 @@ export default function AdminLogin() {
                   no sublinhado. Passa a 232×44. */}
               <summary
                 onClick={gaveta.aoTocarNoResumo}
-                className={`alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
+                className={`alvo-toque cursor-pointer list-none text-xs font-medium text-[var(--bo-text-muted)] underline decoration-foreground/25 underline-offset-4 ${ESTADO} ${PRESSAO} hover:text-[var(--bo-text)] hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/45 focus-visible:ring-offset-2 focus-visible:rounded-sm`}
               >
                 Mudaste de telemóvel ou de computador?
               </summary>

@@ -44,10 +44,39 @@ function semComentarios(fonte: string): string {
 }
 
 describe("o chão do painel", () => {
-  it("é branco, e tem um nome só", () => {
-    expect(semComentarios(CSS), "`--bo-chao` desapareceu ou deixou de ser branco").toMatch(
-      /--bo-chao:\s*#(?:fff|ffffff)\b/i,
-    );
+  /**
+   * ── O CHÃO DEIXOU DE SER BRANCO, E FOI ELA QUE O DECIDIU ────────────────
+   *
+   * Era branco a pedido dela. Deixou de ser quando esse pedido colidiu com
+   * outro: o back office no material da Apple. Vidro só existe se houver o que
+   * atravessar, e por trás da coluna da esquerda só está o chão — sobre branco
+   * liso, uma superfície translúcida vê-se exactamente como branco.
+   *
+   * Posta a escolha com as duas metades, ela respondeu «tinta o chão, quero o
+   * vidro». O valor é o `--bg-base` do sistema de design que aprovou.
+   *
+   * E melhorou uma coisa que estava mal e ninguém tinha medido: o cartão branco
+   * não se distinguia do chão de todo — 1,000 de contraste, que é a definição
+   * de invisível. Quem separava as coisas era só o fio. Agora há fio e degrau
+   * (1,065).
+   *
+   * ── A COINCIDÊNCIA QUE FICA VIGIADA ────────────────────────────────────
+   *
+   * O chão novo (`#f7f8f7`) fica a UM DÍGITO do cinzento do encaixe
+   * (`#f7f7f8`). São ideias diferentes com valores quase iguais — a mesma
+   * forma de bifurcação que custou um defeito nesta casa quando dois verdes
+   * ficaram a um dígito um do outro.
+   *
+   * Aqui não é acidente e não é problema: um encaixe dentro de um cartão
+   * branco passa a ler-se como um buraco até ao chão, que é o que um encaixe
+   * é. Mas os dois tokens continuam a ser DOIS, e o teste seguinte continua a
+   * exigir que ninguém os funda «porque são iguais».
+   */
+  it("é o chão do sistema de design, e continua a ter um nome só", () => {
+    expect(
+      semComentarios(CSS),
+      "`--bo-chao` desapareceu ou deixou de ser o `--bg-base` do sistema",
+    ).toMatch(/--bo-chao:\s*#f7f8f7\b/i);
   });
 
   it("o cinzento do encaixe continua a ser cinzento", () => {

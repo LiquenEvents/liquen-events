@@ -584,7 +584,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={pilhaRef}
         data-acima-dos-modais=""
-        className="fixed bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-accao,0px)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-[calc(var(--bo-barra-accao,0px)+1.5rem)]"
+        className="fixed bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-accao,0px)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none"
       >
         {/* `relative` porque o aviso que sai passa a `absolute` DENTRO da sua
             região, no sítio exacto onde estava (ver o FLIP acima). Sem isto o
@@ -640,6 +640,28 @@ function ToastItem({
     return () => cancelAnimationFrame(id);
   }, []);
 
+  /**
+   * ── UM ERRO NÃO SE DISPENSA SOZINHO ────────────────────────────────────────
+   *
+   * O relógio dos 4 s era armado para TODOS os avisos, incluindo os de erro.
+   * Isso quer dizer que a única notícia de que uma gravação, um envio ou um
+   * carregamento falhou aparecia e ia-se embora ao fim de quatro segundos —
+   * sem gesto nenhum de quem estava a trabalhar, e sem sítio nenhum onde a
+   * voltar a ler. Quem estivesse a olhar para outro separador do ecrã, a
+   * escrever num campo, ou simplesmente a ler mais devagar do que quatro
+   * segundos, perdia-a por completo e ficava a achar que tinha corrido bem.
+   *
+   * A norma diz o mesmo (WCAG 2.2.1): conteúdo que desaparece por si tem de
+   * poder ser dispensado por quem o lê. Um sucesso pode ir-se — a página por
+   * baixo já mostra o resultado —, um erro não: só sai pelo «Fechar».
+   *
+   * A pausa por `hover`/`focus` continua a existir para os avisos que ainda
+   * contam o tempo; para um erro não há tempo nenhum a contar, e por isso o
+   * `resume()` também tem de o respeitar — senão bastava um `mouseleave` para
+   * o erro voltar a armar o relógio que este bloco lhe tirou.
+   */
+  const seDispensaSozinho = toast.kind !== "error";
+
   // Auto-dismiss after TOAST_DURATION, but pause the countdown while the toast is
   // hovered or focused (and resume from where it left off on leave/blur) so a
   // reader is never rushed off a message they're still engaging with.
@@ -662,6 +684,7 @@ function ToastItem({
   };
   const resume = () => {
     clear();
+    if (!seDispensaSozinho) return;
     startedRef.current = Date.now();
     timerRef.current = setTimeout(() => onCloseRef.current(), remainingRef.current);
   };
@@ -672,11 +695,15 @@ function ToastItem({
   };
 
   useEffect(() => {
+    if (!seDispensaSozinho) return;
     startedRef.current = Date.now();
     timerRef.current = setTimeout(() => onCloseRef.current(), remainingRef.current);
     return clear;
-    // Run once on mount; onClose is read via ref so it needn't be a dep.
-  }, []);
+    // Corre uma vez por aviso; o `onClose` é lido por `ref`, logo não é
+    // dependência. O `seDispensaSozinho` é constante para um dado aviso (o
+    // `kind` nunca muda depois de criado), portanto declará-lo não faz o
+    // relógio rearmar-se — só satisfaz a regra das dependências.
+  }, [seDispensaSozinho]);
 
   // Já a sair: o relógio não tem mais nada a fazer, e um aviso fora de fluxo
   // não deve poder recomeçar a contagem por um `mouseleave` de despedida.

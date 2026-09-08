@@ -232,7 +232,7 @@ function EntradaDoIndice({
         title={oQueFalta ? `Página ${pos + 1}: ${oQueFalta}` : undefined}
         className={`alvo-toque flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] leading-tight  ${
           activo
-            ? "border-[#4d6350]/55 bg-[#4d6350]/[0.07] text-[var(--bo-text)]"
+            ? "border-sage-600/55 bg-sage-600/[0.07] text-[var(--bo-text)]"
             : vazio
               ? "border-dashed border-foreground/20 text-foreground/45"
               : "border-[var(--bo-hairline-strong)] text-[var(--bo-tinta-72)] hover:border-foreground/25"

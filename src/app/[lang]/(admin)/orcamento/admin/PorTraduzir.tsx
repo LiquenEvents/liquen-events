@@ -64,7 +64,7 @@ export default function PorTraduzir({
           <button
             type="button"
             onClick={onFicarTodosEmPortugues}
-            className={`alvo-toque text-[11px] font-medium text-[#4d6350] hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[#415440] ${ESTADO} ${PRESSAO}`}
           >
             Ficar em português nos {faltam.length}
           </button>
@@ -100,7 +100,7 @@ export default function PorTraduzir({
             <button
               type="button"
               onClick={() => onIr(c)}
-              className={`alvo-toque text-[11px] font-medium text-[#4d6350] underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
+              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[#415440] hover:underline ${ESTADO} ${PRESSAO}`}
             >
               Traduzir
             </button>

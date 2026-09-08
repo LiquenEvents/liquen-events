@@ -132,9 +132,9 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
               <span
                 className={`flex items-center justify-center w-4 h-4 rounded-full border ${ESTADO} text-white ${
                   state === "atual"
-                    ? "bg-[#4d6350] border-[#4d6350] ring-4 ring-[#4d6350]/15"
+                    ? "bg-sage-600 border-sage-600 ring-4 ring-sage-600/15"
                     : state === "feito"
-                      ? "bg-[#4d6350] border-[#4d6350]"
+                      ? "bg-sage-600 border-sage-600"
                       : "bg-transparent border-foreground/25"
                 }`}
               >
@@ -162,7 +162,7 @@ export default function LifecycleStepper({ quote }: { quote: Quote }) {
               <span
                 aria-hidden
                 className={`w-6 sm:w-10 h-px mt-[-14px] ${
-                  i < currentIndex ? "bg-[#4d6350]/50" : "bg-foreground/15"
+                  i < currentIndex ? "bg-sage-600/50" : "bg-foreground/15"
                 }`}
               />
             )}

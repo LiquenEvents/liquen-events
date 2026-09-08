@@ -4,6 +4,8 @@ import { render, screen, within, cleanup, fireEvent, waitFor } from "@testing-li
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
+import { escolher } from "./ui/escolher.testkit";
+import userEvent from "@testing-library/user-event";
 
 /**
  * Behavioural safety net for the back-office shell.
@@ -498,16 +500,20 @@ describe("AdminClient shell", () => {
       expect(screen.getByText(/Palmela · ≈ \d+ km/)).toBeInTheDocument();
     });
 
-    it("o filtro da espera esconde quem ainda não esperou o suficiente", () => {
+    it("o filtro da espera esconde quem ainda não esperou o suficiente", async () => {
       renderAdmin([
         makeQuote({ name: "Ontem", submittedAt: hAtras(1) }),
         makeQuote({ name: "Ha Muito", submittedAt: hAtras(9) }),
       ]);
       navTo(/Pedidos/);
 
-      fireEvent.change(screen.getByLabelText("Filtrar por tempo de espera"), {
-        target: { value: "7" },
-      });
+      // A `Escolha` já não é um `<select>` depois de montar: ver
+      // `ui/escolher.testkit`. O `fireEvent.change` num botão não faz nada.
+      await escolher(
+        userEvent.setup(),
+        screen.getByLabelText("Filtrar por tempo de espera"),
+        /7\+/,
+      );
       expect(screen.getByText("Ha Muito")).toBeInTheDocument();
       expect(screen.queryByText("Ontem")).not.toBeInTheDocument();
     });

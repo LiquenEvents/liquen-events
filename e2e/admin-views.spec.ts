@@ -111,17 +111,61 @@ test.describe("Back office — a marca do destino activo", () => {
       "Admin login unavailable here (production build without ADMIN_PASSWORD_HASH); CI sets a test hash.",
     );
 
-    const coluna = page.getByRole("navigation", { name: /Navegação do back office/i });
-    const filete = coluna.locator('> span[aria-hidden="true"]');
+    /**
+     * ── E ISTO MUDOU-SE PARA O TELEMÓVEL, PORQUE O FILETE MUDOU-SE ────────
+     *
+     * O filete vive na LISTA DE DESTINOS, e essa lista deixou de estar no
+     * computador: «a barra substitui o menu» — os onze destinos passaram para a
+     * cápsula que flutua em baixo, e a coluna passou a uma gaveta cuja lista é
+     * `lg:hidden`. Medi-lo a 1280 passou a medir uma coisa invisível.
+     *
+     * O que NÃO se faz é apagar o teste: o filete continua a existir e a
+     * deslizar, no telemóvel, onde a gaveta continua a levar os destinos que
+     * não cabem nos quatro da barra. Muda-se o sítio onde se mede, não o que
+     * se garante. A marca do destino activo NA BARRA — a pastilha que se
+     * levanta — é outra coisa e está presa no `a-barra-e-o-menu.test.tsx`.
+     *
+     * Os destinos escolhidos são dois dos que vivem mesmo na gaveta: os quatro
+     * do dia estão na barra e nunca aparecem aqui dentro.
+     */
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: "domcontentloaded" });
 
-    await expect(filete, "a barra lateral perdeu a marca do destino activo").toHaveCount(1);
-    const antes = await filete.evaluate((el) => el.getBoundingClientRect().top);
+    const abrir = page.getByRole("button", { name: /^Mais destinos$/ });
+    await abrir.click();
 
-    await coluna
-      .getByRole("button", { name: /^Pedidos/ })
+    const lista = page.getByRole("navigation", { name: /^Mais destinos$/ });
+    await expect(lista).toBeVisible();
+    const filete = lista.locator('> span[aria-hidden="true"]');
+
+    /**
+     * PRIMEIRO ir a um destino DESTA lista, e só depois procurar o filete.
+     *
+     * Medido: com a Visão Geral activa, a lista não tem filete nenhum — e está
+     * certo. O filete pergunta ao destino activo onde ele está, e a Visão Geral
+     * é um dos quatro da barra, que aqui dentro nascem `hidden`. Um elemento
+     * escondido não tem posição, e marcar um sítio que não existe seria pior do
+     * que não marcar nada.
+     */
+    await lista
+      .getByRole("button", { name: /^Material$/ })
       .first()
       .click();
-    await expect(page.getByRole("heading", { level: 1, name: /^Pedidos$/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Material$/ })).toBeVisible();
+
+    await abrir.click();
+    await expect(lista).toBeVisible();
+    await expect(filete, "a lista de destinos perdeu a marca do destino activo").toHaveCount(1);
+    const antes = await filete.evaluate((el) => el.getBoundingClientRect().top);
+
+    await lista
+      .getByRole("button", { name: /^Temas$/ })
+      .first()
+      .click();
+    await expect(page.getByRole("heading", { level: 1, name: /^Temas$/ })).toBeVisible();
+
+    await abrir.click();
+    await expect(lista).toBeVisible();
 
     // Mudou de sítio…
     await expect
@@ -138,7 +182,7 @@ test.describe("Back office — a marca do destino activo", () => {
     // e a primeira versão deste passo media-o A MEIO — dava 4,17 px de
     // diferença e lia-se como desalinhamento quando era, afinal, a animação a
     // funcionar. O que interessa é onde ele PÁRA.
-    const activo = coluna.locator('[aria-current="page"]');
+    const activo = lista.locator('[aria-current="page"]');
     await expect
       .poll(
         async () => {

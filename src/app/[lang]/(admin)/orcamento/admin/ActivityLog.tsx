@@ -9,7 +9,7 @@ import { Button, Field } from "./ui";
 const KIND_META: Record<ActivityKind, { label: string; color: string; d: string }> = {
   created: {
     label: "Pedido recebido",
-    color: "#4d6350",
+    color: "#4c6752",
     d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 3h6v4H9z",
   },
   status_change: {
@@ -19,7 +19,7 @@ const KIND_META: Record<ActivityKind, { label: string; color: string; d: string 
   },
   price_set: {
     label: "Preço definido",
-    color: "#4d6350",
+    color: "#4c6752",
     d: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
   },
   note_added: {
@@ -29,7 +29,7 @@ const KIND_META: Record<ActivityKind, { label: string; color: string; d: string 
   },
   message_sent: {
     label: "Mensagem enviada",
-    color: "#4d6350",
+    color: "#4c6752",
     d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   },
   proposal_sent: {
@@ -49,7 +49,7 @@ const KIND_META: Record<ActivityKind, { label: string; color: string; d: string 
   },
   payment_added: {
     label: "Pagamento",
-    color: "#4d6350",
+    color: "#4c6752",
     d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10",
   },
   supplier_added: {
@@ -69,7 +69,7 @@ const KIND_META: Record<ActivityKind, { label: string; color: string; d: string 
   },
   assigned: {
     label: "Atribuído",
-    color: "#4d6350",
+    color: "#4c6752",
     d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   },
 };

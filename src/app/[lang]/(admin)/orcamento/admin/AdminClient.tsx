@@ -11,6 +11,7 @@ import {
   useCallback,
   useDeferredValue,
   memo,
+  Fragment,
   type ReactNode,
 } from "react";
 import Image from "next/image";
@@ -92,6 +93,7 @@ import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, vistaValida, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
+import { Escolha } from "./ui/Escolha";
 import {
   Button,
   EmCurso,
@@ -110,6 +112,18 @@ import {
    global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
    três sítios muito concretos, e nenhum deles é este ficheiro. */
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+
+/**
+ * A pele dos seis filtros da lista de pedidos, escrita UMA vez.
+ *
+ * Era a mesma cadeia copiada seis vezes, e seis cópias de uma pele são seis
+ * sítios onde ela se afasta — foi exactamente isso que aconteceu com as
+ * alturas da barra de baixo. A `Escolha` leva `variante="nua"` porque a caixa
+ * é esta, e não a do formulário.
+ */
+const FILTRO_CLASSES =
+  "bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 " +
+  "text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 /* A outra metade do vocabulário: a `.bo-saida` é a palavra em CSS, e este hook
    é a parte que o CSS não pode fazer sozinho — segurar o nó montado os 200 ms
@@ -433,8 +447,6 @@ export const VIEW_COOKIE = "liquen-admin-view";
  * e um endereço que se lê ao telefone vale mais do que um que se explica.
  */
 export const PARAM_VISTA = "v";
-/** A barra lateral recolhida no computador — por aparelho, como o resto. */
-const CHAVE_MENU_RECOLHIDO = "liquen-admin-menu-recolhido";
 
 interface Props {
   /**
@@ -582,7 +594,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
             type="checkbox"
             checked={ctx.selectedIds.has(q.id)}
             onChange={() => ctx.toggleSelect(q.id)}
-            className="h-4 w-4 cursor-pointer accent-[#4d6350]"
+            className="h-4 w-4 cursor-pointer accent-sage-600"
             aria-label={`Selecionar pedido de ${q.name}`}
           />
         </label>
@@ -600,7 +612,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         <span className="block" data-lote-novo={ctx.ehDoLoteNovo?.(q) ? "" : undefined}>
           <span
             className={`block truncate ${
-              ctx.atual === q.id ? "font-semibold text-[#4d6350]" : "text-[var(--bo-text)]"
+              ctx.atual === q.id ? "font-semibold text-sage-600" : "text-[var(--bo-text)]"
             }`}
           >
             {q.name}
@@ -791,9 +803,9 @@ const QuoteCard = memo(function QuoteCard({
       data-lote-novo={doLoteNovo ? "" : undefined}
       className={`relative rounded-xl border ${ESTADO} ${
         isCurrent
-          ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
+          ? "border-sage-600/45 bg-sage-600/[0.05] "
           : isSelected
-            ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+            ? "border-sage-600/30 bg-sage-600/[0.03]"
             : "border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] bg-white "
       }`}
     >
@@ -809,7 +821,7 @@ const QuoteCard = memo(function QuoteCard({
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggle(q.id)}
-          className="w-4 h-4 accent-[#4d6350] cursor-pointer"
+          className="w-4 h-4 accent-sage-600 cursor-pointer"
           aria-label={`Selecionar pedido de ${q.name}`}
         />
       </label>
@@ -843,7 +855,7 @@ const QuoteCard = memo(function QuoteCard({
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <p className="text-[13px] bo-text-muted truncate">{q.email}</p>
               {q.assignedTo && (
-                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
+                <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-sage-600/10 text-sage-600 font-medium whitespace-nowrap">
                   {q.assignedTo}
                 </span>
               )}
@@ -888,7 +900,7 @@ const QuoteCard = memo(function QuoteCard({
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] tracking-[0.1em] uppercase font-semibold ${
                     q.followUpAt < todayStr
                       ? "bg-[#8a2a22]/15 text-[#8a2a22]"
-                      : "bg-[#637a5f]/15 text-[#4d6350]"
+                      : "bg-[#637a5f]/15 text-sage-600"
                   }`}
                   title={q.followUpAt < todayStr ? "Seguimento em atraso" : "Seguimento hoje"}
                 >
@@ -984,7 +996,7 @@ const QuoteCard = memo(function QuoteCard({
         {ctx.destination && (
           <div className="mt-2.5">
             <span
-              className="inline-flex items-center rounded-full bg-[#4d6350]/10 px-2 py-0.5 text-[9px] font-medium tracking-wide text-[#4d6350]"
+              className="inline-flex items-center rounded-full bg-sage-600/10 px-2 py-0.5 text-[9px] font-medium tracking-wide text-sage-600"
               title="Sem data e sem local concreto — normalmente organiza-se à distância"
             >
               Provável casamento à distância
@@ -996,7 +1008,7 @@ const QuoteCard = memo(function QuoteCard({
             {q.tags.slice(0, 4).map((t) => (
               <span
                 key={t}
-                className="px-2 py-0.5 rounded-full bg-[#4d6350]/10 text-[#4d6350] text-[9px] font-medium tracking-wide"
+                className="px-2 py-0.5 rounded-full bg-sage-600/10 text-sage-600 text-[9px] font-medium tracking-wide"
               >
                 {t}
               </span>
@@ -1024,7 +1036,7 @@ const QuoteCard = memo(function QuoteCard({
         <div className="flex items-center justify-end mt-3 pt-3 border-t border-[var(--bo-hairline)]">
           <div className="flex items-center gap-3">
             {q.quotedPrice ? (
-              <span className="text-[#4d6350] text-[13px] font-semibold">
+              <span className="text-sage-600 text-[13px] font-semibold">
                 {formatPrice(q.quotedPrice)}
               </span>
             ) : q.priceBreakdown?.total ? (
@@ -1361,11 +1373,6 @@ export default function AdminClient({
    * dois comportamentos — juntá-los fazia fechar a gaveta no telemóvel
    * esconder a barra no computador da próxima vez que lá voltasse.
    */
-  const [menuRecolhido, setMenuRecolhido] = useState(false);
-  /** Já se recolheu sozinho nesta visita ao estúdio? Sem isto, voltar a abrir a
-   *  barra à mão e continuar a trabalhar fazia-a fechar-se outra vez a cada
-   *  render — ela abria e o ecrã fechava-lhe. */
-  const recolhidoPeloEstudio = useRef(false);
   /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
   const desceu = useDesceu();
   /** Pedido escolhido na vista "Fazer proposta".
@@ -2412,39 +2419,25 @@ export default function AdminClient({
    * era custava mais do que valia.
    */
 
-  /** A escolha dela sobrevive ao recarregar — é por aparelho, como o resto. */
-  useEffect(() => {
-    try {
-      const cru = localStorage.getItem(CHAVE_MENU_RECOLHIDO);
-      if (cru != null) setMenuRecolhido(cru === "1");
-    } catch {
-      /* sem `localStorage` abre como sempre abriu */
-    }
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(CHAVE_MENU_RECOLHIDO, menuRecolhido ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [menuRecolhido]);
-
   /**
-   * ENTRAR EM «FAZER PROPOSTA» RECOLHE A BARRA. Uma vez, e não a cada render:
-   * o `recolhidoPeloEstudio` é o que faz a abertura à mão sobreviver — sem ele,
-   * carregar na cruz para a trazer de volta era ver o ecrã fechá-la outra vez.
-   * Sair do estúdio arma-o de novo, e a barra NÃO é reaberta: o que ela escolheu
-   * enquanto lá estava é a escolha dela.
+   * ── O MENU RECOLHIDO SAIU DAQUI, E O PEDIDO DELE FICOU CUMPRIDO ─────────
+   *
+   * Havia um estado (`menuRecolhido`), duas gravações por aparelho, um efeito
+   * que o ligava ao entrar em «Fazer proposta» e duas cruzes para o ligar e
+   * desligar à mão. Existia por palavras dela: «quando carregamos em fazer
+   * proposta o menu oculte-se automaticamente», porque a coluna de 256 px
+   * comia o ecrã do estúdio — que já vive dentro de outras três.
+   *
+   * Deixou de fazer falta, e não por se ter desistido: a coluna ACABOU. «A
+   * barra substitui o menu» — os destinos passaram todos para a cápsula que
+   * flutua em baixo, e o estúdio tem agora a largura toda em TODAS as vistas,
+   * sempre, sem estado nenhum para guardar nem cruz nenhuma para carregar.
+   *
+   * Um estado que ninguém pode mudar é um estado que mente a quem o lê a
+   * seguir; por isso saiu inteiro, com a chave de `localStorage` e o teste que
+   * o guardava (`AdminClient.menu-recolhido.test.tsx`). O que ele prometia
+   * está guardado noutro sítio — `a-barra-e-o-menu.test.tsx`.
    */
-  useEffect(() => {
-    if (view !== "fazer-proposta") {
-      recolhidoPeloEstudio.current = false;
-      return;
-    }
-    if (recolhidoPeloEstudio.current) return;
-    recolhidoPeloEstudio.current = true;
-    setMenuRecolhido(true);
-  }, [view]);
 
   // Restore the Pedidos status filter + sort the team last used (per device).
   useEffect(() => {
@@ -4273,48 +4266,30 @@ export default function AdminClient({
             duas animações — a gaveta passava a aparecer e desaparecer de um
             fotograma para o outro. Isto corrige o arrasto e não mexe no que
             já estava bem. */}
-        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
+        {/* ── E A COLUNA DEIXOU DE SER UMA COLUNA ──────────────────────────
+            «A barra substitui o menu». No computador já não há coluna encostada
+            ao conteúdo: o que resta desta peça é uma GAVETA, igual em todas as
+            larguras, e o que ela guarda deixou de ser navegação — é o
+            logótipo, a conta, a ajuda e as quatro acções (Atalhos, Backup,
+            Repor, Sair). Os destinos vivem todos na barra de baixo.
+
+            Por isso caíram daqui os `lg:` que a faziam coluna (`lg:sticky`,
+            `lg:translate-x-0`, `lg:shadow-none`, a largura zero do recolher) e
+            o `lg:contents` do invólucro — sem ele, o invólucro volta a ser o
+            bloco contentor que impede a página de se arrastar para o lado, e
+            agora também no computador. */}
+        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)]">
           <aside
-            inert={navEhGaveta && !navOpen}
-            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-chao)] flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] lg:shadow-none motion-safe:transition-transform motion-safe:duration-300 ${
-              navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-            } ${
-              /* Recolhida, a coluna vale ZERO no computador e o conteúdo passa
-                 a ocupar a largura toda. `overflow-hidden` porque o que está lá
-                 dentro continua a medir 256 px — não se desmonta, para a
-                 abertura seguinte não ter de o montar outra vez. E `border-r-0`
-                 porque um risco de 1 px sem nada de um dos lados lê-se como uma
-                 coluna vazia. O `transform` desta transição não é o mesmo que o
-                 da gaveta: aqui anima-se a LARGURA, que é a única coisa que
-                 empurra o conteúdo. */
-              menuRecolhido ? "lg:w-0 lg:overflow-hidden lg:border-r-0" : ""
-            } motion-safe:lg:transition-[width] motion-safe:lg:duration-200`}
+            inert={!navOpen}
+            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] motion-safe:transition-transform motion-safe:duration-300 ${
+              navOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
           >
-            {/* A CRUZ DO COMPUTADOR — recolhe a coluna e devolve os 256 px ao
-                trabalho. É irmã da de baixo, não a mesma: aquela fecha a GAVETA
-                do telemóvel (um estado que se perde ao sair), esta recolhe uma
-                COLUNA (um estado que fica). Por isso são dois botões, cada um
-                visível exactamente onde o seu estado existe. */}
+            {/* A cruz que fecha a gaveta. Deixou de ser «do telemóvel»: a
+                coluna acabou e isto é uma gaveta nas duas larguras, portanto a
+                porta de saída tem de existir onde quer que ela a abra. */}
             <button
-              className={`hidden lg:flex absolute top-3 right-3 w-11 h-11 items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
-              onClick={() => setMenuRecolhido(true)}
-              aria-label="Recolher o menu"
-              title="Recolher o menu"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
-              </svg>
-            </button>
-            {/* Mobile close */}
-            <button
-              className={`lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+              className={`absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
               onClick={() => setNavOpen(false)}
               aria-label="Fechar menu"
             >
@@ -4375,8 +4350,17 @@ export default function AdminClient({
                 que mede o filete (ver a nota dele lá em cima). */}
             <nav
               ref={colunaDosDestinos}
-              aria-label="Navegação do back office"
-              className="relative flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
+              /* «Mais destinos», que é o nome do ⋯ que a abre — e é o que ela
+                 é: no telemóvel a barra leva quatro e o resto vive aqui. O
+                 nome «Navegação do back office» passou para a barra, que é
+                 quem faz agora esse trabalho nas duas larguras. */
+              aria-label="Mais destinos"
+              /* `lg:hidden`: no computador os destinos estão TODOS na barra de
+                 baixo, e o mesmo destino em dois sítios do mesmo ecrã é a
+                 confusão que a regra do `soNoComputador` já evitava do outro
+                 lado. Abaixo de `lg` a barra só leva quatro, e esta lista
+                 continua a ser onde os outros vivem. */
+              className="relative lg:hidden flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
             >
               {/* O filete que anda. `aria-hidden` porque não diz nada que o
                   `aria-current="page"` de cada destino não diga melhor — é
@@ -4385,7 +4369,7 @@ export default function AdminClient({
                   ── DUAS CORRECÇÕES, E AS DUAS SÃO DE PERTENÇA ──────────────
 
                   1. **A COR ERA UM HEX À MÃO, E ERA O TOKEN ERRADO POR UM
-                     DÍGITO.** Estava escrito `bg-[#4d6350]`; o acento da casa é
+                     DÍGITO.** Estava escrito `bg-sage-600`; o acento da casa é
                      `--bo-accent: #4c6350`. Um `d` por um `c` — perto o
                      suficiente para ninguém ver, longe o suficiente para o
                      filete deixar de acompanhar o acento no dia em que ele
@@ -4641,108 +4625,286 @@ export default function AdminClient({
         {/* Backdrop (mobile nav drawer) */}
         {navOpen && (
           <div
-            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-[2px]"
+            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px]"
             onClick={() => setNavOpen(false)}
           />
         )}
 
-        {/* ── Mobile bottom navigation ──
-            Hidden while a quote detail drawer is open: it's a focused, modal
-            surface, so the tab bar would only overlap its footer and distract. */}
+        {/* ══════════════════════════════════════════════════════════════════
+            A BARRA DE DESTINOS DO TELEMÓVEL — UMA CÁPSULA QUE FLUTUA
+            ══════════════════════════════════════════════════════════════════
+
+            Pedido dela, com uma captura de uma barra de navegação a flutuar no
+            fundo de um telemóvel: «quero deixar o back office com o mesmo
+            design da Apple de liquid glass».
+
+            O que se copia é a FORMA, e o que se copia dela é o que a web sabe
+            fazer: a barra deixa de estar encostada ao fundo e a toda a largura
+            e passa a ser uma CÁPSULA a flutuar, com folga por baixo e dos
+            lados, mais uma peça REDONDA à parte para o abridor da gaveta.
+
+            ── O QUE NÃO SE FINGE ────────────────────────────────────────────
+            O material da Apple refracta o que está por trás em tempo real e
+            responde ao movimento com brilhos. Em CSS há `backdrop-filter` com
+            desfoque e saturação, e mais nada. Portanto: camadas, cantos
+            concêntricos, a pastilha do activo e a cápsula a flutuar — sim; um
+            vidro pintado a gradientes a fingir refracção — não. É a mesma
+            recusa que o `globals.css` já escreveu a propósito da vibrância do
+            texto.
+
+            ── PORQUE É QUE O ABRIDOR SAIU DA CÁPSULA ────────────────────────
+            Porque não é um destino, e já estava escrito aqui que não é: «é a
+            porta para os que não cabem aqui». A captura tem a mesma divisão —
+            os destinos numa cápsula, a lupa numa peça redonda separada — e a
+            documentação que ela mandou diz o mesmo por palavras: agrupar por
+            AFINIDADE, «o que faz coisas parecidas fica junto». Quatro destinos
+            num sítio, a porta noutro.
+
+            Continua a ser UM abridor: o hambúrguer do cabeçalho só aparece
+            quando esta barra não está. Não voltam a ser dois.
+
+            ── OS 44 PX, CONTADOS A 390 ──────────────────────────────────────
+            É a restrição que manda, e conta-se antes de desenhar:
+
+                largura da janela ................... 390 px
+                folga lateral (--bo-barra-folga) × 2 . 24
+                peça redonda (= altura da cápsula) ... 62
+                folga entre as duas peças ............  8
+                ──────────────────────────────────────────
+                cápsula ............................. 296
+                fio da moldura (1 px) × 2 ............  2
+                folga do material (4 px) × 2 .........  8
+                ──────────────────────────────────────────
+                fila útil ........................... 286  ÷ 4 = 71,5 px
+
+            E a altura, pela mesma conta: 62 − 2 (fio) − 8 (folga) = 52. A
+            altura da cápsula está contada no `globals.css`, e vem do chão da
+            letra do telemóvel — 12 px, não 8.
+
+            73 × 52 por destino, e a peça redonda 62 × 62. Os três acima dos 44
+            do `.alvo-toque`, e MEDIDOS num browser — não deduzidos. A 320 px, o
+            telemóvel mais estreito que ainda se vê, a fila útil dá 216 ÷ 4 = 54
+            px, e continua a passar.
+
+            ── A ALTURA OCUPADA NÃO MUDOU, E ISSO FOI DE PROPÓSITO ───────────
+            56 (cápsula) + 12 (folga por baixo) = 68, e o `--bo-barra-inferior`
+            reserva 72. O aviso do `Toast`, a barra de acção do estúdio e o
+            fundo da lista da biblioteca leem esse token e continuam a pousar
+            onde pousavam. A conta e a desigualdade estão no `globals.css` e no
+            `barra-inferior.test.tsx`.
+
+            ── E O DEDO PASSA PELOS BURACOS ─────────────────────────────────
+            A `<nav>` continua a cobrir a faixa toda, mas deixou de a TAPAR:
+            `pointer-events-none` nela e `pointer-events-auto` nas duas peças.
+            O que está por baixo, ao lado da cápsula, volta a ser tocável — que
+            antes não era.
+
+            Continua escondida enquanto uma gaveta de detalhe está aberta: é
+            uma superfície modal, e a barra só lhe sobreporia o rodapé. */}
         <nav
-          // Duas navegações no mesmo ecrã precisam de dois nomes: sem isto,
-          // um leitor de ecrã anuncia "navegação" duas vezes e não há como
-          // saber qual é qual — nem para quem ouve, nem para um teste.
-          aria-label="Destinos principais"
-          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] motion-safe:transition-transform motion-safe:duration-300 ${
+          /**
+           * ── O NOME SEGUE A COISA ────────────────────────────────────────
+           *
+           * Duas navegações no mesmo ecrã precisam de dois nomes: sem isto, um
+           * leitor de ecrã anuncia «navegação» duas vezes e não há como saber
+           * qual é qual — nem para quem ouve, nem para um teste.
+           *
+           * Esta chamava-se «Destinos principais» e a coluna da esquerda
+           * chamava-se «Navegação do back office». Trocaram de papel: a coluna
+           * acabou, e a navegação do back office é ESTA — em todas as
+           * larguras. O nome mudou-se atrás do papel, e não ao contrário.
+           *
+           * Não é só arrumação: vinte sítios dos passeios do Playwright usam
+           * este nome para dizer «já estou dentro do back office», incluindo o
+           * arranque que abre a sessão de toda a passagem. Deixá-lo pendurado
+           * na lista que passou a `lg:hidden` punha-os todos à espera de uma
+           * coisa invisível — o que aconteceu, e é o que isto fecha.
+           */
+          aria-label="Navegação do back office"
+          className={`pointer-events-none fixed bottom-0 inset-x-0 z-30 flex items-end justify-center gap-2 px-[var(--bo-barra-folga)] motion-safe:transition-transform motion-safe:duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          // A folga por baixo SOMA-SE ao entalhe: no iPhone há a barra de
+          // gestos do sistema por baixo de tudo, e uma cápsula que flutue a 12
+          // px do bordo da janela flutua a 12 px POR BAIXO dela. A soma põe-a a
+          // 12 px do sítio onde o ecrã acaba de facto.
+          style={{
+            paddingBottom: "calc(var(--bo-barra-folga) + env(safe-area-inset-bottom))",
+          }}
         >
-          {/* OS QUATRO DO DIA, MAIS O ABRIDOR DA GAVETA.
+          {/* ── A CÁPSULA: OS QUATRO DO DIA ──────────────────────────────────
               Estavam aqui três destinos repetidos da gaveta e um "Mais" que
               abria a mesma gaveta que o hambúrguer do cabeçalho já abria — dois
               abridores em cantos opostos. A regra que ficou é outra: os quatro
               destinos do dia vivem SÓ aqui, o resto vive SÓ na gaveta (a lista
-              e a razão estão em `nav.tsx`), e há **um** abridor de cada vez.
+              e a razão estão em `nav.tsx`).
 
-              O abridor voltou para aqui, e não para o canto superior esquerdo,
-              por uma razão de mão: o polegar de quem segura o telemóvel chega
-              ao fundo do ecrã e não chega ao topo do lado oposto. Como o
-              Calendário, as Tarefas e os Temas passaram todos a viver na
-              gaveta, obrigá-la a esticar-se até ao canto para lá chegar era
-              trocar uma duplicação por um mau alcance.
+              `min-w-0` na cápsula e `flex-1 min-w-0` em cada destino: sem isso
+              o rótulo mais comprido («Fazer proposta») estica a célula dele e
+              as quatro deixam de ter a mesma largura. */}
+          <div
+            /* No telemóvel a cápsula ocupa a faixa toda e reparte-a por
+               quatro (`flex-1`). No computador tem DOZE destinos lá dentro e
+               não pode esticar-se de margem a margem: mede o que tem
+               (`lg:flex-none`), e se um dia não couber, rola por dentro em vez
+               de rebentar a cápsula (`lg:overflow-x-auto`). */
+            className="bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] lg:flex-none lg:max-w-full lg:overflow-x-auto"
+            style={{ height: "var(--bo-barra-capsula)" }}
+          >
+            {/* ── QUATRO NO TELEMÓVEL, TODOS NO COMPUTADOR ─────────────────
+                Pedido dela, com a captura da Dock do Mac e da barra do iOS:
+                «quero que o menu fique igual ao do mac ios em baixo com a barra
+                liquid glass». Posta a escolha entre conviver com a coluna da
+                esquerda ou substituí-la, ela respondeu «a barra substitui o
+                menu» — portanto no computador não há coluna, há a barra, e a
+                barra tem de ter TUDO. Uma barra com quatro destinos ao lado de
+                nenhuma coluna seria tirar-lhe oito sítios do dia.
 
-              Não voltam a ser dois: o hambúrguer do cabeçalho só aparece
-              quando ESTA barra não está — ver lá em cima. */}
-          <div className="flex items-stretch">
-            {BARRA_INFERIOR.map((id) => {
+                A ordem é a da COLUNA que ela conhece — `CORE_NAV` e depois
+                `MORE_NAV`, com o fio a separar o dia de trabalho do resto —, e
+                não a ordem de declaração do `NAV`. Não é o mesmo: medido no
+                browser, percorrer o `NAV` dava «Visão Geral · Pedidos ·
+                Calendário · Fazer proposta», e na coluna o «Fazer proposta» é o
+                terceiro. Mudar de sítio os destinos que ela toca de olhos
+                fechados era o custo mais caro desta mudança toda. Os que não são
+                dos quatro do dia nascem `hidden` e só aparecem a partir de
+                `lg`. É a mesma regra que a gaveta já usava ao contrário
+                (`soNoComputador`, mais acima) — nenhum destino aparece duas
+                vezes no mesmo ecrã. */}
+            {[...CORE_NAV, ...MORE_NAV].map((id, i) => {
               const navItem = NAV.find((n) => n.id === id)!;
+              const noTelemovel = BARRA_INFERIOR.includes(id);
               const isActive = view === id;
+              /* O FIO QUE A COLUNA JÁ TINHA, no mesmo sítio. Palavras dela
+                 quando a dobra do «Mais» saiu: «retira o mais e deixa tudo à
+                 vista» — e o que ficou lá foi um fio a dizer onde acaba o dia
+                 de trabalho e começa o resto. Não esconde nada, não tem estado,
+                 não se abre. A Dock do Mac da captura dela tem o mesmo, pela
+                 mesma razão. Só no computador, porque só lá a barra tem os
+                 dois grupos. */
+              const abreOResto = i === CORE_NAV.length;
               return (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] ${ESTADO} ${PRESSAO} ${
-                    isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
-                  }`}
-                >
-                  {id === "pedidos" && pendingCount > 0 && (
-                    <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
+                <Fragment key={id}>
+                  {abreOResto && (
+                    <span
+                      aria-hidden
+                      className="hidden lg:block my-2 w-px shrink-0 self-stretch bg-[var(--bo-hairline)]"
+                    />
                   )}
-                  {/* 120 ms e não 150 — e é o `ESTADO` que serve, apesar de aqui só
+                  <button
+                    onClick={() => setView(id)}
+                    aria-current={isActive ? "page" : undefined}
+                    /* ── A PASTILHA DO DESTINO ONDE ELA ESTÁ ──────────────────
+                     A MESMA que a coluna da esquerda usa (ver `renderNavItem`):
+                     lavagem de acento e tinta de acento. Duas navegações da
+                     mesma casa que marcassem a escolha de maneiras diferentes
+                     eram duas casas — e «colocação previsível e iconografia
+                     consistente» é o que a documentação que ela mandou pede.
+
+                     A lavagem aqui é a OPACA (`--bo-accent-lavagem`) e não o
+                     `--bo-accent-ring`: por baixo desta pastilha não está o
+                     branco do painel, está vidro, e o que passa através dele
+                     pode ser uma fotografia escura. Com a lavagem translúcida,
+                     o acento por cima descia com o fundo e perdia os 4,5:1;
+                     com ela opaca mede 5,19:1 e não depende de nada. A conta
+                     está no `globals.css`, ao lado do token.
+
+                     E não é só cor: a pastilha é uma FORMA que aparece, e o
+                     `font-medium` fica como terceira pista (WCAG 1.4.1). */
+                    /* ── A PASTILHA LEVANTA-SE DO VIDRO ────────────────────────
+                     A segunda captura dela é a barra do iOS 26: o destino onde
+                     se está não é uma mancha de cor pintada no vidro — é uma
+                     peça que SOBE dele, com moldura própria e sombra por baixo.
+
+                     A cor de fundo NÃO muda, e é de propósito: a lavagem opaca
+                     (`--bo-accent-lavagem`) é o que faz o acento medir 5,19:1
+                     por cima dela mesmo quando o que passa através do vidro é
+                     uma fotografia escura, e essa conta está prendida no
+                     `barra-que-flutua.test.ts`. O que se acrescenta é RELEVO —
+                     um fio à volta e uma sombra —, que não mexe em contraste
+                     nenhum. Levantar sem repintar. */
+                    className={`alvo-toque relative ${
+                      noTelemovel ? "flex" : "hidden lg:flex"
+                    } min-w-0 flex-1 lg:w-20 lg:flex-none flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
+                      isActive
+                        ? "bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] font-medium shadow-[var(--bo-sombra-suspensa)] ring-1 ring-inset ring-[var(--bo-hairline)]"
+                        : "text-[var(--bo-text-muted)] font-normal"
+                    }`}
+                  >
+                    {id === "pedidos" && pendingCount > 0 && (
+                      <span className="absolute top-1.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
+                    )}
+                    {/* 120 ms e não 150 — e é o `ESTADO` que serve, apesar de aqui só
                       mudar a escala: no Tailwind v4 a classe `scale-110` emite a
                       propriedade autónoma `scale`, e `scale` está de propósito na
                       lista do `ESTADO` (ver `ui/movimento.ts`). Um degrau a menos
                       para a casa manter. */}
-                  <span className={`${ESTADO} ${isActive ? "scale-110" : ""}`}>{navItem.icon}</span>
-                  {/* `text-center` e `leading-tight`: com cinco células cada
-                      uma fica com 75 px, e "Fazer proposta" precisa de partir
-                      em duas linhas em vez de ser cortado a meio. 75 px continua
-                      bem acima dos 44 do alvo mínimo.
-
-                      DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
+                    <span className={`${ESTADO} ${isActive ? "scale-110" : ""}`}>
+                      {navItem.icon}
+                    </span>
+                    {/* DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
                       e não só na que parte. Sem isso, a célula mais alta empurra
-                      o seu ícone para cima e os cinco ícones da barra deixam de
-                      estar à mesma altura — lê-se como um desalinhamento, que é
+                      o seu ícone para cima e os ícones da barra deixam de estar à
+                      mesma altura — lê-se como um desalinhamento, que é
                       exactamente a queixa que trouxe este trabalho. Reservar o
                       espaço em todas custa uns píxeis e devolve a linha direita. */}
-                  <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center min-h-[2.2em] flex items-start justify-center">
-                    {navItem.label}
-                  </span>
-                </button>
+                    {/* `2.5em` e não `2.2em`: a reserva tem de ser a altura REAL
+                      de duas linhas, e no telemóvel o chão da letra desta casa
+                      é 12 px (`escala-movel.test.ts`) — duas linhas a
+                      `leading-tight` são 30 px, ou seja 2,5em. Com 2,2em a
+                      reserva mentia e o rótulo transbordava a cápsula por
+                      baixo: medido, 2 px em «Visão Geral» e «Fazer proposta». */}
+                    {/* 8 px é o rótulo do telemóvel, onde a cápsula tem 390 px
+                      para repartir por quatro. No computador a barra passou a
+                      ser O MENU — o que ela lê o dia inteiro — e há largura para
+                      o dizer: 10 px a partir de `lg`. A reserva de duas linhas
+                      fica, porque «Propostas Aceites» continua a precisar
+                      delas. */}
+                    <span className="text-[8px] lg:text-[10px] tracking-wide uppercase leading-tight text-center min-h-[2.5em] flex items-start justify-center">
+                      {navItem.label}
+                    </span>
+                  </button>
+                </Fragment>
               );
             })}
-            {/* O ABRIDOR DA GAVETA, ao alcance do polegar. Não é um destino —
-                é a porta para os que não cabem aqui. */}
-            <button
-              onClick={() => setNavOpen(true)}
-              aria-label="Mais destinos"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] ${ESTADO} ${PRESSAO} ${
-                !BARRA_INFERIOR.includes(view)
-                  ? "text-[var(--bo-accent)]"
-                  : "text-[var(--bo-text-faint)]"
-              }`}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-              </svg>
-              {/* A mesma reserva de duas linhas das outras cinco células: esta
-                  é a sexta da mesma barra e tem de alinhar com elas. */}
-              <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center min-h-[2.2em] flex items-start justify-center">
-                Mais
-              </span>
-            </button>
           </div>
+
+          {/* ── A PEÇA REDONDA: A PORTA DA GAVETA ────────────────────────────
+              Ao alcance do polegar, e à parte da cápsula porque não é um
+              destino. Sem rótulo escrito: é a peça redonda da captura, e o
+              nome dela vive no `aria-label` — quem ouve continua a ouvir «Mais
+              destinos», e quem vê continua a ver o mesmo ⋯ no mesmo canto.
+
+              O abridor voltou para aqui, e não para o canto superior esquerdo,
+              por uma razão de mão: o polegar de quem segura o telemóvel chega
+              ao fundo do ecrã e não chega ao topo do lado oposto. */}
+          <button
+            onClick={() => setNavOpen(true)}
+            aria-label="Mais destinos"
+            aria-expanded={navOpen}
+            className={`alvo-toque bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex shrink-0 items-center justify-center shadow-[var(--bo-sombra-suspensa)] ${ESTADO} ${PRESSAO} ${
+              !BARRA_INFERIOR.includes(view)
+                ? "text-[var(--bo-accent)]"
+                : "text-[var(--bo-text-muted)]"
+            }`}
+            style={{
+              height: "var(--bo-barra-capsula)",
+              width: "var(--bo-barra-capsula)",
+            }}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
         </nav>
 
         {/* ── Main ── */}
@@ -4753,7 +4915,13 @@ export default function AdminClient({
             assim que os rótulos da barra subiram ao chão de 12 px (a barra
             passou a 71, o conteúdo continuou a guardar 56). Ver
             `barra-inferior.test.tsx`. */}
-        <div className="flex-1 min-w-0 flex flex-col pb-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] lg:pb-0">
+        {/* O `lg:pb-0` caiu: a barra passou a estar no computador também, e o
+            espaço que ela ocupa tem de ser guardado nas duas larguras — senão a
+            última linha de qualquer lista fica por baixo dela. Os outros três
+            sítios que leem o `--bo-barra-inferior` (o aviso do `Toast`, a barra
+            do estúdio e o fundo da lista da biblioteca) perderam o seu pelo
+            mesmo motivo. */}
+        <div className="flex-1 min-w-0 flex flex-col pb-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))]">
           {/* Top bar */}
           {/* A ESCADA DE PLANOS do back office, escrita uma vez para não voltar
               a colidir:
@@ -4812,7 +4980,7 @@ export default function AdminClient({
                valor inicial — `all` — e ficava `all 150ms ease`. Ou seja, quem
                pedia MENOS movimento recebia MAIS, e com a curva errada. Medido
                num Chromium, não deduzido. */
-            className={`sticky top-0 z-30 bg-[var(--bo-surface,#ffffff)] border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
+            className={`bo-material-faixa bo-material-desfoque sticky top-0 z-30 border-b pt-safe motion-safe:transition-colors motion-safe:duration-150 ${
               desceu ? "border-[var(--bo-hairline)]" : "border-transparent"
             }`}
           >
@@ -4829,36 +4997,11 @@ export default function AdminClient({
                   Por isso este aparece exactamente quando a outra sai, e nunca
                   ao mesmo tempo: continua a haver UM abridor de cada vez, que
                   é a regra que esta arrumação existe para cumprir. */}
-              {/* ── E A PORTA DE VOLTA ────────────────────────────────────
-                  Uma coluna que se recolhe e não se pode trazer de volta é uma
-                  coluna que se perde. Este botão existe EXACTAMENTE enquanto ela
-                  está recolhida e só no computador — que é onde o estado existe.
-                  No telemóvel a barra nunca foi uma coluna, e quem abre a gaveta
-                  é a barra de baixo. */}
-              {menuRecolhido && (
-                <button
-                  onClick={() => setMenuRecolhido(false)}
-                  aria-label="Mostrar o menu"
-                  title="Mostrar o menu"
-                  className={`hidden lg:flex -ml-1 h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  >
-                    <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
-                  </svg>
-                </button>
-              )}
               {selected && (
                 <button
                   onClick={() => setNavOpen(true)}
                   aria-label="Abrir menu"
-                  className={`lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                  className={`-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
                 >
                   <svg
                     width="20"
@@ -5388,7 +5531,7 @@ export default function AdminClient({
                   aria-controls="painel-filtros-pedidos"
                   className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium ${ESTADO} ${PRESSAO} ${
                     filtrosActivos > 0
-                      ? "bg-[#4d6350] border-[#4d6350] text-white"
+                      ? "bg-sage-600 border-sage-600 text-white"
                       : "bg-white border-[var(--bo-hairline)] text-[var(--bo-text-muted)]"
                   }`}
                 >
@@ -5448,7 +5591,7 @@ export default function AdminClient({
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
                   className={`alvo-toque flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs border ${ESTADO} ${PRESSAO} ${
                     mineOnly
-                      ? "bg-[#4d6350] border-[#4d6350] text-white"
+                      ? "bg-sage-600 border-sage-600 text-white"
                       : "bg-white border-[var(--bo-hairline)] text-foreground/45 hover:text-[var(--bo-text-muted)]"
                   }`}
                 >
@@ -5466,90 +5609,104 @@ export default function AdminClient({
                   </svg>
                   Atribuídos a mim
                 </button>
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
+                {/* ── OS FILTROS DEIXARAM DE ABRIR O MENU DO SISTEMA ───────
+                    Palavras dela, com uma captura da lista azul do sistema
+                    aberta por cima da tabela: «aqui também quero com o mesmo
+                    design da apple».
+
+                    Um `<select>` nativo desenha-se com o CSS da casa mas ABRE
+                    a lista do sistema operativo — azul, com a letra dele, sem
+                    raio nem material. Não há folha de estilo que lhe chegue: a
+                    lista é desenhada pelo sistema, fora da página.
+
+                    A `Escolha` é a saída que esta casa já tinha: rende um
+                    `<select>` REAL antes da hidratação (o filtro funciona sem
+                    JavaScript) e passa a combobox do APG depois de montar — com
+                    o menu de material, teclado do padrão e o rótulo pelo
+                    `aria-label`, que um `role="combobox"` não herda de um
+                    `<label for>`. */}
+                <Escolha
+                  variante="nua"
+                  className={FILTRO_CLASSES}
+                  valor={filterCategory}
+                  aoMudar={setFilterCategory}
                   aria-label="Filtrar por categoria"
-                  className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                >
-                  <option value="all">Todas as categorias</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={filterEspera}
-                  onChange={(e) => setFilterEspera(e.target.value as typeof filterEspera)}
+                  opcoes={[
+                    { valor: "all", rotulo: "Todas as categorias" },
+                    ...CATEGORIES.map((c) => ({ valor: c.id, rotulo: c.label })),
+                  ]}
+                />
+                <Escolha
+                  variante="nua"
+                  className={FILTRO_CLASSES}
+                  valor={filterEspera}
+                  aoMudar={(v) => setFilterEspera(v as typeof filterEspera)}
                   aria-label="Filtrar por tempo de espera"
-                  className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                >
-                  <option value="all">Qualquer espera</option>
-                  <option value="3">Espera há 3+ dias</option>
-                  <option value="7">Espera há 7+ dias</option>
-                </select>
+                  opcoes={[
+                    { valor: "all", rotulo: "Qualquer espera" },
+                    { valor: "3", rotulo: "Espera há 3+ dias" },
+                    { valor: "7", rotulo: "Espera há 7+ dias" },
+                  ]}
+                />
                 {mesesDisponiveis.length > 1 && (
-                  <select
-                    value={filterMes}
-                    onChange={(e) => setFilterMes(e.target.value)}
+                  <Escolha
+                    variante="nua"
+                    className={FILTRO_CLASSES}
+                    valor={filterMes}
+                    aoMudar={setFilterMes}
                     aria-label="Filtrar por mês do evento"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                  >
-                    <option value="all">Todos os meses</option>
-                    {mesesDisponiveis.map((m) => (
-                      <option key={m} value={m}>
-                        {mesLegivel(m)}
-                      </option>
-                    ))}
-                  </select>
+                    opcoes={[
+                      { valor: "all", rotulo: "Todos os meses" },
+                      ...mesesDisponiveis.map((m) => ({ valor: m, rotulo: mesLegivel(m) })),
+                    ]}
+                  />
                 )}
                 {regioesDisponiveis.length > 1 && (
-                  <select
-                    value={filterRegiao}
-                    onChange={(e) => setFilterRegiao(e.target.value)}
+                  <Escolha
+                    variante="nua"
+                    className={FILTRO_CLASSES}
+                    valor={filterRegiao}
+                    aoMudar={setFilterRegiao}
                     aria-label="Filtrar por região"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                  >
-                    <option value="all">Todas as regiões</option>
-                    {regioesDisponiveis.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
+                    opcoes={[
+                      { valor: "all", rotulo: "Todas as regiões" },
+                      ...regioesDisponiveis.map((r) => ({ valor: r, rotulo: r })),
+                    ]}
+                  />
                 )}
                 {plannersDisponiveis.length > 0 && (
-                  <select
-                    value={filterPlanner}
-                    onChange={(e) => setFilterPlanner(e.target.value)}
+                  <Escolha
+                    variante="nua"
+                    className={FILTRO_CLASSES}
+                    valor={filterPlanner}
+                    aoMudar={setFilterPlanner}
                     aria-label="Filtrar por planner"
-                    className="bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                  >
-                    <option value="all">Todas as planners</option>
-                    {plannersDisponiveis.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
+                    opcoes={[
+                      { valor: "all", rotulo: "Todas as planners" },
+                      ...plannersDisponiveis.map((n) => ({ valor: n, rotulo: n })),
+                    ]}
+                  />
                 )}
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as typeof sort)}
-                  aria-label="Ordenar pedidos"
+                <Escolha
+                  variante="nua"
                   /* `col-span-2` no telemóvel: «Quem espera há mais tempo» não
                      cabe em meia largura, e um selector com o rótulo cortado
-                     não diz por que ordem a lista está. */
-                  className="col-span-2 flex-1 lg:flex-none bg-white border border-[var(--bo-hairline)] rounded-xl px-3 py-2.5 text-xs text-[var(--bo-tinta-72)] focus:outline-none focus:border-foreground/25 "
-                >
-                  <option value="espera">Quem espera há mais tempo</option>
-                  <option value="recent">Mais recentes</option>
-                  <option value="old">Mais antigos</option>
-                  <option value="value">Maior valor</option>
-                  <option value="followup">Seguimentos primeiro</option>
-                  <option value="eventdate">Data do evento</option>
-                </select>
+                     não diz por que ordem a lista está. Vai no `containerClassName`
+                     porque quem ocupa a célula da grelha é a caixa, não o botão. */
+                  containerClassName="col-span-2 flex-1 lg:flex-none"
+                  className={`w-full ${FILTRO_CLASSES}`}
+                  valor={sort}
+                  aoMudar={(v) => setSort(v as typeof sort)}
+                  aria-label="Ordenar pedidos"
+                  opcoes={[
+                    { valor: "espera", rotulo: "Quem espera há mais tempo" },
+                    { valor: "recent", rotulo: "Mais recentes" },
+                    { valor: "old", rotulo: "Mais antigos" },
+                    { valor: "value", rotulo: "Maior valor" },
+                    { valor: "followup", rotulo: "Seguimentos primeiro" },
+                    { valor: "eventdate", rotulo: "Data do evento" },
+                  ]}
+                />
                 <button
                   onClick={() => {
                     downloadCsv(`pedidos-${dateStamp()}`, quotesToCsvRows(filtered));
@@ -5664,8 +5821,8 @@ export default function AdminClient({
                     onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
                     className={`alvo-toque px-3 py-1 rounded-full text-[10px] font-medium tracking-wide ${ESTADO} ${PRESSAO} ${
                       tagFilter === t
-                        ? "bg-[#4d6350] text-white "
-                        : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"
+                        ? "bg-sage-600 text-white "
+                        : "bg-sage-600/10 text-sage-600 hover:bg-sage-600/18"
                     }`}
                   >
                     {t}
@@ -5684,15 +5841,15 @@ export default function AdminClient({
 
             {/* Bulk actions */}
             {seleccionadosAVista.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06]">
-                <span className="text-[#4d6350] text-xs font-semibold">
+              <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl border border-sage-600/25 bg-sage-600/[0.06]">
+                <span className="text-sage-600 text-xs font-semibold">
                   {seleccionadosAVista.length} selecionado
                   {seleccionadosAVista.length !== 1 ? "s" : ""}
                 </span>
                 {seleccionadosAVista.length < filtered.length && (
                   <button
                     onClick={() => setSelectedIds(new Set(filtered.map((q) => q.id)))}
-                    className={`text-foreground/40 text-xs hover:text-[#4d6350] ${ESTADO} ${PRESSAO}`}
+                    className={`text-foreground/40 text-xs hover:text-sage-600 ${ESTADO} ${PRESSAO}`}
                   >
                     Selecionar todos ({filtered.length})
                   </button>
@@ -5731,7 +5888,7 @@ export default function AdminClient({
                       quotesToCsvRows(filtered.filter((q) => selectedIds.has(q.id))),
                     )
                   }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] ${ESTADO} ${PRESSAO} `}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
                 >
                   Exportar seleção
                 </button>
@@ -5743,7 +5900,7 @@ export default function AdminClient({
                   return (
                     <a
                       href={`mailto:?bcc=${encodeURIComponent(emails.join(","))}`}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-[#4d6350] ${ESTADO} ${PRESSAO} `}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[var(--bo-hairline-strong)] text-foreground/45 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:text-sage-600 ${ESTADO} ${PRESSAO} `}
                       title={`Compor email para ${emails.length} cliente(s) (em bcc)`}
                     >
                       Email ({emails.length})
@@ -6044,7 +6201,7 @@ export default function AdminClient({
                               unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
                               href={localizeHref(`/orcamento/admin/evento/${selected.id}`, locale)}
-                              className={`alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] ${ESTADO} ${PRESSAO} hover:bg-[#4d6350]/[0.16] inline-flex items-center`}
+                              className={`alvo-toque h-9 gap-2 rounded-xl bg-sage-600/10 px-3.5 text-xs font-medium tracking-[0.02em] text-sage-600 ${ESTADO} ${PRESSAO} hover:bg-sage-600/[0.16] inline-flex items-center`}
                               title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
                             >
                               <svg
@@ -6397,7 +6554,7 @@ export default function AdminClient({
                                     rolarAteVer(toolsRef.current, { block: "start" });
                                   }
                                 }}
-                                className={`flex w-full items-center gap-3 rounded-full bg-[#4d6350] px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
+                                className={`flex w-full items-center gap-3 rounded-full bg-sage-600 px-5 py-4 text-left text-white ${ESTADO} ${PRESSAO} hover:bg-[#415440]`}
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
@@ -6602,7 +6759,7 @@ export default function AdminClient({
                                         Custos {formatPrice(costs)} · Margem{" "}
                                         <span
                                           className={
-                                            margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"
+                                            margin >= 0 ? "text-sage-600" : "text-[#8a2a22]"
                                           }
                                         >
                                           {formatPrice(margin)}
@@ -6883,7 +7040,7 @@ export default function AdminClient({
                                   </div>
                                   <div className="flex justify-between border-t border-[var(--bo-hairline)] pt-1 text-xs font-medium">
                                     <span className="text-[var(--bo-text-muted)]">Total</span>
-                                    <span className="font-semibold text-[#4d6350]">
+                                    <span className="font-semibold text-sage-600">
                                       {formatPrice(selected.priceBreakdown.total)}
                                     </span>
                                   </div>
@@ -6899,7 +7056,7 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`mailto:${selected.email}`}
-                                className={`alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline ${ESTADO} ${PRESSAO}`}
+                                className={`alvo-toque !justify-start truncate text-xs text-sage-600 hover:underline ${ESTADO} ${PRESSAO}`}
                               >
                                 {selected.email}
                               </a>
@@ -6937,7 +7094,7 @@ export default function AdminClient({
                                   href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className={`alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] ${ESTADO} ${PRESSAO} hover:opacity-80 inline-flex items-center`}
+                                  className={`alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-sage-600 ${ESTADO} ${PRESSAO} hover:opacity-80 inline-flex items-center`}
                                   title="Abrir conversa no WhatsApp"
                                 >
                                   <svg
@@ -7050,9 +7207,9 @@ export default function AdminClient({
                                       );
                                     tabs?.[nextIdx]?.focus();
                                   }}
-                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,translate] motion-safe:duration-[120ms] ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-[background-color,border-color,color,box-shadow,opacity,scale,translate] motion-safe:duration-[120ms] ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-sage-600/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
-                                      ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] "
+                                      ? "border-sage-600/45 bg-sage-600/[0.05] "
                                       : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:-translate-y-0.5 hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-6)] "
                                   }`}
                                 >
@@ -7060,7 +7217,7 @@ export default function AdminClient({
                                     aria-hidden
                                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${ESTADO} ${
                                       active
-                                        ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
+                                        ? "bg-sage-600/[0.12] text-sage-600"
                                         : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                                     }`}
                                   >
@@ -7084,7 +7241,7 @@ export default function AdminClient({
                                     <span
                                       className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
                                         active
-                                          ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                          ? "bg-sage-600/15 text-sage-600"
                                           : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
                                       }`}
                                     >

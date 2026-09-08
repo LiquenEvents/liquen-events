@@ -188,6 +188,51 @@ export interface TimelineItem {
   time: string; // "HH:MM"
   title: string;
   owner?: string; // responsável / fornecedor
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * QUANTO TEMPO DURA — E PORQUE É DURAÇÃO E NÃO HORA DE FIM
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Minutos. Ausente quer dizer «sem duração marcada»: o momento é um
+   * INSTANTE, um marco no dia, e não um intervalo.
+   *
+   * ── A ESCOLHA: DURAÇÃO, NÃO `fim: "HH:MM"` ──────────────────────────────
+   *
+   * As duas guardam a mesma informação. Três coisas desempatam, e são todas
+   * deste produto e não de gosto:
+   *
+   *  1. **O dia passa da meia-noite.** Este guião já tem uma regra escrita
+   *     para isso: uma hora antes das 05:00 é o FIM do dia e vale +24h (ver
+   *     `ordemNoDia`, em `guiao-do-dia.ts`). Uma hora de fim obrigaria a
+   *     aplicar a mesma adivinhação uma segunda vez, e a segunda é pior: o
+   *     encerramento das 02:00 já conta como dia seguinte, portanto um fim
+   *     «03:00» tanto podia ser uma hora depois como vinte e cinco. Com
+   *     duração há uma adivinhação só — a que já existe: o princípio ancora,
+   *     o resto é aritmética. `23:00 + 180 min` não tem ambiguidade nenhuma.
+   *
+   *  2. **Mudar a hora não pode encolher o momento.** Ela arrasta a cerimónia
+   *     das 17:00 para as 17:30 na véspera. Com hora de fim, a cerimónia
+   *     passava de 45 min para 15 sem ninguém lhe tocar — uma perda
+   *     silenciosa num papel que se imprime. Com duração, andam as duas.
+   *
+   *  3. **É assim que ela sabe a informação.** «A montagem leva três horas» é
+   *     conhecimento do ofício e não muda de evento para evento; «a montagem
+   *     acaba às 12:00» é uma consequência da hora a que se começou. O modelo
+   *     guarda o que se sabe; o ecrã mostra o que se calcula — e mostra mesmo
+   *     a hora de fim («08:00 → 11:00»), porque é assim que ela lê o dia.
+   *
+   * ── E O QUE ESTAVA GRAVADO ANTES DISTO ─────────────────────────────────
+   *
+   * Opcional, e a ausência tem significado próprio. Um guião gravado com o
+   * modelo antigo abre com os momentos todos como instantes: ordena na mesma,
+   * imprime na mesma, e NÃO inventa sobreposições — duas coisas sem duração
+   * declarada nunca se sobrepõem, porque ninguém disse que se sobrepunham.
+   * Nascer com 60 minutos por omissão era pôr o ecrã a acusar choques que ela
+   * nunca escreveu, no guião que ela já tinha — a maneira mais rápida de a
+   * ensinar a ignorar os avisos todos.
+   */
+  duracao?: number;
 }
 
 export type PaymentKind = "sinal" | "pagamento" | "saldo";

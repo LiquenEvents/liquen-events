@@ -161,7 +161,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
               (250 ms) e não os 120 do `micro`. É agora o mesmo tempo da barra de
               cópia de fotografias do estúdio. */}
           <div
-            className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+            className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
             style={{ transform: `scaleX(${fraccaoDaBarra(feitos, total)})` }}
           />
         </div>
@@ -188,7 +188,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                 aria-pressed={feito}
                 className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left ${ESTADO} ${PRESSAO} ${
                   feito
-                    ? "border-[#4d6350]/40 bg-[#e7efe4]"
+                    ? "border-sage-600/40 bg-[#e7efe4]"
                     : "border-[var(--bo-hairline-strong)] bg-white active:bg-[var(--bo-tinta-6)]"
                 }`}
                 // 64 px: bem acima do mínimo de 44, porque aqui não se está
@@ -198,7 +198,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
                 <span
                   aria-hidden
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 ${
-                    feito ? "border-[#4d6350] bg-[#4d6350] text-white" : "border-foreground/25"
+                    feito ? "border-sage-600 bg-sage-600 text-white" : "border-foreground/25"
                   }`}
                 >
                   {feito && (

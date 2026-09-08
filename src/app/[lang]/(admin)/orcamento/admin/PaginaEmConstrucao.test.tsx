@@ -72,8 +72,8 @@ describe("a página em construção", () => {
     );
     const celulas = container.querySelectorAll("span.aspect-square");
     expect(celulas).toHaveLength(3);
-    expect(celulas[0].className).not.toContain("ring-[#4d6350]");
-    expect(celulas[2].className, "a que vai entrar leva moldura").toContain("ring-[#4d6350]");
+    expect(celulas[0].className).not.toContain("ring-sage-600");
+    expect(celulas[2].className, "a que vai entrar leva moldura").toContain("ring-sage-600");
   });
 
   it("as que passam do teto aparecem apagadas", () => {

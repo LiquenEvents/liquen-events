@@ -124,3 +124,10 @@ instagram-export/
 
 # A sessão de administração que os passeios guardam para não voltarem a entrar.
 e2e/.auth/
+
+# As configurações de Playwright de UMA máquina. O `pw.local.config.ts` que
+# apareceu aqui apontava o `executablePath` para `/opt/pw-browsers/chromium` —
+# o caminho deste contentor, e de mais nenhum. É a mesma família do
+# `.lighthouseci/` e do `e2e/.auth/` aqui em cima: existe para uma medição
+# local acontecer, e não diz nada a quem clona o repositório noutro sítio.
+*.local.config.ts

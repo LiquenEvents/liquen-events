@@ -334,7 +334,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
             botão que fecha o carregamento não gravava nada e o estado da
             checklist era uma coluna morta. */}
         {dados.evento?.status === "carregada" && (
-          <span className="rounded-full bg-[#4d6350]/12 px-2 py-0.5 text-[11px] font-medium text-[#4d6350]">
+          <span className="rounded-full bg-sage-600/12 px-2 py-0.5 text-[11px] font-medium text-sage-600">
             {/* O nome e a hora quando se sabem — e o selo de sempre quando não.
                 Um carregamento antigo, de antes de isto ser gravado, não pode
                 passar a dizer «carregada por undefined». */}

@@ -1022,7 +1022,7 @@ function ImportChip({ job }: { job: ImportJob }) {
               omissão. O `PROGRESSO` escreve os mesmos 250 ms numa classe que
               o Tailwind compila mesmo. */}
           <div
-            className={`h-full w-full origin-left rounded-full bg-[#4d6350] ${PROGRESSO}`}
+            className={`h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
             style={{ transform: `scaleX(${Math.round(((done + failed) / total) * 100) / 100})` }}
           />
         </div>
@@ -2701,13 +2701,13 @@ export default function ThemePicker({
                                   failed
                                     ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
                                     : on
-                                      ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
-                                      : "border-[var(--bo-hairline-strong)] hover:border-[#4d6350]/45"
+                                      ? "border-sage-600 ring-2 ring-sage-600/35"
+                                      : "border-[var(--bo-hairline-strong)] hover:border-sage-600/45"
                                 } ${blocked ? "opacity-50" : ""}`}
                               >
                                 <Photo image={im} priority={i < ABOVE_FOLD} />
                                 {on && (
-                                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white">
+                                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white">
                                     <svg
                                       width="12"
                                       height="12"
