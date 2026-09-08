@@ -10847,7 +10847,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            `--bo-barra-accao` (ver o `ResizeObserver` lá em cima) e o
            `Toast.tsx` soma-a à distância a que já se punha do fundo. Ficam os
            dois visíveis, e nenhum tapa o outro. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--bo-hairline-strong)] bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3"
+        /* ── E PASSOU A SER MATERIAL, COMO TUDO O QUE FLUTUA ──────────────
+           Palavras dela, com uma captura desta barra ao lado da cápsula de
+           vidro: «quero isto com o mesmo design da apple».
+
+           Era uma laje branca de bordo a bordo com um risco por cima — a única
+           superfície do estúdio que continuava a fingir que não flutua. Flutua:
+           está `sticky`, o conteúdo passa mesmo por baixo dela, e é isso que a
+           põe na camada FUNCIONAL do sistema de design, onde vive o material.
+
+           `bo-material` traz o raio, o fio dos quatro lados e a superfície
+           translúcida; `bo-material-desfoque` o desfoque. Sai o `border-t`
+           (um risco de um lado só é o desenho de uma laje encostada, e a peça
+           deixou de o ser) e sai a cor sólida — que se pintava POR CIMA do
+           material e o apagava, como já tinha acontecido na coluna e na barra
+           de topo.
+
+           `mx-1` em vez de `-mx-1`: uma peça que flutua tem ar dos lados. Era
+           negativo de propósito, para a laje ir de bordo a bordo do painel;
+           com raio, ir de bordo a bordo era cortar-lhe os cantos contra a
+           margem.
+
+           Continua a publicar a sua altura em `--bo-barra-accao` para o aviso
+           do `Toast` se afastar dela, e continua a pousar à altura da barra de
+           destinos — as duas coisas que este bloco já garantia. */
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3"
       >
         {step === "conteudo" && (
           <>
