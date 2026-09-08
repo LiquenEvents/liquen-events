@@ -441,7 +441,16 @@ export default function AdminLogin() {
            * coluna de 486 px, 64 px de altura deixavam-na a boiar no topo. A
            * proporção é a do ficheiro (`w-auto`), portanto isto é só escala.
            */
-          className="h-24 w-auto object-contain"
+          /*
+            h-32 e não h-24. Ela olhou para a marca no ecrã de entrada e disse
+            «tem que ficar maior».
+
+            Aqui não há o tecto que a barra do painel tem: esta é uma coluna com
+            espaço, e o comentário de cima já dizia que a 64 px «deixavam-na a
+            boiar no topo». A proporção é a do ficheiro (`w-auto`); isto é só
+            escala.
+          */
+          className="h-32 w-auto object-contain"
         />
 
         {/* Login card */}
@@ -563,7 +572,27 @@ export default function AdminLogin() {
             aria-hidden={noEstadoDaChave || undefined}
             inert={noEstadoDaChave || undefined}
           >
-          <div className="overflow-hidden">
+          {/*
+            ── O `overflow-hidden` SÓ ENQUANTO ESTÁ FECHADO ─────────────────
+
+            Ele é o que corta o conteúdo enquanto a linha da grelha ainda não
+            abriu — sem ele, o formulário aparece todo de uma vez e a animação
+            não se vê.
+
+            Mas ABERTO ele corta outra coisa: o anel de foco. O anel desta casa
+            é um `box-shadow` que se estende 4 px para fora do campo, e um
+            ascendente com `overflow-hidden` corta-lhe as laterais. O que sobra
+            são dois riscos verdes, um por cima e outro por baixo do campo — foi
+            isso que ela viu e me disse para tirar.
+
+            A `docs/LOGIN.md` já o proíbe por escrito, na Parte 10: o anel é
+            «adaptado aos cantos arredondados, **nunca cortado por `overflow`**».
+
+            Tirar o anel não é opção: a Parte 12 proíbe `outline: none` sem
+            substituto, e sem ele quem navega por teclado deixa de saber onde
+            está. O que se tira é o CORTE.
+          */}
+          <div className={noEstadoDaChave ? "overflow-hidden" : ""}>
           <form
             onSubmit={submit}
             className="flex flex-col gap-3.5"

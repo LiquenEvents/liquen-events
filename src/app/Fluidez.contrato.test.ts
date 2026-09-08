@@ -519,9 +519,21 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
     //     e uma transição longa atrasaria a sua leitura para quem navega por
     //     teclado — trocaria um defeito de movimento por um de acessibilidade,
     //     que é pior. O tecto é explícito para que ninguém o suba por engano.
+    // ── E A PROPRIEDADE MUDOU DE NOME, POR UMA RAZÃO ─────────────────────
+    //
+    // Era `box-shadow`. O anel passou a `outline`, e não foi cosmética: a
+    // sombra não sabe o raio de quem a recebe, e por isso a regra escrevia
+    // `border-radius: 2px` no ELEMENTO focado para o anel coincidir. O efeito
+    // era o controlo mudar de forma ao ser focado — um rectângulo de canto
+    // vivo colado a um campo redondo, e dois riscos verdes soltos onde algum
+    // ascendente cortava. A dona apontou-o três vezes.
+    //
+    // Um `outline` moderno segue o `border-radius` do próprio elemento. O que
+    // este caso guarda continua a ser o mesmo — que o anel ANIMA, com a curva
+    // da casa, e depressa — só que na propriedade certa.
     const blocos = blocosDe(css, /:focus-visible\s*\{/g).join("\n");
-    const m = /transition:\s*box-shadow\s+(\d+)ms\s+var\(--ease-out\)/.exec(blocos);
-    expect(m, "o `:focus-visible` deixou de animar o box-shadow com o token").toBeTruthy();
+    const m = /transition:\s*outline-color\s+(\d+)ms\s+var\(--ease-out\)/.exec(blocos);
+    expect(m, "o `:focus-visible` deixou de animar o anel com o token").toBeTruthy();
     expect(Number(m![1]), "o anel de foco demora demasiado a ficar legível").toBeLessThanOrEqual(
       200,
     );

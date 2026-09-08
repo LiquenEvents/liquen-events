@@ -969,9 +969,35 @@ test.describe("Back office — mobile", () => {
      * a forma de contar o abridor: pelo nome acessível, que é o que continua a
      * existir, em vez do texto visível, que deixou de existir de propósito.
      */
-    const textos = (await barra.getByRole("button").allInnerTexts())
-      .map((t) => t.trim())
-      .filter(Boolean);
+    /*
+      ── PELO NOME ACESSÍVEL, E NÃO PELO TEXTO VISÍVEL ──────────────────────
+
+      O rótulo visível da barra encurta no telemóvel — «Visão» em vez de «Visão
+      Geral», «Proposta» em vez de «Fazer proposta» — para caber numa linha, que
+      é o que faz a barra ler-se como barra e não como uma lista apertada (as
+      referências que ela mandou, do Instagram e do WhatsApp, têm todas o rótulo
+      numa linha só).
+
+      O que NÃO encurta é o nome acessível: cada botão leva `aria-label` com o
+      nome inteiro, porque quem ouve o ecrã só tem a palavra e «Visão» não é um
+      destino.
+
+      Este caso guarda QUE DESTINOS estão na barra, e a identidade de um destino
+      é o nome inteiro. Passa a lê-lo de onde ele continua a existir — que é
+      exactamente a mesma correcção que o comentário aqui em cima já descreve
+      ter sido feita ao abridor da gaveta.
+    */
+    const textos = (
+      await barra.getByRole("button").evaluateAll((bs) =>
+        bs.map((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim()),
+      )
+    )
+      .filter(Boolean)
+      // O abridor da gaveta é contado à parte, na asserção logo a seguir. Antes
+      // ficava de fora sozinho — não tem texto visível, só `aria-label`, e a
+      // leitura anterior era pelo texto. Agora que se lê o nome acessível, ele
+      // entra na lista e tem de sair aqui.
+      .filter((n) => !/Mais destinos/i.test(n));
     expect(
       textos,
       "A barra de baixo deixou de ser os quatro destinos do dia. " +
@@ -986,7 +1012,11 @@ test.describe("Back office — mobile", () => {
     await abrirGaveta(page);
     const gaveta = page.getByRole("navigation", { name: /Mais destinos/i });
     await expect(gaveta).toBeVisible();
-    const naGaveta = (await gaveta.getByRole("button").allInnerTexts()).map((t) => t.trim());
+    const naGaveta = await gaveta
+      .getByRole("button")
+      .evaluateAll((bs) =>
+        bs.map((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim()),
+      );
 
     const repetidos = naGaveta.filter((t) => NA_BARRA.has(t));
     expect(

@@ -217,12 +217,26 @@ const barraDeBaixo = () =>
 /** A gaveta. É `role="complementary"` — o `<aside>`. */
 const gaveta = () => screen.getByRole("complementary");
 
+/**
+ * ── PELO NOME ACESSÍVEL, E NÃO PELO TEXTO VISÍVEL ─────────────────────────
+ *
+ * O rótulo visível da barra encurta no telemóvel («Visão» em vez de «Visão
+ * Geral») para caber numa linha — é o que a faz ler-se como barra e não como
+ * uma lista apertada, e é o que as referências que ela mandou fazem.
+ *
+ * O nome ACESSÍVEL não encurta: cada botão leva `aria-label` com o nome
+ * inteiro, porque quem ouve o ecrã só tem a palavra. A identidade de um destino
+ * é esse nome, e é por ele que estes casos passam a procurar.
+ */
+const nomeDe = (b: Element) =>
+  (b.getAttribute("aria-label") ?? b.textContent ?? "").trim();
+
 describe("a barra de baixo é o menu do back office", () => {
   it("leva TODOS os destinos, e não só os quatro do dia", () => {
     montar(makeQuote());
     const naBarra = within(barraDeBaixo())
       .getAllByRole("button")
-      .map((b) => b.textContent?.trim())
+      .map(nomeDe)
       .filter(Boolean);
     const faltam = NAV.filter((n) => !naBarra.includes(n.label)).map((n) => n.label);
     expect(faltam, `destinos que a barra não tem: ${faltam.join(", ")}`).toEqual([]);
@@ -241,7 +255,7 @@ describe("a barra de baixo é o menu do back office", () => {
     montar(makeQuote());
     const naBarra = within(barraDeBaixo())
       .getAllByRole("button")
-      .map((b) => b.textContent?.trim())
+      .map(nomeDe)
       .filter((t): t is string => !!t);
     const esperada = [...CORE_NAV, ...MORE_NAV].map((id) => NAV.find((n) => n.id === id)!.label);
     expect(naBarra.slice(0, esperada.length)).toEqual(esperada);
@@ -258,7 +272,7 @@ describe("a barra de baixo é o menu do back office", () => {
     // «Propostas Aceites», e uma busca solta devolvia duas.
     const botoes = within(barraDeBaixo()).getAllByRole("button");
     for (const item of NAV) {
-      const botao = botoes.find((b) => b.textContent?.trim() === item.label);
+      const botao = botoes.find((b) => nomeDe(b) === item.label);
       expect(botao, `«${item.label}» não está na barra`).toBeDefined();
       const soNoComputador = !BARRA_INFERIOR.includes(item.id);
       expect(
