@@ -78,9 +78,21 @@ function corComAlpha(valor: string): { cor: RGB; alpha: number } {
   return { cor: hexParaRgb(hex[0]), alpha: 1 };
 }
 
-/** O material assente num fundo — o que o olho vê depois do alpha compor. */
+/**
+ * O material assente num fundo — o que o olho vê depois do alpha compor.
+ *
+ * ── E É O GRAU FINO, QUE É O QUE A BARRA USA DESDE QUE ELA PEDIU VIDRO ───
+ *
+ * Isto lia o `--bo-material` (0,80), que é o material dos MENUS. A barra
+ * passou ao segundo grau da mesma família — `--bo-material-fino`, 0,66 — e
+ * enquanto esta linha não mudou o ficheiro continuou verde a medir a
+ * superfície errada: uma garantia sobre uma coisa que a barra já não usava.
+ *
+ * É a avaria mais silenciosa que um teste pode ter, e não dá vermelho nenhum
+ * quando acontece. Fica escrito para a próxima pessoa que mexer no grau.
+ */
 function material(fundo: RGB): RGB {
-  const { cor, alpha } = corComAlpha(token("--bo-material"));
+  const { cor, alpha } = corComAlpha(token("--bo-material-fino"));
   return achatar(cor, alpha, fundo);
 }
 const tintaSobre = (alpha: number, fundo: RGB) => achatar(TINTA, alpha, fundo);
@@ -109,7 +121,17 @@ function barra(): string {
 describe("a cápsula é do material da casa, e não um vidro inventado", () => {
   it("leva a superfície, o desfoque e o raio de pílula — pelas classes, não à mão", () => {
     const b = barra();
-    for (const classe of ["bo-material", "bo-material-desfoque", "bo-material-pilula"]) {
+    for (const classe of [
+      "bo-material",
+      "bo-material-desfoque",
+      "bo-material-pilula",
+      // O GRAU FINO. Sem esta, a cápsula cai no material dos menus (0,80) e a
+      // transmissão volta aos 20% que a fizeram parecer uma caixa branca — o
+      // defeito que ela viu e disse por palavras. O passeio
+      // `e2e/o-vidro-deixa-passar.spec.ts` mede-o no pixel; aqui guarda-se
+      // que a classe não se perde num refactor de `className`.
+      "bo-material-fino",
+    ]) {
       expect(b, `a cápsula perdeu a \`${classe}\``).toContain(classe);
     }
   });
@@ -155,14 +177,46 @@ describe("o que se lê em cima do vidro, medido contra o pior fundo", () => {
     throw new Error("nenhum degrau de tinta passa AA sobre este material");
   };
 
+  /**
+   * ── E A TINTA SUBIU COM A TRANSPARÊNCIA, QUE É A OUTRA METADE DA TROCA ──
+   *
+   * Era o `--bo-text-muted` (0,64) e passou a ser o `--bo-tinta-72`. Não é
+   * gosto: é o que este número exige. Medido sobre o pior fundo possível — uma
+   * fotografia preta a passar por baixo do vidro:
+   *
+   *     material   superfície   tinta-64   tinta-72
+   *     0,80       #cccccc        4,88       6,21     ← antes
+   *     0,66       #a8a8a8        4,05       4,91     ← agora
+   *
+   * Com a tinta antiga, mais vidro custava a legibilidade — 4,05:1 chumba AA.
+   * Subindo um degrau, os dois números melhoram ao mesmo tempo: 4,88 → 4,91 de
+   * contraste E 20% → 34% de transmissão. É a mesma manobra que o
+   * `globals.css` já fez quando tirou o verde do visto do `ui/Escolha` em vez
+   * de subir a opacidade do material.
+   *
+   * O caso lê o alpha do token, portanto quem trocar o degrau move o número
+   * atrás dele — e a segunda metade exige que a barra USE mesmo esse degrau,
+   * senão isto seria uma conta sobre uma tinta que ninguém pinta.
+   */
   it("o rótulo do destino em repouso passa AA sobre uma fotografia preta", () => {
     const fundo = material(PRETO);
-    const muted = corComAlpha(token("--bo-tinta-64")).alpha;
-    const racio = racioDeContraste(tintaSobre(muted, fundo), fundo);
+    const repouso = corComAlpha(token("--bo-tinta-72")).alpha;
+    const racio = racioDeContraste(tintaSobre(repouso, fundo), fundo);
     expect(
       racio,
-      `o --bo-text-muted mede ${racio.toFixed(2)}:1 sobre a cápsula assente em preto`,
+      `o --bo-tinta-72 mede ${racio.toFixed(2)}:1 sobre a cápsula assente em preto`,
     ).toBeGreaterThanOrEqual(AA);
+
+    expect(
+      barra(),
+      "o rótulo do destino em repouso deixou de usar o `--bo-tinta-72`. Sobre o grau fino " +
+        "do material, o degrau abaixo (`--bo-text-muted`, 0,64) mede 4,05:1 e chumba AA.",
+    ).toContain("text-[var(--bo-tinta-72)]");
+    expect(
+      barra(),
+      "voltou o `--bo-text-muted` à barra — é o degrau que o material dos MENUS aguenta, " +
+        "não o que este aguenta",
+    ).not.toContain("--bo-text-muted");
   });
 
   it("a barra não pinta tinta abaixo do chão que este material impõe", () => {
@@ -174,7 +228,17 @@ describe("o que se lê em cima do vidro, medido contra o pior fundo", () => {
         for (const m of linha.matchAll(/\btext-(?:foreground|black|white)\/(\d{1,3})\b/g)) {
           if (Number(m[1]) / 100 < limite) faltas.push(`${m[0]} (linha relativa ${i + 1})`);
         }
-        for (const morto of ["--bo-text-faint", "--bo-tinta-58", "--bo-tinta-50"]) {
+        // O `--bo-tinta-64` e o seu apelido entraram nesta lista quando o
+        // material da barra desceu a 0,66: a 4,05:1 deixaram de chegar. O
+        // `chao()` aqui em cima já os apanharia se fossem escritos como
+        // `text-foreground/64`, mas nesta casa escrevem-se pelo nome.
+        for (const morto of [
+          "--bo-text-faint",
+          "--bo-tinta-58",
+          "--bo-tinta-50",
+          "--bo-tinta-64",
+          "--bo-text-muted",
+        ]) {
           if (linha.includes(morto)) faltas.push(`${morto} (linha relativa ${i + 1})`);
         }
       });

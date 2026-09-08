@@ -1010,10 +1010,80 @@ body:is(.admin-mode, :has([data-admin-mode])) {
        dela desalinha as duas fronteiras verticais que o olho lê. Fica com a
        mesma folga da pastilha. */
   --bo-material: rgba(255, 255, 255, 0.8);
+  /* ── O SEGUNDO GRAU DO MESMO MATERIAL, E PORQUE É QUE ELE PRECISA DE EXISTIR
+     ────────────────────────────────────────────────────────────────────────
+
+     Ela mandou as barras do Instagram e do WhatsApp no iOS 26 e disse: «eu
+     quero que esteja aquele liquid glass transparente como é mesmo no macOS».
+     Fui MEDIR a nossa antes de responder, com uma sonda de cor conhecida por
+     trás da cápsula e o pixel do meio lido num Chromium:
+
+         sonda preta ..... rgb(204, 204, 204)
+         sonda branca .... rgb(255, 255, 255)
+         ───────────────────────────────────
+         transmissão ..... 51/255 = **20%**
+
+     Ou seja: o `backdrop-filter` estava lá e funcionava (blur 20 + saturate
+     180), o conteúdo passava mesmo por baixo — mas a 0,80 de opacidade só um
+     quinto do que passa chega ao olho. Isso não é vidro; é tinta com um
+     desfoque que ninguém vê. É exactamente o ponto 1 da investigação dela.
+
+     ── E PORQUE É QUE NÃO SE BAIXA O `--bo-material` E ACABOU ─────────────
+
+     Porque o α do material não é um gosto: é o que o contraste deixa, e a
+     tabela lá em baixo (ponto 1) fixou 0,80 com o chão de tinta no
+     `--bo-text-muted` (0,64). Baixar a família inteira punha os MENUS a
+     3,80:1 — abaixo de AA — e a correcção seria subir a tinta de sete
+     ficheiros.
+
+     A barra não tem esse problema, e a razão é a escala: uma cápsula com
+     quatro rótulos de uma linha controla toda a sua própria tinta, e um menu
+     com dez linhas de texto não. É a mesma leitura que a Apple faz — «a
+     escala altera a física», elementos maiores usam material diferente — e
+     por isso isto é um GRAU do mesmo material e não uma segunda família (a
+     Parte −1 do `docs/DESIGN-SYSTEM.md`, ponto 4, proíbe a segunda).
+
+     ── O NÚMERO, MEDIDO E NÃO ESCOLHIDO ──────────────────────────────────
+
+     Mesma régua do ponto 1: material branco a α assente em PRETO, que é o
+     pior fundo que uma fotografia pode dar.
+
+         α      superfície   tinta-64   tinta-72   transmissão
+         0,80   #cccccc        4,88       6,21        20%   ← o de antes
+         0,74   #bdbdbd        4,54       5,66        26%
+         0,70   #b3b3b3        4,30       5,29        30%
+         0,66   #a8a8a8        4,05     **4,91**      34%   ← este
+         0,62   #9e9e9e        3,80       4,54        38%
+         0,55   #8c8c8c        3,35       3,90        45%
+
+     **0,66, com a tinta da barra a subir de 0,64 para 0,72.** As duas metades
+     andam juntas de propósito, e o resultado é que os dois números melhoram
+     ao mesmo tempo: a transmissão sobe de 20% para 34% (uma vez e meia mais
+     do que passava) e o pior contraste do rótulo sobe de 4,88:1 para 4,91:1.
+     Mais vidro e mais legível — não é um compromisso, é uma troca boa.
+
+     Parou em 0,66 e não em 0,62 porque a 0,62 a tinta-72 mede 4,54:1, que é
+     um centésimo acima do mínimo. Este ficheiro já escreveu, a propósito do
+     0,74, que «quatro centésimos de rácio não são folga nenhuma».
+
+     O escuro NÃO desce, e está escrito no bloco do `light-dark()` porquê. */
+  --bo-material-fino: rgba(255, 255, 255, 0.66);
   /* O recuo de quem não tem `backdrop-filter` e de quem pediu menos
      transparência. Branco puro — a superfície que a casa já tinha. */
   --bo-material-opaco: #ffffff;
   --bo-material-desfoque: 20px;
+  /* ── E O DESFOQUE DO GRAU FINO SOBE, PELA MESMA RAZÃO QUE O OUTRO PAROU ──
+     Os 20 px da família estão travados porque «é o raio a partir do qual o
+     que está por baixo deixa de se reconhecer». Esse raio depende do que
+     PASSA: com 20% de transmissão, 20 px chegavam; com 34%, o que atravessa é
+     uma vez e meia mais forte e as letras de uma lista ainda se adivinham por
+     trás da cápsula — vi-o num retrato. 32 px devolve a mancha de cor sem a
+     letra, que é o que o desfoque existe para fazer.
+
+     E o custo não cresceu na mesma proporção: os 20 px pagavam-se sobre a
+     área de um menu ou da barra de topo inteira; estes 32 pagam-se sobre uma
+     cápsula de 286×72 e uma peça redonda de 62×62. */
+  --bo-material-fino-desfoque: 32px;
   --bo-material-saturacao: 180%;
   --bo-material-raio: 0.75rem; /* 12px — menus, listas, notas */
   --bo-material-raio-grande: 1.125rem; /* 18px — folhas e diálogos */
@@ -1501,6 +1571,29 @@ body:is(.admin-mode, :has([data-admin-mode])) {
     /* O VIDRO. O material claro assenta em branco a 80%; o escuro num verde
        quase preto a 52%, que é o que a Parte 5.2 dá. */
     --bo-material: light-dark(rgba(255, 255, 255, 0.8), rgba(26, 34, 28, 0.52));
+    /* ── E O GRAU FINO NÃO DESCE NO ESCURO, QUE É O CONTRÁRIO DO QUE PARECE ─
+       O claro desce de 0,80 para 0,66 porque tinha 20% de transmissão. O
+       escuro já está a 0,52, e medido pela mesma sonda isso são **48%** — a
+       superfície mais transparente desta casa, e mais vidro do que o claro
+       vai ter mesmo depois desta mudança. Não há aqui nada para corrigir.
+
+       E há uma razão para não descer mais. No claro o pior fundo é o preto;
+       no escuro é o BRANCO — uma fotografia de um vestido ao sol por baixo de
+       uma barra escura. Medido, com a tinta clara (241 245 241):
+
+           α      superfície        tinta-64   tinta-72
+           0,52   rgb(136,140,137)    2,17       2,36
+           0,62   rgb(113,118,114)    2,71       3,01
+           0,82   rgb(67,74,69)       4,50       5,22
+
+       Ou seja o escuro sobre branco já chumba AA hoje, a 2,17:1, e ninguém o
+       media — o teste da cápsula lê o bloco literal do back office, que só
+       tem os valores claros. Subir a tinta para 0,72 melhora-o para 2,36:1 e
+       BAIXAR o α pioraria; portanto o α fica onde está e a tinta sobe. O que
+       falta para lá disso é uma camada de escurecimento por baixo do vidro
+       quando o que passa é claro, e isso é trabalho a seguir — está dito no
+       relatório e não se finge aqui que está feito. */
+    --bo-material-fino: light-dark(rgba(255, 255, 255, 0.66), rgba(26, 34, 28, 0.52));
     --bo-material-opaco: light-dark(#ffffff, #1a221c);
     --bo-vidro-claro: light-dark(rgba(255, 255, 255, 0.1), rgba(20, 28, 22, 0.16));
     --bo-vidro-claro-veu: light-dark(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.62));
@@ -1575,7 +1668,6 @@ body:has([data-admin-mode][data-aparencia="escuro"]) {
 body:has([data-admin-mode][data-aparencia="claro"]) {
   --bo-tinta-rgb: 13 13 13;
 }
-
 
 /* ── O GEIST, E PORQUE É QUE ESTA REGRA NÃO ESTÁ NO `body` ────────────────
    A letra é carregada pelo `layout.tsx` do grupo `(admin)`, e o `next/font`
@@ -3911,14 +4003,30 @@ body[data-menu-open] .whatsapp-fixed {
 
      E desaparece sozinha quando o material deixa de ser material: as duas
      regras de recuo aqui em baixo escrevem `background:` na forma curta, que
-     repõe `background-image: none`. Sem vidro não há reflexo. */
-  background-image: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.7),
-    rgba(255, 255, 255, 0) 1.5px
-  );
+     repõe `background-image: none`. Sem vidro não há reflexo.
+
+     ── E A SEGUNDA LINHA, A DE BAIXO, QUE É O QUE DÁ ESPESSURA ────────────
+     A investigação dela descreve o bordo do material como assimétrico: um fio
+     de luz em cima, onde a luz bate, e uma devolução mais fraca em baixo,
+     onde ela ressalta do que está por trás. O `docs/DESIGN-SYSTEM.md` escreve
+     as duas na mesma regra (`inset 0 1.5px 0 var(--glass-hi)` e
+     `inset 0 -1px 0 var(--glass-lo)`, Parte 3.3) e dá-lhes valores
+     diferentes: 0,92 em cima e 0,16 em baixo.
+
+     Faltava a de baixo, e com a superfície a ficar mais transparente ela
+     deixou de ser um detalhe: um fio só em cima lê-se como uma superfície
+     pintada com um reflexo por cima; os dois lêem-se como uma peça que tem
+     duas faces. É a diferença entre uma película e um vidro.
+
+     Vem como segunda camada de fundo pela mesma razão que a primeira — um
+     `box-shadow: inset` aqui apagava o `shadow-[var(--bo-sombra-suspensa)]`
+     de todas as superfícies que o pedem. Três valores no `background-clip`
+     porque agora são duas imagens e uma cor. */
+  background-image:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 1.5px),
+    linear-gradient(to top, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 1px);
   background-color: var(--bo-material, #ffffff);
-  background-clip: padding-box, border-box;
+  background-clip: padding-box, padding-box, border-box;
   border: 1px solid var(--bo-hairline-strong, rgba(13, 13, 13, 0.13));
   border-radius: var(--bo-material-raio, 0.75rem);
 }
@@ -3949,6 +4057,52 @@ body[data-menu-open] .whatsapp-fixed {
     saturate(var(--bo-material-saturacao, 180%));
   backdrop-filter: blur(var(--bo-material-desfoque, 20px))
     saturate(var(--bo-material-saturacao, 180%));
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   O GRAU FINO — PARA AS PEÇAS QUE TÊM O ECRÃ INTEIRO A PASSAR-LHES POR BAIXO
+   ══════════════════════════════════════════════════════════════════════════
+
+   Os números, a tabela de contraste e a medição que trouxe isto estão no
+   token (`--bo-material-fino`, lá em cima). Aqui só se arruma o mecanismo, e
+   ele é deliberadamente uma linha e meia: esta classe **não desenha nada** —
+   redefine os dois valores que a `.bo-material` e a `.bo-material-desfoque`
+   já lêem, no próprio elemento.
+
+   É por isso que isto é um GRAU da família e não uma família nova. Uma peça
+   que leve `bo-material bo-material-desfoque bo-material-fino` continua a ir
+   buscar o fio, o raio, a moldura e o recuo à mesma regra de sempre; muda-lhe
+   a superfície e o raio do desfoque, como a `.bo-material-grande` lhe muda o
+   raio dos cantos. Mexer no fio ou no recuo continua a ser mexer num sítio.
+
+   ── E É POR ISSO QUE O RECUO CONTINUA A FUNCIONAR SOZINHO ─────────────────
+   As três regras de recuo (sem `backdrop-filter`, `prefers-reduced-transparency`
+   e `prefers-contrast: more`) escrevem `background:` na forma curta com o
+   `--bo-material-opaco`. Nenhuma delas lê o token que esta classe redefine,
+   portanto todas continuam a ganhar-lhe sem ter de a nomear. Um grau novo do
+   material nasce acessível por construção, e não por alguém se lembrar. */
+.bo-material-fino {
+  --bo-material: var(--bo-material-fino);
+  --bo-material-desfoque: var(--bo-material-fino-desfoque);
+}
+/* ── E O GRAU QUE DEIXA DE SER VIDRO, PARA A PEÇA QUE MARCA ONDE ELA ESTÁ ──
+   Mesmo mecanismo, sentido contrário: em vez de destrancar a superfície,
+   tranca-a na lavagem de acento OPACA.
+
+   Existe por uma razão medida, e é a mesma que pôs a pastilha do destino
+   activo opaca dentro da cápsula: o acento verde sobre vidro desce com o que
+   passa por baixo. Sobre o pior fundo (fotografia preta) o `--bo-accent`
+   media 3,28:1 no material antigo e 2,62:1 no fino — abaixo dos 3:1 que o
+   1.4.11 pede a um controlo sem texto visível. Sobre esta lavagem mede
+   4,95:1, e não depende de nada.
+
+   ── E PORQUE É QUE É UMA CLASSE E NÃO UM `bg-[…]` NA ETIQUETA ───────────
+   Porque não funcionava. A `.bo-material` vive FORA de camadas e ganha sempre
+   à `@layer utilities`: um `bg-*` escrito ao lado dela na mesma etiqueta não
+   vale nada — está escrito vinte linhas acima, e foi ao certo o que aconteceu
+   à primeira tentativa desta correcção. Redefinir o token que a `.bo-material`
+   lê é a única forma que pega. */
+.bo-material-activo {
+  --bo-material: var(--bo-accent-lavagem, #e2e6e3);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -5950,7 +6104,6 @@ body:has(.barra-consentimento) footer {
   --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.45);
 }
 
-
 /* ══════════════════════════════════════════════════════════════════════════
    O PONTEIRO TEM SIGNIFICADO — E É ISTO QUE SEPARA UMA APP DE UM SITE
    ══════════════════════════════════════════════════════════════════════════
@@ -5990,7 +6143,8 @@ body:has(.barra-consentimento) footer {
    ficam onde estão, nas classes dos componentes que os usam: esses dependem
    do estado, e não do tipo do elemento.
    ══════════════════════════════════════════════════════════════════════════ */
-body:has([data-admin-mode]) :is(button, [role="button"], [role="tab"], [role="option"], summary, label, select) {
+body:has([data-admin-mode])
+  :is(button, [role="button"], [role="tab"], [role="option"], summary, label, select) {
   cursor: default;
 }
 
@@ -6002,7 +6156,11 @@ body:has([data-admin-mode]) a[href] {
 /* Onde se escreve, o cursor diz que se escreve — incluindo as células
    editáveis de uma tabela, que é onde isto mais falta faz. */
 body:has([data-admin-mode])
-  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, [contenteditable="true"]) {
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    textarea,
+    [contenteditable="true"]
+  ) {
   cursor: text;
 }
 

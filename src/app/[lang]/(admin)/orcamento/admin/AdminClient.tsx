@@ -595,10 +595,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       cabecalho: "",
       largura: "w-10",
       celula: (q) => (
-        <label
-          className="flex items-center justify-center"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <label className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={ctx.selectedIds.has(q.id)}
@@ -4757,7 +4754,29 @@ export default function AdminClient({
                não pode esticar-se de margem a margem: mede o que tem
                (`lg:flex-none`), e se um dia não couber, rola por dentro em vez
                de rebentar a cápsula (`lg:overflow-x-auto`). */
-            className="bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] lg:flex-none lg:max-w-full lg:overflow-x-auto"
+            /* ── O GRAU FINO DO MATERIAL, E O QUE ELE CUSTOU A GANHAR ────────
+               «eu quero que esteja aquele liquid glass transparente como é
+               mesmo no macOS, como é no Instagram, como é no WhatsApp.» Fui
+               medir esta cápsula antes de lhe responder, com uma sonda de cor
+               conhecida por trás dela e o pixel do meio lido num Chromium:
+
+                   sonda preta ..... rgb(204, 204, 204)
+                   sonda branca .... rgb(255, 255, 255)
+                   transmissão ..... 51/255 = 20%
+
+               Ou seja o desfoque estava cá, o conteúdo passava mesmo por
+               baixo — e a 0,80 de opacidade só um quinto do que passava
+               chegava ao olho. O que faltava não era o filtro; era a
+               TRANSPARÊNCIA. A `bo-material-fino` é o segundo grau da mesma
+               família (0,66 e 32 px de desfoque), e a conta que fixou os dois
+               números está no `globals.css`, ao lado do token.
+
+               A `bo-material` continua cá, e tem de continuar: é dela que vêm
+               o fio, o raio, a moldura e — o que mais importa — os três
+               recuos que devolvem uma superfície opaca a quem não tem
+               `backdrop-filter`, a quem pediu menos transparência e a quem
+               pediu mais contraste. O grau fino só redefine dois tokens. */
+            className="bo-material bo-material-desfoque bo-material-fino bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] lg:flex-none lg:max-w-full lg:overflow-x-auto"
             style={{ height: "var(--bo-barra-capsula)" }}
           >
             {/* ── QUATRO NO TELEMÓVEL, TODOS NO COMPUTADOR ─────────────────
@@ -4845,12 +4864,36 @@ export default function AdminClient({
                      `barra-que-flutua.test.ts`. O que se acrescenta é RELEVO —
                      um fio à volta e uma sombra —, que não mexe em contraste
                      nenhum. Levantar sem repintar. */
+                    /* ── E A TINTA DO DESTINO EM REPOUSO SUBIU UM DEGRAU ──────
+                     De `--bo-text-muted` (0,64) para `--bo-tinta-72`, e não é
+                     cosmético: é a outra metade da transparência que a cápsula
+                     ganhou, e as duas andam juntas.
+
+                     O material desceu de 0,80 para 0,66, o que quer dizer que
+                     a superfície por baixo desta tinta ficou mais escura no
+                     pior caso — uma fotografia preta a passar por baixo dá
+                     `#a8a8a8` em vez de `#cccccc`. Medido, sobre esse pior
+                     caso:
+
+                         tinta   sobre #cccccc (antes)   sobre #a8a8a8 (agora)
+                         0,64          4,88:1                  4,05:1  ← chumba
+                         0,72          6,21:1                  4,91:1  ← este
+
+                     Ou seja: com a tinta de antes, mais vidro custava a
+                     legibilidade. Subindo o degrau, os dois números melhoram
+                     ao mesmo tempo — 4,88:1 passa a 4,91:1 E a transmissão
+                     sobe de 20% para 34%. É a mesma manobra que o `globals.css`
+                     já fez uma vez, quando tirou o verde do visto do
+                     `ui/Escolha` em vez de subir a opacidade do material.
+
+                     E o 0,72 continua a ler-se como secundário: o texto de
+                     corpo desta casa é o 0,82. */
                     className={`alvo-toque relative ${
                       noTelemovel ? "flex" : "hidden lg:flex"
                     } min-w-0 flex-1 lg:w-20 lg:flex-none flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
                       isActive
                         ? "bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] font-medium shadow-[var(--bo-sombra-suspensa)] ring-1 ring-inset ring-[var(--bo-hairline)]"
-                        : "text-[var(--bo-text-muted)] font-normal"
+                        : "text-[var(--bo-tinta-72)] font-normal"
                     }`}
                   >
                     {id === "pedidos" && pendingCount > 0 && (
@@ -4914,9 +4957,7 @@ export default function AdminClient({
                       duas linhas deixa de fazer falta — todas as células têm
                       exactamente uma. */}
                     <span className="text-[11px] lg:text-[12px] leading-tight text-center whitespace-nowrap flex items-start justify-center">
-                      <span className="lg:hidden">
-                        {ROTULO_CURTO[id] ?? navItem.label}
-                      </span>
+                      <span className="lg:hidden">{ROTULO_CURTO[id] ?? navItem.label}</span>
                       <span className="hidden lg:inline">{navItem.label}</span>
                     </span>
                   </button>
@@ -4938,10 +4979,35 @@ export default function AdminClient({
             onClick={() => setNavOpen(true)}
             aria-label="Mais destinos"
             aria-expanded={navOpen}
-            className={`alvo-toque bo-material bo-material-desfoque bo-material-pilula pointer-events-auto flex shrink-0 items-center justify-center shadow-[var(--bo-sombra-suspensa)] ${ESTADO} ${PRESSAO} ${
+            /* O MESMO GRAU DE MATERIAL DA CÁPSULA. As duas peças estão lado a
+               lado e são a mesma barra: uma a 0,66 e a outra a 0,80 lêem-se
+               como dois vidros diferentes colados um ao outro, que é
+               exactamente o defeito que a Parte −1 do sistema de design manda
+               evitar. */
+            /* ── E O ⋯ VERDE PASSOU A POUSAR NUMA PASTILHA, COMO OS OUTROS ───
+               Quando o destino aberto não é nenhum dos quatro da cápsula, esta
+               peça é o destino activo — e marcava-o pintando o glifo de verde,
+               sem fundo próprio. Medi o que isso dava sobre o pior fundo (uma
+               fotografia preta a passar por baixo do vidro):
+
+                   material a 0,80 → #cccccc → acento a 3,28:1
+                   material a 0,66 → #a8a8a8 → acento a 2,62:1
+
+               O primeiro já vivia à justa do mínimo de 3:1 que o 1.4.11 pede a
+               um controlo sem texto visível; o segundo chumbava-o. Um vidro
+               mais transparente não podia entrar sem isto.
+
+               A saída é a que a cápsula já usa e que este ficheiro já explicou
+               ao lado da pastilha: o acento não assenta no vidro, assenta na
+               lavagem OPACA (`--bo-accent-lavagem`), onde mede 4,95:1 e não
+               depende do que passa por baixo. De caminho, as duas peças da
+               barra passam a marcar o activo da mesma maneira — pastilha e
+               tinta de acento —, que era o que já se dizia aqui e não era
+               verdade para esta. */
+            className={`alvo-toque bo-material bo-material-desfoque bo-material-fino bo-material-pilula pointer-events-auto flex shrink-0 items-center justify-center shadow-[var(--bo-sombra-suspensa)] ${ESTADO} ${PRESSAO} ${
               !BARRA_INFERIOR.includes(view)
-                ? "text-[var(--bo-accent)]"
-                : "text-[var(--bo-text-muted)]"
+                ? "bo-material-activo text-[var(--bo-accent)]"
+                : "text-[var(--bo-tinta-72)]"
             }`}
             style={{
               height: "var(--bo-barra-capsula)",
@@ -6879,7 +6945,9 @@ export default function AdminClient({
                                         Custos {formatPrice(costs)} · Margem{" "}
                                         <span
                                           className={
-                                            margin >= 0 ? "text-sage-600" : "text-[var(--bo-perigo)]"
+                                            margin >= 0
+                                              ? "text-sage-600"
+                                              : "text-[var(--bo-perigo)]"
                                           }
                                         >
                                           {formatPrice(margin)}

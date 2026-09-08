@@ -230,7 +230,7 @@ jobs:
         # `@propostas` corre no seu próprio passo bloqueante, com config e
         # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
         # este servidor é o de produção e recusa escritas sem Supabase.
-        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento"
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@vidro"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -320,6 +320,39 @@ jobs:
       # um browser a que se pergunte os vê — e por isso partilham o passo.
       - name: O que só um browser vê — molas, modo escuro, ponteiro (bloqueante)
         run: npx playwright test --grep "@movimento"
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. O VIDRO DEIXA PASSAR — ou não deixa, e continua a parecer
+      # que sim.
+      #
+      # Ela mandou as barras do Instagram e do WhatsApp no iOS 26 e disse «o
+      # menu no telemóvel não está assim». A barra tinha `backdrop-filter`, o
+      # conteúdo passava mesmo por baixo dela, e mesmo assim não havia vidro
+      # nenhum: a 0,80 de opacidade só 20% do que passava por trás chegava ao
+      # olho — uma caixa branca com um desfoque que ninguém via.
+      #
+      # Nenhum teste desta casa podia apanhar isso, e não por descuido: os que
+      # existiam medem a REGRA (as classes no `globals.css`, os contrastes
+      # calculados a partir dos tokens) e a regra estava certa. A transmissão
+      # não está escrita em lado nenhum do CSS — é o produto do α da superfície
+      # com o que estiver por trás dela nesse fotograma, e só existe depois de
+      # o browser compor as duas camadas.
+      #
+      # É a mesma assinatura do passo de cima, e por isso corre da mesma
+      # maneira: o CSS fica com a regra e sem o efeito, e só um browser a que
+      # se pergunte o vê. Este mede o pixel — põe uma sonda de cor conhecida
+      # por trás da barra e exige que o que se vê através dela mude.
+      #
+      # Bloqueante e não informativo porque a regressão é MUDA e barata de
+      # fazer: basta alguém subir a opacidade de um token para a barra voltar a
+      # ser tinta, e continua a parecer bem em qualquer captura. Não grava
+      # nada, portanto corre contra o servidor de produção deste job sem
+      # precisar de Supabase.
+      - name: O vidro deixa passar (bloqueante)
+        run: npx playwright test --grep "@vidro"
         env:
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
