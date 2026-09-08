@@ -78,6 +78,25 @@ const eslintConfig = defineConfig([
     // nada em todo o repositório, e chegou a rebentar com ENOENT por estar a
     // ler uma pasta que ainda estava a ser escrita.
     ".next-*/**",
+
+    // ── E O QUE O PLAYWRIGHT DEIXA ATRÁS ────────────────────────────────
+    //
+    // É a mesma avaria da linha de cima, com outro nome. O relatório do
+    // Playwright traz o VISUALIZADOR dele — cinco ficheiros de JavaScript
+    // minificado, com um CodeMirror lá dentro. O ESLint lê-os e devolve 159
+    // erros de `no-this-alias` em código que ninguém desta casa escreveu.
+    //
+    // MEDIDO no dia em que isto entrou: `npm run lint` passou de «0 erros, 129
+    // avisos» para «159 erros, 2969 avisos» — só por eu ter corrido os
+    // passeios antes. O CI não vê isto (arranca limpo e faz o lint antes do
+    // Playwright), portanto é uma armadilha só de quem trabalha na máquina: o
+    // lint local deixa de servir para nada exactamente quando mais faz falta,
+    // que é depois de mexer em testes.
+    //
+    // As duas pastas estão no `.gitignore` — isto é só para o ESLint as ver
+    // com os mesmos olhos.
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 
