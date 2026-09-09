@@ -304,12 +304,27 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingExcludes: {
     "/**": [
-      // O `wasm32` mudou de NOME no `sharp` 0.35.4: o `@img/sharp-wasm32`
-      // deixou de ser declarado e deu lugar a estes dois. O que cá estava
-      // passou a ser uma linha morta — e foi o guarda, já corrigido, que o
-      // disse. É exactamente a avaria que ele foi escrito para apanhar.
-      "./node_modules/@img/sharp-webcontainers-wasm32/**/*",
-      "./node_modules/@img/sharp-freebsd-wasm32/**/*",
+      // ── TRÊS NOMES PARA O `wasm32`, E NENHUM DELES É DE MAIS ───────────
+      //
+      // O `sharp` 0.35.4 deixou de declarar o `@img/sharp-wasm32` e passou a
+      // declarar os outros dois. Tirei o velho por isso — e o CI devolveu-mo
+      // na volta seguinte, com as rotas todas a levá-lo outra vez:
+      //
+      //     api/proposta/[token]/pdf/route.js → sharp-wasm32
+      //
+      // Porque ele CONTINUA no `package-lock.json`, sobra da versão anterior
+      // que o npm não limpou. E é o `package-lock.json` que decide o que uma
+      // máquina de construção instala — não o que o `sharp` declara hoje, nem
+      // o que está no disco de quem escreve o código.
+      //
+      // Os dois nomes NOVOS não entram aqui, e é de propósito: o
+      // `sharp-webcontainers-wasm32` declara `cpu: ["wasm32"]` e o
+      // `sharp-freebsd-wasm32` declara `os: ["freebsd"]`, portanto nenhum é
+      // instalado num Linux x64. Excluí-los seria a linha morta ao contrário.
+      //
+      // Limpar a sobra do lockfile é outro trabalho; enquanto ela lá estiver,
+      // tem de estar aqui.
+      "./node_modules/@img/sharp-wasm32/**/*",
       "./node_modules/@img/sharp-linuxmusl-x64/**/*",
       "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
     ],

@@ -154,32 +154,87 @@ describe("o que o `sharp` leva para dentro da função", () => {
      * apanhar o que este teste veio apanhar: um nome inventado, ou um pacote
      * que mudou de nome numa subida de versão.
      */
-    const daFamilia = new Set(
-      Object.keys(
-        (
-          JSON.parse(
-            readFileSync(join(process.cwd(), "node_modules/sharp/package.json"), "utf8"),
-          ) as {
-            optionalDependencies?: Record<string, string>;
-          }
-        ).optionalDependencies ?? {},
-      ),
-    );
+    /**
+     * ── ONDE ESTÁ A VERDADE SOBRE «ISTO VAI SER INSTALADO?» ───────────────
+     *
+     * Esta asserção já esteve errada DUAS vezes, e as duas custaram uma volta
+     * de CI:
+     *
+     *   1ª  `existsSync(…)` — o disco de quem escreve o código. Falso para
+     *       pacotes de outra plataforma, que o npm salta AQUI e instala na
+     *       máquina de construção. Levou-me a apagar as exclusões de Alpine e
+     *       a mandar 17,8 MB para dentro de 75 rotas.
+     *
+     *   2ª  as `optionalDependencies` do `sharp`. Falso ao contrário: o
+     *       `@img/sharp-wasm32` deixou de ser declarado no 0.35.4 e CONTINUA
+     *       no lockfile, sobra que o npm não limpou. Tirei-o e as rotas
+     *       voltaram a levá-lo.
+     *
+     * A verdade é o `package-lock.json` — é ele que o `npm ci` executa à
+     * letra, e é igual em todas as máquinas. E dá para ser exacto sobre O QUE
+     * LÁ É INSTALADO: cada pacote declara `os` e `cpu`, e o alvo é Linux x64.
+     *
+     * Repare-se no que o lockfile NÃO tem: `libc`. É por isso que o npm não
+     * distingue glibc de Alpine e instala os DOIS — que é a raiz de tudo isto.
+     *
+     * ── E A REGRA DEIXA DE SER «não escrevas nomes errados» ───────────────
+     *
+     * Passa a ser a intenção inteira, nos dois sentidos:
+     *
+     *   · tudo o que é instalado e não é o binário que corre TEM de ser
+     *     excluído (senão viaja dentro de todas as funções);
+     *   · e nada que não seja instalado pode estar na lista (senão é uma linha
+     *     morta a fingir que poupa).
+     *
+     * As duas vezes que me enganei teriam ficado vermelhas aqui, sem gastar
+     * uma volta de CI.
+     */
+    const lockfile = JSON.parse(readFileSync(join(process.cwd(), "package-lock.json"), "utf8")) as {
+      packages?: Record<string, { os?: string[]; cpu?: string[] }>;
+    };
+    const pacotes = lockfile.packages ?? {};
     expect(
-      daFamilia.size,
-      "não se conseguiu ler as variantes declaradas pelo `sharp` — a leitura partiu-se",
-    ).toBeGreaterThan(5);
+      Object.keys(pacotes).length,
+      "não se conseguiu ler o `package-lock.json` — a leitura partiu-se",
+    ).toBeGreaterThan(100);
+
+    /** Este pacote é instalado num Linux x64? (o alvo do Vercel) */
+    const instaladoAqui = (v: { os?: string[]; cpu?: string[] }) =>
+      (!v.os || v.os.includes("linux")) && (!v.cpu || v.cpu.includes("x64"));
+
+    /** O binário que CORRE mesmo: o `sharp` de glibc e o seu `libvips`. */
+    const QUE_CORRE = /^@img\/sharp-(libvips-)?linux-x64$/;
+
+    const variantes = Object.entries(pacotes)
+      .map(([k, v]) => [k.replace(/^node_modules\//, ""), v] as const)
+      .filter(([nome]) => nome.startsWith("@img/sharp-"));
+    expect(variantes.length, "nenhuma variante do `sharp` no lockfile").toBeGreaterThan(5);
+
+    const deviamSairFora = variantes
+      .filter(([nome, v]) => instaladoAqui(v) && !QUE_CORRE.test(nome))
+      .map(([nome]) => nome);
+    const excluidos = new Set(EXCLUIDOS.map((e) => pasta(e).replace(/^node_modules\//, "")));
 
     expect(EXCLUIDOS.length, "deixou de se excluir seja o que for").toBeGreaterThan(0);
+
+    const esquecidos = deviamSairFora.filter((n) => !excluidos.has(n));
+    expect(
+      esquecidos,
+      "o lockfile instala isto num Linux x64, não é o binário que corre, e não está " +
+        "excluído — vai viajar dentro de TODAS as funções:\n  " +
+        esquecidos.join("\n  "),
+    ).toEqual([]);
+
     for (const exc of EXCLUIDOS) {
+      const nome = pasta(exc).replace(/^node_modules\//, "");
       expect(exc, "excluiu-se o `sharp` de glibc, que é o que corre aqui").not.toMatch(
         /sharp-(libvips-)?linux-x64/,
       );
-      const nome = pasta(exc).replace(/^node_modules\//, "");
+      const entrada = pacotes[`node_modules/${nome}`];
       expect(
-        daFamilia.has(nome),
-        `a exclusão \`${exc}\` não é nenhuma das variantes que o \`sharp\` declara — ` +
-          "ou o nome está errado, ou o pacote mudou de nome numa subida de versão",
+        entrada && instaladoAqui(entrada),
+        `a exclusão \`${exc}\` não é instalada num Linux x64 — ou o nome está errado, ` +
+          "ou o pacote saiu do lockfile, ou é de outra plataforma. Linha morta.",
       ).toBe(true);
     }
   });
