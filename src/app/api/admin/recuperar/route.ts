@@ -135,8 +135,28 @@ export async function POST(request: NextRequest) {
     await esperarAtePiso(inicio);
     return NextResponse.json(
       {
+        /**
+         * ── «FALA COM QUEM O GERE» ERA A PESSOA A FALAR CONSIGO PRÓPRIA ──
+         *
+         * Esta frase foi escrita a pensar numa equipa: alguém usa o produto,
+         * outro alguém trata da infraestrutura. Aqui não é assim — quem vê
+         * este ecrã é a dona da empresa, que É quem o gere. Mandou-me a
+         * fotografia do aviso a dizer que «isto não funciona bem», e tinha
+         * razão: a mensagem manda-a falar consigo mesma e não lhe diz nem o
+         * que fazer a seguir, nem que há duas portas abertas ao lado.
+         *
+         * O que a mensagem tem de dar, por esta ordem: o que se pode fazer
+         * AGORA (as duas entradas que funcionam), e só depois o que falta
+         * fazer para esta passar a funcionar.
+         *
+         * O nome da variável que falta fica no `log.error` acima e não aqui:
+         * esta rota responde a quem quer que a chame, e detalhes da instalação
+         * não se contam a quem passa.
+         */
         error:
-          "A recuperação de palavra-passe ainda não está configurada neste site. Fala com quem o gere.",
+          "A recuperação por email ainda não está ligada neste site. Entra com a " +
+          "palavra-passe ou com a chave de acesso. Se és tu quem gere o site, é " +
+          "preciso configurar as contas com email para isto passar a funcionar.",
       },
       { status: 503 },
     );
