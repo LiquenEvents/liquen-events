@@ -271,38 +271,48 @@ const nextConfig: NextConfig = {
    * é isso que o `tracing-do-sharp.test.ts` verifica a cada corrida.
    */
   /**
-   * ── AS DUAS LINHAS DO `musl` SAÍRAM, E FOI O GUARDA A MANDÁ-LAS SAIR ─────
+   * ── TIREI DUAS DESTAS LINHAS E O CI DEVOLVEU-MAS, COM RAZÃO ─────────────
    *
-   * A subida do `sharp` 0.35.3 → 0.35.4 (feita para fechar um aviso GRAVE nas
-   * bibliotecas de imagem que ele traz) pôs o `tracing-do-sharp.test.ts`
-   * vermelho, com a mensagem exacta que ele foi escrito para dar:
+   * A subida do `sharp` 0.35.3 → 0.35.4 pôs o `tracing-do-sharp.test.ts`
+   * vermelho a dizer que as exclusões de Alpine «não apontam para nada». E era
+   * verdade — NESTA MÁQUINA. O 0.35.4 passou a marcar as variantes com a
+   * plataforma a que servem e o npm deixou de as instalar num Linux de glibc.
+   * Concluí que eram linhas mortas e tirei-as.
    *
-   *     a exclusão `./node_modules/@img/sharp-linuxmusl-x64/(tudo)` não aponta
-   *     para nada — ou o pacote mudou de nome, ou a linha é morta
+   * O passo «Peso das rotas» do CI apanhou-me na volta seguinte:
    *
-   * (O caminho está aqui com «(tudo)» no lugar do padrão de asteriscos por uma
-   * razão prosaica: esse padrão acaba em `*` seguido de `/`, que FECHA este
-   * comentário a meio e parte o ficheiro. Já parou um deploy desta casa uma
-   * vez.)
+   *     104 de 135 rotas carregam as bibliotecas de imagem
+   *     75 rotas levam ~17,8 MB que não têm como usar
+   *     api/proposta/[token]/pdf/route.js → sharp-linuxmusl-x64, …
    *
-   * Era a segunda. O `sharp` 0.35.4 passou a marcar as variantes de Alpine com
-   * a plataforma a que servem, e o npm deixou de as instalar numa máquina de
-   * glibc. Deixar de excluir uma coisa que já ninguém instala não poupa nada —
-   * dá é a impressão de estar a poupar, que é pior.
+   * Nas máquinas que CONSTROEM, os pacotes de Alpine são instalados. O meu
+   * `node_modules` não é a instalação que conta, e a lição fica escrita: uma
+   * exclusão de plataforma julga-se pelo que o BUILD instala, não pelo que
+   * está no disco de quem escreve o código.
    *
-   * O que ficou instalado, medido agora:
+   * (O guarda foi corrigido ao mesmo tempo: passou a validar os nomes contra
+   * as `optionalDependencies` do próprio `sharp`, que existem em qualquer
+   * máquina, em vez de exigir que a pasta esteja instalada nesta.)
    *
-   *     @img/sharp-libvips-linux-x64 .... 18 MB    ← é o que corre. FICA.
-   *     @img/sharp-wasm32 ............... 8,8 MB   ← recurso. SAI.
-   *     @img/sharp-linux-x64 ............ 440 KB   ← é o que corre. FICA.
-   *     @img/colour ..................... 96 KB
+   * ── E PORQUE É QUE SE PODE MESMO DEITAR FORA ────────────────────────────
    *
-   * Portanto a exclusão que continua a valer alguma coisa é uma só, e vale
-   * 8,8 MB por função — que é o que o arranque a frio deixa de descomprimir
-   * antes de a primeira linha correr.
+   * `linuxmusl` é para Alpine; `wasm32` é o recurso para quando não há binário
+   * nativo nenhum. O alvo aqui é Linux x64 com glibc. E repare-se que
+   * `sharp-linux-x64` e `sharp-linuxmusl-x64` são nomes diferentes e nenhum é
+   * prefixo do outro no caminho: é isso que faz estes padrões não engolirem o
+   * binário que corre mesmo, e é isso que o `tracing-do-sharp` verifica.
    */
   outputFileTracingExcludes: {
-    "/**": ["./node_modules/@img/sharp-wasm32/**/*"],
+    "/**": [
+      // O `wasm32` mudou de NOME no `sharp` 0.35.4: o `@img/sharp-wasm32`
+      // deixou de ser declarado e deu lugar a estes dois. O que cá estava
+      // passou a ser uma linha morta — e foi o guarda, já corrigido, que o
+      // disse. É exactamente a avaria que ele foi escrito para apanhar.
+      "./node_modules/@img/sharp-webcontainers-wasm32/**/*",
+      "./node_modules/@img/sharp-freebsd-wasm32/**/*",
+      "./node_modules/@img/sharp-linuxmusl-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
+    ],
   },
 
   experimental: {

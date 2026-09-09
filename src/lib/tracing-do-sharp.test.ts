@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import config from "../../next.config";
 
 /**
@@ -128,23 +129,57 @@ describe("o que o `sharp` leva para dentro da função", () => {
     );
   });
 
-  it("e o que se deita fora existe mesmo, e não é o que corre aqui", () => {
+  it("e o que se deita fora é um pacote real do `sharp`, e não o que corre aqui", () => {
     /**
-     * Uma exclusão que não aponta para nada é uma linha morta a dar a
-     * impressão de estar a poupar 27 MB. E uma que apontasse para o pacote de
-     * glibc seria a avaria.
+     * ── ESTE TESTE JÁ MEDIU A COISA ERRADA, E CUSTOU UMA VOLTA DE CI ──────
      *
-     * O alvo do Vercel é Linux x64 com glibc: `linuxmusl` é para Alpine e
-     * `wasm32` é o recurso para quando não há binário nativo nenhum.
+     * A asserção era `existsSync(pasta(exc))`: a pasta excluída tem de estar
+     * instalada AQUI. A ideia estava certa — uma exclusão que não aponta para
+     * nada é uma linha morta a fingir que poupa 27 MB — e a execução estava
+     * errada, porque «aqui» não é onde isto conta.
+     *
+     * O `sharp` 0.35.4 passou a marcar as variantes de Alpine com a plataforma
+     * a que servem, e o npm deixou de as instalar numa máquina de glibc. Este
+     * teste ficou vermelho, eu li-o como «linhas mortas» e tirei as duas
+     * exclusões do `musl`. Nas máquinas que CONSTROEM elas são instaladas, e o
+     * passo «Peso das rotas» do CI respondeu na volta seguinte:
+     *
+     *     75 rotas levam ~17,8 MB que não têm como usar
+     *
+     * Ou seja: o `node_modules` de quem escreve o código não é a instalação
+     * que decide. O que decide é o que o build instala.
+     *
+     * Passa a validar-se contra as `optionalDependencies` DO PRÓPRIO `sharp` —
+     * a lista está no pacote, é a mesma em qualquer máquina, e continua a
+     * apanhar o que este teste veio apanhar: um nome inventado, ou um pacote
+     * que mudou de nome numa subida de versão.
      */
+    const daFamilia = new Set(
+      Object.keys(
+        (
+          JSON.parse(
+            readFileSync(join(process.cwd(), "node_modules/sharp/package.json"), "utf8"),
+          ) as {
+            optionalDependencies?: Record<string, string>;
+          }
+        ).optionalDependencies ?? {},
+      ),
+    );
+    expect(
+      daFamilia.size,
+      "não se conseguiu ler as variantes declaradas pelo `sharp` — a leitura partiu-se",
+    ).toBeGreaterThan(5);
+
     expect(EXCLUIDOS.length, "deixou de se excluir seja o que for").toBeGreaterThan(0);
     for (const exc of EXCLUIDOS) {
       expect(exc, "excluiu-se o `sharp` de glibc, que é o que corre aqui").not.toMatch(
         /sharp-(libvips-)?linux-x64/,
       );
+      const nome = pasta(exc).replace(/^node_modules\//, "");
       expect(
-        existsSync(pasta(exc)),
-        `a exclusão \`${exc}\` não aponta para nada — ou o pacote mudou de nome, ou a linha é morta`,
+        daFamilia.has(nome),
+        `a exclusão \`${exc}\` não é nenhuma das variantes que o \`sharp\` declara — ` +
+          "ou o nome está errado, ou o pacote mudou de nome numa subida de versão",
       ).toBe(true);
     }
   });
