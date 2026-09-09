@@ -52,18 +52,21 @@ export default defineConfig({
   // e dois falhavam dentro do passo `continue-on-error` — doze testes que
   // nunca correram e cuja ausência ninguém via. Correm agora em
   // `npm run test:e2e:dados`, contra um servidor que grava.
-  testIgnore: [
-    "**/passkeys.spec.ts",
-    "**/upload-medicao.spec.ts",
-    "**/biblioteca-temas.spec.ts",
-    "**/carregamento-movel.spec.ts",
-    "**/fazer-proposta-cliente.spec.ts",
-    "**/nav-estudio-marca.spec.ts",
-    "**/painel-estudio-marca.spec.ts",
-    "**/proposta-rascunho.spec.ts",
-    "**/temas.spec.ts",
-    "**/caca/a02-editor-stress.spec.ts",
-  ],
+  //
+  // ── E ESTA LISTA VIVE NO PROJECTO, NÃO AQUI EM CIMA ──────────────────────
+  //
+  // Estava num `testIgnore` de topo, e MEDIDO: não excluía nada. Um
+  // `testIgnore` declarado num projecto SUBSTITUI o de topo — não se soma a
+  // ele —, e o projecto `chromium` declarava o seu (`**/*.setup.ts`). O
+  // resultado era mudo e durava há muito: as passkeys, os temas, o estúdio e o
+  // editor corriam na mesma contra o servidor de PRODUÇÃO, falhavam por não
+  // poderem gravar, e o passo do CI que os corre é `continue-on-error` —
+  // portanto ninguém via. Cinquenta e cinco vermelhos a dizer o que este
+  // ficheiro já dizia por escrito: «estes correm noutro sítio».
+  //
+  // A lista passa para dentro do projecto, junto ao `**/*.setup.ts` que a
+  // estava a apagar. Nada muda de intenção; passa a valer o que já estava
+  // escrito.
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -79,7 +82,26 @@ export default defineConfig({
     { name: "sessao", testMatch: /sessao-admin\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
     {
       name: "chromium",
-      testIgnore: ["**/*.setup.ts"],
+      testIgnore: [
+        "**/*.setup.ts",
+        // Os que precisam de GRAVAR. Correm em `npm run test:e2e:dados` e em
+        // `npm run test:e2e:passkeys`, contra servidores que gravam — a razão
+        // por extenso está aqui em cima e em `playwright.dados.config.ts`.
+        "**/passkeys.spec.ts",
+        "**/upload-medicao.spec.ts",
+        "**/biblioteca-temas.spec.ts",
+        "**/carregamento-movel.spec.ts",
+        "**/fazer-proposta-cliente.spec.ts",
+        "**/nav-estudio-marca.spec.ts",
+        "**/painel-estudio-marca.spec.ts",
+        "**/geometria-dos-alvos.spec.ts",
+        "**/proposta-rascunho.spec.ts",
+        "**/temas.spec.ts",
+        // O guião do dia GRAVA (junta um modelo, muda uma duração) e precisa de
+        // um pedido na lista para lhe pertencer.
+        "**/guiao-do-dia.spec.ts",
+        "**/caca/a02-editor-stress.spec.ts",
+      ],
       use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },
       dependencies: ["sessao"],
     },
