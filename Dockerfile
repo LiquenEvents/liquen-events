@@ -12,6 +12,14 @@ RUN npm ci
 FROM node:22-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# É AQUI que se pede o pacote autossuficiente, e é só aqui.
+#
+# O `next.config.ts` só liga o `output: "standalone"` com esta variável posta —
+# a razão por extenso está lá. Em resumo: o `standalone` só serve a quem corre
+# o site fora do Vercel (este contentor, um VPS, o Cloud Run), e no Vercel
+# chegou a partir os deploys todos. Sem esta linha, o `COPY` do
+# `.next/standalone` lá em baixo não encontra nada.
+ENV BUILD_STANDALONE=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

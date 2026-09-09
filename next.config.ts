@@ -13,31 +13,47 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   /**
    * ══════════════════════════════════════════════════════════════════════════
-   * PACOTE AUTOSSUFICIENTE — E UMA NOTA SOBRE O QUE AQUI NÃO FICOU
+   * O PACOTE AUTOSSUFICIENTE PASSA A SER PEDIDO, EM VEZ DE SER O NORMAL
    * ══════════════════════════════════════════════════════════════════════════
    *
-   * O `standalone` existe para a aplicação poder correr em qualquer contentor
-   * ou nuvem sem depender do `node_modules` original. No Vercel a plataforma
-   * faz o seu próprio empacotamento.
+   * O `standalone` empacota um servidor que corre sem o `node_modules`
+   * original. Quem precisa dele é o `Dockerfile` — que copia
+   * `.next/standalone` — para o site poder correr num contentor, num VPS, no
+   * Cloud Run, onde for. **No Vercel nunca serviu para nada**: a plataforma faz
+   * o seu próprio empacotamento.
    *
-   * ── O QUE SE EXPERIMENTOU AQUI, E SAIU ────────────────────────────────────
+   * ── O QUE ELE CUSTOU, E PORQUE É QUE DEIXA DE ESTAR LIGADO POR OMISSÃO ────
    *
-   * Com o Next 16.3.4, todos os deploys do Vercel morriam no FIM, depois de
-   * compilar e gerar as 106 páginas, no passo `Running onBuildComplete from
-   * Vercel`, à procura de `.next/next-server.js.nft.json`. Cheguei a pôr aqui
-   * `output: process.env.VERCEL ? undefined : "standalone"`, a raciocinar que
-   * o `standalone` não serve para nada no Vercel e podia ser a fonte do
-   * desencontro.
+   * A subida do Next para o 16.3 (feita para fechar um aviso CRÍTICO) pôs todos
+   * os deploys do Vercel a morrer no fim, depois de compilar e gerar as 106
+   * páginas:
    *
-   * Não resolveu — e falhou MAIS CEDO, o que quer dizer que troquei um
-   * problema por outro. Voltou a sair, e a linha fica como sempre esteve.
+   *     Running onBuildComplete from Vercel
+   *     > Build error occurred
+   *     Error: ENOENT: ... '/vercel/path0/.next/next-server.js.nft.json'
    *
-   * A saída foi outra e está no `package.json`: o Next desce da 16.3.4 para a
-   * 16.3.3, que fecha o mesmo aviso crítico (as versões vulneráveis vão até à
-   * 16.3.2) e é uma variável só de distância da última versão que o Vercel
-   * construiu.
+   * Quem falha é o passo do PRÓPRIO Vercel, à procura de um manifesto de
+   * tracing do `standalone` que o 16.3 já não escreve onde ele o espera. Aqui e
+   * no CI a construção passa e o ficheiro é escrito — é a plataforma e a versão
+   * que não se entendem.
+   *
+   * ── E PORQUE É QUE A CONDIÇÃO NÃO É `process.env.VERCEL` ──────────────────
+   *
+   * Foi a primeira coisa que tentei: `process.env.VERCEL ? undefined :
+   * "standalone"`. Não mudou nada — e a explicação mais provável é que essa
+   * variável **só existe se o projecto tiver as variáveis de sistema expostas**,
+   * que é uma caixa nas definições da Vercel e não uma garantia. Uma correcção
+   * que depende de uma caixa que ninguém se lembra de ter ligado não é uma
+   * correcção.
+   *
+   * Por isso a condição inverte-se: o `standalone` **liga-se a pedido**, com
+   * `BUILD_STANDALONE=1`, e quem o pede é o `Dockerfile`, onde a variável está
+   * escrita ao lado da razão. O Vercel não pede, e deixa de o receber.
+   *
+   * Quem construir para um contentor à mão põe a mesma variável — está no
+   * README, e o `Dockerfile` fá-lo sozinho.
    */
-  output: "standalone",
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
   // sharp is a NATIVE module used directly in the proposal-PDF route (image
   // cover-crop). Keep it external so it's loaded from node_modules at runtime
   // instead of being bundled — a bundled native binary can fail to load on

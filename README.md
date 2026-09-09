@@ -62,7 +62,10 @@ declared in [`vercel.json`](./vercel.json) (`0 7 * * *`), and form/cron
 functions get a longer `maxDuration` so email/push sends don't time out.
 
 ### Docker (anywhere)
-The app builds a self-contained server (`output: "standalone"`):
+The app builds a self-contained server. Standalone output is **opt-in** —
+the `Dockerfile` sets `BUILD_STANDALONE=1`, and `next.config.ts` explains why
+it is not the default (on Vercel it is unnecessary, and with Next 16.3 it broke
+every deploy). Building a container by hand? Set the same variable.
 
 ```bash
 docker build -t liquen-events .
