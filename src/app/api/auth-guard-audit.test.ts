@@ -457,6 +457,15 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./contratos/route", methods: ["GET"] },
   { path: "./contratos/[id]/route", methods: ["PATCH"] },
   { path: "./contratos/[id]/pdf/route", methods: ["GET"] },
+  // ── Guiões do dia ─────────────────────────────────────────────────────────
+  // O guião de um evento diz a que horas a equipa entra na quinta, quem faz o
+  // quê e quando o espaço fica vazio. É logística interna e nomes de clientes:
+  // a leitura devolve os dois para TODOS os eventos com data de uma vez, o que
+  // faz desta rota o resumo mais compacto da agenda da casa. Sem sessão, nem
+  // ler nem escrever.
+  { path: "./guioes/route", methods: ["GET"] },
+  { path: "./guioes/modelos/route", methods: ["GET", "POST"] },
+  { path: "./guioes/modelos/[id]/route", methods: ["DELETE"] },
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },
   // Os modelos nas duas línguas: o corpo é o texto que sai para clientes na
   // hora seguinte, e a leitura devolve-o inteiro. Sem sessão, nem uma coisa

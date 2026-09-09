@@ -419,3 +419,58 @@ export function oQueVemASeguir(blocos: readonly BlocoDoDia[], minutoAgora: numbe
     terminado: comForma.length > 0 && !aSeguir && agora.length === 0,
   };
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS DURAÇÕES QUE SE ESCOLHEM COM UM POLEGAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma lista fechada, e não uma caixa de escrever minutos. Ela está de pé, numa
+ * quinta, com as mãos ocupadas: escrever «45» num campo numérico são três
+ * toques, um teclado a tapar meio ecrã e a hipótese de escrever 450. Escolher
+ * de uma lista é um toque.
+ *
+ * Os degraus são os do ofício — um quarto de hora, meia hora, três quartos,
+ * hora a hora até às quatro, e depois os saltos grandes da montagem e da
+ * desmontagem. Uma duração fora desta lista (vinda de outro sítio, ou de um
+ * guião gravado noutro dia) NÃO se perde: entra na lista como opção própria,
+ * ver `opcoesDeDuracao`.
+ *
+ * ── PORQUE É QUE ISTO SE MUDOU DO COMPONENTE PARA AQUI ────────────────────
+ *
+ * Estava dentro do `EventTimeline.tsx`, e enquanto ele foi o único sítio onde
+ * se editava um guião isso estava certo. Deixou de ser: a vista «Guiões do
+ * dia» acrescenta momentos a um guião também, e uma segunda lista de degraus
+ * escrita ao lado da primeira é a maneira de, daqui a seis meses, o guião do
+ * dossier oferecer «90 min» e o da vista de topo não. Os degraus são uma
+ * decisão do ofício, não do componente — vivem com o resto da aritmética do
+ * dia.
+ */
+export const DEGRAUS_DE_DURACAO = [15, 30, 45, 60, 90, 120, 180, 240, 360, 480] as const;
+
+/** O valor da opção «Sem duração» — um instante, um marco sem comprimento. */
+export const SEM_DURACAO = "0";
+
+/** Uma opção de duração, na forma que o `ui/Escolha` recebe. */
+export interface OpcaoDeDuracao {
+  valor: string;
+  rotulo: string;
+}
+
+/**
+ * Os degraus mais a duração ACTUAL, quando ela não é um degrau.
+ *
+ * Sem essa segunda metade, um momento gravado com 75 min — importado, ou
+ * escrito quando a lista era outra — abria com uma lista onde ele não estava, e
+ * o primeiro toque em qualquer opção trocava-o sem que ninguém o tivesse
+ * pedido.
+ */
+export function opcoesDeDuracao(atual: number): OpcaoDeDuracao[] {
+  const degraus: number[] = [...DEGRAUS_DE_DURACAO];
+  if (atual > 0 && !degraus.includes(atual)) degraus.push(atual);
+  degraus.sort((a, b) => a - b);
+  return [
+    { valor: SEM_DURACAO, rotulo: "Sem duração" },
+    ...degraus.map((m) => ({ valor: String(m), rotulo: porExtenso(m) })),
+  ];
+}
