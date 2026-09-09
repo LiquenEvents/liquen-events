@@ -35,27 +35,93 @@
  * subir — e ela não tem de saber que essa caixa existe. Uma construção que se
  * limpa sozinha é uma coisa que nunca mais precisa de ser explicada a ninguém.
  */
-import { readdirSync, rmSync, existsSync } from "node:fs";
+import { readdirSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const SAIDA = ".next";
-/** O que fica. Só isto: é a parte da pasta que poupa tempo em vez de o gastar. */
-const GUARDAR = new Set(["cache"]);
+const CACHE = join(SAIDA, "cache");
+/** Onde fica escrito com que versão do Next é que esta cache foi feita. */
+const MARCA = join(CACHE, "versao-do-next.txt");
+
+/** A versão do Next instalada nesta construção. */
+function versaoDoNext() {
+  try {
+    return JSON.parse(readFileSync("node_modules/next/package.json", "utf8")).version ?? "";
+  } catch {
+    return "";
+  }
+}
 
 if (!existsSync(SAIDA)) {
   console.log("· sem `.next` — nada a limpar antes de construir.");
-  process.exit(0);
+} else {
+  /**
+   * ── PRIMEIRO A DECISÃO SOBRE A CACHE, QUE É A PARTE CARA ─────────────────
+   *
+   * A primeira versão disto guardava a cache SEMPRE e limpava só a saída. Não
+   * chegou: o deploy falhou na mesma, e foi essa falha que localizou a avaria.
+   * Se limpar a saída e manter a cache continua a partir, e desligar a cache
+   * inteira resolve, então o que está estragado está DENTRO da cache.
+   *
+   * Faz sentido: o `.next/cache` guarda trabalho de compilação, e trabalho
+   * compilado por uma versão do Next não é para ser lido por outra.
+   *
+   * Por isso a cache não se deita fora todos os dias — deita-se fora UMA VEZ,
+   * quando a versão muda. Nos outros dias fica inteira e continua a poupar o
+   * que sempre poupou.
+   */
+  const versao = versaoDoNext();
+  const anterior = existsSync(MARCA) ? readFileSync(MARCA, "utf8").trim() : "";
+  if (existsSync(CACHE) && anterior !== "" && versao !== "" && anterior !== versao) {
+    /**
+     * ── E DENTRO DA CACHE, NEM TUDO É DO NEXT ────────────────────────────
+     *
+     * A primeira versão disto apagava o `.next/cache` inteiro — e levava com
+     * ele as miniaturas pré-geradas (`pregen-gallery`, `pregen-logos`), que
+     * são NOSSAS, não têm nada que ver com a versão do Next, e são caras: o
+     * `ci.yml` guarda-as num passo próprio, e a última vez que se refizeram
+     * do zero a construção ficou ~13 minutos mais lenta.
+     *
+     * Sai o que é do Next; fica o que é nosso.
+     */
+    const guardados = [];
+    for (const nome of readdirSync(CACHE)) {
+      if (nome.startsWith("pregen-") || nome === "versao-do-next.txt") {
+        guardados.push(nome);
+        continue;
+      }
+      rmSync(join(CACHE, nome), { recursive: true, force: true });
+    }
+    console.log(
+      `· o Next mudou de ${anterior} para ${versao} — a cache dele foi deitada fora` +
+        (guardados.length > 0
+          ? ` (as miniaturas pré-geradas ficaram: ${guardados.filter((n) => n.startsWith("pregen-")).join(", ")}).`
+          : "."),
+    );
+  }
+
+  /** E a saída da construção anterior, essa, sai sempre: regera-se em segundos. */
+  const apagados = [];
+  for (const nome of readdirSync(SAIDA)) {
+    if (nome === "cache") continue;
+    rmSync(join(SAIDA, nome), { recursive: true, force: true });
+    apagados.push(nome);
+  }
+  console.log(
+    apagados.length === 0
+      ? "· `.next` só tinha a cache — nada a limpar."
+      : `· limpou ${apagados.length} entradas da construção anterior em \`.next\`.`,
+  );
 }
 
-const apagados = [];
-for (const nome of readdirSync(SAIDA)) {
-  if (GUARDAR.has(nome)) continue;
-  rmSync(join(SAIDA, nome), { recursive: true, force: true });
-  apagados.push(nome);
+/**
+ * E deixa dito com que versão é que esta cache vai ficar, para a construção
+ * seguinte poder tomar a mesma decisão. Escreve-se ANTES de construir de
+ * propósito: uma construção que rebente a meio deixa a marca certa na mesma, e
+ * a seguinte não deita fora uma cache que está boa.
+ */
+const versaoAgora = versaoDoNext();
+if (versaoAgora) {
+  mkdirSync(CACHE, { recursive: true });
+  writeFileSync(MARCA, `${versaoAgora}\n`, "utf8");
 }
-
-console.log(
-  apagados.length === 0
-    ? "· `.next` só tinha a cache — nada a limpar."
-    : `· limpou ${apagados.length} entradas da construção anterior em \`.next\` (a cache fica).`,
-);

@@ -11,9 +11,47 @@ const nextConfig: NextConfig = {
   // intercepts pointer events`). Só existe em desenvolvimento — em produção
   // nunca esteve lá —, portanto desligá-lo não muda nada do que é servido.
   devIndicators: false,
-  // Self-contained server bundle so the app can run in any container/cloud
-  // (Vercel ignores this and uses its own build).
-  output: "standalone",
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * PACOTE AUTOSSUFICIENTE — MAS NÃO NO VERCEL, E ISSO CUSTOU UMA TARDE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `standalone` existe para a aplicação poder correr em qualquer contentor
+   * ou nuvem sem depender do `node_modules` original.
+   *
+   * O que aqui estava escrito era «Vercel ignores this and uses its own
+   * build» — e era verdade até ao Next 16.2. Deixou de ser no 16.3, e a fatura
+   * veio inteira: com o 16.3.4, todos os deploys do Vercel morriam no FIM,
+   * depois de compilar, verificar os tipos e gerar as 106 páginas:
+   *
+   *     ✓ Generating static pages (106/106)
+   *       Finalizing page optimization ...
+   *       Running onBuildComplete from Vercel
+   *     > Build error occurred
+   *     Error: ENOENT: no such file or directory,
+   *            open '/vercel/path0/.next/next-server.js.nft.json'
+   *
+   * Quem falha é o passo do PRÓPRIO Vercel, à procura de um manifesto de
+   * tracing do `standalone` que o 16.3 já não escreve onde ele o espera. Não é
+   * do código: aqui e no CI a construção passa e o ficheiro é escrito.
+   *
+   * ── E PORQUE É QUE A CORRECÇÃO É ESTA E NÃO RECUAR O NEXT ─────────────────
+   *
+   * Porque a subida fecha um aviso CRÍTICO no próprio Next, e recuar deixava-o
+   * aberto no site que recebe os pedidos das clientes. Entre desligar uma opção
+   * onde ela nunca foi usada e viver com um crítico, não há escolha.
+   *
+   * No Vercel o `standalone` nunca serviu para nada — a plataforma faz o seu
+   * próprio empacotamento. Fora do Vercel (qualquer contentor, qualquer outra
+   * nuvem) continua exactamente como estava.
+   *
+   * Antes de aqui chegar gastei duas hipóteses razoáveis e erradas: a cache do
+   * Vercel (três medições a apontarem para lá) e a saída da construção
+   * anterior. Nenhuma era. O que decidiu foi a linha `Running onBuildComplete
+   * from Vercel` no registo — que só apareceu quando pedi o registo inteiro em
+   * vez de adivinhar a partir do erro.
+   */
+  output: process.env.VERCEL ? undefined : "standalone",
   // sharp is a NATIVE module used directly in the proposal-PDF route (image
   // cover-crop). Keep it external so it's loaded from node_modules at runtime
   // instead of being bundled — a bundled native binary can fail to load on
@@ -381,23 +419,18 @@ const nextConfig: NextConfig = {
     /* ── A BANDEIRA DAS TRANSIÇÕES DE VISTA SAIU, E NÃO FOI POR GOSTO ────
      *
      * Estava aqui `viewTransition: true`, e a subida do Next 16.2.11 → 16.3.4
-     * (feita para fechar um aviso CRÍTICO no próprio Next) parou o build:
+     * parou o build:
      *
-     *     next.config.ts(332,5): error TS2353: 'viewTransition' does not
-     *     exist in type 'ExperimentalConfig'
+     *     next.config.ts: error TS2353: 'viewTransition' does not exist in
+     *     type 'ExperimentalConfig'
      *
      * Fui ao guia que veio dentro da versão nova — `node_modules/next/dist/
-     * docs/01-app/02-guides/view-transitions.md` — e a frase é esta:
-     * «View transitions work in the App Router with no configuration.»
+     * docs/01-app/02-guides/view-transitions.md` — e a frase é esta: «View
+     * transitions work in the App Router with no configuration».
      *
-     * Ou seja, a chave não foi renomeada nem a funcionalidade removida: ela
-     * GRADUOU-SE, e a bandeira deixou de existir porque já não é precisa. As
-     * transições continuam a funcionar exactamente como funcionavam.
-     *
-     * O `src/components/vt.ts` já lia o `React.ViewTransition` com uma saída
-     * para o caso de ele não existir, portanto não há nada a mudar do outro
-     * lado — mas o comentário de lá, que mandava olhar para esta linha, foi
-     * corrigido para não apontar para uma coisa que já cá não está.
+     * A chave não foi renomeada nem a funcionalidade removida: ela GRADUOU-SE,
+     * e a bandeira deixou de existir porque já não é precisa. As transições
+     * continuam a funcionar exactamente como funcionavam.
      */
   },
 
