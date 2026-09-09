@@ -26,3 +26,16 @@ respondeu **«Fica a barra de baixo»** quando lhe pus a escolha à frente. A fa
 
 `docs/LOGIN.md` reconstrói `/orcamento/admin/login`. Tem no topo uma tabela com
 o que já está feito e o que falta — lê-a antes de refazer seja o que for.
+
+# E o guião do dia também
+
+`docs/GUIAO-DO-DIA.md` explica a vista «Guiões do dia» (`?v=guioes`), o motor
+que ela reutiliza (`lib/orcamento/guiao-do-dia.ts`, que já cá estava) e os
+modelos de guião. Lê-o antes de tocar no `Guioes.tsx`, no `ReguaDoDia.tsx` ou no
+`EventTimeline.tsx`.
+
+A decisão que o abre é a que interessa a quem vier a seguir: **a vista de topo
+MONTA o `EventTimeline` que já existe** em vez de ter um editor próprio. Um
+segundo editor de guiões ao lado do primeiro é o defeito que a Parte −1 do
+sistema de design manda evitar — e, aqui, seriam dois ecrãs a discordar sobre o
+mesmo dia num papel que se entrega à equipa na manhã do evento.

@@ -172,6 +172,7 @@ import {
   Inventario,
   Material,
   Temas,
+  Guioes,
   ClientMessenger,
   EventChecklist,
   EventMaterial,
@@ -4126,6 +4127,7 @@ export default function AdminClient({
     definicoes: "Definições",
     servicos: "Biblioteca de serviços",
     "fazer-proposta": "Fazer proposta",
+    guioes: "Guiões do dia",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
@@ -4170,6 +4172,7 @@ export default function AdminClient({
     definicoes: "Os números com que o estúdio faz contas",
     servicos: "As palavras que vão nas propostas, escritas com tempo",
     "fazer-proposta": "Escolhe o cliente e escreve a proposta",
+    guioes: "O guião de cada dia de evento: quem faz o quê, e a que horas",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
@@ -5638,6 +5641,37 @@ export default function AdminClient({
           {view === "temas" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Temas />
+            </div>
+          )}
+
+          {/* ── Guiões do dia ──
+              A vista recebe o `comPedidoInteiro` e não faz a leitura sozinha,
+              e é de propósito: essa função sabe que a rota do pedido responde
+              200 com uma versão CURTA quando a sessão caiu, e que só o
+              cabeçalho `x-pedido: completo` distingue as duas (ver
+              `lerPedidoInteiro`). Uma segunda leitura escrita lá dentro herdava
+              o defeito — e este é o ecrã onde o guião se GRAVA. */}
+          {view === "guioes" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Guioes
+                carregarPedido={async (id) => {
+                  const actual = quotes.find((q) => q.id === id);
+                  if (!actual) {
+                    return {
+                      ok: false as const,
+                      porque: "Este evento já não está na lista de pedidos. Recarrega a página.",
+                    };
+                  }
+                  const r = await comPedidoInteiro(actual);
+                  return r.ok
+                    ? { ok: true as const, quote: r.quote }
+                    : { ok: false as const, porque: r.porque };
+                }}
+                onQuoteAtualizado={(q) => {
+                  setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                  setSelected((prev) => (prev?.id === q.id ? q : prev));
+                }}
+              />
             </div>
           )}
 
