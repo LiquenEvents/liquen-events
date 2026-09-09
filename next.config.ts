@@ -270,12 +270,39 @@ const nextConfig: NextConfig = {
    * nenhum é prefixo do outro: é isso que faz estes padrões não se tocarem, e
    * é isso que o `tracing-do-sharp.test.ts` verifica a cada corrida.
    */
+  /**
+   * ── AS DUAS LINHAS DO `musl` SAÍRAM, E FOI O GUARDA A MANDÁ-LAS SAIR ─────
+   *
+   * A subida do `sharp` 0.35.3 → 0.35.4 (feita para fechar um aviso GRAVE nas
+   * bibliotecas de imagem que ele traz) pôs o `tracing-do-sharp.test.ts`
+   * vermelho, com a mensagem exacta que ele foi escrito para dar:
+   *
+   *     a exclusão `./node_modules/@img/sharp-linuxmusl-x64/(tudo)` não aponta
+   *     para nada — ou o pacote mudou de nome, ou a linha é morta
+   *
+   * (O caminho está aqui com «(tudo)» no lugar do padrão de asteriscos por uma
+   * razão prosaica: esse padrão acaba em `*` seguido de `/`, que FECHA este
+   * comentário a meio e parte o ficheiro. Já parou um deploy desta casa uma
+   * vez.)
+   *
+   * Era a segunda. O `sharp` 0.35.4 passou a marcar as variantes de Alpine com
+   * a plataforma a que servem, e o npm deixou de as instalar numa máquina de
+   * glibc. Deixar de excluir uma coisa que já ninguém instala não poupa nada —
+   * dá é a impressão de estar a poupar, que é pior.
+   *
+   * O que ficou instalado, medido agora:
+   *
+   *     @img/sharp-libvips-linux-x64 .... 18 MB    ← é o que corre. FICA.
+   *     @img/sharp-wasm32 ............... 8,8 MB   ← recurso. SAI.
+   *     @img/sharp-linux-x64 ............ 440 KB   ← é o que corre. FICA.
+   *     @img/colour ..................... 96 KB
+   *
+   * Portanto a exclusão que continua a valer alguma coisa é uma só, e vale
+   * 8,8 MB por função — que é o que o arranque a frio deixa de descomprimir
+   * antes de a primeira linha correr.
+   */
   outputFileTracingExcludes: {
-    "/**": [
-      "./node_modules/@img/sharp-wasm32/**/*",
-      "./node_modules/@img/sharp-linuxmusl-x64/**/*",
-      "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
-    ],
+    "/**": ["./node_modules/@img/sharp-wasm32/**/*"],
   },
 
   experimental: {
@@ -326,10 +353,27 @@ const nextConfig: NextConfig = {
      * saía sem desenho nenhum.
      */
     inlineCss: true,
-    // React <ViewTransition> (View Transitions API): página-a-página com
-    // deslize direcional e morph thumbnail→lightbox na galeria. Browsers sem
-    // suporte navegam normalmente, apenas sem animação.
-    viewTransition: true,
+    /* ── A BANDEIRA DAS TRANSIÇÕES DE VISTA SAIU, E NÃO FOI POR GOSTO ────
+     *
+     * Estava aqui `viewTransition: true`, e a subida do Next 16.2.11 → 16.3.4
+     * (feita para fechar um aviso CRÍTICO no próprio Next) parou o build:
+     *
+     *     next.config.ts(332,5): error TS2353: 'viewTransition' does not
+     *     exist in type 'ExperimentalConfig'
+     *
+     * Fui ao guia que veio dentro da versão nova — `node_modules/next/dist/
+     * docs/01-app/02-guides/view-transitions.md` — e a frase é esta:
+     * «View transitions work in the App Router with no configuration.»
+     *
+     * Ou seja, a chave não foi renomeada nem a funcionalidade removida: ela
+     * GRADUOU-SE, e a bandeira deixou de existir porque já não é precisa. As
+     * transições continuam a funcionar exactamente como funcionavam.
+     *
+     * O `src/components/vt.ts` já lia o `React.ViewTransition` com uma saída
+     * para o caso de ele não existir, portanto não há nada a mudar do outro
+     * lado — mas o comentário de lá, que mandava olhar para esta linha, foi
+     * corrigido para não apontar para uma coisa que já cá não está.
+     */
   },
 
   async headers() {

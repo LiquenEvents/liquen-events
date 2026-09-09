@@ -59,14 +59,14 @@
     "@supabase/supabase-js": "^2.106.2",
     "@types/nodemailer": "^8.0.0",
     "bcryptjs": "^3.0.3",
-    "next": "16.2.11",
-    "nodemailer": "^9.0.3",
+    "next": "16.3.4",
+    "nodemailer": "^9.1.1",
     "ogl": "^1.0.11",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.2.108",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.4",
     "web-push": "^3.6.7",
     "web-vitals": "^4.2.4",
     "zod": "^4.4.3"
@@ -96,7 +96,7 @@
     "vitest": "^4.1.7"
   },
   "overrides": {
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.4",
     "postcss": "^8.5.10",
     "deepmerge-ts": "^8.0.1"
   }

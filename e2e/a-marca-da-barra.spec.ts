@@ -52,12 +52,57 @@ async function medirATinta(page: import("@playwright/test").Page, url: string) {
         }
       }
     }
+    /**
+     * ── E ONDE ESTÁ A FOLHA EM RELAÇÃO À PALAVRA ───────────────────────────
+     *
+     * A marca é EMPILHADA: o símbolo por cima, «LÍQUEN EVENTS» por baixo. Corta-
+     * se pela linha vazia mais alta entre os dois e mede-se cada metade.
+     */
+    const tinta = (x: number, y: number) => {
+      const i = (y * c.width + x) * 4;
+      return d[i + 3] > 16 && !(d[i] > 245 && d[i + 1] > 245 && d[i + 2] > 245);
+    };
+    const centroDe = (y0: number, y1: number) => {
+      let a = c.width;
+      let b = -1;
+      for (let y = y0; y < y1; y++)
+        for (let x = 0; x < c.width; x++)
+          if (tinta(x, y)) {
+            if (x < a) a = x;
+            if (x > b) b = x;
+          }
+      return b < 0 ? null : (a + b) / 2;
+    };
+    let corte = miny;
+    let melhor = -1;
+    for (let y = miny; y <= maxy; y++) {
+      let vazia = true;
+      for (let x = 0; x < c.width && vazia; x++) if (tinta(x, y)) vazia = false;
+      if (!vazia) continue;
+      let fim = y;
+      while (fim <= maxy) {
+        let v = true;
+        for (let x = 0; x < c.width && v; x++) if (tinta(x, fim)) v = false;
+        if (!v) break;
+        fim++;
+      }
+      if (fim - y > melhor) {
+        melhor = fim - y;
+        corte = Math.round((y + fim) / 2);
+      }
+      y = fim;
+    }
+    const simbolo = centroDe(miny, corte);
+    const palavra = centroDe(corte, maxy + 1);
+
     return {
       tela: { w: c.width, h: c.height },
       fracaoLargura: (maxx - minx + 1) / c.width,
       fracaoAltura: (maxy - miny + 1) / c.height,
       desvioX: ((minx + maxx) / 2 - c.width / 2) / c.width,
       desvioY: ((miny + maxy) / 2 - c.height / 2) / c.height,
+      /** Quanto é que a folha desvia do centro da palavra, em fracção da tela. */
+      simboloVsPalavra: simbolo === null || palavra === null ? null : (simbolo - palavra) / c.width,
     };
   }, url);
 }
@@ -106,6 +151,37 @@ test.describe("a marca da barra do back office @movimento", () => {
       Math.abs(tinta.desvioY),
       `o desenho está ${(tinta.desvioY * 100).toFixed(1)}% acima/abaixo do centro do ficheiro`,
     ).toBeLessThan(0.02);
+
+    /**
+     * 2b. E A FOLHA ESTÁ POR CIMA DA PALAVRA, NÃO AO LADO DELA.
+     *
+     * Esta é a que ela viu e eu não. Depois de o ficheiro estar recortado e
+     * centrado, mandou outra fotografia: «o logo não está bem ao meio». Fui
+     * medir as duas metades em separado, e o desvio do RECORTE era de 2 px —
+     * invisível. O que ela estava a ver era outro, e maior:
+     *
+     *     centro da palavra «LÍQUEN EVENTS» .... 450
+     *     centro do símbolo (a folha) .......... 354
+     *     ─────────────────────────────────────────
+     *     a folha, 96 px à esquerda ............ 10,6% da largura da palavra
+     *
+     * Num logótipo empilhado é a PALAVRA que define a largura, portanto centrar
+     * o conjunto centra a palavra — e a folha, que é onde o olho pousa
+     * primeiro, fica pendurada para um lado. O conjunto lê-se torto mesmo
+     * estando, à letra, ao meio.
+     *
+     * Ela decidiu alinhar a folha por cima da palavra, só no ficheiro do back
+     * office. Isto guarda essa decisão.
+     */
+    expect(
+      tinta.simboloVsPalavra,
+      "não se conseguiu separar o símbolo da palavra — a medida deixou de medir",
+    ).not.toBeNull();
+    expect(
+      Math.abs(tinta.simboloVsPalavra!),
+      `a folha está ${(tinta.simboloVsPalavra! * 100).toFixed(1)}% da largura ao lado do ` +
+        "centro da palavra — o conjunto lê-se torto mesmo estando centrado",
+    ).toBeLessThan(0.01);
 
     /**
      * 3. E A CAIXA ESTÁ MESMO AO MEIO DA BARRA.
