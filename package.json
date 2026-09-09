@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "npm run pregen && next dev",
     "pregen": "node scripts/pregen-heroes.mjs && node scripts/pregen-gallery.mjs && node scripts/pregen-logos.mjs",
-    "build": "node scripts/pregen-heroes.mjs && node scripts/pregen-gallery.mjs && node scripts/pregen-logos.mjs && node scripts/limpa-saida.mjs && next build && node scripts/folhas-que-existem.mjs",
+    "build": "node scripts/pregen-heroes.mjs && node scripts/pregen-gallery.mjs && node scripts/pregen-logos.mjs && next build && node scripts/folhas-que-existem.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -59,7 +59,7 @@
     "@supabase/supabase-js": "^2.106.2",
     "@types/nodemailer": "^8.0.0",
     "bcryptjs": "^3.0.3",
-    "next": "16.3.4",
+    "next": "16.3.3",
     "nodemailer": "^9.1.1",
     "ogl": "^1.0.11",
     "pdf-lib": "^1.17.1",
