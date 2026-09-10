@@ -160,8 +160,13 @@ describe("as escritas feitas aqui não se perdem para a lista global", () => {
       </ToastProvider>,
     );
     await user.click(await screen.findByRole("button", { name: /Concluídas/ }));
-    const concluir = await screen.findByRole("button", { name: "Marcar como por concluir" });
-    expect(concluir.getAttribute("aria-pressed")).toBe("true");
+    /* A caixa de riscar passou a ser uma `<input type="checkbox">` a sério —
+       «checkbox que não é `<input type="checkbox">`» está nas proibições do
+       documento dela. O nome é o TÍTULO da tarefa (numa lista de dezasseis,
+       dezasseis «Marcar como concluída» não se distinguem), e o estado lê-se
+       no `checked` e não num `aria-pressed`, que era o que um botão tinha. */
+    const concluir = await screen.findByRole("checkbox", { name: "Confirmar catering" });
+    expect((concluir as HTMLInputElement).checked).toBe(true);
 
     soltarPatch?.();
   });

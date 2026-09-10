@@ -2497,16 +2497,42 @@ export default function AdminClient({
   const janelaAberta = newQuoteOpen || shortcutsOpen || ajudaOpen || restoreOpen;
   const janelaAbertaRef = useRef(false);
   const paletteAbertaRef = useRef(false);
+  /* A vista, num ref, pela mesma razão que as outras duas aqui em cima: o
+     ouvinte de teclado monta-se uma vez e fecharia sobre a vista do primeiro
+     desenho. Sem isto, o ⌘N das Tarefas ou nunca disparava ou disparava em
+     todas as vistas — conforme a que estivesse aberta ao montar. */
+  const viewRef = useRef(view);
   useEffect(() => {
     janelaAbertaRef.current = janelaAberta;
     paletteAbertaRef.current = paletteOpen;
-  }, [janelaAberta, paletteOpen]);
+    viewRef.current = view;
+  }, [janelaAberta, paletteOpen, view]);
 
   // Global keyboard shortcuts. ⌘K works anywhere; the rest are ignored while
   // typing so they never fight with form fields.
   useEffect(() => {
     let lastG = 0; // timestamp of the last "g" press, for the "g then key" chord
     const onKey = (e: KeyboardEvent) => {
+      /* ── ⌘N NAS TAREFAS ────────────────────────────────────────────────
+         Antes do teste do «a escrever», e de propósito: ⌘N é um atalho com
+         modificador, e um atalho com modificador não colide com o que se está
+         a escrever num campo — é para isso que o modificador serve. Quem está
+         a escrever uma tarefa e faz ⌘N quer a seguinte, que é exactamente o
+         que isto faz.
+
+         Só nas Tarefas: noutra vista o ⌘N do browser (janela nova) continua a
+         ser dela. */
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "n" &&
+        viewRef.current === "tarefas"
+      ) {
+        if (janelaAbertaRef.current || paletteAbertaRef.current) return;
+        e.preventDefault();
+        setPedidoDeNovaTarefa((n) => n + 1);
+        return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         // A paleta também não se abre por baixo de outra janela; fechá-la com o
         // mesmo atalho continua a valer, que é o que ⌘K faz quando ela é a que
@@ -4116,6 +4142,24 @@ export default function AdminClient({
   ]);
   const mostrarAccoesDePedidos = ACOES_DE_PEDIDOS.has(view);
 
+  /**
+   * ── A ACÇÃO PRIMÁRIA DAS TAREFAS VIVE NA BARRA, COMO NAS OUTRAS VISTAS ──
+   *
+   * «Não há ação primária na toolbar. Todos os outros ecrãs têm "+ Novo".
+   * Este não tem — porque a criação está num cartão permanente no conteúdo.»
+   *
+   * A regra é uma acção primária e uma só, sempre no fim da barra, e a
+   * consistência entre ecrãs é o que faz um produto ler-se como um produto.
+   *
+   * O que passa daqui para baixo é um CONTADOR e não uma função: a caixa de
+   * escrever vive dentro das `Tarefas` (é a última linha da lista, ver a fase
+   * 03 do documento dela), e o que a barra faz é pedir-lhe que abra. Um
+   * contador porque carregar duas vezes seguidas tem de pedir duas vezes — um
+   * booleano ficava preso a `true` e o segundo toque não fazia nada.
+   */
+  const [pedidoDeNovaTarefa, setPedidoDeNovaTarefa] = useState(0);
+  const pedirNovaTarefa = useCallback(() => setPedidoDeNovaTarefa((n) => n + 1), []);
+
   const VIEW_TITLES: Record<View, string> = {
     overview: "Visão Geral",
     pedidos: "Pedidos",
@@ -4173,7 +4217,13 @@ export default function AdminClient({
     servicos: "As palavras que vão nas propostas, escritas com tempo",
     "fazer-proposta": "Escolhe o cliente e escreve a proposta",
     guioes: "O guião de cada dia de evento: quem faz o quê, e a que horas",
-    tarefas: "Organização interna da equipa",
+    /* ── A DESCRIÇÃO DAS TAREFAS SAIU ─────────────────────────────────
+       «A hierarquia do cabeçalho está invertida: "Organização interna da
+       equipa" acima do título, em cinzento pequeno.» [APPLE] A regra é
+       título curto que identifica a vista, e mais nada — e "Tarefas" já o
+       diz. Vazio como a Visão Geral, que é o outro sítio onde o título se
+       basta a si próprio. */
+    tarefas: "",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
     material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
@@ -5438,6 +5488,26 @@ export default function AdminClient({
                     </kbd>
                   </button>
                 )}
+                {view === "tarefas" && (
+                  <button
+                    onClick={pedirNovaTarefa}
+                    aria-label="Nova tarefa"
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
+                    title="Escrever uma tarefa (⌘N)"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                    >
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                    </svg>
+                    <span className="hidden sm:inline">Nova tarefa</span>
+                  </button>
+                )}
                 {mostrarAccoesDePedidos && (
                   <button
                     onClick={() => setNewQuoteOpen(true)}
@@ -5700,7 +5770,7 @@ export default function AdminClient({
           {/* ── Tarefas ── */}
           {view === "tarefas" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Tarefas defaultAssignee={userName} />
+              <Tarefas defaultAssignee={userName} pedidoDeNova={pedidoDeNovaTarefa} />
             </div>
           )}
 

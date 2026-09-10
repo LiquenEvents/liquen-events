@@ -62,11 +62,19 @@ afterEach(() => {
 });
 
 /** O quadrado de riscar da linha com este título (é o primeiro botão da linha). */
+/**
+ * A caixa de riscar de uma tarefa.
+ *
+ * Era o primeiro `<button>` da linha; passou a ser uma `<input
+ * type="checkbox">` a sério — «checkbox que não é `<input type="checkbox">`»
+ * está nas proibições do documento dela, e um `<button aria-pressed>` lê-se
+ * «botão, premido» em vez de «caixa de verificação, marcada».
+ *
+ * Procura-se pelo papel e pelo nome, que é o título da tarefa: é assim que ela
+ * a encontra na lista, e é assim que quem ouve o ecrã a ouve.
+ */
 function caixaDe(titulo: string): HTMLElement {
-  const linha = screen.getByText(titulo).closest("div.group");
-  const botao = linha?.querySelector("button");
-  if (!botao) throw new Error(`Sem caixa de riscar para "${titulo}"`);
-  return botao as HTMLElement;
+  return screen.getByRole("checkbox", { name: titulo });
 }
 
 describe("Tarefas — reposição depois de uma gravação recusada", () => {
@@ -87,8 +95,16 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     await user.click(screen.getByRole("button", { name: "Guardar" }));
 
     // 2. Entretanto ela risca a tarefa B, e ESSA grava bem.
+    //
+    // ── E A LINHA FICA NO LUGAR SEGUNDO E MEIO ANTES DE DESCER ───────────
+    // Ver `ESPERA_ANTES_DE_DESCER_MS` no `Tarefas.tsx`: marcar não pode fazer
+    // a lista saltar debaixo do cursor, portanto a tarefa continua desenhada
+    // onde estava — riscada — e só depois muda de secção. O `findBy` espera
+    // por isso e é por isso que leva um prazo maior do que o de omissão.
     await user.click(caixaDe("Ligar à florista"));
-    expect(await screen.findByRole("button", { name: /Concluídas \(1\)/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /Concluídas \(1\)/ }, { timeout: 4000 }),
+    ).toBeInTheDocument();
 
     // 3. Só agora o servidor recusa a alteração de A.
     recusarGravacaoDeA();
@@ -102,7 +118,13 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     expect(screen.getByText("Confirmar catering")).toBeInTheDocument();
     // Mas a tarefa B tem de ficar onde ficou: está concluída no servidor.
     expect(screen.getByRole("button", { name: /Concluídas \(1\)/ })).toBeInTheDocument();
-    expect(screen.getByText("A fazer (1)")).toBeInTheDocument();
+    // A contagem deixou de ser um cabeçalho («A fazer (1)») e passou a ser
+    // ESTADO da vista — ver a nota no `Tarefas.tsx`. Diz o mesmo número e diz
+    // quantas dessas já passaram do prazo.
+    // Pelo texto e não pelo papel: os avisos desta vista também são
+    // `role="status"` — e é o que devem ser —, portanto o papel sozinho
+    // devolve dois.
+    expect(screen.getByText(/1 por fazer/)).toBeInTheDocument();
   });
 
   it("uma tarefa eliminada com sucesso não regressa quando OUTRA gravação falha", async () => {

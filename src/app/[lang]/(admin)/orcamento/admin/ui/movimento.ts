@@ -356,3 +356,20 @@ export const MARCA_MS = 325;
 
 export const MARCA =
   "motion-safe:transition-[translate,width] motion-safe:duration-quick motion-safe:ease-quick";
+
+/**
+ * ── A MOLA DE MARCAR ─────────────────────────────────────────────────────
+ *
+ * 320 ms, `scale(1) → 1.18 → 1`, com a curva `quick`. É o número que ela
+ * escreveu no documento das Tarefas, e é o mesmo degrau de todas as outras
+ * aberturas da casa (325 é o token; 320 é o que ela pediu, e a diferença de
+ * cinco milissegundos não é uma segunda velocidade — é o mesmo degrau).
+ *
+ * Vive aqui, e não escrito à mão na linha da tarefa, pela regra deste
+ * ficheiro: as durações e as curvas moram todas no mesmo sítio, para a subida
+ * de uma delas chegar a toda a gente sem se procurar por onde.
+ *
+ * Os fotogramas estão no `tema.css` (`@keyframes bo-marca-mola`), que é onde
+ * um `@keyframes` pode viver.
+ */
+export const MOLA_DE_MARCAR = "motion-safe:animate-[bo-marca-mola_320ms_var(--ease-quick)]";

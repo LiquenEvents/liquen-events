@@ -519,5 +519,30 @@
   --transition-duration-nav: 515ms;
 }
 
+/* ── A MOLA DE MARCAR UMA TAREFA ────────────────────────────────────────────
+   «Ao marcar, a checkbox anima com mola: `scale(1) → 1.18 → 1`, 320 ms,
+   `--ease-quick`.» É o único sítio do produto onde uma caixa de marcar cresce,
+   e a razão é a que ela escreve: marcar uma tarefa é a recompensa do ecrã, e
+   uma recompensa que não se vê não é recompensa nenhuma.
+
+   O pico a 45% e não a 50%: uma mola sobe mais depressa do que desce, e um
+   pico ao meio lê-se como um «pop» mecânico. E é `scale` como propriedade
+   autónoma, e não `transform` — a mesma armadilha do Tailwind 4 que o
+   `ui/movimento.ts` conta ter apanhado no botão.
+
+   O `prefers-reduced-motion` não precisa de guarda aqui: a classe que a usa
+   traz o `motion-safe:` à frente, que é onde esta casa põe a decisão. */
+@keyframes bo-marca-mola {
+  0% {
+    scale: 1;
+  }
+  45% {
+    scale: 1.18;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
 @custom-variant com-rato (@media (hover: hover) and (pointer: fine));
 @custom-variant sem-rato (@media not ((hover: hover) and (pointer: fine)));
