@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import config from "../../next.config";
 
 /**
@@ -128,23 +129,112 @@ describe("o que o `sharp` leva para dentro da função", () => {
     );
   });
 
-  it("e o que se deita fora existe mesmo, e não é o que corre aqui", () => {
+  it("e o que se deita fora é um pacote real do `sharp`, e não o que corre aqui", () => {
     /**
-     * Uma exclusão que não aponta para nada é uma linha morta a dar a
-     * impressão de estar a poupar 27 MB. E uma que apontasse para o pacote de
-     * glibc seria a avaria.
+     * ── ESTE TESTE JÁ MEDIU A COISA ERRADA, E CUSTOU UMA VOLTA DE CI ──────
      *
-     * O alvo do Vercel é Linux x64 com glibc: `linuxmusl` é para Alpine e
-     * `wasm32` é o recurso para quando não há binário nativo nenhum.
+     * A asserção era `existsSync(pasta(exc))`: a pasta excluída tem de estar
+     * instalada AQUI. A ideia estava certa — uma exclusão que não aponta para
+     * nada é uma linha morta a fingir que poupa 27 MB — e a execução estava
+     * errada, porque «aqui» não é onde isto conta.
+     *
+     * O `sharp` 0.35.4 passou a marcar as variantes de Alpine com a plataforma
+     * a que servem, e o npm deixou de as instalar numa máquina de glibc. Este
+     * teste ficou vermelho, eu li-o como «linhas mortas» e tirei as duas
+     * exclusões do `musl`. Nas máquinas que CONSTROEM elas são instaladas, e o
+     * passo «Peso das rotas» do CI respondeu na volta seguinte:
+     *
+     *     75 rotas levam ~17,8 MB que não têm como usar
+     *
+     * Ou seja: o `node_modules` de quem escreve o código não é a instalação
+     * que decide. O que decide é o que o build instala.
+     *
+     * Passa a validar-se contra as `optionalDependencies` DO PRÓPRIO `sharp` —
+     * a lista está no pacote, é a mesma em qualquer máquina, e continua a
+     * apanhar o que este teste veio apanhar: um nome inventado, ou um pacote
+     * que mudou de nome numa subida de versão.
      */
+    /**
+     * ── ONDE ESTÁ A VERDADE SOBRE «ISTO VAI SER INSTALADO?» ───────────────
+     *
+     * Esta asserção já esteve errada DUAS vezes, e as duas custaram uma volta
+     * de CI:
+     *
+     *   1ª  `existsSync(…)` — o disco de quem escreve o código. Falso para
+     *       pacotes de outra plataforma, que o npm salta AQUI e instala na
+     *       máquina de construção. Levou-me a apagar as exclusões de Alpine e
+     *       a mandar 17,8 MB para dentro de 75 rotas.
+     *
+     *   2ª  as `optionalDependencies` do `sharp`. Falso ao contrário: o
+     *       `@img/sharp-wasm32` deixou de ser declarado no 0.35.4 e CONTINUA
+     *       no lockfile, sobra que o npm não limpou. Tirei-o e as rotas
+     *       voltaram a levá-lo.
+     *
+     * A verdade é o `package-lock.json` — é ele que o `npm ci` executa à
+     * letra, e é igual em todas as máquinas. E dá para ser exacto sobre O QUE
+     * LÁ É INSTALADO: cada pacote declara `os` e `cpu`, e o alvo é Linux x64.
+     *
+     * Repare-se no que o lockfile NÃO tem: `libc`. É por isso que o npm não
+     * distingue glibc de Alpine e instala os DOIS — que é a raiz de tudo isto.
+     *
+     * ── E A REGRA DEIXA DE SER «não escrevas nomes errados» ───────────────
+     *
+     * Passa a ser a intenção inteira, nos dois sentidos:
+     *
+     *   · tudo o que é instalado e não é o binário que corre TEM de ser
+     *     excluído (senão viaja dentro de todas as funções);
+     *   · e nada que não seja instalado pode estar na lista (senão é uma linha
+     *     morta a fingir que poupa).
+     *
+     * As duas vezes que me enganei teriam ficado vermelhas aqui, sem gastar
+     * uma volta de CI.
+     */
+    const lockfile = JSON.parse(readFileSync(join(process.cwd(), "package-lock.json"), "utf8")) as {
+      packages?: Record<string, { os?: string[]; cpu?: string[] }>;
+    };
+    const pacotes = lockfile.packages ?? {};
+    expect(
+      Object.keys(pacotes).length,
+      "não se conseguiu ler o `package-lock.json` — a leitura partiu-se",
+    ).toBeGreaterThan(100);
+
+    /** Este pacote é instalado num Linux x64? (o alvo do Vercel) */
+    const instaladoAqui = (v: { os?: string[]; cpu?: string[] }) =>
+      (!v.os || v.os.includes("linux")) && (!v.cpu || v.cpu.includes("x64"));
+
+    /** O binário que CORRE mesmo: o `sharp` de glibc e o seu `libvips`. */
+    const QUE_CORRE = /^@img\/sharp-(libvips-)?linux-x64$/;
+
+    const variantes = Object.entries(pacotes)
+      .map(([k, v]) => [k.replace(/^node_modules\//, ""), v] as const)
+      .filter(([nome]) => nome.startsWith("@img/sharp-"));
+    expect(variantes.length, "nenhuma variante do `sharp` no lockfile").toBeGreaterThan(5);
+
+    const deviamSairFora = variantes
+      .filter(([nome, v]) => instaladoAqui(v) && !QUE_CORRE.test(nome))
+      .map(([nome]) => nome);
+    const excluidos = new Set(EXCLUIDOS.map((e) => pasta(e).replace(/^node_modules\//, "")));
+
     expect(EXCLUIDOS.length, "deixou de se excluir seja o que for").toBeGreaterThan(0);
+
+    const esquecidos = deviamSairFora.filter((n) => !excluidos.has(n));
+    expect(
+      esquecidos,
+      "o lockfile instala isto num Linux x64, não é o binário que corre, e não está " +
+        "excluído — vai viajar dentro de TODAS as funções:\n  " +
+        esquecidos.join("\n  "),
+    ).toEqual([]);
+
     for (const exc of EXCLUIDOS) {
+      const nome = pasta(exc).replace(/^node_modules\//, "");
       expect(exc, "excluiu-se o `sharp` de glibc, que é o que corre aqui").not.toMatch(
         /sharp-(libvips-)?linux-x64/,
       );
+      const entrada = pacotes[`node_modules/${nome}`];
       expect(
-        existsSync(pasta(exc)),
-        `a exclusão \`${exc}\` não aponta para nada — ou o pacote mudou de nome, ou a linha é morta`,
+        entrada && instaladoAqui(entrada),
+        `a exclusão \`${exc}\` não é instalada num Linux x64 — ou o nome está errado, ` +
+          "ou o pacote saiu do lockfile, ou é de outra plataforma. Linha morta.",
       ).toBe(true);
     }
   });

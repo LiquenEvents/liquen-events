@@ -2197,6 +2197,79 @@ body:is(.admin-mode, :has([data-admin-mode])) :is(.text-foreground\/50, .text-fo
     transition: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NUM CAMPO DE ESCREVER, QUEM MOSTRA O FOCO É A MOLDURA — NÃO UM ANEL POR FORA
+   ══════════════════════════════════════════════════════════════════════════
+
+   ── PORQUE É QUE ELA PEDIU ISTO QUATRO VEZES ──────────────────────────
+
+   «Retira esta linha à volta quando se carrega para escrever.» Depois «retira
+   o anel». Depois «retira os anéis de pesquisas do back office todos». E,
+   depois de eu já ter corrigido o anel para seguir a forma do controlo, mandou
+   outra fotografia do mesmo campo de email com a mesma queixa.
+
+   Da quarta vez fui perceber PORQUE É QUE ela vê isto tantas vezes, e a
+   resposta está na especificação: num campo de texto, **clicar com o rato
+   também activa o `:focus-visible`**. Não é um caso de teclado — é o que
+   acontece a ela, com o rato, todas as vezes que carrega num campo para
+   escrever. Por isso é o estado que ela mais vê do produto inteiro, e por isso
+   a insistência.
+
+   E o que ela vê, num campo de moldura fina e cantos de 10 px, são DUAS linhas
+   concêntricas separadas por dois píxeis de branco: a moldura do campo e o
+   anel. Lê-se como um erro de desenho, não como foco.
+
+   ── E PORQUE É QUE A CORRECÇÃO NÃO É, OUTRA VEZ, TIRAR O ANEL ─────────
+
+   Porque `outline: none` sem substituto está proibido por escrito na Parte 18
+   do `docs/DESIGN-SYSTEM.md`, e sem indicador nenhum quem navega por teclado
+   deixa de saber onde está.
+
+   O que se faz é o que a Apple faz num campo de texto: **é a própria moldura
+   que muda**. Sem segunda linha, sem folga, sem halo. A moldura passa de fio
+   quase invisível a dois píxeis de acento, e é isso o indicador.
+
+   ── A CONTA, PARA NÃO SE TROCAR UM DEFEITO POR OUTRO ──────────────────
+
+   A 2.4.11 das WCAG pede que o indicador tenha 3:1 contra o que está ao lado
+   E que se distinga do estado sem foco. Aqui:
+
+     · acento `--bo-accent` sobre o branco do campo ....... ~5,9:1  ✓
+     · moldura em repouso (fio a ~0,12) → acento .......... muda de valor
+       inteiro, e a espessura duplica de 1 px para 2 ....... ✓
+
+   Portanto o indicador é mais forte do que era, não mais fraco: o que
+   desaparece é a SEGUNDA linha, não o sinal.
+
+   ── ONDE É QUE ISTO NÃO SE APLICA ─────────────────────────────────────
+
+   Só a campos de escrever. Um botão, um link, uma célula da barra não têm
+   moldura própria para carregar o estado, e por isso continuam com o anel de
+   `outline` de cima — que é o que a Apple também faz. E o `forced-colors`
+   mais abaixo repõe um `outline` de sistema em toda a gente, porque nesse modo
+   o browser deita fora cores e sombras nossas.
+   ══════════════════════════════════════════════════════════════════════════ */
+body:is(.admin-mode, :has([data-admin-mode]))
+  :is(
+    textarea,
+    select,
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not(
+        [type="file"]
+      ):not([type="submit"]):not([type="button"]):not([type="reset"])
+  ):focus-visible {
+  outline: none;
+  border-color: var(--bo-accent);
+  /* O segundo píxel da moldura, por dentro: engrossa sem empurrar o layout
+     nem abrir folga do lado de fora, que é o que fazia as duas linhas. */
+  box-shadow: inset 0 0 0 1px var(--bo-accent);
+}
+@media (forced-colors: active) {
+  body:is(.admin-mode, :has([data-admin-mode])) :is(textarea, select, input):focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 0;
+  }
+}
 /* The quote confirmation is the one public page whose ground is cream
    (#f7f4ee) rather than white. That single step down drops the at-rest navbar's
    moss links from 4.69:1 to 4.27:1 — under WCAG AA for their 11px size. Rebind

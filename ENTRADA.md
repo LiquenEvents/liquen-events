@@ -40,17 +40,53 @@ Uma variável chamada `ADMIN_USERS`, com uma linha por pessoa:
   tarefas antigas.
 - `email` — o que se escreve para entrar. É este o campo novo.
 - `passwordHash` — a palavra-passe, embaralhada. **Nunca se escreve aqui a
-  palavra-passe em claro.**
+  palavra-passe em claro.** E, desde 2026-09, **é opcional** — ver a caixa
+  seguinte, que é quase de certeza o caminho que queres.
 
-Para gerar um `passwordHash`, no computador, dentro da pasta do projecto:
+### O caminho curto: não precisas de gerar palavra-passe nenhuma
+
+Se **deixares o `passwordHash` de fora**, a conta usa a palavra-passe que o site
+já tem (a `ADMIN_PASSWORD_HASH`, a mesma com que entras hoje). Basta isto:
+
+```json
+[{ "name": "Catarina", "email": "liquen.alentejo@gmail.com" }]
+```
+
+É tudo. Não muda a tua palavra-passe, não há nada a gerar, e a recuperação por
+email passa a funcionar — porque o que ela precisa é do **endereço**, não de um
+segredo novo.
+
+> **Porque é que isto existe.** A versão anterior deste manual mandava gerar um
+> hash com um comando de Node, num terminal. Quem gere este site não tem
+> terminal nenhum: copiou o exemplo aqui de baixo com as reticências e tudo
+> (`"$2b$12$..."`) e gravou. Aquilo não é o hash de palavra-passe nenhuma, e à
+> publicação seguinte teria ficado fechada fora do painel do próprio negócio.
+> Só não aconteceu porque as variáveis da Vercel esperam pela publicação
+> seguinte. **Um manual que só funciona para quem tem terminal não é um manual
+> desta casa.**
+
+Quem quiser mesmo uma palavra-passe SÓ sua põe o `passwordHash` — e aí quem o
+tem deixa de poder entrar pela partilhada. Ou, mais simples ainda: define uma
+pela própria recuperação, que a guarda por conta.
+
+### E se quiseres mesmo gerar um
+
+No computador, dentro da pasta do projecto:
 
 ```
 node -e "console.log(require('bcryptjs').hashSync('a-palavra-passe-aqui', 12))"
 ```
 
-Copia o resultado (começa por `$2b$12$`) para o `passwordHash`. **Usa sempre o
-12** — números diferentes entre pessoas fazem o site demorar tempos diferentes a
-responder, e esse tempo diz a quem tenta entrar quais os endereços que existem.
+Copia o resultado (começa por `$2b$12$`, e tem uns 60 caracteres — se o que
+copiaste tem reticências, não é um hash, é o exemplo) para o `passwordHash`.
+**Usa sempre o 12** — números diferentes entre pessoas fazem o site demorar
+tempos diferentes a responder, e esse tempo diz a quem tenta entrar quais os
+endereços que existem.
+
+**A rede:** se puseres contas sem `passwordHash` e a instalação não tiver
+`ADMIN_PASSWORD_HASH`, essas contas não teriam entrada nenhuma — e o site
+recusa o `ADMIN_USERS` inteiro em vez de ficar sem porta em silêncio. Fica
+registado nos logs a dizer exactamente isso.
 
 Depois de todos terem `email`, avisa quem faz a manutenção: há um caminho antigo
 no código (entrar pelo nome) que só depois disso pode ser removido.

@@ -13,7 +13,7 @@
  *
  * SAÍDA. public/_img/l/<chave>-<largura>.webp, para tudo o que está em
  * public/logos/ mais os dois logótipos de raiz (public/logo-liquen.png e
- * public/logo-liquen-branco.png). São 21 fontes x 4 larguras = 84 ficheiros,
+ * public/logo-liquen-branco.png e public/logo-liquen-marca.png).
  * ~0,7 MB — ao contrário das miniaturas da galeria (220 MB), isto é pequeno o
  * bastante para não valer a pena discutir se se versiona.
  *
@@ -97,7 +97,10 @@ const IMAGE_EXT = /\.(avif|png|jpe?g|webp)$/i;
  * separador, que ninguém desenha com <Image> e para os quais uma escada
  * responsiva não faz sentido nenhum.
  */
-const ROOT_LOGOS = ["/logo-liquen.png", "/logo-liquen-branco.png"];
+// Tem de ser igual ao `ROOT_LOGOS` de src/lib/site-image-loader.ts — um
+// `.mjs` não importa TS, por isso quem verifica a sincronia é
+// src/lib/site-image-loader.test.ts.
+const ROOT_LOGOS = ["/logo-liquen.png", "/logo-liquen-branco.png", "/logo-liquen-marca.png"];
 
 /** Mesma regra de chave que galleryKey() em scripts/pregen-gallery.mjs e que o
     carregador: basename sem extensão, tudo fora de [A-Za-z0-9_-] em "_". */

@@ -4,8 +4,13 @@ import * as React from "react";
  * React's <ViewTransition> (View Transitions API integration).
  *
  * In the App Router, "react" resolves to Next's vendored React build, which
- * already ships `ViewTransition` (enabled via experimental.viewTransition in
- * next.config.ts). The stable @types/react doesn't declare it yet, so this
+ * already ships `ViewTransition`. Até ao Next 16.2 isso exigia a bandeira
+ * `experimental.viewTransition`; a partir do 16.3 ela deixou de existir porque
+ * a funcionalidade se graduou — «View transitions work in the App Router with
+ * no configuration», diz o guia que vem dentro do pacote. A razão por extenso
+ * está no `next.config.ts`, onde a bandeira estava.
+ *
+ * The stable @types/react doesn't declare it yet, so this
  * module is the single, typed access point. `ViewTransition` may be undefined
  * if the vendored React ever drops the export — consumers must keep a
  * no-animation fallback path.

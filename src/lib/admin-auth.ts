@@ -151,7 +151,46 @@ interface AdminUser {
   name: string;
   /** Identificador de entrada. Opcional só durante a transição (ver topo). */
   email?: string;
-  passwordHash: string;
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O HASH PRÓPRIO É OPCIONAL — E A RAZÃO É UMA PESSOA REAL, NUMA TARDE REAL
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A dona desta casa não é técnica. Para ligar a recuperação de palavra-passe
+   * precisava de acrescentar o `email` à conta dela no `ADMIN_USERS` — e o
+   * `ADMIN_USERS` não existia, porque a instalação dela sempre entrou pela
+   * palavra-passe única, a `ADMIN_PASSWORD_HASH`.
+   *
+   * Criar a variável obrigava-a a inventar também um `passwordHash`, e um hash
+   * de bcrypt não se escreve à mão: gera-se com um comando de Node, dentro da
+   * pasta do projecto, num terminal. Ela não tem nada disso.
+   *
+   * O que aconteceu a seguir estava escrito nas estrelas: copiou o EXEMPLO do
+   * manual, reticências e tudo — `"passwordHash": "$2b$12$..."` — e gravou.
+   * Aquilo não é o hash de palavra-passe nenhuma. À publicação seguinte, o
+   * `ADMIN_USERS` passaria a mandar e ela ficava **fechada fora do painel do
+   * próprio negócio**, sem forma nenhuma de voltar a entrar. Só não aconteceu
+   * porque as variáveis da Vercel esperam pela publicação seguinte, e deu tempo
+   * de a apagar.
+   *
+   * ── O QUE ISTO MUDA ──────────────────────────────────────────────────────
+   *
+   * Sem `passwordHash`, a conta usa a palavra-passe que a instalação JÁ TEM
+   * (`ADMIN_PASSWORD_HASH`). Passa a ser possível acrescentar contas — com
+   * `name` e `email`, que é tudo o que a recuperação precisa — sem gerar
+   * segredo nenhum e sem mudar a palavra-passe de ninguém.
+   *
+   * É um degrau de migração, e é honesto quanto ao que faz: contas sem hash
+   * próprio PARTILHAM a palavra-passe antiga. Numa casa de uma pessoa isso é
+   * exactamente o estado de hoje, com um nome e um endereço por cima. Quem
+   * quiser palavras-passe separadas põe o `passwordHash` — ou define uma pela
+   * própria recuperação, que a guarda por conta (ver `hashEfectivo`).
+   *
+   * A rede: em produção, uma conta sem hash próprio numa instalação SEM
+   * `ADMIN_PASSWORD_HASH` não teria entrada nenhuma. Isso é recusado à entrada,
+   * em `configuredUsers`, com o erro a dizer o que falta.
+   */
+  passwordHash?: string;
   totpSecret?: string;
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -226,7 +265,9 @@ function configuredUsers(): AdminUser[] | null {
       parsed.every(
         (u) =>
           typeof u?.name === "string" &&
-          typeof u?.passwordHash === "string" &&
+          // Ausente = usa a palavra-passe partilhada da instalação. Ver a nota
+          // grande no `passwordHash` do tipo, e a rede logo a seguir a isto.
+          (u.passwordHash === undefined || typeof u.passwordHash === "string") &&
           // `email` é opcional durante a transição, mas se vier tem de ser
           // texto: um `email: 123` calado transformava-se em «esta conta não
           // tem endereço» e a recuperação dela desaparecia sem aviso.
@@ -242,6 +283,29 @@ function configuredUsers(): AdminUser[] | null {
               (u.assina.cargo === undefined || typeof u.assina.cargo === "string"))),
       )
     ) {
+      /**
+       * A REDE DAS CONTAS SEM HASH PRÓPRIO.
+       *
+       * Uma conta sem `passwordHash` cai na palavra-passe partilhada. Se essa
+       * também não existir, a conta não tem entrada NENHUMA — e o modo de
+       * falhar seria o pior possível: o `ADMIN_USERS` passa a mandar, portanto
+       * a instalação inteira fica sem porta, em silêncio.
+       *
+       * Recusa-se aqui, com o nome do que falta. Recusar devolve `null`, e
+       * `null` faz o resto do módulo voltar à palavra-passe partilhada — que
+       * nesta situação é o estado em que a instalação já estava.
+       */
+      const semHashProprio = (parsed as AdminUser[]).filter((u) => u.passwordHash === undefined);
+      if (semHashProprio.length > 0 && !process.env.ADMIN_PASSWORD_HASH) {
+        log.error(
+          "auth: ADMIN_USERS tem contas sem `passwordHash` e não há ADMIN_PASSWORD_HASH " +
+            "para lhes servir de palavra-passe — essas contas não teriam entrada nenhuma; " +
+            "ADMIN_USERS ignorado",
+          undefined,
+          { contas: semHashProprio.map((u) => u.name) },
+        );
+        return null;
+      }
       return parsed;
     }
     log.error("auth: ADMIN_USERS tem um formato inesperado; ignorado");
@@ -487,7 +551,11 @@ export async function verifyCredentials(
     const senhas = await lerSenhasRedefinidas();
     const achada = encontrarConta(users, identificador);
     const u = achada?.user;
-    if (u && compareSync(password, hashEfectivo(u, senhas))) {
+    // `hashEfectivo` devolve `null` quando a conta não tem hash próprio NEM
+    // partilhado. Isso já é recusado à entrada pelo `configuredUsers`, mas um
+    // `null` que chegasse aqui tem de acabar em recusa e nunca em excepção.
+    const efectivo = u ? hashEfectivo(u, senhas) : null;
+    if (u && efectivo && compareSync(password, efectivo)) {
       if (!achada!.porEmail && u.email) {
         // CAMINHO ANTIGO (marcado em 2026-08-12): entrou com o nome tendo a
         // conta email. Fica no registo para se poder ver quando é que este
@@ -512,7 +580,8 @@ export async function verifyCredentials(
     // todos os hashes com o mesmo factor (12) e não sobra sinal nenhum.
     if (!u) {
       try {
-        compareSync(password, hashEfectivo(users[0], senhas));
+        const fantasma = hashEfectivo(users[0], senhas);
+        if (fantasma) compareSync(password, fantasma);
       } catch {
         // Hash configurado malformado: o compare atira, mas o caminho tem de
         // terminar em recusa na mesma — nunca em excepção para quem chama.
@@ -563,11 +632,25 @@ async function lerSenhasRedefinidas(): Promise<Record<string, SenhaRedefinida>> 
   }
 }
 
-function hashEfectivo(u: AdminUser, senhas: Record<string, SenhaRedefinida>): string {
+/**
+ * O hash que o AMBIENTE dá a esta conta: o dela, ou o partilhado da instalação.
+ *
+ * `null` quando não há nem um nem outro — o que o `configuredUsers` já recusa,
+ * mas que se diz aqui na mesma para quem chama não ter de adivinhar.
+ */
+function hashDoAmbiente(u: AdminUser): string | null {
+  return u.passwordHash ?? sharedHash();
+}
+
+function hashEfectivo(u: AdminUser, senhas: Record<string, SenhaRedefinida>): string | null {
+  const doAmbiente = hashDoAmbiente(u);
   const email = u.email ? normalizarIdentificador(u.email) : "";
   const guardada = email ? senhas[email] : undefined;
-  if (!guardada?.hash) return u.passwordHash;
-  if (guardada.substituiu !== u.passwordHash) return u.passwordHash;
+  if (!guardada?.hash) return doAmbiente;
+  // O `substituiu` compara-se com o hash do AMBIENTE, seja ele o próprio da
+  // conta ou o partilhado. Assim a regra continua a mesma para os dois casos:
+  // rodar o hash no painel da Vercel invalida a redefinição correspondente.
+  if (guardada.substituiu !== doAmbiente) return doAmbiente;
   return guardada.hash;
 }
 
@@ -708,7 +791,16 @@ export async function definirPalavraPasseComToken(
   registo.senhas[normalizarIdentificador(conta.email)] = {
     hash: hashSync(nova, 12),
     definidaEm: agora,
-    substituiu: conta.passwordHash,
+    /**
+     * O hash do AMBIENTE, que numa conta sem `passwordHash` próprio é o
+     * partilhado da instalação.
+     *
+     * O `?? ""` falha para o lado seguro: uma cadeia vazia nunca é igual a um
+     * hash real, portanto se algum dia isto acontecesse a palavra-passe
+     * guardada simplesmente não seria honrada e valia a do ambiente — em vez
+     * de valer uma redefinição que já ninguém consegue invalidar.
+     */
+    substituiu: hashDoAmbiente(conta) ?? "",
   };
   delete registo.pedidos[email];
 

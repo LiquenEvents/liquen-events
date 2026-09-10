@@ -11,9 +11,49 @@ const nextConfig: NextConfig = {
   // intercepts pointer events`). Só existe em desenvolvimento — em produção
   // nunca esteve lá —, portanto desligá-lo não muda nada do que é servido.
   devIndicators: false,
-  // Self-contained server bundle so the app can run in any container/cloud
-  // (Vercel ignores this and uses its own build).
-  output: "standalone",
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O PACOTE AUTOSSUFICIENTE PASSA A SER PEDIDO, EM VEZ DE SER O NORMAL
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `standalone` empacota um servidor que corre sem o `node_modules`
+   * original. Quem precisa dele é o `Dockerfile` — que copia
+   * `.next/standalone` — para o site poder correr num contentor, num VPS, no
+   * Cloud Run, onde for. **No Vercel nunca serviu para nada**: a plataforma faz
+   * o seu próprio empacotamento.
+   *
+   * ── O QUE ELE CUSTOU, E PORQUE É QUE DEIXA DE ESTAR LIGADO POR OMISSÃO ────
+   *
+   * A subida do Next para o 16.3 (feita para fechar um aviso CRÍTICO) pôs todos
+   * os deploys do Vercel a morrer no fim, depois de compilar e gerar as 106
+   * páginas:
+   *
+   *     Running onBuildComplete from Vercel
+   *     > Build error occurred
+   *     Error: ENOENT: ... '/vercel/path0/.next/next-server.js.nft.json'
+   *
+   * Quem falha é o passo do PRÓPRIO Vercel, à procura de um manifesto de
+   * tracing do `standalone` que o 16.3 já não escreve onde ele o espera. Aqui e
+   * no CI a construção passa e o ficheiro é escrito — é a plataforma e a versão
+   * que não se entendem.
+   *
+   * ── E PORQUE É QUE A CONDIÇÃO NÃO É `process.env.VERCEL` ──────────────────
+   *
+   * Foi a primeira coisa que tentei: `process.env.VERCEL ? undefined :
+   * "standalone"`. Não mudou nada — e a explicação mais provável é que essa
+   * variável **só existe se o projecto tiver as variáveis de sistema expostas**,
+   * que é uma caixa nas definições da Vercel e não uma garantia. Uma correcção
+   * que depende de uma caixa que ninguém se lembra de ter ligado não é uma
+   * correcção.
+   *
+   * Por isso a condição inverte-se: o `standalone` **liga-se a pedido**, com
+   * `BUILD_STANDALONE=1`, e quem o pede é o `Dockerfile`, onde a variável está
+   * escrita ao lado da razão. O Vercel não pede, e deixa de o receber.
+   *
+   * Quem construir para um contentor à mão põe a mesma variável — está no
+   * README, e o `Dockerfile` fá-lo sozinho.
+   */
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
   // sharp is a NATIVE module used directly in the proposal-PDF route (image
   // cover-crop). Keep it external so it's loaded from node_modules at runtime
   // instead of being bundled — a bundled native binary can fail to load on
@@ -270,8 +310,60 @@ const nextConfig: NextConfig = {
    * nenhum é prefixo do outro: é isso que faz estes padrões não se tocarem, e
    * é isso que o `tracing-do-sharp.test.ts` verifica a cada corrida.
    */
+  /**
+   * ── TIREI DUAS DESTAS LINHAS E O CI DEVOLVEU-MAS, COM RAZÃO ─────────────
+   *
+   * A subida do `sharp` 0.35.3 → 0.35.4 pôs o `tracing-do-sharp.test.ts`
+   * vermelho a dizer que as exclusões de Alpine «não apontam para nada». E era
+   * verdade — NESTA MÁQUINA. O 0.35.4 passou a marcar as variantes com a
+   * plataforma a que servem e o npm deixou de as instalar num Linux de glibc.
+   * Concluí que eram linhas mortas e tirei-as.
+   *
+   * O passo «Peso das rotas» do CI apanhou-me na volta seguinte:
+   *
+   *     104 de 135 rotas carregam as bibliotecas de imagem
+   *     75 rotas levam ~17,8 MB que não têm como usar
+   *     api/proposta/[token]/pdf/route.js → sharp-linuxmusl-x64, …
+   *
+   * Nas máquinas que CONSTROEM, os pacotes de Alpine são instalados. O meu
+   * `node_modules` não é a instalação que conta, e a lição fica escrita: uma
+   * exclusão de plataforma julga-se pelo que o BUILD instala, não pelo que
+   * está no disco de quem escreve o código.
+   *
+   * (O guarda foi corrigido ao mesmo tempo: passou a validar os nomes contra
+   * as `optionalDependencies` do próprio `sharp`, que existem em qualquer
+   * máquina, em vez de exigir que a pasta esteja instalada nesta.)
+   *
+   * ── E PORQUE É QUE SE PODE MESMO DEITAR FORA ────────────────────────────
+   *
+   * `linuxmusl` é para Alpine; `wasm32` é o recurso para quando não há binário
+   * nativo nenhum. O alvo aqui é Linux x64 com glibc. E repare-se que
+   * `sharp-linux-x64` e `sharp-linuxmusl-x64` são nomes diferentes e nenhum é
+   * prefixo do outro no caminho: é isso que faz estes padrões não engolirem o
+   * binário que corre mesmo, e é isso que o `tracing-do-sharp` verifica.
+   */
   outputFileTracingExcludes: {
     "/**": [
+      // ── TRÊS NOMES PARA O `wasm32`, E NENHUM DELES É DE MAIS ───────────
+      //
+      // O `sharp` 0.35.4 deixou de declarar o `@img/sharp-wasm32` e passou a
+      // declarar os outros dois. Tirei o velho por isso — e o CI devolveu-mo
+      // na volta seguinte, com as rotas todas a levá-lo outra vez:
+      //
+      //     api/proposta/[token]/pdf/route.js → sharp-wasm32
+      //
+      // Porque ele CONTINUA no `package-lock.json`, sobra da versão anterior
+      // que o npm não limpou. E é o `package-lock.json` que decide o que uma
+      // máquina de construção instala — não o que o `sharp` declara hoje, nem
+      // o que está no disco de quem escreve o código.
+      //
+      // Os dois nomes NOVOS não entram aqui, e é de propósito: o
+      // `sharp-webcontainers-wasm32` declara `cpu: ["wasm32"]` e o
+      // `sharp-freebsd-wasm32` declara `os: ["freebsd"]`, portanto nenhum é
+      // instalado num Linux x64. Excluí-los seria a linha morta ao contrário.
+      //
+      // Limpar a sobra do lockfile é outro trabalho; enquanto ela lá estiver,
+      // tem de estar aqui.
       "./node_modules/@img/sharp-wasm32/**/*",
       "./node_modules/@img/sharp-linuxmusl-x64/**/*",
       "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
@@ -326,10 +418,22 @@ const nextConfig: NextConfig = {
      * saía sem desenho nenhum.
      */
     inlineCss: true,
-    // React <ViewTransition> (View Transitions API): página-a-página com
-    // deslize direcional e morph thumbnail→lightbox na galeria. Browsers sem
-    // suporte navegam normalmente, apenas sem animação.
-    viewTransition: true,
+    /* ── A BANDEIRA DAS TRANSIÇÕES DE VISTA SAIU, E NÃO FOI POR GOSTO ────
+     *
+     * Estava aqui `viewTransition: true`, e a subida do Next 16.2.11 → 16.3.4
+     * parou o build:
+     *
+     *     next.config.ts: error TS2353: 'viewTransition' does not exist in
+     *     type 'ExperimentalConfig'
+     *
+     * Fui ao guia que veio dentro da versão nova — `node_modules/next/dist/
+     * docs/01-app/02-guides/view-transitions.md` — e a frase é esta: «View
+     * transitions work in the App Router with no configuration».
+     *
+     * A chave não foi renomeada nem a funcionalidade removida: ela GRADUOU-SE,
+     * e a bandeira deixou de existir porque já não é precisa. As transições
+     * continuam a funcionar exactamente como funcionavam.
+     */
   },
 
   async headers() {

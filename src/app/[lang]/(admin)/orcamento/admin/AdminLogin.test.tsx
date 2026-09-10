@@ -187,8 +187,7 @@ describe("a ordem dos dois caminhos", () => {
       documento proíbe é dois botões cheios a COMPETIR aos olhos de quem está a
       decidir, e um botão dentro de uma caixa fechada não compete com nada.
     */
-    const escondido = (el: HTMLElement) =>
-      el.closest("[inert], [aria-hidden='true']") !== null;
+    const escondido = (el: HTMLElement) => el.closest("[inert], [aria-hidden='true']") !== null;
 
     const cheios = () =>
       Array.from(container.querySelectorAll<HTMLElement>("button")).filter(
@@ -220,9 +219,7 @@ describe("a ordem dos dois caminhos", () => {
     ).not.toBeInTheDocument();
     // É a única porta que resta: não pode estar desenhada como alternativa de
     // coisa nenhuma.
-    expect(screen.getByRole("button", { name: /^Entrar$/i }).className).toContain(
-      "bg-sage-600",
-    );
+    expect(screen.getByRole("button", { name: /^Entrar$/i }).className).toContain("bg-sage-600");
   });
 
   it("a explicação do aparelho cabe numa linha", () => {
@@ -239,10 +236,7 @@ describe("a passkey proposta sem se carregar em nada", () => {
     montar();
     // `webauthn` TEM de ser o último valor: fora do fim, a norma manda o browser
     // ignorá-lo, e a proposta nunca aparece.
-    expect(screen.getByLabelText(/^Email$/i)).toHaveAttribute(
-      "autocomplete",
-      "username webauthn",
-    );
+    expect(screen.getByLabelText(/^Email$/i)).toHaveAttribute("autocomplete", "username webauthn");
   });
 
   it("arma a entrada automática onde o browser a sabe fazer", async () => {
@@ -355,7 +349,9 @@ describe("manter a sessão iniciada", () => {
     expect(caixa).not.toBeChecked();
     // O número, e não «manter-me com sessão iniciada» — uma promessa sem número
     // é lida por cada pessoa como lhe apetecer.
-    expect(screen.getByText(/Manter a sessão iniciada neste aparelho durante 30 dias/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Manter a sessão iniciada neste aparelho durante 30 dias/i),
+    ).toBeInTheDocument();
   });
 
   it("explica o que se escolhe, e só isso — a omissão não gasta linhas", async () => {
@@ -475,6 +471,53 @@ describe("o que o Bloco 1 deixou, e continua de pé", () => {
     // errada. São dois `<form>` irmãos, e têm de continuar a sê-lo.
     expect(formularioDaRecuperacao).not.toBe(campoDaEntrada.closest("form"));
     expect(formularioDaRecuperacao.querySelector("form")).toBeNull();
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ENQUANTO SE RECUPERA, HÁ UM SÓ CAMPO DE EMAIL À MÃO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Ela mandou a fotografia do ecrã com o painel de recuperação aberto. O que
+   * lá estava: um campo «Email», uma palavra-passe, um «manter a sessão
+   * iniciada», um «Entrar» apagado, um parágrafo de instruções, um SEGUNDO
+   * campo de email chamado «Email da tua conta», um aviso vermelho, um
+   * «Enviar ligação», um «Voltar», um «Entrar com a chave de acesso» e um
+   * «Mudei de aparelho». Escreveu «isto não funciona bem».
+   *
+   * Dois campos de email na mesma vista é a parte que se mede daqui: quem
+   * chega com a palavra-passe perdida não tem de decidir em qual dos dois
+   * escreve. O formulário de entrada recolhe — a mesma altura animada que já
+   * servia a chave de acesso — e volta com o «Voltar».
+   *
+   * O teste NÃO conta elementos no DOM: o formulário continua lá, recolhido,
+   * porque é assim que a altura anima. Conta o que está ALCANÇÁVEL, que é o
+   * que a pessoa e o leitor de ecrã vêem — e é por isso que a asserção é sobre
+   * `inert`, e não sobre `querySelectorAll`.
+   */
+  it("com a recuperação aberta, o formulário de entrada fica fora de alcance", async () => {
+    const u = userEvent.setup();
+    montar();
+    await abrirOFormulario(u);
+
+    const campoDaEntrada = screen.getByLabelText(/^Email$/i);
+    expect(
+      campoDaEntrada.closest("[inert]"),
+      "antes de recuperar, o formulário de entrada tem de estar mesmo utilizável",
+    ).toBeNull();
+
+    await u.click(screen.getByRole("button", { name: /^Esqueci-me da palavra-passe$/i }));
+    await screen.findByLabelText(/Email da tua conta/i);
+
+    expect(
+      campoDaEntrada.closest("[inert]"),
+      "com a recuperação aberta, o email da entrada continuava alcançável — são " +
+        "dois campos de email a pedir a mesma coisa na mesma vista",
+    ).not.toBeNull();
+
+    // E a porta de volta é uma só: o «Voltar». O atalho para a chave de acesso
+    // sai enquanto se está aqui, senão o ecrã volta a ter três saídas.
+    expect(screen.queryByRole("button", { name: /Entrar com a chave de acesso/i })).toBeNull();
   });
 });
 

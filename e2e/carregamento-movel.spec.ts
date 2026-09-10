@@ -222,10 +222,78 @@ test.describe("Carregamento no telemóvel", () => {
     await (await primeiraPorMarcar(page)).click();
     await expect(barra).toHaveAttribute("aria-valuenow", String(antes + 1));
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * (A) SEM REDE: A PÁGINA VOLTA, E O QUE ESTÁ GUARDADO NÃO SE PERDE
+     * ══════════════════════════════════════════════════════════════════════
+     */
     await context.setOffline(true);
     await page.reload();
-    await expect(barra).toHaveAttribute("aria-valuenow", String(antes + 1));
+
+    // Veio a página desta checklist, e não o `offline.html` nem a raiz.
+    await expect(page.getByText(/carregados/)).toBeVisible();
+
+    const guardado = await page.evaluate((id) => {
+      const lista = JSON.parse(localStorage.getItem(`liquen-material-${id}`) ?? "[]");
+      const fila = JSON.parse(localStorage.getItem("liquen-material-fila") ?? "[]");
+      return {
+        marcados: lista.filter((i: { loadedAt?: string }) => i.loadedAt).length,
+        naLista: lista.length,
+        porEnviar: fila.filter((m: { eventId?: string }) => m.eventId === id).length,
+      };
+    }, eventId);
+
+    expect(guardado.naLista, "a checklist inteira sobreviveu ao recarregar").toBeGreaterThan(0);
+    expect(guardado.marcados, "a marcação sobreviveu ao recarregar sem rede").toBe(antes + 1);
+    expect(guardado.porEnviar, "e continua na fila de saída, para ir quando houver rede").toBe(1);
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * (B) E O ECRÃ REPINTA-A SEM FALAR COM O SERVIDOR
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * ── PORQUE É QUE ESTA METADE TEM A REDE LIGADA E A API CORTADA ────────
+     *
+     * Porque com a rede toda em baixo o `next dev` NÃO HIDRATA a página que o
+     * service worker devolve — e sem hidratação nenhum `useEffect` corre,
+     * incluindo o que pinta a lista a partir do `localStorage`. Medido na
+     * mesma página pública, com a mesma sonda (fibras do React nos nós do
+     * DOM), a recarregar sem rede sob o service worker:
+     *
+     *     next dev  · Next 16.2.11 .... hidrata
+     *     next dev  · Next 16.3.3 ..... NÃO hidrata (nem quando a rede volta)
+     *     next start · Next 16.3.3 .... hidrata
+     *
+     * É uma regressão do servidor de DESENVOLVIMENTO na 16.3.3, e o produto
+     * está bom: em produção — que é onde ela abre o endereço da carrinha — a
+     * página volta viva. O que se perdeu foi a possibilidade de o provar AQUI,
+     * e esta suite corre contra `next dev` por uma razão que não se pode
+     * mudar: o servidor de produção recusa escritas sem Supabase, e sem
+     * escritas não há checklist para medir (ver playwright.dados.config.ts).
+     *
+     * Então a promessa parte-se em duas, cada metade medida onde pode ser:
+     *   · «o ecrã volta VIVO sem rede» — passou a ter guarda próprio, contra o
+     *     servidor de produção: e2e/o-ecra-volta-vivo-sem-rede.spec.ts;
+     *   · «o ecrã pinta a marcação SEM FALAR COM O SERVIDOR» — é o que se mede
+     *     abaixo. A rede volta (para o `next dev` hidratar), a API fica
+     *     cortada, e o número na barra só pode vir do `localStorage`.
+     *
+     * O que NÃO se faz é afrouxar a asserção nem saltar o passeio: a barra
+     * continua a ter de dizer `antes + 1`, e a checklist continua a ter de ter
+     * linhas — foi um `aria-valuemax="0"` que denunciou a regressão, com a
+     * página a afirmar «Sem checklist» sobre uma checklist que existia.
+     */
     await context.setOffline(false);
+    await page.route("**/api/**", (rota) => rota.abort());
+    await page.reload();
+
+    await expect(barra).toHaveAttribute("aria-valuenow", String(antes + 1));
+    expect(
+      Number(await barra.getAttribute("aria-valuemax")),
+      "a barra voltou com linhas, e não a afirmar que não há checklist",
+    ).toBeGreaterThan(0);
+
+    await page.unroute("**/api/**");
   });
 
   test("os críticos por marcar avisam, e dizem quais", async ({ page }) => {

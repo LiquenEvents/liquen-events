@@ -50,6 +50,83 @@ describe("verifyCredentials — shared password fallback", () => {
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA CONTA SEM HASH PRÓPRIO USA A PALAVRA-PASSE QUE A CASA JÁ TEM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto existe por causa de uma tarde concreta. A dona da empresa foi ligar a
+ * recuperação de palavra-passe, o que exige pôr o `email` da conta dela no
+ * `ADMIN_USERS` — variável que a instalação dela nunca teve, porque sempre
+ * entrou pela palavra-passe única.
+ *
+ * Criar o `ADMIN_USERS` obrigava-a a inventar também um `passwordHash`, que
+ * não se escreve à mão: gera-se com um comando de Node, num terminal, dentro
+ * da pasta do projecto. Ela copiou o EXEMPLO do manual — reticências incluídas,
+ * `"$2b$12$..."` — e gravou. À publicação seguinte ficava fechada fora do
+ * painel do próprio negócio, sem palavra-passe que correspondesse àquilo.
+ *
+ * O degrau que estes testes fixam: **acrescentar uma conta não obriga a
+ * inventar um segredo.** `name` e `email` chegam, e a palavra-passe continua a
+ * ser a que a instalação já tinha.
+ */
+describe("contas sem `passwordHash` próprio — o degrau da migração", () => {
+  it("entra com a palavra-passe partilhada da instalação", async () => {
+    process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("a-de-sempre", 10);
+    process.env.ADMIN_USERS = JSON.stringify([
+      { name: "Catarina", email: "catarina@liquen-events.com" },
+    ]);
+
+    expect(
+      await verifyCredentials("catarina@liquen-events.com", "a-de-sempre"),
+      "a conta sem hash próprio devia entrar com a palavra-passe da casa",
+    ).toEqual({ name: "Catarina", email: "catarina@liquen-events.com" });
+    expect(await verifyCredentials("catarina@liquen-events.com", "outra")).toBeNull();
+  });
+
+  it("e a conta COM hash próprio continua a usar o dela, não a da casa", async () => {
+    process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("a-de-sempre", 10);
+    process.env.ADMIN_USERS = JSON.stringify([
+      { name: "Catarina", email: "catarina@liquen-events.com" },
+      {
+        name: "Rui",
+        email: "rui@liquen-events.com",
+        passwordHash: bcrypt.hashSync("só-do-rui", 10),
+      },
+    ]);
+
+    expect(await verifyCredentials("rui@liquen-events.com", "só-do-rui")).toEqual({
+      name: "Rui",
+      email: "rui@liquen-events.com",
+    });
+    // A partilhada NÃO abre a conta de quem tem hash próprio. Sem isto, pôr um
+    // hash a alguém não lhe dava separação nenhuma — dava-lhe DUAS entradas.
+    expect(
+      await verifyCredentials("rui@liquen-events.com", "a-de-sempre"),
+      "quem tem hash próprio não devia entrar também pela palavra-passe da casa",
+    ).toBeNull();
+  });
+
+  it("sem hash próprio e sem palavra-passe da casa, o ADMIN_USERS é recusado inteiro", async () => {
+    // Em produção não há palavra-passe de recurso. Uma conta assim não teria
+    // entrada nenhuma, e o modo de falhar seria o pior: o `ADMIN_USERS` passa a
+    // mandar e a instalação fica sem porta, em silêncio.
+    // `vi.stubEnv` e não uma atribuição: o `NODE_ENV` é só de leitura nos tipos
+    // do Node, e o `unstubAllEnvs` repõe-no sem eu ter de me lembrar.
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.ADMIN_USERS = JSON.stringify([
+      { name: "Catarina", email: "catarina@liquen-events.com" },
+    ]);
+    try {
+      expect(await verifyCredentials("catarina@liquen-events.com", "seja-o-que-for")).toBeNull();
+      // E não abre pela pública de desenvolvimento, que está no repositório.
+      expect(await verifyCredentials("catarina@liquen-events.com", "liquen2026")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe("verifyCredentials — individual accounts (ADMIN_USERS)", () => {
   beforeEach(() => {
     process.env.ADMIN_USERS = JSON.stringify([

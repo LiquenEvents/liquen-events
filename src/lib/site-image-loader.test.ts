@@ -92,6 +92,7 @@ describe("site-image-loader: o ramo de recurso", () => {
       "/logos/b.png",
       "/logo-liquen.png",
       "/logo-liquen-branco.png",
+      "/logo-liquen-marca.png",
       "/qualquer-outra.jpg",
       "https://remoto.exemplo/x.jpg",
       "",
@@ -202,7 +203,11 @@ describe("site-image-loader: contrato com o resto do sistema", () => {
     expect(roots, "não encontrei ROOT_LOGOS em pregen-logos.mjs").not.toBeNull();
     const doScript = roots![1].match(/"([^"]+)"/g)!.map((s) => s.slice(1, -1));
     expect(doScript.every(isLogoSrc), `${doScript} não são todos reconhecidos`).toBe(true);
-    expect(doScript.sort()).toEqual(["/logo-liquen-branco.png", "/logo-liquen.png"]);
+    expect(doScript.sort()).toEqual([
+      "/logo-liquen-branco.png",
+      "/logo-liquen-marca.png",
+      "/logo-liquen.png",
+    ]);
   });
 
   it("todos os logótipos de public/ têm um ficheiro pré-gerado para cada largura", () => {
@@ -216,6 +221,7 @@ describe("site-image-loader: contrato com o resto do sistema", () => {
     for (const src of [
       "/logo-liquen.png",
       "/logo-liquen-branco.png",
+      "/logo-liquen-marca.png",
       ...listarLogos(path.join(ROOT, "public", "logos")),
     ]) {
       for (const w of LOGO_WIDTHS) {

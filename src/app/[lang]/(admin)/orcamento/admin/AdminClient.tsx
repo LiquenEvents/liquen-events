@@ -5180,31 +5180,73 @@ export default function AdminClient({
               className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"
             >
               <SafeImage
-                src="/logo-liquen.png"
-                alt=""
-                width={300}
-                height={179}
                 /*
-                  h-12 e não h-8. A marca desta casa é EMPILHADA — o símbolo por
-                  cima e a palavra por baixo —, e num logótipo assim a palavra
-                  fica com menos de um quinto da altura total. Medido no
-                  retrato: a 32 px de altura, «LÍQUEN EVENTS» saía com 6 px e não
-                  se lia; era uma mancha.
+                  ── O FICHEIRO É OUTRO, E A RAZÃO ESTÁ MEDIDA ──────────────
 
-                  48 punha a palavra nos ~9 px em que ela volta a ler-se — e
-                  ela olhou para isso e disse «tem que estar bem maior». Sobe
-                  para 64.
+                  Ela mandou a barra e escreveu «coloca isto maior e mais ao
+                  meio». Antes de mexer no tamanho fui medir o PNG, pixel a
+                  pixel, num browser:
 
-                  É o tecto físico desta faixa: ela mede ~84 px (com o
-                  `lg:py-5`), e 64 deixam 10 px de folga em cima e em baixo. Mais
-                  do que isto obriga a barra a crescer, e a barra é a moldura do
-                  painel inteiro — cresce em todos os ecrãs, todos os dias, para
-                  a marca ficar maior num sítio.
+                      tela do ficheiro ........ 3747 × 2238
+                      desenho lá dentro ....... 2146 × 1084
+                      margens vazias .......... 866 à esquerda, 735 à direita,
+                                                478 em cima, 676 em baixo
 
-                  A opacidade saiu: estava a 90% para a marca não competir com o
-                  título, e a 64 px o que ela quer é precisamente que se veja.
+                  O desenho ocupa **57% da largura e 48% da altura** do
+                  ficheiro. O resto é transparência.
+
+                  Isso explica as duas queixas de uma vez, e nenhuma delas era
+                  o número que eu ia mexer:
+
+                  · «MAIOR» — o `h-16` aplicava-se à TELA, não ao desenho. A
+                    marca que ela via tinha 64 × 48% ≈ 31 px de altura, menos de
+                    metade do que o número dizia. Não era pequena por estar
+                    mal dimensionada: era pequena por metade da caixa ser vazio.
+
+                  · «MAIS AO MEIO» — o desenho não está centrado no seu próprio
+                    ficheiro. Está 65 px à direita e 99 px acima do centro da
+                    tela (1,7% e 4,5%). Centrar a TELA na barra, que é o que o
+                    `justify-center` faz, deixava o desenho ao lado do meio —
+                    sempre, e sem nada no CSS que o explicasse.
+
+                  O `logo-liquen-marca.png` é o mesmo desenho recortado às
+                  margens (2146 × 1084 → 900 × 455, com a transparência
+                  intacta). Centrar isto é centrar a marca, e a altura que se
+                  pede é a altura que se vê.
+
+                  O `logo-liquen.png` original fica onde estava — barra pública,
+                  rodapé, dados estruturados —, porque recortá-lo mudava o sítio
+                  todo e isso não é o que ela pediu.
                 */
-                className="h-16 w-auto object-contain"
+                src="/logo-liquen-marca.png"
+                alt=""
+                width={900}
+                height={455}
+                /*
+                  ── A ALTURA, AGORA QUE ELA É A ALTURA DO DESENHO ──────────
+
+                  A marca desta casa é EMPILHADA — o símbolo por cima, a palavra
+                  por baixo —, e num logótipo assim a palavra leva menos de um
+                  quinto da altura. Por isso a altura é o número que decide se
+                  «LÍQUEN EVENTS» se lê ou é uma mancha.
+
+                  O que estava: `h-16` sobre a tela do ficheiro velho, ou seja
+                  **31 px de desenho** (a conta está lá em cima). Foi isso que
+                  ela viu quando escreveu «coloca isto maior», já depois de eu
+                  ter subido o número duas vezes — e as duas vezes o número
+                  subiu, e o desenho quase não.
+
+                  O que fica: `h-14` sobre o ficheiro recortado, ou seja **56 px
+                  de desenho**. Quase o dobro, com o número a descer — que é a
+                  prova de que o problema nunca esteve aqui.
+
+                  E é o tecto desta faixa, não um gosto: a barra mede ~84 px
+                  (com o `lg:py-5`), e 56 deixam 14 px de folga em cima e em
+                  baixo. Passar disto obriga a BARRA a crescer, e a barra é a
+                  moldura do painel inteiro — cresceria em todos os ecrãs, todos
+                  os dias, para a marca ficar maior num sítio.
+                */
+                className="h-14 w-auto object-contain"
               />
             </div>
             <div
