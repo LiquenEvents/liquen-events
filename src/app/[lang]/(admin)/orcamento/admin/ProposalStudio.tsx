@@ -10571,14 +10571,39 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   value={money.gross > 0 ? eur(split.sinal) : "—"}
                 />
               </dl>
-              {/* ── QUANDO O CASAL PREFERE WHATSAPP ───────────────────────
-                  Antes ainda de enviar: serve para uma revisão de uma
-                  proposta que já tinha ido antes (`linkDaProposta` de uma
-                  sessão anterior) — o resumo sai com esse link até haver um
-                  mais novo. */}
-              <div className="mt-3">
+              {/* ── QUANDO O CASAL PREFERE WHATSAPP, AQUI TAMBÉM ──────────
+                  «Gostava que também desse para enviar pelo WhatsApp no fazer
+                  a proposta.»
+
+                  O botão já existia — no painel que aparece DEPOIS de enviar.
+                  Ela procurou-o aqui, que é onde se envia, e não o encontrou:
+                  uma coisa que só aparece a seguir ao gesto não conta como
+                  estando no ecrã do gesto.
+
+                  ── E PORQUE É QUE ELE SÓ APARECE COM LINK ──────────────────
+
+                  Porque sem link a mensagem leva o nome, a data e o VALOR — e
+                  mais nada. Um casal a receber um preço sem proposta nenhuma
+                  para o ler é pior do que não receber nada, e o botão que o
+                  mandou parecia estar a funcionar.
+
+                  O link nasce ao enviar. A partir daí — revisões, segundas
+                  voltas, o casal que pediu para reenviar — ele está aqui, antes
+                  do envio, com o link da vez anterior até haver um mais novo. A
+                  linha por baixo diz isso a quem chega primeiro, porque a
+                  ausência de um botão não explica nada a ninguém. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {linkDaProposta && (
+                  <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
+                )}
                 <CopiarResumo texto={resumoParaCopiar} />
               </div>
+              {!linkDaProposta && (
+                <p className="bo-text-muted mt-2 text-xs leading-relaxed">
+                  O link do casal nasce ao enviar. A partir daí, o botão de WhatsApp aparece aqui e
+                  no fim — com a proposta lá dentro.
+                </p>
+              )}
               {/* ══════════════════════════════════════════════════════════
                   A LÍNGUA TAMBÉM SE ESCOLHE AQUI, ONDE SE ENVIA
                   ══════════════════════════════════════════════════════════
