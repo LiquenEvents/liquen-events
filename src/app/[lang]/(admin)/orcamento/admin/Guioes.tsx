@@ -28,7 +28,9 @@ import { useToast } from "./Toast";
 import { printRunSheet } from "./export";
 import { ReguaDoDia } from "./ReguaDoDia";
 import { FolhaDaTimeline } from "./FolhaDaTimeline";
-import EventTimeline from "./EventTimeline";
+import EventTimeline, { GRAVAR_AO_ESCREVER_MS } from "./EventTimeline";
+import { BotaoWhatsApp } from "./ui/BotaoWhatsApp";
+import { timelineParaWhatsApp } from "@/lib/whatsapp";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
@@ -546,7 +548,9 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
            número, viu-o no ecrã, e voltaria amanhã sem ele. */
         if (!res.ok) toast("Não foi possível guardar as contagens da folha.", "error");
       });
-    }, 600);
+      /* O mesmo número dos campos da timeline, e importado de lá para não
+         poderem discordar — ver a nota no `EventTimeline.tsx`. */
+    }, GRAVAR_AO_ESCREVER_MS);
   }
 
   function tituloDaFolha(g: { evento: string; cliente: string; data: string }): string {
@@ -861,6 +865,29 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                   >
                     {aDescarregar ? "A preparar…" : "Descarregar PDF"}
                   </Button>
+                  {/* ── E PELO WHATSAPP, QUE É POR ONDE ELA MANDA ──────────
+                      «Quero que haja uma opção para partilhar logo pelo
+                      WhatsApp e apareça logo os contactos do WhatsApp.»
+
+                      O PDF é o que se imprime e se leva para a quinta; a
+                      mensagem é o que chega ao telemóvel do fornecedor na
+                      véspera. São os dois, e não um em vez do outro — por isso
+                      o botão fica ao lado do outro e não no lugar dele.
+
+                      O texto agrupa-se pelas MESMAS duas regras da folha e do
+                      ficheiro (`timelineParaWhatsApp` chama o `blocosDaFolha`):
+                      uma terceira versão do mesmo dia a andar por aí seria a
+                      que fica no telemóvel de quem está longe do papel. */}
+                  <BotaoWhatsApp
+                    texto={timelineParaWhatsApp({
+                      titulo: tituloDaFolha(aberto),
+                      adultos: cabecalho.adultos,
+                      criancas: cabecalho.criancas,
+                      staff: cabecalho.staff,
+                      momentos: pedido?.timeline ?? [],
+                    })}
+                    rotulo="WhatsApp"
+                  />
                   <Button size="sm" variant="ghost" onClick={fechar} className="lg:hidden">
                     Voltar aos guiões
                   </Button>

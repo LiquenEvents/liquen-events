@@ -82,3 +82,117 @@
     rgb(255 255 255 / 0.07) 100%
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O BOTÃO DO WHATSAPP
+   ══════════════════════════════════════════════════════════════════════════
+
+   «Coloca uma boa animação com o logo do WhatsApp.»
+
+   O que a animação tem de dizer é uma coisa só: **isto vai SAIR daqui**. Não é
+   um botão que guarda nem que abre um painel — abre outra aplicação e entrega
+   uma mensagem a alguém. Por isso o gesto é um envio: a bolha levanta-se um
+   pouco e uma onda sai dela, uma vez, como o toque numa água parada.
+
+   Não pulsa em repouso, e é uma decisão. Um botão que se mexe sozinho num ecrã
+   onde ela passa o dia a escrever é ruído que não se pode desligar — a
+   animação acontece quando ela chega ao botão, que é quando lhe interessa.
+
+   As durações e as curvas são as da casa (`tema.css`): 150 ms no estado,
+   260 ms no regresso do toque. A onda leva os 540 ms do degrau `snappy`, que é
+   o degrau de uma coisa que atravessa espaço.
+   ─────────────────────────────────────────────────────────────────────────── */
+.bo-whatsapp {
+  /* A cor deles, e só aqui — a razão está no `BotaoWhatsApp.tsx`.
+
+     ── E A LETRA É ESCURA, QUE É O CONTRÁRIO DO QUE TODA A GENTE FAZ ──────
+     MEDIDO: branco sobre este verde dá **1,98:1** — reprova a qualquer
+     medida, e é exactamente o botão de WhatsApp que se vê em metade dos
+     sítios. A tinta escura dá **7,33:1**, e **5,93:1** com o rato em cima
+     (o verde escurece). Os dois passam com folga. */
+  background: #25d366;
+  color: #06301a;
+  border: 1px solid rgb(0 0 0 / 0.06);
+}
+
+.bo-whatsapp:hover {
+  background: #1fbe5a;
+}
+
+.bo-whatsapp-marca {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform var(--transition-duration-interactive, 150ms) var(--ease-interactive),
+    filter var(--transition-duration-interactive, 150ms) var(--ease-interactive);
+}
+
+/* A bolha levanta-se — o princípio do gesto de mandar. */
+.bo-whatsapp:hover .bo-whatsapp-marca,
+.bo-whatsapp:focus-visible .bo-whatsapp-marca {
+  transform: translateY(-1.5px);
+}
+
+/* E assenta com o dedo em cima, sem ressalto: um botão que ressalta parece um
+   brinquedo, e este manda uma proposta a um casal. */
+.bo-whatsapp:active .bo-whatsapp-marca {
+  transform: translateY(0) scale(0.94);
+  transition-duration: var(--transition-duration-press, 260ms);
+  transition-timing-function: var(--ease-press);
+}
+
+/* A ONDA. Um anel que sai da bolha e se apaga — uma vez por passagem, e não em
+   ciclo. `::after` e não um elemento: não há nada aqui que precise de existir
+   no documento, e um `<span>` vazio a mais é um nó que os leitores de ecrã
+   têm de saltar. */
+.bo-whatsapp-marca::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 1.5px solid currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bo-whatsapp:hover .bo-whatsapp-marca::after,
+.bo-whatsapp:focus-visible .bo-whatsapp-marca::after {
+  animation: bo-whatsapp-onda var(--transition-duration-snappy, 540ms) var(--ease-snappy);
+}
+
+/* ── O TECTO DA ONDA É A ALTURA DO BOTÃO, E FOI VISTO ──────────────────────
+   Estava em `scale(1.9)`. MEDIDO no desenho: o anel parte dos 24 px (o glifo de
+   18 mais os 3 de folga de cada lado) e a 1,9 chega aos 45 — mais alto do que o
+   botão, que tem 36. O resultado é um círculo cinzento a passar por FORA da
+   aresta esquerda, que se lê como uma falha de desenho e não como um gesto.
+
+   1,45 dá 35 px: a onda cresce até encostar à altura do botão e apaga-se lá
+   dentro. É a diferença entre uma coisa que sai da bolha e uma coisa que sai do
+   botão. */
+@keyframes bo-whatsapp-onda {
+  from {
+    opacity: 0.55;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+
+/* Quem pediu sossego fica com o botão inteiro e sem gesto nenhum: a cor, o
+   logótipo e o rótulo já dizem o que ele é. */
+@media (prefers-reduced-motion: reduce) {
+  .bo-whatsapp-marca,
+  .bo-whatsapp:hover .bo-whatsapp-marca,
+  .bo-whatsapp:active .bo-whatsapp-marca {
+    transform: none;
+    transition: none;
+  }
+  .bo-whatsapp:hover .bo-whatsapp-marca::after,
+  .bo-whatsapp:focus-visible .bo-whatsapp-marca::after {
+    animation: none;
+  }
+}

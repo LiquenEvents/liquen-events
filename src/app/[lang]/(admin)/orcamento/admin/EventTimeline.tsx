@@ -114,6 +114,20 @@ function sortByTime(items: TimelineItem[]): TimelineItem[] {
  * uma vez e nunca mais se corrige é um campo que fica errado para sempre no
  * dia em que a montagem muda de sítio.
  */
+/**
+ * Quanto tempo se espera, depois da última tecla, antes de gravar.
+ *
+ * Vive aqui e é IMPORTADO pelo `Guioes.tsx` em vez de lá estar escrito outra
+ * vez. Ela pediu que os campos da timeline gravassem «como está nos números do
+ * staff e crianças» — se os dois números viverem em sítios diferentes, um dia
+ * um deles muda e passam a ser duas velocidades a fingir que são a mesma.
+ *
+ * 600 ms: acima disto uma pessoa que escreve depressa passa por um pensamento
+ * inteiro sem nada ficar gravado; abaixo, uma frase de dez palavras manda meia
+ * dúzia de gravações que ninguém pediu.
+ */
+export const GRAVAR_AO_ESCREVER_MS = 600;
+
 type EditableField = "time" | "title" | "owner" | "local" | "notas";
 
 /**
@@ -407,17 +421,98 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     );
   }
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * GRAVA ENQUANTO ELA ESCREVE — «como está nos números do staff e crianças»
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Antes gravava-se em `blur` ou `Enter`. Parece inofensivo e não é: o texto
+   * só existia no ecrã até ela sair do campo, e um separador fechado, um
+   * telemóvel que adormece ou um clique na linha ao lado levavam-no. As
+   * contagens da folha já gravavam sozinhas (`Guioes.tsx`, `mudarCabecalho`), e
+   * ela apanhou a diferença — dois campos no mesmo ecrã com duas promessas
+   * diferentes sobre o que acontece ao que se escreve.
+   *
+   * Os 600 ms são os mesmos das contagens, e não é preguiça de copiar: é a
+   * mesma pergunta («parou de escrever?») e duas respostas diferentes no mesmo
+   * ecrã seriam duas velocidades a fingir que são uma.
+   *
+   * ── E O `ESCAPE` PASSOU A SER DESFAZER, PORQUE TINHA DE PASSAR ─────────
+   *
+   * «Escape cancela» era verdade enquanto nada tinha sido gravado. Com gravação
+   * automática deixa de ser: aos 600 ms o que ela escreveu JÁ está guardado, e
+   * um `Escape` que só fechasse o campo prometia uma coisa e fazia outra.
+   *
+   * Passa a repor o valor com que o campo abriu — e a GRAVAR essa reposição, se
+   * entretanto se gravou alguma coisa. Continua a ser «deixa isto como estava»,
+   * que é o que ela quer dizer quando carrega em Escape; o que muda é que agora
+   * é verdade também no servidor.
+   */
+  const porGravar = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** O valor com que o campo abriu — o destino do Escape e do ✕. */
+  const valorAoAbrir = useRef("");
+
+  useEffect(
+    () => () => {
+      if (porGravar.current) clearTimeout(porGravar.current);
+    },
+    [],
+  );
+
   function startEdit(id: string, field: EditableField, current: string) {
+    /* Trocar de campo com uma gravação em fila grava-a JÁ, e não a deita fora:
+       o que ela escreveu no campo anterior é dela, e um clique noutro sítio não
+       é um pedido para o esquecer. */
+    if (porGravar.current) {
+      clearTimeout(porGravar.current);
+      porGravar.current = null;
+      if (editing) gravarCampo(editing.id, editing.field, draft);
+    }
     setEditing({ id, field });
     setDraft(current);
+    valorAoAbrir.current = current;
   }
+
+  /** Escreve, e marca a gravação para daqui a pouco. */
+  function escreverNoCampo(v: string) {
+    setDraft(v);
+    if (!editing) return;
+    const { id, field } = editing;
+    if (porGravar.current) clearTimeout(porGravar.current);
+    porGravar.current = setTimeout(() => {
+      porGravar.current = null;
+      gravarCampo(id, field, v);
+    }, GRAVAR_AO_ESCREVER_MS);
+  }
+
+  /** Fecha o campo, gravando já o que estiver em fila. */
   function commitEdit() {
     if (!editing) return;
     const { id, field } = editing;
+    if (porGravar.current) {
+      clearTimeout(porGravar.current);
+      porGravar.current = null;
+    }
     setEditing(null); // fecha já — o blur que se segue não volta a fazer commit
+    gravarCampo(id, field, draft);
+  }
+
+  /** Deixa o campo como estava — no ecrã e, se já lá chegou, no servidor. */
+  function desistirDoCampo() {
+    if (porGravar.current) {
+      clearTimeout(porGravar.current);
+      porGravar.current = null;
+    }
+    const aberto = editing;
+    const original = valorAoAbrir.current;
+    setEditing(null);
+    if (aberto) gravarCampo(aberto.id, aberto.field, original);
+  }
+
+  function gravarCampo(id: string, field: EditableField, texto: string) {
     const item = items.find((i) => i.id === id);
     if (!item) return;
-    const v = draft.trim();
+    const v = texto.trim();
     /* ── OS CAMPOS QUE PODEM FICAR VAZIOS ────────────────────────────────
        O responsável, o local e a nota. Apagar o que lá está é uma edição
        legítima — a montagem mudou de sítio, a nota deixou de fazer sentido —
@@ -443,7 +538,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
   }
   function editKeys(e: React.KeyboardEvent) {
     if (e.key === "Enter") commitEdit();
-    if (e.key === "Escape") setEditing(null);
+    if (e.key === "Escape") desistirDoCampo();
   }
 
   /**
@@ -819,11 +914,11 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
                 )}
                 editing={editing}
                 draft={draft}
-                setDraft={setDraft}
+                setDraft={escreverNoCampo}
                 commitEdit={commitEdit}
                 editKeys={editKeys}
                 startEdit={startEdit}
-                cancelarEdicao={() => setEditing(null)}
+                cancelarEdicao={desistirDoCampo}
                 commitDuracao={commitDuracao}
                 remove={remove}
               />
@@ -915,6 +1010,12 @@ interface BlocoProps {
   emChoque: boolean;
   editing: { id: string; field: EditableField } | null;
   draft: string;
+  /**
+   * Escrever no campo aberto. NÃO é o `setState` cru: é o `escreverNoCampo` do
+   * pai, que além de pôr a letra no ecrã marca a gravação para daqui a 600 ms.
+   * O nome fica por ser o que o filho faz com ela — escrever o rascunho —, e a
+   * gravação não é assunto deste componente.
+   */
   setDraft: (v: string) => void;
   commitEdit: () => void;
   editKeys: (e: React.KeyboardEvent) => void;

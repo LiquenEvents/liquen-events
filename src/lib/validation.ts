@@ -258,6 +258,27 @@ const timelineItemSchema = z.object({
     .min(0)
     .max(24 * 60)
     .optional(),
+  /**
+   * ── ONDE E O QUE É PRECISO GARANTIR ────────────────────────────────────
+   *
+   * As duas colunas do meio da folha dela. Entraram no `TimelineItem` e no
+   * ecrã, e NÃO entraram aqui — que é o defeito contra o qual o comentário da
+   * `duracao`, três linhas acima, está escrito. O `.strip()` apagava-as em
+   * silêncio, com 200, e fazia duas coisas ao mesmo tempo:
+   *
+   *  1. o local e a nota que ela escrevia desapareciam ao gravar;
+   *  2. e a gravação SEGUINTE respondia 409 — porque o ecrã dizia ter partido
+   *     de um guião COM local e notas e o servidor tinha um SEM, e a conferência
+   *     da base (`api/orcamento/[id]`) via, correctamente, duas listas
+   *     diferentes. A mensagem «a timeline mudou noutro sítio» era verdadeira à
+   *     letra: tinha mudado, ao passar por aqui.
+   *
+   * Os tectos são os da folha: um local é um nome de sítio («Adega Fitapreta»),
+   * uma nota é uma frase curta («enviar táxi»), e nenhuma das duas é um campo
+   * onde se escreva um parágrafo.
+   */
+  local: trimmed(200).optional(),
+  notas: trimmed(500).optional(),
 });
 
 const paymentSchema = z.object({
