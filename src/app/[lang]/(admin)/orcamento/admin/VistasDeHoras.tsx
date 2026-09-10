@@ -212,15 +212,6 @@ function Bloco({ entrada }: { entrada: DiaDisposto["comHora"][number] }) {
         insetInlineStart: `${(entrada.pista / entrada.pistas) * 100}%`,
         width: `${100 / entrada.pistas}%`,
       }}
-      onContextMenu={
-        entrada.onMenu
-          ? (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              entrada.onMenu?.(e.clientX, e.clientY);
-            }
-          : undefined
-      }
     >
       <ChipDoDia
         bloco
@@ -230,37 +221,7 @@ function Bloco({ entrada }: { entrada: DiaDisposto["comHora"][number] }) {
         titulo={entrada.titulo}
         rotulo={entrada.rotulo}
         dica={entrada.dica}
-        onClick={(e) => {
-          e.stopPropagation();
-          entrada.onAbrir();
-        }}
-        className={entrada.riscarNoHover ? "hover:line-through" : undefined}
-      />
-    </div>
-  );
-}
-
-/** A etiqueta de dia inteiro, com o menu do botão direito à volta dela. */
-function ChipDeDiaInteiro({ entrada }: { entrada: EntradaDeHoras }) {
-  return (
-    <div
-      className="min-w-0"
-      onContextMenu={
-        entrada.onMenu
-          ? (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              entrada.onMenu?.(e.clientX, e.clientY);
-            }
-          : undefined
-      }
-    >
-      <ChipDoDia
-        cor={entrada.cor}
-        marca={entrada.marca}
-        titulo={entrada.titulo}
-        rotulo={entrada.rotulo}
-        dica={entrada.dica}
+        onMenu={entrada.onMenu}
         onClick={(e) => {
           e.stopPropagation();
           entrada.onAbrir();
@@ -481,7 +442,20 @@ export function VistaDeHoras({
                     )}
                   >
                     {d.semHora.map((e) => (
-                      <ChipDeDiaInteiro key={e.chave} entrada={e} />
+                      <ChipDoDia
+                        key={e.chave}
+                        cor={e.cor}
+                        marca={e.marca}
+                        titulo={e.titulo}
+                        rotulo={e.rotulo}
+                        dica={e.dica}
+                        onMenu={e.onMenu}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          e.onAbrir();
+                        }}
+                        className={e.riscarNoHover ? "hover:line-through" : undefined}
+                      />
                     ))}
                   </div>
                 ))}

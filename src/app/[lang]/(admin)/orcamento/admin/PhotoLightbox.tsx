@@ -51,6 +51,71 @@ export interface PhotoLightboxProps {
   /** Transferir a foto que está à vista. */
   onDownload: (image: ThemeImage, index: number) => void;
   downloading?: boolean;
+  /**
+   * ── DE ONDE A LUPA CRESCE ─────────────────────────────────────────────
+   *
+   * O rectângulo da MINIATURA no instante em que se abriu, em coordenadas da
+   * janela. `null` ou ausente = abre como abria, com a `.bo-entrada` de
+   * sempre.
+   *
+   * `docs/APPLE-TEMAS.md`, Parte 3: «entrada com `--ease-quick` a partir da
+   * posição da miniatura (FLIP), NÃO do centro do ecrã», e Parte 5: 325 ms.
+   */
+  origem?: DOMRect | null;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O FLIP — a lupa nasce na miniatura em que se carregou
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * FLIP é First, Last, Invert, Play: sabe-se onde a coisa estava (`origem`),
+ * deixa-se o browser desenhá-la onde ela vai ficar, calcula-se a transformação
+ * que a levaria de volta ao sítio antigo, aplica-se, e anima-se até à
+ * identidade. O resultado é uma fotografia que CRESCE do mosaico em vez de
+ * aparecer no meio do ecrã — que é a diferença entre saber qual das sessenta
+ * se abriu e ter de a procurar outra vez ao fechar.
+ *
+ * Anima só `transform` e `opacity`, que é a regra absoluta de movimento do
+ * `docs/DESIGN-SYSTEM.md` (Parte 2.4). Nada de `width`, `top` ou `left`.
+ *
+ * ── OS VALORES VÊM DOS TOKENS, LIDOS DO `:root` ──────────────────────────
+ *
+ * «Nenhum valor literal fora dos tokens.» A duração e a curva não se escrevem
+ * aqui: lêem-se do documento, onde o `tema.css` as pôs
+ * (`--transition-duration-quick`, `--ease-quick`). Se o token faltar — e já
+ * faltou nesta casa, ver a nota do `@theme static` — o FLIP não corre, em vez
+ * de correr com um número inventado.
+ *
+ * ── E NÃO CORRE COM `prefers-reduced-motion` ─────────────────────────────
+ *
+ * «Substitui transições de POSIÇÃO por fades» [APPLE]. É exactamente uma
+ * transição de posição e de escala, portanto desliga-se inteira e fica o fade
+ * que a `.bo-entrada` já dá.
+ */
+function crescerDaMiniatura(caixa: HTMLElement, origem: DOMRect): Animation | null {
+  if (typeof window === "undefined" || typeof caixa.animate !== "function") return null;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return null;
+  const destino = caixa.getBoundingClientRect();
+  if (!destino.width || !destino.height || !origem.width || !origem.height) return null;
+
+  const raiz = getComputedStyle(document.documentElement);
+  const duracao = Number.parseFloat(raiz.getPropertyValue("--transition-duration-quick"));
+  const curva = raiz.getPropertyValue("--ease-quick").trim();
+  if (!Number.isFinite(duracao) || duracao <= 0 || !curva) return null;
+
+  const escalaX = origem.width / destino.width;
+  const escalaY = origem.height / destino.height;
+  const dx = origem.left + origem.width / 2 - (destino.left + destino.width / 2);
+  const dy = origem.top + origem.height / 2 - (destino.top + destino.height / 2);
+
+  return caixa.animate(
+    [
+      { transform: `translate(${dx}px, ${dy}px) scale(${escalaX}, ${escalaY})`, opacity: 0.4 },
+      { transform: "none", opacity: 1 },
+    ],
+    { duration: duracao, easing: curva, fill: "none" },
+  );
 }
 
 export default function PhotoLightbox({
@@ -61,10 +126,13 @@ export default function PhotoLightbox({
   onClose,
   onDownload,
   downloading,
+  origem = null,
 }: PhotoLightboxProps) {
   const image = images[index];
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  /** A caixa que o FLIP anima — a fotografia, sem as setas. */
+  const palcoRef = useRef<HTMLDivElement>(null);
   // O original ainda não chegou: mostra-se a miniatura esticada.
   const [loaded, setLoaded] = useState(false);
   const { alvo, desistiu, aoFalhar, tentarDeNovo } = useFotoComPlanoB(image?.url, image?.thumbUrl);
@@ -135,6 +203,27 @@ export default function PhotoLightbox({
   // quem abriu (a grelha guarda o elemento activo).
   useEffect(() => {
     closeRef.current?.focus();
+  }, []);
+
+  /**
+   * ── E A LUPA CRESCE DA MINIATURA ────────────────────────────────────────
+   *
+   * Uma vez, na montagem, e só com `origem`: `crescerDaMiniatura` mede o
+   * destino no instante em que corre, e corre depois do primeiro desenho —
+   * que é o «Last» do FLIP.
+   *
+   * Não atrasa nada. A animação corre POR CIMA de uma lupa que já está no
+   * sítio, já tem foco e já responde ao teclado; interrompê-la é carregar em
+   * Esc, e o Esc fecha na mesma.
+   */
+  useEffect(() => {
+    if (!aberto || !origem || !palcoRef.current) return;
+    const anim = crescerDaMiniatura(palcoRef.current, origem);
+    return () => anim?.cancel();
+    // Só na montagem: reabrir noutra fotografia remonta este componente (é o
+    // pai que o desmonta ao fechar), e as setas trocam a foto SEM FLIP — «não
+    // animes interações de alta frequência».
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Enquanto está aberto, a página por baixo não rola. Regido pelo `aberto` e
@@ -212,38 +301,53 @@ export default function PhotoLightbox({
             ‹
           </button>
         )}
-        {/* A miniatura por baixo enquanto o original não chega: há sempre
-          imagem, em vez de um retângulo preto durante um segundo. Deixa de
-          fazer sentido quando é ELA o alvo (seria a mesma foto desfocada por
-          baixo de si própria) ou quando já não há nada por onde tentar. */}
-        {!loaded && !desistiu && image.thumbUrl && alvo !== image.thumbUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image.thumbUrl}
-            alt=""
-            aria-hidden
-            className="absolute max-h-full max-w-full object-contain blur-sm"
-          />
-        )}
-        {desistiu || !alvo ? (
-          <AvisoDeFalha
-            titulo="Não foi possível mostrar esta fotografia"
-            mensagem="A ligação pode ter caído, ou a foto pode ter sido removida noutro separador. O ficheiro continua no tema."
-            aoTentarDeNovo={tentarDeNovo}
-          />
-        ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            key={alvo}
-            src={alvo}
-            alt={`Foto ${index + 1} de ${images.length}`}
-            onLoad={() => setLoaded(true)}
-            onError={aoFalhar}
-            className={`max-h-full max-w-full object-contain motion-safe:transition-opacity ${
-              loaded ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        )}
+        {/* ── O PALCO, E PORQUE É QUE ELE EXISTE ─────────────────────────
+            É o que o FLIP anima: a fotografia e a miniatura que a segura,
+            SEM as setas. Antes eram todos filhos do mesmo `flex`, e uma
+            entrada que crescesse daqui levava as setas a crescer com ela —
+            dois controlos de 44 px a passar por 8 px, que é a coisa que a
+            Parte 5 do sistema de design chama «distrativa». As setas ficam
+            irmãs, e paradas. */}
+        <div
+          ref={palcoRef}
+          className="relative flex h-full w-full items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          {/* A miniatura por baixo enquanto o original não chega: há sempre
+            imagem, em vez de um retângulo preto durante um segundo. Deixa de
+            fazer sentido quando é ELA o alvo (seria a mesma foto desfocada por
+            baixo de si própria) ou quando já não há nada por onde tentar. */}
+          {!loaded && !desistiu && image.thumbUrl && alvo !== image.thumbUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image.thumbUrl}
+              alt=""
+              aria-hidden
+              className="absolute max-h-full max-w-full object-contain blur-sm"
+            />
+          )}
+          {desistiu || !alvo ? (
+            <AvisoDeFalha
+              titulo="Não foi possível mostrar esta fotografia"
+              mensagem="A ligação pode ter caído, ou a foto pode ter sido removida noutro separador. O ficheiro continua no tema."
+              aoTentarDeNovo={tentarDeNovo}
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              key={alvo}
+              src={alvo}
+              alt={`Foto ${index + 1} de ${images.length}`}
+              onLoad={() => setLoaded(true)}
+              onError={aoFalhar}
+              className={`max-h-full max-w-full object-contain motion-safe:transition-opacity ${
+                loaded ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          )}
+        </div>
         {index < images.length - 1 && (
           <button
             type="button"

@@ -56,6 +56,16 @@ export interface ChipDoDiaProps {
   dica: string;
   onClick: (e: MouseEvent<HTMLButtonElement>) => void;
   /**
+   * O menu do botão direito desta etiqueta, quando o há.
+   *
+   * O ponto 17 da auditoria dela é uma linha: «Não há menu de contexto no
+   * evento nem no dia.» Vive AQUI, na etiqueta, e não num invólucro à volta
+   * dela, porque é a etiqueta que é o alvo — um `<div>` a envolver cada uma
+   * acrescentava um nó por evento em todas as células de todos os meses para
+   * apanhar um gesto que a própria peça já recebe.
+   */
+  onMenu?: (x: number, y: number) => void;
+  /**
    * A MESMA etiqueta, mas a encher a caixa em que está — as vistas de dia e de
    * semana (`VistasDeHoras.tsx`) posicionam-na em absoluto com a altura da
    * DURAÇÃO, e nessas a etiqueta tem de subir ao topo do bloco em vez de se
@@ -84,6 +94,7 @@ export function ChipDoDia({
   rotulo,
   dica,
   onClick,
+  onMenu,
   bloco,
   className,
 }: ChipDoDiaProps) {
@@ -93,6 +104,17 @@ export function ChipDoDia({
       aria-label={rotulo}
       title={dica}
       onClick={onClick}
+      onContextMenu={
+        onMenu
+          ? (e) => {
+              e.preventDefault();
+              // A célula por baixo tem menu próprio (o do DIA). Sem esta
+              // cerca, o botão direito numa etiqueta abria os dois.
+              e.stopPropagation();
+              onMenu(e.clientX, e.clientY);
+            }
+          : undefined
+      }
       style={{ "--tipo": cor } as CSSProperties}
       className={cn(
         "group/chip flex w-full min-w-0 gap-1 overflow-hidden pe-1 text-start",

@@ -307,9 +307,16 @@ const TaskRow = memo(function TaskRow({
   t,
   overdue,
   arrastavel,
+  escolhida,
+  marca,
+  aArrastar,
   onToggle,
   onEdit,
   onRemove,
+  onEscolher,
+  onPrazo,
+  onMover,
+  onArrastar,
 }: {
   t: Task;
   overdue: boolean;
@@ -323,15 +330,40 @@ const TaskRow = memo(function TaskRow({
    * uma promessa falsa, e três botões no hover de uma linha são proibição da
    * Parte 8.
    *
-   * O que a fase 09 tem para fazer aqui: pendurar os manipuladores de ponteiro
-   * nesta linha quando a marca estiver posta, e chamar o
-   * `reordenarManualmente` de `@/lib/tarefas/listas` ao largar — o motor da
-   * ordem manual já está escrito e testado.
+   * ── E A FASE 09 CHEGOU ──────────────────────────────────────────────────
+   *
+   * A marca continua a ser a mesma (`data-arrastavel`), e agora traz com ela o
+   * `draggable` e os quatro manipuladores. O que NÃO veio foi a pega desenhada:
+   * a linha inteira agarra-se, que é o que os Lembretes fazem, e uma pega de
+   * seis pontinhos seria o terceiro controlo de uma linha que a Parte 8 quer
+   * com um.
    */
   arrastavel: boolean;
+  /** A linha que o painel de detalhe está a mostrar. */
+  escolhida: boolean;
+  /** Onde é que a linha arrastada vai entrar, se for aqui. */
+  marca: "antes" | "depois" | null;
+  /** Esta é a linha que está a ser arrastada neste momento. */
+  aArrastar: boolean;
   onToggle: (t: Task) => void;
   onEdit: (t: Task) => void;
   onRemove: (id: string) => void;
+  onEscolher: (t: Task) => void;
+  /** «Hoje» e «Amanhã» do menu — o prazo sem abrir o editor. */
+  onPrazo: (t: Task, quando: "hoje" | "amanha") => void;
+  /** A alternativa ao arrasto, que nunca pode ser o único caminho. [APPLE] */
+  onMover: (id: string, direccao: -1 | 1) => void;
+  /**
+   * Os quatro momentos do arrasto, num objecto só: são estáveis, chegam do
+   * ecrã, e passá-los soltos era quadruplicar a lista de propriedades de uma
+   * linha que está atrás de um `memo()`.
+   */
+  onArrastar: {
+    comecar: (e: React.DragEvent<HTMLDivElement>) => void;
+    porCima: (e: React.DragEvent<HTMLDivElement>) => void;
+    largar: (e: React.DragEvent<HTMLDivElement>) => void;
+    acabar: () => void;
+  };
 }) {
   return (
     /* ── LINHA DE TABELA NO COMPUTADOR, CARTÃO DE DUAS LINHAS NO TELEMÓVEL ──
@@ -359,8 +391,36 @@ const TaskRow = memo(function TaskRow({
       // atributo presente, e quem o procurar com `[data-arrastavel]` apanhava
       // a lista inteira.
       data-arrastavel={arrastavel || undefined}
-      className={`group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO}`}
+      // A identidade da linha no DOM. É por aqui que o teclado (setas, ⌘⌫,
+      // ⇧F10) e o arrasto sabem em que tarefa estão sem que o ecrã tenha de
+      // fabricar um manipulador por linha — que é o que desfazia o `memo()`.
+      data-tarefa={t.id}
+      draggable={arrastavel || undefined}
+      onDragStart={arrastavel ? onArrastar.comecar : undefined}
+      onDragOver={arrastavel ? onArrastar.porCima : undefined}
+      onDrop={arrastavel ? onArrastar.largar : undefined}
+      onDragEnd={arrastavel ? onArrastar.acabar : undefined}
+      aria-current={escolhida || undefined}
+      className={`group relative flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 ${ESTADO} ${
+        escolhida ? "bg-[var(--bo-accent-lavagem)]" : "hover:bg-[var(--bo-tinta-3)]"
+      } ${arrastavel ? "cursor-grab active:cursor-grabbing" : ""} ${aArrastar ? "opacity-50" : ""}`}
     >
+      {/* ── A LINHA DE INSERÇÃO ────────────────────────────────────────────
+          «Sinal de aceitação só sobre destino válido — linha de inserção ou
+          realce do contentor.» [APPLE]
+
+          Um elemento absoluto e não um `border-top`: uma moldura de 2 px que
+          aparece e desaparece empurra a linha 2 px para baixo a cada passagem
+          do cursor, e o que se vê é a lista a tremer debaixo do que se
+          arrasta. Este não ocupa espaço nenhum. */}
+      {marca && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-0 h-0.5 bg-[var(--bo-accent)] ${
+            marca === "antes" ? "top-0" : "bottom-0"
+          }`}
+        />
+      )}
       {/* ── É UMA `<input type="checkbox">` A SÉRIO ───────────────────────
           «Checkbox que não é `<input type="checkbox">`» está nas proibições
           deste ecrã, e com razão: o que estava aqui era um `<button>` com

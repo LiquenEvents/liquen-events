@@ -24,7 +24,17 @@ import {
   useCalendarios,
 } from "./CalendariosFiltraveis";
 import { ChipDoDia, MaisDoDia } from "./ChipDoDia";
-import { MESES, anoDoCalendario, fechadosNoAno } from "@/lib/orcamento/ano-do-calendario";
+import { VistaDeHoras, type DiaDeHoras, type EntradaDeHoras } from "./VistasDeHoras";
+import { MenuDeContexto, type PedidoDeMenu } from "./MenuDeContexto";
+import type { AccaoDeItem } from "./ui";
+import {
+  DIAS_DA_SEMANA,
+  MESES,
+  anoDoCalendario,
+  fechadosNoAno,
+  maisDias,
+} from "@/lib/orcamento/ano-do-calendario";
+import { diasDaSemana, tituloDaSemana } from "@/lib/orcamento/dia-do-calendario";
 import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -32,7 +42,15 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
-const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+/**
+ * Os três caracteres de cada dia, no cabeçalho da grelha do mês.
+ *
+ * Vêm da mesma lista que a vista de semana e os mini-meses do ano usam
+ * (`lib/orcamento/ano-do-calendario`), e não de uma cópia escrita aqui — pela
+ * razão que está escrita ao lado do `MONTHS`, três linhas abaixo. Eram três
+ * listas a nomear os mesmos sete dias no MESMO ecrã.
+ */
+const WEEKDAYS: readonly string[] = DIAS_DA_SEMANA.map((d) => d.curto);
 /**
  * Os nomes dos meses vêm do módulo que faz as contas do ano
  * (`lib/orcamento/ano-do-calendario`), e não de uma segunda lista aqui.
@@ -197,6 +215,7 @@ function AddEventModal({
   aberto,
   date,
   dateLabel,
+  tipoInicial,
   onClose,
   onCreate,
 }: {
@@ -215,6 +234,16 @@ function AddEventModal({
   aberto: boolean;
   date: string;
   dateLabel: string;
+  /**
+   * Com que tipo o formulário abre.
+   *
+   * O menu do botão direito de um dia (fase 10) tem três entradas que criam —
+   * «Novo evento», «Nova nota…» e «Fechar este dia…» — e as três abrem esta
+   * mesma caixa. Sem isto, escolher «Fechar este dia» abria um formulário com
+   * «Evento» marcado e obrigava a corrigir o tipo à mão: o item do menu diz o
+   * que vai acontecer, e a caixa que ele abre tem de o confirmar.
+   */
+  tipoInicial: CalendarEventKind;
   onClose: () => void;
   onCreate: (payload: {
     title: string;
@@ -229,7 +258,9 @@ function AddEventModal({
     kind: CalendarEventKind;
     time: string;
     note: string;
-  }>({ title: "", kind: "evento", time: "", note: "" });
+    // O diálogo é remontado por `key` sempre que a data OU o tipo mudam (ver o
+    // `key` lá em baixo), portanto o valor inicial chega sempre fresco.
+  }>({ title: "", kind: tipoInicial, time: "", note: "" });
   const [saving, setSaving] = useState(false);
   // O trinco segue o `aberto` e não a montagem: enquanto o diálogo se apaga já
   // não é um diálogo, e o mês por trás volta a rolar no INSTANTE do gesto. Sem
@@ -483,6 +514,16 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
   const [modalDate, setModalDate] = useState<string | null>(null);
   /**
+   * Com que tipo o «Novo no calendário» abre — ver o `tipoInicial` lá em cima.
+   * Estado simples e não `useSaidaDeUmSo`: só decide o valor inicial de um
+   * formulário que é remontado por `key`, e durante os 200 ms da saída não
+   * muda, portanto o `key` do diálogo a apagar-se fica quieto.
+   */
+  const [tipoDoModal, setTipoDoModal] = useState<CalendarEventKind>("evento");
+  /** O menu do botão direito, quando há um aberto. Fase 10, ponto 17. */
+  const [menu, setMenu] = useState<PedidoDeMenu | null>(null);
+  const fecharMenu = useCallback(() => setMenu(null), []);
+  /**
    * ── QUEM ABRIU O «NOVO NO CALENDÁRIO» ─────────────────────────────────────
    *
    * O diálogo fica montado 200 ms a apagar-se e passa a `inert` no fotograma do
@@ -521,18 +562,35 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
   /**
    * ══════════════════════════════════════════════════════════════════════
-   * MÊS OU ANO — A PORTA DA FASE 07
+   * AS QUATRO VISTAS — FASES 06, 07 E 08
    * ══════════════════════════════════════════════════════════════════════
    *
-   * Duas das quatro vistas que o `docs/APPLE-CALENDARIO.md` pede (Dia, Semana,
-   * Mês, Ano). Entram as duas que já existem; as outras duas juntam-se ao
-   * mesmo comutador quando forem escritas, sem nada mudar aqui.
+   * «A app Calendário tem Dia, Semana, Mês e Ano, com `⌘1` a `⌘4`. […] O mês
+   * sozinho é a menos útil das quatro.» (ponto 9 da auditoria dela)
    *
-   * O mês continua a ser o que abre: é a vista de trabalho. O ano é a que
-   * responde a «temos livre em julho de 2027?», e essa pergunta faz-se quando
-   * chega um pedido — não é onde se começa o dia.
+   * As quatro vivem no MESMO comutador e no mesmo cartão. O comutador já cá
+   * estava com duas; a forma não muda, muda a lista.
+   *
+   * O mês continua a ser o que abre: é a vista de trabalho. O dia é onde se
+   * planeia uma montagem, a semana é onde se vê a carga dos próximos sete
+   * dias, e o ano é o que responde a «temos livre em julho de 2027?» — e essa
+   * pergunta faz-se quando chega um pedido, não é onde se começa o dia.
    */
-  const [vista, setVista] = useState<"mes" | "ano">("mes");
+  const [vista, setVista] = useState<Vista>("mes");
+
+  /**
+   * ── O DIA QUE AS VISTAS DE DIA E DE SEMANA MOSTRAM ────────────────────────
+   *
+   * O `cursor` é um mês (dia 1, sempre) e é o que a grelha do mês e os doze
+   * mini-meses do ano lêem. As vistas novas precisam de precisão de DIA, e
+   * arredondar o `cursor` ao dia estragava as outras duas.
+   *
+   * São dois estados e não um, portanto, e o que os mantém de acordo são as
+   * duas portas por onde se navega — `irParaDia` e `trocarDeVista`. Sem isso,
+   * saltar de «semana de 28 de setembro» para o mês abria Agosto, que é o mês
+   * onde o cursor tinha ficado três cliques antes.
+   */
+  const [diaAncora, setDiaAncora] = useState<string>(() => todayKey());
 
   /**
    * ══════════════════════════════════════════════════════════════════════
@@ -660,9 +718,10 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   }
 
   // Open the "add event" modal for a given day (shared by click + keyboard).
-  function openAdd(key: string) {
+  function openAdd(key: string, tipo: CalendarEventKind = "evento") {
     // De onde se veio, para se poder voltar. Ver `abridorDoModal`.
     abridorDoModal.current = document.activeElement as HTMLElement | null;
+    setTipoDoModal(tipo);
     setModalDate(key);
   }
 
