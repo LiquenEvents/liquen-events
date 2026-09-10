@@ -230,7 +230,7 @@ jobs:
         # `@propostas` corre no seu próprio passo bloqueante, com config e
         # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
         # este servidor é o de produção e recusa escritas sem Supabase.
-        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@vidro"
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@semrede|@vidro"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -353,6 +353,29 @@ jobs:
       # precisar de Supabase.
       - name: O vidro deixa passar (bloqueante)
         run: npx playwright test --grep "@vidro"
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # O `public/sw.js` guarda o invólucro das páginas para que uma visita sem
+      # rede ainda veja o sítio. Faltava medir a outra metade: que o que volta
+      # esteja VIVO. Se o JavaScript não pegar, o que aparece é uma fotografia
+      # do ecrã — o menu não abre e não se vai a sítio nenhum.
+      #
+      # TEM de ser aqui, contra o servidor de PRODUÇÃO, e não na suite dos
+      # dados: desde o Next 16.3.3 o `next dev` não hidrata uma página devolvida
+      # pela cache do service worker sem rede (medido nos três: `next start`
+      # hidrata, o `next dev` da 16.2.11 hidratava, o da 16.3.3 não). Correr
+      # este guarda em dev seria medir o servidor de desenvolvimento em vez do
+      # produto.
+      #
+      # Bloqueante porque a regressão é MUDA: a página continua a aparecer
+      # inteira em qualquer captura de ecrã, e só quem lhe toca descobre que
+      # está morta. Não grava nada, portanto o servidor de produção deste job
+      # basta.
+      - name: Sem rede, o ecrã volta vivo (bloqueante)
+        run: npx playwright test --grep "@semrede"
         env:
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"

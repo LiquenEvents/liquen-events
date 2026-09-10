@@ -224,8 +224,33 @@ describe("POST /api/admin/recuperar — sem sítio onde gravar, diz-se", () => {
     ]);
     const res = await POST(pedido({ email: "catarina@liquen-events.com" }));
     expect(res.status).toBe(503);
-    expect(await res.json()).toMatchObject({
-      error: expect.stringContaining("não está configurada"),
-    });
+    const { error } = (await res.json()) as { error: string };
+
+    /**
+     * ── O QUE ESTE TESTE MEDE MUDOU, E DE PROPÓSITO ──────────────────────
+     *
+     * Media que a frase continha «não está configurada». Passava — e a frase
+     * que passava mandava a pessoa «falar com quem o gere», sendo que quem lê
+     * isto É quem o gere: é a dona da empresa, sozinha. Mandou a fotografia
+     * do aviso a dizer que não funcionava bem, e o teste verde não a protegeu
+     * de nada, porque estava a medir uma palavra em vez de uma utilidade.
+     *
+     * Agora mede as duas coisas que a mensagem tem MESMO de trazer: uma saída
+     * que funciona já, e a razão de a recuperação não estar de pé. Uma frase
+     * que perca qualquer delas fica vermelha, mesmo que seja bem escrita.
+     */
+    expect(error, "a mensagem tem de dizer o que se pode fazer AGORA").toMatch(
+      /chave de acesso|palavra-passe/i,
+    );
+    expect(error, "e porque é que a recuperação não responde").toMatch(/configurar|ligada/i);
+
+    /**
+     * E não conta a quem passa o nome da variável que falta. Esta rota
+     * responde a qualquer pedido da internet; o detalhe da instalação fica no
+     * `log.error`, que só quem gere o servidor lê.
+     */
+    expect(error, "detalhes da instalação não vão na resposta pública").not.toMatch(
+      /ADMIN_USERS|ENTRADA\.md|env/i,
+    );
   });
 });

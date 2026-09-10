@@ -95,6 +95,59 @@ export function exigirLogin(entrou: boolean): void {
  * credenciais erradas gasta o contador por conta da rota (5 em 5 minutos), e
  * uma suite que insiste é uma suite que se tranca a si própria à porta.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ESPERA QUE A CORTINA DE ENTRADA SAIA DA FRENTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A cortina («Decoramos eventos, eternizamos memórias.») cobre o ecrã inteiro
+ * enquanto a página carrega. Enquanto lá está, TUDO o que está por baixo conta
+ * como invisível para o Playwright — e um clique num elemento que existe fica à
+ * espera até esgotar o tempo, com a mensagem enganadora «element is not
+ * visible».
+ *
+ * ── PORQUE É QUE ISTO APARECEU AGORA ─────────────────────────────────────
+ *
+ * O `geometria-dos-alvos` ficou instável: a primeira tentativa morria a
+ * esperar por uma linha da tabela, e a REPETIÇÃO passava os onze pontos da
+ * rolagem sem uma queixa. Fui ao rasto e li os retratos: aos 85% do percurso a
+ * cortina ainda lá estava, inteira. Não era o teste que estava errado — era o
+ * ecrã que ainda não tinha sido entregue.
+ *
+ * A cortina sai quando a sua animação acaba (2,25 s). Só que uma animação de
+ * CSS **não progride enquanto a página não está à vista**, e num CI com vários
+ * contextos, ou nesta máquina com trabalho a mais, isso acontece. A cortina não
+ * está avariada: está à espera da sua vez, e o teste não sabia disso.
+ *
+ * ── PORQUE É QUE ISTO NÃO ENFRAQUECE TESTE NENHUM ────────────────────────
+ *
+ * Porque não se salta nada nem se afrouxa uma asserção: espera-se pela MARCA
+ * que o próprio `Cortina.tsx` põe na raiz do documento quando se levanta
+ * (`data-cortina="fora"`). É o mesmo sinal por que o guarda do vidro já espera,
+ * pela mesma razão e depois do mesmo engano — lá, o que ele media era a cortina
+ * em vez da barra.
+ *
+ * Vive aqui, no ajudante que TODOS os passeios usam para entrar, e não num
+ * teste só: a espera é boa para todos e o defeito podia aparecer em qualquer um.
+ */
+export async function esperarQueACortinaSaia(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => {
+        const c = document.querySelector(".cortina");
+        // Sem cortina no documento também não há nada a tapar — é o caso de
+        // quem pediu menos movimento, em que ela nem chega a ser desenhada.
+        return !c || document.documentElement.getAttribute("data-cortina") === "fora";
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .catch(() => {
+      // Não se atira: se ela ficar mesmo presa, quem chamou vai falhar a
+      // seguir com a sua própria mensagem, que diz mais do que esta.
+    });
+}
+
 export async function entrarNoBackOffice(page: Page): Promise<boolean> {
   const painel = page.getByRole("navigation", { name: /Navegação do back office/i });
 
@@ -103,6 +156,7 @@ export async function entrarNoBackOffice(page: Page): Promise<boolean> {
       .waitForResponse((r) => r.url().includes("/api/admin/passkeys/entrada"), { timeout: 60_000 })
       .catch(() => null);
     await page.goto("/orcamento/admin");
+    await esperarQueACortinaSaia(page);
 
     // Já autenticado (sessão de um passo anterior): o painel abre directo.
     if (
@@ -150,7 +204,11 @@ export async function entrarNoBackOffice(page: Page): Promise<boolean> {
       .waitFor({ state: "visible", timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
-    if (dentro) return true;
+    // A entrada troca de ecrã, e a cortina pode voltar com ele.
+    if (dentro) {
+      await esperarQueACortinaSaia(page);
+      return true;
+    }
   }
   return false;
 }

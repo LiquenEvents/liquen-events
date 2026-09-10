@@ -36,7 +36,7 @@
  * não a configuração — e exige que nenhuma delas seja um invólucro vazio.
  * Uma folha que só tenha `@layer` e `@font-face` não é uma folha: é o sintoma.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -44,7 +44,67 @@ import { join } from "node:path";
  * para uma cópia com uma folha esvaziada e confirma-se que ele morde. Uma
  * rede que nunca se viu falhar não é uma rede.
  */
-const PASTA = process.argv[2] ?? join(".next", "static", "chunks");
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * ONDE ESTÃO AS FOLHAS — PROCURADAS, E NÃO ADIVINHADAS
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era `join(".next", "static", "chunks")`, escrito à mão. Funcionava aqui
+ * e no CI, e **rebentava todos os deploys do Vercel**:
+ *
+ *     Error: ENOENT: no such file or directory,
+ *            scandir '.next/static/chunks'
+ *         at scripts/folhas-que-existem.mjs:64
+ *
+ * A construção passava inteira — compilava, verificava os tipos, gerava as 106
+ * páginas — e morria neste guarda, a seguir, porque naquela máquina o
+ * compilador não põe as folhas nessa pasta. Um caminho escrito à mão é uma
+ * suposição sobre o que o compilador faz, e essa suposição envelhece: muda com
+ * a versão, com o empacotador, e com a plataforma.
+ *
+ * (Custou uma tarde inteira a encontrar, e não por ser difícil: eu estava a ler
+ * o erro ANTERIOR, de outro passo, e a assumir que era sempre o mesmo. Só
+ * quando pedi o registo INTEIRO é que apareceu este.)
+ *
+ * Agora procura-se: varre-se a saída da construção INTEIRA atrás de `.css`,
+ * seja em que pasta for. Nem sequer se assume que existe uma pasta `static` —
+ * porque a única coisa que se sabe do registo do Vercel é que `static/chunks`
+ * não estava lá, e não se sabe se a mãe estava.
+ *
+ * O guarda fica mais forte, não mais fraco: deixa de poder ser enganado por
+ * uma mudança de arrumação, e continua a chumbar se não houver folha nenhuma,
+ * que é o que ele veio apanhar.
+ */
+const RAIZ = process.argv[2] ?? ".next";
+
+/**
+ * Duas pastas ficam de fora, e por razões diferentes:
+ *
+ *  · `cache` guarda trabalho de construções ANTERIORES. Uma folha velha lá
+ *    dentro faria este guarda dar por boa uma construção que não escreveu
+ *    nada — exactamente o vazio que ele existe para apanhar.
+ *  · `standalone` é uma CÓPIA da saída, feita quando se pede o pacote
+ *    autossuficiente. Contá-la seria contar tudo duas vezes.
+ */
+// `cache` é trabalho interno do compilador; `standalone` é uma CÓPIA do que já
+// se contou (e contá-la duas vezes fazia o guarda mentir sobre quantas folhas
+// existem); `dev` é a saída do servidor de DESENVOLVIMENTO, que fica em
+// `.next/dev` depois de um `npm run dev` e nada tem a ver com o que se
+// construiu — em CI nem existe, mas em local punha aqui três folhas a mais.
+const FORA = new Set(["cache", "standalone", "dev"]);
+
+/** Todos os `.css` debaixo de uma pasta, a qualquer profundidade. */
+function folhasEm(raiz) {
+  if (!existsSync(raiz)) return [];
+  const achadas = [];
+  for (const entrada of readdirSync(raiz, { withFileTypes: true })) {
+    if (entrada.isDirectory() && FORA.has(entrada.name)) continue;
+    const caminho = join(raiz, entrada.name);
+    if (entrada.isDirectory()) achadas.push(...folhasEm(caminho));
+    else if (entrada.name.endsWith(".css")) achadas.push(caminho);
+  }
+  return achadas;
+}
 
 /**
  * Quantas REGRAS de estilo tem uma folha, sem contar com o que não pinta
@@ -61,15 +121,21 @@ function regrasQuePintam(css) {
   return (semAtRegras.match(/\{/g) ?? []).length;
 }
 
-const folhas = readdirSync(PASTA)
-  .filter((f) => f.endsWith(".css"))
-  .map((f) => {
-    const css = readFileSync(join(PASTA, f), "utf8");
-    return { nome: f, bytes: css.length, regras: regrasQuePintam(css) };
-  });
+const caminhos = folhasEm(RAIZ);
+const folhas = caminhos.map((caminho) => {
+  const css = readFileSync(caminho, "utf8");
+  return {
+    nome: caminho.slice(RAIZ.length + 1),
+    bytes: css.length,
+    regras: regrasQuePintam(css),
+  };
+});
 
 if (folhas.length === 0) {
-  console.error("✗ a compilação não escreveu folha de estilos nenhuma.");
+  console.error(
+    `✗ a compilação não escreveu folha de estilos nenhuma debaixo de \`${RAIZ}\`.` +
+      (existsSync(RAIZ) ? "" : " (a pasta nem sequer existe)"),
+  );
   process.exit(1);
 }
 

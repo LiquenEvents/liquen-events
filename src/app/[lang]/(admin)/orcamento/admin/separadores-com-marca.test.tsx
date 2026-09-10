@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import EmailTemplates from "./EmailTemplates";
@@ -180,14 +180,77 @@ describe("a barra «Modelos / Editor clássico»", () => {
     // Sem isto, abrir o ecrã punha a pílula a deslizar do canto até ao
     // separador activo: um movimento que ninguém provocou, a anunciar uma troca
     // que não houve.
-    const { container } = render(
-      <ToastProvider>
-        <EmailTemplates />
-      </ToastProvider>,
-    );
-    await screen.findByRole("tab", { name: "Modelos" });
-    const antes = container.querySelector<HTMLElement>('[role="tablist"] > span[aria-hidden]');
-    expect(antes?.className).not.toMatch(/motion-safe:transition-/);
+    //
+    // ── PORQUE É QUE O FOTOGRAMA É SEGURADO À MÃO ─────────────────────────
+    //
+    // Este teste chumbou na subida do Next 16.2.11 → 16.3.4, e a leitura
+    // apressada era «a subida partiu a pílula». Não partiu. O `Segmented` liga
+    // a animação dentro de um `requestAnimationFrame`, portanto no browser o
+    // PRIMEIRO desenho acontece sempre sem ela — isso não mudou nem podia
+    // mudar com uma subida de versão.
+    //
+    // O que mudou foi a AFERIÇÃO: o `findByRole` espera, e a espera passou a
+    // ser longa que chegue para o `requestAnimationFrame` do jsdom disparar
+    // ANTES da asserção. O teste deixou de medir o primeiro desenho e passou a
+    // medir o segundo, sem que ninguém lhe tocasse.
+    //
+    // Segurar o fotograma resolve isso de vez: os `requestAnimationFrame`
+    // ficam em fila e só correm quando este teste os mandar correr. Assim a
+    // asserção de baixo aponta para o primeiro desenho seja qual for a versão
+    // do React, do Next ou do testing-library por baixo.
+    const pendentes: FrameRequestCallback[] = [];
+    const rafOriginal = globalThis.requestAnimationFrame;
+    const cafOriginal = globalThis.cancelAnimationFrame;
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) =>
+      pendentes.push(cb)) as typeof globalThis.requestAnimationFrame;
+    globalThis.cancelAnimationFrame = (() => {}) as typeof globalThis.cancelAnimationFrame;
+
+    try {
+      const { container } = render(
+        <ToastProvider>
+          <EmailTemplates />
+        </ToastProvider>,
+      );
+      await screen.findByRole("tab", { name: "Modelos" });
+
+      /**
+       * ── E A PÍLULA TEM DE EXISTIR PARA A ASSERÇÃO VALER ALGUMA COISA ────
+       *
+       * Escrevi primeiro isto como `expect(antes?.className).not.toMatch(…)`.
+       * Passava — e passa na mesma quando não há pílula nenhuma, porque
+       * `undefined` não casa com expressão nenhuma. Um teste que passa por não
+       * haver nada para medir.
+       *
+       * (Custou-me duas tentativas de controlo negativo perceber isto, e a
+       * primeira foi pior do que inútil: fui tirar o travão ao `Segmented`, que
+       * é o OUTRO componente com pílula desta casa, e concluí que o teste era
+       * vazio quando ele só não estava a ser tocado. O travão desta barra vive
+       * no `useMarcaQueAnda`/`EmailTemplates`. Com o travão certo removido, esta
+       * asserção fica vermelha — verificado.)
+       *
+       * O contrato é: **no instante em que a pílula aparece, ela não tem
+       * transição**. Portanto espera-se por ela — a medida vem de um `useEffect`
+       * normal, que corre com o fotograma seguro — e só depois se mede.
+       */
+      const pilula = await waitFor(() => {
+        const el = container.querySelector<HTMLElement>('[role="tablist"] > span[aria-hidden]');
+        expect(el, "a pílula não chegou a ser desenhada — não há nada a medir").not.toBeNull();
+        return el!;
+      });
+      expect(
+        pilula.className,
+        "a pílula nasceu já com transição: ao abrir o ecrã, ela desliza do canto " +
+          "até ao separador activo, a anunciar uma troca que ninguém fez",
+      ).not.toMatch(/motion-safe:transition-/);
+
+      // E agora, o fotograma seguinte — este, sim, à hora que este teste diz.
+      await act(async () => {
+        for (const cb of pendentes.splice(0)) cb(0);
+      });
+    } finally {
+      globalThis.requestAnimationFrame = rafOriginal;
+      globalThis.cancelAnimationFrame = cafOriginal;
+    }
 
     await passarUmFotograma();
     const depois = pilulaDe(barraDe("Editor de modelos"))!;

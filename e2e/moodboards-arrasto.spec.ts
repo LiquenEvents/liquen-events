@@ -107,7 +107,51 @@ async function semearRascunho(page: Page, quoteId: string): Promise<void> {
 }
 
 async function abrirEstudio(page: Page, nomeCliente: string): Promise<void> {
-  await page.goto("/orcamento/admin");
+  /**
+   * ── A SECÇÃO PEDE-SE PELO ENDEREÇO, E NÃO PELO `localStorage` ─────────────
+   *
+   * Era assim: semeava-se `liquen-admin-view` e esperava-se que o back office
+   * restaurasse a secção. Com o Next 16.3.3 deixou de funcionar, e MEDIDO no
+   * percurso dela — abrir «Fazer proposta», sair, voltar ao endereço limpo:
+   *
+   *     produção ............ T+0 Visão Geral · T+2,5s FAZER PROPOSTA  ✔
+   *     next dev (16.3.3) ... T+0 Visão Geral · T+2,5s Visão Geral     ✘
+   *                           e o cookie dela foi reescrito para «overview»
+   *
+   * O produto está bom: ela reabre o back office e volta à secção onde estava.
+   * É o servidor de DESENVOLVIMENTO que a perde — e esta suite corre contra ele
+   * porque precisa de GRAVAR (ver playwright.propostas.config.ts).
+   *
+   * Passa a pedir-se a secção pelo `?v=`, que é o caminho PÚBLICO e documentado
+   * («isto vai parar a favoritos e a mensagens: "abre-me isto"», em
+   * AdminClient.tsx) e que o SERVIDOR resolve — o cabeçalho já vem desenhado no
+   * primeiro fotograma, medido. Não se afrouxa nada: chega-se à mesma secção
+   * pela porta da frente, e some a corrida que o comentário aqui em cima já
+   * descrevia («um clique na navegação feito logo a seguir ao carregamento é
+   * desfeito pelo efeito que restaura a vista»).
+   */
+  await page.goto("/orcamento/admin?v=fazer-proposta");
+
+  /**
+   * ── E ESPERA-SE QUE O JAVASCRIPT PEGUE, QUE ANTES ERA DE GRAÇA ───────────
+   *
+   * Com o `?v=`, o cabeçalho «Fazer proposta» passa a vir DESENHADO PELO
+   * SERVIDOR — aparece no primeiro fotograma. É bom para ela e é uma armadilha
+   * para o teste: esperar por ele deixou de provar que a página está viva.
+   * Medido, foi exactamente o que aconteceu — o clique no cartão do cliente
+   * caiu numa página por hidratar, não fez NADA e não deixou rasto, e o
+   * relatório acusou o estúdio de não abrir.
+   *
+   * Antes isto era de graça: o cabeçalho só existia depois de a aplicação
+   * trocar de secção no cliente, ou seja, depois de hidratar. Agora pede-se o
+   * sinal a sério — a classe `admin-mode`, que o `layout.tsx` do back office põe
+   * no `body` DENTRO de um `useEffect` (o `data-admin-mode` é o irmão dela que
+   * vem do servidor, e por isso não serve aqui).
+   */
+  await page.waitForFunction(() => document.body.classList.contains("admin-mode"), undefined, {
+    timeout: 30_000,
+  });
+
   await expect(page.getByRole("heading", { name: /^Fazer proposta$/ })).toBeVisible({
     timeout: 20000,
   });

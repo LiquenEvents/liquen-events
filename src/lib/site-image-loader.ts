@@ -111,8 +111,19 @@ export const siteImageKey = galleryKey;
  */
 export const LOGO_WIDTHS = [64, 128, 256, 384, 512] as const;
 
-/** Os dois logótipos que vivem na raiz de public/ em vez de em /logos/. */
-const ROOT_LOGOS = ["/logo-liquen.png", "/logo-liquen-branco.png"];
+/**
+ * Os logótipos que vivem na raiz de public/ em vez de em /logos/.
+ *
+ * O `logo-liquen-marca.png` entrou depois dos outros dois e ficou de fora
+ * desta lista — o que não parte nada de forma visível, e é por isso que vale
+ * a pena escrever aqui o que custava. Quem não está na lista cai no ramo de
+ * recurso, que devolve o `src` INTACTO e IGNORA a largura pedida. Resultado
+ * medido: 76 KB de PNG por cada abertura do back office, em vez do WebP de
+ * uma das cinco larguras pré-geradas; e o `next dev` a avisar, em todas as
+ * páginas, que "o carregador não implementa width". A marca é a imagem que
+ * aparece em TODOS os ecrãs do back office — é o pior sítio para pagar isto.
+ */
+const ROOT_LOGOS = ["/logo-liquen.png", "/logo-liquen-branco.png", "/logo-liquen-marca.png"];
 
 /** Arredonda para cima até à largura pré-gerada mais próxima (satura no topo). */
 export function snapLogoWidth(width: number): number {
