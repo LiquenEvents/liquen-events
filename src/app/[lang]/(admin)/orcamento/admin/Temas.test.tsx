@@ -27,9 +27,12 @@ async function confirmarRemocao() {
   });
 }
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import Temas, {
   COLUNAS,
   GRELHA_DE_FOTOS,
+  PISO_DA_CELULA_PX,
   contarFotosDaBiblioteca,
   desdeQuando,
   mergePage,
@@ -2692,6 +2695,43 @@ describe("Grelha de fotos de um tema — ergonomia de toque", () => {
     );
     // Uma coluna só, ou três sem condição nenhuma, são o defeito medido.
     expect(GRELHA_DE_FOTOS).not.toMatch(/(^|\s)grid-cols-[13](\s|$)/);
+  });
+
+  /**
+   * ── E A CÉLULA TEM DE TER ALTURA PARA ELES ─────────────────────────────
+   *
+   * Rede nova, e nasceu de uma sobreposição real. A fase 07 pôs a célula a
+   * 4:3, ou seja 25% mais baixa do que a quadrada de antes — e a 320 px o alvo
+   * de cima (`×`, que APAGA a foto) passava a sobrepor-se 5,2 px ao de baixo
+   * (`↑`). Num toque na zona sobreposta ganha quem vem depois no DOM: o `×`.
+   *
+   * O piso está escrito no `Temas.tsx` com a conta ao lado; aqui refaz-se a
+   * conta a partir dos números que a decidem, para o dia em que alguém mexer
+   * num deles.
+   */
+  it("a célula 4:3 nunca fica mais baixa do que os três alvos que carrega", () => {
+    const MARGEM = 4; // `top-1` / `bottom-1`
+    const ALVO = 44; // `.alvo-toque`
+    const INTERVALO = 8; // o mínimo entre dois alvos, já fixado nesta casa
+    expect(PISO_DA_CELULA_PX).toBe(2 * MARGEM + 2 * ALVO + INTERVALO);
+
+    // E o piso vale MESMO: está na célula, na que está a subir e no esqueleto
+    // — as três têm de ter a mesma geometria, senão a grelha salta quando uma
+    // se torna a outra.
+    const fonte = readFileSync(
+      join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/Temas.tsx"),
+      "utf8",
+    );
+    const comRacio = fonte.match(/aspect-\[4\/3\][^"`]*/g) ?? [];
+    // A capa do CARTÃO de tema também é 4:3 e não tem alvos por cima; as da
+    // GRELHA são as que vivem numa célula com botões.
+    const daGrelha = comRacio.filter((c) => c.includes("rounded-lg"));
+    expect(daGrelha.length).toBeGreaterThanOrEqual(3);
+    for (const classe of daGrelha) {
+      expect(classe, `\`${classe}\` é 4:3 e não tem piso de altura`).toContain(
+        `min-h-[${PISO_DA_CELULA_PX}px]`,
+      );
+    }
   });
 
   it("dá 44 px de alvo aos três botões de cada foto", async () => {

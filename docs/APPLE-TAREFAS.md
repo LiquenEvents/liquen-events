@@ -5,8 +5,8 @@
 
 ## O QUE JÁ ESTÁ FEITO
 
-Auditado no `Tarefas.tsx` (1389 linhas) contra a tabela da **Parte 7**, e não de
-memória.
+Auditado no `Tarefas.tsx` (2511 linhas), no `TarefaDetalhe.tsx` e nos três
+módulos de `src/lib/tarefas/` contra a tabela da **Parte 7**, e não de memória.
 
 | # | Fase | Estado |
 |---|---|---|
@@ -14,16 +14,16 @@ memória.
 | 02 | Linha de tarefa | **feito** — `<input type="checkbox">` a sério, `⋯` no hover |
 | 03 | Adição inline | **feito** — `LinhaDeEscrever`: a última linha cria, `Enter` cria e fica |
 | 04 | Concluir | **feito** — mola na marca, espera de 1,5 s, e «Anular» |
-| 05 | Listas | **por fazer** — não há Hoje · Esta semana · Atrasadas · Sem data |
-| 06 | Agrupar e ordenar | **por fazer** — sem cabeçalhos `sticky` e sem arrastar |
-| 07 | Linguagem natural | **por fazer** |
-| 08 | Painel de detalhe | **por fazer** — a coluna vazia continua vazia |
-| 09 | Arrastar e menus | **por fazer** |
+| 05 | Listas | **feito** — `BarraDeListas` mais as listas por evento, com contagem |
+| 06 | Agrupar e ordenar | **feito** — cabeçalhos `sticky`, e «Manual» activa o arrastar |
+| 07 | Linguagem natural | **feito** — `lib/tarefas/linguagem-natural.ts`, com pastilhas editáveis |
+| 08 | Painel de detalhe | **feito** — `TarefaDetalhe.tsx`: notas, subtarefas, ligações e a porta para o evento. Os quatro campos (prazo, quem, área, prioridade) continuam a EDITAR-SE na linha e o painel só os mostra — um segundo editor dos mesmos campos era a família duplicada que a Parte −1 do sistema de design proíbe |
+| 09 | Arrastar e menus | **feito** — arrasto com linha de inserção e Anular, ordem GUARDADA (`Task.posicao`, ver `lib/tarefas/posicoes.ts`), menu no `⋯` e no botão direito, `↓`/`↑`, `⇧F10`, `⌘⌫`, `Esc`. **Três coisas do ponto 21 ficaram fora, com razão:** `⌘1`–`⌘5` (é como o browser troca de separador), `⌘F` (é a pesquisa global da casa e a do browser) e o `Espaço` a marcar a linha focada (o foco está num botão, e roubar-lhe o `Espaço` parte-o). E do ponto 20 ficaram fora os três submenus — «Escolher data…», «Atribuir a…» e «Prioridade» —, que o `ui/MenuDeAccoes` não sabe desenhar e que o «Editar tarefa» já dá |
 | 10 | Estado vazio | **feito** — com botão, como a Parte 8 exige |
-| 11 | Acessibilidade | **por fazer** — a lista da Parte 6 não foi percorrida |
+| 11 | Acessibilidade | **por fazer** — a lista da Parte 6 não foi percorrida de fio a pavio |
 
-Cinco das onze. As que faltam são as que mudam a ESTRUTURA do ecrã (05, 06, 08,
-09); as feitas são as que mudam a linha e o gesto.
+Dez das onze. A que falta é a única que não muda o ecrã: percorrer a lista da
+Parte 6 inteira e medir o Lighthouse.
 
 ---
 

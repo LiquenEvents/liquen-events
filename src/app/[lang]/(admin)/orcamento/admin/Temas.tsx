@@ -507,6 +507,42 @@ export const COLUNAS: Record<Densidade, string> = {
  * quer dizer. O piso dos 111 px continua garantido por construção em toda a
  * gama do `auto-fill`, e à mão nos 240–384 px que sobram (a 240, 114 px).
  */
+/**
+ * ── O PISO DE ALTURA DA CÉLULA, E PORQUE É QUE O 4:3 O OBRIGOU ────────────
+ *
+ * A célula era `aspect-square`; a fase 07 do `docs/APPLE-TEMAS.md` põe-na a
+ * 4:3. Uma célula 4:3 é 25% MAIS BAIXA do que a quadrada com a mesma largura —
+ * e a altura desta célula não é decoração: dentro dela vivem TRÊS alvos de
+ * 44 px, um encostado ao topo (o `×`, que APAGA a foto) e dois encostados ao
+ * fundo.
+ *
+ * A conta do que eles precisam, de cima para baixo:
+ *
+ *     4 (top-1) + 44 + 8 (intervalo mínimo entre alvos) + 44 + 4 (bottom-1)
+ *   = 104 px
+ *
+ * MEDIDO com a grelha nova, à altura de cada janela:
+ *
+ *     janela   célula          folga entre o alvo de cima e o de baixo
+ *      320     121,0 × 90,8    −5,2 px   ← SOBREPOSTOS
+ *      375     148,5 × 111,4   +15,4 px
+ *      390     156,0 × 117,0   +21,0 px
+ *     1024     185,0 × 138,8   +42,8 px
+ *     1440     190,5 × 142,9   +46,9 px
+ *
+ * A 320 px o `×` e o `↑` sobrepunham-se em 5 px, e quem ganha um toque na
+ * zona sobreposta é o que vem depois no DOM — o `×`. Ou seja: o dedo ia a
+ * «mover para o início» e apagava a fotografia.
+ *
+ * O piso corrige isso e não desfaz o 4:3: a partir de 138,7 px de célula (que
+ * é toda a gama de 375 para cima) o rácio é exactamente 4:3 e este mínimo
+ * nunca chega a pegar. Só nos últimos ~55 px antes dos 320 é que a célula fica
+ * um pouco mais alta do que 4:3 — e a alternativa ali era dois alvos por cima
+ * um do outro. «Onde este documento e a acessibilidade discordarem, ganha a
+ * acessibilidade» (`docs/DESIGN-SYSTEM.md`, Parte −1, ponto 5).
+ */
+export const PISO_DA_CELULA_PX = 104;
+
 export const GRELHA_DE_FOTOS =
   "grid grid-cols-2 gap-3 @min-[24rem]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]";
 
@@ -5163,7 +5199,11 @@ function ThemeFolder({
         {loading ? (
           <div className={GRELHA_DE_FOTOS}>
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="bo-skeleton aspect-[4/3] rounded-lg" aria-hidden />
+              <div
+                key={i}
+                className="bo-skeleton aspect-[4/3] min-h-[104px] rounded-lg"
+                aria-hidden
+              />
             ))}
           </div>
         ) : unreadable ? (
@@ -5202,7 +5242,7 @@ function ThemeFolder({
                   key={p.id}
                   aria-hidden
                   title={`${p.name} — a carregar`}
-                  className="relative aspect-[4/3] overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
+                  className="relative aspect-[4/3] min-h-[104px] overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
                 >
                   {p.src ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -5300,7 +5340,7 @@ function ThemeFolder({
                         accoes: accoesDaFoto(im, i),
                       });
                     }}
-                    className={`celula-saltavel group relative aspect-[4/3] overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
+                    className={`celula-saltavel group relative aspect-[4/3] min-h-[104px] overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
                       isSelected
                         ? "border-sage-600 ring-2 ring-sage-600/40"
                         : "border-[var(--bo-hairline-strong)]"

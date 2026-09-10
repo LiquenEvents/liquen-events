@@ -1952,11 +1952,14 @@ export default function Tarefas({
           `lg:` e não `md:`: é o corte da casa, o mesmo em que a barra de
           destinos deixa de ser gaveta (ver `Cortes.contrato.test.ts`).
 
-          MEDIDO a 1024 (o `lg` justo): 224 px de listas + 288 de detalhe + dois
-          intervalos de 24 deixam 424 px à coluna do meio, que é o que a linha
-          de tarefa precisa para mostrar o título e a data sem quebrar — a fila
-          só parte abaixo de `sm`. A 1280 são 680, e a 1440 (o `max-w-6xl`
-          cheio) são 592 mais o ar que sobra fora do contentor. */}
+          MEDIDO, com o `px-10` da vista (80 px de margens a partir de `lg`) e
+          os dois intervalos de 24: a 1024 sobram 384 px para a coluna do meio,
+          a 1280 sobram 640, e de 1440 para cima o `max-w-6xl` fecha nos 1152 e
+          o meio assenta em 592. Os 384 do caso mais apertado chegam à linha de
+          tarefa — a partir de `sm` ela é uma fila que NÃO quebra e o título
+          corta com reticências, que é o que mantém a densidade da lista (a
+          Parte 3 do documento manda-o cortar e pôr o texto inteiro no `title`;
+          agora está também no painel, que é onde ele se lê por extenso). */}
       <div className="lg:flex lg:items-start lg:gap-6">
         <div
           style={{ "--cena": 0 } as React.CSSProperties}
@@ -2440,9 +2443,11 @@ export default function Tarefas({
             MEDIDO a 375 px: com o painel fechado a vista fica byte a byte como
             estava; aberto, o cartão do detalhe mede 343 px de conteúdo (375
             menos as duas margens de 16) e nenhum dos seus alvos desce dos 44 —
-            as caixas das subtarefas, os dois «Remover» e o «Fechar» levam
-            `alvo-toque`. Sem transbordo horizontal: os títulos quebram
-            (`break-words`) e as ligações cortam (`truncate`). */}
+            os dois «Remover», o «Fechar» e o RÓTULO de cada subtarefa levam
+            `alvo-toque` (nesse, o alvo é o rótulo inteiro, com o título lá
+            dentro; a caixa de 18 px é só o desenho, como na linha da lista).
+            Sem transbordo horizontal: os títulos quebram (`break-words`) e as
+            ligações cortam (`truncate`). */}
         <div
           style={{ "--cena": 3 } as React.CSSProperties}
           className={`bo-cena mt-5 lg:mt-0 lg:w-72 lg:shrink-0 ${
