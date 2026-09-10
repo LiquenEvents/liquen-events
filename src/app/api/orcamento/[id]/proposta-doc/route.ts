@@ -160,6 +160,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        *  envio, mais abaixo. Só `true` conta: qualquer outra coisa é «ainda
        *  não respondeu». */
       cortesConfirmados?: unknown;
+      /**
+       * ── POR ONDE É QUE A PROPOSTA SEGUE ────────────────────────────────
+       *
+       * «Quero que seja possível escolher enviar apenas para o email, apenas
+       * para o WhatsApp, ou para os dois.»
+       *
+       * Só o EMAIL passa por aqui: o WhatsApp não se manda do servidor — abre-se
+       * no telemóvel dela, com a mensagem escrita, e é ela que escolhe a quem.
+       * Por isso o servidor tem uma pergunta só: **sai email?**
+       *
+       * Ausente ou qualquer coisa que não seja `false` significa SIM, e é
+       * deliberado: todos os pedidos anteriores a esta escolha existir não
+       * trazem o campo, e nenhum deles pode deixar de enviar por causa disso.
+       * A escolha nova tem de ser explícita para tirar alguma coisa.
+       */
+      porEmail?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
@@ -1310,9 +1326,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // "erro", tenta de novo e cria propostas duplicadas. Falhar no email devolve
     // 200 com emailed:false + motivo, para a UI explicar o que aconteceu.
     const hasRecipient = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
+    /* Ver a nota do `porEmail` no corpo do pedido: só um `false` EXPLÍCITO
+       cala o email. Um pedido antigo, que não conhece este campo, envia como
+       sempre enviou. */
+    const querEmail = body?.porEmail !== false;
     let emailed = false;
     let emailError: string | undefined;
-    if (!hasRecipient) {
+    /** Não saiu email porque ela ESCOLHEU que não saísse — e não porque falhou. */
+    let semEmailPorEscolha = false;
+    if (!querEmail) {
+      /* Sem `emailError`: a diferença entre «não saiu» e «não saiu por culpa
+         de alguma coisa» é a diferença entre um ecrã calmo e um ecrã que
+         parece avariado. A proposta fica gravada e o link do casal nasce à
+         mesma — é ele que vai no WhatsApp. */
+      semEmailPorEscolha = true;
+      log.info("proposta-doc: envio sem email, por escolha de quem enviou", {
+        id,
+        proposta: proposal.id,
+      });
+    } else if (!hasRecipient) {
       emailError = "O pedido não tem um email de cliente válido.";
     } else {
       try {
@@ -1617,6 +1649,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: proposal.id,
       emailed,
       emailError,
+      /* «Não saiu email» tem duas causas muito diferentes, e o ecrã tem de as
+         separar: uma é uma avaria (o `emailError`), a outra é a escolha dela.
+         Sem esta linha, escolher «só WhatsApp» dava um aviso cor de laranja a
+         dizer que alguma coisa correu mal. */
+      ...(semEmailPorEscolha ? { semEmailPorEscolha: true } : {}),
       /**
        * O estado em que a proposta FICOU. Vai na resposta porque é a resposta a
        * «e agora, o que é que ela vê no quadro?»: com o email fora, é
