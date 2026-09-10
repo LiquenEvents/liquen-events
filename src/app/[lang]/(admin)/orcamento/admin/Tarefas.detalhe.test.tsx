@@ -302,6 +302,46 @@ describe("fase 09 — o menu da linha, o mover e o teclado", () => {
     );
   });
 
+  it("arrastar a última para cima da primeira põe-na lá — e grava", async () => {
+    const user = userEvent.setup();
+    await montar();
+    await ligarOrdemManual(user);
+
+    const antes = screen
+      .getAllByRole("checkbox")
+      .map((c) => c.getAttribute("aria-label")!)
+      .slice(0, 3);
+    const linhaDe = (titulo: string) =>
+      screen.getByText(titulo).closest("[data-tarefa]") as HTMLElement;
+
+    /* O `DataTransfer` do jsdom não existe; o que os manipuladores lhe pedem
+       são três coisas, e são estas. Sem elas o `dragstart` rebentava antes de
+       chegar ao código que se quer medir. */
+    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: () => {} };
+    const ultima = linhaDe(antes[2]);
+    const primeira = linhaDe(antes[0]);
+    /* E as caixas medem todas 0×0 no jsdom, portanto a metade de cima e a de
+       baixo seriam a mesma. A da primeira linha passa a medir 40 px de altura
+       para o `clientY: 5` cair, sem ambiguidade, na metade DE CIMA — que é o
+       que quer dizer «entra antes desta». */
+    primeira.getBoundingClientRect = () => ({ top: 0, height: 40 }) as DOMRect;
+
+    fireEvent.dragStart(ultima, { dataTransfer });
+    fireEvent.dragOver(primeira, { dataTransfer, clientY: 5 });
+    fireEvent.drop(primeira, { dataTransfer });
+
+    await waitFor(() => {
+      const depois = screen
+        .getAllByRole("checkbox")
+        .map((c) => c.getAttribute("aria-label"))
+        .slice(0, 3);
+      expect(depois).toEqual([antes[2], antes[0], antes[1]]);
+    });
+    await waitFor(() =>
+      expect(escritas.some((e) => typeof e.corpo.posicao === "number")).toBe(true),
+    );
+  });
+
   it("o aviso do movimento diz a posição e oferece anular", async () => {
     const user = userEvent.setup();
     await montar();

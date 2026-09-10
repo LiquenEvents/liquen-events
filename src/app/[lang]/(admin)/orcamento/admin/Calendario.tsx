@@ -940,7 +940,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
       irParaDia(`${alvo.getFullYear()}-${pad2(alvo.getMonth() + 1)}-${pad2(alvo.getDate())}`);
     },
     // `goTo` é do corpo do componente — ver a nota do `navegar`.
-     
+
     [vista, diaAncora, year, month, irParaDia],
   );
 
@@ -1521,12 +1521,21 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                   ── A CONTA DA LARGURA, A 375 PX ────────────────────────────
                   Passou de dois segmentos para quatro, e esta fila já saiu uma
                   vez pela borda por ter ganho um comando (está escrito no
-                  bloco acima). Com `text-xs` (12 px) e `px-3`:
-                    Dia ~20+24 · Semana ~46+24 · Mês ~26+24 · Ano ~25+24
-                  = 213 px com a folga do carril. A coluna do calendário tem
-                  343 px a 375, portanto o comutador cabe inteiro numa linha e
-                  o que quebra para baixo é a cápsula da navegação — que é o
-                  que o `min-w-0 flex-wrap` desta fila já garante. O
+                  bloco acima, e a lição era «375 é o caso estreito, não 390»).
+
+                  MEDIDO no Chromium a 375 px, com a geometria desta casa
+                  (`h-8 px-3 text-xs`, carril com `p-1` e `gap-1`):
+
+                    Dia 43,9 · Semana 73,0 · Mês 48,0 · Ano 47,2
+                    comutador inteiro ......... 234,1 px
+                    cápsula «‹ Hoje ›» ........ 121,1 px
+
+                  A coluna do calendário tem 343 px a 375 (a conta está na
+                  grelha do mês, mais abaixo). O comutador cabe inteiro numa
+                  linha (234 < 343); os dois juntos não cabem (234 + 8 + 121 =
+                  363), portanto a cápsula QUEBRA para a linha de baixo — que é
+                  precisamente o que o `min-w-0 flex-wrap` desta fila existe
+                  para fazer, em vez de a seta de avançar sair pela borda. O
                   «Exportar» continua fora do telemóvel (`hidden sm:`). */}
               <Segmented
                 size="sm"
