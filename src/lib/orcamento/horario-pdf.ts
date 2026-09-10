@@ -7,7 +7,7 @@ import {
   CARLITO_REGULAR_TTF_B64,
 } from "@/lib/proposal-fonts";
 import { LOGO_DARK_PNG_B64 } from "@/lib/proposal-assets";
-import { ordenar } from "./guiao-do-dia";
+import { blocosDaFolha } from "./folha-da-timeline";
 import type { TimelineItem } from "./types";
 
 /**
@@ -81,12 +81,59 @@ const ENTRELINHA = 11.5;
 const FOLGA_X = 6;
 const FOLGA_Y = 7;
 
-const CONTORNO = rgb(217 / 255, 217 / 255, 217 / 255);
-const ZEBRA = rgb(243 / 255, 243 / 255, 243 / 255);
-const CABECALHO = rgb(239 / 255, 239 / 255, 239 / 255);
-const FAIXA = rgb(67 / 255, 67 / 255, 67 / 255);
-const TINTA = rgb(0.1, 0.1, 0.1);
+/**
+ * ── AS CORES SÃO AS DA CASA, E NÃO OS CINZENTOS DA FOLHA DELA ─────────────
+ *
+ * «Está óptimo! E agora coloca as cores da Líquen.»
+ *
+ * A folha original é a cinzentos de processador de texto: faixa a
+ * rgb(67,67,67), cabeçalho a rgb(239,239,239), zebra a rgb(243,243,243),
+ * contorno a rgb(217,217,217). O DESENHO fica — as medidas, a grelha, a zebra
+ * por bloco de hora, tudo o que ela mandou copiar —; o que muda é a tinta.
+ *
+ * Cada uma vem do `src/app/tema.css`, que é onde a paleta desta casa vive, e
+ * NENHUMA está escrita à mão a partir de uma fotografia:
+ *
+ *   · faixa .......... `--color-sage-700`  #39513f  (o verde escuro da marca)
+ *   · cabeçalhos ..... `--color-sage-100`  #e9f2eb
+ *   · zebra .......... `--color-sage-50`   #f5faf6
+ *   · contorno ....... `--color-sage-200`  #d0e1d4
+ *   · tinta .......... `--color-ink`       #2a2620
+ *
+ * A escolha de luminância é a mesma da folha dela, e não por acaso: o cinzento
+ * do cabeçalho era mais escuro do que o da zebra, para o cabeçalho pesar mais
+ * do que as linhas. O `sage-100` sobre o `sage-50` mantém essa ordem — trocá-la
+ * fazia as linhas pesarem mais do que os nomes das colunas.
+ *
+ * O que NÃO se pinta de verde é o texto do corpo. Uma folha de trabalho lê-se
+ * a preto; verde em tudo é uma folha bonita que cansa a meio da segunda página.
+ */
+const CONTORNO = hex("#d0e1d4");
+const ZEBRA = hex("#f5faf6");
+const CABECALHO = hex("#e9f2eb");
+const FAIXA = hex("#39513f");
+const TINTA = hex("#2a2620");
 const BRANCO = rgb(1, 1, 1);
+
+/** «#39513f» → o `rgb()` do pdf-lib. Para as cores se escreverem como no tema. */
+function hex(codigo: string) {
+  const n = parseInt(codigo.slice(1), 16);
+  return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+}
+
+/**
+ * Uma linha da lista de fornecedores do fim da folha dela.
+ *
+ * Lá está escrita assim: «Decoração e flores – Liquen Events – Catarina Gaspar
+ * – 919259820». Categoria, quem é, e como se lhe liga — que é a informação de
+ * que a equipa precisa às sete da manhã quando falta uma carrinha.
+ */
+export interface FornecedorDaFolha {
+  categoria: string;
+  nome: string;
+  /** Telefone, email, ou os dois. Vazio quando o directório não o tem. */
+  contacto: string;
+}
 
 export interface HorarioParaPdf {
   /** «CASAMENTO J&P 28.06.25» — o que vai na faixa escura. */
@@ -96,13 +143,8 @@ export interface HorarioParaPdf {
   criancas: string;
   staff: string;
   momentos: readonly TimelineItem[];
-}
-
-/** «08:30» → «08h30», que é como a folha dela escreve as horas. */
-function horaDaFolha(hhmm: string): string {
-  const encontro = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
-  if (!encontro) return hhmm.trim();
-  return `${encontro[1].padStart(2, "0")}h${encontro[2]}`;
+  /** A lista do fim da folha. Vazia quando o evento ainda não tem nenhum. */
+  fornecedores?: readonly FornecedorDaFolha[];
 }
 
 /**
@@ -148,7 +190,7 @@ interface BlocoDeHora {
 }
 
 export async function horarioEmPdf(dados: HorarioParaPdf): Promise<Uint8Array | null> {
-  const momentos = ordenar(dados.momentos);
+  const momentos = dados.momentos;
   if (momentos.length === 0) return null;
 
   const pdf = await PDFDocument.create();
@@ -171,28 +213,24 @@ export async function horarioEmPdf(dados: HorarioParaPdf): Promise<Uint8Array | 
   const larguraNotas = X_FIM - X_NOTAS - FOLGA_X * 2;
   const larguraLocal = X_DESC - X_LOCAL - FOLGA_X * 2;
 
-  // ── OS BLOCOS, UM POR HORA ───────────────────────────────────────────────
-  const blocos: BlocoDeHora[] = [];
-  let anterior: BlocoDeHora | null = null;
-  let localAnterior = "";
-  for (const m of momentos) {
-    const hora = horaDaFolha(m.time);
-    if (!anterior || anterior.hora !== hora) {
-      anterior = { hora, locais: [], descricao: [], notas: [], altura: 0 };
-      blocos.push(anterior);
-    }
-    const local = (m.local ?? "").trim();
-    if (local && local !== localAnterior) {
-      anterior.locais.push(...emLinhas(local, reg, CORPO, larguraLocal));
-      localAnterior = local;
-    }
-    anterior.descricao.push(...emLinhas(m.title, reg, CORPO, larguraDesc));
-    if (m.notas?.trim()) anterior.notas.push(...emLinhas(m.notas, reg, CORPO, larguraNotas));
-  }
-  for (const b of blocos) {
-    const linhas = Math.max(b.locais.length, b.descricao.length, b.notas.length, 1);
-    b.altura = linhas * ENTRELINHA + FOLGA_Y * 2;
-  }
+  /* ── OS BLOCOS SÃO OS MESMOS DO ECRÃ ──────────────────────────────────────
+     `blocosDaFolha` é a função que a pré-visualização também usa. Não é
+     economia de código: uma pré-visualização que agrupasse de outra maneira era
+     pior do que não haver pré-visualização — ela confia no que vê, manda
+     imprimir, e sai outra folha. */
+  const blocos: BlocoDeHora[] = blocosDaFolha(momentos).map((b) => {
+    const locais = b.locais.flatMap((l) => emLinhas(l, reg, CORPO, larguraLocal));
+    const descricao = b.descricoes.flatMap((d) => emLinhas(d, reg, CORPO, larguraDesc));
+    const notas = b.notas.flatMap((n) => emLinhas(n, reg, CORPO, larguraNotas));
+    const linhas = Math.max(locais.length, descricao.length, notas.length, 1);
+    return {
+      hora: b.hora,
+      locais,
+      descricao,
+      notas,
+      altura: linhas * ENTRELINHA + FOLGA_Y * 2,
+    };
+  });
 
   // ── AS PÁGINAS ───────────────────────────────────────────────────────────
   let pagina = pdf.addPage([LARGURA, ALTURA]);
@@ -210,6 +248,43 @@ export async function horarioEmPdf(dados: HorarioParaPdf): Promise<Uint8Array | 
     desenharBloco(pagina, y, b, reg, bold, zebrada);
     y -= b.altura;
     zebrada = !zebrada;
+  }
+
+  // ── OS FORNECEDORES, NO FIM ──────────────────────────────────────────────
+  const fornecedores = dados.fornecedores ?? [];
+  if (fornecedores.length > 0) {
+    const precisa = 26 + fornecedores.length * 14;
+    if (y - precisa < chao) {
+      pagina = pdf.addPage([LARGURA, ALTURA]);
+      y = ALTURA - 46;
+    } else {
+      y -= 26;
+    }
+    pagina.drawText("Fornecedores", {
+      x: X_TABELA,
+      y: y - 11,
+      size: 11,
+      font: bold,
+      color: FAIXA,
+    });
+    y -= 26;
+    for (const f of fornecedores) {
+      /* «Categoria – Nome – Contacto», com o travessão que ela usa. A
+         categoria a negrito porque é por ela que se procura na folha: quem
+         precisa do catering às sete da manhã procura a palavra, não o nome da
+         empresa. */
+      const cat = `${f.categoria} `;
+      pagina.drawText(cat, { x: X_TABELA, y, size: CORPO, font: bold, color: FAIXA });
+      const resto = [f.nome, f.contacto].filter(Boolean).join("  –  ");
+      pagina.drawText(`–  ${resto}`, {
+        x: X_TABELA + bold.widthOfTextAtSize(cat, CORPO) + 2,
+        y,
+        size: CORPO,
+        font: reg,
+        color: TINTA,
+      });
+      y -= 14;
+    }
   }
 
   return pdf.save();
@@ -327,12 +402,15 @@ function filaDosNomes(pagina: PDFPage, topo: number, bold: PDFFont): number {
     /* Centrados na coluna, como na folha dela — e não encostados à esquerda.
        Num cabeçalho de grelha o nome pertence à COLUNA inteira. */
     const largura = bold.widthOfTextAtSize(nome, 9.5);
+    /* Os nomes das colunas em verde da marca, e não a preto: é o mesmo peso
+       que a casa já dá aos títulos de secção na folha impressa. O corpo fica
+       a tinta. */
     pagina.drawText(nome, {
       x: de + (ate - de - largura) / 2,
       y: base + 6.5,
       size: 9.5,
       font: bold,
-      color: TINTA,
+      color: FAIXA,
     });
   }
   return base;

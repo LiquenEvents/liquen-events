@@ -28,6 +28,7 @@ import { useToast } from "./Toast";
 import { printRunSheet } from "./export";
 import { ReguaDoDia } from "./ReguaDoDia";
 import { GrelhaDoDia } from "./GrelhaDoDia";
+import { FolhaDaTimeline } from "./FolhaDaTimeline";
 import EventTimeline from "./EventTimeline";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -404,6 +405,19 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    * não ter. O `setData` do `useCachedList` escreve na cache, portanto sair da
    * vista e voltar não ressuscita o estado antigo.
    */
+  /**
+   * O título da folha, igual ao do PDF: «CASAMENTO CAROLINA 04.09.26».
+   *
+   * A data no formato curto que ela escreve à mão — dd.mm.aa, e não «sábado, 4
+   * de setembro». Numa folha que anda pelo bolso de dez fornecedores a data é
+   * uma etiqueta, não uma frase.
+   */
+  function tituloDaFolha(g: { evento: string; cliente: string; data: string }): string {
+    const [ano, mes, dia] = g.data.split("-");
+    const curta = ano && mes && dia ? `${dia}.${mes}.${ano.slice(2)}` : "";
+    return [g.evento, g.cliente, curta].filter(Boolean).join(" ") || "Timeline";
+  }
+
   function guiaoMudou(id: string, momentos: TimelineItem[]) {
     lista.setData((prev) => ({
       guioes: (prev?.guioes ?? []).map((g) => (g.id === id ? { ...g, momentos } : g)),
@@ -688,7 +702,24 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                       deitava fora a única saída que ela tem para não perder o
                       que escreveu. `hidden` tira-o do ecrã e da árvore de
                       acessibilidade sem lhe tocar no estado. */}
-                  <div hidden={vistaDoDia === "grelha"}>
+                  {/* ── A EDIÇÃO E A FOLHA, LADO A LADO ─────────────────────
+                      «Quero que dê para ir vendo ao lado como está a ficar à
+                      medida que vamos preenchendo o timeline, para não termos
+                      que estar sempre a fazer download para ver como está.»
+
+                      É a queixa certa: a folha só existia depois de um
+                      download. Escrever doze momentos e descarregar doze vezes
+                      para ver se as colunas ficam bem é trabalho que o ecrã
+                      devia fazer sozinho.
+
+                      Duas colunas só a partir do `lg`. Abaixo disso a folha
+                      vai para BAIXO do editor e não desaparece: numa coluna
+                      estreita ela deixaria de se ler, mas continua a ser o que
+                      ela quer conferir depois de escrever. */}
+                  <div
+                    hidden={vistaDoDia === "grelha"}
+                    className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:items-start"
+                  >
                     <EventTimeline
                       key={pedido.id}
                       quote={pedido}
@@ -696,6 +727,18 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                       modelos={modelos.data?.modelos}
                       aoGuardarComoModelo={(nome, momentos) => void guardarModelo(nome, momentos)}
                     />
+                    {/* Colada ao topo: ela escreve no fundo do editor (a linha
+                        de acrescentar) e confere no topo da folha. Sem o
+                        `sticky`, escrever o décimo momento levava a folha para
+                        fora do ecrã. */}
+                    <aside className="lg:sticky lg:top-4">
+                      <p className="bo-eyebrow mb-2 text-[var(--bo-text-muted)]">Como vai ficar</p>
+                      <FolhaDaTimeline
+                        titulo={tituloDaFolha(aberto)}
+                        adultos={pedido.guests ? String(pedido.guests) : ""}
+                        momentos={aberto.momentos}
+                      />
+                    </aside>
                   </div>
                 </>
               )}

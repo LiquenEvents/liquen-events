@@ -1131,7 +1131,28 @@ export default function Tarefas({
            lentidão. O degrau está aqui dentro, no ramo já carregado, para o
            esqueleto de cima ficar de fora. */
         <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena">
-          <Card padding="none" className="overflow-hidden">
+          {/* ── O CARTÃO DEIXOU DE CORTAR O QUE SAI DE DENTRO DELE ────────
+              «Isto não está bem, está a tapar, não dá para ver tudo no ecrã» —
+              com a lista da Prioridade aberta e cortada a meio, o «Alta» e o
+              «Normal» a desaparecerem na borda do cartão.
+
+              A causa é minha e é desta ronda: a caixa de escrever uma tarefa
+              passou a ser a ÚLTIMA linha da lista (fase 03), e o cartão tinha
+              `overflow-hidden`. Enquanto a criação vivia num cartão só seu lá
+              em cima, as listas dos seus campos abriam para o ar; aqui abrem
+              para dentro de uma caixa que as corta.
+
+              O `Escolha` já sabe virar a lista para cima quando não há espaço
+              — mas ele mede o ECRÃ, e quem estava a cortar era o cartão. Um
+              recorte de um antepassado não se vê de dentro.
+
+              Tira-se o recorte, e arredondam-se em vez disso a primeira e a
+              última linha: era só para isso que ele servia — para o fundo de
+              uma linha em `hover` não esquadrar os cantos do cartão. */}
+          <Card
+            padding="none"
+            className="[&>*:first-child]:rounded-t-2xl [&>*:last-child]:rounded-b-2xl"
+          >
             {/* ── «A FAZER (0)» DEIXA DE SER UM CABEÇALHO COM UM ZERO ─────
                 «É um cabeçalho com um zero, seguido de um separador e de nada.
                 O traço a sublinhar um cabeçalho sem conteúdo por baixo.»
