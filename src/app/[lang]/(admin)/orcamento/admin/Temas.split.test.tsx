@@ -110,8 +110,11 @@ async function cartao(nome: RegExp) {
 }
 
 async function abrir(nome: RegExp) {
+  // O `findAllByRole` fica FORA do `act`: um `waitFor` lá dentro nunca deixa
+  // as microtarefas da leitura correr, e o ecrã fica preso no esqueleto.
+  const alvo = await cartao(nome);
   await act(async () => {
-    fireEvent.click(await cartao(nome));
+    fireEvent.click(alvo);
   });
   await act(async () => {});
 }
@@ -200,7 +203,7 @@ describe("Fase 06 — split view", () => {
     await abrir(/Terracotta/);
 
     await act(async () => {
-      fireEvent.click(within(coluna()).getByRole("button", { name: "← Todos os temas" }));
+      fireEvent.click(within(coluna()).getByRole("button", { name: "Todos os temas" }));
     });
 
     expect(await screen.findByRole("button", { name: "Novo tema" })).toBeTruthy();
