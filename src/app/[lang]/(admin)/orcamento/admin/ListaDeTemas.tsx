@@ -129,7 +129,11 @@ export default function ListaDeTemas({
          rolar em vez de se esticar até ao fim dela. O `top-2` é o mesmo da
          barra da selecção — as duas coisas coladas ao topo desta vista param
          na mesma linha. */
-      className="hidden lg:sticky lg:top-2 lg:block lg:self-start"
+      /* E ROLA POR DENTRO quando a biblioteca é maior do que o ecrã: com 28
+         temas a coluna passa a altura da janela, e uma coluna `sticky` mais
+         alta do que a janela é uma coluna cujo fim não se alcança. O tecto é
+         a altura da janela menos o `top-2` de cada lado. */
+      className="hidden lg:sticky lg:top-2 lg:block lg:max-h-[calc(100vh-1rem)] lg:self-start lg:overflow-y-auto"
     >
       {/* ── A SAÍDA DO SPLIT VIEW ─────────────────────────────────────────
           O «← Temas» desaparece da barra do tema (Parte 6: «(desaparece —
@@ -197,9 +201,16 @@ export default function ListaDeTemas({
                 className={`alvo-toque flex w-full items-center gap-2.5 rounded-lg border px-2 py-1.5 text-left ${ESTADO} ${PRESSAO} ${
                   alvo
                     ? // O sinal de aceitação, e só durante o arrasto: o realce
-                      // do contentor mais uma moldura de 2 px, que é o que o
-                      // ponto 17 pede em vez do tracejado permanente.
-                      "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)]"
+                      // do contentor (`--bo-accent-lavagem`, que é o
+                      // `accent-subtle` do documento) mais os 2 px de moldura
+                      // que o ponto 17 pede em vez do tracejado permanente.
+                      //
+                      // Os 2 px são 1 de `border` mais 1 de `ring`, e não
+                      // `border-2`: a moldura conta para a caixa, e passar de
+                      // 1 para 2 px empurrava o nome do tema meio píxel para
+                      // dentro a cada passagem do ponteiro. Um `ring` desenha
+                      // por fora e não mexe em nada.
+                      "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)] ring-1 ring-[var(--bo-accent)]"
                     : activo
                       ? "border-transparent bg-[var(--bo-tinta-6)]"
                       : "border-transparent hover:bg-[var(--bo-tinta-6)]"
