@@ -259,7 +259,17 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    * manhã a saltar entre dois casamentos — voltar à régua a cada troca era
    * cobrar-lhe um toque por cada vez.
    */
-  const [vistaDoDia, setVistaDoDia] = useState<VistaDoDia>("regua");
+  /**
+   * ── A GRELHA É A VISTA, E A RÉGUA É ONDE SE ESCREVE ──────────────────────
+   *
+   * Abria na régua. Passa a abrir na grelha, porque foi isso que ela pediu com
+   * o horário da faculdade à frente: «quero que o timeline seja mesmo assim».
+   *
+   * A régua não sai nem podia sair — é o único sítio onde os momentos se
+   * escrevem, e continua a um toque. O que muda é qual das duas responde
+   * primeiro: quem abre uma timeline vem ver o dia, e só depois mexer nele.
+   */
+  const [vistaDoDia, setVistaDoDia] = useState<VistaDoDia>("grelha");
   const [abertoId, setAbertoId] = useState<string | null>(null);
   const [pedido, setPedido] = useState<Quote | null>(null);
   const [aAbrir, setAAbrir] = useState<string | null>(null);
@@ -527,9 +537,13 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                     size="sm"
                     value={vistaDoDia}
                     onChange={setVistaDoDia}
+                    /* Os rótulos dizem o que cada uma FAZ, e não como se
+                       chama por dentro. «Por pessoa» descrevia o eixo e não
+                       o gesto; «Régua» era o nome de casa de um editor. Quem
+                       chega quer ver o horário, ou quer mexer nele. */
                     options={[
-                      { value: "regua", label: "Régua" },
-                      { value: "grelha", label: "Por pessoa" },
+                      { value: "grelha", label: "Horário" },
+                      { value: "regua", label: "Editar" },
                     ]}
                   />
                   {/* Imprimir vive AQUI e não na linha da lista, e a razão é

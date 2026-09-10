@@ -224,6 +224,22 @@ describe("Timelines — a lista", () => {
   });
 });
 
+/**
+ * ── ABRIR UMA TIMELINE JÁ NÃO É ABRIR O EDITOR ─────────────────────────────
+ *
+ * A vista abre no «Horário» — a grelha —, que foi o que ela pediu com o horário
+ * da faculdade à frente. O editor continua montado por baixo, mas `hidden`, e
+ * um elemento escondido não tem papel na árvore de acessibilidade: os
+ * `getByRole` daqui deixavam de o encontrar, e faziam bem.
+ *
+ * Estes casos medem a EDIÇÃO, portanto passam a dar o toque que ela dá para
+ * editar. Quem quiser medir o que se vê ao abrir, mede a grelha — e não precisa
+ * deste passo.
+ */
+async function irParaEditar(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("radio", { name: "Editar" }));
+}
+
 describe("Timelines — abrir e editar", () => {
   it("abrir um evento vai buscar o pedido inteiro e monta o editor", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -238,6 +254,7 @@ describe("Timelines — abrir e editar", () => {
 
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
     expect(pedidos).toEqual(["q-pronto"]);
+    await irParaEditar(user);
     // O guião que abre é o DAQUELE evento, e não o de outro.
     expect(screen.getByRole("button", { name: "Remover 09:00 Montagem" })).toBeTruthy();
   });
@@ -261,6 +278,7 @@ describe("Timelines — abrir e editar", () => {
     await screen.findByRole("button", { name: /Carla e Diogo/ });
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
+    await irParaEditar(user);
 
     const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
     const modelo = MODELOS_DA_CASA[0];
@@ -281,6 +299,7 @@ describe("Timelines — abrir e editar", () => {
     await screen.findByRole("button", { name: /Carla e Diogo/ });
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
+    await irParaEditar(user);
 
     await escolher(
       user,

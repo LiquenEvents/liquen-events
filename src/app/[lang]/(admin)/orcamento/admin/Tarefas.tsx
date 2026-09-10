@@ -19,7 +19,6 @@ import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { corDeTexto, metaFor } from "./status-meta";
 import { ESTADO, PRESSAO } from "./ui/movimento";
-import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -293,8 +292,6 @@ const TaskRow = memo(function TaskRow({
 
 export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: string }) {
   const { toast } = useToast();
-  /** «Detalhes (opcional)», na caixa de escrever uma tarefa. Ver `ui/gaveta.ts`. */
-  const gaveta = useGaveta();
   const {
     data: tasks = [],
     setData: setTasks,
@@ -797,41 +794,24 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
             Adicionar
           </Button>
         </div>
-        <details className="group mt-3" onToggle={gaveta.aoAlternar}>
-          {/* ── 122×15 NUM TELEMÓVEL ────────────────────────────────────────
-              MEDIDO a 375 px: este interruptor tinha 15 px de altura — um
-              terço do mínimo de 44 — e é a ÚNICA porta para o responsável, o
-              prazo e a área de uma tarefa nova. Num telemóvel, falhar-lhe o
-              toque é ficar sem esses campos.
+        {/* ── OS DETALHES DEIXARAM DE ESTAR ATRÁS DE UMA PORTA ───────────
+            «Retira isto do opcional. Quero que apareça logo.»
 
-              Escapou a todos os varrimentos porque um `<summary>` não é
-              `<button>`, não tem `role` e não tem `tabindex` escrito: a rede da
-              ergonomia táctil não o via (agora vê — ver `ergonomia-tactil.mjs`).
+            Eram quatro campos — responsável, área, prioridade e prazo — dentro
+            de um `<details>` fechado, com a palavra «opcional» a dizer que não
+            valiam a pena. Valem: o responsável é a coluna por que a grelha do
+            dia se reparte, e o prazo é o que põe a tarefa na lista certa. Uma
+            tarefa escrita sem eles é uma tarefa que alguém tem de voltar a
+            abrir.
 
-              `alvo-toque` cresce só sob `(pointer: coarse)`, portanto no
-              portátil a linha fica exactamente como estava; `!justify-start`
-              porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
-              a classe centra por omissão. */}
-          <summary
-            onClick={gaveta.aoTocarNoResumo}
-            className={`alvo-toque !justify-start bo-eyebrow inline-flex list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`${SETA_DA_GAVETA} group-open:rotate-90`}
-              aria-hidden="true"
-            >
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-            Detalhes (opcional)
-          </summary>
+            O que sai é a PORTA, não os campos: continuam a poder ficar em
+            branco. O que muda é que se vêem sem ninguém ter de os procurar.
+
+            O rótulo perde o «(opcional)» pela mesma razão — a palavra estava a
+            responder à pergunta «tenho de preencher isto?», e a resposta já
+            está no «Sem responsável» e no «Sem área» de cada campo. */}
+        <div className="mt-3">
+          <p className="bo-eyebrow text-[var(--bo-text-muted)]">Detalhes</p>
           {/* ── O CORPO É UM BLOCO, E NÃO QUATRO CAMPOS ────────────────────
               Quatro campos numa grelha são uma LINHA, não quatro blocos: a
               escada da casa é por bloco, e uma fila de campos a entrar um a um
@@ -839,12 +819,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               píxeis da `.bo-entrada` — a distância de um rótulo, porque isto
               sai de debaixo do resumo que está mesmo por cima.
 
-              E o `gaveta.corpo` é uma CLASSE, não uma `key`: estes campos
-              guardam o que ela já escreveu, e um `key` a mudar remontava-os e
-              deitava fora o responsável e o prazo que ela acabou de escolher. */}
-          <div
-            className={`mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 ${gaveta.corpo}`}
-          >
+              Continuam a ser UM bloco e não quatro: a escada da casa é por
+              bloco, e uma fila de campos a entrar um a um lê-se como um
+              tremor. */}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {equipa.length > 0 ? (
               <Field
                 as="select"
@@ -897,7 +875,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               onChange={(e) => setDueDate(e.target.value)}
             />
           </div>
-        </details>
+        </div>
       </Card>
 
       {/* Filter by person */}

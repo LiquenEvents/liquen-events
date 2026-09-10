@@ -265,9 +265,29 @@ export function GrelhaDoDia({ dia, agora = null, chaveDoEvento }: GrelhaDoDiaPro
   const horas: number[] = [];
   for (let m = janela.inicio; m <= janela.fim; m += MINUTOS_POR_HORA) horas.push(m);
 
-  /** As linhas da hora são o FUNDO da coluna, e não cem elementos no documento. */
+  /**
+   * ── AS FAIXAS DA HORA SÃO O FUNDO DA COLUNA ──────────────────────────────
+   *
+   * As linhas continuam a ser fundo, e não cem elementos no documento. O que se
+   * lhes junta é a ZEBRA: uma hora sim, uma hora não, a 3% de tinta.
+   *
+   * Ela mandou o horário da faculdade e disse «quero que o timeline seja mesmo
+   * assim». O que faz aquela folha ler-se de longe não é a cor dos blocos — é
+   * a hora ser uma FAIXA com chão e tecto, e não um risco solto. Com o risco
+   * só, contar de que hora a que hora uma coisa vai obriga a seguir a linha
+   * com o dedo até à coluna da esquerda; com a faixa, a resposta é a banda em
+   * que o bloco assenta.
+   *
+   * Duas camadas, e a ordem importa: a zebra por baixo (senão come a linha), o
+   * risco por cima. O período da zebra é de DUAS horas porque uma banda pintada
+   * e a seguinte limpa é o que faz o par.
+   */
+  const alturaDaHora = MINUTOS_POR_HORA * PX_POR_MINUTO;
   const riscasDeHora = {
-    backgroundImage: `repeating-linear-gradient(to bottom, var(--bo-hairline) 0 1px, transparent 1px ${MINUTOS_POR_HORA * PX_POR_MINUTO}px)`,
+    backgroundImage: [
+      `repeating-linear-gradient(to bottom, var(--bo-hairline) 0 1px, transparent 1px ${alturaDaHora}px)`,
+      `repeating-linear-gradient(to bottom, var(--bo-tinta-3) 0 ${alturaDaHora}px, transparent ${alturaDaHora}px ${alturaDaHora * 2}px)`,
+    ].join(", "),
   } as const;
 
   return (
@@ -368,15 +388,26 @@ export function GrelhaDoDia({ dia, agora = null, chaveDoEvento }: GrelhaDoDiaPro
             className="sticky start-0 z-10 border-e border-[var(--bo-hairline)] bg-[var(--bo-surface)]"
             style={{ height: alturaTotal }}
           >
-            {horas.map((m) => (
-              <span
+            {/* ── CADA HORA É UMA FAIXA, COM PRINCÍPIO EM CIMA E FIM EM BAIXO
+                Copiado à letra do horário que ela mandou, porque é o que lá
+                faz o trabalho: «09:00» encostado ao cimo da banda e «10:00»
+                encostado ao fundo e à direita. Lidos juntos, os dois números
+                dizem o INTERVALO — que é a pergunta — em vez de marcarem um
+                instante e deixarem a conta para quem lê.
+
+                A última hora da janela não abre faixa nenhuma: seria uma banda
+                de sessenta píxeis por baixo do fim do dia. O seu número é o
+                «fim» da faixa anterior, e já lá está. */}
+            {horas.slice(0, -1).map((m) => (
+              <div
                 key={m}
                 aria-hidden="true"
-                className="absolute start-0 w-full pe-1.5 text-end text-[10px] tabular-nums text-[var(--bo-text-faint)]"
-                style={{ top: (m - janela.inicio) * PX_POR_MINUTO - 5 }}
+                className="absolute start-0 flex w-full flex-col justify-between px-1.5 py-0.5 text-[10px] leading-none tabular-nums text-[var(--bo-text-faint)]"
+                style={{ top: (m - janela.inicio) * PX_POR_MINUTO, height: alturaDaHora }}
               >
-                {horaDoMinuto(m)}
-              </span>
+                <span className="text-start">{horaDoMinuto(m)}</span>
+                <span className="text-end">{horaDoMinuto(m + MINUTOS_POR_HORA)}</span>
+              </div>
             ))}
             {minutoDoAgora !== null && (
               <span

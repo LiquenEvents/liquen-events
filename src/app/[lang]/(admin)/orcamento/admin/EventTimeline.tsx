@@ -20,7 +20,6 @@ import {
   type BlocoDoDia,
 } from "@/lib/orcamento/guiao-do-dia";
 import {
-  CRONOGRAMA_BASE,
   modeloAPartirDoGuiao,
   momentosDoModelo,
   type ModeloDeGuiao,
@@ -321,10 +320,6 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     ]);
   }
 
-  function seed() {
-    aplicarMomentos("gerar o cronograma-base", CRONOGRAMA_BASE);
-  }
-
   /**
    * Guardar o que está no ecrã como modelo.
    *
@@ -589,7 +584,9 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
             </ul>
           ) : (
             <p className="bo-text-muted mt-1 text-sm">
-              {seguinte.terminado ? "A timeline chegou ao fim." : "Não há nada marcado neste momento."}
+              {seguinte.terminado
+                ? "A timeline chegou ao fim."
+                : "Não há nada marcado neste momento."}
             </p>
           )}
 
@@ -724,8 +721,20 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
             </svg>
           }
           title="Timeline por preencher"
-          description="Gera um cronograma-base para um dia de evento típico e adapta os momentos a este evento."
-          action={{ label: "Gerar cronograma-base", onClick: seed }}
+          /* ── O «GERAR CRONOGRAMA-BASE» SAIU, E FOI ELA QUE O MANDOU SAIR ──
+             «Quero retirar isto de gerar cronograma. Quero apenas ser eu a
+             fazer sozinha.»
+
+             O botão punha nove momentos de um dia de evento TÍPICO num guião
+             que é de um evento concreto — e depois o trabalho dela era apagar
+             o que não servia, que é mais trabalho do que escrever o que serve.
+             O estado vazio passa a apontar para onde se escreve: a linha do
+             fundo, que já lá está e é por onde ela entra.
+
+             Os modelos ficam: «Juntar modelo…» é escolha dela, momento a
+             momento, e o «Guardar como modelo…» é como eles nascem — do
+             trabalho dela, e não de um dia inventado. */
+          description="Escreve o primeiro momento na linha do fundo — a hora, o que acontece e quem faz."
         />
       ) : (
         <div className="mb-5">

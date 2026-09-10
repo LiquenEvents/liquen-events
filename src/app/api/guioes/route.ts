@@ -55,9 +55,29 @@ export async function GET(request: NextRequest) {
   try {
     const hoje = Date.now();
     const guioes: ResumoDeGuiao[] = (await listQuotes())
-      // Arquivado é «isto já não conta»: um pedido arquivado não aparece na
-      // lista de pedidos e não pode aparecer aqui a pedir um guião.
-      .filter((q) => !q.archived && /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? ""))
+      // ── SÓ O QUE JÁ É TRABALHO ────────────────────────────────────────
+      //
+      // «Nos timelines quero que o sistema seja inteligente o suficiente para
+      // dar para fazer timelines apenas das propostas que já foram aceites.»
+      //
+      // Três condições, e cada uma tira uma coisa diferente:
+      //
+      //  · `!q.archived` — arquivado é «isto já não conta». Já cá estava.
+      //  · a data — um evento sem dia não tem horas para pôr numa grelha.
+      //  · **`q.status === "aceite"`** — o novo. Um guião do dia é a folha por
+      //    que a equipa se rege no dia; fazê-la para um pedido que ainda está
+      //    a ser pensado é planear um dia que pode não acontecer. A lista dela
+      //    tinha quinze eventos e treze diziam «Sem timeline» — não por
+      //    esquecimento, mas porque a maior parte ainda eram propostas por
+      //    responder.
+      //
+      // `aceite` é o topo da escada do `estado-do-pedido.ts`, e chega-se lá
+      // por três caminhos — ela marca a proposta como aceite, entra um
+      // pagamento, ou regista-se o contrato. Qualquer um deles quer dizer a
+      // mesma coisa: isto vai acontecer.
+      .filter(
+        (q) => !q.archived && q.status === "aceite" && /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? ""),
+      )
       .sort(
         (a, b) =>
           Math.abs(Date.parse(`${a.date}T12:00:00`) - hoje) -
