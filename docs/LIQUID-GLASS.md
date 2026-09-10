@@ -53,9 +53,20 @@ que é como o `cluster()` do ficheiro dela já o fazia.
 | O `destroy()` limpa | Filtros no documento: 1 antes, **0** depois — e `Glass.test.tsx` guarda o mesmo pelo React |
 | O texto continua legível | Contraste calculado no pior caso de cada tema (foto preta em claro, foto branca em escuro) — ver o comentário no `Temas.tsx` |
 
-O caminho alternativo (Safari, Firefox) está montado e testado
-(`Glass.test.tsx`), mas **ainda não foi visto num Safari a sério** — o ponto 5
-da Parte 7 continua por fazer, e é dela.
+### O caminho alternativo (Safari, Firefox)
+
+Está montado, testado (`Glass.test.tsx`) e **visto** — mas não onde interessa,
+e a diferença importa:
+
+| | |
+|---|---|
+| **Visto** | Forçado a correr no Chromium com `CSS.supports('backdrop-filter','url(…)')` a responder que NÃO. Desenha `blur(13px) saturate(1.7)`, marca-se `data-lg-fallback`, e o rebordo ganha corpo. Lado a lado com o vidro a sério: mais macio, sem a dobra na aresta, e uma barra perfeitamente apresentável — o texto lê-se igual nas duas. |
+| **Por ver** | Um **Safari a sério**. Isto prova o MEU caminho de código e o meu CSS; não prova como é que o WebKit desenha `blur()` e `mask-composite`. Nesta máquina só está instalado o Chromium — não há WebKit nem Firefox. |
+
+O ponto 5 da Parte 7 — «abre no Safari antes de dar por fechado» — continua
+por fazer, e é dela. O que mudou é o tamanho do risco: já não é «não sabemos o
+que aparece», é «sabemos o que devia aparecer e falta confirmar num motor
+diferente».
 
 ---
 
