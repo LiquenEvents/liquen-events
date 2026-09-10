@@ -318,7 +318,35 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
                     <p className="text-[var(--bo-text-muted)] text-xs font-medium leading-snug whitespace-pre-line">
                       {entry.summary}
                     </p>
-                    <span className="text-[var(--bo-text-faint)] text-[10px] shrink-0 whitespace-nowrap">
+                    {/* ── `suppressHydrationWarning`, E NÃO É PREGUIÇA ──────────────
+                      O `timeLabel` chama `Date.now()` DENTRO do render. O
+                      servidor desenha num instante e o cliente hidrata noutro —
+                      e quando o limiar do minuto cai entre os dois, os dois
+                      textos são diferentes. Apanhado pelo guarda de erros do
+                      `temas.spec.ts`, com as duas frases à vista:
+
+                          servidor ..... «há 1min»
+                          cliente ...... «agora»
+
+                      React não avisa e segue: desfaz a árvore inteira e volta a
+                      desenhá-la no cliente («this tree will be regenerated»).
+                      Custa trabalho e faz o passeio tremer de vez em quando —
+                      passava, e um dia não passava, sem nada ter mudado.
+
+                      Esta é a saída que o próprio React documenta para carimbos
+                      de tempo: dizer-lhe que ESTE texto pode diferir de
+                      propósito. Não esconde nenhum defeito nosso — a diferença
+                      não é um erro, é o relógio a andar entre os dois desenhos.
+                      Fica no `span` do carimbo e em mais nada, para não calar o
+                      que houver à volta.
+
+                      (O `toLocaleDateString` das entradas antigas tem o mesmo
+                      risco pelo fuso do servidor, e fica coberto pelo mesmo
+                      atributo.) */}
+                    <span
+                      suppressHydrationWarning
+                      className="text-[var(--bo-text-faint)] text-[10px] shrink-0 whitespace-nowrap"
+                    >
                       {timeLabel(entry.at)}
                     </span>
                   </div>
