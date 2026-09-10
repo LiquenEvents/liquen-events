@@ -59,7 +59,36 @@ test.describe("Timelines @guiao", () => {
     });
 
     exigirLogin(await entrarNoBackOffice(page));
-    const quoteId = await garantirPedido(page);
+    await garantirPedido(page);
+
+    /**
+     * ── E AGORA O PEDIDO CERTO, QUE NÃO É NECESSARIAMENTE O PRIMEIRO ────────
+     *
+     * O `garantirPedido` garante que EXISTE um pedido e devolve o PRIMEIRO da
+     * lista de pedidos. Esta vista ordena por outra coisa — a data mais próxima
+     * de hoje — e a suite dos dados chega aqui com mais do que um pedido (o
+     * `fazer-proposta-cliente` cria um cliente novo pelo ecrã, e esse fica à
+     * frente na lista de pedidos).
+     *
+     * Quando os dois não coincidem, o passo de baixo esvaziava a timeline de UM
+     * evento e o passeio abria OUTRO — o que este já tinha da corrida anterior.
+     * O modelo entrava por cima e ficavam DOIS «Remover 17:00 Cerimónia»; o
+     * localizador ficava ambíguo e a mensagem («strict mode violation») aponta
+     * para o sítio errado. Sozinho o passeio passava, porque aí só há um
+     * pedido — e foi por isso que isto só apareceu no CI.
+     *
+     * Pede-se pelo NOME, que é o mesmo por que a asserção da lista procura a
+     * linha: assim o que se limpa e o que se abre são o mesmo evento.
+     */
+    const pedidos = await (await page.request.get("/api/orcamento")).json();
+    const semente = (Array.isArray(pedidos) ? pedidos : []).find(
+      (q: { name?: unknown }) => typeof q?.name === "string" && q.name.includes("Semente E2E"),
+    ) as { id?: string } | undefined;
+    expect(
+      typeof semente?.id === "string" && semente.id.length > 0,
+      "o pedido «Semente E2E» existe na lista de pedidos",
+    ).toBe(true);
+    const quoteId = semente!.id as string;
 
     /**
      * ── O GUIÃO COMEÇA VAZIO, E ISSO É FIXTURE E NÃO ASSERÇÃO ──────────────
