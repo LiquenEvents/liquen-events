@@ -46,6 +46,34 @@ const SUPERFICIES: Record<string, string> = {
   "chão do back office": "#f7f7f8",
 };
 
+/**
+ * ── A TINTA QUE NÃO ASSENTA NUMA SUPERFÍCIE DA CASA ────────────────────────
+ *
+ * Quase todo o texto do back office assenta no cartão ou no chão, e é contra
+ * esses dois que faz sentido medi-lo. Há um token que não: o
+ * `--bo-sobre-acento` é branco porque existe para ir POR CIMA do acento — o
+ * número dentro de um disco cheio, o rótulo dentro de um botão primário.
+ * Medido contra o cartão branco dá 1,00:1, e o guarda chumbava um desenho
+ * correcto por estar a olhar para o fundo errado.
+ *
+ * ── PORQUE É QUE ISTO É UM PAR NOMEADO E NÃO UMA LEITURA DA LINHA ──────────
+ *
+ * A primeira tentativa foi ler a linha: se ela trouxesse `bg-[var(--bo-…)]`,
+ * media-se contra esse fundo. Parecia mais geral e era pior — MEDIDO, abriu
+ * quatro buracos de uma vez, porque uma linha de Tailwind não é um elemento:
+ * o fundo que lá está pode ser uma lavagem com alfa, pode ser de um `hover:`,
+ * pode ser de outro nó. O `--bo-perigo` passou a ser medido contra si próprio
+ * (1,00:1) e o menu de acções ficou a chumbar por uma razão inventada.
+ *
+ * Um par NOMEADO diz uma coisa verdadeira e só uma: esta tinta vive naquele
+ * fundo. E não abre porta nenhuma — quem puser `--bo-sobre-acento` num cartão
+ * branco continua a ter branco sobre branco, e continua a ser um defeito; o
+ * que o guarda deixa de fazer é acusá-lo no sítio onde ele está certo.
+ */
+const SOBRE: Record<string, string> = {
+  "--bo-sobre-acento": "--bo-accent",
+};
+
 /** WCAG 2.x, luminância relativa. */
 function luminancia(hex: string): number {
   const canal = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -222,7 +250,15 @@ describe("o contraste das cores escritas à mão", () => {
     const fracos: string[] = [];
     const vistas = new Set<string>();
     for (const { cor, onde } of coresDeTexto()) {
-      for (const [nome, fundo] of Object.entries(SUPERFICIES)) {
+      // Uma tinta com fundo nomeado mede-se lá, e só lá.
+      const nomeDoFundo = SOBRE[cor];
+      const fundoNomeado = nomeDoFundo
+        ? resolver(`var(${nomeDoFundo})`, "#ffffff", TOKENS)
+        : null;
+      const superficies: [string, string][] = fundoNomeado
+        ? [[`o acento (${nomeDoFundo})`, fundoNomeado]]
+        : Object.entries(SUPERFICIES);
+      for (const [nome, fundo] of superficies) {
         let efectiva = cor;
         if (cor.startsWith("--bo-")) {
           const declarado = TOKENS.get(cor);

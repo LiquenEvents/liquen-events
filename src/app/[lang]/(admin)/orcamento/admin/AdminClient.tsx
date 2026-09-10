@@ -1382,6 +1382,41 @@ export default function AdminClient({
    */
   /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
   const desceu = useDesceu();
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * O CABEÇALHO MEDE-SE, PARA QUEM COLA POR BAIXO DELE SABER ONDE PARAR
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * A barra do topo é `sticky top-0`. Qualquer `<h2 sticky top-0>` dentro de
+   * uma vista pede o mesmo zero — e desaparece por baixo dela, levando com ele
+   * a primeira linha da secção, que passa a estar tapada e a não se poder tocar.
+   *
+   * A altura NÃO é uma constante: o cabeçalho encolhe quando a página desce
+   * (`desceu`), muda com o `pt-safe` de um telemóvel com entalhe, e cresce se o
+   * título partir em duas linhas. Um número escrito à mão fica errado no dia em
+   * que qualquer uma dessas coisas mudar, e não se queixa — está escrito por
+   * extenso no `carregamento/[eventId]/Carregamento.tsx`, que é onde a casa
+   * pagou esta lição.
+   *
+   * `ResizeObserver` e não um `useEffect` com `offsetHeight`: o encolher é uma
+   * transição, e uma medição tirada no fotograma do render apanha a altura de
+   * antes.
+   */
+  const cabecalhoRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = cabecalhoRef.current;
+    if (!el) return;
+    const publicar = () =>
+      document.documentElement.style.setProperty("--bo-cabecalho", `${el.offsetHeight}px`);
+    publicar();
+    const ro = new ResizeObserver(publicar);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--bo-cabecalho");
+    };
+  }, []);
   /** Pedido escolhido na vista "Fazer proposta".
    *
    *  Vive aqui e não dentro da vista porque a vista desmonta ao mudar de
@@ -5179,6 +5214,23 @@ export default function AdminClient({
               tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
               novo. */}
           <header
+            ref={cabecalhoRef}
+            /* ── E O CABEÇALHO DIZ A SUA ALTURA A QUEM COLA POR BAIXO DELE ──
+               Ele é `sticky top-0` com 81 px. Um `<h2 sticky top-0>` dentro de
+               uma lista pede o MESMO zero — e a lista é a que perde: o
+               cabeçalho de grupo desliza para debaixo desta barra e some, com o
+               primeiro item da secção tapado por ela.
+
+               A casa já apanhou este defeito uma vez, no carregamento de
+               material, e a lição está escrita lá por extenso: «um número
+               escrito à mão que descreve a altura de outra coisa fica errado no
+               dia em que essa outra coisa muda, e não se queixa». Custou dois
+               passeios de telemóvel e cento e vinte segundos a tentar tocar num
+               botão tapado.
+
+               Por isso não se escreve 81 em lado nenhum: o cabeçalho MEDE-SE e
+               publica `--bo-cabecalho`, e quem cola por baixo pede essa
+               variável. Muda a barra, muda o encosto, sem ninguém ir procurar. */
             /* O FIO DO CABEÇALHO: 150 ms, e ainda não é o degrau da casa.
                Devia ser o `ESTADO` (120 ms) como o resto. Não é, porque o
                `fio-do-cabecalho.test.ts` prende aqui a classe
