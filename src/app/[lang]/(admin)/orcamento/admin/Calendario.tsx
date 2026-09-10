@@ -154,6 +154,23 @@ function exportIcs(quotes: Quote[]) {
 interface Props {
   quotes: Quote[];
   onOpen: (q: Quote) => void;
+  /**
+   * ── O QUE ABRE DA LISTA DOS PRÓXIMOS EVENTOS ──────────────────────────
+   *
+   * «Quando carrego num destes vai para a página antiga que havia para fazer
+   * propostas. Coloca para ir para a página de fazer proposta do cliente que
+   * carregámos.»
+   *
+   * A lista dos próximos eventos e a grelha respondem a perguntas diferentes.
+   * Na grelha, tocar num evento é «mostra-me este pedido» — o painel do pedido
+   * é a resposta certa e fica. Na lista dos próximos, o que ela vai fazer a
+   * seguir é ESCREVER a proposta daquele casal: é a lista de trabalho da
+   * semana, não um índice.
+   *
+   * Por isso são duas portas e não uma. Quando esta não é dada, a lista cai no
+   * `onOpen` — nunca fica sem porta nenhuma.
+   */
+  onFazerProposta?: (q: Quote) => void;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -346,7 +363,7 @@ function AddEventModal({
   );
 }
 
-export default function Calendario({ quotes, onOpen }: Props) {
+export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   const { toast } = useToast();
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
@@ -1224,7 +1241,10 @@ export default function Calendario({ quotes, onOpen }: Props) {
             {upcoming.map((q) => (
               <button
                 key={q.id}
-                onClick={() => onOpen(q)}
+                /* A porta desta lista é «Fazer proposta» — ver `onFazerProposta`
+                   nas props. A queda para o `onOpen` é para nenhum toque ficar
+                   sem resposta se alguém montar isto sem a segunda porta. */
+                onClick={() => (onFazerProposta ?? onOpen)(q)}
                 className={`w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
               >
                 <div className="flex items-center gap-3">

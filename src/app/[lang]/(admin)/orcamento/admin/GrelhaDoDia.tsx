@@ -7,6 +7,7 @@ import {
   SEM_RESPONSAVEL,
   type ColunaDeResponsavel,
 } from "@/lib/orcamento/guioes";
+import { horasDaJanela, janelaDoHorario, MINUTOS_POR_HORA } from "@/lib/orcamento/horario";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -72,7 +73,6 @@ import {
  * próprio que se abre já no sítio certo (ver `useEffect` do «agora»).
  */
 const PX_POR_MINUTO = 1;
-const MINUTOS_POR_HORA = 60;
 
 /**
  * A coluna das horas. 48 px chegam para «02:00» a 11 px com folga dos dois
@@ -157,17 +157,6 @@ export interface GrelhaDoDiaProps {
   chaveDoEvento?: string;
 }
 
-/** Um dia sem forma nenhuma não desenha grelha nenhuma — mas continua a caber numa hora. */
-function janelaDaGrelha(dia: AnaliseDoDia): { inicio: number; fim: number } | null {
-  if (dia.inicio === null || dia.fim === null) return null;
-  const inicio = Math.floor(dia.inicio / MINUTOS_POR_HORA) * MINUTOS_POR_HORA;
-  const fim = Math.max(
-    Math.ceil(dia.fim / MINUTOS_POR_HORA) * MINUTOS_POR_HORA,
-    inicio + MINUTOS_POR_HORA,
-  );
-  return { inicio, fim };
-}
-
 /**
  * A frase inteira de um bloco — o nome acessível, e o que o rato mostra.
  *
@@ -199,7 +188,7 @@ function Losango() {
 }
 
 export function GrelhaDoDia({ dia, agora = null, chaveDoEvento }: GrelhaDoDiaProps) {
-  const janela = useMemo(() => janelaDaGrelha(dia), [dia]);
+  const janela = useMemo(() => janelaDoHorario(dia), [dia]);
   const colunas = useMemo(() => colunasPorResponsavel(dia.blocos), [dia.blocos]);
 
   /** Os ids que entram num choque — sai do motor, a grelha não decide isto. */
@@ -262,8 +251,7 @@ export function GrelhaDoDia({ dia, agora = null, chaveDoEvento }: GrelhaDoDiaPro
   }
 
   const alturaTotal = (janela.fim - janela.inicio) * PX_POR_MINUTO;
-  const horas: number[] = [];
-  for (let m = janela.inicio; m <= janela.fim; m += MINUTOS_POR_HORA) horas.push(m);
+  const horas = horasDaJanela(janela);
 
   /**
    * ── AS FAIXAS DA HORA SÃO O FUNDO DA COLUNA ──────────────────────────────

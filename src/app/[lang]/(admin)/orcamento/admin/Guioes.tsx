@@ -270,6 +270,55 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    * primeiro: quem abre uma timeline vem ver o dia, e só depois mexer nele.
    */
   const [vistaDoDia, setVistaDoDia] = useState<VistaDoDia>("grelha");
+
+  /**
+   * ── DESCARREGAR O HORÁRIO EM PDF ────────────────────────────────────────
+   *
+   * O ficheiro vem do `/api/guioes/<id>/pdf`, desenhado no servidor — é lá que
+   * a fonte que escreve nomes portugueses já está carregada (ver o cabeçalho
+   * da rota).
+   *
+   * O `URL.createObjectURL` tem de ser revogado À MÃO: um blob que ninguém
+   * revoga fica de pé até a aba fechar, e ela abre horários o dia todo. O
+   * `setTimeout` de zero é para o clique já ter partido quando o endereço
+   * morre — revogar na mesma volta do laço deixava o download por fazer em
+   * alguns browsers.
+   */
+  const [aDescarregar, setADescarregar] = useState(false);
+  const [falhaAoDescarregar, setFalhaAoDescarregar] = useState<string | null>(null);
+
+  async function descarregarPdf(id: string) {
+    setADescarregar(true);
+    setFalhaAoDescarregar(null);
+    try {
+      const res = await fetch(`/api/guioes/${encodeURIComponent(id)}/pdf`);
+      if (!res.ok) {
+        const corpo: unknown = await res.json().catch(() => null);
+        const dito = (corpo as { error?: unknown } | null)?.error;
+        setFalhaAoDescarregar(
+          typeof dito === "string" && dito
+            ? dito
+            : "Não foi possível preparar o PDF. Tenta daqui a bocado.",
+        );
+        return;
+      }
+      const nome =
+        /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
+        "horario.pdf";
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      setFalhaAoDescarregar("Erro de ligação. Tenta novamente.");
+    } finally {
+      setADescarregar(false);
+    }
+  }
   const [abertoId, setAbertoId] = useState<string | null>(null);
   const [pedido, setPedido] = useState<Quote | null>(null);
   const [aAbrir, setAAbrir] = useState<string | null>(null);
@@ -559,11 +608,51 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                   >
                     Imprimir folha do dia…
                   </Button>
+                  {/* ── E DESCARREGAR, QUE NÃO É A MESMA COISA QUE IMPRIMIR ──
+                      «Quero que haja uma opção no timeline que seja fazer
+                      download. E que fique como a foto que mandei num PDF.»
+
+                      O «Imprimir» abre uma janela e deixa o resto com ela — o
+                      destino, a margem, e o cabeçalho que o browser mete com a
+                      data e o endereço do back office. Um ficheiro para mandar
+                      à equipa não pode levar o endereço do back office impresso
+                      no fundo.
+
+                      ── E PORQUE É QUE NÃO É UMA ÂNCORA COM `download` ──────
+
+                      Porque uma âncora não sabe ler uma recusa. A rota responde
+                      409 a uma timeline sem uma única hora escrita — que é o
+                      estado em que ela abre um evento novo — e com uma âncora
+                      isso levava-a a uma página de JSON em cru, fora do back
+                      office, com o botão «voltar» como única saída. Assim a
+                      recusa é uma frase no sítio onde ela carregou. */}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!pedido || aDescarregar}
+                    loading={aDescarregar}
+                    onClick={() => void descarregarPdf(aberto.id)}
+                  >
+                    {aDescarregar ? "A preparar…" : "Descarregar PDF"}
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={fechar} className="lg:hidden">
                     Voltar aos guiões
                   </Button>
                 </div>
               </div>
+
+              {/* A recusa do PDF fica onde ela carregou, e não numa página de
+                  JSON fora do back office. Uma linha, `role="status"`, e some
+                  assim que ela tenta outra vez. */}
+              {falhaAoDescarregar && (
+                <p
+                  role="status"
+                  className="mb-3 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]"
+                >
+                  <span aria-hidden="true">⚠</span>
+                  <span>{falhaAoDescarregar}</span>
+                </p>
+              )}
 
               {falhaAoAbrir ? (
                 <AvisoDeFalha

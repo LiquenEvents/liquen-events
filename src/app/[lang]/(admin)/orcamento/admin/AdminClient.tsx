@@ -5177,7 +5177,29 @@ export default function AdminClient({
             */}
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"
+              /*
+                ── «COLOCA MAIS PARA O LADO ESQUERDO O LOGO» ─────────────
+
+                MEDIDO a 1440, no Calendário, com a sessão aberta:
+
+                    o título ................ 40 → 204
+                    os comandos ............. 979 → 1400
+                    o vazio entre os dois ... 204 → 979, meio aos 591
+                    a marca ................. 665 → 776, meio aos 720
+
+                Ou seja: ela estava centrada na BARRA e não no espaço que a
+                barra lhe deixa. Os comandos da direita pesam 421 px e o título
+                164; com a marca no meio dos 1440, ela encosta-se ao lado cheio
+                e deixa um buraco do lado do título. É isso que se vê, e é isso
+                que ela apanhou.
+
+                A margem à direita de 18% empurra o meio da marca 129 px para a
+                esquerda (com `justify-center`, o centro anda metade da margem),
+                que a põe nos 591 — o meio do vazio. Uma percentagem e não um
+                número de píxeis, para o ecrã largo e o de 1024 fazerem a mesma
+                conta.
+              */
+              className="pointer-events-none absolute inset-0 hidden items-center justify-center pe-[18%] lg:flex"
             >
               <SafeImage
                 /*
@@ -5592,7 +5614,11 @@ export default function AdminClient({
           {/* ── Calendário ── */}
           {view === "calendario" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Calendario quotes={activeQuotes} onOpen={openQuote} />
+              <Calendario
+                quotes={activeQuotes}
+                onOpen={openQuote}
+                onFazerProposta={irFazerAProposta}
+              />
             </div>
           )}
 
