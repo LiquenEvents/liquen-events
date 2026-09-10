@@ -5,7 +5,18 @@ import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/ty
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
-import { Button, CampoDeHora, Card, EmptyState, Field, PerguntaDestrutiva, cn } from "./ui";
+import {
+  Button,
+  CampoDeHora,
+  Card,
+  EmptyState,
+  Field,
+  PerguntaDestrutiva,
+  Segmented,
+  cn,
+} from "./ui";
+import CalendarioAno from "./CalendarioAno";
+import { MESES, anoDoCalendario, fechadosNoAno } from "@/lib/orcamento/ano-do-calendario";
 import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -14,20 +25,16 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const MONTHS = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
-];
+/**
+ * Os nomes dos meses vêm do módulo que faz as contas do ano
+ * (`lib/orcamento/ano-do-calendario`), e não de uma segunda lista aqui.
+ *
+ * Havia uma cópia escrita à mão neste ficheiro. Com a vista de ano montada
+ * passavam a ser duas listas a nomear os mesmos doze meses no MESMO ecrã — e
+ * duas listas a dizer o mesmo é como se descobre, um dia, que uma delas diz
+ * «Setembro» onde a outra diz «Sétembro».
+ */
+const MONTHS: readonly string[] = MESES;
 
 const STATUS_COLOR: Record<string, string> = {
   pendente: "#8a8a82",
@@ -424,6 +431,21 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
   /**
    * ══════════════════════════════════════════════════════════════════════
+   * MÊS OU ANO — A PORTA DA FASE 07
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Duas das quatro vistas que o `docs/APPLE-CALENDARIO.md` pede (Dia, Semana,
+   * Mês, Ano). Entram as duas que já existem; as outras duas juntam-se ao
+   * mesmo comutador quando forem escritas, sem nada mudar aqui.
+   *
+   * O mês continua a ser o que abre: é a vista de trabalho. O ano é a que
+   * responde a «temos livre em julho de 2027?», e essa pergunta faz-se quando
+   * chega um pedido — não é onde se começa o dia.
+   */
+  const [vista, setVista] = useState<"mes" | "ano">("mes");
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
    * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE FICOU POR FAZER
    * ══════════════════════════════════════════════════════════════════════
    *
@@ -662,6 +684,19 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     return vistos.size;
   }, [byDay, eventsByDay, year, month]);
 
+  /**
+   * O estado da vista de ano: quantos dias do ano estão fechados.
+   *
+   * Substitui o «N eventos este mês» quando se troca para o ano, e é o número
+   * certo para essa vista — a pergunta do ano não é quantos eventos há, é
+   * quantos dias já não dão. Só se conta quando o ano está à vista: são doze
+   * meses de contas, e a grelha do mês não precisa delas.
+   */
+  const fechadosDoAno = useMemo(
+    () => (vista === "ano" ? fechadosNoAno(anoDoCalendario(year, quotes, events)) : 0),
+    [vista, year, quotes, events],
+  );
+
   const dayLabelLong = (key: string) =>
     new Date(key + "T12:00:00").toLocaleDateString("pt-PT", {
       weekday: "long",
@@ -767,15 +802,48 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 className="font-display leading-tight text-[var(--bo-text)]"
                 style={{ fontSize: "clamp(26px, 3.5vw, 36px)" }}
               >
-                {MONTHS[month]} {year}
+                {/* No ano, o título é o ANO. É a mesma regra do documento —
+                    o título da vista é a unidade que ela mostra — e o `<>…</>`
+                    guarda a expressão do mês tal e qual, que é o que o
+                    `entrada-do-calendario.test.ts` mede. */}
+                {vista === "ano" ? (
+                  year
+                ) : (
+                  <>
+                    {MONTHS[month]} {year}
+                  </>
+                )}
               </h3>
               <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1.5">
-                {monthTotal === 0
-                  ? "Sem eventos este mês"
-                  : `${monthTotal} evento${monthTotal !== 1 ? "s" : ""} este mês`}
+                {vista === "ano"
+                  ? fechadosDoAno === 0
+                    ? "Ano todo livre"
+                    : `${fechadosDoAno} dia${fechadosDoAno !== 1 ? "s" : ""} fechado${fechadosDoAno !== 1 ? "s" : ""} este ano`
+                  : monthTotal === 0
+                    ? "Sem eventos este mês"
+                    : `${monthTotal} evento${monthTotal !== 1 ? "s" : ""} este mês`}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {/* ── O COMUTADOR DAS VISTAS ────────────────────────────────
+                  Duas das quatro que o documento pede. Fica ANTES do
+                  «Exportar» porque trocar de vista é a acção frequente e
+                  exportar é a rara — a ordem da barra é a ordem do uso. */}
+              <Segmented
+                size="sm"
+                ariaLabel="Vista do calendário"
+                value={vista}
+                onChange={(v) => {
+                  setVista(v);
+                  // O painel do dia aponta para um dia da grelha do mês; no ano
+                  // essa grelha sai do ecrã e ele ficaria a apontar para nada.
+                  setSelectedDay(null);
+                }}
+                options={[
+                  { value: "mes", label: "Mês" },
+                  { value: "ano", label: "Ano" },
+                ]}
+              />
               <Button
                 variant="secondary"
                 size="sm"
@@ -788,13 +856,20 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
               <div
                 className="flex items-center rounded-xl border border-[var(--bo-hairline)] p-0.5"
                 role="group"
-                aria-label="Navegação do mês"
+                aria-label={vista === "ano" ? "Navegação do ano" : "Navegação do mês"}
               >
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => goTo(new Date(year, month - 1, 1))}
-                  aria-label="Mês anterior"
+                  /* No ano, as setas andam de ANO. É o mesmo gesto na mesma
+                     tecla a mover a unidade que está à vista — trocar de vista
+                     e continuar a saltar de mês seria o botão a mentir. */
+                  onClick={() =>
+                    goTo(
+                      vista === "ano" ? new Date(year - 1, month, 1) : new Date(year, month - 1, 1),
+                    )
+                  }
+                  aria-label={vista === "ano" ? "Ano anterior" : "Mês anterior"}
                   className="w-8 pointer-coarse:w-11 px-0"
                 >
                   <svg
@@ -824,8 +899,12 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => goTo(new Date(year, month + 1, 1))}
-                  aria-label="Mês seguinte"
+                  onClick={() =>
+                    goTo(
+                      vista === "ano" ? new Date(year + 1, month, 1) : new Date(year, month + 1, 1),
+                    )
+                  }
+                  aria-label={vista === "ano" ? "Ano seguinte" : "Mês seguinte"}
                   className="w-8 pointer-coarse:w-11 px-0"
                 >
                   <svg
@@ -846,58 +925,86 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
             </div>
           </div>
 
-          {/* ── Weekday header ── */}
-          <div className="grid grid-cols-7 mb-2" aria-hidden="true">
-            {WEEKDAYS.map((w) => (
-              <div
-                key={w}
-                className="text-center text-foreground/30 text-[9px] tracking-[0.25em] uppercase py-1"
-              >
-                {w}
-              </div>
-            ))}
-          </div>
+          {/* ── A VISTA DE ANO, OU A DE MÊS ────────────────────────────────
+              As duas vivem no MESMO cartão e trocam-se aqui. É de propósito:
+              o título, o estado da vista, as setas e o «Hoje» são os mesmos
+              nas duas, e um segundo cartão ao lado seria um segundo cabeçalho
+              a discordar do primeiro — o defeito que a Parte −1 do
+              `docs/DESIGN-SYSTEM.md` manda evitar.
 
-          {/* ── Month grid: hairline lines via 1px gaps over a tinted base ── */}
-          <div
-            role="group"
-            aria-label={`Calendário de ${MONTHS[month]} ${year}`}
-            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)]"
-          >
-            {cells.map((c) => {
-              if (!c.inMonth) {
-                return (
+              A troca é seca, sem transição: mudar de vista é uma interação de
+              alta frequência e a Parte 2.4 do sistema de design não as anima.
+              (O documento do calendário pede um fade cruzado de 200 ms na
+              Parte 6; fica para quando as quatro vistas existirem e houver
+              onde o pôr uma vez só, em vez de dois blocos a desvanecer-se um
+              por cima do outro dentro de um cartão que muda de altura.) */}
+          {vista === "ano" ? (
+            <CalendarioAno
+              ano={year}
+              quotes={quotes}
+              marcacoes={events}
+              hoje={todayStr}
+              /* A saída da vista de ano é a grelha do mês que ela escolheu —
+                 é lá que se vê o que está marcado e se marca. */
+              onAbrirMes={(mes) => {
+                goTo(new Date(year, mes, 1));
+                setVista("mes");
+              }}
+            />
+          ) : (
+            <>
+              {/* ── Weekday header ── */}
+              <div className="grid grid-cols-7 mb-2" aria-hidden="true">
+                {WEEKDAYS.map((w) => (
                   <div
-                    key={c.key}
-                    aria-hidden="true"
-                    className="min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1.5 sm:p-2"
+                    key={w}
+                    className="text-center text-foreground/30 text-[9px] tracking-[0.25em] uppercase py-1"
                   >
-                    <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
-                      {c.day}
-                    </span>
+                    {w}
                   </div>
-                );
-              }
-              const key = c.key;
-              const dayQuotes = byDay.get(key) ?? [];
-              const dayEvents = eventsByDay.get(key) ?? [];
-              const isToday = key === todayStr;
-              const isSelected = key === selectedDay;
-              const total = dayQuotes.length + dayEvents.length;
-              // Chip budget for the cell: up to 2 quotes, then events fill the
-              // rest (compressed to 1 when the day is busy so the "+N" fits).
-              // `hidden` is derived from what's actually shown — so a day with
-              // exactly 3 of one type still surfaces the 3rd via "+1" instead of
-              // dropping it silently.
-              const shownQuotes = dayQuotes.slice(0, 2);
-              const shownEvents = dayEvents.slice(0, total > 3 ? 1 : 2);
-              const hiddenCount = total - shownQuotes.length - shownEvents.length;
-              // On very narrow screens the chips collapse into plain dots.
-              const dots = [
-                ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
-                ...dayEvents.map((ev) => KIND_META[ev.kind].color),
-              ].slice(0, 4);
-              /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
+                ))}
+              </div>
+
+              {/* ── Month grid: hairline lines via 1px gaps over a tinted base ── */}
+              <div
+                role="group"
+                aria-label={`Calendário de ${MONTHS[month]} ${year}`}
+                className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)]"
+              >
+                {cells.map((c) => {
+                  if (!c.inMonth) {
+                    return (
+                      <div
+                        key={c.key}
+                        aria-hidden="true"
+                        className="min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1.5 sm:p-2"
+                      >
+                        <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
+                          {c.day}
+                        </span>
+                      </div>
+                    );
+                  }
+                  const key = c.key;
+                  const dayQuotes = byDay.get(key) ?? [];
+                  const dayEvents = eventsByDay.get(key) ?? [];
+                  const isToday = key === todayStr;
+                  const isSelected = key === selectedDay;
+                  const total = dayQuotes.length + dayEvents.length;
+                  // Chip budget for the cell: up to 2 quotes, then events fill the
+                  // rest (compressed to 1 when the day is busy so the "+N" fits).
+                  // `hidden` is derived from what's actually shown — so a day with
+                  // exactly 3 of one type still surfaces the 3rd via "+1" instead of
+                  // dropping it silently.
+                  const shownQuotes = dayQuotes.slice(0, 2);
+                  const shownEvents = dayEvents.slice(0, total > 3 ? 1 : 2);
+                  const hiddenCount = total - shownQuotes.length - shownEvents.length;
+                  // On very narrow screens the chips collapse into plain dots.
+                  const dots = [
+                    ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
+                    ...dayEvents.map((ev) => KIND_META[ev.kind].color),
+                  ].slice(0, 4);
+                  /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
                  O nome acessível da célula era «9 de Janeiro — 2 eventos», sem
                  ANO. Num calendário em que se anda para trás e para a frente
                  mês a mês — e esta casa fecha datas com um ano e meio de
@@ -909,58 +1016,58 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
                  O ano vem do `year` que a própria grelha já usa para se
                  desenhar, portanto não há segunda fonte para discordar. */
-              const dayLabel = `${c.day} de ${MONTHS[month]} de ${year}${isToday ? " (hoje)" : ""} — ${
-                total > 0
-                  ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
-                  : "Enter para adicionar"
-              }`;
-              return (
-                <div
-                  key={key}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={dayLabel}
-                  aria-pressed={isSelected || undefined}
-                  onClick={() => {
-                    // A day with entries opens the peek; an empty day goes
-                    // straight to "add" — the fastest path either way.
-                    if (total > 0) setSelectedDay(isSelected ? null : key);
-                    else openAdd(key);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (total > 0) setSelectedDay(isSelected ? null : key);
-                      else openAdd(key);
-                    }
-                  }}
-                  className={`group relative min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
-                    isSelected
-                      ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
-                      : isToday
-                        ? "hover:bg-sage-600/[0.03]"
-                        : "hover:bg-sage-600/[0.025]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    {isToday ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white text-[10px] font-semibold tabular-nums">
-                        {c.day}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/40 px-0.5">
-                        {c.day}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-label={`Adicionar a ${c.day} de ${MONTHS[month]}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openAdd(key);
+                  const dayLabel = `${c.day} de ${MONTHS[month]} de ${year}${isToday ? " (hoje)" : ""} — ${
+                    total > 0
+                      ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
+                      : "Enter para adicionar"
+                  }`;
+                  return (
+                    <div
+                      key={key}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={dayLabel}
+                      aria-pressed={isSelected || undefined}
+                      onClick={() => {
+                        // A day with entries opens the peek; an empty day goes
+                        // straight to "add" — the fastest path either way.
+                        if (total > 0) setSelectedDay(isSelected ? null : key);
+                        else openAdd(key);
                       }}
-                      /* ── 13×14 PX, TRINTA E CINCO A COMPETIR NA GRELHA ────
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          if (total > 0) setSelectedDay(isSelected ? null : key);
+                          else openAdd(key);
+                        }
+                      }}
+                      className={`group relative min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
+                        isSelected
+                          ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
+                          : isToday
+                            ? "hover:bg-sage-600/[0.03]"
+                            : "hover:bg-sage-600/[0.025]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        {isToday ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white text-[10px] font-semibold tabular-nums">
+                            {c.day}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/40 px-0.5">
+                            {c.day}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          aria-label={`Adicionar a ${c.day} de ${MONTHS[month]}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAdd(key);
+                          }}
+                          /* ── 13×14 PX, TRINTA E CINCO A COMPETIR NA GRELHA ────
                          MEDIDO a 1440×900: `13.1×14` px cada. Este «+» nunca é
                          desenhado no dedo (`pointer-coarse:!hidden`), portanto
                          a régua é a do rato — e a da WCAG 2.2 AA (2.5.8) são
@@ -970,103 +1077,103 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                          `size-6` é só a CAIXA que recebe o clique: o «+» fica
                          com o mesmo `text-sm`, centrado, e como a célula tem
                          `min-h-[80px]` a linha do topo não empurra nada. */
-                      className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
-                    >
-                      +
-                    </button>
-                  </div>
+                          className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
+                        >
+                          +
+                        </button>
+                      </div>
 
-                  {/* Chips (sm and up) */}
-                  <div className="hidden sm:flex flex-col gap-[3px] mt-1">
-                    {shownQuotes.map((q) => (
-                      <button
-                        key={q.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpen(q);
-                        }}
-                        aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                        title={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: STATUS_COLOR[q.status] }}
-                        />
-                        <span className="truncate">{q.name.split(" ")[0]}</span>
-                      </button>
-                    ))}
-                    {shownEvents.map((ev) => (
-                      <button
-                        key={ev.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          pedirParaRemover(ev.id, ev.title);
-                        }}
-                        aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
-                        title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                        className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: KIND_META[ev.kind].color }}
-                        />
-                        <span className="truncate">
-                          {ev.time ? `${ev.time} ` : ""}
-                          {ev.title}
-                        </span>
-                      </button>
-                    ))}
-                    {hiddenCount > 0 && (
-                      <span className="text-foreground/35 text-[9px] leading-none px-1.5 py-0.5">
-                        +{hiddenCount}
-                      </span>
-                    )}
-                  </div>
+                      {/* Chips (sm and up) */}
+                      <div className="hidden sm:flex flex-col gap-[3px] mt-1">
+                        {shownQuotes.map((q) => (
+                          <button
+                            key={q.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpen(q);
+                            }}
+                            aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                            title={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                            className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ background: STATUS_COLOR[q.status] }}
+                            />
+                            <span className="truncate">{q.name.split(" ")[0]}</span>
+                          </button>
+                        ))}
+                        {shownEvents.map((ev) => (
+                          <button
+                            key={ev.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              pedirParaRemover(ev.id, ev.title);
+                            }}
+                            aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
+                            title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
+                            className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ background: KIND_META[ev.kind].color }}
+                            />
+                            <span className="truncate">
+                              {ev.time ? `${ev.time} ` : ""}
+                              {ev.title}
+                            </span>
+                          </button>
+                        ))}
+                        {hiddenCount > 0 && (
+                          <span className="text-foreground/35 text-[9px] leading-none px-1.5 py-0.5">
+                            +{hiddenCount}
+                          </span>
+                        )}
+                      </div>
 
-                  {/* Dots (below sm) — chips would overflow tiny cells */}
-                  {dots.length > 0 && (
-                    <div className="flex sm:hidden flex-wrap gap-[3px] mt-1.5 px-0.5">
-                      {dots.map((color, di) => (
-                        <span
-                          key={di}
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: color }}
-                        />
-                      ))}
-                      {total > dots.length && (
-                        <span className="text-foreground/35 text-[8px] leading-[6px]">+</span>
+                      {/* Dots (below sm) — chips would overflow tiny cells */}
+                      {dots.length > 0 && (
+                        <div className="flex sm:hidden flex-wrap gap-[3px] mt-1.5 px-0.5">
+                          {dots.map((color, di) => (
+                            <span
+                              key={di}
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: color }}
+                            />
+                          ))}
+                          {total > dots.length && (
+                            <span className="text-foreground/35 text-[8px] leading-[6px]">+</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
 
-          {/* ── Legend ── */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
-              <span key={k} className="flex items-center gap-1.5">
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: KIND_META[k].color }}
-                  aria-hidden="true"
-                />
-                <span className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase">
-                  {KIND_META[k].label}
+              {/* ── Legend ── */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
+                  <span key={k} className="flex items-center gap-1.5">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: KIND_META[k].color }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase">
+                      {KIND_META[k].label}
+                    </span>
+                  </span>
+                ))}
+                <span className="ml-auto hidden sm:inline text-foreground/25 text-[9px] tracking-[0.15em] uppercase">
+                  Clica num dia para ver ou adicionar
                 </span>
-              </span>
-            ))}
-            <span className="ml-auto hidden sm:inline text-foreground/25 text-[9px] tracking-[0.15em] uppercase">
-              Clica num dia para ver ou adicionar
-            </span>
-          </div>
+              </div>
 
-          {/* ── Day peek: everything on the selected day, with real targets ── */}
-          {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
-            /* ── ESPREITAR O DIA ────────────────────────────────────────────
+              {/* ── Day peek: everything on the selected day, with real targets ── */}
+              {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
+                /* ── ESPREITAR O DIA ────────────────────────────────────────────
                Montagem condicional: carregar num dia com marcações faz nascer
                este painel por baixo da grelha, e ele empurra o que está a
                seguir para baixo. Aparecia de um fotograma para o outro — a
@@ -1132,105 +1239,107 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                Se um dia isto mudar de forma — sair do fluxo, passar a folha no
                telemóvel — a resposta muda com ela, e o arnês está lá para se
                voltar a correr. */
-            <div className="bo-entrada mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
-                <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
-                <div className="flex items-center gap-1">
-                  <Button variant="subtle" size="sm" onClick={() => openAdd(selectedDay)}>
-                    Adicionar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedDay(null)}
-                    aria-label="Fechar dia"
-                    className="w-8 pointer-coarse:w-11 px-0"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-              <div className="divide-y divide-[var(--bo-hairline)]">
-                {selectedQuotes.map((q) => (
-                  <button
-                    key={q.id}
-                    onClick={() => onOpen(q)}
-                    className={`w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: STATUS_COLOR[q.status] }}
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
-                        {q.name}
-                      </span>
-                      {/* A palavra do estado À VISTA — aqui há linha para ela.
+                <div className="bo-entrada mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
+                    <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
+                    <div className="flex items-center gap-1">
+                      <Button variant="subtle" size="sm" onClick={() => openAdd(selectedDay)}>
+                        Adicionar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedDay(null)}
+                        aria-label="Fechar dia"
+                        className="w-8 pointer-coarse:w-11 px-0"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[var(--bo-hairline)]">
+                    {selectedQuotes.map((q) => (
+                      <button
+                        key={q.id}
+                        onClick={() => onOpen(q)}
+                        className={`w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: STATUS_COLOR[q.status] }}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                            {q.name}
+                          </span>
+                          {/* A palavra do estado À VISTA — aqui há linha para ela.
                           Na grelha do mês o estado ia só na cor do ponto (ver
                           o `STATUS_LABEL`); este painel é onde o dia se lê a
                           sério, e é onde a palavra tem de estar. */}
-                      <span className="block text-foreground/40 text-[10px] truncate">
-                        {estadoEmPalavra(q.status)}
-                        {` · ${eventTypeLabel(q)}`}
-                        {q.guests ? ` · ${q.guests} convidados` : ""}
-                      </span>
-                    </span>
-                    <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase shrink-0">
-                      Abrir
-                    </span>
-                  </button>
-                ))}
-                {selectedEvents.map((ev) => (
-                  <div key={ev.id} className="flex items-center gap-3 px-4 py-3">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: KIND_META[ev.kind].color }}
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
-                        {ev.time ? `${ev.time} · ` : ""}
-                        {ev.title}
-                      </span>
-                      <span className="block text-foreground/40 text-[10px] truncate">
-                        {KIND_META[ev.kind].label}
-                        {ev.note ? ` · ${ev.note}` : ""}
-                      </span>
-                    </span>
-                    <button
-                      onClick={() => pedirParaRemover(ev.id, ev.title)}
-                      aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
-                      className={`text-foreground/35 hover:text-[var(--bo-perigo)] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
-                    >
-                      Remover
-                    </button>
+                          <span className="block text-foreground/40 text-[10px] truncate">
+                            {estadoEmPalavra(q.status)}
+                            {` · ${eventTypeLabel(q)}`}
+                            {q.guests ? ` · ${q.guests} convidados` : ""}
+                          </span>
+                        </span>
+                        <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase shrink-0">
+                          Abrir
+                        </span>
+                      </button>
+                    ))}
+                    {selectedEvents.map((ev) => (
+                      <div key={ev.id} className="flex items-center gap-3 px-4 py-3">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: KIND_META[ev.kind].color }}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                            {ev.time ? `${ev.time} · ` : ""}
+                            {ev.title}
+                          </span>
+                          <span className="block text-foreground/40 text-[10px] truncate">
+                            {KIND_META[ev.kind].label}
+                            {ev.note ? ` · ${ev.note}` : ""}
+                          </span>
+                        </span>
+                        <button
+                          onClick={() => pedirParaRemover(ev.id, ev.title)}
+                          aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
+                          className={`text-foreground/35 hover:text-[var(--bo-perigo)] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
 
-          {/* ── Empty month ── */}
-          {monthTotal === 0 && (
-            <EmptyState
-              icon={
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="4" width="18" height="17" rx="2" />
-                  <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-                </svg>
-              }
-              title="Mês sem eventos"
-              description="Clica num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
-            />
+              {/* ── Empty month ── */}
+              {monthTotal === 0 && (
+                <EmptyState
+                  icon={
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="4" width="18" height="17" rx="2" />
+                      <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+                    </svg>
+                  }
+                  title="Mês sem eventos"
+                  description="Clica num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
+                />
+              )}
+            </>
           )}
         </Card>
 
