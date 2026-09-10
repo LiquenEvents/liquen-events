@@ -909,6 +909,19 @@ export default function Temas() {
     pedidosDeMover.current += 1;
     setPedidoDeMover({ destino, carga, n: pedidosDeMover.current });
   }, []);
+  /**
+   * ── AS DUAS PORTAS NOVAS TAMBÉM PERGUNTAM ──────────────────────────────
+   *
+   * Trocar de tema na coluna DESMONTA a pasta (ela tem `key={open.id}`), o que
+   * é a mesma coisa que sair dela: um lote a subir fica pelo caminho. O
+   * «← Temas» já perguntava; estas duas nasceram sem perguntar, e é o género
+   * de perda que só se descobre quando faltam fotos.
+   */
+  const [aSubirFotos, setASubirFotos] = useState(false);
+  const podeTrocarDeTema = useCallback(
+    () => !aSubirFotos || window.confirm(AVISO_DE_LOTE_A_MEIO),
+    [aSubirFotos],
+  );
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
   // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
   useEffect(() => {
@@ -1616,8 +1629,12 @@ export default function Temas() {
              ao lado das fotografias dele. */
           temas={visible.some((t) => t.id === open.id) ? visible : [open, ...visible]}
           activoId={open.id}
-          aoEscolher={setOpenId}
-          aoVoltar={() => setOpenId(null)}
+          aoEscolher={(id) => {
+            if (id !== open.id && podeTrocarDeTema()) setOpenId(id);
+          }}
+          aoVoltar={() => {
+            if (podeTrocarDeTema()) setOpenId(null);
+          }}
           aoLargarFotos={largarNoTema}
           aArrastar={aArrastar}
         />
@@ -1654,6 +1671,7 @@ export default function Temas() {
             }
             onDelete={() => setAEliminar(open)}
             aoArrastar={setAArrastar}
+            aoSubir={setASubirFotos}
             pedidoDeMover={pedidoDeMover}
           />
         </div>
@@ -2828,6 +2846,22 @@ function vestirOArrasto(e: React.DragEvent, quantas: number): void {
   window.setTimeout(() => cracha.remove(), 0);
 }
 
+/**
+ * ── SAIR DA PASTA COM UM LOTE A MEIO ──────────────────────────────────────
+ *
+ * A pergunta vive aqui, e não dentro do `leave()`, porque desde o split view
+ * há TRÊS portas para fora desta pasta e não uma: o «← Temas» (que é o
+ * `leave`), o «Todos os temas» da coluna e cada linha dessa coluna — trocar de
+ * tema desmonta a pasta tal como sair dela.
+ *
+ * Duas dessas três estão do lado do `Temas`, que não sabe se há fotos a subir;
+ * por isso a pasta di-lo (`aoSubir`) e a pergunta é a mesma frase nos três
+ * sítios. Sem isto, arrastar fotos para um tema e carregar na linha do lado
+ * abandonava o lote em silêncio.
+ */
+const AVISO_DE_LOTE_A_MEIO =
+  "Ainda há fotos a subir. Se sair agora, as que faltam não são carregadas. Sair mesmo assim?";
+
 /** A pasta de UM tema: renomear, carregar fotos, remover fotos, eliminar. */
 function ThemeFolder({
   theme,
@@ -2839,6 +2873,7 @@ function ThemeFolder({
   onCopiedTo,
   onDelete,
   aoArrastar,
+  aoSubir,
   pedidoDeMover,
 }: {
   theme: ThemeSummary;
@@ -2855,6 +2890,9 @@ function ThemeFolder({
   /** Começou (ou acabou) um arrasto de fotografias. Quem precisa de saber é a
    *  coluna da esquerda, que é irmã desta pasta e não a conhece. */
   aoArrastar?: (aArrastar: boolean) => void;
+  /** Há um lote a subir? Quem precisa de saber é o `Temas`: as outras duas
+   *  portas para fora desta pasta são dele. Ver `AVISO_DE_LOTE_A_MEIO`. */
+  aoSubir?: (aSubir: boolean) => void;
   /** Um lote largado num tema da coluna. Ver a nota no `Temas`. */
   pedidoDeMover?: { destino: ThemeSummary; carga: CargaDeFotos; n: number } | null;
 }) {
@@ -4289,15 +4327,15 @@ function ThemeFolder({
     }
   }
 
+  // O `aoSubir` é um `setState` do pai, portanto estável entre desenhos.
+  useEffect(() => {
+    aoSubir?.(uploadingCount > 0);
+    return () => aoSubir?.(false);
+  }, [uploadingCount, aoSubir]);
+
   /** Sair com um lote a meio abandona o que falta — é preciso dizê-lo. */
   function leave() {
-    if (
-      uploadingCount > 0 &&
-      !window.confirm(
-        "Ainda há fotos a subir. Se sair agora, as que faltam não são carregadas. Sair mesmo assim?",
-      )
-    )
-      return;
+    if (uploadingCount > 0 && !window.confirm(AVISO_DE_LOTE_A_MEIO)) return;
     onBack();
   }
 
@@ -4565,7 +4603,15 @@ function ThemeFolder({
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={leave}>
+          {/* ── «← TEMAS» DESAPARECE NO SPLIT VIEW ──────────────────────
+              Parte 6 do `docs/APPLE-TEMAS.md`, à letra: «← Temas →
+              (desaparece — split view)». A partir de `lg` o caminho de volta
+              é o «Todos os temas» da coluna da esquerda, e ter os dois seria
+              duas saídas com nomes diferentes para o mesmo sítio.
+
+              Abaixo de `lg` a coluna não existe, e este botão é o único
+              caminho — por isso não sai, esconde-se onde há substituto. */}
+          <Button variant="ghost" size="sm" onClick={leave} className="lg:hidden">
             ← Temas
           </Button>
           {renaming ? (

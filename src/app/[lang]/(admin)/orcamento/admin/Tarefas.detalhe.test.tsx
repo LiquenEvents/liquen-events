@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
@@ -327,7 +335,13 @@ describe("fase 09 — o menu da linha, o mover e o teclado", () => {
     primeira.getBoundingClientRect = () => ({ top: 0, height: 40 }) as DOMRect;
 
     fireEvent.dragStart(ultima, { dataTransfer });
-    fireEvent.dragOver(primeira, { dataTransfer, clientY: 5 });
+    /* O `clientY` põe-se À MÃO no evento: o jsdom não tem `DragEvent`, e o que
+       o `fireEvent` fabrica no lugar dele deixa cair as coordenadas do rato —
+       com isso, a metade de baixo ganhava sempre e este caso media o oposto do
+       que diz. */
+    const porCima = createEvent.dragOver(primeira, { dataTransfer });
+    Object.defineProperty(porCima, "clientY", { value: 5 });
+    fireEvent(primeira, porCima);
     fireEvent.drop(primeira, { dataTransfer });
 
     await waitFor(() => {

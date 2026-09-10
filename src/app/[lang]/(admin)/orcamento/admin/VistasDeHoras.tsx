@@ -436,7 +436,10 @@ export function VistaDeHoras({
                   <div
                     key={d.data}
                     className={cn(
-                      "flex min-w-0 flex-col gap-[3px] border-b border-s border-[var(--bo-hairline)] p-1",
+                      // `gap-1` são os 4 px de folga entre etiquetas que a
+                      // Parte 8 do documento pede — é a folga que impede um
+                      // toque de acertar na de baixo.
+                      "flex min-w-0 flex-col gap-1 border-b border-s border-[var(--bo-hairline)] p-1",
                       d.data === hoje &&
                         "bg-[color-mix(in_oklab,var(--bo-accent-lavagem)_40%,transparent)]",
                     )}

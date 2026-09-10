@@ -118,7 +118,14 @@ export function ChipDoDia({
       style={{ "--tipo": cor } as CSSProperties}
       className={cn(
         "group/chip flex w-full min-w-0 gap-1 overflow-hidden pe-1 text-start",
-        bloco ? "h-full items-start py-0.5" : "min-h-5 items-center",
+        /* 20 px visuais e 24 px de ALVO no dedo — os números da Parte 8 do
+           `docs/APPLE-CALENDARIO.md` («chips com 20 px visuais e 24 px de alvo,
+           com 4 px de folga entre eles»). O `pointer-coarse:` cresce só onde o
+           dedo é grosso, portanto o desenho no computador fica como está. Não é
+           o `.alvo-toque` da casa: esse força 44 px E `display: inline-flex`
+           centrado, e numa célula de mês com três etiquetas isso empurrava-as
+           para fora da célula. */
+        bloco ? "h-full items-start py-0.5" : "min-h-5 pointer-coarse:min-h-6 items-center",
         "rounded-[var(--bo-raio-miudeza)]",
         "bg-[color-mix(in_oklab,var(--tipo)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--tipo)_20%,transparent)]",
         "text-[11px] leading-none text-[var(--bo-text)]",
