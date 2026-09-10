@@ -1005,6 +1005,27 @@ export default function Tarefas({
    */
   const [escolhida, setEscolhida] = useState<string | null>(null);
 
+  /**
+   * ── E O PAINEL VAI TER COM ELA, NO ECRÃ ESTREITO ────────────────────────
+   *
+   * Abaixo de `lg` o painel não é uma coluna ao lado: é um bloco por BAIXO da
+   * lista. Numa lista de vinte tarefas isso é meio ecrã de distância — ela
+   * toca numa e não acontece nada à vista, que se lê como avaria.
+   *
+   * `nearest` e não `start`: rola o MÍNIMO para o painel aparecer, em vez de o
+   * atirar para o topo e levar a lista para fora do ecrã. E `auto` para quem
+   * pediu para não animar — um `smooth` é movimento como qualquer outro.
+   */
+  const painelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!escolhida) return;
+    const el = painelRef.current;
+    if (!el || typeof window.matchMedia !== "function") return;
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    const calmo = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "nearest", behavior: calmo ? "auto" : "smooth" });
+  }, [escolhida]);
+
   /* ── O ARRASTO (fase 09) ────────────────────────────────────────────────
      Duas coisas em estado, porque as duas se DESENHAM: qual é a linha que
      está a ser arrastada (fica a meia opacidade) e onde é que ela entra (a
@@ -1640,6 +1661,14 @@ export default function Tarefas({
   );
 
   const escolher = useCallback((t: Task) => setEscolhida(t.id), []);
+
+  /* A tarefa escolhida, tirada da lista VIVA e não guardada à parte: é o que
+     faz o painel mostrar o que ela acabou de gravar, e desaparecer quando a
+     tarefa é eliminada noutro sítio. */
+  const tarefaEscolhida = useMemo(
+    () => tasks.find((t) => t.id === escolhida) ?? null,
+    [tasks, escolhida],
+  );
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -2377,6 +2406,44 @@ export default function Tarefas({
               )}
             </div>
           )}
+        </div>
+
+        {/* ══ A TERCEIRA COLUNA — O PAINEL DE DETALHE (fase 08) ══════════════
+            «Zero espaço morto: o painel de detalhe ocupa a coluna que hoje
+            está vazia» (critério de aceitação nº 7).
+
+            ── PORQUE É QUE ELE EXISTE MESMO SEM TAREFA ESCOLHIDA ───────────
+            No computador, sim: uma coluna que aparece e desaparece conforme se
+            toca numa linha faz a lista do meio mudar de largura a cada toque —
+            e a lista é o que ela está a ler. Sem escolha nenhuma, o painel diz
+            o que faz, que é a melhor coisa que um sítio vazio pode dizer.
+
+            ── E PORQUE É QUE ABAIXO DE `lg` SÓ EXISTE ESCOLHIDO ────────────
+            Porque ali não é uma coluna: é um bloco por baixo da lista. Vazio,
+            seria um cartão a explicar-se a si próprio no fim de um ecrã
+            estreito — ruído a ocupar o sítio das tarefas. «O painel de detalhe
+            colapsa primeiro» é o que a Parte 6 do documento manda quando o
+            espaço aperta, e é isto.
+
+            MEDIDO a 375 px: com o painel fechado a vista fica byte a byte como
+            estava; aberto, o cartão do detalhe mede 343 px de conteúdo (375
+            menos as duas margens de 16) e nenhum dos seus alvos desce dos 44 —
+            as caixas das subtarefas, os dois «Remover» e o «Fechar» levam
+            `alvo-toque`. Sem transbordo horizontal: os títulos quebram
+            (`break-words`) e as ligações cortam (`truncate`). */}
+        <div
+          style={{ "--cena": 3 } as React.CSSProperties}
+          className={`bo-cena mt-5 lg:mt-0 lg:w-72 lg:shrink-0 ${
+            tarefaEscolhida ? "" : "hidden lg:block"
+          }`}
+          ref={painelRef}
+        >
+          <TarefaDetalhe
+            tarefa={tarefaEscolhida}
+            aoFechar={() => setEscolhida(null)}
+            aoEditar={startEditTask}
+            aoGravar={gravarCampos}
+          />
         </div>
       </div>
 

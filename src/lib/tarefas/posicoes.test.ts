@@ -17,6 +17,15 @@ import { ESPACO, ordemGuardada, posicoesDepoisDeMover } from "./posicoes";
 const mapa = (pares: Record<string, number | undefined>) => (id: string) => pares[id];
 
 describe("as posições da ordem manual", () => {
+  /* Os casos daqui para baixo escrevem 1024, 2048 e 3072 à mão, porque um
+     teste que recalcula o que está a provar não prova nada. O preço é que se
+     alguém mexer no `ESPACO` eles passam a mentir em silêncio — e é isso que
+     esta linha impede: falha aqui, uma vez, com o número novo à frente, em vez
+     de falhar em vinte sítios sem dizer porquê. */
+  it("o degrau é o que os casos abaixo assumem que ele é", () => {
+    expect(ESPACO).toBe(1024);
+  });
+
   it("a primeira arrumação numera a lista de raiz, com degraus de 1024", () => {
     const escritas = posicoesDepoisDeMover(["c", "a", "b"], mapa({}), "c");
     expect(escritas).toEqual([
