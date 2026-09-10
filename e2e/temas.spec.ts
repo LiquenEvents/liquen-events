@@ -171,7 +171,23 @@ test.describe("Biblioteca de Temas", () => {
 
       // ── 2. Vê-lo listado ──────────────────────────────────────────────
       await page.getByRole("button", { name: /← Temas/ }).click();
-      const card = page.getByRole("button", { name: literal(themeName) });
+      /* ── O NOME EXACTO, E NÃO «CONTÉM» ────────────────────────────────
+         Este localizador era uma expressão que só pedia que o nome do tema
+         aparecesse no rótulo, e passou a casar com DOIS botões: o cartão, que
+         se chama pelo nome do tema, e o menu do cartão, que passou a
+         anunciar-se «Acções de <tema>».
+
+         O segundo é uma melhoria e não um defeito — um botão de menu que diz
+         sobre o que age vale mais, para quem ouve o ecrã, do que um «Acções»
+         solto. O que estava errado era a pergunta: «um botão cujo nome contém
+         isto» deixou de identificar uma coisa só.
+
+         `exact` também não serve: o cartão nunca se chamou só pelo nome — traz
+         a seguir a contagem de fotografias e a data. O que os separa é o
+         PRINCÍPIO: o cartão COMEÇA pelo nome do tema, o menu começa por
+         «Acções de». Um `^` chega, e continua a ser uma pergunta sobre o
+         cartão e não sobre «qualquer botão que fale neste tema». */
+      const card = page.getByRole("button", { name: new RegExp("^" + literal(themeName).source) });
       await expect(card).toBeVisible();
 
       // ── 3. Abri-lo, e ler o estado das fotos sem mentir ───────────────

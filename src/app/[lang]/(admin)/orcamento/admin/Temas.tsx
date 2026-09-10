@@ -42,6 +42,14 @@ import { useSaidaDeUmSo } from "./ui/saida";
 import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
+import { MenuDeContexto, type PedidoDeMenu } from "./MenuDeContexto";
+import {
+  AMBITOS,
+  ambitosDisponiveis,
+  filtrarPorAmbito,
+  type Ambito,
+  type DadosDeUso,
+} from "@/lib/temas-filtros";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 
@@ -200,13 +208,41 @@ const SearchIcon = (
 
 /** "1 foto" / "7 fotos" — o plural aparece em meia dúzia de frases. */
 /** Por que ordem os temas aparecem. */
-export type Ordem = "alfabetica" | "recentes" | "fotos";
+export type Ordem = "alfabetica" | "recentes" | "fotos" | "mais-usados" | "menos-usados";
 
+/**
+ * ── OS NOMES DIZEM O CRITÉRIO, E NÃO A DIRECÇÃO ────────────────────────────
+ *
+ * «A–Z» e «Recentes» eram o que estava. O `docs/APPLE-TEMAS.md` (Parte 6) pede
+ * «Ordenar: Nome», com «Nome · Mais recentes · Mais usados · Menos usados» — a
+ * lista escreve-se com o critério à frente, para o controlo dizer por que
+ * ordem a grelha está sem ser preciso adivinhar o que «A–Z» quer dizer numa
+ * biblioteca com acentos.
+ *
+ * «Com mais fotos» fica, e não é um quinto por gosto: já cá estava, é o que
+ * responde a «qual é o tema que dá para montar um mood board hoje», e tirá-lo
+ * seria desfazer trabalho para chegar ao número quatro do documento.
+ *
+ * As duas do USO só se OFERECEM quando a contagem de propostas chegou (vem
+ * noutro pedido, ver `usos`) — e se a preferência guardada for uma delas antes
+ * de ela chegar, a `ordenarTemas` cai no nome, que é a ordem de repouso.
+ */
 export const ORDENS: readonly { valor: Ordem; rotulo: string }[] = [
-  { valor: "alfabetica", rotulo: "A–Z" },
-  { valor: "recentes", rotulo: "Recentes" },
+  { valor: "alfabetica", rotulo: "Nome" },
+  { valor: "recentes", rotulo: "Mais recentes" },
   { valor: "fotos", rotulo: "Com mais fotos" },
+  { valor: "mais-usados", rotulo: "Mais usados" },
+  { valor: "menos-usados", rotulo: "Menos usados" },
 ];
+
+/** As ordens que precisam da contagem de propostas para significarem alguma
+ *  coisa. Sem ela não se mostram — ver `ORDENS`. */
+export const ORDENS_DE_USO: readonly Ordem[] = ["mais-usados", "menos-usados"];
+
+/** O que o «⋯» da barra de topo governa, para o rótulo acessível — «Acções de
+ *  Biblioteca de Temas». Sem isto ele chamava-se «Acções» como os dos cartões,
+ *  e numa grelha de 28 haveria 29 botões com o mesmo nome. */
+const MENU_DA_BIBLIOTECA = "Biblioteca de Temas";
 
 const ORDEM_KEY = "liquen-temas-ordem";
 
@@ -238,14 +274,29 @@ export function guardarOrdem(o: Ordem): void {
  * Uma pasta ilegível (`imageCount: null`) fica no fim de "com mais fotos", em
  * vez de valer zero e passar à frente de um tema com uma foto — não sabemos
  * quantas tem, e adivinhar para baixo seria esconder o tema.
+ *
+ * `usos` é a contagem de propostas por tema, e chega depois dos cartões. Sem
+ * ela, as duas ordens do USO não têm por onde ordenar e a lista fica pelo nome
+ * — a ordem de repouso desta biblioteca. Um empate (dois temas com três
+ * propostas cada) também desce ao nome, para a grelha não trocar de arrumação
+ * entre dois desenhos.
  */
-export function ordenarTemas(temas: readonly ThemeSummary[], ordem: Ordem): ThemeSummary[] {
+export function ordenarTemas(
+  temas: readonly ThemeSummary[],
+  ordem: Ordem,
+  usos?: Record<string, number> | null,
+): ThemeSummary[] {
   const porOrdem = (a: ThemeSummary, b: ThemeSummary): number => {
     if (ordem === "recentes") return (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
     if (ordem === "fotos") {
       const na = a.imageCount ?? -1;
       const nb = b.imageCount ?? -1;
       if (na !== nb) return nb - na;
+    }
+    if (usos && (ordem === "mais-usados" || ordem === "menos-usados")) {
+      const na = usos[a.id] ?? 0;
+      const nb = usos[b.id] ?? 0;
+      if (na !== nb) return ordem === "mais-usados" ? nb - na : na - nb;
     }
     return a.name.localeCompare(b.name, "pt");
   };
@@ -435,6 +486,28 @@ export function desdeQuando(iso: string | undefined, agora = Date.now()): string
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * A data inteira, para o `title` de uma data relativa.
+ *
+ * «há 1 mês» é o que se lê de relance; «12 de agosto de 2026» é o que responde
+ * quando a pergunta é «foi antes ou depois do casamento dos Ferreira?». As
+ * duas, e não uma — é o ponto 13 da auditoria do `docs/APPLE-TEMAS.md` e a
+ * última linha das proibições da Parte 9.
+ *
+ * Devolve `undefined` quando não há data ou ela não se deixa ler: um `title`
+ * vazio é uma dica que aparece sem nada escrito.
+ */
+export function dataPorExtenso(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return undefined;
+  return new Date(t).toLocaleDateString("pt-PT", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /**
@@ -708,18 +781,21 @@ export default function Temas() {
   const [densidade, setDensidade] = useState<Densidade>("compacto");
   const [ordem, setOrdem] = useState<Ordem>("alfabetica");
   /**
-   * «204 fotos em 18 temas» — e, quando alguma pasta não se deixou ler, di-lo
-   * em vez de a somar como zero. Um total calado que encolhe é a maneira mais
-   * fácil de alguém concluir que faltam fotos e as voltar a carregar.
+   * ── O ÂMBITO DA VISTA ──────────────────────────────────────────────────
+   *
+   * «Todos · Por usar · Usados este ano · Favoritos · Arquivados», da Parte 1,
+   * ponto 12 do `docs/APPLE-TEMAS.md`. Substitui o interruptor «Arquivados»
+   * que aqui estava: o arquivo continua a ser uma VISTA e não um filtro que se
+   * soma (era essa a regra, e não muda), e passa a ser um dos cinco âmbitos em
+   * vez de um botão sozinho ao lado deles. As contas estão em
+   * `lib/temas-filtros.ts`.
+   *
+   * Não se guarda entre sessões, ao contrário da ordem e da densidade: essas
+   * são preferências de leitura («como é que eu gosto de ver isto»), e um
+   * âmbito é onde se está agora. Reabrir a Biblioteca dentro de «Arquivados»
+   * era abri-la vazia.
    */
-  const resumoDaBiblioteca = useMemo(() => {
-    const { fotos, temas, ilegiveis } = contarFotosDaBiblioteca(themes);
-    const base = `${plural(fotos, "foto", "fotos")} em ${plural(temas, "tema", "temas")}`;
-    return ilegiveis > 0
-      ? `${base} · ${plural(ilegiveis, "pasta não se deixou ler", "pastas não se deixaram ler")}`
-      : base;
-  }, [themes]);
-  const [verArquivados, setVerArquivados] = useState(false);
+  const [ambito, setAmbito] = useState<Ambito>("todos");
   /**
    * ── EM QUANTAS PROPOSTAS É QUE CADA TEMA JÁ SAIU ───────────────────────
    *
@@ -748,6 +824,17 @@ export default function Temas() {
    */
   const [aFundir, setAFundir] = useState<ThemeSummary | null>(null);
   const [revendo, setRevendo] = useState(false);
+  /**
+   * ── O MENU ABERTO NO PONTEIRO ──────────────────────────────────────────
+   *
+   * Um só, e ao nível do ecrã: dois menus de contexto abertos ao mesmo tempo
+   * não é um estado que exista. Abre-se com o botão direito num cartão, com o
+   * botão direito no vazio da grelha, e com o «⋯» da barra de topo — sempre
+   * com uma lista de `AccaoDeItem`, que é a mesma peça de dados que o «⋯» de
+   * cada cartão já usa. Ver `MenuDeContexto.tsx`.
+   */
+  const [menu, setMenu] = useState<PedidoDeMenu | null>(null);
+  const fecharMenu = useCallback(() => setMenu(null), []);
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
   // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
   useEffect(() => {
@@ -862,6 +949,34 @@ export default function Temas() {
    */
   const accoesDoTema = useCallback(
     (t: ThemeSummary): AccaoDeItem[] => [
+      /* ── «ABRIR» É O PRIMEIRO ITEM, E EXISTE MESMO SENDO ÓBVIO ──────────
+         «Incluir só os comandos mais prováveis» e «tudo o que está no menu de
+         contexto existe também na interface principal». [APPLE] O caminho
+         normal para abrir um tema é carregar no cartão; num menu aberto com o
+         botão direito EM CIMA do cartão, não haver «Abrir» obriga a fechar o
+         menu para fazer o gesto mais provável de todos. */
+      {
+        id: "abrir",
+        rotulo: "Abrir",
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
+            <path d="M13 19h7m0 0-3-3m3 3-3 3" />
+            <path d="M20 14v-1M4 6v10a2 2 0 0 0 2 2h4" />
+          </svg>
+        ),
+        onAccao: () => setOpenId(t.id),
+      },
       {
         id: "favorito",
         rotulo: t.favorito ? "Desafixar" : "Fixar no topo",
@@ -932,6 +1047,36 @@ export default function Temas() {
           </svg>
         ),
         onAccao: () => setAFundir(t),
+      },
+      /* ── A DESTRUTIVA FICA NO FIM, A VERMELHO E COM O NOME DO QUE SE PERDE
+         Ponto 20 da auditoria: «"Eliminar tema" é um link de texto ao lado do
+         botão primário» — uma acção destrutiva com o peso de um link comum e
+         encostada à acção principal. Passa para aqui, marcada como destrutiva:
+         o `MenuDeAccoes` (e o menu do botão direito) põem-na a vermelho,
+         depois de um filete, e a pergunta que se segue diz o nome do tema e
+         quantas fotografias se perdem — a `perguntaDeEliminar`, que já existia
+         e já dizia as duas coisas. */
+      {
+        id: "eliminar",
+        rotulo: "Eliminar tema…",
+        destrutiva: true,
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h16M10 11v6M14 11v6" />
+            <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+          </svg>
+        ),
+        onAccao: () => setAEliminar(t),
       },
     ],
     [alternarMarca],
@@ -1196,10 +1341,43 @@ export default function Temas() {
   const origemDaFusao = useNoEcraAteSair(aFundir !== null, aSairDaFusao, aFundir);
   const temasDaFusao = useNoEcraAteSair(aFundir !== null, aSairDaFusao, themes);
 
-  /** Quantos temas estão arquivados — o que autoriza (ou não) mostrar o
-   *  interruptor do arquivo. Sem nada lá dentro, seria um controlo a explicar
-   *  uma funcionalidade que ninguém ainda usou. */
-  const arquivados = useMemo(() => themes.filter((t) => t.arquivado).length, [themes]);
+  /**
+   * ── AS ACÇÕES DA BIBLIOTECA INTEIRA ────────────────────────────────────
+   *
+   * As que não são sobre UM tema. Hoje é uma — «Rever etiquetas…», que era um
+   * link de texto entre os botões da barra —, e as reticências dizem que abre
+   * outra vista em vez de fazer já. [APPLE]
+   *
+   * Vive aqui em cima, ao lado do `accoesDoTema`, para as duas listas de menu
+   * deste ecrã se lerem juntas: quem acrescentar o «Exportar biblioteca…» do
+   * documento vê logo onde ele pertence.
+   */
+  const accoesDaBiblioteca: AccaoDeItem[] = useMemo(
+    () => [
+      {
+        id: "rever-etiquetas",
+        rotulo: "Rever etiquetas…",
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h10M4 12h10M4 17h6" />
+            <path d="m16 15 2 2 4-4" />
+          </svg>
+        ),
+        onAccao: () => setRevendo(true),
+      },
+    ],
+    [],
+  );
 
   /**
    * ── OS PARES QUE ELA NÃO TEM DE ENCONTRAR A OLHO ───────────────────────
@@ -1211,19 +1389,66 @@ export default function Temas() {
    */
   const parecidos = useMemo(() => temasParecidos(themes), [themes]);
 
+  /** O que se sabe sobre o uso dos temas. O ano ainda não vem do servidor —
+   *  ver a nota do `ambitosNoEcra`. */
+  const dadosDeUso: DadosDeUso = useMemo(() => ({ usos, usosEsteAno: null }), [usos]);
+
+  /**
+   * ── OS ÂMBITOS QUE SE MOSTRAM, E O QUE FALTA A UM DELES ────────────────
+   *
+   * Quatro dos cinco respondem-se com o que este ecrã já tem em mãos. O quinto
+   * — «Usados este ano» — precisa de saber QUANDO é que um tema saiu, e o
+   * `/api/temas/uso` só devolve QUANTAS vezes (ver `lib/temas-uso.ts`: conta
+   * propostas, sem data). Enquanto o servidor não mandar a contagem do ano, o
+   * âmbito não aparece — a alternativa era oferecê-lo e devolver a lista toda
+   * ou nenhuma, e um filtro que mente ensina a não usar os outros quatro.
+   * A conta já está escrita e testada em `lib/temas-filtros.ts`; falta-lhe o
+   * número.
+   */
+  const ambitosNoEcra = useMemo(
+    () => ambitosDisponiveis(themes, dadosDeUso),
+    [themes, dadosDeUso],
+  );
+  /** O âmbito escolhido pode deixar de existir por baixo dos pés — desarquivar
+   *  o último tema arquivado esvazia «Arquivados». Aí volta-se a «Todos», em
+   *  vez de ficar um filtro activo que já não está na barra. */
+  const ambitoActivo: Ambito = ambitosNoEcra.some((a) => a.valor === ambito) ? ambito : "todos";
+
   const visible = useMemo(() => {
     const needle = normalizedThemeName(deferredSearch);
     // O arquivo é uma VISTA, não um filtro que se soma: ou se está a ver o que
     // se usa, ou se está a ver o que se pôs de lado. Misturar os dois era
     // devolver ao ecrã exactamente o que arquivar veio tirar de lá.
-    const base = themes.filter((t) => (verArquivados ? t.arquivado : !t.arquivado));
+    const base = filtrarPorAmbito(themes, ambitoActivo, dadosDeUso);
     const filtrados = needle
       ? // Procurar por nome E por nota: a nota ("tons quentes, para espaços de
         // pedra") é muitas vezes como a Catarina se lembra do tema.
         base.filter((t) => normalizedThemeName(`${t.name} ${t.notes ?? ""}`).includes(needle))
       : base;
-    return ordenarTemas(filtrados, ordem);
-  }, [themes, deferredSearch, ordem, verArquivados]);
+    return ordenarTemas(filtrados, ordem, usos);
+  }, [themes, deferredSearch, ordem, ambitoActivo, dadosDeUso, usos]);
+
+  /**
+   * ── O TAMANHO DA BIBLIOTECA É O ESTADO DA VISTA ────────────────────────
+   *
+   * Era «204 fotos em 18 temas», uma legenda solta por baixo do campo de
+   * procura que descrevia sempre a biblioteca inteira. O
+   * `docs/APPLE-TEMAS.md` (ponto 4) manda que passe a estado da vista e que
+   * MUDE ao filtrar: «28 temas · 567 fotografias» → «4 temas · 61
+   * fotografias». É o âmbito visível dito em números — que é a informação que
+   * falta a quem acabou de carregar num filtro e quer saber o que sobrou.
+   *
+   * E continua a dizer quando alguma pasta não se deixou ler, em vez de a
+   * somar como zero: um total calado que encolhe é a maneira mais fácil de
+   * alguém concluir que faltam fotos e as voltar a carregar.
+   */
+  const estadoDaVista = useMemo(() => {
+    const { fotos, temas, ilegiveis } = contarFotosDaBiblioteca(visible);
+    const base = `${plural(temas, "tema", "temas")} · ${plural(fotos, "fotografia", "fotografias")}`;
+    return ilegiveis > 0
+      ? `${base} · ${plural(ilegiveis, "pasta não se deixou ler", "pastas não se deixaram ler")}`
+      : base;
+  }, [visible]);
 
   // A revisão em lote trabalha sobre a biblioteca TODA, não sobre um tema — é
   // um ecrã irmão da lista, não um separador dentro dela.
@@ -1341,35 +1566,50 @@ export default function Temas() {
       )}
 
       {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
-          Três blocos, pela ordem de leitura: os controlos (0), o aviso dos
-          nomes por arrumar (1) e a grelha dos temas (2). A escada é a da casa
-          (`.bo-cena` no `globals.css`) — 600 ms, degraus de 20 ms, tecto ao
-          sexto, desligada em `prefers-reduced-motion`. */}
+          QUATRO blocos, pela ordem de leitura: os controlos (0), os filtros
+          (1), o aviso dos nomes por arrumar (2) e a grelha dos temas (3). A
+          escada é a da casa (`.bo-cena` no `globals.css`) — 600 ms, degraus de
+          20 ms, tecto ao sexto, desligada em `prefers-reduced-motion`.
+
+          ── E O DEGRAU NOVO NÃO SE ACRESCENTA NO FIM ─────────────────────────
+          Os filtros nasceram com `--cena: 0`, a partilhar a vez com os
+          controlos, e o `vistas-que-se-compoem.test.ts` chumbou — «há blocos a
+          partilhar a mesma vez: 0, 0, 1, 2». Não é cosmético: dois blocos a
+          entrar no mesmo instante lêem-se como UM bloco, e a escada existe
+          justamente para o olho seguir a ordem de leitura.
+
+          Um bloco que entra a meio da página empurra os degraus abaixo dele.
+          Contar de cima e renumerar é o preço; pô-lo no fim, longe de onde se
+          lê, era pior — a entrada deixava de acompanhar os olhos. */}
       <Toolbar
         style={{ "--cena": 0 } as React.CSSProperties}
         className="bo-cena mb-6"
         start={
-          searchable ? (
-            /* ── O RESUMO DEIXA DE SER FILHO DO CAMPO ────────────────────
-               Pedido dela, na Fase 3: «"395 fotos em 25 temas" está órfão».
+          /* ── O CAMPO E O ESTADO DA VISTA, NA MESMA LINHA E NA MESMA BASE ──
+             Pedido dela, na Fase 3: «"395 fotos em 25 temas" está órfão». Era
+             filho da caixa `relative` que ancora a lupa — herdava a largura do
+             campo e lia-se como se descrevesse o que lá estava escrito.
 
-               Estava dentro da caixa `relative` do campo de procura — uma caixa
-               que só existe para ancorar o ícone da lupa. Herdava a largura do
-               campo, encostava-se a ele, e lia-se como se descrevesse o que
-               estava escrito na procura. Não descreve: descreve a BIBLIOTECA, e
-               continua verdadeiro com o campo vazio.
+             Agora é IRMÃO do campo e ao LADO dele, não por baixo: o
+             `docs/APPLE-TEMAS.md` (ponto 4) manda que a contagem seja o estado
+             da vista, «ao lado do campo, em role="status" aria-live="polite"»,
+             e que mude ao filtrar. Um estado é uma coisa que se lê de relance
+             na mesma linha dos controlos; uma legenda pendurada por baixo é
+             uma nota de rodapé.
 
-               Passa a irmão do campo, na mesma coluna. O que muda é a quem ele
-               parece pertencer.
+             A DESCRIÇÃO DA SECÇÃO SAIU («Guarda aqui as fotos por tema…»):
+             ponto 3 da auditoria — quem entra na secção Temas sabe o que são
+             temas, e a descrição estava a ocupar a linha de maior destaque.
 
-               A largura era `sm:w-72`: uma pergunta sobre a JANELA feita dentro
-               de uma `Toolbar` que já é `flex flex-wrap` e se parte sozinha. O
-               que decide o tamanho desta caixa é a fila onde ela está, não o
-               ecrã — `basis-72 grow-0` dá-lhe as mesmas 18rem em todo o lado e
-               deixa-a encolher quando a fila é mais estreita do que isso, sem
-               um único ponto de corte pelo meio. */
-            <div className="w-full max-w-md basis-72 grow-0">
-              <div className="relative">
+             `basis-72 grow-0` no campo: a largura decide-se pela fila onde ele
+             está, não pela janela, e a `Toolbar` já é `flex flex-wrap`. A 375 px
+             a fila parte-se e o estado desce para baixo do campo sozinho. */
+          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
+            {searchable && (
+              // O campo só aparece quando há lista que chegue para justificar
+              // um controlo a mais — com três temas, procurar é mais trabalho
+              // do que ler.
+              <div className="relative w-full max-w-md basis-72 grow-0">
                 {SearchIcon}
                 <input
                   value={search}
@@ -1379,17 +1619,24 @@ export default function Temas() {
                   className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
                 />
               </div>
-              {/* O TAMANHO DA BIBLIOTECA, dito por ela própria. Era preciso
-                  somar os cartões à mão para responder a «quantas fotos
-                  temos?» — e este é o activo mais valioso do back office. */}
-              <p className="bo-text-muted mt-1.5 text-xs">{resumoDaBiblioteca}</p>
-            </div>
-          ) : (
-            <p className="bo-text-muted max-w-xl text-sm leading-relaxed">
-              Guarda aqui as fotos por tema. Depois, no estúdio de propostas, é só escolher o tema e
-              as fotos entram no mood board.
+            )}
+            {/* O ESTADO DA VISTA. `aria-live="polite"` e não `assertive`:
+                muda a cada tecla escrita na procura, e um leitor de ecrã a
+                interromper-se a si próprio a cada letra não deixa ouvir nem o
+                campo nem a contagem. */}
+            <p
+              role="status"
+              aria-live="polite"
+              // O nome distingue esta região da do `ToastProvider`, que também
+              // é um `role="status"` e vive na mesma página: sem ele, quem
+              // navega por regiões encontra duas «status» e não sabe qual é
+              // qual.
+              aria-label="Temas à vista"
+              className="bo-text-muted text-xs"
+            >
+              {estadoDaVista}
             </p>
-          )
+          </div>
         }
         end={
           /* SEM CAIXA À VOLTA, e é isso que corrige a vista no telemóvel.
@@ -1446,7 +1693,11 @@ export default function Temas() {
                     containerClassName="w-auto"
                     className="py-2 pl-3 text-xs text-[var(--bo-tinta-72)]"
                   >
-                    {ORDENS.map((o) => (
+                    {/* «Mais usados» e «Menos usados» só entram quando a
+                        contagem de propostas chegou — ver `ORDENS`. Oferecer
+                        uma ordem que ainda não sabe ordenar era pedir-lhe que
+                        carregasse e não visse mexer nada. */}
+                    {ORDENS.filter((o) => usos || !ORDENS_DE_USO.includes(o.valor)).map((o) => (
                       <option key={o.valor} value={o.valor}>
                         {o.rotulo}
                       </option>
@@ -1485,37 +1736,54 @@ export default function Temas() {
               </div>
             )}
 
-            {/* ── O QUE A LISTA CONTÉM ────────────────────────────────────
-                Sozinho no seu grupo porque é a única coisa aqui que troca o
-                CONJUNTO que se está a ver — o arquivo é uma vista, não um
-                filtro que se soma. Só aparece quando há mesmo alguma coisa
-                arquivada: senão seria um interruptor a explicar uma
-                funcionalidade que ninguém usou. */}
-            {arquivados > 0 && (
+            {/* ── FAZER ───────────────────────────────────────────────────
+                Era «Rever etiquetas» em `ghost` ao lado de «Novo tema»: um
+                link de texto entre botões de barra, que é a última linha das
+                proibições da Parte 9 do `docs/APPLE-TEMAS.md` — uma acção de
+                manutenção rara com o mesmo peso visual dos controlos de vista.
+
+                Passa para dentro do «⋯», que é onde a Apple põe o que se faz
+                de vez em quando («máximo três grupos de controlos numa
+                toolbar»). Fica com um item só, e é assim que se quer: é a
+                gaveta que espera pelo «Fundir temas…» e pelo «Exportar
+                biblioteca…» do documento, e um item numa gaveta é melhor do
+                que um item a competir com a acção que ela faz todos os dias.
+
+                ── E PORQUE É QUE NÃO É UM `MenuDeAccoes` ───────────────────
+                Porque esse esconde-se em repouso onde há rato
+                (`com-rato:opacity-0` + `group-hover`), que é exactamente o que
+                o torna certo EM CIMA DE UM CARTÃO e errado numa barra: sem um
+                `group` à volta, o «⋯» ficaria invisível e «Rever etiquetas»
+                deixava de ser encontrável. O painel é o mesmo — o mesmo
+                material, os mesmos itens, a mesma lista de `AccaoDeItem` —,
+                aberto no `MenuDeContexto`, que é o menu deste ecrã. */}
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
-                aria-pressed={verArquivados}
-                onClick={() => setVerArquivados((v) => !v)}
-                className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
-                  verArquivados
-                    ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
-                    : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-[var(--bo-text-muted)]"
-                }`}
+                aria-haspopup="menu"
+                aria-expanded={menu?.de === "barra"}
+                aria-label={`Acções de ${MENU_DA_BIBLIOTECA}`}
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  // Ancorado ao canto inferior esquerdo do botão: o painel
+                  // desce dele como desceria de um «⋯» de cartão, e o
+                  // `MenuDeContexto` encosta-o para dentro se não couber.
+                  setMenu({
+                    x: r.left,
+                    y: r.bottom + 4,
+                    de: "barra",
+                    sobre: MENU_DA_BIBLIOTECA,
+                    accoes: accoesDaBiblioteca,
+                  });
+                }}
+                className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
               >
-                Arquivados ({arquivados})
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <circle cx="5" cy="12" r="1.6" />
+                  <circle cx="12" cy="12" r="1.6" />
+                  <circle cx="19" cy="12" r="1.6" />
+                </svg>
               </button>
-            )}
-
-            {/* ── FAZER ───────────────────────────────────────────────────
-                «Rever etiquetas» é MANUTENÇÃO e fica em `ghost`: um faz-se
-                todos os dias, o outro de vez em quando, e em `secondary` os
-                dois competiam no topo. Ficam no mesmo grupo porque são as duas
-                acções do ecrã — é o grupo que o olho procura quando veio aqui
-                para fazer alguma coisa, e não para olhar. */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Button variant="ghost" size="sm" onClick={() => setRevendo(true)}>
-                Rever etiquetas
-              </Button>
               <Button
                 variant={adding ? "secondary" : "primary"}
                 size="sm"
@@ -1529,6 +1797,60 @@ export default function Temas() {
         }
       />
 
+      {/* ══════════════════════════════════════════════════════════════════
+          OS ÂMBITOS — «"por usar" É METADADO SEM FILTRO»
+          ══════════════════════════════════════════════════════════════════
+
+          Ponto 12 da auditoria do `docs/APPLE-TEMAS.md`: a informação mais
+          accionável da grelha — que temas nunca saíram numa proposta — estava
+          escrita em cada cartão e não havia forma de filtrar por ela. «É o
+          padrão da app Fotografias e é o que transforma esta página de
+          catálogo em ferramenta.»
+
+          ── A FILA PENSADA A 375 ─────────────────────────────────────────
+          Cinco âmbitos com contagem não cabem numa linha de 375 px, e uma
+          barra que não quebra não encolhe — foi o que já custou a esta vista
+          a navegação inteira no telemóvel (ver a nota do `end` da barra).
+          Por isso é `flex-wrap`: parte-se em duas ou três linhas e nenhum
+          rótulo sai do ecrã. Os chips são os da casa, à letra os mesmos que o
+          interruptor «Arquivados» usava antes de ser um deles.
+
+          ── E NÃO ANIMA ──────────────────────────────────────────────────
+          «Nunca animes a mudança de filtro» (Parte 5) — é uma interação de
+          alta frequência. O conteúdo troca em silêncio: a grelha não leva
+          `key` nova nem entrada, só passa a ter outros filhos.
+
+          Só aparece com dois âmbitos ou mais: com um só, seria um controlo a
+          explicar uma funcionalidade que ainda não tem o que mostrar. */}
+      {ambitosNoEcra.length > 1 && (
+        <div
+          role="group"
+          aria-label="Filtrar os temas"
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className="bo-cena mb-5 flex flex-wrap items-center gap-1.5"
+        >
+          {ambitosNoEcra.map((a) => (
+            <button
+              key={a.valor}
+              type="button"
+              aria-pressed={ambitoActivo === a.valor}
+              onClick={() => setAmbito(a.valor)}
+              className={`alvo-toque rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
+                ambitoActivo === a.valor
+                  ? "border-foreground/20 bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
+                  : "border-[var(--bo-hairline-strong)] text-foreground/40 hover:text-[var(--bo-text-muted)]"
+              }`}
+            >
+              {a.rotulo}
+              {/* A contagem é do ÂMBITO e não da procura — ver
+                  `contarPorAmbito`. `tabular-nums` para os números não
+                  dançarem de largura quando sobem de 9 para 10. */}
+              <span className="ml-1.5 tabular-nums opacity-70">{a.contagem}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── OS NOMES POR ARRUMAR ──────────────────────────────────────────
           A `SugestaoDeNome` abaixo só aparece enquanto se ESCREVE um nome — e
           um tema baptizado há seis meses nunca mais passa por esse campo. Era
@@ -1540,7 +1862,7 @@ export default function Temas() {
       {/* Segundo degrau numa caixa à volta: a `NomesPorArrumar` devolve `null`
           quando não há nada a arrumar, e o `empty:hidden` faz esta caixa
           desaparecer com ela em vez de ficar um degrau a animar o vazio. */}
-      <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena empty:hidden">
+      <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena empty:hidden">
         <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
       </div>
 
@@ -1617,124 +1939,148 @@ export default function Temas() {
         </Card>
       ) : visible.length === 0 ? (
         <Card padding="sm">
-          {/* Sem procura escrita, dizer "nenhum tema com '' no nome" seria uma
-              frase sem sentido — o que está a acontecer é que todos os temas
-              foram arquivados. */}
-          <p className="bo-text-muted text-sm">
-            {search.trim()
-              ? `Nenhum tema com “${search.trim()}” no nome ou na nota.`
-              : verArquivados
-                ? "Não há temas arquivados."
-                : "Todos os temas estão arquivados. Abre “Arquivados” para os repor."}
-          </p>
+          {/* ── FILTRO SEM RESULTADOS ≠ BIBLIOTECA VAZIA ─────────────────
+              Ponto 14 da auditoria, e são três frases diferentes porque são
+              três situações diferentes: não há nada escrito e o âmbito está em
+              «Todos» (então está tudo arquivado), há procura escrita (e a
+              frase cita o que se procurou), ou o âmbito é que não tem nada.
+              As duas últimas têm saída — «Limpar filtros» —, porque uma
+              mensagem sem saída obriga a adivinhar qual dos dois controlos é
+              que está a esconder os temas. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <p className="bo-text-muted text-sm">
+              {search.trim()
+                ? `Nenhum tema corresponde a “${search.trim()}”.`
+                : ambitoActivo !== "todos"
+                  ? `Nenhum tema em “${AMBITOS.find((a) => a.valor === ambitoActivo)?.rotulo}”.`
+                  : "Todos os temas estão arquivados. Abre “Arquivados” para os repor."}
+            </p>
+            {(search.trim() || ambitoActivo !== "todos") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setAmbito("todos");
+                }}
+              >
+                Limpar filtros
+              </Button>
+            )}
+          </div>
         </Card>
       ) : (
         /* Terceiro degrau na GRELHA e não em cada cartão: vinte e cinco temas a
            entrar um a um seria a lentidão que o tecto do sexto degrau existe
            para evitar. A grelha chega inteira. */
         <div
-          style={{ "--cena": 2 } as React.CSSProperties}
+          style={{ "--cena": 3 } as React.CSSProperties}
+          /* ── O BOTÃO DIREITO NO VAZIO DA GRELHA ─────────────────────────
+             «Em área vazia da grelha, oferece "Novo tema".» (ponto 8 da
+             auditoria.) O `defaultPrevented` é o que distingue o vazio de um
+             cartão: o cartão trata o seu próprio menu e já chamou
+             `preventDefault` antes de o evento subir até aqui. Sem essa
+             pergunta, carregar com o botão direito num cartão abria dois
+             menus — o dele e este por cima. */
+          onContextMenu={(e) => {
+            if (e.defaultPrevented) return;
+            e.preventDefault();
+            setMenu({
+              x: e.clientX,
+              y: e.clientY,
+              sobre: MENU_DA_BIBLIOTECA,
+              accoes: [
+                {
+                  id: "novo-tema",
+                  rotulo: "Novo tema",
+                  icone: PlusIcon,
+                  onAccao: () => setAdding(true),
+                },
+                ...accoesDaBiblioteca,
+              ],
+            });
+          }}
           className={`bo-cena grid ${COLUNAS[densidade]}`}
         >
           {visible.map((t) => (
             /* As acções são IRMÃS do botão do cartão, não filhas: um botão
                dentro de outro botão é HTML inválido, e o resultado prático é
                que fixar um tema abria-o a seguir. */
-            <div key={t.id} role="group" aria-label={t.name} className="group relative">
-              {/* ══ AS ACÇÕES DO CARTÃO, EM DUAS FORMAS ═══════════════════
-                  MEDIDO a 375×667 com dedo: dois alvos de 44 px sobre um cartão
-                  de 165,5 px de largura — 55,6 % da largura do cartão tapada
-                  pelos botões, e a capa do tema por baixo deles. Com um «⋯» só
-                  passa a 26,6 %.
+            <div
+              key={t.id}
+              role="group"
+              aria-label={t.name}
+              /* ── O BOTÃO DIREITO ABRE O MESMO MENU DO «⋯» ────────────
+                 Ponto 8 da auditoria: «numa coleção, o botão direito é
+                 obrigatório». A lista é literalmente a mesma chamada —
+                 `accoesDoTema(t)` —, e é essa igualdade que o ponto 9 exige
+                 («abre o MESMO menu do botão direito»). Ver `MenuDeContexto`.
 
-                  Quem escolhe a forma é o CSS (`com-rato:` / `sem-rato:`, ver
-                  globals.css) e não o JavaScript: o hook lê `false` no servidor
-                  e o computador piscava — desenhava as duas acções e escondia-as
-                  a seguir, uma vez por cartão.
+                 No contentor e não no botão do cartão: o «⋯», a nota do tema
+                 parecido e a capa são todos deste tema, e carregar com o botão
+                 direito em qualquer um deles é a mesma pergunta. */
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, sobre: t.name, accoes: accoesDoTema(t) });
+              }}
+              className="group relative"
+            >
+              {/* ══ UM BOTÃO SÓ SOBRE A FOTOGRAFIA ═══════════════════════
+                  Ponto 9 da auditoria do `docs/APPLE-TEMAS.md`: «três botões
+                  circulares cinzentos aparecem sobre a fotografia no hover…
+                  sem rótulo, com ícones ambíguos». A correcção é «UM botão
+                  discreto ⋯ no canto superior direito, que abre o mesmo menu
+                  do botão direito» — e a Parte 9 proíbe, à letra, «mais de um
+                  botão flutuante sobre uma miniatura».
 
-                  Nenhuma das duas apaga nada (arquivar é arrumar, não apagar —
-                  daí não haver aqui nada marcado como destrutivo). */}
-              <div className="absolute right-2 top-2 z-10 hidden com-rato:flex gap-1">
-                {/* ── UMA LISTA, DOIS DESENHOS ──────────────────────────
-                    Isto era escrito à mão: duas acções copiadas do
-                    `accoesDoTema` para aqui, ícone a ícone. A promessa («é a
-                    MESMA lista, e nenhum dos dois desenhos pode ganhar uma
-                    acção que o outro não tenha») era só um comentário — e
-                    partiu-se no minuto em que a lista ganhou o «Juntar a outro
-                    tema…», que passou a existir no menu do dedo e não aqui.
+                  Aqui havia dois desenhos: com rato, a lista `accoesDoTema`
+                  percorrida em chips soltos; sem rato, um «⋯». Passa a ser o
+                  «⋯» nos dois — a mesma lista, um só desenho, e o cartão
+                  deixa de ter duas linguagens conforme o ponteiro.
 
-                    Agora é mesmo a mesma lista, percorrida. O que era especial
-                    na estrela continua a sê-lo, mas por uma regra escrita e
-                    não por uma cópia: ver `fixar`. */}
-                {accoesDoTema(t).map((a) => {
-                  const fixar = a.id === "favorito";
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      /* Sem o nome do tema no rótulo: o cartão está dentro de um
-                         grupo com esse nome, portanto quem usa leitor de ecrã já
-                         o ouviu — e repeti-lo aqui faria "Terracotta" identificar
-                         três botões diferentes no mesmo sítio. */
-                      aria-label={a.rotulo}
-                      aria-pressed={fixar ? !!t.favorito : undefined}
-                      title={
-                        a.id === "arquivar" && !t.arquivado ? "Arquivar (não apaga nada)" : a.rotulo
-                      }
-                      onClick={a.onAccao}
-                      /* Um favorito JÁ FIXADO vê-se sempre — a estrela acesa é o
-                         que diz que está fixado, escondê-la apagava a informação.
-                         Por isso é ele que NÃO leva variante nenhuma: fica em
-                         `opacity-100` em toda a parte. Os outros escondem-se só
-                         onde há rato, que é onde o `group-hover` os pode trazer
-                         de volta. */
-                      /* ── O CHIP QUE POUSA NA FOTOGRAFIA ────────────────
-                         Era `bg-[var(--bo-surface)]/85` com `backdrop-blur-sm` e tinta a
-                         `text-foreground/45`. Três coisas erradas de uma vez,
-                         e as três medidas:
+                  MEDIDO a 375×667 com dedo: os chips tapavam 55,6 % da largura
+                  de um cartão de 165,5 px (dois alvos de 44) e agora tapam
+                  26,6 % (um).
 
-                         · a TINTA. 3,11:1 sobre uma fotografia branca e 2,91:1
-                           sobre uma preta — o segundo chumba até os 3:1 que o
-                           1.4.11 pede a um ícone, e a estrela é o que diz se um
-                           tema está fixado;
-                         · o DESFOQUE. Um por chip, ou seja um por acção e por
-                           cartão: doze numa vista de quatro temas, noventa numa
-                           biblioteca de trinta. A própria investigação que
-                           trouxe o vidro fixa um tecto de cinco superfícies
-                           filtradas por ecrã;
-                         · o FUNDO. Branco a 85% em cima de uma fotografia
-                           clara é invisível — o chip desaparece na foto.
+                  ── E A ESTRELA NÃO SE PERDEU ────────────────────────────
+                  O chip do favorito ficava SEMPRE visível de propósito: aceso,
+                  era ele que dizia que o tema está fixado. Tirar o chip sem
+                  mais nada apagava essa informação — por isso ela desce para o
+                  rasto de números do cartão, como bandeira, que é onde o
+                  desenho do `ThemeCard` da Parte 3 do documento a põe («14
+                  fotos · 1 proposta · ⚑»). O que era um botão a dizer duas
+                  coisas passa a um botão (no menu) e um sinal (na linha).
 
-                         Passa à variante CLARA da casa (`.bo-vidro-claro`):
-                         véu de 50% mais vidro a 10%, sem filtro, com o glifo a
-                         branco. Medido: 3,35:1 sobre a pior fotografia. A conta
-                         inteira está no `globals.css`.
+                  O «⋯» esconde-se em repouso só onde há rato — é o coração do
+                  `MenuDeAccoes` — e volta com o rato sobre o cartão ou com o
+                  foco de teclado nele. Onde não há rato está sempre visível. */}
+              {/* O `absolute` vai NESTA caixa e não no `MenuDeAccoes`: ele
+                  dá-se a si mesmo um `relative` (é o que ancora a gaveta) e,
+                  entre dois utilitários de `position` na mesma classe, quem
+                  ganha é a ordem do Tailwind e não a ordem em que estão
+                  escritos. MEDIDO antes de os separar: o menu esticava-se aos
+                  165,5 px do cartão inteiro. */}
+              <div className="absolute right-2 top-2 z-10">
+                <MenuDeAccoes
+                  sobre={t.name}
+                  accoes={accoesDoTema(t)}
+                  /* ── O VIDRO CLARO VIAJA COM O BOTÃO ────────────────────
+                     O «⋯» pousa EM CIMA de uma fotografia, e o `MenuDeAccoes`
+                     traz tinta de texto normal (`--bo-text-muted`) — que sobre
+                     uma capa clara desaparece. A conta já estava feita para os
+                     chips que aqui estavam e não se refaz: `.bo-vidro-claro`,
+                     véu de 50% mais vidro a 10%, sem filtro, glifo a branco,
+                     3,35:1 sobre a pior fotografia (a conta inteira está no
+                     `globals.css`). Sem desfoque de propósito — um por cartão
+                     eram noventa numa biblioteca de trinta.
 
-                         E o FIXADO deixa de ser uma cor de aviso a mais
-                         (`#8a6d2f`, que nesta casa quer dizer «atenção») e
-                         passa a ser a pastilha cheia de acento — o mesmo gesto
-                         com que os menus, a coluna e a barra de baixo dizem
-                         «esta». Branco sobre `--bo-accent`: 6,55:1. */
-                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-full text-white opacity-100 ${ESTADO} ${PRESSAO} ${
-                        fixar && t.favorito
-                          ? "bg-[var(--bo-accent)]"
-                          : "bo-vidro-claro com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
-                      }`}
-                    >
-                      {a.icone}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Sem rato: um «⋯» só, com as MESMAS acções lá dentro.
-                  O `absolute` vai numa caixa à volta e não no próprio
-                  `MenuDeAccoes`: ele já se dá a si mesmo um `relative` (é o que
-                  ancora a gaveta) e, entre dois utilitários de `position` na
-                  mesma classe, quem ganha é a ordem do Tailwind e não a ordem
-                  em que estão escritos. MEDIDO antes de o separar: o menu
-                  esticava-se aos 165,5 px do cartão inteiro. */}
-              <div className="absolute right-2 top-2 z-10 com-rato:hidden">
-                <MenuDeAccoes sobre={t.name} accoes={accoesDoTema(t)} />
+                     O véu acompanha o botão a aparecer e a desaparecer, com as
+                     MESMAS variantes que ele usa por dentro: senão ficava um
+                     círculo escuro em repouso com o glifo invisível lá dentro.
+                     `focus-within` e não `focus-visible` porque quem foca é o
+                     botão FILHO desta caixa. */
+                  className="bo-vidro-claro rounded-full opacity-100 [&>button]:text-white com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-within:opacity-100"
+                />
               </div>
               <button
                 type="button"
@@ -1787,7 +2133,19 @@ export default function Temas() {
                       avif={t.coverAvif}
                       planoB={t.coverFallbackUrl}
                       lqip={t.coverLqip}
-                      className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-elemento group-hover:scale-[1.02]"
+                      /* ── SEM `scale` NO HOVER ──────────────────────────
+                         Era `group-hover:scale-[1.02]` na capa. A Parte 9 do
+                         `docs/APPLE-TEMAS.md` proíbe `scale` no hover de
+                         cartões de grelha, e a Parte 3 repete-o com a razão
+                         («sobrepõe os vizinhos»). Aqui a capa está dentro de
+                         uma moldura `overflow-hidden`, portanto não chegava a
+                         tapar o vizinho — o que fazia era mexer a fotografia
+                         debaixo do ponteiro em cada passagem de rato, numa
+                         grelha de 28 cartões que se percorre com o rato.
+
+                         O que sinaliza o hover continua a ser a moldura a
+                         ganhar o acento, no botão aqui em baixo. */
+                      className="h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-foreground/40">
@@ -1813,7 +2171,16 @@ export default function Temas() {
                       do que o vizinho e a grelha perdia a linha de base. Ao
                       fim de duas linhas ainda pode cortar — mas aí já se leu o
                       que distingue. */}
-                  <p className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-[var(--bo-text)]">
+                  {/* O `title` é a dica que o ponto 10 pede para quando o
+                      nome corta ao fim das duas linhas: «título com altura
+                      reservada de duas linhas, com tooltip quando trunca».
+                      Vai sempre, e não só quando corta — saber SE corta exige
+                      medir o nó depois de desenhado, e uma dica que repete o
+                      nome que está à vista não incomoda ninguém. */}
+                  <p
+                    title={t.name}
+                    className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-[var(--bo-text)]"
+                  >
                     {t.name}
                   </p>
                   {/* ══════════════════════════════════════════════════════
@@ -1834,21 +2201,46 @@ export default function Temas() {
                       menos decisiva das três, e é por isso que está no fim. */}
                   <p className="bo-text-muted mt-0.5 truncate text-xs">
                     {photoCountLabel(t.imageCount, t.truncated)}
-                    {/* «7 propostas» ou «por usar» — a segunda é a metade mais
-                        útil: é o que distingue um tema que a biblioteca TEM de
-                        um tema que o estúdio USA. Só entra quando a contagem
-                        chegou (vem de outro pedido, depois dos cartães). */}
-                    {usos
-                      ? usos[t.id]
-                        ? ` · ${plural(usos[t.id], "proposta", "propostas")}`
-                        : " · por usar"
-                      : ""}
+                    {/* «7 propostas» ou «Nunca usado» — a segunda é a metade
+                        mais útil: é o que distingue um tema que a biblioteca
+                        TEM de um tema que o estúdio USA. Só entra quando a
+                        contagem chegou (vem de outro pedido, depois dos
+                        cartões).
+
+                        Era «por usar»; a Parte 6 do documento manda «Nunca
+                        usado», e a diferença não é de gosto: em minúsculas e
+                        sem verbo, «por usar» lia-se como mais um número da
+                        fila. Agora é também o nome de um âmbito da barra —
+                        «Por usar» —, e o rasto do cartão e o filtro dizem a
+                        mesma coisa com as mesmas palavras. */}
+                    {usos ? (usos[t.id] ? ` · ${plural(usos[t.id], "proposta", "propostas")}` : " · Nunca usado") : ""}
                     {/* NÃO aparece quando a pasta não pôde ser lida: «Fotos
                         indisponíveis · há 2 meses» mistura um aviso com uma
-                        informação de rotina, e é o aviso que tem de se ler. */}
-                    {t.imageCount !== null && desdeQuando(t.updatedAt)
-                      ? ` · ${desdeQuando(t.updatedAt)}`
-                      : ""}
+                        informação de rotina, e é o aviso que tem de se ler.
+
+                        ── A DATA RELATIVA LEVA A ABSOLUTA ATRÁS ──────────
+                        Ponto 13 da auditoria: «"há 1 mês", "há 19 dias". Num
+                        contexto de trabalho não chega.» O relativo fica (é o
+                        que se lê de relance numa grelha de 28) e a data
+                        inteira vai no `title`, que é o que responde quando a
+                        pergunta passa a ser «isto foi antes ou depois do
+                        casamento dos Ferreira?». */}
+                    {t.imageCount !== null && desdeQuando(t.updatedAt) ? (
+                      <span title={dataPorExtenso(t.updatedAt)}>
+                        {` · ${desdeQuando(t.updatedAt)}`}
+                      </span>
+                    ) : null}
+                    {/* A BANDEIRA DO FIXADO, que era o chip aceso por cima da
+                        fotografia. Fica no fim da linha, como no desenho do
+                        `ThemeCard` (Parte 3), e leva nome escrito: um glifo
+                        sozinho não diz nada a quem ouve o ecrã. */}
+                    {t.favorito ? (
+                      <span className="text-[var(--bo-accent)]">
+                        {" · "}
+                        <span aria-hidden="true">★</span>
+                        <span className="sr-only">Fixado no topo</span>
+                      </span>
+                    ) : null}
                   </p>
                   {/* ── UMA RESSALVA DE CADA VEZ ────────────────────────
                       Duas notas apagadas empilhadas leem-se como nenhuma. Este
@@ -1858,14 +2250,27 @@ export default function Temas() {
 
                       A ordem é a de quem pede acção: um tema repetido tem
                       remédio a um toque, um tema com poucas fotos é uma nota de
-                      curadoria, e a nota é contexto. */}
-                  {parecidos.get(t.id) ? null : temPoucasFotos(t) ? (
-                    <p className="mt-0.5 truncate text-xs text-[var(--bo-aviso)]">
-                      Ainda com poucas fotos para escolher
-                    </p>
-                  ) : t.notes ? (
-                    <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
-                  ) : null}
+                      curadoria, e a nota é contexto.
+
+                      ── E A LINHA EXISTE MESMO QUANDO NÃO TEM NADA ───────
+                      Ponto 10 da auditoria: «cartões com altura desigual… a
+                      fila fica desalinhada». O nome já tinha as duas linhas
+                      reservadas; esta não tinha nenhuma — e bastava UM tema
+                      com nota escrita para o cartão dele ficar 17 px mais alto
+                      do que os quatro vizinhos. Uma caixa vazia com a altura
+                      de uma linha custa 17 px e resolve a fila inteira, e é o
+                      mesmo remédio (altura reservada) que já lá estava no
+                      nome. `aria-hidden` quando está vazia: é geometria, e não
+                      há nada para anunciar. */}
+                  <div className="min-h-[1.125rem]">
+                    {parecidos.get(t.id) ? null : temPoucasFotos(t) ? (
+                      <p className="mt-0.5 truncate text-xs text-[var(--bo-aviso)]">
+                        Ainda com poucas fotos para escolher
+                      </p>
+                    ) : t.notes ? (
+                      <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
+                    ) : null}
+                  </div>
                 </div>
               </button>
               {/* ── «ISTO JÁ EXISTE COM OUTRO NOME» ───────────────────────
@@ -1897,6 +2302,10 @@ export default function Temas() {
           ))}
         </div>
       )}
+      {/* O menu do botão direito, um só para o ecrã inteiro. Fica no fim
+          para se desenhar por cima de tudo o resto sem depender de quem tem
+          `z-index` — e é `fixed`, portanto não é a grelha que o recorta. */}
+      <MenuDeContexto pedido={menu} onFechar={fecharMenu} />
       {perguntaDeEliminar}
     </div>
   );
@@ -3093,12 +3502,35 @@ function ThemeFolder({
     };
   }, [theme.id, loading, loadingMore, hasMore, aheadFits, images.length]);
 
-  function toggleAt(index: number, extend: boolean) {
+  /**
+   * ── OS TRÊS GESTOS DE SELECÇÃO ─────────────────────────────────────────
+   *
+   * «Suportar seleção; ⌘A; Shift+clique para intervalo; ⌘+clique para
+   * adicionar.» [APPLE, Collections + Focus and selection] — ponto 7 da
+   * auditoria do `docs/APPLE-TEMAS.md`.
+   *
+   * ── E PORQUE É QUE O CLIQUE SIMPLES NÃO SUBSTITUI A SELECÇÃO ───────────
+   *
+   * Num Finder, clicar numa foto desmarca as outras e o ⌘ é que acrescenta.
+   * Aqui a célula é um `role="checkbox"` com `aria-checked` — e num checkbox o
+   * clique ALTERNA, é o que o nome promete a quem ouve o ecrã e é o único
+   * gesto que existe num telemóvel, onde não há ⌘ nenhum. Trocar isso partia
+   * a semântica e obrigava a escolher quarenta fotos com uma tecla que metade
+   * dos dispositivos não tem.
+   *
+   * O que o ⌘ faz aqui, então, é uma coisa que o clique não fazia: GANHA ao
+   * Shift. Com os dois carregados, o Finder acrescenta um item ao intervalo em
+   * vez de o refazer — e é exactamente isso que se ganha em poder escolher a
+   * quadragésima primeira foto sem perder o intervalo de quarenta que estava
+   * feito.
+   */
+  function toggleAt(index: number, mods: { shift: boolean; somar: boolean }) {
     // A âncora é lida AGORA e só depois movida: o React corre o `setSelected`
     // preguiçosamente, já na renderização, e lá dentro `anchor.current` já
     // valeria `index` — o Shift+clique passava a ser um clique normal.
     const from = anchor.current;
     anchor.current = index;
+    const extend = mods.shift && !mods.somar;
     setSelected((prev) => {
       const next = new Set(prev);
       if (extend && from !== null && from !== index) {
@@ -3128,6 +3560,7 @@ function ThemeFolder({
     setSelected(new Set());
     anchor.current = null;
   }
+
 
   /** Remove um conjunto de fotos. Uma só confirmação para o conjunto todo, e
    *  as que o servidor recusar voltam ao sítio onde estavam. */
@@ -3411,6 +3844,7 @@ function ThemeFolder({
     // acende-se à vista).
   }
 
+
   async function rename() {
     // O Enter fecha o campo e o onBlur dispara logo a seguir: sem esta guarda
     // saíam dois PATCH iguais para o servidor.
@@ -3490,6 +3924,9 @@ function ThemeFolder({
   // Ver uma foto em grande. `null` = fechado. Guarda-se também o elemento que
   // estava focado, para o foco voltar ao mosaico de onde se abriu.
   const [zoomAt, setZoomAt] = useState<number | null>(null);
+  /** O menu do botão direito desta pasta — um só, como na lista de temas. */
+  const [menuDaFoto, setMenuDaFoto] = useState<PedidoDeMenu | null>(null);
+  const fecharMenuDaFoto = useCallback(() => setMenuDaFoto(null), []);
   const zoomOpener = useRef<HTMLElement | null>(null);
   const [downloading, setDownloading] = useState(false);
 
@@ -3575,6 +4012,97 @@ function ThemeFolder({
   );
   const aSairDaCopia = useSaidaDeUmSo(copyOpen);
   const copiaNoEcra = useNoEcraAteSair(copyOpen, aSairDaCopia, seleccionadas);
+
+  /**
+   * ── ⌘A SELECIONA TUDO, ESC LIMPA ───────────────────────────────────────
+   *
+   * Os dois atalhos que faltavam à selecção desta pasta (ponto 15 da auditoria
+   * e a `SelectionBar` da Parte 3 do `docs/APPLE-TEMAS.md`: «Esc limpa a
+   * seleção»). Com 312 fotos numa pasta, escolher todas era 312 cliques.
+   *
+   * ── O QUE ESTE OUVINTE NÃO PODE ROUBAR ────────────────────────────────
+   *
+   *  · o ⌘A DENTRO DE UM CAMPO — renomear o tema é um `<input>`, e lá o ⌘A
+   *    selecciona o texto. Roubá-lo seria tirar um atalho para dar outro;
+   *  · o Esc de quem tem uma janela aberta por cima — a pergunta de remover, o
+   *    «Copiar para…», a lupa e o próprio menu de contexto fecham-se com Esc, e
+   *    quem carrega está a fechar ESSA e não a desfazer a selecção que fez
+   *    antes de a abrir. Por isso os quatro travam aqui;
+   *  · o ⌘A com a pasta vazia — sem fotos não há nada a seleccionar, e
+   *    `preventDefault` sem fazer nada seria só um atalho estragado.
+   *
+   * `Escape` sem selecção não faz nada e NÃO trava o evento: o teclado do
+   * back office tem outros donos por cima deste ecrã.
+   */
+  useEffect(() => {
+    const janelaAberta = copyOpen || aRemover !== null || zoomAt !== null || renaming;
+    const noTeclado = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      const aEscrever =
+        !!alvo &&
+        (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.isContentEditable);
+      if ((e.metaKey || e.ctrlKey) && (e.key === "a" || e.key === "A")) {
+        if (aEscrever || janelaAberta || images.length === 0) return;
+        e.preventDefault();
+        setSelected(new Set(images.map((im) => im.path)));
+        // A âncora fica na última: um Shift+clique a seguir a um ⌘A encurta a
+        // selecção a partir do fim, que é o que um gestor de ficheiros faz.
+        anchor.current = images.length - 1;
+        return;
+      }
+      if (e.key === "Escape" && !janelaAberta) {
+        // Actualizador funcional: assim o ouvinte não precisa de conhecer a
+        // selecção actual e não se volta a registar a cada foto escolhida.
+        setSelected((prev) => (prev.size > 0 ? new Set() : prev));
+        anchor.current = null;
+      }
+    };
+    document.addEventListener("keydown", noTeclado);
+    return () => document.removeEventListener("keydown", noTeclado);
+  }, [images, copyOpen, aRemover, zoomAt, renaming]);
+
+  /**
+   * ── O MENU DE UMA FOTOGRAFIA ───────────────────────────────────────────
+   *
+   * «Menu de contexto no tema e NA FOTOGRAFIA» (ponto 8 da auditoria). As
+   * quatro acções são as que já estão desenhadas em cima da célula — é a regra
+   * da Apple que o documento cita: «tudo o que está no menu de contexto existe
+   * também na interface principal». Aqui ganham nome escrito, que é o que os
+   * três círculos sem rótulo do ponto 18 nunca tiveram.
+   *
+   * Os botões da célula FICAM (ao contrário dos chips do cartão de tema, que
+   * saíram): cada um é o único caminho de DEDO para o que faz — o arrasto de
+   * reordenar é HTML5 e não pega no telemóvel — e um menu de contexto sem
+   * botão direito não existe. A razão está escrita por extenso na célula.
+   */
+  const accoesDaFoto = useCallback(
+    (im: ThemeImage, i: number): AccaoDeItem[] => [
+      { id: "ver", rotulo: "Ver em grande", onAccao: () => openZoom(i) },
+      ...(i > 0
+        ? [
+            {
+              id: "inicio",
+              rotulo: "Mover para o início",
+              onAccao: () => moveTo(i, 0),
+            },
+          ]
+        : []),
+      ...(im.path === coverPath
+        ? []
+        : [{ id: "capa", rotulo: "Definir como capa", onAccao: () => void setAsCover(im) }]),
+      {
+        id: "remover",
+        rotulo: "Remover do tema…",
+        destrutiva: true,
+        onAccao: () => pedirParaRemoverUma(im),
+      },
+    ],
+    // `moveTo`, `setAsCover` e `pedirParaRemoverUma` são funções do corpo do
+    // componente e mudam a cada desenho de propósito (fecham sobre o estado
+    // actual da grelha). O que importa fixar é a foto e a capa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [coverPath, openZoom],
+  );
 
   const aSairDaLupa = useSaidaDeUmSo(zoomAt !== null);
   const indiceDaLupa = useNoEcraAteSair(zoomAt !== null, aSairDaLupa, zoomAt);
@@ -4026,6 +4554,8 @@ function ThemeFolder({
         />
       )}
 
+      <MenuDeContexto pedido={menuDaFoto} onFechar={fecharMenuDaFoto} />
+
       {indiceDaLupa !== null && images[indiceDaLupa] && (
         <PhotoLightbox
           aberto={zoomAt !== null}
@@ -4162,6 +4692,19 @@ function ThemeFolder({
                     // nem descodifica esta célula. A altura não depende disso
                     // (é `aspect-square` numa coluna de largura fixa), por
                     // isso a barra de deslocamento não mexe. Ver globals.css.
+                    /* O botão direito abre as mesmas quatro acções que os
+                       botões da célula — ver `accoesDaFoto`. O menu é `fixed`,
+                       portanto o `overflow-hidden` desta célula (que a recorta
+                       aos cantos redondos) não o corta. */
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMenuDaFoto({
+                        x: e.clientX,
+                        y: e.clientY,
+                        sobre: `foto ${i + 1} de ${images.length}`,
+                        accoes: accoesDaFoto(im, i),
+                      });
+                    }}
                     className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
                       isSelected
                         ? "border-sage-600 ring-2 ring-sage-600/40"
@@ -4189,7 +4732,12 @@ function ThemeFolder({
                       role="checkbox"
                       aria-checked={isSelected}
                       aria-label={`Selecionar foto ${i + 1} de ${images.length}`}
-                      onClick={(e) => toggleAt(i, e.shiftKey)}
+                      onClick={(e) =>
+                        // `ctrlKey` ao lado do `metaKey` porque o back office
+                        // também se abre em Windows e em Linux, onde o gesto
+                        // de somar à selecção é o Ctrl.
+                        toggleAt(i, { shift: e.shiftKey, somar: e.metaKey || e.ctrlKey })
+                      }
                       onKeyDown={(e) => {
                         // Alt + setas move a foto. Sem o Alt, as setas continuam
                         // a andar entre células, que é o que o teclado espera.

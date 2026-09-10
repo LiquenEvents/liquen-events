@@ -160,14 +160,26 @@ describe("o vidro claro não traz filtro, e é isso que o mantém dentro do tect
   /**
    * E o fixado. Deixou de ser `#8a6d2f` — que nesta casa é a cor de AVISO, e
    * usá-la para dizer «este está fixado» era dar-lhe um segundo significado no
-   * mesmo ecrã — e passou a ser a pastilha cheia de acento, que é como a casa
-   * inteira marca uma escolha.
+   * mesmo ecrã — e passou a ser o acento, que é como a casa inteira marca uma
+   * escolha.
+   *
+   * ── PORQUE É QUE ISTO DEIXOU DE MEDIR UMA JANELA À VOLTA DO CHIP ────────
+   *
+   * Media-se numa janela de 400 caracteres à volta do `bo-vidro-claro` porque
+   * o fixado ERA um dos chips: uma pastilha cheia de acento por cima da
+   * fotografia, ao lado do chip de arquivar. Deixou de ser — o ponto 9 do
+   * `docs/APPLE-TEMAS.md` manda UM botão só sobre a miniatura, e a Parte 9
+   * proíbe à letra «mais de um botão flutuante sobre uma miniatura». A estrela
+   * desceu para o rasto de números do cartão, que é onde o desenho do
+   * `ThemeCard` (Parte 3) a põe.
+   *
+   * O que este caso guarda é a decisão de COR, e essa não mudou: o fixado
+   * marca-se com o acento e nunca com a cor de aviso. Passa a medir-se no
+   * ficheiro inteiro, que é o âmbito da decisão.
    */
-  it("o tema fixado usa a pastilha de acento e não a cor de aviso", () => {
+  it("o tema fixado usa o acento e não a cor de aviso", () => {
     const bloco = TEMAS();
-    const i = bloco.indexOf("bo-vidro-claro");
-    const janela = bloco.slice(Math.max(0, i - 400), i + 400);
-    expect(janela).toContain("bg-[var(--bo-accent)]");
-    expect(janela, "a cor de aviso voltou ao chip do tema").not.toContain("#8a6d2f");
+    expect(bloco).toContain("var(--bo-accent)");
+    expect(bloco, "a cor de aviso voltou a marcar o tema fixado").not.toContain("#8a6d2f");
   });
 });

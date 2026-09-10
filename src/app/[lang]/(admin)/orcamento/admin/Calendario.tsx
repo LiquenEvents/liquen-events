@@ -16,6 +16,14 @@ import {
   cn,
 } from "./ui";
 import CalendarioAno from "./CalendarioAno";
+import {
+  GlifoDoTipo,
+  ListaDeCalendarios,
+  TIPOS,
+  TIPO_META,
+  useCalendarios,
+} from "./CalendariosFiltraveis";
+import { ChipDoDia, MaisDoDia } from "./ChipDoDia";
 import { MESES, anoDoCalendario, fechadosNoAno } from "@/lib/orcamento/ano-do-calendario";
 import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import { useCachedList } from "./useCachedList";
@@ -84,12 +92,11 @@ function estadoEmPalavra(status: string): string {
   return STATUS_LABEL[status] ?? status ?? "—";
 }
 
-const KIND_META: Record<CalendarEventKind, { label: string; color: string }> = {
-  reuniao: { label: "Reunião", color: "#7a8caa" },
-  evento: { label: "Evento", color: "#7c854b" },
-  bloqueio: { label: "Data fechada", color: "#8a2a22" },
-  nota: { label: "Nota", color: "#a08a5a" },
-};
+/**
+ * Os quatro tipos — o rótulo e a cor — vivem no `CalendariosFiltraveis.tsx`,
+ * que é onde eles passaram a ser CALENDÁRIOS e não uma legenda. Estavam aqui
+ * com quatro hexadecimais escritos à mão; a razão da mudança está lá.
+ */
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
@@ -311,7 +318,7 @@ function AddEventModal({
         <fieldset className="mb-4">
           <legend className="bo-eyebrow mb-2">Tipo</legend>
           <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
+            {TIPOS.map((k) => (
               <button
                 key={k}
                 type="button"
@@ -320,11 +327,11 @@ function AddEventModal({
                 className={`px-3 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase border ${ESTADO} ${PRESSAO} ${form.kind === k ? "text-cream" : "text-foreground/50 border-[var(--bo-hairline-strong)] hover:border-foreground/30"}`}
                 style={
                   form.kind === k
-                    ? { background: KIND_META[k].color, borderColor: KIND_META[k].color }
+                    ? { background: TIPO_META[k].cor, borderColor: TIPO_META[k].cor }
                     : undefined
                 }
               >
-                {KIND_META[k].label}
+                {TIPO_META[k].label}
               </button>
             ))}
           </div>
@@ -372,6 +379,89 @@ function AddEventModal({
           {saving ? "A guardar…" : "Adicionar ao calendário"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DIA POR EXTENSO — uma escrita só, dois sítios onde ela aparece
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel que abre por baixo da grelha e o popover do «+N mais» dizem a MESMA
+ * coisa sobre o mesmo dia. Escritos duas vezes, seriam dois sítios a discordar
+ * um dia — e é literalmente o defeito que a Parte −1 do `docs/DESIGN-SYSTEM.md`
+ * manda evitar («convergir o que já existe em vez de criar uma segunda família
+ * ao lado»).
+ *
+ * É aqui que a palavra do estado fica À VISTA, e não só na cor: o
+ * `Calendario.estado-nao-e-so-cor.test.tsx` lê esta linha.
+ */
+function LinhasDoDia({
+  quotes,
+  marcacoes,
+  onAbrir,
+  onRemover,
+}: {
+  quotes: Quote[];
+  marcacoes: CalendarEvent[];
+  onAbrir: (q: Quote) => void;
+  onRemover: (id: string, title: string) => void;
+}) {
+  return (
+    <div className="divide-y divide-[var(--bo-hairline)]">
+      {quotes.map((q) => (
+        <button
+          key={q.id}
+          onClick={() => onAbrir(q)}
+          className={`w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
+        >
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ background: STATUS_COLOR[q.status] }}
+            aria-hidden="true"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+              {q.name}
+            </span>
+            {/* A palavra do estado À VISTA — aqui há linha para ela.
+                Na grelha do mês o estado ia só na cor da barra (ver o
+                `STATUS_LABEL`); este painel é onde o dia se lê a sério, e é
+                onde a palavra tem de estar. */}
+            <span className="block text-foreground/40 text-[10px] truncate">
+              {estadoEmPalavra(q.status)}
+              {` · ${eventTypeLabel(q)}`}
+              {q.guests ? ` · ${q.guests} convidados` : ""}
+            </span>
+          </span>
+          <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase shrink-0">
+            Abrir
+          </span>
+        </button>
+      ))}
+      {marcacoes.map((ev) => (
+        <div key={ev.id} className="flex items-center gap-3 px-4 py-3">
+          <GlifoDoTipo kind={ev.kind} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+              {ev.time ? `${ev.time} · ` : ""}
+              {ev.title}
+            </span>
+            <span className="block text-foreground/40 text-[10px] truncate">
+              {TIPO_META[ev.kind].label}
+              {ev.note ? ` · ${ev.note}` : ""}
+            </span>
+          </span>
+          <button
+            onClick={() => onRemover(ev.id, ev.title)}
+            aria-label={`Remover ${TIPO_META[ev.kind].label}: ${ev.title}`}
+            className={`text-foreground/35 hover:text-[var(--bo-perigo)] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
+          >
+            Remover
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -443,6 +533,25 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
    * chega um pedido — não é onde se começa o dia.
    */
   const [vista, setVista] = useState<"mes" | "ano">("mes");
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * OS QUATRO CALENDÁRIOS — A FASE 04
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * O que se liga e desliga na barra lateral (ver `CalendariosFiltraveis.tsx`)
+   * é filtrado AQUI, uma vez, e as duas vistas leem daqui: a grelha do mês e
+   * os doze mini-meses do ano. Um filtro aplicado só numa delas seria o mesmo
+   * mês a dizer duas coisas conforme o botão em que se carregou por último.
+   *
+   * O que NÃO se filtra são os pedidos — não estavam na legenda que estes
+   * quatro substituem. A razão longa está no ficheiro deles.
+   */
+  const calendarios = useCalendarios();
+  const marcacoesVisiveis = useMemo(
+    () => events.filter((e) => calendarios.ligados.has(e.kind)),
+    [events, calendarios.ligados],
+  );
 
   /**
    * ══════════════════════════════════════════════════════════════════════
@@ -577,12 +686,12 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const e of events) {
+    for (const e of marcacoesVisiveis) {
       if (!map.has(e.date)) map.set(e.date, []);
       map.get(e.date)!.push(e);
     }
     return map;
-  }, [events]);
+  }, [marcacoesVisiveis]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, Quote[]>();
@@ -620,6 +729,9 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   // dimmed (and inert) so the grid is always a clean rectangle of hairlines.
   const cells: { key: string; day: number; inMonth: boolean }[] = [];
   const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  /** Quantas linhas tem este mês — quatro, cinco ou seis. É o que reparte a
+   *  altura disponível pelas semanas, em vez de a deixar sobrar por baixo. */
+  const semanas = totalCells / 7;
   for (let i = 0; i < totalCells; i++) {
     const d = new Date(year, month, i - startOffset + 1);
     cells.push({
@@ -685,6 +797,32 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   }, [byDay, eventsByDay, year, month]);
 
   /**
+   * Quantas marcações de cada tipo tem a unidade à vista — o mês, ou o ano.
+   *
+   * Conta-se sobre a lista INTEIRA e não sobre a filtrada, de propósito: o
+   * número ao lado de um calendário desligado é a única coisa que diz o que
+   * está escondido. Um zero a aparecer quando se desliga a caixa era esconder
+   * a informação duas vezes.
+   */
+  const contagensPorTipo = useMemo(() => {
+    const prefixo = vista === "ano" ? `${year}-` : `${year}-${pad2(month + 1)}`;
+    const conta: Record<CalendarEventKind, number> = {
+      reuniao: 0,
+      evento: 0,
+      bloqueio: 0,
+      nota: 0,
+    };
+    for (const e of events) {
+      if (!e.date.startsWith(prefixo)) continue;
+      // Um tipo que o servidor invente não soma para nenhum dos quatro — e não
+      // deita o ecrã abaixo por ler uma chave que não existe.
+      if (conta[e.kind] === undefined) continue;
+      conta[e.kind] += 1;
+    }
+    return conta;
+  }, [events, vista, year, month]);
+
+  /**
    * O estado da vista de ano: quantos dias do ano estão fechados.
    *
    * Substitui o «N eventos este mês» quando se troca para o ano, e é o número
@@ -693,8 +831,8 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
    * meses de contas, e a grelha do mês não precisa delas.
    */
   const fechadosDoAno = useMemo(
-    () => (vista === "ano" ? fechadosNoAno(anoDoCalendario(year, quotes, events)) : 0),
-    [vista, year, quotes, events],
+    () => (vista === "ano" ? fechadosNoAno(anoDoCalendario(year, quotes, marcacoesVisiveis)) : 0),
+    [vista, year, quotes, marcacoesVisiveis],
   );
 
   const dayLabelLong = (key: string) =>
@@ -765,17 +903,33 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
           outra, 24 px de intervalo são altura pura num ecrã onde ela já é o que
           falta; lado a lado, são a goteira que separa as duas colunas. */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:gap-6">
-        {/* Margem interna estreita no telemóvel, a de sempre a partir de `sm`.
-            A CONTA: num ecrã de 375 px sobram 343 depois da margem da vista.
-            Com os 24 px de `p-6` de cada lado ficavam 295 para sete colunas com
-            seis filetes de 1 px — 41 px por dia, três abaixo do mínimo de 44.
-            Com 12 px sobram 319, e cada dia fica com 44. É a diferença entre
-            acertar no dia certo e abrir o do lado. */}
-        <Card
-          padding="lg"
-          style={{ "--cena": 0 } as React.CSSProperties}
-          className="bo-cena !p-3 sm:!p-8"
-        >
+        {/* ── FORA O CARTÃO — A FASE 02 ───────────────────────────────────
+            O ponto 7 da auditoria dela: «Uma grelha de calendário é conteúdo
+            de página inteira. O cartão com raio e padding rouba cerca de 60 px
+            de cada lado e faz a grelha mais pequena do que podia ser.»
+
+            A CONTA, medida nas duas larguras que esta casa usa:
+
+              · a 375 px o cartão levava `!p-3` (12 px de cada lado) e sobravam
+                319 para sete colunas com seis filetes — 44,7 px por dia, que
+                era o mínimo à justa. Sem cartão sobram 343, e cada dia fica
+                com 48,2. Mais 3,5 px de alvo em cada um dos trinta e cinco;
+              · a 1440 px o cartão levava `sm:!p-8` (32 px de cada lado) e
+                comia 64 px de grelha. Sem ele, cada coluna ganha 9.
+
+            E não é só largura: sem o cartão, a grelha passa a poder ENCHER A
+            ALTURA (o ponto 8 — «metade do ecrã está vazia e a grelha está
+            apertada»), porque deixa de haver uma caixa branca a decidir onde
+            ela acaba. O que delimita a grelha passam a ser os filetes entre as
+            células, que é o que o documento manda: «Os limites das células são
+            os separadores; não é preciso mais nada a delimitar.» */}
+        {/* `min-w-0` na coluna do mês: `1fr` é `minmax(auto, 1fr)`, e sem
+            isto o mínimo automático é o CONTEÚDO — uma etiqueta com o nome
+            inteiro de um casal passava a poder empurrar a coluna em vez de
+            truncar dentro dela. É o par obrigatório do `truncate` da fase 03.
+            O `1fr` fica como estava porque é o que o `Cortes.movel.test.ts`
+            mede, e a correcção certa é esta e não trocar o `1fr`. */}
+        <section className="bo-cena min-w-0" style={{ "--cena": 0 } as React.CSSProperties}>
           {/* ── Header: month title + quiet controls on one row ──────────────
               …e em DUAS quando não cabem numa. MEDIDO num telemóvel de 390×844:
               «Agosto 2026» mostrava 90 px dos 103 de que precisa, e lia-se
@@ -958,7 +1112,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
             <CalendarioAno
               ano={year}
               quotes={quotes}
-              marcacoes={events}
+              marcacoes={marcacoesVisiveis}
               hoje={todayStr}
               /* A saída da vista de ano é a grelha do mês que ela escolheu —
                  é lá que se vê o que está marcado e se marca. */
@@ -981,21 +1135,59 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 ))}
               </div>
 
-              {/* ── Month grid: hairline lines via 1px gaps over a tinted base ── */}
+              {/* ── A GRELHA, SEM CAIXA E A ENCHER A ALTURA ─────────────────
+                  Os filetes continuam a ser os intervalos de 1 px sobre uma
+                  base tingida — o que saiu foram o `rounded-xl`, o
+                  `overflow-hidden` e a moldura: sem cartão à volta, uma
+                  segunda moldura só desenharia o cartão outra vez, mais fino.
+
+                  ── A ALTURA, E A CONTA DELA ────────────────────────────────
+                  O ponto 8 dela: cinco linhas ocupavam ~430 px e sobravam
+                  ~200 px de página em branco por baixo. As linhas passam a
+                  `minmax(--celula, 1fr)`: a célula tem um chão (52 px no
+                  telemóvel, 96 no computador — o mínimo que o documento dá na
+                  Parte 3) e o que sobrar reparte-se por elas.
+
+                  Os 21rem que se tiram ao ecrã, somados: 81 do cabeçalho
+                  fixo (o número está escrito no `AdminClient.tsx`), 40 do
+                  respiro da vista, ~64 do título do mês, 28 da fila dos dias
+                  da semana, 86 da cápsula da navegação e 40 de respiro em
+                  baixo = 339 px ≈ 21,2rem. Só a partir de `lg:`, porque num
+                  telemóvel a página é para rolar e uma grelha com a altura do
+                  ecrã empurrava tudo o resto para fora dele.
+
+                  MEDIDO no Chromium, com a folha do back office compilada e a
+                  marcação real desta vista (grelha de cinco semanas):
+
+                    375×800    grelha 343 px, célula 48,1×52    sem transbordo
+                    640×800    célula 83,7×106, etiqueta 20 px de altura
+                    1280×800   grelha 534 px de altura
+                    1440×900   564 px — o mínimo já manda
+                    1440×1080  744 px — e continua a repartir pelas semanas
+
+                  A célula a 375 px era 44,7 com o cartão e passou a 48,1: os
+                  24 px de margem que o cartão comia estão nas sete colunas. */}
               <div
                 role="group"
                 aria-label={`Calendário de ${MONTHS[month]} ${year}`}
-                className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)]"
+                className="grid grid-cols-7 gap-px bg-[var(--bo-hairline)] [--celula:3.25rem] sm:[--celula:6rem] lg:min-h-[calc(100dvh-21rem)]"
+                style={{ gridTemplateRows: `repeat(${semanas}, minmax(var(--celula), 1fr))` }}
               >
-                {cells.map((c) => {
+                {cells.map((c, indice) => {
                   if (!c.inMonth) {
                     return (
                       <div
                         key={c.key}
                         aria-hidden="true"
-                        className="min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1.5 sm:p-2"
+                        /* ── OS DIAS DO MÊS AO LADO, ESBATIDOS ─────────────
+                           O ponto 10 dela: «31 de agosto e 1 a 4 de outubro
+                           parecem dias de setembro». Passam a ter o fundo
+                           recuado da casa e o número no tom mais calmo que a
+                           escada dá — não estão desligados, estão noutro mês,
+                           e a grelha tem de o dizer sem se partir em duas. */
+                        className="bg-[var(--bo-surface-sunken)] p-1.5 sm:p-2"
                       >
-                        <span className="text-[10px] sm:text-[11px] tabular-nums text-[var(--bo-text-faint)]">
+                        <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/25">
                           {c.day}
                         </span>
                       </div>
@@ -1007,18 +1199,30 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                   const isToday = key === todayStr;
                   const isSelected = key === selectedDay;
                   const total = dayQuotes.length + dayEvents.length;
-                  // Chip budget for the cell: up to 2 quotes, then events fill the
-                  // rest (compressed to 1 when the day is busy so the "+N" fits).
-                  // `hidden` is derived from what's actually shown — so a day with
-                  // exactly 3 of one type still surfaces the 3rd via "+1" instead of
-                  // dropping it silently.
-                  const shownQuotes = dayQuotes.slice(0, 2);
-                  const shownEvents = dayEvents.slice(0, total > 3 ? 1 : 2);
-                  const hiddenCount = total - shownQuotes.length - shownEvents.length;
+                  /* ── O QUE CABE NUMA CÉLULA, E O QUE VAI PARA O «+N MAIS» ──
+                     UMA fila só, e a ordem é a do dia: os pedidos primeiro —
+                     a data é deles, e é por causa deles que o dia está
+                     ocupado —, as marcações a seguir.
+                     Havia duas orçamentações separadas («dois pedidos, e as
+                     marcações que sobrarem»), e num dia com três marcações e
+                     zero pedidos isso deixava uma linha vazia por baixo.
+
+                     CABEM três linhas: a célula tem 96 px de chão (Parte 3 do
+                     documento), o número do dia leva ~18 e cada etiqueta 20
+                     mais 3 de intervalo — 18 + 3×23 = 87, com 9 de folga.
+                     Quando não cabem, a última linha é o «+N mais», portanto
+                     mostram-se duas: 2 + 1 continua a dar três. */
+                  const CABEM = 3;
+                  const doDia = [
+                    ...dayQuotes.map((q) => ({ pedido: q, marcacao: null })),
+                    ...dayEvents.map((ev) => ({ pedido: null, marcacao: ev })),
+                  ];
+                  const mostrados = total > CABEM ? doDia.slice(0, CABEM - 1) : doDia;
+                  const hiddenCount = total - mostrados.length;
                   // On very narrow screens the chips collapse into plain dots.
                   const dots = [
                     ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
-                    ...dayEvents.map((ev) => KIND_META[ev.kind].color),
+                    ...dayEvents.map((ev) => TIPO_META[ev.kind].cor),
                   ].slice(0, 4);
                   /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
                  O nome acessível da célula era «9 de Janeiro — 2 eventos», sem
@@ -1044,7 +1248,13 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                       tabIndex={0}
                       aria-label={dayLabel}
                       aria-pressed={isSelected || undefined}
-                      onClick={() => {
+                      onClick={(e) => {
+                        /* Um clique NASCIDO dentro do popover do «+N mais» já
+                           foi tratado lá: é o mesmo dia, mas não é um gesto
+                           dirigido à célula. Sem isto, escolher uma linha do
+                           popover fechava-o e abria por baixo o painel do dia
+                           — duas respostas para um toque só. */
+                        if ((e.target as HTMLElement).closest("[data-mais-do-dia]")) return;
                         // A day with entries opens the peek; an empty day goes
                         // straight to "add" — the fastest path either way.
                         if (total > 0) setSelectedDay(isSelected ? null : key);
@@ -1057,7 +1267,11 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                           else openAdd(key);
                         }
                       }}
-                      className={`group relative min-h-[52px] sm:min-h-[80px] bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
+                      /* Sem `min-h` próprio: a altura da célula é a linha da
+                         grelha (`minmax(--celula, 1fr)`), e dois mínimos a
+                         decidir a mesma altura é como uma delas fica para
+                         trás. */
+                      className={`group relative bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
                         isSelected
                           ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
                           : isToday
@@ -1092,59 +1306,74 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
                          `size-6` é só a CAIXA que recebe o clique: o «+» fica
                          com o mesmo `text-sm`, centrado, e como a célula tem
-                         `min-h-[80px]` a linha do topo não empurra nada. */
+                         96 px de chão a linha do topo não empurra nada. */
                           className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
                         >
                           +
                         </button>
                       </div>
 
-                      {/* Chips (sm and up) */}
-                      <div className="hidden sm:flex flex-col gap-[3px] mt-1">
-                        {shownQuotes.map((q) => (
-                          <button
-                            key={q.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpen(q);
-                            }}
-                            aria-label={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                            title={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                            className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ background: STATUS_COLOR[q.status] }}
+                      {/* ── AS ETIQUETAS (de `sm` para cima) ─────────────────
+                          A fase 03 inteira: cor por tipo, hora antes do
+                          título, truncatura com reticências, e o «+N mais» com
+                          popover. O desenho da etiqueta está no `ChipDoDia`.
+
+                          `min-w-0` na pilha, senão as etiquetas empurram a
+                          célula em vez de truncarem dentro dela — é a regra do
+                          `truncate` dentro de uma grelha. */}
+                      <div className="hidden sm:flex flex-col gap-[3px] mt-1 min-w-0">
+                        {mostrados.map(({ pedido: q, marcacao: ev }) =>
+                          q ? (
+                            <ChipDoDia
+                              key={`q:${q.id}`}
+                              /* O pedido é pintado pelo ESTADO e não pelo tipo:
+                                 é o que a casa já fazia no ponto de 6 px, e o
+                                 estado é o que muda de semana para semana.
+                                 A palavra vai no nome acessível, como manda o
+                                 `Calendario.estado-nao-e-so-cor.test.tsx`. */
+                              cor={STATUS_COLOR[q.status]}
+                              titulo={q.name}
+                              rotulo={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                              dica={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpen(q);
+                              }}
                             />
-                            <span className="truncate">{q.name.split(" ")[0]}</span>
-                          </button>
-                        ))}
-                        {shownEvents.map((ev) => (
-                          <button
-                            key={ev.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              pedirParaRemover(ev.id, ev.title);
-                            }}
-                            aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
-                            title={`${KIND_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                            className={`flex items-center gap-1.5 min-w-0 text-left text-[9px] leading-none px-1.5 py-1 rounded-md bg-[var(--bo-tinta-3)] text-[var(--bo-text-muted)] hover:line-through hover:bg-[var(--bo-tinta-6)] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${ESTADO} ${PRESSAO}`}
-                          >
-                            <span
-                              className="w-1.5 h-1.5 rounded-full shrink-0"
-                              style={{ background: KIND_META[ev.kind].color }}
+                          ) : ev ? (
+                            <ChipDoDia
+                              key={`e:${ev.id}`}
+                              cor={TIPO_META[ev.kind].cor}
+                              marca={<GlifoDoTipo kind={ev.kind} />}
+                              hora={ev.time}
+                              titulo={ev.title}
+                              rotulo={`Remover ${TIPO_META[ev.kind].label}: ${ev.title}`}
+                              dica={`${TIPO_META[ev.kind].label}: ${ev.title} (clique para remover)`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                pedirParaRemover(ev.id, ev.title);
+                              }}
+                              className="hover:line-through"
                             />
-                            <span className="truncate">
-                              {ev.time ? `${ev.time} ` : ""}
-                              {ev.title}
-                            </span>
-                          </button>
-                        ))}
+                          ) : null,
+                        )}
                         {hiddenCount > 0 && (
-                          <span className="text-foreground/35 text-[9px] leading-none px-1.5 py-0.5">
-                            +{hiddenCount}
-                          </span>
+                          <MaisDoDia
+                            quantos={hiddenCount}
+                            dia={dayLabelLong(key)}
+                            /* As três colunas da direita abrem o popover para
+                               dentro: o `body` desta casa tem `overflow-x:
+                               clip` e o que sai pela borda direita não se
+                               alcança com o dedo nem com a barra. */
+                            aoFim={indice % 7 >= 4}
+                          >
+                            <LinhasDoDia
+                              quotes={dayQuotes}
+                              marcacoes={dayEvents}
+                              onAbrir={onOpen}
+                              onRemover={pedirParaRemover}
+                            />
+                          </MaisDoDia>
                         )}
                       </div>
 
@@ -1168,24 +1397,18 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 })}
               </div>
 
-              {/* ── Legend ── */}
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                {(Object.keys(KIND_META) as CalendarEventKind[]).map((k) => (
-                  <span key={k} className="flex items-center gap-1.5">
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: KIND_META[k].color }}
-                      aria-hidden="true"
-                    />
-                    <span className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase">
-                      {KIND_META[k].label}
-                    </span>
-                  </span>
-                ))}
-                <span className="ml-auto hidden sm:inline text-foreground/25 text-[9px] tracking-[0.15em] uppercase">
-                  Clica num dia para ver ou adicionar
-                </span>
-              </div>
+              {/* ── A LEGENDA SAIU DAQUI, E NÃO FOI SUBSTITUÍDA POR NADA ───
+                  Ela era o ponto 13 («uma legenda necessária para decifrar a
+                  grelha, colocada POR BAIXO da grelha — e é só legenda») e
+                  passou a ser os quatro CALENDÁRIOS da barra lateral, que
+                  ligam e desligam o que se vê. A mesma informação, no sítio
+                  onde se age sobre ela.
+
+                  E com ela saiu o «Clica num dia para ver ou adicionar»: o
+                  ponto 14 da auditoria e a Parte 15 do `docs/DESIGN-SYSTEM.md`
+                  dizem o mesmo — não se explica como funciona um componente
+                  padrão; se um clique não se descobre, o que falta é
+                  afordância, não uma frase. */}
 
               {/* ── Day peek: everything on the selected day, with real targets ── */}
               {selectedDay && (selectedQuotes.length > 0 || selectedEvents.length > 0) && (
@@ -1273,64 +1496,12 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                       </Button>
                     </div>
                   </div>
-                  <div className="divide-y divide-[var(--bo-hairline)]">
-                    {selectedQuotes.map((q) => (
-                      <button
-                        key={q.id}
-                        onClick={() => onOpen(q)}
-                        className={`w-full flex items-center gap-3 text-left px-4 py-3 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: STATUS_COLOR[q.status] }}
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
-                            {q.name}
-                          </span>
-                          {/* A palavra do estado À VISTA — aqui há linha para ela.
-                          Na grelha do mês o estado ia só na cor do ponto (ver
-                          o `STATUS_LABEL`); este painel é onde o dia se lê a
-                          sério, e é onde a palavra tem de estar. */}
-                          <span className="block text-foreground/40 text-[10px] truncate">
-                            {estadoEmPalavra(q.status)}
-                            {` · ${eventTypeLabel(q)}`}
-                            {q.guests ? ` · ${q.guests} convidados` : ""}
-                          </span>
-                        </span>
-                        <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase shrink-0">
-                          Abrir
-                        </span>
-                      </button>
-                    ))}
-                    {selectedEvents.map((ev) => (
-                      <div key={ev.id} className="flex items-center gap-3 px-4 py-3">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: KIND_META[ev.kind].color }}
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[var(--bo-tinta-72)] text-xs font-medium truncate">
-                            {ev.time ? `${ev.time} · ` : ""}
-                            {ev.title}
-                          </span>
-                          <span className="block text-foreground/40 text-[10px] truncate">
-                            {KIND_META[ev.kind].label}
-                            {ev.note ? ` · ${ev.note}` : ""}
-                          </span>
-                        </span>
-                        <button
-                          onClick={() => pedirParaRemover(ev.id, ev.title)}
-                          aria-label={`Remover ${KIND_META[ev.kind].label}: ${ev.title}`}
-                          className={`text-foreground/35 hover:text-[var(--bo-perigo)] text-[9px] tracking-[0.15em] uppercase shrink-0 ${ESTADO} ${PRESSAO}`}
-                        >
-                          Remover
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  <LinhasDoDia
+                    quotes={selectedQuotes}
+                    marcacoes={selectedEvents}
+                    onAbrir={onOpen}
+                    onRemover={pedirParaRemover}
+                  />
                 </div>
               )}
 
@@ -1351,87 +1522,123 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                       <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
                     </svg>
                   }
-                  title="Mês sem eventos"
-                  description="Clica num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
+                  /* ── UM MÊS VAZIO E UM MÊS FILTRADO NÃO SÃO O MESMO ─────
+                     A Parte 11 do `docs/DESIGN-SYSTEM.md` separa-os por
+                     escrito: «distinguir "ainda não há" de "nenhum corresponde
+                     a estes filtros" + limpar filtros». Com quatro calendários
+                     que se desligam, um mês cheio pode ficar em branco por
+                     escolha dela — e dizer-lhe «mês sem eventos» seria o ecrã
+                     a mentir sobre a agenda. */
+                  title={
+                    calendarios.todosLigados ? "Mês sem eventos" : "Nada nos calendários ligados"
+                  }
+                  description={
+                    calendarios.todosLigados
+                      ? "Clica num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
+                      : "Este mês tem marcações, mas nenhuma dos calendários que estão ligados."
+                  }
+                  action={
+                    calendarios.todosLigados
+                      ? undefined
+                      : { label: "Mostrar todos os calendários", onClick: calendarios.mostrarTodos }
+                  }
                 />
               )}
             </>
           )}
-        </Card>
+        </section>
 
-        {/* Upcoming */}
-        <Card
-          padding="none"
-          style={{ "--cena": 1 } as React.CSSProperties}
-          className="bo-cena overflow-hidden self-start"
-        >
-          <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-[var(--bo-hairline)]">
-            Próximos eventos
-          </p>
-          <div className="divide-y divide-[var(--bo-hairline)]">
-            {upcoming.map((q) => (
-              <button
-                key={q.id}
-                /* A porta desta lista é «Fazer proposta» — ver `onFazerProposta`
+        {/* ── A BARRA LATERAL: os calendários, e o que vem a seguir ─────────
+            Fica à DIREITA e não à esquerda como no desenho da Parte 2 do
+            documento dela, e é a mesma razão que já está escrita na Parte 7.2
+            do `docs/DESIGN-SYSTEM.md`: «nesta casa a navegação já não é uma
+            coluna» — os onze destinos vivem na cápsula que flutua em baixo, e
+            o lado esquerdo do conteúdo não é uma barra, é o começo do texto.
+            Mudar esta coluna de lado punha-a a competir com uma barra lateral
+            que não existe, e — empilhada no telemóvel — punha os filtros e os
+            próximos eventos ANTES da grelha, que é o herói do ecrã. */}
+        <div className="flex flex-col gap-4 lg:gap-6">
+          <ListaDeCalendarios
+            calendarios={calendarios}
+            contagens={contagensPorTipo}
+            className="bo-cena"
+            style={{ "--cena": 1 } as React.CSSProperties}
+          />
+
+          {/* Upcoming */}
+          <Card
+            padding="none"
+            style={{ "--cena": 2 } as React.CSSProperties}
+            className="bo-cena overflow-hidden self-start"
+          >
+            <p className="bo-eyebrow px-5 sm:px-6 py-4 border-b border-[var(--bo-hairline)]">
+              Próximos eventos
+            </p>
+            <div className="divide-y divide-[var(--bo-hairline)]">
+              {upcoming.map((q) => (
+                <button
+                  key={q.id}
+                  /* A porta desta lista é «Fazer proposta» — ver `onFazerProposta`
                    nas props. A queda para o `onOpen` é para nenhum toque ficar
                    sem resposta se alguém montar isto sem a segunda porta. */
-                onClick={() => (onFazerProposta ?? onOpen)(q)}
-                className={`w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-sage-600/[0.06]">
-                    <p className="text-sage-600 text-lg font-light leading-none">
-                      {new Date(q.date + "T12:00:00").getDate()}
-                    </p>
-                    {/* O ANO, quando não é este.
+                  onClick={() => (onFazerProposta ?? onOpen)(q)}
+                  className={`w-full text-left px-5 sm:px-6 py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-center shrink-0 w-10 py-1.5 rounded-lg bg-sage-600/[0.06]">
+                      <p className="text-sage-600 text-lg font-light leading-none">
+                        {new Date(q.date + "T12:00:00").getDate()}
+                      </p>
+                      {/* O ANO, quando não é este.
                         A lista lia-se «10 Set · 24 Out · 22 Mai · 29 Mai» e
                         parecia desordenada — está certa, são 2026 e 2027, e
                         faltava a única coisa que o dizia. Só aparece quando é
                         preciso: escrever «2026» em todas as linhas de uma
                         agenda de 2026 é ruído que se aprende a saltar. */}
-                    <p className="text-foreground/40 text-[9px] uppercase mt-0.5">
-                      {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
-                      {new Date(q.date + "T12:00:00").getFullYear() !==
-                        new Date().getFullYear() && (
-                        <span className="ml-0.5">
-                          {String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
-                        </span>
-                      )}
-                    </p>
+                      <p className="text-foreground/40 text-[9px] uppercase mt-0.5">
+                        {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
+                        {new Date(q.date + "T12:00:00").getFullYear() !==
+                          new Date().getFullYear() && (
+                          <span className="ml-0.5">
+                            {String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[var(--bo-tinta-72)] text-xs font-medium truncate">
+                        {q.name}
+                      </p>
+                      <p className="text-foreground/40 text-[11px] truncate">
+                        {eventTypeLabel(q)} · {q.guests} convidados
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[var(--bo-tinta-72)] text-xs font-medium truncate">
-                      {q.name}
-                    </p>
-                    <p className="text-foreground/40 text-[11px] truncate">
-                      {eventTypeLabel(q)} · {q.guests} convidados
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))}
-            {upcoming.length === 0 && (
-              <EmptyState
-                icon={
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    aria-hidden="true"
-                  >
-                    <rect x="3" y="4" width="18" height="17" rx="2" />
-                    <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-                  </svg>
-                }
-                title="Sem eventos agendados"
-                description="Os próximos eventos com data marcada aparecem aqui."
-              />
-            )}
-          </div>
-        </Card>
+                </button>
+              ))}
+              {upcoming.length === 0 && (
+                <EmptyState
+                  icon={
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="4" width="18" height="17" rx="2" />
+                      <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+                    </svg>
+                  }
+                  title="Sem eventos agendados"
+                  description="Os próximos eventos com data marcada aparecem aqui."
+                />
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Add-event modal — keyed by date so it mounts fresh (and autofocuses)

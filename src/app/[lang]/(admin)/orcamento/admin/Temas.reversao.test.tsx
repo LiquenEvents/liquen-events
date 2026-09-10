@@ -61,8 +61,24 @@ function cartao(): HTMLElement {
   return screen.getByRole("group", { name: "Bouquets Campestres" });
 }
 
+/**
+ * Arquiva pelo menu do cartão.
+ *
+ * As acções deixaram de ser chips soltos sobre a fotografia e passaram a ser
+ * itens do «⋯» — ponto 9 da auditoria do `docs/APPLE-TEMAS.md`, «UM botão
+ * discreto ⋯ … as três ações passam a itens de menu, com nome escrito».
+ */
 async function arquivar() {
-  await userEvent.click(within(cartao()).getAllByRole("button", { name: "Arquivar" })[0]);
+  await userEvent.click(within(cartao()).getByRole("button", { name: /Acções de/ }));
+  await userEvent.click(screen.getByRole("menuitem", { name: "Arquivar" }));
+}
+
+/** Está o cartão por arquivar? (O rótulo do item diz o que a acção FARIA.) */
+async function daParaArquivar(): Promise<boolean> {
+  await userEvent.click(within(cartao()).getByRole("button", { name: /Acções de/ }));
+  const ha = screen.queryAllByRole("menuitem", { name: "Arquivar" }).length > 0;
+  await userEvent.keyboard("{Escape}");
+  return ha;
 }
 
 const aviso = () => screen.getByRole("alert").textContent ?? "";
@@ -80,11 +96,8 @@ describe("Temas — arquivar quando o servidor recusa", () => {
     await arquivar();
 
     // O cartão volta a estar por arquivar…
-    await waitFor(() =>
-      expect(within(cartao()).getAllByRole("button", { name: "Arquivar" }).length).toBeGreaterThan(
-        0,
-      ),
-    );
+    await waitFor(() => expect(cartao()).toBeTruthy());
+    expect(await daParaArquivar()).toBe(true);
     // …e a frase nomeia o tema, diz porquê, e diz que ele voltou.
     expect(aviso()).toContain("Bouquets Campestres");
     expect(aviso()).toMatch(/não está a aceitar gravações/);

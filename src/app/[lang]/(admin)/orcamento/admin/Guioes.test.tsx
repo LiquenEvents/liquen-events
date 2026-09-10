@@ -324,47 +324,49 @@ describe("Timelines — abrir e editar", () => {
     expect(screen.queryByText("Cronograma do Dia")).toBeNull();
   });
 
-  it(
-    "juntar um modelo grava os momentos do modelo na timeline do evento",
-    { timeout: 20_000 },
-    async () => {
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      montar();
-      await screen.findByRole("button", { name: /Carla e Diogo/ });
-      await user.click(linhaDe("Carla e Diogo"));
-      await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
+  it("juntar um modelo grava os momentos do modelo na timeline do evento", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    montar();
+    await screen.findByRole("button", { name: /Carla e Diogo/ });
+    await user.click(linhaDe("Carla e Diogo"));
+    await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
 
-      const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
-      const modelo = MODELOS_DA_CASA[0];
-      await escolher(user, escolha, modelo.nome);
+    const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
+    const modelo = MODELOS_DA_CASA[0];
+    await escolher(user, escolha, modelo.nome);
 
-      /* ── O TECTO É EXPLÍCITO, E A RAZÃO ESTÁ NO `beforeEach` ─────────────
-       Este ficheiro corre com `useFakeTimers({ shouldAdvanceTime: true })`: o
-       relógio é falso mas anda sozinho, a passo do relógio verdadeiro, e quem
-       o faz andar é um intervalo no laço de eventos.
+    /* ── ESPERAR NÃO É A FERRAMENTA CERTA AQUI, E JÁ FALHOU TRÊS VEZES ───
+         Este ficheiro corre com `useFakeTimers({ shouldAdvanceTime: true })`: o
+         relógio é falso mas anda sozinho, movido por um intervalo no laço de
+         eventos. O `waitFor` conta nesse relógio.
 
-       Numa passagem completa — dez mil testes, vários processos — esse laço
-       fica esfomeado. O tempo REAL passa à mesma, o tempo FALSO fica para
-       trás, e o `waitFor`, que conta no falso, esgota o orçamento do teste sem
-       nunca ter chegado a esperar o que julga estar a esperar. MEDIDO: passa
-       sozinho (10/10), e falhou em duas de três passagens completas — sempre
-       aqui, sempre com zero gravações em vez de uma.
+         Numa passagem completa — dez mil testes, vários processos — o laço fica
+         esfomeado: o tempo REAL passa, o FALSO fica para trás, e o `waitFor`
+         esgota o orçamento sem nunca ter chegado a esperar o que julga estar a
+         esperar. Falhou em três passagens completas, sempre aqui.
 
-       Vinte segundos não afrouxam a asserção: continua a ser UMA gravação, com
-       o mesmo destino e o mesmo corpo. Afrouxam a paciência — que era o que
-       estava a medir a carga da máquina em vez do produto. E o tecto do CASO
-       sobe com ele: o do `it` são 5 s, e um `waitFor` mais paciente do que o
-       teste que o contém nunca chega a ganhar. Foi o meu primeiro remendo, e
-       não serviu para nada. */
-      await waitFor(() => expect(gravados).toHaveLength(1), { timeout: 15_000 });
-      expect(gravados[0].url).toBe("/api/orcamento/q-vazio");
-      const timeline = gravados[0].corpo.timeline as TimelineItem[];
-      expect(timeline.map((t) => t.title)).toEqual(modelo.momentos.map((t) => t.title));
-      // Cada momento nasce com id próprio — sem isso, reaplicar o gesto depois de
-      // um 409 punha uma segunda cópia no guião.
-      expect(new Set(timeline.map((t) => t.id)).size).toBe(timeline.length);
-    },
-  );
+         Subi o tecto do `waitFor` para 5 s: não serviu de nada, porque o do
+         `it` eram 5 s. Subi os dois, para 15 e 20 s: falhou na mesma. É a
+         lição — **quando o remédio é mais paciência e o vermelho volta, o
+         diagnóstico estava errado.** O que falta não é tempo: é fazer o
+         relógio ANDAR.
+
+         `advanceTimersByTimeAsync` avança o relógio falso E esvazia as
+         microtarefas, que é o que deixa a promessa do `fetch` fingido
+         resolver. Deixa de depender de um intervalo esfomeado, e por isso
+         deixa de depender da carga da máquina. A asserção é a mesma: UMA
+         gravação, com o mesmo destino e o mesmo corpo. */
+    for (let i = 0; i < 40 && gravados.length === 0; i++) {
+      await vi.advanceTimersByTimeAsync(25);
+    }
+    expect(gravados).toHaveLength(1);
+    expect(gravados[0].url).toBe("/api/orcamento/q-vazio");
+    const timeline = gravados[0].corpo.timeline as TimelineItem[];
+    expect(timeline.map((t) => t.title)).toEqual(modelo.momentos.map((t) => t.title));
+    // Cada momento nasce com id próprio — sem isso, reaplicar o gesto depois de
+    // um 409 punha uma segunda cópia no guião.
+    expect(new Set(timeline.map((t) => t.id)).size).toBe(timeline.length);
+  });
 
   it("a lista fica em dia com o que se editou, sem recarregar a página", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

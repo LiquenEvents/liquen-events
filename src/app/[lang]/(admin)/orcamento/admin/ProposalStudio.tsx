@@ -73,6 +73,11 @@ import { useLarguraDaZona } from "./useMedida";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import AEnviarAProposta from "./AEnviarAProposta";
 import { BotaoWhatsApp } from "./ui/BotaoWhatsApp";
+
+/** Por onde a proposta segue. Ver a nota longa no `canal`, dentro do estúdio. */
+type CanalDeEnvio = "email" | "whatsapp" | "ambos";
+/** Onde fica a última escolha dela. */
+const CANAL_GUARDADO = "liquen-canal-de-envio";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
@@ -1775,6 +1780,59 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [traducao, setTraducao] = useState<EstadoDaTraducao>("desligada");
   const traducaoLigada = traducao === "ligada";
   const [confirmSend, setConfirmSend] = useState(false);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * POR ONDE É QUE A PROPOSTA SEGUE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * «Quero colocar aqui a opção de enviar por email e por WhatsApp. E quero que
+   * seja possível escolher enviar apenas só para o email, apenas só para o
+   * WhatsApp, ou para os dois.»
+   *
+   * ── OS DOIS CANAIS NÃO FUNCIONAM DA MESMA MANEIRA, E ISSO VÊ-SE ─────────
+   *
+   * O **email** sai do SERVIDOR: leva o PDF em anexo e parte sozinho quando ela
+   * carrega em enviar.
+   *
+   * O **WhatsApp** não. Nenhuma página consegue mandar uma mensagem por
+   * alguém — o que se pode é abrir o WhatsApp com a mensagem escrita e a lista
+   * de contactos à espera. Ou seja, o WhatsApp é sempre um SEGUNDO gesto, dela,
+   * a seguir a este. E não pode ser automático: uma janela aberta depois de um
+   * `await` é bloqueada pelo browser (a mesma razão pela qual o «Imprimir folha
+   * do dia» vive onde vive).
+   *
+   * Por isso a escolha faz duas coisas diferentes: decide se o email SAI, e
+   * decide se o passo do WhatsApp fica em destaque no fim. Não finge que os
+   * dois são a mesma coisa.
+   *
+   * ── E LEMBRA-SE DA ÚLTIMA ──────────────────────────────────────────────
+   *
+   * A omissão é «Email», que é como isto sempre funcionou — ninguém que não
+   * peça nada pode passar a ter uma janela do WhatsApp a abrir-se. Mas se ela
+   * escolher WhatsApp, é isso que encontra da próxima: uma escolha que se
+   * repete todos os dias e se pede todos os dias é uma escolha mal feita.
+   */
+  const [canal, setCanal] = useState<CanalDeEnvio>("email");
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(CANAL_GUARDADO);
+      if (guardado === "email" || guardado === "whatsapp" || guardado === "ambos") {
+        setCanal(guardado);
+      }
+    } catch {
+      /* Uma janela privada ou o armazenamento desligado dão erro aqui. A
+         omissão serve, e não vale um ecrã partido. */
+    }
+  }, []);
+  const escolherCanal = useCallback((c: CanalDeEnvio) => {
+    setCanal(c);
+    try {
+      localStorage.setItem(CANAL_GUARDADO, c);
+    } catch {
+      /* Ver acima: não poder lembrar-se não é razão para não obedecer agora. */
+    }
+  }, []);
   /**
    * O que a composição cortou no documento que estava a seguir — `null`
    * enquanto ninguém perguntou nada.
@@ -6447,6 +6505,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           // Só viaja quando é «sim»: um campo a dizer `false` em todos os
           // envios normais era um campo a mais a explicar a quem lesse a rota.
           ...(cortesConfirmados ? { cortesConfirmados: true } : {}),
+          /* Só viaja quando é «não», pela mesma razão do `cortesConfirmados`
+             aqui em cima — e porque a rota trata a AUSÊNCIA como «sim», para
+             nenhum envio antigo deixar de sair por causa de um campo novo. */
+          ...(canal === "whatsapp" ? { porEmail: false } : {}),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -6559,7 +6621,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         if (problemas.length > 0) {
           toast(problemas.join(" "), "error");
         } else {
-          toast("Proposta enviada ao cliente", "success");
+          /* Com «só WhatsApp» não seguiu nada para ninguém — a proposta foi
+             GERADA. Um aviso a dizer «enviada» era a mentira que faria a
+             próxima pessoa não carregar no botão que falta. */
+          toast(
+            canal === "whatsapp"
+              ? "Proposta gerada — falta mandá-la"
+              : "Proposta enviada ao cliente",
+            "success",
+          );
         }
       }
       // Trava contra reenvio acidental: o passo Enviar passa a mostrar a
@@ -10503,11 +10573,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     strokeLinejoin="round"
                   />
                 </svg>{" "}
-                Proposta enviada
+                {canal === "whatsapp" ? "Proposta pronta" : "Proposta enviada"}
               </p>
+              {/* ── O QUE SE DIZ NO FIM DEPENDE DO QUE SE FEZ ──────────────
+                  «Não precisas de fazer mais nada» era verdade quando só havia
+                  email. Com o WhatsApp escolhido é falso — falta o gesto dela,
+                  e é o gesto que entrega a proposta. Uma frase que diz «está
+                  tudo feito» por cima de uma coisa por fazer é a maneira mais
+                  rápida de a proposta não chegar a ninguém. */}
               <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
-                A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisas de
-                fazer mais nada.
+                {canal === "whatsapp"
+                  ? "A proposta está gerada e o link está pronto. Falta mandá-lo — é o botão aqui em baixo."
+                  : canal === "ambos"
+                    ? `O email seguiu para ${quote.email || "o cliente"}. Falta o WhatsApp, se o quiseres mandar também.`
+                    : `A proposta foi gerada e enviada para ${quote.email || "o cliente"}. Não precisas de fazer mais nada.`}
               </p>
               {/* ── QUANDO O CASAL PREFERE WHATSAPP ─────────────────────────
                   A comunicação sai toda por email, e em Portugal é normal o
@@ -10521,7 +10600,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   passos, menos os três do meio. O copiar FICA, para quem quer
                   o texto noutro sítio qualquer. */}
               <div className="flex flex-wrap items-center gap-2">
-                <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
+                <BotaoWhatsApp texto={resumoParaCopiar} />
                 <CopiarResumo texto={resumoParaCopiar} />
               </div>
               <Button
@@ -10538,8 +10617,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           ) : (
             <>
               <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
-                Confirma os dados abaixo. Ao enviar, o cliente recebe a proposta em PDF por email.
+                Confirma os dados abaixo e escolhe por onde segue.
               </p>
+
+              {/* ── POR ONDE SEGUE ────────────────────────────────────────────
+                  A escolha vem ANTES do resumo e do botão, porque muda o que o
+                  resumo quer dizer: com «só WhatsApp», a linha «Para: <email>»
+                  deixa de ser o destino e passa a ser só um dado do pedido.
+
+                  Os rótulos dizem o CANAL e não o verbo — «Email», «WhatsApp»,
+                  «Os dois» — porque o verbo já está no botão a seguir, e repetir
+                  «enviar» três vezes numa fila de três não ajuda a escolher. */}
+              <div className="mt-4">
+                <p className="bo-eyebrow mb-1.5 text-[var(--bo-text-muted)]">Por onde segue</p>
+                <Segmented
+                  size="sm"
+                  ariaLabel="Por onde é que a proposta segue"
+                  value={canal}
+                  onChange={escolherCanal}
+                  options={[
+                    { value: "email", label: "Email" },
+                    { value: "whatsapp", label: "WhatsApp" },
+                    { value: "ambos", label: "Os dois" },
+                  ]}
+                />
+                {/* ── O QUE CADA ESCOLHA FAZ, DITO ANTES DO GESTO ────────────
+                    Sem esta linha, «WhatsApp» prometia um envio automático que
+                    não existe: nenhuma página consegue mandar uma mensagem por
+                    alguém. O que acontece é o WhatsApp ABRIR com a mensagem
+                    escrita, e ser ela a escolher a quem — e isso é um segundo
+                    gesto, dela, depois deste. Dizê-lo aqui é a diferença entre
+                    uma expectativa cumprida e uma surpresa. */}
+                <p className="bo-text-muted mt-2 text-xs leading-relaxed">
+                  {canal === "email"
+                    ? "O cliente recebe a proposta em PDF por email."
+                    : canal === "whatsapp"
+                      ? "Não sai email. A proposta é gerada e o link fica pronto — a seguir abres o WhatsApp e escolhes a quem o mandas."
+                      : "O cliente recebe o PDF por email, e a seguir abres o WhatsApp com o link para lho mandares também."}
+                </p>
+              </div>
               {/* ── SEM DESTINATÁRIO, DIZ-SE AQUI E NÃO DEPOIS ──────────────
                   Um pedido que entrou por telefone não tem email. Até aqui só
                   se sabia DEPOIS de carregar em Enviar: a proposta ficava
@@ -10547,7 +10663,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                   Agora está antes do dedo, e diz ONDE se resolve — no painel do
                   pedido, que passou a deixar corrigir os contactos. */}
-              {!emailDoCliente && (
+              {/* ── E O AVISO DO EMAIL EM FALTA CALA-SE QUANDO NÃO É POR AÍ ──
+                  Com «só WhatsApp», não ter email de cliente deixou de ser um
+                  problema — é o caso NORMAL de um pedido que entrou por
+                  telefone. Um aviso cor de laranja a apontar para uma coisa
+                  que não faz falta ensina a ignorar avisos. */}
+              {!emailDoCliente && canal !== "whatsapp" && (
                 <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
                   <span aria-hidden="true">⚠</span>
                   <span>
@@ -10593,9 +10714,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   linha por baixo diz isso a quem chega primeiro, porque a
                   ausência de um botão não explica nada a ninguém. */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {linkDaProposta && (
-                  <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
-                )}
+                {linkDaProposta && <BotaoWhatsApp texto={resumoParaCopiar} />}
                 <CopiarResumo texto={resumoParaCopiar} />
               </div>
               {!linkDaProposta && (

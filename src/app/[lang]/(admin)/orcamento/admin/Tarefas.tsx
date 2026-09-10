@@ -20,6 +20,7 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 import { corDeTexto, metaFor } from "./status-meta";
 import { ESTADO, MOLA_DE_MARCAR, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { interpretarTarefa, type Interpretacao } from "@/lib/tarefas/linguagem-natural";
 /* As regras das fases 05 e 06 vivem em `@/lib/tarefas/listas` e não aqui: o que
    é uma tarefa «de hoje» e o que conta como atrasada são perguntas que se
    discutem e se testam sozinhas, longe do desenho. */
@@ -701,10 +702,48 @@ export default function Tarefas({
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("normal");
   const [dueDate, setDueDate] = useState("");
-  const [assignee, setAssignee] = useState(
-    defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "",
+  /* O responsável com que a linha ABRE. Vive numa função e não escrito duas
+     vezes porque é lido em três sítios — ao montar, ao limpar depois de criar,
+     e para saber se ela mexeu no campo antes de a leitura lhe tocar. Três
+     cópias do mesmo `?:` era o mesmo que três oportunidades de discordarem. */
+  const PREDEFINIDO = useCallback(
+    () => (defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : ""),
+    [defaultAssignee],
   );
+  const [assignee, setAssignee] = useState(PREDEFINIDO);
   const [area, setArea] = useState("");
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE ELA ESCREVE NA LINHA, LIDO — E MOSTRADO ANTES DE ACONTECER
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * «Confirmar florista amanhã às 10h #Ana !alta» tem lá dentro uma data, uma
+   * hora, um responsável e uma prioridade. O motor que os lê está em
+   * `lib/tarefas/linguagem-natural.ts`, é puro, e recusa-se a adivinhar — na
+   * dúvida não extrai nada, porque uma data errada só se descobre no dia.
+   *
+   * ── E MOSTRA-SE, EM VEZ DE ACONTECER EM SILÊNCIO ────────────────────────
+   *
+   * Esta é a decisão que interessa. Uma extracção silenciosa faz duas coisas
+   * más ao mesmo tempo: come a palavra do título — ela escreve «amanhã» e a
+   * palavra desaparece sem explicação — e acerta 90% das vezes, com os 10% que
+   * falham a ficarem guardados como se fossem verdade.
+   *
+   * Por isso o que se lê aparece por baixo do campo, em pastilhas, ENQUANTO
+   * ela escreve: o que ela vê é o que vai ficar. E se não quiser nada disto,
+   * há um botão que o desliga — o texto fica exactamente como o escreveu.
+   *
+   * ── E NÃO SE ESCREVE NOS CAMPOS ENQUANTO ELA ESCREVE ────────────────────
+   *
+   * Os quatro campos de baixo são dela. Escrever-lhes por cima a cada tecla
+   * dava uma caixa de data a saltar enquanto ela pensa, e apagava o que ela lá
+   * tivesse posto à mão. O que a leitura preenche, preenche no momento de
+   * CRIAR — e só onde ela não tocou.
+   */
+  const [semInterpretar, setSemInterpretar] = useState(false);
+  const lida: Interpretacao = useMemo(() => interpretarTarefa(title), [title]);
+  const aInterpretar = !semInterpretar && lida.marcas.length > 0;
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -871,17 +910,47 @@ export default function Tarefas({
   }
 
   async function add(fecharDepois = false) {
-    const t = title.trim();
+    /**
+     * ── O QUE SE LEU DA LINHA ENTRA AQUI, E NÃO ANTES ────────────────────
+     *
+     * A regra é uma só: **o que ela escreveu à mão ganha sempre**. A leitura
+     * só preenche o campo que continua no valor de partida — prazo vazio,
+     * prioridade `normal`, responsável no que a equipa deu por omissão.
+     *
+     * Sem esta regra, escrever «amanhã» na linha apagava a data que ela tinha
+     * acabado de escolher no campo de baixo, e ela via o seu próprio gesto a
+     * ser desfeito por uma palavra.
+     *
+     * A hora junta-se à data com um `T`, que é como o `dueDate` a guarda. Uma
+     * hora sem data não vale nada sozinha — «às 10h» de que dia? — e por isso
+     * só entra acompanhada.
+     */
+    const usar = aInterpretar ? lida : null;
+    const t = (usar ? usar.titulo : title).trim();
     if (!t || adding) return;
+
+    const prazoLido =
+      usar?.data && !dueDate
+        ? usar.hora
+          ? `${usar.data.valor}T${usar.hora.valor}`
+          : usar.data.valor
+        : dueDate;
+    const responsavelLido =
+      usar?.responsavel && assignee.trim() === PREDEFINIDO()
+        ? usar.responsavel.valor
+        : assignee.trim();
+    const prioridadeLida =
+      usar?.prioridade && priority === "normal" ? usar.prioridade.valor : priority;
+
     setAdding(true);
     const { ok, corpo } = await gravar(`criar a tarefa «${t}»`, "/api/tarefas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: t,
-        priority,
-        dueDate: dueDate || undefined,
-        assignee: assignee.trim() || undefined,
+        priority: prioridadeLida,
+        dueDate: prazoLido || undefined,
+        assignee: responsavelLido || undefined,
         area: area || undefined,
       }),
     });
@@ -903,7 +972,8 @@ export default function Tarefas({
     setDueDate("");
     setPriority("normal");
     setArea("");
-    setAssignee(defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "");
+    setAssignee(PREDEFINIDO());
+    setSemInterpretar(false);
     /* `Enter` deixa a linha aberta e vazia — quem escreve tarefas escreve-as em
        rajada. `⇧Enter` fecha, para quem só tinha uma. O foco volta ao campo
        nos dois casos em que ele continua a existir: sem isto, a gravação
@@ -1576,6 +1646,60 @@ export default function Tarefas({
                     aoCriar={add}
                     aGravar={adding}
                   >
+                    {/* ── O QUE A LINHA DIZ, ANTES DE ELA CARREGAR ─────────────────
+                        As pastilhas do que foi lido. Não são decoração: são a
+                        promessa do que vai ficar gravado, feita ANTES do gesto
+                        que a cumpre. É o que separa isto de uma extracção
+                        silenciosa que acerta quase sempre.
+
+                        `role="status"`: muda enquanto ela escreve, sem a página
+                        recarregar, e quem usa leitor de ecrã tem de ouvir a
+                        mesma promessa que os outros lêem. */}
+                    {aInterpretar && (
+                      <div
+                        role="status"
+                        /* Nome próprio, e não só o papel. Este ecrã tem mais do
+                           que um `role="status"` — a contagem da lista é outro —
+                           e um leitor de ecrã que anuncia dois «estados» sem os
+                           nomear obriga quem ouve a adivinhar de qual se trata. */
+                        aria-label="O que a linha vai gravar"
+                        className="mt-2 flex flex-wrap items-center gap-1.5 text-caption2"
+                      >
+                        <span className="bo-text-muted">Vai ficar com</span>
+                        {/* ── SÓ SE MOSTRA O QUE VAI MESMO ACONTECER ────────
+                            Um campo que ela já preencheu à mão GANHA à leitura
+                            (ver o `add`). Mostrar aqui a data lida, quando o
+                            campo de baixo já tem outra, era prometer uma coisa
+                            e gravar outra — e das duas seria a pastilha a
+                            parecer o erro, porque é a que está à frente dela.
+
+                            A condição de cada pastilha é, à letra, a mesma
+                            condição do `add`. Se um dia divergirem, isto volta
+                            a mentir; por isso estão escritas com as mesmas
+                            palavras nos dois sítios. */}
+                        {lida.data && !dueDate && (
+                          <Pastilha rotulo="Quando" valor={quandoLido(lida)} />
+                        )}
+                        {lida.responsavel && assignee.trim() === PREDEFINIDO() && (
+                          <Pastilha rotulo="Quem" valor={lida.responsavel.valor} />
+                        )}
+                        {lida.evento && <Pastilha rotulo="Evento" valor={lida.evento.valor} />}
+                        {lida.prioridade && priority === "normal" && (
+                          <Pastilha rotulo="Prioridade" valor={lida.prioridade.valor} />
+                        )}
+                        {/* E o desligar, que é o que torna a promessa honesta:
+                            sem ele, a única saída de uma leitura errada era
+                            apagar a palavra e reescrever a frase à volta. */}
+                        <button
+                          type="button"
+                          onClick={() => setSemInterpretar(true)}
+                          className={`alvo-toque ms-1 rounded-md px-1.5 text-[var(--bo-text-muted)] underline decoration-dotted underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                        >
+                          Tal como escrevi
+                        </button>
+                      </div>
+                    )}
+
                     {/* ── OS DETALHES DEIXARAM DE ESTAR ATRÁS DE UMA PORTA ───────────
                 «Retira isto do opcional. Quero que apareça logo.»
 
@@ -1715,4 +1839,33 @@ export default function Tarefas({
       />
     </div>
   );
+}
+
+/**
+ * Uma pastilha do que a linha disse. Rótulo e valor juntos, porque «11 set»
+ * sozinho não diz se é o prazo ou a data do evento.
+ */
+function Pastilha({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bo-accent-lavagem)] px-2 py-0.5">
+      <span className="bo-text-muted">{rotulo}</span>
+      <span className="font-medium text-[var(--bo-text)]">{valor}</span>
+    </span>
+  );
+}
+
+/**
+ * O «quando» por extenso, como ela o vai ler na lista — e não «2026-09-11».
+ *
+ * A hora só aparece acompanhada da data: «às 10h» de que dia não é informação
+ * nenhuma, e o motor deixa-a existir sozinha de propósito para o ECRÃ decidir.
+ * Aqui a decisão é não a mostrar sozinha.
+ */
+function quandoLido(lida: Interpretacao): string {
+  if (!lida.data) return "";
+  const [ano, mes, dia] = lida.data.valor.split("-");
+  const MESES = "jan fev mar abr mai jun jul ago set out nov dez".split(" ");
+  const curto = `${Number(dia)} ${MESES[Number(mes) - 1] ?? ""}`;
+  const comAno = ano === String(new Date().getFullYear()) ? curto : `${curto} ${ano.slice(2)}`;
+  return lida.hora ? `${comAno}, ${lida.hora.valor.replace(":", "h")}` : comAno;
 }
