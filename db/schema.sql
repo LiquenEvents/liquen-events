@@ -279,6 +279,18 @@ create table if not exists public.tasks (
 -- If upgrading an existing database, add the new columns:
 alter table public.tasks add column if not exists assignee text;
 alter table public.tasks add column if not exists area text;
+-- ── O PAINEL DE DETALHE E A ORDEM À MÃO (docs/APPLE-TAREFAS.md, fases 08/09) ──
+-- `notas` é texto corrido; `subtarefas` e `anexos` são listas de objectos
+-- pequenos e SEMPRE lidas inteiras com a tarefa — nunca se pesquisa dentro
+-- delas nem se junta com outra tabela —, portanto `jsonb` e não duas tabelas
+-- filhas. `posicao` é a ordem manual: `double precision` porque uma linha
+-- largada entre duas outras fica com a MÉDIA das vizinhas (ver
+-- `src/lib/tarefas/posicoes.ts`), e é isso que faz um arrasto custar UMA
+-- gravação em vez de uma por linha.
+alter table public.tasks add column if not exists notas text;
+alter table public.tasks add column if not exists subtarefas jsonb;
+alter table public.tasks add column if not exists anexos jsonb;
+alter table public.tasks add column if not exists posicao double precision;
 
 create index if not exists tasks_done_idx on public.tasks (done);
 create index if not exists tasks_due_idx  on public.tasks (due_date);

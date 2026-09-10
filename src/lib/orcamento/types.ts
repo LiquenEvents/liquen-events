@@ -369,6 +369,37 @@ export interface ActivityEntry {
 
 export type TaskPriority = "baixa" | "normal" | "alta";
 
+/**
+ * Um passo de uma tarefa — o que o painel de detalhe chama «subtarefas»
+ * (`docs/APPLE-TAREFAS.md`, fase 08).
+ *
+ * Deliberadamente RASO: título e feita, e mais nada. Uma subtarefa com prazo,
+ * responsável e prioridade própria é uma tarefa, e essa já existe — dar-lhe os
+ * mesmos campos era construir uma segunda árvore de tarefas dentro da primeira,
+ * com duas listas a discordar sobre o que está por fazer.
+ */
+export interface Subtarefa {
+  id: string;
+  titulo: string;
+  feita: boolean;
+}
+
+/**
+ * Um anexo de uma tarefa. É uma LIGAÇÃO, e não um ficheiro carregado.
+ *
+ * Não há rota de upload nenhuma neste produto — as fotografias da biblioteca
+ * entram por outro caminho, e inventar aqui um armazenamento novo era uma fase
+ * inteira disfarçada de campo. O que esta casa tem, e usa todos os dias, são
+ * ligações: a pasta do Drive do casamento, o orçamento do florista, a
+ * inspiração no Pinterest. É isso que o painel guarda.
+ */
+export interface AnexoDaTarefa {
+  id: string;
+  nome: string;
+  /** `http(s)` apenas — ver `anexoDaTarefaSchema` em `lib/validation.ts`. */
+  url: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -380,6 +411,29 @@ export interface Task {
   assignee?: string; // quem é responsável (sócio/membro da equipa)
   area?: string; // ex.: Comercial, Produção, Decoração, Financeiro
   createdAt: string;
+  /**
+   * ── OS TRÊS CAMPOS DO PAINEL DE DETALHE (fase 08) ────────────────────────
+   *
+   * Texto longo — o que não cabe no título. É o «Detalhes (opcional)» que a
+   * Parte 5 do documento manda renomear para «Notas» e reduzir a isto mesmo:
+   * só para texto corrido.
+   */
+  notas?: string;
+  subtarefas?: Subtarefa[];
+  anexos?: AnexoDaTarefa[];
+  /**
+   * ── A ORDEM QUE ELA ARRUMOU À MÃO (fase 09) ──────────────────────────────
+   *
+   * Um número de ordenação, e não um índice: as posições nascem espaçadas
+   * (1024, 2048, 3072…) e uma tarefa largada entre duas outras fica com a
+   * MÉDIA das vizinhas. É o que faz um arrasto custar UMA gravação em vez de
+   * uma por linha — ver `lib/tarefas/posicoes.ts`, onde isto está medido e
+   * testado.
+   *
+   * Ausente quer dizer «nunca foi arrumada à mão», e não «primeira»: quem não
+   * tem posição fica no topo, que é onde a linha de escrever a acabou de pôr.
+   */
+  posicao?: number;
 }
 
 export interface Quote extends QuoteFormData {

@@ -55,6 +55,24 @@ export interface ChipDoDiaProps {
   /** A dica do rato, com o texto completo — a Parte 4 pede-a. */
   dica: string;
   onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  /**
+   * A MESMA etiqueta, mas a encher a caixa em que está — as vistas de dia e de
+   * semana (`VistasDeHoras.tsx`) posicionam-na em absoluto com a altura da
+   * DURAÇÃO, e nessas a etiqueta tem de subir ao topo do bloco em vez de se
+   * centrar no meio dele: um evento de três horas com o título a meio-caminho
+   * lê-se como se começasse às onze e meia.
+   *
+   * É uma variante e não uma segunda etiqueta porque tudo o resto é igual — a
+   * cor por tipo, a barra de 2 px, a hora antes do título, a truncatura, o
+   * nome acessível. Uma segunda peça ao lado desta era o defeito que a Parte
+   * −1 do `docs/DESIGN-SYSTEM.md` manda evitar.
+   *
+   * Não se resolve com `className`: o `cn()` desta casa é um juntador simples
+   * (não é o `tailwind-merge`), portanto `items-start` passado de fora ficava
+   * ao lado do `items-center` daqui e quem decidia era a ordem das regras no
+   * CSS compilado — ou seja, ninguém.
+   */
+  bloco?: boolean;
   className?: string;
 }
 
@@ -66,6 +84,7 @@ export function ChipDoDia({
   rotulo,
   dica,
   onClick,
+  bloco,
   className,
 }: ChipDoDiaProps) {
   return (
@@ -76,7 +95,8 @@ export function ChipDoDia({
       onClick={onClick}
       style={{ "--tipo": cor } as CSSProperties}
       className={cn(
-        "group/chip flex min-h-5 w-full min-w-0 items-center gap-1 overflow-hidden pe-1 text-start",
+        "group/chip flex w-full min-w-0 gap-1 overflow-hidden pe-1 text-start",
+        bloco ? "h-full items-start py-0.5" : "min-h-5 items-center",
         "rounded-[var(--bo-raio-miudeza)]",
         "bg-[color-mix(in_oklab,var(--tipo)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--tipo)_20%,transparent)]",
         "text-[11px] leading-none text-[var(--bo-text)]",
@@ -91,8 +111,29 @@ export function ChipDoDia({
         className="w-0.5 shrink-0 self-stretch rounded-full bg-[var(--tipo)]"
       />
       {marca}
-      {hora && <span className="shrink-0 tabular-nums text-[var(--bo-text-muted)]">{hora}</span>}
-      <span className="truncate">{titulo}</span>
+      {/* ── A HORA E O TÍTULO: EM FILA NO MÊS, EMPILHADOS NO BLOCO ────────
+          Na célula do mês a etiqueta tem 20 px de altura e uma linha só, e a
+          Parte 4 do documento manda a hora ANTES do título, na mesma linha.
+
+          Num bloco da vista de dia a caixa tem 44 px de altura e cerca de 96
+          de largura (ver `LARGURA_MINIMA_DA_COLUNA`): «09:00 Montagem Torre de
+          Palma» em fila deixava ~50 px para o título, ou seja quatro
+          caracteres e reticências. Isso é a pílula de duas letras que o ponto
+          11 da auditoria proíbe, outra vez. Empilhados, a hora fica em cima e
+          o título tem a largura toda e duas linhas. */}
+      {bloco ? (
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          {hora && <span className="tabular-nums text-[var(--bo-text-muted)]">{hora}</span>}
+          <span className="line-clamp-2 leading-tight">{titulo}</span>
+        </span>
+      ) : (
+        <>
+          {hora && (
+            <span className="shrink-0 tabular-nums text-[var(--bo-text-muted)]">{hora}</span>
+          )}
+          <span className="truncate">{titulo}</span>
+        </>
+      )}
     </button>
   );
 }

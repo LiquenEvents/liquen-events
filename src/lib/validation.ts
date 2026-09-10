@@ -406,6 +406,31 @@ export const proposalCreateSchema = z.object({
   notes: trimmed(5000).optional(),
 });
 
+const subtarefaSchema = z.object({
+  id: entityId,
+  titulo: trimmed(300),
+  feita: z.boolean(),
+});
+
+/**
+ * Um anexo de uma tarefa — uma LIGAÇÃO, não um ficheiro (ver `AnexoDaTarefa`).
+ *
+ * O URL é validado a sério e limitado a `http`/`https`. Não é zelo: este
+ * endereço acaba num `<a href>` do back office, e um `javascript:` gravado por
+ * quem tenha a sessão de outra pessoa passava a correr no ecrã de quem
+ * carregasse. Um esquema fechado é a única defesa que não depende de o ecrã se
+ * lembrar de a fazer.
+ */
+const anexoDaTarefaSchema = z.object({
+  id: entityId,
+  nome: trimmed(200),
+  url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((v) => /^https?:\/\/\S+$/i.test(v), "A ligação tem de começar por http:// ou https://"),
+});
+
 export const taskUpdateSchema = z
   .object({
     title: trimmed(300).min(1),
@@ -416,6 +441,41 @@ export const taskUpdateSchema = z
     clientName: trimmed(200).nullish(),
     assignee: trimmed(120).nullish(),
     area: trimmed(80).nullish(),
+    /**
+     * ── OS QUATRO CAMPOS DAS FASES 08 E 09, E PORQUE É QUE ESTAS LINHAS SÃO
+     *    LOAD-BEARING ───────────────────────────────────────────────────────
+     *
+     * Este esquema corre em `.strip()` (o modo por omissão do zod): uma chave
+     * que NÃO esteja declarada aqui é apagada em silêncio, sem erro e com 200
+     * por cima. É a mesma armadilha que a `duracao` e o `local` de um momento
+     * da timeline documentam no `timelineItemSchema` — e que já custou a esta
+     * casa duas rondas de diagnóstico, porque o defeito parece o contrário de
+     * um defeito: o pedido responde «gravado».
+     *
+     * Sem estas quatro linhas: a nota que ela escreve no painel desaparece ao
+     * gravar, e a gravação seguinte responde 409, porque o ecrã declara ter
+     * partido de uma tarefa COM nota e o servidor tem uma SEM.
+     *
+     * O guarda que o prova é o `validation.tarefas.test.ts`, no formato do
+     * `validation.timeline.test.ts`.
+     *
+     * Os tectos: uma nota é um parágrafo («o Miguel leva as jarras na
+     * sexta»), não um documento; cem subtarefas é mais do que qualquer tarefa
+     * real desta casa alguma vez teve, e a partir daí o que ela tem em mãos é
+     * uma lista, não uma tarefa.
+     */
+    notas: trimmed(5000).nullish(),
+    subtarefas: z.array(subtarefaSchema).max(100),
+    anexos: z.array(anexoDaTarefaSchema).max(50),
+    /**
+     * A ordem manual. Finito e limitado de propósito: as posições nascem
+     * espaçadas de 1024 e uma tarefa largada entre duas fica com a média das
+     * vizinhas (`lib/tarefas/posicoes.ts`), portanto o valor cresce com o
+     * número de linhas e nunca com o número de arrastos. O tecto é folgado o
+     * suficiente para um milhão de tarefas e apertado o suficiente para um
+     * `Infinity` ou um `1e308` não entrarem na coluna.
+     */
+    posicao: z.number().finite().min(0).max(1e12).nullish(),
   })
   .partial();
 

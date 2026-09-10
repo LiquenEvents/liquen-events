@@ -12,6 +12,7 @@ import {
   MAX_PHOTO_ORDER,
   MAX_THEME_NAME,
   MAX_THEME_NOTES,
+  THEME_COPY_CHUNK,
   THEME_PAGE_SIZE,
   normalizedThemeName,
   type SkipReason,
@@ -52,6 +53,15 @@ import {
 } from "@/lib/temas-filtros";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
+import ListaDeTemas from "./ListaDeTemas";
+import {
+  escreverCarga,
+  fotosQueViajam,
+  fraseDeMovimentoFalhado,
+  fraseDoMovimento,
+  fraseDoRegresso,
+  type CargaDeFotos,
+} from "@/lib/temas-arrasto";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -460,9 +470,45 @@ export const COLUNAS: Record<Densidade, string> = {
  *
  * (O `md:grid-cols-5` que aqui vivia era a última infracção deste ficheiro ao
  * contrato dos cortes. Nunca tinha sido uma pergunta sobre a janela.)
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * FASE 07 — A ESCADA DE DEGRAUS PASSA A `auto-fill`, E O PISO DE 2 FICA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `docs/APPLE-TEMAS.md`, ponto 21: «grelha `repeat(auto-fill, minmax(180px,
+ * 1fr))`, RÁCIO FIXO 4:3 com `object-fit: cover`, gap de 12».
+ *
+ * A escada de cinco degraus acima fazia o trabalho de um `auto-fill` à mão —
+ * e fazia-o com um número diferente do do documento. `auto-fill` diz a mesma
+ * coisa numa linha e nunca desafina: a célula não desce de 180 px, aconteça o
+ * que acontecer à zona de largar, e não há degrau nenhum para alguém esquecer
+ * de acertar quando a coluna do split view lhe tirar 272 px de largura.
+ *
+ * ── MAS O PISO DE DUAS COLUNAS NÃO SE DEITA FORA ──────────────────────────
+ *
+ * `minmax(180px, 1fr)` sozinho dá UMA coluna abaixo de 372 px de contentor —
+ * ou seja, uma fotografia por linha nos 309 px que um telemóvel de 375 dá a
+ * esta grelha. A decisão medida que este comentário conta (duas colunas, 150,5
+ * px de célula, três alvos de 44 px lá dentro) não é uma preferência: é o que
+ * torna a pasta percorrível ao dedo. Por isso o `auto-fill` só entra a partir
+ * de 24rem (384 px), que é a primeira largura onde ele próprio já dá duas
+ * (2 × 180 + 12 = 372); abaixo disso mandam as duas colunas de sempre.
+ *
+ * A tabela que sai daqui, com o `gap-3` do documento:
+ *
+ *     zona de largar   colunas   célula
+ *     309 (janela 375)    2       148,5
+ *     558 (janela 640)    2       273
+ *     654 (janela 1024)   3       210
+ *     798 (1440, split)   4       190,5
+ *    1070 (janela 1440)   5       204,4
+ *
+ * Menos fotos por linha do que antes, e maiores — é o que 180 px de mínimo
+ * quer dizer. O piso dos 111 px continua garantido por construção em toda a
+ * gama do `auto-fill`, e à mão nos 240–384 px que sobram (a 240, 114 px).
  */
 export const GRELHA_DE_FOTOS =
-  "grid grid-cols-2 gap-2 @min-[22rem]:grid-cols-3 @min-[30rem]:grid-cols-4 @min-[38rem]:grid-cols-5 @min-[46rem]:grid-cols-6";
+  "grid grid-cols-2 gap-3 @min-[24rem]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]";
 
 /**
  * "há 3 dias", "hoje" — a data como se fala, para o cartão poder dizer o que
@@ -835,6 +881,34 @@ export default function Temas() {
    */
   const [menu, setMenu] = useState<PedidoDeMenu | null>(null);
   const fecharMenu = useCallback(() => setMenu(null), []);
+  /**
+   * ── O ARRASTO DE FOTOGRAFIAS ENTRE TEMAS, VISTO DE CIMA ────────────────
+   *
+   * Fase 08. O gesto começa DENTRO da pasta (é lá que estão as fotografias) e
+   * acaba na coluna da esquerda (é lá que estão os temas) — dois sítios que
+   * não se conhecem. O que os liga é este par de estados, e vive aqui porque
+   * é aqui que a lista de temas e a pasta se encontram.
+   *
+   *  · `aArrastar` é o que acende o sinal de aceitação na coluna. Não se lê do
+   *    `dataTransfer`: durante o `dragover` o browser deixa ver os TIPOS mas
+   *    não os dados, e a coluna precisa de saber que há um lote a andar mesmo
+   *    antes de o ponteiro lhe tocar;
+   *  · `pedidoDeMover` é a largada. Quem age é a PASTA — é ela que tem a
+   *    grelha, a selecção e o «Anular» —, por isso o que atravessa é o pedido
+   *    e não o resultado. O `n` distingue dois arrastos seguidos para o mesmo
+   *    tema, que de outra forma seriam o mesmo objecto e não disparavam nada.
+   */
+  const [aArrastar, setAArrastar] = useState(false);
+  const pedidosDeMover = useRef(0);
+  const [pedidoDeMover, setPedidoDeMover] = useState<{
+    destino: ThemeSummary;
+    carga: CargaDeFotos;
+    n: number;
+  } | null>(null);
+  const largarNoTema = useCallback((destino: ThemeSummary, carga: CargaDeFotos) => {
+    pedidosDeMover.current += 1;
+    setPedidoDeMover({ destino, carga, n: pedidosDeMover.current });
+  }, []);
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
   // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
   useEffect(() => {
@@ -1405,10 +1479,7 @@ export default function Temas() {
    * A conta já está escrita e testada em `lib/temas-filtros.ts`; falta-lhe o
    * número.
    */
-  const ambitosNoEcra = useMemo(
-    () => ambitosDisponiveis(themes, dadosDeUso),
-    [themes, dadosDeUso],
-  );
+  const ambitosNoEcra = useMemo(() => ambitosDisponiveis(themes, dadosDeUso), [themes, dadosDeUso]);
   /** O âmbito escolhido pode deixar de existir por baixo dos pés — desarquivar
    *  o último tema arquivado esvazia «Arquivados». Aí volta-se a «Todos», em
    *  vez de ficar um filtro activo que já não está na barra. */
@@ -1496,41 +1567,98 @@ export default function Temas() {
 
   if (open) {
     return (
-      <>
-        <ThemeFolder
-          key={open.id}
-          theme={open}
-          // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
-          // o cartão do destino tem de somar as fotos que lá chegaram, senão a
-          // contagem só se corrige no próximo carregamento da página.
-          themes={themes}
-          onCopiedTo={(destId, added) =>
-            setThemes((prev) =>
-              prev.map((t) =>
-                t.id === destId && t.imageCount !== null
-                  ? { ...t, imageCount: t.imageCount + added }
-                  : t,
-              ),
-            )
-          }
-          onBack={() => setOpenId(null)}
-          onFolderState={(s) => syncCard(open.id, s)}
-          onRename={(name) =>
-            setThemes((prev) =>
-              prev
-                .map((t) => (t.id === open.id ? { ...t, name } : t))
-                .sort((a, b) => a.name.localeCompare(b.name, "pt")),
-            )
-          }
-          onCover={(coverPath, coverUrl) =>
-            setThemes((prev) =>
-              prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
-            )
-          }
-          onDelete={() => setAEliminar(open)}
+      /* ══════════════════════════════════════════════════════════════════
+         O SPLIT VIEW — FASE 06
+         ══════════════════════════════════════════════════════════════════
+
+         Ponto 16 da auditoria: «o detalhe é uma página nova com "← Temas" —
+         navegação de telemóvel aplicada a um ecrã de desktop». A correcção é
+         «lista de temas à esquerda, fotografias à direita; trocar de tema não
+         recarrega a página». [APPLE, Split views]
+
+         ── E NÃO RECARREGA MESMO ────────────────────────────────────────
+         Nunca houve navegação de página aqui — o `openId` é estado, e a URL
+         não muda. O que havia era uma TROCA de ecrã: a grelha de cartões
+         desaparecia inteira para a pasta aparecer, e voltar a ela era o único
+         caminho para o tema do lado. Agora os dois estão ao mesmo tempo no
+         ecrã e trocar de tema é carregar numa linha da esquerda.
+
+         ── PORQUE É QUE O CORTE É O `lg` E NÃO OS 1200 px DO DOCUMENTO ──
+         Porque esta casa tem três larguras e só três (`ui/adaptativo.ts`, e o
+         `Cortes.contrato.test.ts` que as prende): 640, 1024 e 1440. 1200 não
+         é nenhuma delas, e acrescentar uma quarta só para este ecrã é o
+         começo dos dois sistemas de cortes que aquele contrato existe para
+         evitar. `lg` (1024) é, por definição desta casa, «a partir daqui é
+         desktop» — e é também onde a navegação do back office deixa de ser
+         gaveta, ou seja onde há mesmo largura em fluxo para uma coluna.
+
+         MEDIDO a 1024: sobram 688 px de conteúdo; a coluna leva 256 e o
+         intervalo 16, e ficam 416 px para a zona de largar — 382 úteis, duas
+         colunas de 185 px. Acima do piso de 111 px, e acima dos 180 px de
+         célula que a fase 07 fixa.
+
+         Abaixo de `lg` a coluna não existe (é `hidden` no `ListaDeTemas`) e a
+         pasta ocupa a vista toda, exactamente como ocupava — com o «← Temas»
+         no lugar. É a regra da Parte 1 do sistema de design: «a vista compacta
+         é adiada o máximo possível».
+
+         ── SEM `--cena` ────────────────────────────────────────────────
+         A escada desta vista tem quatro blocos (0,1,2,3) e o tecto são
+         quatro (`vistas-que-se-compoem.test.ts`). Este ramo nunca teve
+         degrau nenhum e continua a não ter: entrar num tema é uma troca de
+         conteúdo, não a apresentação de uma vista nova. */
+      <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start lg:gap-4">
+        <ListaDeTemas
+          /* A coluna mostra o ÂMBITO à vista — é a mesma lista que a grelha de
+             cartões mostrava —, mais o tema aberto quando um filtro o deixou
+             de fora. Sem essa ressalva, arquivar o tema em que se está a
+             trabalhar apagava-o da coluna e ficava uma lista sem linha activa
+             ao lado das fotografias dele. */
+          temas={visible.some((t) => t.id === open.id) ? visible : [open, ...visible]}
+          activoId={open.id}
+          aoEscolher={setOpenId}
+          aoVoltar={() => setOpenId(null)}
+          aoLargarFotos={largarNoTema}
+          aArrastar={aArrastar}
         />
+        <div className="min-w-0">
+          <ThemeFolder
+            key={open.id}
+            theme={open}
+            // A pasta precisa da lista toda para poder oferecer "Copiar para…" — e
+            // o cartão do destino tem de somar as fotos que lá chegaram, senão a
+            // contagem só se corrige no próximo carregamento da página.
+            themes={themes}
+            onCopiedTo={(destId, added) =>
+              setThemes((prev) =>
+                prev.map((t) =>
+                  t.id === destId && t.imageCount !== null
+                    ? { ...t, imageCount: t.imageCount + added }
+                    : t,
+                ),
+              )
+            }
+            onBack={() => setOpenId(null)}
+            onFolderState={(s) => syncCard(open.id, s)}
+            onRename={(name) =>
+              setThemes((prev) =>
+                prev
+                  .map((t) => (t.id === open.id ? { ...t, name } : t))
+                  .sort((a, b) => a.name.localeCompare(b.name, "pt")),
+              )
+            }
+            onCover={(coverPath, coverUrl) =>
+              setThemes((prev) =>
+                prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
+              )
+            }
+            onDelete={() => setAEliminar(open)}
+            aoArrastar={setAArrastar}
+            pedidoDeMover={pedidoDeMover}
+          />
+        </div>
         {perguntaDeEliminar}
-      </>
+      </div>
     );
   }
 
@@ -2213,7 +2341,11 @@ export default function Temas() {
                         fila. Agora é também o nome de um âmbito da barra —
                         «Por usar» —, e o rasto do cartão e o filtro dizem a
                         mesma coisa com as mesmas palavras. */}
-                    {usos ? (usos[t.id] ? ` · ${plural(usos[t.id], "proposta", "propostas")}` : " · Nunca usado") : ""}
+                    {usos
+                      ? usos[t.id]
+                        ? ` · ${plural(usos[t.id], "proposta", "propostas")}`
+                        : " · Nunca usado"
+                      : ""}
                     {/* NÃO aparece quando a pasta não pôde ser lida: «Fotos
                         indisponíveis · há 2 meses» mistura um aviso com uma
                         informação de rotina, e é o aviso que tem de se ler.
@@ -2623,6 +2755,79 @@ function SkippedThumb({ file, track }: { file: File; track: (file: File) => stri
   return <img src={src} alt="" decoding="async" className="h-full w-full object-cover" />;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CRACHÁ DO NÚMERO — o que se vê debaixo do ponteiro num arrasto múltiplo
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Arrasto múltiplo agrupado com BADGE OVAL DO NÚMERO.» [APPLE], Parte 4 do
+ * `docs/APPLE-TEMAS.md`.
+ *
+ * Sem isto, pegar em quarenta fotografias arrasta a imagem de UMA — e o que se
+ * vê debaixo do ponteiro é indistinguível de arrastar uma só. O número é a
+ * única coisa que diz quantas vão a caminho antes de se largar.
+ *
+ * ── PORQUE É QUE O NÓ VIVE FORA DO ECRÃ E MORRE A SEGUIR ──────────────────
+ *
+ * O `setDragImage` tira uma FOTOGRAFIA do elemento no instante da chamada, mas
+ * a especificação exige que ele ainda esteja no documento nesse instante —
+ * `display: none` ou um nó solto dão um arrasto sem imagem nenhuma. Por isso
+ * ele entra no documento, é fotografado, e sai no próximo turno da fila de
+ * tarefas, que é o primeiro momento em que já não faz falta.
+ *
+ * `translate(-100%)` e não `left: -9999px`: em `rtl` o segundo empurra o
+ * documento para o lado e o browser mostra uma barra de deslocamento durante
+ * um fotograma.
+ */
+function vestirOArrasto(e: React.DragEvent, quantas: number): void {
+  // Uma foto arrasta-se a si própria — a imagem que o browser faz da célula é
+  // melhor do que qualquer coisa que se desenhe aqui, e é a da Apple.
+  if (quantas <= 1) return;
+  const dt = e.dataTransfer;
+  if (typeof dt?.setDragImage !== "function" || typeof document === "undefined") return;
+  const celula = e.currentTarget as HTMLElement;
+  const cracha = document.createElement("div");
+  cracha.setAttribute("aria-hidden", "true");
+  cracha.style.cssText = [
+    "position:fixed",
+    "top:0",
+    "left:0",
+    "transform:translate(-100%,-100%)",
+    "pointer-events:none",
+    "z-index:-1",
+    `width:${Math.round(celula.offsetWidth || 120)}px`,
+    `height:${Math.round(celula.offsetHeight || 90)}px`,
+    "border-radius:8px",
+    "background:var(--bo-surface)",
+    "border:1px solid var(--bo-accent)",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "font:600 13px/1 system-ui,sans-serif",
+  ].join(";");
+  const oval = document.createElement("span");
+  oval.textContent = String(quantas);
+  // Cápsula, e não rectângulo: é um crachá de contagem, que é o único sítio
+  // onde a Parte 4 da tabela de formas do sistema de design pede cápsula num
+  // elemento pequeno.
+  oval.style.cssText = [
+    "min-width:28px",
+    "padding:4px 8px",
+    "border-radius:999px",
+    "background:var(--bo-accent)",
+    "color:#fff",
+    "text-align:center",
+  ].join(";");
+  cracha.appendChild(oval);
+  document.body.appendChild(cracha);
+  try {
+    dt.setDragImage(cracha, 12, 12);
+  } catch {
+    // Um browser que recuse a imagem faz o arrasto na mesma, com a dele.
+  }
+  window.setTimeout(() => cracha.remove(), 0);
+}
+
 /** A pasta de UM tema: renomear, carregar fotos, remover fotos, eliminar. */
 function ThemeFolder({
   theme,
@@ -2633,6 +2838,8 @@ function ThemeFolder({
   onCover,
   onCopiedTo,
   onDelete,
+  aoArrastar,
+  pedidoDeMover,
 }: {
   theme: ThemeSummary;
   /** Todos os temas — para o "Copiar para…" saber para onde pode levar. */
@@ -2641,9 +2848,15 @@ function ThemeFolder({
   onFolderState: (state: FolderState) => void;
   onRename: (name: string) => void;
   onCover: (coverPath: string, coverUrl?: string) => void;
-  /** Chegaram `added` fotos ao tema `destId` — o cartão dele tem de somar. */
+  /** Chegaram `added` fotos ao tema `destId` — o cartão dele tem de somar.
+   *  Um número NEGATIVO subtrai, que é o que o «Anular» de um arrasto pede. */
   onCopiedTo: (destId: string, added: number) => void;
   onDelete: () => void;
+  /** Começou (ou acabou) um arrasto de fotografias. Quem precisa de saber é a
+   *  coluna da esquerda, que é irmã desta pasta e não a conhece. */
+  aoArrastar?: (aArrastar: boolean) => void;
+  /** Um lote largado num tema da coluna. Ver a nota no `Temas`. */
+  pedidoDeMover?: { destino: ThemeSummary; carga: CargaDeFotos; n: number } | null;
 }) {
   const { toast } = useToast();
   /** As fotos JÁ CARREGADAS, mais recentes primeiro. É sempre um PREFIXO da
@@ -2730,6 +2943,27 @@ function ThemeFolder({
   /** Profundidade do arrasto: entrar numa foto dispara `dragleave` no
    *  contentor, e a moldura piscava a cada célula por baixo do ponteiro. */
   const dragDepth = useRef(0);
+  /**
+   * ── O QUE O ARRASTO ENTRE TEMAS PRECISA DE GUARDAR ────────────────────
+   *
+   * `aMover` é a espera: enquanto ela dura, a barra da selecção mostra a
+   * contagem verdadeira em vez de um botão parado (é o mesmo `EmCurso` que a
+   * transferência e a remoção já usam).
+   *
+   * `anuncio` é a região `role="status"` que a Parte 4 exige — «operações de
+   * arrasto anunciadas em role="status"». Não é o toast: o toast é para quem
+   * VÊ, e um leitor de ecrã não lê um aviso que aparece no canto e se vai
+   * embora ao fim de quatro segundos.
+   *
+   * `recarga` obriga a pasta a reler a primeira página. Serve o «Anular»: as
+   * fotografias voltam do tema de destino com CAMINHOS NOVOS no Storage (uma
+   * cópia seguida de um apagar, não um renomear) e com URLs assinados novos.
+   * Repô-las de memória com o `reinsertAt` desenhava uma grelha de imagens
+   * partidas — o que se repõe é o pedido, não o objecto.
+   */
+  const [aMover, setAMover] = useState<{ feito: number; total: number } | null>(null);
+  const [anuncio, setAnuncio] = useState("");
+  const [recarga, setRecarga] = useState(0);
   /** Âncora do Shift+clique (índice na grelha à vista). */
   const anchor = useRef<number | null>(null);
 
@@ -2776,7 +3010,12 @@ function ThemeFolder({
         // O rato já pousou neste cartão? Então a listagem pode já estar cá —
         // ver `adiantarTema`. `null` quer dizer «não havia, ou já não vale», e
         // aí paga-se a ida normal, exactamente como antes disto existir.
-        const adiantada = await usarAdiantada(theme.id);
+        //
+        // Numa RECARGA não se usa: o que se está a pedir é justamente a
+        // verdade nova do servidor (as fotografias que o «Anular» acabou de
+        // mandar de volta), e uma página adiantada é, por definição, a de
+        // antes.
+        const adiantada = recarga === 0 ? await usarAdiantada(theme.id) : null;
         const pagina =
           adiantada ??
           (await (async () => {
@@ -2821,7 +3060,7 @@ function ThemeFolder({
     return () => {
       active = false;
     };
-  }, [theme.id, toast]);
+  }, [theme.id, toast, recarga]);
 
   /**
    * O offset da página seguinte é, sempre, quantas fotos já temos.
@@ -3561,7 +3800,6 @@ function ThemeFolder({
     anchor.current = null;
   }
 
-
   /** Remove um conjunto de fotos. Uma só confirmação para o conjunto todo, e
    *  as que o servidor recusar voltam ao sítio onde estavam. */
   async function removeImages(targets: ThemeImage[], aoProgredir?: (feitas: number) => void) {
@@ -3695,6 +3933,140 @@ function ThemeFolder({
         "info",
       );
     }
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * LARGAR UM LOTE NUM TEMA DA COLUNA — FASE 08
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * «Arrastar para um tema da lista lateral… dentro do mesmo tema reordena;
+   * para outro tema MOVE… sempre com Anular.» (Parte 4 do
+   * `docs/APPLE-TEMAS.md`.)
+   *
+   * ── PORQUE É QUE ISTO NÃO É UM SEGUNDO «COPIAR PARA…» ─────────────────
+   *
+   * Porque é o MESMO. O pedido que sai daqui é o que o `ThemeCopyDialog` já
+   * fazia — `POST /api/temas/{origem}/imagens/copiar` com `modo: "mover"`, em
+   * pedaços de `THEME_COPY_CHUNK` —, e o que chega de volta entra no
+   * `applyCopyOutcome`, que já sabe tirar da grelha só o que o servidor
+   * confirmou, corrigir a capa que saiu e deixar seleccionado o que ficou
+   * para trás. O arrasto é uma segunda PORTA para a operação, não uma segunda
+   * operação: é exactamente a alternativa obrigatória da Parte 4, lida ao
+   * contrário («Mover para… faz o mesmo sem arrastar»).
+   *
+   * O que é próprio do arrasto, e só dele, são as três coisas que este método
+   * acrescenta: a contagem enquanto espera, o anúncio em `role="status"`, e o
+   * «Anular» dentro do aviso.
+   */
+  async function moverParaTema(destino: ThemeSummary, paths: string[]) {
+    if (paths.length === 0 || destino.id === theme.id) return;
+    setAMover({ feito: 0, total: paths.length });
+    const copied: { from: string; to: string }[] = [];
+    const existing: string[] = [];
+    const failed: string[] = [];
+    let thumbsMissing = 0;
+    for (let i = 0; i < paths.length; i += THEME_COPY_CHUNK) {
+      const chunk = paths.slice(i, i + THEME_COPY_CHUNK);
+      try {
+        const res = await fetch(`/api/temas/${theme.id}/imagens/copiar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paths: chunk, destino: destino.id, modo: "mover" }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(String(res.status));
+        for (const c of Array.isArray(data?.copied) ? data.copied : []) {
+          if (typeof c?.from === "string" && typeof c?.to === "string") copied.push(c);
+        }
+        existing.push(...(Array.isArray(data?.existing) ? data.existing : []));
+        failed.push(...(Array.isArray(data?.failed) ? data.failed : []));
+        thumbsMissing += typeof data?.thumbsMissing === "number" ? data.thumbsMissing : 0;
+      } catch {
+        // O pedaço que falha inteiro conta como falha das suas fotos: elas
+        // continuam aqui, e o `applyCopyOutcome` deixa-as seleccionadas para
+        // se poder repetir sem as escolher de novo.
+        failed.push(...chunk);
+      }
+      if (!alive.current) return;
+      setAMover({ feito: Math.min(i + THEME_COPY_CHUNK, paths.length), total: paths.length });
+    }
+    if (!alive.current) return;
+    setAMover(null);
+    applyCopyOutcome({
+      mode: "mover",
+      destId: destino.id,
+      destName: destino.name,
+      copied: copied.map((c) => c.from),
+      existing,
+      failed,
+      untouched: [],
+      thumbsMissing,
+      stopped: false,
+    });
+    if (copied.length === 0) {
+      setAnuncio(fraseDeMovimentoFalhado(paths.length, destino.name));
+      return;
+    }
+    setAnuncio(fraseDoMovimento(copied.length, destino.name));
+    /* ── E NENHUMA ACÇÃO A UM GESTO SEM ANULAR ──────────────────────────
+       Parte 9, e o critério 6 do documento. Um arrasto é o gesto mais fácil
+       de fazer sem querer que este ecrã tem — o ponteiro passa por cima da
+       coluna a caminho de outra coisa — e mover quarenta fotografias para o
+       tema errado sem saída era a versão em ponto grande do `×` a um clique
+       que o ponto 19 mandou tirar. */
+    toast(fraseDoMovimento(copied.length, destino.name), "success", {
+      rotulo: "Anular",
+      aoTocar: () => void anularMovimento(destino, copied),
+    });
+  }
+
+  /**
+   * Desfaz um arrasto: as fotografias voltam do destino para aqui.
+   *
+   * O caminho é o mesmo ao contrário — um `mover` a partir do tema de destino,
+   * com os caminhos NOVOS (o `to` que o servidor devolveu). E a seguir a pasta
+   * relê a primeira página em vez de repor de memória: ver a nota do `recarga`
+   * — o que volta tem caminhos e URLs assinados novos, e o objecto que estava
+   * na grelha já não descreve nenhum ficheiro.
+   */
+  async function anularMovimento(destino: ThemeSummary, movidas: { from: string; to: string }[]) {
+    const paths = movidas.map((m) => m.to);
+    setAMover({ feito: 0, total: paths.length });
+    let devolvidas = 0;
+    for (let i = 0; i < paths.length; i += THEME_COPY_CHUNK) {
+      const chunk = paths.slice(i, i + THEME_COPY_CHUNK);
+      try {
+        const res = await fetch(`/api/temas/${destino.id}/imagens/copiar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paths: chunk, destino: theme.id, modo: "mover" }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(String(res.status));
+        devolvidas += Array.isArray(data?.copied) ? data.copied.length : 0;
+      } catch {
+        // Fica dito no fim, com o número certo: anular metade é uma coisa que
+        // ela tem de ver, não uma que se cale.
+      }
+      if (!alive.current) return;
+      setAMover({ feito: Math.min(i + THEME_COPY_CHUNK, paths.length), total: paths.length });
+    }
+    if (!alive.current) return;
+    setAMover(null);
+    // O cartão do destino perde o que devolveu (o `onCopiedTo` soma, e um
+    // número negativo subtrai — ver a prop). O desta pasta corrige-se sozinho
+    // quando a recarga trouxer o total novo.
+    if (devolvidas > 0) onCopiedTo(destino.id, -devolvidas);
+    bibliotecaAlterada();
+    setRecarga((n) => n + 1);
+    setAnuncio(fraseDoRegresso(devolvidas, theme.name));
+    toast(
+      devolvidas === paths.length
+        ? fraseDoRegresso(devolvidas, theme.name)
+        : `${fraseDoRegresso(devolvidas, theme.name)} As restantes ficaram em «${destino.name}».`,
+      devolvidas === paths.length ? "success" : "error",
+    );
   }
 
   /**
@@ -3844,7 +4216,6 @@ function ThemeFolder({
     // acende-se à vista).
   }
 
-
   async function rename() {
     // O Enter fecha o campo e o onBlur dispara logo a seguir: sem esta guarda
     // saíam dois PATCH iguais para o servidor.
@@ -3930,8 +4301,25 @@ function ThemeFolder({
   const zoomOpener = useRef<HTMLElement | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  /**
+   * ── DE ONDE É QUE A LUPA CRESCE ────────────────────────────────────────
+   *
+   * «Entrada com `--ease-quick` a partir da POSIÇÃO DA MINIATURA (FLIP), não
+   * do centro do ecrã.» (Parte 3 do `docs/APPLE-TEMAS.md`.) Para isso é
+   * preciso o rectângulo da célula no instante do gesto — e depois disso a
+   * célula pode estar tapada, ou fora do ecrã, ou já não existir.
+   *
+   * As células registam-se aqui pelo índice. Um `Map` e não um array: as
+   * células desmontam-se por baixo (o `content-visibility` da
+   * `.celula-saltavel` não desmonta, mas a remoção de uma foto sim) e um
+   * array com buracos é um array que engana quem o percorre.
+   */
+  const celulas = useRef(new Map<number, HTMLElement>());
+  const [origemDaLupa, setOrigemDaLupa] = useState<DOMRect | null>(null);
   const openZoom = useCallback((i: number) => {
     zoomOpener.current = document.activeElement as HTMLElement | null;
+    const celula = celulas.current.get(i);
+    setOrigemDaLupa(celula?.getBoundingClientRect() ?? null);
     setZoomAt(i);
   }, []);
   const closeZoom = useCallback(() => {
@@ -4062,6 +4450,29 @@ function ThemeFolder({
   }, [images, copyOpen, aRemover, zoomAt, renaming]);
 
   /**
+   * ── A LARGADA CHEGA DA COLUNA DA ESQUERDA ──────────────────────────────
+   *
+   * O `dragstart` é aqui, o `drop` é lá, e o `pedidoDeMover` é o que os liga
+   * (ver a nota no `Temas`). O efeito dispara pelo CONTADOR e não pelo
+   * objecto: dois arrastos seguidos para o mesmo tema com as mesmas fotos são
+   * dois pedidos, e um `useEffect` que comparasse o destino não via o segundo.
+   *
+   * O `spring loading` pode ter aberto OUTRO tema antes da largada, e nesse
+   * caso esta pasta já não é a origem do lote — por isso o pedido só é servido
+   * quando a carga saiu mesmo daqui.
+   */
+  const pedidoServido = useRef(0);
+  useEffect(() => {
+    if (!pedidoDeMover || pedidoDeMover.n === pedidoServido.current) return;
+    pedidoServido.current = pedidoDeMover.n;
+    if (pedidoDeMover.carga.origem !== theme.id) return;
+    void moverParaTema(pedidoDeMover.destino, pedidoDeMover.carga.paths);
+    // `moverParaTema` fecha sobre o estado actual da grelha de propósito — é
+    // uma função do corpo, como o `moveTo` e o `setAsCover`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoDeMover, theme.id]);
+
+  /**
    * ── O MENU DE UMA FOTOGRAFIA ───────────────────────────────────────────
    *
    * «Menu de contexto no tema e NA FOTOGRAFIA» (ponto 8 da auditoria). As
@@ -4078,6 +4489,26 @@ function ThemeFolder({
   const accoesDaFoto = useCallback(
     (im: ThemeImage, i: number): AccaoDeItem[] => [
       { id: "ver", rotulo: "Ver em grande", onAccao: () => openZoom(i) },
+      /* ── A ALTERNATIVA POR MENU É OBRIGATÓRIA ─────────────────────────
+         «Alternativa por menu obrigatória — "Mover para…" faz o mesmo sem
+         arrastar.» [APPLE], Parte 4. Um arrasto precisa de rato, de precisão
+         e de duas mãos livres; um menu não precisa de nenhuma das três, e é
+         o único caminho no telemóvel — onde o arrasto HTML5 não pega.
+
+         Abre a folha que já existe (`ThemeCopyDialog`, com «Mover»
+         escolhido), e leva a foto do menu se ela não estiver na selecção. */
+      ...(otherThemes.length > 0
+        ? [
+            {
+              id: "mover",
+              rotulo: "Mover para…",
+              onAccao: () => {
+                setSelected((prev) => (prev.has(im.path) ? prev : new Set([im.path])));
+                setCopyOpen(true);
+              },
+            },
+          ]
+        : []),
       ...(i > 0
         ? [
             {
@@ -4101,7 +4532,7 @@ function ThemeFolder({
     // componente e mudam a cada desenho de propósito (fecham sobre o estado
     // actual da grelha). O que importa fixar é a foto e a capa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [coverPath, openZoom],
+    [coverPath, openZoom, otherThemes.length],
   );
 
   const aSairDaLupa = useSaidaDeUmSo(zoomAt !== null);
@@ -4428,7 +4859,21 @@ function ThemeFolder({
           O `sticky` está no invólucro para que a espera acompanhe o scroll tal
           como a barra acompanhava; a 390 px cada um ocupa a largura toda e
           empilham. */}
-      {(selectedCount > 0 || emBloco) && (
+      {/* ── O QUE O ARRASTO DIZ A QUEM OUVE O ECRÃ ──────────────────────────
+          «Operações de arrasto anunciadas em `role="status"`» (Parte 7), e a
+          Parte 4 dá a frase: «3 fotografias movidas para Bouquets
+          Campestres.» O toast não serve para isto — flutua no canto, some ao
+          fim de quatro segundos e o «Anular» que ele carrega é para quem VÊ.
+
+          `aria-label` porque esta página tem outras duas regiões `status` (o
+          `ToastProvider` e o estado da vista da lista); sem nome, quem navega
+          por regiões encontra três iguais. Vazia em repouso — uma região viva
+          com texto lá dentro é lida outra vez a cada re-desenho. */}
+      <p role="status" aria-live="polite" aria-label="Movimento de fotografias" className="sr-only">
+        {anuncio}
+      </p>
+
+      {(selectedCount > 0 || emBloco || aMover) && (
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
             /* ── A PRIMEIRA SUPERFÍCIE DE VIDRO A SÉRIO DA CASA ──────────
@@ -4518,6 +4963,19 @@ function ThemeFolder({
               </div>
             </Glass>
           )}
+          {aMover && (
+            /* A espera do arrasto, no mesmo sítio e com o mesmo desenho da
+               transferência e da remoção. Um lote de quarenta fotografias
+               demora, e a única coisa que se via era a grelha parada. */
+            <div className="rounded-xl bg-[var(--bo-surface)]/95 backdrop-blur">
+              <EmCurso
+                titulo="A mover as fotos…"
+                feito={aMover.feito}
+                total={aMover.total}
+                nota="Podes continuar a usar o ecrã. Se te enganaste, o aviso no fim traz «Anular»."
+              />
+            </div>
+          )}
           {emBloco && (
             /* Fundo opaco por baixo: o cartão da espera é translúcido de
                propósito (é um tom sobre o papel), e colado ao topo passava a
@@ -4565,6 +5023,9 @@ function ThemeFolder({
           onClose={closeZoom}
           onDownload={downloadImage}
           downloading={downloading}
+          // De onde a lupa cresce. `null` quando a célula já não está no ecrã
+          // — aí abre como abria, do centro.
+          origem={origemDaLupa}
         />
       )}
 
@@ -4593,14 +5054,41 @@ function ThemeFolder({
         // dela não acompanha a da janela a partir de `lg`, onde a navegação
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do
         // `GRELHA_DE_FOTOS`.
-        className={`@container rounded-2xl border border-dashed p-4 ${ESTADO} ${
-          drag ? "border-sage-600/60 bg-sage-600/[0.06]" : "border-[var(--bo-hairline-strong)]"
+        /* ══════════════════════════════════════════════════════════════════
+           O TRACEJADO SÓ EXISTE DURANTE UM ARRASTO — FASE 07
+           ══════════════════════════════════════════════════════════════════
+
+           Ponto 17 da auditoria, e o critério 8: «a área tracejada está sempre
+           visível… um tracejado permanente é ruído que ensina a ignorar o
+           sinal. A grelha é só a grelha.» [APPLE, Drag and drop: mostrar sinal
+           de aceitação SÓ sobre um destino válido, durante o arrasto.]
+
+           Três estados, e a moldura tem sempre 1 px para a geometria não
+           saltar (é ela que o `zonaDeLargar` do teste conta):
+
+             · a arrastar ficheiros por cima → tracejado no acento, e o realce
+               do contentor. É o sinal de aceitação, e só aqui;
+             · com fotografias na grelha → moldura TRANSPARENTE. A grelha é só
+               a grelha;
+             · sem fotografias nenhumas → um fio da casa, contínuo. Não é uma
+               zona de largar a anunciar-se: é a moldura da frase que ocupa o
+               lugar das fotografias, e sem ela o texto fica solto no meio da
+               página. Contínuo e não tracejado, que é a diferença entre uma
+               moldura e um convite.
+
+           A `bo-cena` não entra aqui: ver a nota do split view. */
+        className={`@container rounded-2xl border p-4 ${ESTADO} ${
+          drag
+            ? "border-dashed border-sage-600/60 bg-sage-600/[0.06]"
+            : images.length === 0 && pending.length === 0
+              ? "border-[var(--bo-hairline-strong)]"
+              : "border-transparent"
         }`}
       >
         {loading ? (
           <div className={GRELHA_DE_FOTOS}>
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="bo-skeleton aspect-square rounded-lg" aria-hidden />
+              <div key={i} className="bo-skeleton aspect-[4/3] rounded-lg" aria-hidden />
             ))}
           </div>
         ) : unreadable ? (
@@ -4639,7 +5127,7 @@ function ThemeFolder({
                   key={p.id}
                   aria-hidden
                   title={`${p.name} — a carregar`}
-                  className="relative aspect-square overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
+                  className="relative aspect-[4/3] overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-6)]"
                 >
                   {p.src ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -4663,6 +5151,10 @@ function ThemeFolder({
                 return (
                   <div
                     key={im.path}
+                    ref={(no) => {
+                      if (no) celulas.current.set(i, no);
+                      else celulas.current.delete(i);
+                    }}
                     draggable
                     onDragStart={(e) => {
                       setDragFrom(i);
@@ -4670,10 +5162,29 @@ function ThemeFolder({
                       // Alguns navegadores só iniciam o arrasto com dados lá
                       // dentro; o valor não é usado por ninguém.
                       e.dataTransfer.setData("text/plain", String(i));
+                      /* ── E O MESMO GESTO SERVE OS DOIS DESTINOS ─────────
+                         «Dentro do mesmo tema REORDENA; para outro tema
+                         MOVE.» [APPLE] É um arrasto só, com duas cargas: o
+                         índice em `text/plain`, que é o que as células
+                         vizinhas lêem para reordenar, e o lote de caminhos no
+                         tipo próprio, que é o que a coluna da esquerda lê
+                         para mover. Quem decide é o destino onde ele acaba.
+
+                         E o lote é a SELECÇÃO quando se pega numa foto que
+                         está nela — ver `fotosQueViajam`. */
+                      const lote = fotosQueViajam(
+                        im.path,
+                        selected,
+                        images.map((x) => x.path),
+                      );
+                      escreverCarga(e.dataTransfer, { origem: theme.id, paths: lote });
+                      vestirOArrasto(e, lote.length);
+                      aoArrastar?.(true);
                     }}
                     onDragEnd={() => {
                       setDragFrom(null);
                       setDragOver(null);
+                      aoArrastar?.(false);
                     }}
                     onDragOver={(e) => {
                       if (dragFrom === null) return;
@@ -4690,7 +5201,7 @@ function ThemeFolder({
                     }}
                     // `celula-saltavel`: fora do ecrã, o browser não desenha
                     // nem descodifica esta célula. A altura não depende disso
-                    // (é `aspect-square` numa coluna de largura fixa), por
+                    // (é `aspect-[4/3]` numa coluna de largura fixa), por
                     // isso a barra de deslocamento não mexe. Ver globals.css.
                     /* O botão direito abre as mesmas quatro acções que os
                        botões da célula — ver `accoesDaFoto`. O menu é `fixed`,
@@ -4705,7 +5216,7 @@ function ThemeFolder({
                         accoes: accoesDaFoto(im, i),
                       });
                     }}
-                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
+                    className={`celula-saltavel group relative aspect-[4/3] overflow-hidden rounded-lg border bg-[var(--bo-tinta-6)] ${ESTADO} ${
                       isSelected
                         ? "border-sage-600 ring-2 ring-sage-600/40"
                         : "border-[var(--bo-hairline-strong)]"
@@ -4715,7 +5226,7 @@ function ThemeFolder({
                         : ""
                     }`}
                   >
-                    {/* A célula já tem `aspect-square`, por isso adiar a foto
+                    {/* A célula já tem `aspect-[4/3]`, por isso adiar a foto
                         não salta nada. E o que se mostra é a MINIATURA: com o
                         original, uma página de 60 fotos puxava ~150 MB. As da
                         primeira dobra não esperam pela vez de ninguém. */}
@@ -4738,7 +5249,34 @@ function ThemeFolder({
                         // de somar à selecção é o Ctrl.
                         toggleAt(i, { shift: e.shiftKey, somar: e.metaKey || e.ctrlKey })
                       }
+                      // ── `ESPAÇO` PRÉ-VISUALIZA ──────────────────────────
+                      // «É o gesto que qualquer utilizador de Mac tenta
+                      // primeiro» (ponto 23), e o critério 5 do documento.
+                      // Anunciado, para não ser um segredo: um atalho que só
+                      // quem leu o documento conhece não existe.
+                      aria-keyshortcuts="Space"
                       onKeyDown={(e) => {
+                        /* ── E O QUE ISTO CUSTA, ESCRITO POR EXTENSO ──────
+                           Esta célula é um `role="checkbox"`, e num checkbox o
+                           `Espaço` alterna. O documento manda o `Espaço` para
+                           o Quick Look — duas vezes, e é critério de
+                           aceitação. Fica o Quick Look, e o alternar NÃO se
+                           perde: um `<button>` dispara `click` com o `Enter`,
+                           portanto marcar e desmarcar continuam a ter caminho
+                           de teclado, mais o rato e o dedo.
+
+                           O que se troca é a tecla, não a função — e é a
+                           troca que a fase 11 vem fechar, quando a célula
+                           passar a `role="gridcell"` com `aria-selected` (é o
+                           que a Parte 7 pede) e o `Espaço` deixar de ser de
+                           ninguém. Até lá o comentário fica, para quem vier a
+                           seguir não desfazer isto a pensar que foi
+                           distracção. */
+                        if (e.key === " " || e.key === "Spacebar") {
+                          e.preventDefault();
+                          openZoom(i);
+                          return;
+                        }
                         // Alt + setas move a foto. Sem o Alt, as setas continuam
                         // a andar entre células, que é o que o teclado espera.
                         if (!e.altKey) return;
