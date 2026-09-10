@@ -4,6 +4,23 @@
 > ⚠️ **Não confundir com `docs/temas.md`**, que é outra coisa: esse descreve a
 > biblioteca de temas como ela já funcionava. Este manda reconstruí-la.
 
+## ISTO ESTÁ PROMETIDO, E A PROMESSA ESTÁ AQUI E NÃO NUMA CONVERSA
+
+**10 de Setembro de 2026** — «não te esqueças mesmo de fazer depois os temas.»
+
+Ficou de fora da primeira ronda de agentes por uma razão que é dela e não contra
+ela: dos três ecrãs, este é o que já tinha mais feito ANTES do documento existir
+(4346 linhas, quase todas as fases começadas e nenhuma acabada). Pôr um agente
+aqui ao mesmo tempo que os outros dois era a maneira mais rápida de desfazer
+trabalho que já estava bom.
+
+Fica registado por escrito porque uma promessa dita numa conversa é exactamente
+o que se perde — foi assim que este documento e os outros dois andaram meses sem
+existir em lado nenhum. Quem abrir este ficheiro a seguir, com os outros dois
+ecrãs entregues, **este é o próximo**.
+
+---
+
 ## O QUE JÁ ESTÁ FEITO
 
 Auditado no `Temas.tsx` (4346 linhas) contra a tabela da **Parte 8**.
