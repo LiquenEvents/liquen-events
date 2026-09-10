@@ -160,10 +160,13 @@ async function garantirUmPedido(page: Page): Promise<void> {
  *
  * MEDIDO, e é o que obrigou a escrever isto: com o passeio a auditar logo a
  * seguir ao `<h1>`, a auditoria das Tarefas via SETE elementos interactivos —
- * os da navegação — e nenhum da vista. O `<summary>` «Detalhes (opcional)», de
- * 15 px de altura, estava lá em baixo à espera de ser medido e nunca foi. O
- * guarda `examinados > 0` dava-se por satisfeito com a moldura, portanto o
- * passo passava, verde, sobre um ecrã que ainda não existia.
+ * os da navegação — e nenhum da vista. O que estava lá em baixo à espera de ser
+ * medido, e nunca foi, era o `<summary>` «Detalhes (opcional)» de 15 px de
+ * altura. (Esse já não existe: ela mandou-o abrir — «retira isto do opcional,
+ * quero que apareça logo» — e os quatro campos deixaram de ter porta. A LIÇÃO
+ * fica, que é o que este parágrafo guarda.) O guarda `examinados > 0` dava-se
+ * por satisfeito com a moldura, portanto o passo passava, verde, sobre um ecrã
+ * que ainda não existia.
  *
  * Duas linhas resolvem-no: o esqueleto (`data-view-skeleton`, posto pelo
  * `ViewSkeleton`) tem de ter saído, e o `<main>` tem de ter conteúdo próprio.
@@ -675,14 +678,25 @@ test.describe("Back office — mobile", () => {
       await rota.fallback();
     });
 
-    await page
-      .getByPlaceholder(/O que há para fazer/i)
-      .first()
-      .fill("tarefa que não vai gravar");
-    await page
-      .getByRole("button", { name: /^Adicionar$/ })
-      .first()
-      .tap();
+    /* ── ESCREVER UMA TAREFA MUDOU DE GESTO, E ESTE PASSEIO APRENDE-O ─────
+       Fase 03 do documento das Tarefas: o cartão de criar saiu do topo da
+       página («ocupa ~180 px, sempre, para uma ação ocasional, e empurra para
+       baixo aquilo que é o conteúdo») e a criação passou a ser a última linha
+       da lista, que só vira campo quando se lhe toca.
+
+       E o botão «Adicionar» saiu com ele — era um primário DESACTIVADO como
+       estado inicial de um ecrã vazio, que é a primeira coisa que se vê ao
+       entrar aqui e se lê como avaria. `Enter` cria, que é o gesto que toda a
+       gente tenta primeiro.
+
+       O passeio passa a dar os mesmos dois gestos que ela dá. O que ele mede —
+       que uma gravação recusada se explica, se fecha com o dedo e não tapa a
+       navegação — não mudou nada. */
+    await page.getByRole("button", { name: "Nova tarefa" }).first().tap();
+    const campoDaTarefa = page.getByPlaceholder(/O que há para fazer/i).first();
+    await expect(campoDaTarefa, "a linha de escrever uma tarefa abriu").toBeVisible();
+    await campoDaTarefa.fill("tarefa que não vai gravar");
+    await campoDaTarefa.press("Enter");
 
     // 1. DIZ O QUE SE PASSOU, em português e sem código de erro.
     const aviso = page.locator('[role="alert"] > div').first();
@@ -988,9 +1002,11 @@ test.describe("Back office — mobile", () => {
       ter sido feita ao abridor da gaveta.
     */
     const textos = (
-      await barra.getByRole("button").evaluateAll((bs) =>
-        bs.map((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim()),
-      )
+      await barra
+        .getByRole("button")
+        .evaluateAll((bs) =>
+          bs.map((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim()),
+        )
     )
       .filter(Boolean)
       // O abridor da gaveta é contado à parte, na asserção logo a seguir. Antes
