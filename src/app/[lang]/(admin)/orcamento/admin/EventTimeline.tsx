@@ -12,11 +12,20 @@ import {
   duracaoDe,
   estaNoDia,
   horaDoMinuto,
+  opcoesDeDuracao,
   oQueVemASeguir,
   ordenar,
   porExtenso,
+  SEM_DURACAO,
   type BlocoDoDia,
 } from "@/lib/orcamento/guiao-do-dia";
+import {
+  CRONOGRAMA_BASE,
+  modeloAPartirDoGuiao,
+  momentosDoModelo,
+  type ModeloDeGuiao,
+  type MomentoDeModelo,
+} from "@/lib/orcamento/guiao-modelos";
 import { Button, Escolha, Field, EmptyState } from "./ui";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
@@ -25,57 +34,26 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 interface Props {
   quote: Quote;
   onChange: (items: TimelineItem[]) => void;
-}
-
-/**
- * Sensible starting run sheet for a typical event day.
- *
- * As durações não são enfeite: são o que faz o cronograma-base ter FORMA logo
- * à nascença. Sem elas, gerar o cronograma dava outra vez oito instantes e a
- * pergunta «isto cabe?» continuava sem resposta até ela preencher oito
- * durações à mão — que é exactamente o trabalho que ninguém faz.
- *
- * O buraco das 13:00 às 16:00 é REAL e fica de propósito: é o tempo morto
- * entre a montagem acabada e os convidados a chegar. O ecrã diz que ele
- * existe; ela decide se está certo.
- */
-const TEMPLATE: Omit<TimelineItem, "id">[] = [
-  { time: "09:00", title: "Montagem e decoração do espaço", duracao: 180 },
-  { time: "12:00", title: "Chegada de fornecedores (catering, som)", duracao: 60 },
-  { time: "16:00", title: "Receção dos convidados", duracao: 60 },
-  { time: "17:00", title: "Cerimónia", duracao: 45 },
-  { time: "18:30", title: "Cocktail de boas-vindas", duracao: 90 },
-  { time: "20:00", title: "Jantar", duracao: 180 },
-  { time: "23:00", title: "Festa / momento de dança", duracao: 180 },
-  { time: "02:00", title: "Encerramento e desmontagem", duracao: 120 },
-];
-
-/**
- * ── AS DURAÇÕES QUE SE ESCOLHEM COM UM POLEGAR ─────────────────────────────
- *
- * Uma lista fechada, e não uma caixa de escrever minutos. Ela está de pé, numa
- * quinta, com as mãos ocupadas: escrever «45» num campo numérico são três
- * toques, um teclado a tapar meio ecrã e a hipótese de escrever 450. Escolher
- * de uma lista é um toque.
- *
- * Os degraus são os do ofício — um quarto de hora, meia hora, três quartos,
- * hora a hora até às quatro, e depois os saltos grandes da montagem e da
- * desmontagem. Uma duração fora desta lista (vinda de outro sítio, ou de um
- * guião gravado noutro dia) NÃO se perde: entra na lista como opção própria,
- * ver `opcoesDeDuracao`.
- */
-const DEGRAUS_DE_DURACAO = [15, 30, 45, 60, 90, 120, 180, 240, 360, 480] as const;
-
-const SEM_DURACAO = "0";
-
-function opcoesDeDuracao(atual: number) {
-  const degraus: number[] = [...DEGRAUS_DE_DURACAO];
-  if (atual > 0 && !degraus.includes(atual)) degraus.push(atual);
-  degraus.sort((a, b) => a - b);
-  return [
-    { valor: SEM_DURACAO, rotulo: "Sem duração" },
-    ...degraus.map((m) => ({ valor: String(m), rotulo: porExtenso(m) })),
-  ];
+  /**
+   * ── OS MODELOS SÃO UMA PROPRIEDADE, E NÃO UMA LEITURA DAQUI DE DENTRO ────
+   *
+   * Este componente edita o guião em dois sítios: dentro do dossier de um
+   * evento (onde sempre esteve) e dentro da vista «Timelines» (que é nova).
+   * A vista de topo tem os modelos porque é a vista dos modelos; o dossier
+   * abre exactamente como abria.
+   *
+   * Uma leitura própria (`useCachedList`) dava-os aos dois sem prop nenhuma, e
+   * foi o que se tentou primeiro. Não passa: os testes deste componente contam
+   * as chamadas ao `fetch` para provar que duas remoções ao mesmo tempo não
+   * ressuscitam um momento — uma leitura de modelos à montagem entrava como
+   * chamada número um e trocava as respostas todas. Uma leitura acrescentada a
+   * um componente que já usa o `fetch` para gravar não é gratuita.
+   *
+   * Sem esta propriedade, o guião vazio oferece o botão de sempre e mais nada.
+   */
+  modelos?: readonly ModeloDeGuiao[];
+  /** Guardar o guião actual como modelo. Sem isto, o comando não aparece. */
+  aoGuardarComoModelo?: (nome: string, momentos: MomentoDeModelo[]) => void;
 }
 
 /**
@@ -147,7 +125,7 @@ interface Colisao {
   reaplicar: (atuais: TimelineItem[]) => TimelineItem[];
 }
 
-export default function EventTimeline({ quote, onChange }: Props) {
+export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoModelo }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<TimelineItem[]>(quote.timeline ?? []);
   const [time, setTime] = useState("");
@@ -322,17 +300,58 @@ export default function EventTimeline({ quote, onChange }: Props) {
     );
   }
 
-  function seed() {
-    // Os ids nascem AQUI e não dentro do gesto: se o cronograma-base tiver de
-    // ser reaplicado depois de uma colisão, tem de ser o mesmo, e não uma
-    // segunda cópia com ids novos. E acrescenta em vez de substituir — o botão
-    // só aparece com o guião vazio, portanto no uso normal dá o mesmo, mas
-    // reaplicá-lo por cima do guião de outra pessoa não o pode deitar fora.
-    const novos = TEMPLATE.map((t) => ({ ...t, id: randomId() }));
-    persist("gerar o cronograma-base", (atuais) => [
+  /**
+   * Pôr um conjunto de momentos no guião — o cronograma-base ou um modelo.
+   *
+   * Os ids nascem AQUI e não dentro do gesto: se isto tiver de ser reaplicado
+   * depois de uma colisão, tem de pôr os MESMOS momentos, e não uma segunda
+   * cópia com ids novos.
+   *
+   * E ACRESCENTA, nunca substitui. Com o guião vazio dá o mesmo; com o guião
+   * de outra pessoa por baixo — que é o que acontece quando um 409 manda
+   * reaplicar o gesto — deitar fora o que lá está era usar um modelo para
+   * apagar trabalho. Não há nesta vista um único caminho que destrua um guião
+   * sem ser momento a momento, com o × de cada linha.
+   */
+  function aplicarMomentos(oQue: string, momentos: readonly MomentoDeModelo[]) {
+    const novos = momentosDoModelo({ momentos: [...momentos] }, randomId);
+    persist(oQue, (atuais) => [
       ...atuais,
       ...novos.filter((n) => !atuais.some((a) => a.id === n.id)),
     ]);
+  }
+
+  function seed() {
+    aplicarMomentos("gerar o cronograma-base", CRONOGRAMA_BASE);
+  }
+
+  /**
+   * Guardar o que está no ecrã como modelo.
+   *
+   * O nome pede-se com um `prompt` do browser e não com um diálogo próprio, e
+   * é uma escolha deliberada e não preguiça: o comando vive dentro de um painel
+   * que já é editável ponto a ponto, e abrir uma folha por cima dele para pedir
+   * uma linha de texto era a «modal a partir de modal» que a Parte 10 do
+   * sistema de design proíbe. Quem grava o modelo é quem chama, através de
+   * `aoGuardarComoModelo` — este componente não conhece rota nenhuma de
+   * modelos.
+   */
+  function guardarComoModelo() {
+    if (!aoGuardarComoModelo) return;
+    const momentos = modeloAPartirDoGuiao(items);
+    if (momentos.length === 0) {
+      toast("A timeline ainda não tem momentos com hora e nome para guardar.", "error");
+      return;
+    }
+    const sugestao = quote.eventName?.trim() || "Timeline";
+    const nome = window.prompt("Que nome dás a este modelo?", sugestao);
+    if (nome === null) return;
+    const limpo = nome.trim();
+    if (!limpo) {
+      toast("Dá um nome ao modelo — é por ele que o encontras outra vez.", "error");
+      return;
+    }
+    aoGuardarComoModelo(limpo, momentos);
   }
   function add() {
     const t = title.trim();
@@ -349,7 +368,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
       // guião antigo — que é a comparação que o 409 faz.
       ...(minutos > 0 ? { duracao: minutos } : {}),
     };
-    persist(`acrescentar «${time} ${t}» ao guião`, (atuais) => [...atuais, momento]);
+    persist(`acrescentar «${time} ${t}» à timeline`, (atuais) => [...atuais, momento]);
     setTime("");
     setTitle("");
     setOwner("");
@@ -358,7 +377,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
   function remove(id: string) {
     const momento = items.find((i) => i.id === id);
     persist(
-      `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» do guião`,
+      `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» da timeline`,
       (atuais) => atuais.filter((i) => i.id !== id),
     );
   }
@@ -470,18 +489,47 @@ export default function EventTimeline({ quote, onChange }: Props) {
     // `--bo-p-vista` (12 → 24) é o token do respiro vertical de uma vista:
     // 12 px de volta no telemóvel, computador na mesma.
     <section className="border-t border-[var(--bo-hairline-strong)] pt-[var(--bo-p-vista)]">
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="bo-eyebrow">Cronograma do Dia</p>
+        {/* ── OS MODELOS, ONDE ELES SÃO PRECISOS ────────────────────────────
+            Só quando quem chama os deu (a vista «Timelines»). No dossier
+            de um evento este bloco não existe e o painel abre como sempre
+            abriu — ver a propriedade `modelos`.
+
+            «Juntar» e não «aplicar»: os momentos do modelo ACRESCENTAM-SE ao
+            que lá está (ver `aplicarMomentos`), e um verbo que prometesse
+            substituição mentiria sobre o que o toque faz. */}
+        {modelos && modelos.length > 0 && (
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+            <Escolha
+              aria-label="Juntar um modelo a esta timeline"
+              opcoes={modelos.map((m) => ({ valor: m.id, rotulo: m.nome }))}
+              valor=""
+              vazio="Juntar modelo…"
+              aoMudar={(id) => {
+                const modelo = modelos.find((m) => m.id === id);
+                if (modelo) aplicarMomentos(`juntar o modelo «${modelo.nome}»`, modelo.momentos);
+              }}
+              className="w-full text-xs"
+              containerClassName="min-w-0 flex-1 sm:w-44 sm:flex-none"
+            />
+          </div>
+        )}
         {items.length > 0 && (
           <div className="flex shrink-0 items-center gap-1.5">
             <span className="rounded-full bg-[var(--bo-tinta-6)] px-2.5 py-1 text-[11px] tabular-nums text-[var(--bo-text-muted)]">
               {items.length} {items.length === 1 ? "momento" : "momentos"}
             </span>
+            {aoGuardarComoModelo && (
+              <Button size="sm" variant="ghost" onClick={guardarComoModelo}>
+                Guardar como modelo…
+              </Button>
+            )}
             <button
               type="button"
               onClick={() => printRunSheet(quote)}
-              title="Imprimir guião do dia"
-              aria-label="Imprimir guião do dia"
+              title="Imprimir a timeline"
+              aria-label="Imprimir a timeline"
               // 27×27 medidos a 375 px — um botão de ícone sem rótulo, que é
               // a classe de alvo mais fácil de falhar com o polegar.
               className={`alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
@@ -541,7 +589,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
             </ul>
           ) : (
             <p className="bo-text-muted mt-1 text-sm">
-              {seguinte.terminado ? "O guião chegou ao fim." : "Não há nada marcado neste momento."}
+              {seguinte.terminado ? "A timeline chegou ao fim." : "Não há nada marcado neste momento."}
             </p>
           )}
 
@@ -582,11 +630,11 @@ export default function EventTimeline({ quote, onChange }: Props) {
           className="mb-5 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3 text-sm"
         >
           <p className="font-medium text-[var(--bo-perigo)]">
-            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o guião mudou noutro sítio
+            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: a timeline mudou noutro sítio
             entretanto.
           </p>
           <p className="bo-text-muted mt-1">
-            O guião que está no ecrã é o que ficou guardado. Não se perdeu nada — podes voltar a
+            A timeline que está no ecrã é a que ficou guardada. Não se perdeu nada — podes voltar a
             aplicar o que estavas a fazer por cima dele.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -675,7 +723,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
               <path d="M12 7v5l3 2" />
             </svg>
           }
-          title="Guião do dia por preencher"
+          title="Timeline por preencher"
           description="Gera um cronograma-base para um dia de evento típico e adapta os momentos a este evento."
           action={{ label: "Gerar cronograma-base", onClick: seed }}
         />

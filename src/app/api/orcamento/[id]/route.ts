@@ -194,7 +194,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
    * DE QUE VERSÃO É QUE ESTA LISTA FOI COPIADA
    * ══════════════════════════════════════════════════════════════════════════
    *
-   * Os painéis do dossier — Pagamentos, Checklist, Guião do dia, Produção e
+   * Os painéis do dossier — Pagamentos, Checklist, Timeline, Produção e
    * Custos — copiam a colecção INTEIRA para estado interno quando abrem, e ao
    * gravar mandam-na inteira de volta (ver `COLECCOES_INTEIRAS`). Isso quer
    * dizer que a gravação não é «marca este pagamento como recebido» — é

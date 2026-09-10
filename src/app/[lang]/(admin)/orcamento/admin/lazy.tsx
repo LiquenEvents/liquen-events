@@ -169,6 +169,7 @@ const contratos = splitView(() => import("./Contratos"));
 const inventario = splitView(() => import("./Inventario"));
 const material = splitView(() => import("./Material"));
 const temas = splitView(() => import("./Temas"));
+const guioes = splitView(() => import("./Guioes"));
 
 export const Kanban = kanban.View;
 export const Clientes = clientes.View;
@@ -187,6 +188,7 @@ export const Contratos = contratos.View;
 export const Inventario = inventario.View;
 export const Material = material.View;
 export const Temas = temas.View;
+export const Guioes = guioes.View;
 
 // ── Detail-panel tools (only needed once a quote is opened) ──
 export const ProposalBuilder = dynamic(() => import("./ProposalBuilder"), {
@@ -252,6 +254,7 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   inventario: inventario.warm,
   material: material.warm,
   temas: temas.warm,
+  guioes: guioes.warm,
   // Dois módulos para uma vista só: as Estatísticas desenham o painel dos
   // fechos da Meta por baixo dos gráficos, e aquecer só metade deixava o
   // clique a ir buscar a outra metade à rede — que é justamente o que este

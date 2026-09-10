@@ -392,7 +392,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 size="sm"
                 className="alvo-toque"
                 onClick={() => printRunSheet(quote)}
-                title="Imprimir o guião do dia (cronograma e checklist do evento)"
+                title="Imprimir a timeline (cronograma e checklist do evento)"
                 iconLeft={
                   <svg
                     width="14"
@@ -412,7 +412,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   </svg>
                 }
               >
-                <span className="hidden sm:inline">Guião do dia</span>
+                <span className="hidden sm:inline">Timeline</span>
               </Button>
 
               {/* .ics — só quando o evento tem data (buildEventIcs devolve null

@@ -15,6 +15,7 @@ export type View =
   | "propostas"
   | "acompanhamento"
   | "fazer-proposta"
+  | "guioes"
   | "tarefas"
   | "fornecedores"
   | "inventario"
@@ -59,6 +60,7 @@ const TODAS: Record<View, true> = {
   propostas: true,
   acompanhamento: true,
   "fazer-proposta": true,
+  guioes: true,
   tarefas: true,
   fornecedores: true,
   inventario: true,
@@ -129,7 +131,33 @@ export const CORE_NAV: View[] = [
   "tarefas",
 ];
 
-export const MORE_NAV: View[] = ["contratos", "material", "temas", "estatisticas", "definicoes"];
+/**
+ * ── PORQUE É QUE OS «GUIÕES DO DIA» ENTRAM AQUI E NÃO NA BARRA DE BAIXO ───
+ *
+ * A `BARRA_INFERIOR` tem quatro lugares e os quatro estão tomados por uma razão
+ * escrita e medida (ver o bloco a seguir): são o dia de trabalho comercial —
+ * ver o que há, ler o que entrou, escrever a proposta, ver as que saíram. Um
+ * quinto botão dava cinco alvos de 75 px numa barra de 390 onde 44 é o mínimo,
+ * e tirar um dos quatro para pôr este era trocar a tarefa que dá o dinheiro por
+ * uma que só serve nas semanas em que há evento.
+ *
+ * Os guiões são um destino de SEMANA e não de hora: prepara-se um guião uma vez
+ * por evento, e consulta-se no próprio dia. É exactamente a definição que o
+ * comentário da barra dá aos destinos que ficam na gaveta. No computador não há
+ * diferença nenhuma — a barra mostra os doze.
+ *
+ * FICA EM PRIMEIRO no «Mais», e não no fim: é o único destino desta lista que se
+ * usa com um evento em cima, de pé, numa quinta. Os outros cinco são de
+ * escritório.
+ */
+export const MORE_NAV: View[] = [
+  "guioes",
+  "contratos",
+  "material",
+  "temas",
+  "estatisticas",
+  "definicoes",
+];
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -278,6 +306,30 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
       >
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6M9 13h6M9 17h6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "guioes",
+    label: "Timelines",
+    /* Uma régua do dia: a espinha do tempo à esquerda e dois blocos de
+       comprimentos diferentes — que é a ideia inteira desta vista (a duração é
+       o comprimento). Não é um relógio nem um calendário de propósito: esses
+       dois ícones já estão tomados pelas Tarefas e pelo Calendário, e três
+       destinos com a mesma metáfora não se distinguem no canto do olho. */
+    icon: (
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <path d="M4 4v16" strokeLinecap="round" />
+        <rect x="8" y="5" width="12" height="4" rx="1" />
+        <rect x="8" y="15" width="7" height="4" rx="1" />
+        <path d="M4 7h4M4 17h4" strokeLinecap="round" />
       </svg>
     ),
   },
