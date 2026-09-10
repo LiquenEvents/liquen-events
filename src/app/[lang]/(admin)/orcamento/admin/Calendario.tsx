@@ -824,7 +824,23 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                     : `${monthTotal} evento${monthTotal !== 1 ? "s" : ""} este mês`}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            {/* ── ESTA FILA DEIXOU DE PODER SER `shrink-0` ──────────────────
+                MEDIDO no CI, a 375 px (iPhone SE): «Mês|Ano · Exportar · Hoje ‹ ›»
+                dava 3 px para lá da margem direita, e o `body` tem
+                `overflow-x: clip` — ou seja, a seta de avançar o mês ficava
+                CORTADA, sem maneira nenhuma de lá chegar com o dedo.
+
+                É o mesmo defeito, palavra por palavra, que o `Guioes.tsx` já
+                tem escrito: uma fila que cabia com dois comandos, ganhou um
+                terceiro, e o `shrink-0` recusou-se a encolher — com ele, o
+                `flex-wrap` nunca chega a disparar, porque não há o que quebrar
+                quando a caixa não aperta.
+
+                `min-w-0` e `flex-wrap`: a fila encolhe, e quando não couber a
+                navegação passa para a linha de baixo inteira em vez de sair
+                pela borda. E a lição de medição fica dita — 375 px é o caso
+                estreito desta casa, não 390. Eu tinha medido a 390 e não vi. */}
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               {/* ── O COMUTADOR DAS VISTAS ────────────────────────────────
                   Duas das quatro que o documento pede. Fica ANTES do
                   «Exportar» porque trocar de vista é a acção frequente e
