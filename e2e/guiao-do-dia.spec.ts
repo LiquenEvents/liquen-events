@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido";
+import { entrarNoBackOffice, exigirLogin, pedidoDoDia } from "./semear-pedido";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -59,43 +59,10 @@ test.describe("Timelines @guiao", () => {
     });
 
     exigirLogin(await entrarNoBackOffice(page));
-    /**
-     * ── E AGORA: QUEM SE LIMPA TEM DE SER QUEM SE ABRE ──────────────────────
-     *
-     * O `garantirPedido` garante que EXISTE um pedido e devolve o PRIMEIRO da
-     * lista de pedidos. Esta vista ordena por outra coisa — a data mais próxima
-     * de hoje — e a suite dos dados chega aqui com mais do que um pedido (o
-     * `fazer-proposta-cliente` cria um cliente novo pelo ecrã).
-     *
-     * Quando os dois não coincidem, este passo esvaziava a timeline de UM
-     * evento e o passeio abria OUTRO — o que trazia o que a corrida anterior
-     * lhe deixou. O modelo entrava por cima e ficavam DOIS «Remover 17:00
-     * Cerimónia»; o localizador ficava ambíguo e a mensagem («strict mode
-     * violation») apontava para o sítio errado.
-     *
-     * A correcção não é adivinhar o nome da semente — foi o que tentei
-     * primeiro, e falhou no CI a dizer «o pedido não existe» quando o que não
-     * existia era a RESPOSTA (a rota devolve 401 enquanto a sessão não assenta,
-     * e `{ error: … }` não é um array). Pergunta-se ao servidor QUAL É o
-     * cliente do pedido que se semeou, e é essa a linha que se abre. Sem
-     * nomes fixos e sem depender de ordenação nenhuma.
-     *
-     * A leitura tem a mesma teimosia do `primeiroPedido`, e pela mesma razão.
-     */
-    const quoteId = await garantirPedido(page);
-
-    let cliente = "";
-    for (let tentativa = 0; tentativa < 12 && !cliente; tentativa += 1) {
-      const res = await page.request.get(`/api/orcamento/${quoteId}`);
-      if (res.ok()) {
-        const q: unknown = await res.json();
-        const n = (q as { name?: unknown })?.name;
-        if (typeof n === "string" && n.trim()) cliente = n.trim();
-      }
-      if (!cliente) await page.waitForTimeout(400);
-    }
-    expect(cliente.length > 0, "o pedido semeado tem um nome de cliente para procurar").toBe(true);
-    const naLista = new RegExp(cliente.slice(0, 24).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    // O pedido que se limpa e o que se abre têm de ser o mesmo, e nenhum nome
+    // fixo serve para os casar — a razão inteira, com as duas tentativas
+    // erradas que a precederam, está em `pedidoDoDia`.
+    const { id: quoteId, naLista } = await pedidoDoDia(page);
 
     /**
      * ── O GUIÃO COMEÇA VAZIO, E ISSO É FIXTURE E NÃO ASSERÇÃO ──────────────

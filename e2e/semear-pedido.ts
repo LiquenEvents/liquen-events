@@ -276,38 +276,66 @@ async function primeiroPedido(page: Page): Promise<string | null> {
  * Quem escreve pela API e abre pelo nome tem de usar isto, para os dois lados
  * falarem do mesmo pedido — haja um na lista ou vinte.
  */
-export async function idDaSemente(page: Page, nome = "Semente E2E"): Promise<string> {
-  /**
-   * ── E LÊ-SE COM A TEIMOSIA DO `primeiroPedido`, PELA MESMA RAZÃO ──────────
-   *
-   * Isto lia a lista UMA VEZ. Em local passava sempre; no CI falhava — e a
-   * frase que saía («nenhum pedido «Semente E2E» na lista») acusava o produto
-   * de não ter um pedido que TEM. O que não existia era a RESPOSTA: esta rota
-   * devolve 401 enquanto a sessão não assenta, e o `primeiroPedido`, aqui em
-   * cima, já repete por causa disso — este não repetia.
-   *
-   * É o mesmo engano de tratar uma resposta que ainda não chegou como uma
-   * resposta que diz que não. A mensagem de falha continua a listar o que
-   * ESTAVA lá, que é o que distingue os dois casos quando voltar a acontecer.
-   */
-  let nomes: string[] = [];
-  for (let tentativa = 0; tentativa < 12; tentativa += 1) {
-    const res = await page.request.get("/api/orcamento");
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PEDIDO QUE OS ECRÃS DO DIA VÃO ABRIR — E O NOME POR QUE SE PROCURA A LINHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os dois passeios do dia (a timeline e a grelha) fazem a mesma coisa: escrevem
+ * num pedido pela API e depois abrem a linha dele na lista. Se os dois não
+ * forem o MESMO pedido, escreve-se num e abre-se outro — e o sintoma («o modelo
+ * foi aplicado duas vezes», «a lista não tem a linha») não se parece nada com a
+ * causa.
+ *
+ * ── DUAS TENTATIVAS ERRADAS, PARA NÃO SE REPETIREM ────────────────────────
+ *
+ * 1. Usar o id do `garantirPedido` e procurar a linha pelo NOME da semente.
+ *    O `garantirPedido` devolve o PRIMEIRO da lista, e as vistas do dia ordenam
+ *    pela data mais próxima de hoje — quando há mais do que um pedido, os dois
+ *    divergem.
+ *
+ * 2. Procurar o pedido chamado «Semente E2E». Falha no CI, e a razão só se viu
+ *    porque a mensagem listava o que LÁ ESTAVA:
+ *
+ *        ["Maria da Conceição…","Rita e Tomás","Rita e Tomás", …]
+ *
+ *    Nenhuma «Semente E2E». Em CI a pasta `data/` chega a esta suite JÁ COM
+ *    pedidos dos passos anteriores do mesmo trabalho (o `admin-mobile` cria a
+ *    «Rita e Tomás»), portanto o `garantirPedido` reaproveita um deles e nunca
+ *    chega a criar a semente. Em local, com `rm -rf data/*` à frente, existia
+ *    sempre — e foi por isso que passava aqui e falhava lá.
+ *
+ * ── O QUE FICA ────────────────────────────────────────────────────────────
+ *
+ * Nenhum nome fixo. Garante-se que existe UM pedido, pergunta-se ao servidor de
+ * quem ele é, e devolve-se as duas coisas: o id para escrever, e o nome do
+ * cliente para encontrar a linha. Passam a ser o mesmo pedido por construção.
+ *
+ * A leitura repete enquanto não vier resposta, como o `primeiroPedido` aqui em
+ * cima: a rota devolve 401 enquanto a sessão não assenta, e um `{ error: … }`
+ * lido de uma vez só parece uma lista sem o que se procura.
+ */
+export async function pedidoDoDia(
+  page: Page,
+): Promise<{ id: string; cliente: string; naLista: RegExp }> {
+  const id = await garantirPedido(page);
+
+  let cliente = "";
+  for (let tentativa = 0; tentativa < 12 && !cliente; tentativa += 1) {
+    const res = await page.request.get(`/api/orcamento/${id}`);
     if (res.ok()) {
-      const lista = (await res.json()) as { id?: string; name?: string }[];
-      if (Array.isArray(lista)) {
-        nomes = lista.map((q) => String(q?.name ?? "?"));
-        const semente = lista.find((q) => (q.name ?? "").includes(nome));
-        if (semente?.id) return semente.id;
-      }
+      const q: unknown = await res.json();
+      const n = (q as { name?: unknown })?.name;
+      if (typeof n === "string" && n.trim()) cliente = n.trim();
     }
-    await page.waitForTimeout(400);
+    if (!cliente) await page.waitForTimeout(400);
   }
-  expect(
-    false,
-    `nenhum pedido «${nome}» na lista depois de 12 leituras — o que lá estava: ${JSON.stringify(nomes)}`,
-  ).toBe(true);
-  throw new Error("inalcançável");
+  expect(cliente.length > 0, `o pedido ${id} tem um nome de cliente para procurar`).toBe(true);
+
+  // Vinte e quatro caracteres chegam para o distinguir e não apanham a data nem
+  // o estado, que vêm no mesmo nome acessível da linha.
+  const naLista = new RegExp(cliente.slice(0, 24).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return { id, cliente, naLista };
 }
 
 export async function garantirPedido(page: Page, nome = "Semente E2E"): Promise<string> {

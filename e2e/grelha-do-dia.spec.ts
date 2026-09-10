@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
-import { entrarNoBackOffice, exigirLogin, garantirPedido, idDaSemente } from "./semear-pedido";
+import { entrarNoBackOffice, exigirLogin, pedidoDoDia } from "./semear-pedido";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -93,7 +93,7 @@ function bloco(page: Page, coluna: string, titulo: string): Locator {
  * hidratação antes de clicar, porque o cabeçalho passa a vir desenhado do
  * servidor e deixa de a provar. O sinal é a classe `admin-mode` no `body`.
  */
-async function abrirAGrelha(page: Page) {
+async function abrirAGrelha(page: Page, naLista: RegExp) {
   await page.goto("/orcamento/admin?v=guioes", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.body.classList.contains("admin-mode"), null, {
     timeout: 120_000,
@@ -102,7 +102,7 @@ async function abrirAGrelha(page: Page) {
     timeout: 60_000,
   });
 
-  const linha = page.getByRole("button", { name: /Semente E2E/ }).first();
+  const linha = page.getByRole("button", { name: naLista }).first();
   await expect(linha).toBeVisible({ timeout: 60_000 });
   await linha.click();
   await expect(page.getByText("Cronograma do Dia")).toBeVisible({ timeout: 60_000 });
@@ -114,12 +114,17 @@ async function abrirAGrelha(page: Page) {
 }
 
 test.describe("Grelha do dia @grelha", () => {
+  // O nome do cliente do pedido que este bloco semeia, para encontrar a sua
+  // linha na lista. Fica aqui e não no módulo: esta suite corre em série e com
+  // um trabalhador só, mas uma variável de módulo é uma armadilha à espera.
+  let doDia: RegExp;
+
   test.beforeEach(async ({ page }) => {
     exigirLogin(await entrarNoBackOffice(page));
-    // Garante que há pelo menos um pedido; o id que devolve é o do PRIMEIRO da
-    // lista, que pode não ser este — ver `idDaSemente`.
-    await garantirPedido(page);
-    const id = await idDaSemente(page);
+    // O pedido que se escreve e o que se abre têm de ser o mesmo — e nenhum
+    // nome fixo serve para os casar. Ver `pedidoDoDia`.
+    const { id, naLista } = await pedidoDoDia(page);
+    doDia = naLista;
 
     // A semente é reaproveitada entre corridas: o dia que este passeio mede é
     // o que ele próprio escreve, e não o que a corrida anterior deixou. Vai
@@ -131,7 +136,7 @@ test.describe("Grelha do dia @grelha", () => {
 
   test("as horas descem, uma coluna por quem faz, e a altura é a duração", async ({ page }) => {
     test.setTimeout(240_000);
-    await abrirAGrelha(page);
+    await abrirAGrelha(page, doDia);
 
     // ── AS COLUNAS ────────────────────────────────────────────────────────
     // Quatro, e não cinco: «Ana Silva» e «ana silva » são a mesma pessoa. A
@@ -216,7 +221,7 @@ test.describe("Grelha do dia @grelha", () => {
       page,
     }) => {
       test.setTimeout(240_000);
-      await abrirAGrelha(page);
+      await abrirAGrelha(page, doDia);
 
       const grelha = page.getByRole("group", { name: "Grelha do dia, por responsável" });
       const medidas = await grelha.evaluate((el) => ({
@@ -314,7 +319,7 @@ test.describe("Grelha do dia @grelha", () => {
 
     test("cada coluna cabe com palavras lá dentro, e não só com cor", async ({ page }) => {
       test.setTimeout(240_000);
-      await abrirAGrelha(page);
+      await abrirAGrelha(page, doDia);
 
       const coluna = await caixa(page.getByRole("region", { name: "Coluna de Rui" }));
       const cerimonia = await caixa(bloco(page, "Rui", "Cerimónia"));
