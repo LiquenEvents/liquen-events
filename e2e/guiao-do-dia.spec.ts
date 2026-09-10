@@ -100,6 +100,20 @@ test.describe("Timelines @guiao", () => {
     }).toPass({ timeout: 120_000 });
 
     // ── 2. A LISTA TRAZ O EVENTO SEMEADO ────────────────────────────────────
+    //
+    // ── PRIMEIRO, ALARGAR O ÂMBITO ────────────────────────────────────────
+    // A lista abre nos eventos FECHADOS, que é o que ela pediu: «quero que dê
+    // para fazer timelines apenas das propostas que já foram aceites». O
+    // pedido que esta suite semeia entra pela porta pública e nasce
+    // `pendente` — como qualquer pedido de um casal —, portanto não está lá.
+    //
+    // O toque em «Todos os eventos» é o que ela dá quando quer preparar um dia
+    // que ainda não fechou, e é a outra metade do mesmo pedido dela: «aqui
+    // quero que dê também para escolher aqueles que quero fazer um timeline».
+    // Marcar a semente como aceite era mais curto e media menos: passava a
+    // provar o caminho fácil e deixava este por provar.
+    await page.getByRole("radio", { name: /^Todos os eventos/ }).click();
+
     // Pelo nome ACESSÍVEL da linha, que é o que uma pessoa com leitor de ecrã
     // ouve: a data, o cliente e o estado do guião.
     const linha = page.getByRole("button", { name: naLista }).first();

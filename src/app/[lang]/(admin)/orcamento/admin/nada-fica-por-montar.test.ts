@@ -88,6 +88,19 @@ const POR_MONTAR: Readonly<Record<string, string>> = {
    * ocupadas. O candidato é o `PainelDeHoje` — o cartão que só existe no dia
    * do evento, no topo das Timelines —, e a decisão é dela, não minha a
    * reboque de outra.
+   *
+   * ── E O PASSEIO QUE A ATRAVESSAVA SAIU COM A PORTA ─────────────────────
+   *
+   * O `e2e/grelha-do-dia.spec.ts` entrava por «Por pessoa» — um comando que
+   * deixou de existir. Um passeio que atravessa uma porta que não existe não é
+   * um teste: ou se apaga, ou se lhe inventa uma porta só para ele passar, e a
+   * segunda é pior do que não ter teste nenhum.
+   *
+   * O que NÃO saiu, e é o que continua a provar esta peça: o
+   * `GrelhaDoDia.test.tsx` (as horas, as colunas, a altura, os choques) e o
+   * `guioes.colunas.test.ts` (a repartição por responsável). O comportamento
+   * está guardado; o que se perdeu foi a volta pelo browser, e essa volta
+   * volta no dia em que a grelha tiver casa.
    */
   "app/[lang]/(admin)/orcamento/admin/GrelhaDoDia.tsx":
     "Ficou sem porta quando o comutador «Horário | Editar» saiu das Timelines " +
