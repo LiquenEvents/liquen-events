@@ -43,7 +43,7 @@ import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido
 /** O modelo da casa que este passeio aplica. Ver `MODELOS_DA_CASA`. */
 const MODELO = "Casamento de tarde";
 
-test.describe("Guiões do dia @guiao", () => {
+test.describe("Timelines @guiao", () => {
   test("da lista ao guião gravado, e à folha que se imprime", async ({ page }) => {
     test.setTimeout(180_000);
 
@@ -88,10 +88,10 @@ test.describe("Guiões do dia @guiao", () => {
     // idempotente, portanto insistir não constrói nada a dobrar.
     await expect(async () => {
       await nav
-        .getByRole("button", { name: /^Guiões do dia$/ })
+        .getByRole("button", { name: /^Timelines$/ })
         .first()
         .click();
-      await expect(page.getByRole("heading", { level: 1, name: /^Guiões do dia$/ })).toBeVisible({
+      await expect(page.getByRole("heading", { level: 1, name: /^Timelines$/ })).toBeVisible({
         timeout: 5_000,
       });
     }).toPass({ timeout: 120_000 });
@@ -162,7 +162,7 @@ test.describe("Guiões do dia @guiao", () => {
     // Recarregar é a única prova. Sem o PATCH a chegar ao servidor, o guião
     // volta vazio e o ecrã volta a oferecer o cronograma-base.
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { level: 1, name: /^Guiões do dia$/ })).toBeVisible({
+    await expect(page.getByRole("heading", { level: 1, name: /^Timelines$/ })).toBeVisible({
       timeout: 60_000,
     });
     const linhaDepois = page.getByRole("button", { name: /Semente E2E/ }).first();

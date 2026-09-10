@@ -108,7 +108,7 @@ const ROTULO_DO_SINAL: Record<TipoDeSinal, string> = {
   choque: "Choque",
   buraco: "Vazio",
   "sem-duracao": "Sem duração",
-  "sem-guiao": "Sem guião",
+  "sem-guiao": "Sem timeline",
   sobreposicao: "Em paralelo",
   pronto: "Pronto",
 };
@@ -379,7 +379,7 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
         <div className={abertoId ? "hidden lg:block" : "block"}>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Segmented<Filtro>
-              ariaLabel="Filtrar os guiões"
+              ariaLabel="Filtrar as timelines"
               size="sm"
               value={filtro}
               onChange={setFiltro}
@@ -395,7 +395,7 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
             <SkeletonList rows={5} />
           ) : lista.error ? (
             <AvisoDeFalha
-              titulo="Não foi possível ler os guiões"
+              titulo="Não foi possível ler as timelines"
               mensagem={lista.errorMessage}
               falha={lista.falha}
               aoTentarDeNovo={lista.refresh}
@@ -404,17 +404,17 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
             <EmptyState
               icon={<IconeDeGuiao />}
               title="Ainda não há eventos com data"
-              description="Um guião do dia pertence a um evento marcado. Assim que um pedido tiver data, aparece aqui à espera de guião."
+              description="Uma timeline pertence a um evento marcado. Assim que um pedido tiver data, aparece aqui à espera de timeline."
             />
           ) : visiveis.length === 0 ? (
             <EmptyState
               icon={<IconeDeGuiao />}
               title={
                 filtro === "problemas"
-                  ? "Nenhum guião com pessoas em dois sítios ao mesmo tempo"
-                  : "Nenhum guião por fazer"
+                  ? "Nenhuma timeline com pessoas em dois sítios ao mesmo tempo"
+                  : "Nenhuma timeline por fazer"
               }
-              description="Mudou o filtro, não os dados: há guiões, só que nenhum deles cai neste caso."
+              description="Mudou o filtro, não os dados: há timelines, só que nenhuma delas cai neste caso."
               action={{ label: "Ver todos", onClick: () => setFiltro("todos") }}
             />
           ) : (
@@ -441,7 +441,7 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
               <EmptyState
                 icon={<IconeDeGuiao />}
                 title="Escolhe um evento"
-                description="O guião do dia abre-se aqui: a régua à escala, os avisos, e a folha para imprimir e dar à equipa."
+                description="A timeline abre-se aqui: a régua à escala, os avisos, e a folha para imprimir e dar à equipa."
               />
             </div>
           ) : (
@@ -479,7 +479,7 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
 
               {falhaAoAbrir ? (
                 <AvisoDeFalha
-                  titulo="Não foi possível abrir este guião"
+                  titulo="Não foi possível abrir esta timeline"
                   mensagem={falhaAoAbrir}
                   aoTentarDeNovo={() => void abrir(aberto.id)}
                 />
@@ -488,7 +488,7 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                   <div className="bo-skeleton h-2.5 w-40" aria-hidden />
                   <div className="bo-skeleton h-11 w-full" aria-hidden />
                   <div className="bo-skeleton h-16 w-full" aria-hidden />
-                  <span className="sr-only">A abrir o guião…</span>
+                  <span className="sr-only">A abrir a timeline…</span>
                 </div>
               ) : (
                 <EventTimeline
@@ -692,7 +692,7 @@ function PainelDeHoje({
               ) : (
                 <p className="bo-text-muted text-sm">
                   {seguinte.terminado
-                    ? "O guião chegou ao fim."
+                    ? "A timeline chegou ao fim."
                     : "Não há nada marcado neste momento."}
                 </p>
               )}

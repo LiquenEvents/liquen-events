@@ -21,7 +21,7 @@ import { join } from "node:path";
  * porque num ecrã largo o rótulo ainda lá está a segurá-la.
  *
  * Medidos a 375×667 com `(pointer: coarse)`, antes:
- *   · «Copiar link do portal», «Imprimir Dossier», «Guião do dia» e «.ics»
+ *   · «Copiar link do portal», «Imprimir Dossier», «Timeline» e «.ics»
  *     — 38×44 cada, e a 6 px uns dos outros;
  *   · «Abrir portal» — 38×32, a mais pequena da barra;
  *   · «Criar proposta» (a próxima acção) — 148×40;
@@ -95,7 +95,7 @@ describe("o dossier do evento, ao dedo", () => {
   it.each([
     ["onClick={copyPortalLink}", "copiar o link do portal"],
     ["onClick={() => printEventDossier(quote)}", "imprimir o dossier"],
-    ["onClick={() => printRunSheet(quote)}", "o guião do dia"],
+    ["onClick={() => printRunSheet(quote)}", "a timeline"],
     ["onClick={() => downloadEventIcs(quote)}", "o .ics"],
   ])("dá 44 px de largura a %s (%s)", (accao) => {
     expect(blocoQueContem(CABECALHO, accao)).toContain("alvo-toque");

@@ -38,7 +38,7 @@ interface Props {
    * ── OS MODELOS SÃO UMA PROPRIEDADE, E NÃO UMA LEITURA DAQUI DE DENTRO ────
    *
    * Este componente edita o guião em dois sítios: dentro do dossier de um
-   * evento (onde sempre esteve) e dentro da vista «Guiões do dia» (que é nova).
+   * evento (onde sempre esteve) e dentro da vista «Timelines» (que é nova).
    * A vista de topo tem os modelos porque é a vista dos modelos; o dossier
    * abre exactamente como abria.
    *
@@ -340,10 +340,10 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     if (!aoGuardarComoModelo) return;
     const momentos = modeloAPartirDoGuiao(items);
     if (momentos.length === 0) {
-      toast("O guião ainda não tem momentos com hora e nome para guardar.", "error");
+      toast("A timeline ainda não tem momentos com hora e nome para guardar.", "error");
       return;
     }
-    const sugestao = quote.eventName?.trim() || "Guião do dia";
+    const sugestao = quote.eventName?.trim() || "Timeline";
     const nome = window.prompt("Que nome dás a este modelo?", sugestao);
     if (nome === null) return;
     const limpo = nome.trim();
@@ -368,7 +368,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       // guião antigo — que é a comparação que o 409 faz.
       ...(minutos > 0 ? { duracao: minutos } : {}),
     };
-    persist(`acrescentar «${time} ${t}» ao guião`, (atuais) => [...atuais, momento]);
+    persist(`acrescentar «${time} ${t}» à timeline`, (atuais) => [...atuais, momento]);
     setTime("");
     setTitle("");
     setOwner("");
@@ -377,7 +377,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
   function remove(id: string) {
     const momento = items.find((i) => i.id === id);
     persist(
-      `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» do guião`,
+      `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» da timeline`,
       (atuais) => atuais.filter((i) => i.id !== id),
     );
   }
@@ -492,7 +492,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       <div className="mb-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="bo-eyebrow">Cronograma do Dia</p>
         {/* ── OS MODELOS, ONDE ELES SÃO PRECISOS ────────────────────────────
-            Só quando quem chama os deu (a vista «Guiões do dia»). No dossier
+            Só quando quem chama os deu (a vista «Timelines»). No dossier
             de um evento este bloco não existe e o painel abre como sempre
             abriu — ver a propriedade `modelos`.
 
@@ -502,7 +502,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
         {modelos && modelos.length > 0 && (
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
             <Escolha
-              aria-label="Juntar um modelo a este guião"
+              aria-label="Juntar um modelo a esta timeline"
               opcoes={modelos.map((m) => ({ valor: m.id, rotulo: m.nome }))}
               valor=""
               vazio="Juntar modelo…"
@@ -528,8 +528,8 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
             <button
               type="button"
               onClick={() => printRunSheet(quote)}
-              title="Imprimir guião do dia"
-              aria-label="Imprimir guião do dia"
+              title="Imprimir a timeline"
+              aria-label="Imprimir a timeline"
               // 27×27 medidos a 375 px — um botão de ícone sem rótulo, que é
               // a classe de alvo mais fácil de falhar com o polegar.
               className={`alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
@@ -589,7 +589,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
             </ul>
           ) : (
             <p className="bo-text-muted mt-1 text-sm">
-              {seguinte.terminado ? "O guião chegou ao fim." : "Não há nada marcado neste momento."}
+              {seguinte.terminado ? "A timeline chegou ao fim." : "Não há nada marcado neste momento."}
             </p>
           )}
 
@@ -630,11 +630,11 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
           className="mb-5 rounded-xl border border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/50 px-4 py-3 text-sm"
         >
           <p className="font-medium text-[var(--bo-perigo)]">
-            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o guião mudou noutro sítio
+            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: a timeline mudou noutro sítio
             entretanto.
           </p>
           <p className="bo-text-muted mt-1">
-            O guião que está no ecrã é o que ficou guardado. Não se perdeu nada — podes voltar a
+            A timeline que está no ecrã é a que ficou guardada. Não se perdeu nada — podes voltar a
             aplicar o que estavas a fazer por cima dele.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -723,7 +723,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
               <path d="M12 7v5l3 2" />
             </svg>
           }
-          title="Guião do dia por preencher"
+          title="Timeline por preencher"
           description="Gera um cronograma-base para um dia de evento típico e adapta os momentos a este evento."
           action={{ label: "Gerar cronograma-base", onClick: seed }}
         />

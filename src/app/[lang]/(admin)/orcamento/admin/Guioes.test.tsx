@@ -155,7 +155,7 @@ function linhaDe(cliente: string | RegExp) {
   });
 }
 
-describe("Guiões do dia — a lista", () => {
+describe("Timelines — a lista", () => {
   it("mostra um evento por linha, os que aí vêm primeiro", async () => {
     montar();
     await screen.findByRole("button", { name: /Beatriz e Tomás/ });
@@ -170,7 +170,7 @@ describe("Guiões do dia — a lista", () => {
     expect(linhas[2]).toContain("Carla e Diogo");
   });
 
-  it("o estado de cada guião é COR, FORMA e PALAVRA — nunca só cor", async () => {
+  it("o estado de cada timeline é COR, FORMA e PALAVRA — nunca só cor", async () => {
     montar();
     const linha = await screen.findByRole("button", { name: /Beatriz e Tomás/ });
     const pastilha = within(linha).getByText("Choque");
@@ -183,11 +183,11 @@ describe("Guiões do dia — a lista", () => {
     expect(linha.getAttribute("aria-label")).toContain("dois sítios ao mesmo tempo");
   });
 
-  it("um evento sem guião distingue-se de um guião pronto", async () => {
+  it("um evento sem timeline distingue-se de uma timeline pronta", async () => {
     montar();
     const semGuiao = await screen.findByRole("button", { name: /Carla e Diogo/ });
     const pronto = linhaDe("Ana e Rui");
-    expect(within(semGuiao).getByText("Sem guião")).toBeTruthy();
+    expect(within(semGuiao).getByText("Sem timeline")).toBeTruthy();
     expect(within(pronto).getByText("Pronto")).toBeTruthy();
     // CONTROLO NEGATIVO: se a linha vazia herdasse o estado da outra, isto
     // passava a encontrar «Pronto» nas duas.
@@ -224,7 +224,7 @@ describe("Guiões do dia — a lista", () => {
   });
 });
 
-describe("Guiões do dia — abrir e editar", () => {
+describe("Timelines — abrir e editar", () => {
   it("abrir um evento vai buscar o pedido inteiro e monta o editor", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const pedidos: string[] = [];
@@ -255,14 +255,14 @@ describe("Guiões do dia — abrir e editar", () => {
     expect(screen.queryByText("Cronograma do Dia")).toBeNull();
   });
 
-  it("juntar um modelo grava os momentos do modelo no guião do evento", async () => {
+  it("juntar um modelo grava os momentos do modelo na timeline do evento", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     montar();
     await screen.findByRole("button", { name: /Carla e Diogo/ });
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
 
-    const escolha = await screen.findByLabelText("Juntar um modelo a este guião");
+    const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
     const modelo = MODELOS_DA_CASA[0];
     await escolher(user, escolha, modelo.nome);
 
@@ -284,18 +284,18 @@ describe("Guiões do dia — abrir e editar", () => {
 
     await escolher(
       user,
-      await screen.findByLabelText("Juntar um modelo a este guião"),
+      await screen.findByLabelText("Juntar um modelo a esta timeline"),
       MODELOS_DA_CASA[0].nome,
     );
 
     /**
      * Dois sítios a dizer coisas diferentes sobre o mesmo dia é o defeito que
      * esta vista existe para não ter. Sem a escrita de volta na lista, a
-     * pastilha «Sem guião» ficava colada à linha até alguém recarregar.
+     * pastilha «Sem timeline» ficava colada à linha até alguém recarregar.
      */
     await waitFor(() => {
       const linha = screen.getByRole("button", { name: /Carla e Diogo/ });
-      expect(within(linha).queryByText("Sem guião")).toBeNull();
+      expect(within(linha).queryByText("Sem timeline")).toBeNull();
     });
   });
 });

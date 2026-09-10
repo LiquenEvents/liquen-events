@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * A lista de pedidos que o back office carrega vem em RESUMO, e o `timeline` é
  * um dos cinco campos que o resumo deixa cair de propósito (ver
  * `CAMPOS_SO_DO_DETALHE`): com trezentos pedidos, era o cronograma que enchia o
- * HTML da página de administração. A vista «Guiões do dia» precisa exactamente
+ * HTML da página de administração. A vista «Timelines» precisa exactamente
  * do campo que foi cortado — e para TODOS os eventos, que é a pergunta que ela
  * existe para responder.
  *

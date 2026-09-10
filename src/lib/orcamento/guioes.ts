@@ -128,7 +128,7 @@ const ORDEM_DA_GRAVIDADE: Record<Gravidade, number> = {
  */
 export function sinaisDoGuiao(momentos: readonly TimelineItem[]): SinalDoGuiao[] {
   if (momentos.length === 0) {
-    return [{ tipo: "sem-guiao", quantos: 1, frase: "Sem guião" }];
+    return [{ tipo: "sem-guiao", quantos: 1, frase: "Sem timeline" }];
   }
 
   const dia = analisarODia(momentos);
@@ -183,7 +183,7 @@ export function sinaisDoGuiao(momentos: readonly TimelineItem[]): SinalDoGuiao[]
     sinais.push({
       tipo: "pronto",
       quantos: 1,
-      frase: `Guião pronto — ${momentos.length} ${momentos.length === 1 ? "momento" : "momentos"}`,
+      frase: `Timeline pronta — ${momentos.length} ${momentos.length === 1 ? "momento" : "momentos"}`,
     });
   }
 
@@ -196,7 +196,7 @@ export function sinaisDoGuiao(momentos: readonly TimelineItem[]): SinalDoGuiao[]
 
 /** O sinal que manda — o mais grave. Nunca é `undefined`: há sempre um. */
 export function sinalPrincipal(sinais: readonly SinalDoGuiao[]): SinalDoGuiao {
-  return sinais[0] ?? { tipo: "sem-guiao", quantos: 1, frase: "Sem guião" };
+  return sinais[0] ?? { tipo: "sem-guiao", quantos: 1, frase: "Sem timeline" };
 }
 
 /** Um guião com a sua leitura já feita — o que a lista desenha. */

@@ -4127,7 +4127,7 @@ export default function AdminClient({
     definicoes: "Definições",
     servicos: "Biblioteca de serviços",
     "fazer-proposta": "Fazer proposta",
-    guioes: "Guiões do dia",
+    guioes: "Timelines",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
@@ -4893,7 +4893,7 @@ export default function AdminClient({
                      corpo desta casa é o 0,82. */
                     className={`alvo-toque relative ${
                       noTelemovel ? "flex" : "hidden lg:flex"
-                    } min-w-0 flex-1 lg:w-20 lg:flex-none flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
+                    } min-w-0 flex-1 lg:w-auto lg:flex-none lg:px-1.5 flex-col items-center justify-center gap-0.5 rounded-[var(--bo-raio-pilula)] px-1 ${ESTADO} ${PRESSAO} ${
                       isActive
                         ? "bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] font-medium shadow-[var(--bo-sombra-suspensa)] ring-1 ring-inset ring-[var(--bo-hairline)]"
                         : "text-[var(--bo-tinta-72)] font-normal"
@@ -4959,6 +4959,40 @@ export default function AdminClient({
                       (`ROTULO_CURTO`) onde o inteiro não cabe, e a reserva de
                       duas linhas deixa de fazer falta — todas as células têm
                       exactamente uma. */}
+                    {/* ── E A CÉLULA DEIXA DE TER 80 px NO COMPUTADOR ─────────
+                      Ela mandou uma fotografia com dois rótulos POR CIMA um do
+                      outro. A célula tinha `lg:w-20` — 80 px fixos, o idioma de
+                      quatro separadores iguais de um telemóvel — e o rótulo é
+                      `whitespace-nowrap`: não parte, não encolhe, transborda.
+                      Medido a 1440 px, com as doze células:
+
+                          Fazer proposta ....... 89 px numa célula de 80  (+9)
+                          Propostas Aceites ... 106 px numa célula de 80  (+26)
+
+                      As outras dez cabiam, e por isso o defeito era invisível
+                      até dois vizinhos compridos ficarem lado a lado.
+
+                      No computador a célula passa a ter a largura do seu nome
+                      mais 16 px de folga. Somadas dão 942 px e a cápsula tem
+                      971 — cabe, e sem estrear o `overflow-x-auto` que já
+                      estava declarado ao lado. No telemóvel nada muda: lá são
+                      quatro células iguais (`flex-1`), que é onde esse idioma
+                      está certo.
+
+                      E a folga é 6 px, a mesma em todas as larguras, porque a
+                      1024 — o primeiro pixel em que este menu existe — não é
+                      só a célula que tem de caber. Medido lá: a cápsula e o
+                      botão «⋯» ao lado somavam 1033 px num ecrã de 1024, e
+                      SAÍAM os dois, um por cada lado. Não era defeito meu (com
+                      as células de 80 px a cápsula era ainda mais larga, 971),
+                      mas é defeito, e o guarda novo mede-o.
+
+                      Cheguei a pôr 8 px a partir de `xl`, para ficar com mais
+                      ar no ecrã grande. O `Cortes.contrato.test.ts` chumbou-o
+                      na hora: esta casa tem TRÊS larguras e só três, e um
+                      quarto ponto de corte é uma regra nova para toda a gente
+                      manter em troca de dois píxeis. Uma folga só, medida nas
+                      duas pontas. */}
                     <span className="text-[11px] lg:text-[12px] leading-tight text-center whitespace-nowrap flex items-start justify-center">
                       <span className="lg:hidden">{ROTULO_CURTO[id] ?? navItem.label}</span>
                       <span className="hidden lg:inline">{navItem.label}</span>
@@ -5644,7 +5678,7 @@ export default function AdminClient({
             </div>
           )}
 
-          {/* ── Guiões do dia ──
+          {/* ── Timelines ──
               A vista recebe o `comPedidoInteiro` e não faz a leitura sozinha,
               e é de propósito: essa função sabe que a rota do pedido responde
               200 com uma versão CURTA quando a sessão caiu, e que só o
@@ -6531,7 +6565,7 @@ export default function AdminClient({
                                   ),
                                 },
                                 {
-                                  label: "Guião do dia",
+                                  label: "Timeline",
                                   hint: "Imprimir a folha de operações",
                                   onClick: () => printRunSheet(selected),
                                   icon: (
