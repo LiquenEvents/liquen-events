@@ -59,36 +59,43 @@ test.describe("Timelines @guiao", () => {
     });
 
     exigirLogin(await entrarNoBackOffice(page));
-    await garantirPedido(page);
-
     /**
-     * ── E AGORA O PEDIDO CERTO, QUE NÃO É NECESSARIAMENTE O PRIMEIRO ────────
+     * ── E AGORA: QUEM SE LIMPA TEM DE SER QUEM SE ABRE ──────────────────────
      *
      * O `garantirPedido` garante que EXISTE um pedido e devolve o PRIMEIRO da
      * lista de pedidos. Esta vista ordena por outra coisa — a data mais próxima
      * de hoje — e a suite dos dados chega aqui com mais do que um pedido (o
-     * `fazer-proposta-cliente` cria um cliente novo pelo ecrã, e esse fica à
-     * frente na lista de pedidos).
+     * `fazer-proposta-cliente` cria um cliente novo pelo ecrã).
      *
-     * Quando os dois não coincidem, o passo de baixo esvaziava a timeline de UM
-     * evento e o passeio abria OUTRO — o que este já tinha da corrida anterior.
-     * O modelo entrava por cima e ficavam DOIS «Remover 17:00 Cerimónia»; o
-     * localizador ficava ambíguo e a mensagem («strict mode violation») aponta
-     * para o sítio errado. Sozinho o passeio passava, porque aí só há um
-     * pedido — e foi por isso que isto só apareceu no CI.
+     * Quando os dois não coincidem, este passo esvaziava a timeline de UM
+     * evento e o passeio abria OUTRO — o que trazia o que a corrida anterior
+     * lhe deixou. O modelo entrava por cima e ficavam DOIS «Remover 17:00
+     * Cerimónia»; o localizador ficava ambíguo e a mensagem («strict mode
+     * violation») apontava para o sítio errado.
      *
-     * Pede-se pelo NOME, que é o mesmo por que a asserção da lista procura a
-     * linha: assim o que se limpa e o que se abre são o mesmo evento.
+     * A correcção não é adivinhar o nome da semente — foi o que tentei
+     * primeiro, e falhou no CI a dizer «o pedido não existe» quando o que não
+     * existia era a RESPOSTA (a rota devolve 401 enquanto a sessão não assenta,
+     * e `{ error: … }` não é um array). Pergunta-se ao servidor QUAL É o
+     * cliente do pedido que se semeou, e é essa a linha que se abre. Sem
+     * nomes fixos e sem depender de ordenação nenhuma.
+     *
+     * A leitura tem a mesma teimosia do `primeiroPedido`, e pela mesma razão.
      */
-    const pedidos = await (await page.request.get("/api/orcamento")).json();
-    const semente = (Array.isArray(pedidos) ? pedidos : []).find(
-      (q: { name?: unknown }) => typeof q?.name === "string" && q.name.includes("Semente E2E"),
-    ) as { id?: string } | undefined;
-    expect(
-      typeof semente?.id === "string" && semente.id.length > 0,
-      "o pedido «Semente E2E» existe na lista de pedidos",
-    ).toBe(true);
-    const quoteId = semente!.id as string;
+    const quoteId = await garantirPedido(page);
+
+    let cliente = "";
+    for (let tentativa = 0; tentativa < 12 && !cliente; tentativa += 1) {
+      const res = await page.request.get(`/api/orcamento/${quoteId}`);
+      if (res.ok()) {
+        const q: unknown = await res.json();
+        const n = (q as { name?: unknown })?.name;
+        if (typeof n === "string" && n.trim()) cliente = n.trim();
+      }
+      if (!cliente) await page.waitForTimeout(400);
+    }
+    expect(cliente.length > 0, "o pedido semeado tem um nome de cliente para procurar").toBe(true);
+    const naLista = new RegExp(cliente.slice(0, 24).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
     /**
      * ── O GUIÃO COMEÇA VAZIO, E ISSO É FIXTURE E NÃO ASSERÇÃO ──────────────
@@ -128,7 +135,7 @@ test.describe("Timelines @guiao", () => {
     // ── 2. A LISTA TRAZ O EVENTO SEMEADO ────────────────────────────────────
     // Pelo nome ACESSÍVEL da linha, que é o que uma pessoa com leitor de ecrã
     // ouve: a data, o cliente e o estado do guião.
-    const linha = page.getByRole("button", { name: /Semente E2E/ }).first();
+    const linha = page.getByRole("button", { name: naLista }).first();
     await expect(linha, "o evento semeado não apareceu na lista de timelines").toBeVisible({
       timeout: 30_000,
     });
@@ -194,7 +201,7 @@ test.describe("Timelines @guiao", () => {
     await expect(page.getByRole("heading", { level: 1, name: /^Timelines$/ })).toBeVisible({
       timeout: 60_000,
     });
-    const linhaDepois = page.getByRole("button", { name: /Semente E2E/ }).first();
+    const linhaDepois = page.getByRole("button", { name: naLista }).first();
     await expect(linhaDepois).toBeVisible({ timeout: 30_000 });
     await expect(
       linhaDepois,
