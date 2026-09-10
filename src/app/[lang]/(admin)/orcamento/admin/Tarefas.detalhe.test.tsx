@@ -245,7 +245,6 @@ describe("fase 08 — o painel de detalhe", () => {
 
 describe("fase 09 — o menu da linha, o mover e o teclado", () => {
   it("as acções da linha vivem num botão só, e o menu abre-se com o botão direito", async () => {
-    const user = userEvent.setup();
     await montar();
 
     const linha = screen.getByText("Confirmar florista").closest("div.group")!;
@@ -371,7 +370,6 @@ describe("fase 09 — o menu da linha, o mover e o teclado", () => {
   });
 
   it("as setas passam o foco de linha em linha", async () => {
-    const user = userEvent.setup();
     await montar();
 
     const primeira = screen.getByRole("button", { name: "Abrir «Confirmar florista»" });
