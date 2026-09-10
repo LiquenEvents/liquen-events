@@ -252,6 +252,64 @@ async function primeiroPedido(page: Page): Promise<string | null> {
  *
  * TEM de ser chamado depois do login (a listagem é autenticada).
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ID DA SEMENTE — E NÃO O DO PRIMEIRO PEDIDO DA LISTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O `garantirPedido` devolve o id do PRIMEIRO pedido da lista, e é isso que o
+ * torna barato: reaproveita em vez de criar, e assim a suite não bate no tecto
+ * de cinco pedidos por minuto que a rota impõe. Enquanto houver UM pedido só,
+ * o primeiro é a semente e ninguém dá pela diferença.
+ *
+ * Deixou de haver um só. Esta suite tem passeios que criam pedidos próprios (o
+ * do nome de 300 caracteres, por exemplo), e com dois na lista o «primeiro»
+ * pode ser o outro. O que acontece a partir daí é silencioso e caríssimo de
+ * diagnosticar: o passeio ESCREVE num pedido pela API e ABRE outro no ecrã,
+ * porque a linha da lista procura-se pelo NOME.
+ *
+ * Foi assim que o passeio dos guiões apareceu vermelho com uma cara que não era
+ * a dele — «Remover 09:00 Montagem» a casar com dois botões. A leitura óbvia
+ * era «o modelo está a ser aplicado duas vezes»; a verdade era que a limpeza
+ * tinha ido para o pedido errado e nunca chegou ao que estava a ser aberto.
+ *
+ * Quem escreve pela API e abre pelo nome tem de usar isto, para os dois lados
+ * falarem do mesmo pedido — haja um na lista ou vinte.
+ */
+export async function idDaSemente(page: Page, nome = "Semente E2E"): Promise<string> {
+  /**
+   * ── E LÊ-SE COM A TEIMOSIA DO `primeiroPedido`, PELA MESMA RAZÃO ──────────
+   *
+   * Isto lia a lista UMA VEZ. Em local passava sempre; no CI falhava — e a
+   * frase que saía («nenhum pedido «Semente E2E» na lista») acusava o produto
+   * de não ter um pedido que TEM. O que não existia era a RESPOSTA: esta rota
+   * devolve 401 enquanto a sessão não assenta, e o `primeiroPedido`, aqui em
+   * cima, já repete por causa disso — este não repetia.
+   *
+   * É o mesmo engano de tratar uma resposta que ainda não chegou como uma
+   * resposta que diz que não. A mensagem de falha continua a listar o que
+   * ESTAVA lá, que é o que distingue os dois casos quando voltar a acontecer.
+   */
+  let nomes: string[] = [];
+  for (let tentativa = 0; tentativa < 12; tentativa += 1) {
+    const res = await page.request.get("/api/orcamento");
+    if (res.ok()) {
+      const lista = (await res.json()) as { id?: string; name?: string }[];
+      if (Array.isArray(lista)) {
+        nomes = lista.map((q) => String(q?.name ?? "?"));
+        const semente = lista.find((q) => (q.name ?? "").includes(nome));
+        if (semente?.id) return semente.id;
+      }
+    }
+    await page.waitForTimeout(400);
+  }
+  expect(
+    false,
+    `nenhum pedido «${nome}» na lista depois de 12 leituras — o que lá estava: ${JSON.stringify(nomes)}`,
+  ).toBe(true);
+  throw new Error("inalcançável");
+}
+
 export async function garantirPedido(page: Page, nome = "Semente E2E"): Promise<string> {
   const existente = await primeiroPedido(page);
   if (existente) return existente;

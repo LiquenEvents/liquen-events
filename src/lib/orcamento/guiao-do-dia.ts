@@ -179,8 +179,21 @@ export interface AnaliseDoDia {
  * O responsável, comparável: sem espaços à volta, sem maiúsculas e sem
  * acentos. «Rita», «rita » e «RITA» são a mesma pessoa, e um choque que não
  * se detecta por causa de um acento é um choque que chega ao dia do evento.
+ *
+ * ── PORQUE É QUE ISTO DEIXOU DE SER PRIVADO ───────────────────────────────
+ *
+ * Passou a haver um segundo sítio a agrupar pessoas: a grelha do dia
+ * (`colunasPorResponsavel`, em `guioes.ts`) põe uma COLUNA por responsável. Se
+ * ela usasse o `owner` em cru, «Ana» e «ana » abriam duas colunas — e o motor,
+ * que compara por esta chave, dizia ao mesmo tempo que era a mesma pessoa em
+ * dois sítios ao mesmo tempo. Duas partes do mesmo ecrã a discordar sobre
+ * quantas pessoas há no dia.
+ *
+ * A regra de comparação é UMA e vive aqui, com o resto da aritmética do dia.
+ * Exportá-la é mais barato do que a segunda cópia que a alternativa obrigava a
+ * escrever.
  */
-function chaveDoResponsavel(owner?: string): string {
+export function chaveDoResponsavel(owner?: string): string {
   return (owner ?? "")
     .trim()
     .toLocaleLowerCase("pt-PT")
