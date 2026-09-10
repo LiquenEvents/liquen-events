@@ -37,9 +37,19 @@ import { ESTADO_ADMIN } from "./e2e/estado-admin";
  * office contra o servidor de produção, que é onde a divisão de pacotes e os
  * chunks preguiçosos se provam.
  *
- * A UMA EXCEPÇÃO conhecida está documentada onde dói: o passeio do recarregar
- * offline em `carregamento-movel.spec.ts` precisa do service worker, que só se
- * REGISTA em produção. Ver o comentário lá.
+ * AS DUAS EXCEPÇÕES conhecidas estão documentadas onde doem, as duas no
+ * passeio do recarregar offline em `carregamento-movel.spec.ts`:
+ *
+ *   1. precisa do service worker, e o que só existe em produção é o REGISTO
+ *      dele — resolve-se registando o `public/sw.js` de verdade à mão;
+ *   2. desde o Next 16.3.3, o `next dev` NÃO HIDRATA uma página devolvida pela
+ *      cache do service worker sem rede (medido; `next start` hidrata, e o
+ *      16.2.11 em dev também hidratava). Sem hidratação não corre `useEffect`
+ *      nenhum, e a metade da promessa que dependia disso passou a ter guarda
+ *      próprio contra o servidor de PRODUÇÃO:
+ *      `e2e/o-ecra-volta-vivo-sem-rede.spec.ts`.
+ *
+ * Ver os comentários lá — trazem as medições.
  *
  * Porta própria, para poder correr ao lado das outras suites sem lhes tocar.
  */
