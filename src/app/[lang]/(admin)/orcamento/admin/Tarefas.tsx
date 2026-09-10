@@ -574,7 +574,19 @@ const TaskRow = memo(function TaskRow({
           onClick={() => onEscolher(t)}
           aria-label={`Abrir «${t.title}»`}
           title={t.title}
-          className={`block w-full text-start text-sm break-words sm:truncate ${ESTADO} ${
+          /* ── E O ALVO ────────────────────────────────────────────────────
+             `alvo-toque` porque isto é um controlo novo e o mínimo da casa são
+             44 px no dedo. MEDIDO a 375 px: sem ele o título dava 20 px de
+             altura — passa dos 24 da WCAG 2.2 AA por baixo e dos 44 desta casa
+             por muito. Com ele, a linha cresce de 68 para 82 px no telemóvel
+             (a caixa de verificação ao lado já era 44) e ganha-se o gesto que
+             se espera de uma lista no telemóvel: tocar no nome abre a tarefa.
+
+             `block` a seguir por ordem: o `.alvo-toque` põe `display:
+             inline-flex` numa camada, e um título centrado a meio da linha não
+             é um título de lista. No computador nada disto existe — a regra
+             vive dentro de `(pointer: coarse)`. */
+          className={`alvo-toque block w-full text-start text-sm break-words sm:truncate ${ESTADO} ${
             t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"
           }`}
         >
