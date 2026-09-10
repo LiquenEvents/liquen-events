@@ -44,11 +44,51 @@ async function abrirEstudio(page: import("@playwright/test").Page) {
 
   // Passo 2 — o estúdio, com o editor de serviços montado (o chunk é
   // preguiçoso, daí a espera generosa).
-  await expect(
-    page.getByLabel(/^Linha 1 do grupo 1$/).first(),
-    "o editor de serviços do estúdio",
-  ).toBeVisible({ timeout: 30_000 });
+  const linha1 = page.getByLabel(/^Linha 1 do grupo 1$/).first();
+  await expect(linha1, "o editor de serviços do estúdio").toBeVisible({ timeout: 30_000 });
   await assentar(page, 800);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * E O CAMPO TEM DE ACEITAR O QUE SE LHE ESCREVE — «VISÍVEL» NÃO PROVA ISSO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Todos os passeios deste ficheiro escrevem no editor. Esperar que a linha
+   * esteja VISÍVEL não prova que ela responda: o estúdio é um chunk preguiçoso
+   * e, entre o campo aparecer e o React assumir o formulário, cada tecla cai
+   * num nó que já foi deitado fora — não deixa rasto e não dá erro.
+   *
+   * ── COMO É QUE ISTO APARECEU ────────────────────────────────────────────
+   *
+   * Não apareceu por uma mudança no editor: apareceu quando a MARCA DA BARRA
+   * passou a ser servida pelo carregador de imagens (76 KB de PNG → 4,5 KB de
+   * WebP). Uma imagem 17 vezes mais leve chega noutro instante, e esse instante
+   * calhou no meio da escrita. Bissectei os quinze commits do ramo até ao
+   * commit da imagem para acreditar nisto.
+   *
+   * O passeio «apagar uma linha do meio» ficava com
+   *
+   *     ["Um", "Quatro", "", ""]        em vez de   ["Um", "Três", "Quatro"]
+   *
+   * — o «Dois» e o «Três» caíram em nós detidos, e a acusação que saía era «a
+   * remoção deslocou os valores», que aponta para o sítio errado.
+   *
+   * ── PORQUE É QUE A PORTA É ESTA ─────────────────────────────────────────
+   *
+   * Não se espera mais tempo (uma espera fixa maior só adia o mesmo defeito
+   * para uma máquina mais lenta): escreve-se uma letra e EXIGE-SE que ela
+   * fique. É a mesma pergunta que o passeio vai fazer a seguir, feita uma vez
+   * antes de medir. Se falhar, `toPass` volta a tentar — e se nunca passar,
+   * falha a dizer que o editor não aceita escrita, que é a verdade.
+   */
+  await expect(async () => {
+    await linha1.click();
+    await linha1.fill("");
+    await page.keyboard.type("x");
+    expect(await linha1.inputValue()).toBe("x");
+  }).toPass({ timeout: 30_000 });
+  await linha1.fill("");
+  await assentar(page, 200);
 }
 
 test("A2 · 50 linhas: continua utilizável e sem erros de consola", async ({ page }, info) => {
