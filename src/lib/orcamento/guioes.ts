@@ -2,6 +2,7 @@ import type { TimelineItem } from "./types";
 import {
   analisarODia,
   BURACO_MINIMO_MIN,
+  chaveDoResponsavel,
   duracaoDe,
   estaNoDia,
   porExtenso,
@@ -392,4 +393,143 @@ export function vaziosDaRegua(dia: AnaliseDoDia): { inicio: number; fim: number 
     vazios.push({ inicio: bloco.inicio - antes.minutos, fim: bloco.inicio });
   }
   return vazios;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS COLUNAS DA GRELHA — UMA POR QUEM FAZ, NO MESMO DIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A pergunta, nas palavras dela: **«Olhas para as 14:00 e vês, lado a lado, o
+ * que cada um está a fazer nesse momento. É a pergunta do dia do evento: quem
+ * está onde, e quem está livre para a próxima coisa.»**
+ *
+ * A régua deitada responde a «este dia está cheio?»; a régua vertical do
+ * `EventTimeline` responde a «isto cabe?» e é onde se edita. Nenhuma das duas
+ * responde a esta, porque as duas misturam as pessoas na mesma pista: com a Ana
+ * e o Rui no mesmo carril, ler «quem está livre às 14:00» obriga a percorrer o
+ * dia inteiro a ler nomes. Uma coluna por pessoa transforma essa leitura numa
+ * linha horizontal — que é exactamente o que a fotografia do horário
+ * universitário faz com as salas.
+ *
+ * ── A CHAVE É A DO MOTOR, E TEM DE SER ────────────────────────────────────
+ *
+ * `chaveDoResponsavel` (sem espaços, sem maiúsculas, sem acentos). Com o
+ * `owner` em cru, «Ana» e «ana » abriam duas colunas enquanto o motor — que usa
+ * a chave — dizia que era a mesma pessoa em dois sítios ao mesmo tempo. O mesmo
+ * ecrã a contradizer-se sobre quantas pessoas há no dia.
+ *
+ * O NOME que se escreve na coluna é a primeira grafia do dia, e não a chave: a
+ * chave é para comparar, não para ler — ninguém quer ver «ana silva» no topo de
+ * uma coluna onde escreveu «Ana Silva».
+ *
+ * ── OS CARRIS SÃO OS MESMOS, POR COLUNA ───────────────────────────────────
+ *
+ * Dentro de uma coluna, duas coisas ao mesmo tempo são — por definição — a
+ * MESMA pessoa em dois sítios, que é o erro que o motor já detecta. Postas uma
+ * por cima da outra, a segunda tapava a primeira e a grelha escondia
+ * precisamente o que existe para mostrar. Vão para carris (`emCarris`, o mesmo
+ * do `ReguaDoDia`), lado a lado e mais estreitas — como na fotografia dela.
+ *
+ * Um INSTANTE dentro de uma montagem também abre carril (o `emCarris` dá-lhe um
+ * minuto só para esta decisão) e NÃO é um choque: a intersecção de um ponto com
+ * um intervalo mede zero minutos, e é essa linha do motor que faz um guião
+ * antigo abrir calado. A grelha herda isso de graça.
+ */
+
+/** A chave da coluna dos momentos que ainda não têm responsável. */
+export const SEM_RESPONSAVEL = "";
+
+/** O nome escrito no topo dessa coluna. */
+export const ROTULO_SEM_RESPONSAVEL = "Sem responsável";
+
+export interface ColunaDeResponsavel {
+  /** A chave comparável — `SEM_RESPONSAVEL` na coluna de quem não tem nome. */
+  chave: string;
+  /** O nome tal como ela o escreveu, na primeira grafia que aparece no dia. */
+  nome: string;
+  /** Os momentos desta pessoa, cada um no carril que lhe coube. */
+  blocos: BlocoEmCarril[];
+  /** Quantos carris esta coluna precisa. Nunca menos de um. */
+  carris: number;
+  /** O minuto a que o dia desta pessoa começa — é por ele que as colunas se ordenam. */
+  inicio: number;
+}
+
+/**
+ * As colunas do dia, pela ordem em que se lêem.
+ *
+ * ── A ORDEM: QUEM COMEÇA PRIMEIRO FICA À ESQUERDA ─────────────────────────
+ *
+ * Não é alfabética. A grelha lê-se de cima para baixo (o dia) e da esquerda
+ * para a direita (as pessoas), e com as colunas ordenadas pela hora a que cada
+ * um entra ao serviço a grelha ganha uma diagonal: quem monta de manhã à
+ * esquerda, quem só chega para a cerimónia à direita. Alfabético punha o «Zé da
+ * carrinha» das 07:00 no fim e obrigava a procurar o princípio do dia.
+ *
+ * Empate desfeito pelo nome, para a ordem não depender da ordem de chegada dos
+ * dados: duas pessoas que comecem às 09:00 têm de ficar sempre na mesma ordem
+ * entre dois carregamentos, senão as colunas trocam de sítio sozinhas.
+ *
+ * ── E OS MOMENTOS SEM RESPONSÁVEL VÃO PARA O FIM ──────────────────────────
+ *
+ * Têm coluna PRÓPRIA, e não uma repetição em todas nem uma faixa a atravessar a
+ * grelha. Repetir em todas mentia (aquele momento não é de toda a gente); uma
+ * faixa de largura inteira dizia que era de toda a gente, que é a mesma mentira
+ * deitada. Uma coluna própria diz a verdade e diz-a pela forma: aquela coluna
+ * cheia é o trabalho que ainda não tem dono, e a grelha mostra-o sem uma linha
+ * de prosa.
+ *
+ * Fica em ÚLTIMO — e é a decisão que a largura de 390 px obriga a tomar: ao
+ * princípio empurrava uma pessoa a sério para fora do primeiro ecrã do
+ * telemóvel, e a primeira coluna é a que ela lê sem rolar nada.
+ *
+ * Os momentos sem hora legível ficam de fora, como no `emCarris`: não têm sítio
+ * na régua e inventar-lhes um era desenhá-los às 00:00. Quem chama tem de os
+ * contar e dizê-lo — ver a `GrelhaDoDia`.
+ */
+export function colunasPorResponsavel(
+  blocos: readonly {
+    inicio: number;
+    fim: number;
+    duracao: number;
+    temHora: boolean;
+    item: TimelineItem;
+  }[],
+): ColunaDeResponsavel[] {
+  type Bloco = (typeof blocos)[number];
+  const porChave = new Map<string, { nome: string; blocos: Bloco[] }>();
+
+  for (const b of blocos) {
+    if (!b.temHora) continue;
+    const chave = chaveDoResponsavel(b.item.owner);
+    const existente = porChave.get(chave);
+    if (existente) {
+      existente.blocos.push(b);
+      continue;
+    }
+    porChave.set(chave, {
+      nome: chave === SEM_RESPONSAVEL ? ROTULO_SEM_RESPONSAVEL : (b.item.owner ?? "").trim(),
+      blocos: [b],
+    });
+  }
+
+  const colunas: ColunaDeResponsavel[] = [];
+  for (const [chave, { nome, blocos: seus }] of porChave) {
+    const { blocos: postos, carris } = emCarris(seus);
+    colunas.push({
+      chave,
+      nome,
+      blocos: postos,
+      carris,
+      inicio: Math.min(...seus.map((b) => b.inicio)),
+    });
+  }
+
+  return colunas.sort((a, b) => {
+    if (a.chave === SEM_RESPONSAVEL) return 1;
+    if (b.chave === SEM_RESPONSAVEL) return -1;
+    if (a.inicio !== b.inicio) return a.inicio - b.inicio;
+    return a.nome.localeCompare(b.nome, "pt-PT");
+  });
 }

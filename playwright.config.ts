@@ -98,8 +98,11 @@ export default defineConfig({
         "**/proposta-rascunho.spec.ts",
         "**/temas.spec.ts",
         // O guião do dia GRAVA (junta um modelo, muda uma duração) e precisa de
-        // um pedido na lista para lhe pertencer.
+        // um pedido na lista para lhe pertencer. A grelha não grava, mas precisa
+        // do MESMO pedido semeado para ter colunas que medir — e sem ele saltava
+        // aqui em silêncio, que é a armadilha que este ficheiro acabou de fechar.
         "**/guiao-do-dia.spec.ts",
+        "**/grelha-do-dia.spec.ts",
         "**/caca/a02-editor-stress.spec.ts",
       ],
       use: { ...devices["Desktop Chrome"], storageState: ESTADO_ADMIN },

@@ -27,6 +27,7 @@ import { useCachedList } from "./useCachedList";
 import { useToast } from "./Toast";
 import { printRunSheet } from "./export";
 import { ReguaDoDia } from "./ReguaDoDia";
+import { GrelhaDoDia } from "./GrelhaDoDia";
 import EventTimeline from "./EventTimeline";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -80,6 +81,33 @@ interface Props {
 }
 
 type Filtro = "todos" | "por-fazer" | "problemas";
+
+/**
+ * ── AS DUAS MANEIRAS DE OLHAR PARA O MESMO DIA ────────────────────────────
+ *
+ * A régua vertical (`EventTimeline`) e a grelha por responsável
+ * (`GrelhaDoDia`) não são duas versões da mesma coisa com desenhos
+ * diferentes: respondem a duas perguntas que se fazem em dias diferentes.
+ *
+ *  · **Régua** — «isto cabe?». Uma pista só, o dia inteiro por ordem, com os
+ *    vazios e as sobreposições marcados entre os blocos. É a pergunta da
+ *    VÉSPERA, e é o único sítio onde se EDITA e se GRAVA (com o 409 e o
+ *    «voltar a aplicar» que já lá estão). A grelha não grava nada — se
+ *    gravasse, eram duas gravações a discordar sobre o mesmo dia, que é
+ *    exactamente o defeito que o `CLAUDE.md` manda evitar.
+ *
+ *  · **Por pessoa** — «quem está onde às 14:00, e quem está livre para a
+ *    próxima coisa?». Uma coluna por responsável, as horas a descer. É a
+ *    pergunta do DIA DO EVENTO, feita de pé, com as mãos ocupadas. A régua não
+ *    lhe responde por construção: mistura toda a gente na mesma pista, e ler
+ *    «quem está livre» obriga a percorrer o dia a ler nomes.
+ *
+ * Uma só das duas não chegava. Só a régua deixa a pergunta dela sem ecrã; só a
+ * grelha tira a edição e o «isto cabe?» — e a grelha, a editar, seria a segunda
+ * gravação. Ficam as duas, com um comutador, e a régua por omissão porque é a
+ * que serve nos 364 dias em que o evento não é hoje.
+ */
+type VistaDoDia = "regua" | "grelha";
 
 /**
  * ── A LINGUAGEM DOS SINAIS: COR, FORMA E PALAVRA, SEMPRE AS TRÊS ──────────
@@ -225,6 +253,13 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
   );
 
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  /**
+   * A escolha vive AQUI e não dentro do painel do evento: trocar de evento
+   * mantém a maneira de olhar. No dia do evento ela põe a grelha e passa a
+   * manhã a saltar entre dois casamentos — voltar à régua a cada troca era
+   * cobrar-lhe um toque por cada vez.
+   */
+  const [vistaDoDia, setVistaDoDia] = useState<VistaDoDia>("regua");
   const [abertoId, setAbertoId] = useState<string | null>(null);
   const [pedido, setPedido] = useState<Quote | null>(null);
   const [aAbrir, setAAbrir] = useState<string | null>(null);
@@ -434,8 +469,22 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
           )}
         </div>
 
-        {/* ── O GUIÃO ABERTO ───────────────────────────────────────────── */}
-        <div className={abertoId ? "block" : "hidden lg:block"}>
+        {/* ── O GUIÃO ABERTO ─────────────────────────────────────────────
+            `min-w-0`, e não é decoração: este painel é um item de uma grelha,
+            e um item de grelha nasce com `min-width: auto` — ou seja, recusa-se
+            a ficar mais estreito do que o seu conteúdo mínimo. A grelha do dia
+            por responsável tem largura mínima própria (48 px de horas mais
+            96 px por pessoa), portanto a 390 px com quatro pessoas o painel
+            esticava para 432 px e arrastava a PÁGINA INTEIRA para um rolo
+            horizontal — que é a coisa que o sistema de design proíbe à letra.
+            Medido, e só se vê num browser: o rolo tem de ficar dentro da caixa
+            da grelha, e para isso o painel tem de poder encolher.
+
+            O `lg:grid-cols-[minmax(0,…)]` acima já resolvia isto no computador;
+            abaixo dos 1024 px a grelha é de uma coluna só e a coluna implícita
+            é `auto`, portanto não resolvia nada — que é exactamente a largura
+            onde ela trabalha. */}
+        <div className={`min-w-0 ${abertoId ? "block" : "hidden lg:block"}`}>
           {!aberto ? (
             <div className="bo-card">
               <EmptyState
@@ -457,7 +506,32 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                     {aberto.local ? ` · ${aberto.local}` : ""}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {/* ── ESTA FILA DEIXOU DE PODER SER `shrink-0` ──────────────
+                    Tinha dois comandos e cabia; passou a ter três, e a 390 px
+                    os três medem 506 px. Com `shrink-0` a fila recusava-se a
+                    encolher, o `flex-wrap` nunca chegava a disparar (não há o
+                    que quebrar quando a caixa não aperta), e o cabeçalho
+                    arrastava a página inteira 116 px para o lado. Medido no
+                    browser — no computador não se vê, porque lá sobra largura.
+
+                    `min-w-0` em vez de `shrink-0`: a fila encolhe, o
+                    `flex-wrap` faz o seu trabalho e os comandos passam para a
+                    linha de baixo. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {/* ── O COMUTADOR DAS DUAS PERGUNTAS ───────────────────
+                      Ver `VistaDoDia` para porque é que são duas e não uma.
+                      Fica ao pé das acções e não por cima da régua: é uma
+                      escolha de como olhar, da mesma família do «Imprimir». */}
+                  <Segmented<VistaDoDia>
+                    ariaLabel="Como ver esta timeline"
+                    size="sm"
+                    value={vistaDoDia}
+                    onChange={setVistaDoDia}
+                    options={[
+                      { value: "regua", label: "Régua" },
+                      { value: "grelha", label: "Por pessoa" },
+                    ]}
+                  />
                   {/* Imprimir vive AQUI e não na linha da lista, e a razão é
                       técnica: o `printRunSheet` abre uma janela, e uma janela
                       aberta depois de um `await` é bloqueada pelo browser. Na
@@ -491,13 +565,36 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                   <span className="sr-only">A abrir a timeline…</span>
                 </div>
               ) : (
-                <EventTimeline
-                  key={pedido.id}
-                  quote={pedido}
-                  onChange={(momentos) => guiaoMudou(pedido.id, momentos)}
-                  modelos={modelos.data?.modelos}
-                  aoGuardarComoModelo={(nome, momentos) => void guardarModelo(nome, momentos)}
-                />
+                <>
+                  {vistaDoDia === "grelha" && (
+                    /* A ANÁLISE É A DA LISTA, e não uma segunda conta feita
+                       aqui: é a mesma `analisarODia` sobre os mesmos momentos,
+                       e o `guiaoMudou` mantém a cache em dia a cada edição. Um
+                       `analisarODia` escrito neste sítio dava, no dia em que
+                       uma das duas fosse afinada, uma grelha a discordar da
+                       pastilha que está na linha ao lado. */
+                    <GrelhaDoDia
+                      dia={aberto.dia}
+                      agora={aberto.hoje ? relogio : null}
+                      chaveDoEvento={pedido.id}
+                    />
+                  )}
+                  {/* O painel de edição fica MONTADO, escondido, e não
+                      desmontado: ele guarda no seu estado o aviso do 409 com o
+                      gesto por reaplicar, e desmontá-lo ao trocar de vista
+                      deitava fora a única saída que ela tem para não perder o
+                      que escreveu. `hidden` tira-o do ecrã e da árvore de
+                      acessibilidade sem lhe tocar no estado. */}
+                  <div hidden={vistaDoDia === "grelha"}>
+                    <EventTimeline
+                      key={pedido.id}
+                      quote={pedido}
+                      onChange={(momentos) => guiaoMudou(pedido.id, momentos)}
+                      modelos={modelos.data?.modelos}
+                      aoGuardarComoModelo={(nome, momentos) => void guardarModelo(nome, momentos)}
+                    />
+                  </div>
+                </>
               )}
             </div>
           )}

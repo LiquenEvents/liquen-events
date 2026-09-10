@@ -252,6 +252,92 @@ async function primeiroPedido(page: Page): Promise<string | null> {
  *
  * TEM de ser chamado depois do login (a listagem é autenticada).
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ID DA SEMENTE — E NÃO O DO PRIMEIRO PEDIDO DA LISTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O `garantirPedido` devolve o id do PRIMEIRO pedido da lista, e é isso que o
+ * torna barato: reaproveita em vez de criar, e assim a suite não bate no tecto
+ * de cinco pedidos por minuto que a rota impõe. Enquanto houver UM pedido só,
+ * o primeiro é a semente e ninguém dá pela diferença.
+ *
+ * Deixou de haver um só. Esta suite tem passeios que criam pedidos próprios (o
+ * do nome de 300 caracteres, por exemplo), e com dois na lista o «primeiro»
+ * pode ser o outro. O que acontece a partir daí é silencioso e caríssimo de
+ * diagnosticar: o passeio ESCREVE num pedido pela API e ABRE outro no ecrã,
+ * porque a linha da lista procura-se pelo NOME.
+ *
+ * Foi assim que o passeio dos guiões apareceu vermelho com uma cara que não era
+ * a dele — «Remover 09:00 Montagem» a casar com dois botões. A leitura óbvia
+ * era «o modelo está a ser aplicado duas vezes»; a verdade era que a limpeza
+ * tinha ido para o pedido errado e nunca chegou ao que estava a ser aberto.
+ *
+ * Quem escreve pela API e abre pelo nome tem de usar isto, para os dois lados
+ * falarem do mesmo pedido — haja um na lista ou vinte.
+ */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PEDIDO QUE OS ECRÃS DO DIA VÃO ABRIR — E O NOME POR QUE SE PROCURA A LINHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os dois passeios do dia (a timeline e a grelha) fazem a mesma coisa: escrevem
+ * num pedido pela API e depois abrem a linha dele na lista. Se os dois não
+ * forem o MESMO pedido, escreve-se num e abre-se outro — e o sintoma («o modelo
+ * foi aplicado duas vezes», «a lista não tem a linha») não se parece nada com a
+ * causa.
+ *
+ * ── DUAS TENTATIVAS ERRADAS, PARA NÃO SE REPETIREM ────────────────────────
+ *
+ * 1. Usar o id do `garantirPedido` e procurar a linha pelo NOME da semente.
+ *    O `garantirPedido` devolve o PRIMEIRO da lista, e as vistas do dia ordenam
+ *    pela data mais próxima de hoje — quando há mais do que um pedido, os dois
+ *    divergem.
+ *
+ * 2. Procurar o pedido chamado «Semente E2E». Falha no CI, e a razão só se viu
+ *    porque a mensagem listava o que LÁ ESTAVA:
+ *
+ *        ["Maria da Conceição…","Rita e Tomás","Rita e Tomás", …]
+ *
+ *    Nenhuma «Semente E2E». Em CI a pasta `data/` chega a esta suite JÁ COM
+ *    pedidos dos passos anteriores do mesmo trabalho (o `admin-mobile` cria a
+ *    «Rita e Tomás»), portanto o `garantirPedido` reaproveita um deles e nunca
+ *    chega a criar a semente. Em local, com `rm -rf data/*` à frente, existia
+ *    sempre — e foi por isso que passava aqui e falhava lá.
+ *
+ * ── O QUE FICA ────────────────────────────────────────────────────────────
+ *
+ * Nenhum nome fixo. Garante-se que existe UM pedido, pergunta-se ao servidor de
+ * quem ele é, e devolve-se as duas coisas: o id para escrever, e o nome do
+ * cliente para encontrar a linha. Passam a ser o mesmo pedido por construção.
+ *
+ * A leitura repete enquanto não vier resposta, como o `primeiroPedido` aqui em
+ * cima: a rota devolve 401 enquanto a sessão não assenta, e um `{ error: … }`
+ * lido de uma vez só parece uma lista sem o que se procura.
+ */
+export async function pedidoDoDia(
+  page: Page,
+): Promise<{ id: string; cliente: string; naLista: RegExp }> {
+  const id = await garantirPedido(page);
+
+  let cliente = "";
+  for (let tentativa = 0; tentativa < 12 && !cliente; tentativa += 1) {
+    const res = await page.request.get(`/api/orcamento/${id}`);
+    if (res.ok()) {
+      const q: unknown = await res.json();
+      const n = (q as { name?: unknown })?.name;
+      if (typeof n === "string" && n.trim()) cliente = n.trim();
+    }
+    if (!cliente) await page.waitForTimeout(400);
+  }
+  expect(cliente.length > 0, `o pedido ${id} tem um nome de cliente para procurar`).toBe(true);
+
+  // Vinte e quatro caracteres chegam para o distinguir e não apanham a data nem
+  // o estado, que vêm no mesmo nome acessível da linha.
+  const naLista = new RegExp(cliente.slice(0, 24).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return { id, cliente, naLista };
+}
+
 export async function garantirPedido(page: Page, nome = "Semente E2E"): Promise<string> {
   const existente = await primeiroPedido(page);
   if (existente) return existente;
