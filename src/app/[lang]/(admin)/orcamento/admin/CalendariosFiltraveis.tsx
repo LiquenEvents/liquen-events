@@ -238,7 +238,18 @@ export function ListaDeCalendarios({
             <li key={k}>
               <label
                 className={cn(
-                  "flex items-center gap-3 px-5 sm:px-6 py-2.5 cursor-default",
+                  /* ── 44 px NO DEDO, E O `py-2.5` NÃO CHEGAVA ───────────────
+                     MEDIDO no passeio de telemóvel: 183×39 px, quatro vezes —
+                     uma por calendário. O mínimo desta casa são 44, e 39 é a
+                     medida de uma linha que se falha com o polegar e se acerta
+                     na de cima.
+
+                     `alvo-toque` e não mais `py-`: a classe só cresce onde o
+                     ponteiro é grosso, portanto no computador a lista continua
+                     compacta — quatro linhas com 5 px a mais cada uma seriam
+                     20 px de barra lateral a mais, para nada, em quem usa
+                     rato. */
+                  "alvo-toque flex items-center gap-3 px-5 sm:px-6 py-2.5 cursor-default",
                   "hover:bg-[var(--bo-tinta-3)]",
                   // O `ESTADO` da casa: 150 ms e a mola interactiva, como
                   // qualquer outra linha em que se passa o rato.
