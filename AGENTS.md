@@ -8,7 +8,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# O `next dev` da 16.3.3 não é o produto — e três coisas partem-se só lá
+# O `next dev` da 16.3.3 não é o produto — e duas coisas partem-se só lá
 
 Medido, nas três combinações, com o mesmo código:
 

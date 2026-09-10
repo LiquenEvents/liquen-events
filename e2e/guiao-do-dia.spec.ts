@@ -44,7 +44,7 @@ import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido
 const MODELO = "Casamento de tarde";
 
 test.describe("Timelines @guiao", () => {
-  test("da lista ao guião gravado, e à folha que se imprime", async ({ page }) => {
+  test("da lista à timeline gravada, e à folha que se imprime", async ({ page }) => {
     test.setTimeout(180_000);
 
     /**
@@ -77,7 +77,7 @@ test.describe("Timelines @guiao", () => {
     const limpou = await page.request.patch(`/api/orcamento/${quoteId}`, {
       data: { timeline: [] },
     });
-    expect(limpou.ok(), "não foi possível esvaziar o guião da semente").toBe(true);
+    expect(limpou.ok(), "não foi possível esvaziar a timeline da semente").toBe(true);
     await page.reload({ waitUntil: "domcontentloaded" });
 
     const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
@@ -100,7 +100,7 @@ test.describe("Timelines @guiao", () => {
     // Pelo nome ACESSÍVEL da linha, que é o que uma pessoa com leitor de ecrã
     // ouve: a data, o cliente e o estado do guião.
     const linha = page.getByRole("button", { name: /Semente E2E/ }).first();
-    await expect(linha, "o evento semeado não apareceu na lista de guiões").toBeVisible({
+    await expect(linha, "o evento semeado não apareceu na lista de timelines").toBeVisible({
       timeout: 30_000,
     });
 
@@ -111,11 +111,11 @@ test.describe("Timelines @guiao", () => {
     await linha.click();
     await expect(
       page.getByText("Cronograma do Dia"),
-      "abrir uma linha da lista devia montar o guião daquele evento",
+      "abrir uma linha da lista devia montar a timeline daquele evento",
     ).toBeVisible({ timeout: 60_000 });
 
     // ── 3. CRIAR O GUIÃO A PARTIR DE UM MODELO ──────────────────────────────
-    const escolherModelo = page.getByLabel("Juntar um modelo a este guião");
+    const escolherModelo = page.getByLabel("Juntar um modelo a esta timeline");
     await expect(escolherModelo).toBeVisible({ timeout: 30_000 });
     await escolherModelo.click();
     await page.getByRole("option", { name: MODELO }).click();
@@ -169,7 +169,7 @@ test.describe("Timelines @guiao", () => {
     await expect(linhaDepois).toBeVisible({ timeout: 30_000 });
     await expect(
       linhaDepois,
-      "o guião gravado devia aparecer na lista com a sobreposição que ficou",
+      "a timeline gravada devia aparecer na lista com a sobreposição que ficou",
     ).toHaveAttribute("aria-label", /ao mesmo tempo/);
 
     // ── 6. A FOLHA DO DIA IMPRIME-SE, E VAI CHEIA ───────────────────────────
