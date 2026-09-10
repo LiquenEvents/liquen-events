@@ -882,24 +882,25 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
    */
   const trocarDeVista = useCallback(
     (proxima: Vista) => {
-      setVista((anterior) => {
-        const eraDeHoras = anterior === "dia" || anterior === "semana";
-        const vaiParaHoras = proxima === "dia" || proxima === "semana";
-        if (!eraDeHoras && vaiParaHoras) {
-          const prefixo = `${year}-${pad2(month + 1)}`;
-          setDiaAncora(selectedDay ?? (todayStr.startsWith(prefixo) ? todayStr : `${prefixo}-01`));
-        }
-        if (eraDeHoras && !vaiParaHoras) {
-          const [a, m] = diaAncora.split("-").map(Number);
-          setCursor(new Date(a, m - 1, 1));
-        }
-        return proxima;
-      });
+      const eraDeHoras = vista === "dia" || vista === "semana";
+      const vaiParaHoras = proxima === "dia" || proxima === "semana";
+      if (!eraDeHoras && vaiParaHoras) {
+        const prefixo = `${year}-${pad2(month + 1)}`;
+        setDiaAncora(selectedDay ?? (todayStr.startsWith(prefixo) ? todayStr : `${prefixo}-01`));
+      }
+      if (eraDeHoras && !vaiParaHoras) {
+        const [a, m] = diaAncora.split("-").map(Number);
+        setCursor(new Date(a, m - 1, 1));
+      }
+      setVista(proxima);
       // O painel do dia aponta para um dia da grelha do mês; noutra vista essa
       // grelha sai do ecrã e ele ficaria a apontar para nada.
       setSelectedDay(null);
     },
-    [year, month, selectedDay, todayStr, diaAncora],
+    // A vista ANTERIOR é lida do fecho e não de um `setVista(anterior => …)`:
+    // um actualizador de estado tem de ser puro, e pôr lá dentro os outros dois
+    // `set*` fazia-o correr duas vezes em modo estrito.
+    [vista, year, month, selectedDay, todayStr, diaAncora],
   );
 
   /**

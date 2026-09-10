@@ -3,25 +3,37 @@
 
 ## O QUE JÁ ESTÁ FEITO
 
-Auditado no `Calendario.tsx` (1343 linhas) contra a tabela da **Parte 9**.
+Auditado no código contra a tabela da **Parte 9** — `Calendario.tsx`,
+`CalendarioAno.tsx`, `VistasDeHoras.tsx`, `ChipDoDia.tsx`,
+`CalendariosFiltraveis.tsx` e `lib/orcamento/{ano,dia}-do-calendario.ts`.
 
 | # | Fase | Estado |
 |---|---|---|
-| 01 | Toolbar | **parcial** — há título de mês e setas de navegação; falta o resto da Parte 9 |
-| 02 | Grelha a toda a largura | **por fazer** — continua dentro de um cartão |
-| 03 | Chips | **por fazer** — sem `+N mais` nem popover |
-| 04 | Calendários filtráveis | **por fazer** — a legenda não liga nem desliga nada |
-| 05 | Painel de próximos | **parcial** — há `sticky`, falta o agrupamento por mês do documento |
-| 06 | Vista de dia | **por fazer** |
-| 07 | Vista de ano | **por fazer** — é a que responde a «temos livre em julho?» |
-| 08 | Vista de semana | **por fazer** |
-| 09 | Arrastar | **por fazer** |
-| 10 | Menus e teclado | **por fazer** — sem `⌘1–4` nem `⌘T` |
-| 11 | Acessibilidade | **por fazer** — sem `role="grid"` |
+| 01 | Toolbar | **parcial** — o mês é o título, no degrau de display, com as setas e o «Hoje»; falta o menu `⋯` (o «Exportar» ainda é um botão ao nível da navegação) |
+| 02 | Grelha a toda a largura | **feito** — sem cartão, enche largura e altura, dias adjacentes esbatidos |
+| 03 | Chips | **feito** — cor por tipo, glifo, hora antes do título, truncatura, `+N mais` com popover |
+| 04 | Calendários filtráveis | **feito** — quatro caixas de marcar na barra lateral, com `⌥+clique` a isolar; filtram as QUATRO vistas |
+| 05 | Painel de próximos | **parcial** — há `sticky`, falta o agrupamento por mês e a ligação à grelha (pontos 22 e 25) |
+| 06 | Vista de dia | **feito** — coluna 07:00–24:00 a 44 px/hora, linha do agora, sobreposição em pistas |
+| 07 | Vista de ano | **feito** — doze mini-meses com o resumo em palavras |
+| 08 | Vista de semana | **feito** — sete colunas na mesma escala, faixa de dia inteiro, coluna de hoje |
+| 09 | Arrastar | **por fazer** — e é ela que destranca o `Mudar de dia…` do menu de contexto (ver abaixo) |
+| 10 | Menus e teclado | **parcial** — menu de contexto no dia, no pedido e na marcação; `⌘1–4`, `⌘T` (e `T`), `⌘N`, `←/→` e `⌥←/→`. Falta `Delete`, `Espaço`, `Home`/`End` e `PageUp`/`PageDown`, que são navegação DENTRO da grelha e vão com a fase 11 |
+| 11 | Acessibilidade | **por fazer** — a grelha do mês ainda é um `role="group"` de `role="button"`, não um `role="grid"` de `gridcell` |
 
-**Este ecrã está por começar.** Só existe a vista de MÊS; as de dia, semana e
-ano — que são metade do documento — não têm nada. Ela escolheu «prefiro as
-tarefas primeiro», e este ficou atrás.
+**Duas coisas que o código não deixou fazer como está escrito**, e ficam aqui
+para quem vier a seguir não as procurar:
+
+  · o menu de contexto do evento pede `Mudar de dia…` e `Alterar tipo`, e o
+    `/api/calendario` tem POST e DELETE e **não tem PATCH**. Mudar uma marcação
+    seria apagá-la e criar outra — troca-lhe o `id`, perde o `createdAt` e, se a
+    criação falhar depois do apagar, perde a marcação. Sem Anular (fase 09) isso
+    não se faz. Ficaram `Duplicar` (que é um POST), `Ver na vista de dia` e
+    `Remover` pela pergunta da casa;
+  · o `⌘T` da Parte 18 **não chega ao código num separador de browser** —
+    `⌘T`/`Ctrl+T` é «separador novo» e não é entregue à página. Está ligado à
+    mesma (numa janela de aplicação instalada chega cá), e ao lado dele há o `T`
+    SOLTO, que é o que a web faz há anos e o que dispara mesmo.
 
 ---
 

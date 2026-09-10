@@ -173,8 +173,18 @@ function Corpo({
   const descarregarNotas = useCallback(() => {
     const valor = notasRef.current;
     if (valor === gravadoRef.current) return;
+    /* Marca-se como gravado À IDA, para dois `blur` seguidos não mandarem o
+       mesmo parágrafo duas vezes — e DESMARCA-SE se o servidor recusar. Sem a
+       segunda metade, uma gravação falhada deixava a nota com aspecto de
+       guardada: o aviso dizia que não tinha ido, e o `blur` seguinte não a
+       tentava outra vez porque «já estava». */
+    const anterior = gravadoRef.current;
     gravadoRef.current = valor;
-    void gravarRef.current(tarefa.id, { notas: valor }, `guardar as notas de «${tarefa.title}»`);
+    void gravarRef
+      .current(tarefa.id, { notas: valor }, `guardar as notas de «${tarefa.title}»`)
+      .then((ok) => {
+        if (!ok) gravadoRef.current = anterior;
+      });
   }, [tarefa.id, tarefa.title]);
 
   useEffect(() => descarregarNotas, [descarregarNotas]);
