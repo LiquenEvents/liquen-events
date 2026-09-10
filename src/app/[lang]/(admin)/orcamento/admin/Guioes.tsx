@@ -886,7 +886,6 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                       staff: cabecalho.staff,
                       momentos: pedido?.timeline ?? [],
                     })}
-                    rotulo="WhatsApp"
                   />
                   <Button size="sm" variant="ghost" onClick={fechar} className="lg:hidden">
                     Voltar aos guiões

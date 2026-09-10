@@ -10521,7 +10521,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   passos, menos os três do meio. O copiar FICA, para quem quer
                   o texto noutro sítio qualquer. */}
               <div className="flex flex-wrap items-center gap-2">
-                <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
+                <BotaoWhatsApp texto={resumoParaCopiar} />
                 <CopiarResumo texto={resumoParaCopiar} />
               </div>
               <Button
@@ -10593,9 +10593,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   linha por baixo diz isso a quem chega primeiro, porque a
                   ausência de um botão não explica nada a ninguém. */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {linkDaProposta && (
-                  <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
-                )}
+                {linkDaProposta && <BotaoWhatsApp texto={resumoParaCopiar} />}
                 <CopiarResumo texto={resumoParaCopiar} />
               </div>
               {!linkDaProposta && (

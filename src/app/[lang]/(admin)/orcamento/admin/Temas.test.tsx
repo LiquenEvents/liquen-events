@@ -290,6 +290,20 @@ function haCartaoDoTema(name: RegExp): boolean {
     .some((b) => b.getAttribute("aria-haspopup") !== "menu");
 }
 
+/**
+ * Abre o «⋯» de um tema e devolve o item de menu pedido.
+ *
+ * O cartão passou a ter UM botão sobre a fotografia em vez de dois chips
+ * soltos (ponto 9 da auditoria do `docs/APPLE-TEMAS.md`), por isso as acções
+ * deixaram de ser botões da grelha e passaram a ser itens de menu. Quem quiser
+ * uma acção abre o menu — que é o que ela também faz.
+ */
+function accaoNoMenuDoTema(tema: RegExp, accao: string | RegExp): HTMLElement {
+  const abridor = screen.getAllByRole("button", { name: new RegExp(`Acções de ${tema.source}`) });
+  fireEvent.click(abridor[0]);
+  return screen.getByRole("menuitem", { name: accao });
+}
+
 /** Abre a pasta de um tema e espera que a leitura das fotos assente. */
 async function openFolder(name: RegExp) {
   fireEvent.click(await acharCartaoDoTema(name));
@@ -832,18 +846,48 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
    * mostram a MESMA lista. Enquanto os ícones do rato eram escritos à mão, a
    * promessa era só um comentário — e partiu-se na primeira acção nova.
    */
-  it("a acção existe no desenho do rato e no do dedo", async () => {
+  /**
+   * ── UM DESENHO SÓ, E O BOTÃO DIREITO A DIZER O MESMO ───────────────────
+   *
+   * Isto media a igualdade entre DOIS desenhos do cartão — chips soltos com
+   * rato, «⋯» sem rato. Deixou de haver dois: o ponto 9 da auditoria do
+   * `docs/APPLE-TEMAS.md` manda «UM botão discreto ⋯… que abre o mesmo menu do
+   * botão direito», e a Parte 9 proíbe mais de um botão flutuante sobre uma
+   * miniatura.
+   *
+   * O que se guarda agora é a igualdade que ficou, e é a que o documento
+   * exige: o menu do «⋯» e o menu do botão direito são a MESMA lista.
+   */
+  it("o «⋯» e o botão direito abrem a mesma lista", async () => {
+    dois();
+    renderTemas();
+    const cartao = await acharCartaoDoTema(/Clássico Intemporal/);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ })[0]);
+    const doBotao = screen
+      .getAllByRole("menuitem")
+      .map((m) => m.textContent);
+    expect(doBotao).toContain("Juntar a outro tema…");
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    fireEvent.contextMenu(cartao, { clientX: 40, clientY: 40 });
+    const doDireito = screen.getAllByRole("menuitem").map((m) => m.textContent);
+    expect(doDireito).toEqual(doBotao);
+  });
+
+  /** «Ações destrutivas no fim, a vermelho, com confirmação nomeada.» */
+  it("«Eliminar tema…» é o último item e pergunta pelo nome", async () => {
     dois();
     renderTemas();
     await acharCartaoDoTema(/Clássico Intemporal/);
-    // O do rato: um botão por cartão, com o rótulo por extenso.
-    expect(screen.getAllByRole("button", { name: "Juntar a outro tema…" })).toHaveLength(2);
-    // O do dedo: dentro do «⋯», que é o mesmo `accoesDoTema`.
-    const menus = screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ });
-    fireEvent.click(menus[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ })[0]);
+    const itens = screen.getAllByRole("menuitem").map((m) => m.textContent);
+    expect(itens[itens.length - 1]).toBe("Eliminar tema…");
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Eliminar tema…" }));
     expect(
-      screen.getAllByRole("menuitem", { name: "Juntar a outro tema…" }).length,
-    ).toBeGreaterThan(0);
+      await screen.findByText(/Eliminar o tema «Clássico Intemporal»/),
+    ).toBeTruthy();
   });
 
   /**
@@ -887,7 +931,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
     dois();
     renderTemas();
     await acharCartaoDoTema(/Clássico Intemporal/);
-    fireEvent.click(screen.getAllByRole("button", { name: "Juntar a outro tema…" })[0]);
+    fireEvent.click(accaoNoMenuDoTema(/Clássico Intemporal/, "Juntar a outro tema…"));
 
     route("POST /api/temas/t1/fundir", () =>
       ok({
@@ -925,7 +969,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
     dois();
     renderTemas();
     await acharCartaoDoTema(/Clássico Intemporal/);
-    fireEvent.click(screen.getAllByRole("button", { name: "Juntar a outro tema…" })[0]);
+    fireEvent.click(accaoNoMenuDoTema(/Clássico Intemporal/, "Juntar a outro tema…"));
 
     route("POST /api/temas/t1/fundir", () =>
       ok({
@@ -962,6 +1006,181 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
  * promete: que o número chega DEPOIS dos cartões (e por isso não os atrasa) e
  * que a sua ausência não estraga nada.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS ÂMBITOS — FASE 04 DO `docs/APPLE-TEMAS.md`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «"por usar" é metadado sem filtro»: a informação mais accionável da grelha
+ * estava escrita em cada cartão e não havia maneira de reduzir a lista por
+ * ela. A aritmética está presa em `lib/temas-filtros.test.ts`; aqui prende-se
+ * que ela CHEGA à barra e que carregar num âmbito muda a grelha.
+ */
+describe("Biblioteca de Temas — os âmbitos", () => {
+  const biblioteca = () =>
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Terracotta", imageCount: 9 },
+        { ...THEME, id: "t2", name: "Boho", imageCount: 4 },
+        { ...THEME, id: "t3", name: "Itália", imageCount: 6, favorito: true },
+        { ...THEME, id: "t4", name: "Antigo", imageCount: 2, arquivado: true },
+        // O quinto é o que faz a barra ganhar campo de procurar
+        // (`themes.length > 4`), e um dos testes precisa dele.
+        { ...THEME, id: "t5", name: "Praia", imageCount: 3 },
+      ]),
+    );
+
+  /** Espera pelos cartões e pela contagem de propostas, que vem a seguir. */
+  async function comUso(usos: Record<string, number>) {
+    biblioteca();
+    route("GET /api/temas/uso", () => ok({ ok: true, usos }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+  }
+
+  it("filtrar por «Por usar» deixa os temas com zero propostas", async () => {
+    await comUso({ t1: 7 });
+    fireEvent.click(screen.getByRole("button", { name: /Por usar/ }));
+
+    expect(haCartaoDoTema(/Terracotta/)).toBe(false);
+    expect(haCartaoDoTema(/Boho/)).toBe(true);
+    // O arquivado não volta pela porta do filtro: o arquivo é uma vista.
+    expect(haCartaoDoTema(/Antigo/)).toBe(false);
+  });
+
+  it("o estado da vista acompanha o âmbito escolhido", async () => {
+    await comUso({ t1: 7 });
+    const estado = screen.getByRole("status", { name: "Temas à vista" });
+    expect(estado.textContent).toBe("4 temas · 22 fotografias");
+
+    fireEvent.click(screen.getByRole("button", { name: /Favoritos/ }));
+    expect(estado.textContent).toBe("1 tema · 6 fotografias");
+  });
+
+  it("«Arquivados» é um âmbito, e mostra só o que está arquivado", async () => {
+    await comUso({ t1: 7 });
+    fireEvent.click(screen.getByRole("button", { name: /Arquivados/ }));
+    expect(haCartaoDoTema(/Antigo/)).toBe(true);
+    expect(haCartaoDoTema(/Terracotta/)).toBe(false);
+  });
+
+  /** Um âmbito sem nada lá dentro seria um controlo a explicar uma
+   *  funcionalidade que ninguém ainda usou. */
+  it("não oferece «Por usar» enquanto a contagem de propostas não chegar", async () => {
+    biblioteca();
+    route("GET /api/temas/uso", () => ({ ok: false, status: 500, json: async () => ({}) }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: /Por usar/ })).toBeNull();
+    // E os outros continuam lá.
+    expect(screen.getByRole("button", { name: /Favoritos/ })).toBeTruthy();
+  });
+
+  /** «Usados este ano» precisa de saber QUANDO um tema saiu, e o
+   *  `/api/temas/uso` só devolve QUANTAS vezes. Enquanto não mandar a data, o
+   *  âmbito não aparece — em vez de aparecer e devolver a lista toda. */
+  it("«Usados este ano» não se oferece enquanto o servidor não mandar o ano", async () => {
+    await comUso({ t1: 7 });
+    expect(screen.queryByRole("button", { name: /Usados este ano/ })).toBeNull();
+  });
+
+  /** «Filtro sem resultados é uma mensagem DIFERENTE de biblioteca vazia.» */
+  it("um âmbito vazio depois de uma procura tem saída", async () => {
+    await comUso({ t1: 7, t2: 1, t3: 2 });
+    fireEvent.click(screen.getByRole("button", { name: /Favoritos/ }));
+    fireEvent.change(screen.getByLabelText(/Procurar tema/), { target: { value: "zzz" } });
+    await act(async () => {});
+
+    expect(screen.getByText(/Nenhum tema corresponde a “zzz”/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(haCartaoDoTema(/Terracotta/)).toBe(true);
+  });
+
+  /** Desarquivar o último arquivado esvazia o âmbito por baixo dos pés. */
+  it("um âmbito que desaparece devolve a vista a «Todos»", async () => {
+    await comUso({ t1: 7 });
+    fireEvent.click(screen.getByRole("button", { name: /Arquivados/ }));
+    expect(haCartaoDoTema(/Antigo/)).toBe(true);
+
+    route("PATCH /api/temas/t4", () => ok({ ok: true }));
+    fireEvent.click(accaoNoMenuDoTema(/Antigo/, "Repor na lista"));
+    await act(async () => {});
+
+    // Sem nada arquivado o âmbito sai da barra — e a vista não fica presa nele.
+    expect(screen.queryByRole("button", { name: /Arquivados/ })).toBeNull();
+    expect(haCartaoDoTema(/Terracotta/)).toBe(true);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CARTÃO E OS MENUS — FASES 02 E 03
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe("Biblioteca de Temas — um botão sobre a fotografia", () => {
+  const um = () =>
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9 }]));
+
+  /** «Mais de um botão flutuante sobre uma miniatura» é proibido pela Parte 9. */
+  it("há um só botão por cima da capa, e é o «⋯»", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    const flutuantes = within(grupo)
+      .getAllByRole("button")
+      .filter((b) => b.closest('[class*="absolute"]') !== null);
+    expect(flutuantes).toHaveLength(1);
+    expect(flutuantes[0].getAttribute("aria-haspopup")).toBe("menu");
+  });
+
+  /** A estrela era um chip aceso sobre a fotografia; a informação não se
+   *  perdeu, mudou de sítio — para o rasto de números, com nome escrito. */
+  it("um tema fixado di-lo na linha dos números, e não por cima da capa", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, favorito: true }]),
+    );
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    expect(within(grupo).getByText("Fixado no topo")).toBeTruthy();
+  });
+
+  /** «Datas relativas sem data absoluta em tooltip» é proibido pela Parte 9. */
+  it("a data relativa leva a data inteira no `title`", async () => {
+    const ontem = new Date(Date.now() - 86_400_000).toISOString();
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: ontem }]),
+    );
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const relativa = screen.getByText(/ontem/);
+    expect(relativa.getAttribute("title")).toMatch(/\d{4}/);
+  });
+
+  /** O botão direito é obrigatório numa coleção, e no vazio da grelha oferece
+   *  «Novo tema». */
+  it("o botão direito no vazio da grelha oferece «Novo tema»", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    const grelha = grupo.parentElement!;
+    fireEvent.contextMenu(grelha, { clientX: 10, clientY: 10 });
+    expect(screen.getByRole("menuitem", { name: "Novo tema" })).toBeTruthy();
+  });
+
+  /** Carregar com o botão direito EM CIMA de um cartão é a pergunta do tema, e
+   *  não a da grelha: um menu, e não dois. */
+  it("o botão direito num cartão não abre também o menu da grelha", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    fireEvent.contextMenu(grupo, { clientX: 10, clientY: 10 });
+    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    expect(screen.queryByRole("menuitem", { name: "Novo tema" })).toBeNull();
+  });
+});
+
 describe("Biblioteca de Temas — em quantas propostas saiu", () => {
   it("o número entra depois, e diz quando um tema nunca saiu", async () => {
     route("GET /api/temas", () =>
@@ -979,7 +1198,7 @@ describe("Biblioteca de Temas — em quantas propostas saiu", () => {
     expect(screen.getByText(/9 fotos · 7 propostas/)).toBeTruthy();
     // «Por usar» é a metade mais útil: distingue um tema que a biblioteca TEM
     // de um tema que o estúdio USA.
-    expect(screen.getByText(/9 fotos · por usar/)).toBeTruthy();
+    expect(screen.getByText(/9 fotos · Nunca usado/)).toBeTruthy();
   });
 
   it("uma proposta só não se diz no plural", async () => {
@@ -1003,7 +1222,7 @@ describe("Biblioteca de Temas — em quantas propostas saiu", () => {
     const cartao = cartaoDoTema(/Terracotta/);
     expect(cartao.textContent).toMatch(/9 fotos/);
     expect(cartao.textContent).not.toMatch(/proposta/);
-    expect(cartao.textContent).not.toMatch(/por usar/);
+    expect(cartao.textContent).not.toMatch(/Nunca usado/);
   });
 });
 
@@ -1115,16 +1334,16 @@ describe("Biblioteca de Temas — a barra de controlos", () => {
     );
 
   /**
-   * O resumo descreve a BIBLIOTECA, e continua verdadeiro com a procura
-   * vazia. Vivia dentro da caixa que ancora o ícone da lupa — herdava a
+   * O resumo vivia dentro da caixa que ancora o ícone da lupa — herdava a
    * largura do campo e lia-se como se descrevesse o que lá estava escrito.
+   * Continua irmão do campo; o que mudou é o que ele conta.
    */
-  it("o resumo da biblioteca não é filho do campo de procura", async () => {
+  it("o estado da vista não é filho do campo de procura", async () => {
     cinco();
     renderTemas();
-    const resumo = await screen.findByText(/fotos em 5 temas/);
+    const estado = await screen.findByRole("status", { name: "Temas à vista" });
     expect(
-      resumo.closest(".relative"),
+      estado.closest(".relative"),
       "a caixa `relative` existe só para pôr a lupa em cima do campo",
     ).toBeNull();
     // E o campo continua lá, ao lado.
@@ -1132,19 +1351,51 @@ describe("Biblioteca de Temas — a barra de controlos", () => {
   });
 
   /**
+   * ── A CONTAGEM MUDA AO FILTRAR ─────────────────────────────────────────
+   *
+   * Ponto 4 da auditoria do `docs/APPLE-TEMAS.md`: «"567 fotos em 28 temas"
+   * está solta por baixo do campo de pesquisa… passa a ESTADO DA VISTA, e
+   * muda ao filtrar: `28 temas · 567 fotos` → `4 temas · 61 fotos`».
+   *
+   * É a diferença entre uma legenda e um estado: depois de carregar num
+   * filtro, o que interessa saber é o que sobrou.
+   */
+  it("o estado da vista conta o que está à vista, e muda com a procura", async () => {
+    cinco();
+    renderTemas();
+    const estado = await screen.findByRole("status", { name: "Temas à vista" });
+    expect(estado.textContent).toBe("5 temas · 45 fotografias");
+
+    fireEvent.change(screen.getByLabelText(/Procurar tema/), { target: { value: "Terracotta" } });
+    await act(async () => {});
+    expect(estado.textContent).toBe("1 tema · 9 fotografias");
+  });
+
+  /**
    * Espaçamento igual quer dizer «cinco coisas sem relação», e não era
    * verdade: umas mudam como a lista se vê, outra o que ela contém, duas
    * fazem alguma coisa.
    */
-  it("as duas acções ficam juntas, e separadas do resto", async () => {
+  /**
+   * ── «REVER ETIQUETAS» SAIU DE ENTRE OS BOTÕES ──────────────────────────
+   *
+   * Era um link de texto entre botões de barra — a última linha das
+   * proibições da Parte 9 do `docs/APPLE-TEMAS.md`, e o ponto 6 da auditoria:
+   * «uma ação de manutenção rara, com o mesmo peso visual dos controlos de
+   * vista». Passa para dentro do «⋯», ao lado de «Novo tema».
+   */
+  it("«Rever etiquetas» vive no «⋯», e não entre os botões", async () => {
     cinco();
     renderTemas();
     const novo = await screen.findByRole("button", { name: /Novo tema/ });
     const grupo = novo.parentElement!;
-    expect(grupo.textContent).toMatch(/Rever etiquetas/);
+    expect(grupo.textContent).not.toMatch(/Rever etiquetas/);
     // O que muda a VISTA não está no mesmo grupo do que FAZ.
     expect(grupo.textContent).not.toMatch(/Compacto/);
     expect(grupo.querySelector("select")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Acções de Biblioteca de Temas/ }));
+    expect(screen.getByRole("menuitem", { name: "Rever etiquetas…" })).toBeTruthy();
   });
 
   it("a ordenação e o tamanho dos cartões ficam no mesmo grupo", async () => {
@@ -1347,6 +1598,99 @@ describe("Biblioteca de Temas — lote de 300 fotos", () => {
       (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens",
     )[1].init?.body as FormData;
     expect(second.getAll("thumbs")).toEqual([]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A SELECÇÃO — FASE 05 DO `docs/APPLE-TEMAS.md`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Suportar seleção; ⌘A; Shift+clique para intervalo; ⌘+clique para
+ * adicionar.» [APPLE] O clique e o Shift já cá estavam (e têm testes seus, lá
+ * em cima, no bloco da remoção em bloco); o que faltava era o ⌘, o ⌘A e o Esc.
+ *
+ * Com 312 fotos numa pasta, escolher todas eram 312 cliques.
+ */
+describe("Biblioteca de Temas — os atalhos da selecção", () => {
+  async function pastaCom(n: number) {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: n }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, n, true), total: n }));
+    renderTemas();
+    await openFolder(/Terracotta/);
+  }
+
+  it("⌘A escolhe as fotos todas da pasta", async () => {
+    await pastaCom(5);
+    fireEvent.keyDown(document, { key: "a", metaKey: true });
+    expect(screen.getByText("5 fotos selecionadas")).toBeTruthy();
+  });
+
+  /** Windows e Linux também abrem o back office, e lá o gesto é o Ctrl. */
+  it("Ctrl+A faz o mesmo", async () => {
+    await pastaCom(3);
+    fireEvent.keyDown(document, { key: "a", ctrlKey: true });
+    expect(screen.getByText("3 fotos selecionadas")).toBeTruthy();
+  });
+
+  it("Esc limpa a selecção", async () => {
+    await pastaCom(4);
+    fireEvent.keyDown(document, { key: "a", metaKey: true });
+    expect(screen.getByText("4 fotos selecionadas")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText(/fotos selecionadas/)).toBeNull();
+  });
+
+  /**
+   * O ⌘A dentro de um campo selecciona o TEXTO. Roubá-lo seria tirar um atalho
+   * para dar outro — e o campo aqui é o de renomear o tema.
+   */
+  it("⌘A dentro de um campo não mexe na selecção", async () => {
+    await pastaCom(5);
+    // O botão do nome, no cabeçalho da pasta, é o que abre o campo.
+    fireEvent.click(screen.getByRole("button", { name: "Terracotta" }));
+    const campo = await screen.findByLabelText("Nome do tema");
+    fireEvent.keyDown(campo, { key: "a", metaKey: true });
+    expect(screen.queryByText(/fotos selecionadas/)).toBeNull();
+  });
+
+  /**
+   * O ⌘ GANHA ao Shift: com os dois carregados acrescenta-se uma foto ao
+   * intervalo em vez de o refazer. É o que permite escolher a quadragésima
+   * primeira sem perder as quarenta que já estavam.
+   */
+  it("⌘+clique acrescenta uma foto sem refazer o intervalo do Shift", async () => {
+    await pastaCom(5);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 5" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 3 de 5" }), {
+      shiftKey: true,
+    });
+    expect(screen.getByText("3 fotos selecionadas")).toBeTruthy();
+
+    // Com Shift E ⌘: sem o ⌘, isto estenderia de 3 até 5 e daria cinco.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 5 de 5" }), {
+      shiftKey: true,
+      metaKey: true,
+    });
+    expect(screen.getByText("4 fotos selecionadas")).toBeTruthy();
+  });
+
+  /**
+   * ── O BOTÃO DIREITO NUMA FOTOGRAFIA ────────────────────────────────────
+   *
+   * As quatro acções são as que já estão desenhadas na célula — «tudo o que
+   * está no menu de contexto existe também na interface principal» [APPLE] —,
+   * e aqui ganham nome escrito. A destrutiva é a última.
+   */
+  it("o botão direito numa foto abre as acções dela, com a destrutiva no fim", async () => {
+    await pastaCom(3);
+    const celula = screen.getByRole("checkbox", { name: "Selecionar foto 2 de 3" }).parentElement!;
+    fireEvent.contextMenu(celula, { clientX: 20, clientY: 20 });
+
+    const itens = screen.getAllByRole("menuitem").map((m) => m.textContent);
+    expect(itens[0]).toBe("Ver em grande");
+    expect(itens[itens.length - 1]).toBe("Remover do tema…");
   });
 });
 
@@ -2591,7 +2935,10 @@ describe("largura de contentor, não largura de ecrã", () => {
     renderTemas();
 
     const campo = await screen.findByLabelText(/Procurar tema/);
-    const caixa = campo.closest("div")!.parentElement!;
+    // A caixa `relative` do campo (a que ancora a lupa) é agora a mesma que
+    // lhe dá a largura: o estado da vista passou a irmão dela na fila, e não
+    // a filho de um invólucro comum. Ver a nota do `start` da barra.
+    const caixa = campo.closest("div")!;
 
     expect(caixa.className).toContain("basis-72");
     expect(

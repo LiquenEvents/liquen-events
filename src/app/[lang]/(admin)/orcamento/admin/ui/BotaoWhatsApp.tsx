@@ -36,14 +36,25 @@ import { ESTADO, PRESSAO } from "./movimento";
 export interface BotaoWhatsAppProps {
   /** A mensagem que vai já escrita. */
   texto: string;
-  /** O rótulo. «Partilhar pelo WhatsApp» por omissão. */
+  /**
+   * O rótulo. **«Mandar por WhatsApp» por omissão, e são as palavras dela.**
+   *
+   * Havia três frases para o mesmo gesto — «WhatsApp» na timeline, «Enviar
+   * pelo WhatsApp» no estúdio, «Partilhar pelo WhatsApp» aqui por omissão. Três
+   * maneiras de dizer a mesma coisa no mesmo produto obrigam a ler o botão de
+   * cada vez, em vez de o reconhecer.
+   *
+   * Ela escolheu a frase a olhar para o botão da timeline. Fica essa, e fica
+   * como OMISSÃO — assim o próximo sítio que precise de um destes herda-a sem
+   * ter de a decidir outra vez.
+   */
   rotulo?: string;
   className?: string;
 }
 
 export function BotaoWhatsApp({
   texto,
-  rotulo = "Partilhar pelo WhatsApp",
+  rotulo = "Mandar por WhatsApp",
   className = "",
 }: BotaoWhatsAppProps) {
   return (

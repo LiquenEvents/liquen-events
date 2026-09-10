@@ -105,8 +105,10 @@ async function abrirAFusao() {
     </ToastProvider>,
   );
   await assentar();
-  const botoes = screen.getAllByRole("button", { name: "Juntar a outro tema…" });
-  fireEvent.click(botoes[0]);
+  // Pelo menu do cartão: as acções do tema passaram a viver dentro do «⋯»
+  // (ponto 9 da auditoria do `docs/APPLE-TEMAS.md`).
+  fireEvent.click(screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ })[0]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Juntar a outro tema…" }));
   return await screen.findByRole("dialog", { name: /Juntar “Clássico Intemporal” a/ });
 }
 
