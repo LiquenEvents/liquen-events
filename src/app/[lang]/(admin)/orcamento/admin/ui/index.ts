@@ -84,3 +84,10 @@ export type { CampoDataProps } from "./CampoData";
 // mesma escala em vez de cada um escolher a sua — ver `movimento.ts` para o
 // censo que a motivou e para as três avarias silenciosas que ele encontrou.
 export { ESTADO, PRESSAO, PROGRESSO, TOQUE_MS, ESTADO_MS, PROGRESSO_MS } from "./movimento";
+
+/**
+ * A superfície de vidro. Uma por ecrã — vidro sobre vidro duplica o custo e
+ * transforma o fundo em papa cinzenta (`docs/LIQUID-GLASS.md`, Parte 5).
+ */
+export { Glass } from "./Glass";
+export type { GlassProps, SuperficieDeVidro } from "./Glass";

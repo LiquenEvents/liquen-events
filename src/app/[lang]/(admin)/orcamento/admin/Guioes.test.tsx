@@ -335,7 +335,17 @@ describe("Timelines — abrir e editar", () => {
     const modelo = MODELOS_DA_CASA[0];
     await escolher(user, escolha, modelo.nome);
 
-    await waitFor(() => expect(gravados).toHaveLength(1));
+    /* ── O TECTO É EXPLÍCITO, E A RAZÃO É UM VERMELHO MEDIDO ─────────────
+       O `waitFor` espera 1000 ms por omissão. MEDIDO: este caso passa sozinho
+       (10/10) e passou numa passagem completa de 768 ficheiros, mas falhou
+       noutra — sempre aqui, sempre com zero gravações em vez de uma. O que ele
+       espera é uma gravação a atravessar o React e o `fetch` fingido, e num
+       computador com dez mil testes a correr ao lado isso pode passar do
+       segundo.
+       Cinco segundos não afrouxam a asserção: continua a ser UMA gravação, com
+       o mesmo destino e o mesmo corpo. Afrouxam só a paciência — que é o que
+       estava a medir a carga da máquina em vez do produto. */
+    await waitFor(() => expect(gravados).toHaveLength(1), { timeout: 5000 });
     expect(gravados[0].url).toBe("/api/orcamento/q-vazio");
     const timeline = gravados[0].corpo.timeline as TimelineItem[];
     expect(timeline.map((t) => t.title)).toEqual(modelo.momentos.map((t) => t.title));
