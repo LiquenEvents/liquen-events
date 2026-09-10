@@ -86,7 +86,12 @@ const RAIZ = process.argv[2] ?? ".next";
  *  · `standalone` é uma CÓPIA da saída, feita quando se pede o pacote
  *    autossuficiente. Contá-la seria contar tudo duas vezes.
  */
-const FORA = new Set(["cache", "standalone"]);
+// `cache` é trabalho interno do compilador; `standalone` é uma CÓPIA do que já
+// se contou (e contá-la duas vezes fazia o guarda mentir sobre quantas folhas
+// existem); `dev` é a saída do servidor de DESENVOLVIMENTO, que fica em
+// `.next/dev` depois de um `npm run dev` e nada tem a ver com o que se
+// construiu — em CI nem existe, mas em local punha aqui três folhas a mais.
+const FORA = new Set(["cache", "standalone", "dev"]);
 
 /** Todos os `.css` debaixo de uma pasta, a qualquer profundidade. */
 function folhasEm(raiz) {
