@@ -58,8 +58,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const bytes = await horarioEmPdf({
       titulo: titulo || "Timeline",
-      convidados: q.guests ? String(q.guests) : "",
-      local: q.location ?? "",
+      /* As três contagens do topo da folha dela. Sabemos os convidados; as
+         crianças e a equipa ainda não têm onde ser escritas neste produto, e
+         por isso vão em BRANCO — um zero seria uma afirmação («não vêm
+         crianças») em vez da verdade («ainda não está escrito»). */
+      adultos: q.guests ? String(q.guests) : "",
+      criancas: "",
+      staff: "",
       momentos: q.timeline ?? [],
     });
 

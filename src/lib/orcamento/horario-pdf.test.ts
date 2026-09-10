@@ -33,8 +33,9 @@ const DIA: TimelineItem[] = [
 
 const BASE = {
   titulo: "Casamento J&P 28.06.25",
-  convidados: "240",
-  local: "Adega Fita Preta",
+  adultos: "240",
+  criancas: "6 crianças (1 c/ 1 ano)",
+  staff: "24",
 };
 
 describe("a timeline em PDF", () => {

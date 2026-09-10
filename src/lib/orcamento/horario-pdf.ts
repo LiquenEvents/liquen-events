@@ -1,93 +1,100 @@
 import "server-only";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { CARLITO_BOLD_TTF_B64, CARLITO_REGULAR_TTF_B64 } from "@/lib/proposal-fonts";
+import {
+  CARLITO_BOLD_TTF_B64,
+  CARLITO_ITALIC_TTF_B64,
+  CARLITO_REGULAR_TTF_B64,
+} from "@/lib/proposal-fonts";
 import { LOGO_DARK_PNG_B64 } from "@/lib/proposal-assets";
 import { ordenar } from "./guiao-do-dia";
 import type { TimelineItem } from "./types";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * A TIMELINE EM PDF — A FOLHA QUE A EQUIPA DELA JÁ LEVA PARA O EVENTO
+ * A TIMELINE EM PDF — A FOLHA DELA, MEDIDA A OLHO NU E DEPOIS A SÉRIO
  * ════════════════════════════════════════════════════════════════════════════
  *
- * ── DE ONDE VEIO ESTE DESENHO ────────────────────────────────────────────
+ * ── COMO É QUE ISTO CHEGOU AQUI, E O ERRO QUE ME CUSTOU UMA VOLTA ────────
  *
- * Não o inventei. Ela mandou a timeline a sério de um casamento — a folha que
- * a equipa levou para a Adega Fita Preta a 28 de Junho, três páginas, feita à
- * mão — e escreveu: **«quero que faças assim mesmo para o nosso timeline»**.
+ * Ela mandou a timeline a sério de um casamento — a folha da Adega Fita
+ * Preta, 28 de Junho, três páginas — e disse «quero que faças assim mesmo».
  *
- * Fui lê-la, e o que lá está é isto:
+ * Fiz uma primeira versão a partir do TEXTO do PDF dela: extraí as posições de
+ * cada palavra e reconstruí as colunas. Bateu certo nas colunas e falhou tudo
+ * o resto — ela respondeu «não está nada parecido». E tinha razão, porque eu
+ * tinha lido o ficheiro e nunca o tinha VISTO. O que faz aquela folha não são
+ * as colunas: é a GRELHA.
  *
- *     CASAMENTO J&P 28.06.25
- *            Timeline
+ * Instalei um renderizador, olhei para a página, e depois fui buscar os
+ * números à imagem, pixel a pixel, em vez de os estimar. É de lá que vêm todas
+ * as constantes deste ficheiro.
  *
- *     Adultos      Crianças                  Staff
- *     240          6 crianças (1 c/ 1 ano)   24
+ * ── O QUE A FOLHA DELA TEM, POR ORDEM ───────────────────────────────────
  *
- *     HORA   LOCAL        DESCRIÇÃO                        NOTAS
- *     08h30  Fitapreta    Chegada Icook para montagem
- *     10h30               Chegada Festaaluga para montagem
- *                         Chegada Liquen Flowers
- *                         Chegada equipa WP
- *     14h30  Governador   Chegada foto e vídeo aos noivos
+ *  1. Uma **faixa escura** com o nome do evento em branco, centrada.
+ *  2. **«Timeline»**, a negrito e em itálico, centrado.
+ *  3. Uma **tabela de contagens** de três colunas — Adultos · Crianças ·
+ *     Staff — com os rótulos em itálico sobre cinzento e os números em baixo.
+ *  4. A **tabela do dia**, com CONTORNO EM TODAS AS CÉLULAS, cabeçalho a
+ *     negrito sobre cinzento, e **uma linha por HORA** — as cinco coisas das
+ *     10h30 vivem todas dentro da mesma célula da descrição.
+ *  5. **Zebra por bloco de hora**: uma linha cinzenta, a seguinte branca.
  *
- * ── AS TRÊS COISAS QUE FAZEM AQUELA FOLHA FUNCIONAR ─────────────────────
+ * ── AS MEDIDAS, TIRADAS DA IMAGEM A 100 DPI ─────────────────────────────
  *
- * 1. **A hora escreve-se UMA vez.** Às 10h30 acontecem cinco coisas, e a hora
- *    aparece na primeira. Repeti-la cinco vezes faria a coluna da esquerda
- *    parecer cinco momentos diferentes quando é um só.
+ *     bordo esquerdo da tabela ....  91 px → 65,5 pt
+ *     HORA | LOCAL ................ 172 px → 123,8 pt
+ *     LOCAL | DESCRIÇÃO ........... 272 px → 195,8 pt
+ *     DESCRIÇÃO | NOTAS ........... 589 px → 424,0 pt
+ *     bordo direito ............... 751 px → 540,6 pt
  *
- * 2. **O local também.** «Fitapreta» escreve-se quando se muda para lá, e não
- *    outra vez. Uma coluna cheia de «Fitapreta» não diz nada; uma coluna com
- *    duas palavras em três páginas diz exactamente onde o dia muda de sítio.
+ *     contorno .................... rgb(217,217,217)
+ *     zebra ....................... rgb(243,243,243)
+ *     cabeçalho ................... rgb(239,239,239)
+ *     faixa do título ............. rgb(67,67,67)
  *
- * 3. **As NOTAS são uma coluna à parte.** «Sergey chega» é a descrição;
- *    «enviar táxi» é a nota. As duas na mesma coluna fazem uma folha que se lê
- *    em voz alta e não se cumpre.
- *
- * ── E PORQUE É QUE NÃO É A GRELHA ───────────────────────────────────────
- *
- * A grelha de horas (a `GrelhaDoDia`, no ecrã) responde a «são três e meia,
- * quem está livre?». Esta folha responde a «o que é que se segue, e o que é
- * preciso ter pronto para isso?». São perguntas diferentes e a segunda é a que
- * se faz com a folha na mão no dia. O ecrã ficou com a primeira; o papel e o
- * PDF ficam com esta, que é a que ela já usa.
+ * O logótipo é o que ela pediu por cima disto tudo — «gostei do logo no pdf e
+ * da cor» —, e é a única coisa nesta folha que não estava na dela.
  */
 
-/** A4 ao alto, em pontos. É o formato da folha dela. */
+/** A4 ao alto. É o formato da folha dela. */
 const LARGURA = 595.28;
 const ALTURA = 841.89;
-const MARGEM = 48;
 
-/**
- * As colunas, medidas na folha dela e trazidas para as nossas margens.
- *
- * Lá estão em x71 · x129 · x201 · x427, com a página a acabar aos 560. Aqui os
- * mesmos degraus a partir de 48: a hora estreita (cabe «08h30»), o local
- * estreito (é um nome de sítio), a descrição larga (é onde está o trabalho) e
- * as notas com o que sobra.
- */
-const COL_HORA = MARGEM;
-const COL_LOCAL = MARGEM + 52;
-const COL_DESC = MARGEM + 124;
-const COL_NOTAS = MARGEM + 352;
-const FIM = LARGURA - MARGEM;
+/** As fronteiras das colunas, em pontos, medidas na folha dela. */
+const X_TABELA = 65.5;
+const X_LOCAL = 123.8;
+const X_DESC = 195.8;
+const X_NOTAS = 424;
+const X_FIM = 540.6;
 
-const CORPO = 8.5;
-const ENTRELINHA = 11;
-const TINTA = rgb(0.11, 0.12, 0.1);
-const TINTA_FRACA = rgb(0.42, 0.44, 0.4);
-const VERDE = rgb(0.32, 0.35, 0.18);
-const RISCO = rgb(0.82, 0.82, 0.8);
+/** A faixa do título e a tabela das contagens são mais estreitas do que a tabela. */
+const X_FAIXA = 105;
+const X_FAIXA_FIM = 511;
+const X_CONTAGENS = 69;
+const X_CONTAGENS_FIM = 531;
+
+const CORPO = 9;
+const ENTRELINHA = 11.5;
+/** A folga dentro de uma célula: 6 pt de cada lado, como na folha dela. */
+const FOLGA_X = 6;
+const FOLGA_Y = 7;
+
+const CONTORNO = rgb(217 / 255, 217 / 255, 217 / 255);
+const ZEBRA = rgb(243 / 255, 243 / 255, 243 / 255);
+const CABECALHO = rgb(239 / 255, 239 / 255, 239 / 255);
+const FAIXA = rgb(67 / 255, 67 / 255, 67 / 255);
+const TINTA = rgb(0.1, 0.1, 0.1);
+const BRANCO = rgb(1, 1, 1);
 
 export interface HorarioParaPdf {
-  /** «CASAMENTO J&P 28.06.25» — o título grande, já composto por quem chama. */
+  /** «CASAMENTO J&P 28.06.25» — o que vai na faixa escura. */
   titulo: string;
-  /** Quantos convidados. Vazio quando o pedido ainda não o diz. */
-  convidados: string;
-  /** O sítio do evento, para o subtítulo. */
-  local: string;
+  /** As três contagens do topo. Vazias quando o produto ainda não as sabe. */
+  adultos: string;
+  criancas: string;
+  staff: string;
   momentos: readonly TimelineItem[];
 }
 
@@ -103,8 +110,8 @@ function horaDaFolha(hhmm: string): string {
  *
  * Por PALAVRA e nunca por letra: cortar «Chegada Festaaluga» a meio da segunda
  * palavra dá uma folha que se lê aos soluços. Uma palavra sozinha maior do que
- * a coluna (um endereço, um nome sem espaços) fica por cortar e transborda —
- * é preferível a parti-la e ninguém a reconhecer.
+ * a coluna fica por cortar e transborda — é preferível a parti-la e ninguém a
+ * reconhecer.
  */
 function emLinhas(texto: string, fonte: PDFFont, tamanho: number, largura: number): string[] {
   const palavras = texto.split(/\s+/).filter(Boolean);
@@ -123,23 +130,23 @@ function emLinhas(texto: string, fonte: PDFFont, tamanho: number, largura: numbe
   return linhas;
 }
 
-/** Uma linha da folha, já com o texto partido e a saber se abre um bloco de hora. */
-interface LinhaDaFolha {
+/**
+ * Um bloco de hora: uma linha da tabela dela.
+ *
+ * É aqui que está a diferença entre a folha dela e uma lista: às 10h30
+ * acontecem cinco coisas, e as cinco vivem na MESMA célula da descrição, com a
+ * hora escrita uma vez à esquerda. Numa lista seriam cinco linhas com a hora
+ * repetida cinco vezes, e a coluna da esquerda passava a parecer cinco
+ * momentos diferentes.
+ */
+interface BlocoDeHora {
   hora: string;
-  local: string;
+  locais: string[];
   descricao: string[];
   notas: string[];
-  /** Verdade na primeira linha de cada hora — é onde a régua fina se desenha. */
-  abreBloco: boolean;
   altura: number;
 }
 
-/**
- * Desenha a timeline e devolve o PDF em bytes.
- *
- * `null` quando não há um único momento: uma folha em branco parece um defeito
- * e quem chama tem de o dizer por palavras.
- */
 export async function horarioEmPdf(dados: HorarioParaPdf): Promise<Uint8Array | null> {
   const momentos = ordenar(dados.momentos);
   if (momentos.length === 0) return null;
@@ -157,184 +164,279 @@ export async function horarioEmPdf(dados: HorarioParaPdf): Promise<Uint8Array | 
   const carlito = (b64: string) => pdf.embedFont(Buffer.from(b64, "base64"), { subset: true });
   const reg = await carlito(CARLITO_REGULAR_TTF_B64);
   const bold = await carlito(CARLITO_BOLD_TTF_B64);
-  /* «E coloca o logo no pdf quando for para descarregar o timeline.» É a mesma
-     marca que vai nas propostas e nos contratos (`LOGO_DARK_PNG_B64`), pela
-     mesma razão por que ela lá está: uma folha que sai da casa e vai parar às
-     mãos de dez fornecedores tem de dizer de quem é. */
+  const italico = await carlito(CARLITO_ITALIC_TTF_B64);
   const marca = await pdf.embedPng(Buffer.from(LOGO_DARK_PNG_B64, "base64"));
 
-  const larguraDesc = COL_NOTAS - COL_DESC - 10;
-  const larguraNotas = FIM - COL_NOTAS;
-  const larguraLocal = COL_DESC - COL_LOCAL - 6;
+  const larguraDesc = X_NOTAS - X_DESC - FOLGA_X * 2;
+  const larguraNotas = X_FIM - X_NOTAS - FOLGA_X * 2;
+  const larguraLocal = X_DESC - X_LOCAL - FOLGA_X * 2;
 
-  // ── AS LINHAS, JÁ MEDIDAS ────────────────────────────────────────────────
-  const linhas: LinhaDaFolha[] = [];
-  let horaAnterior = "";
+  // ── OS BLOCOS, UM POR HORA ───────────────────────────────────────────────
+  const blocos: BlocoDeHora[] = [];
+  let anterior: BlocoDeHora | null = null;
   let localAnterior = "";
   for (const m of momentos) {
     const hora = horaDaFolha(m.time);
-    const mudouDeHora = hora !== horaAnterior;
+    if (!anterior || anterior.hora !== hora) {
+      anterior = { hora, locais: [], descricao: [], notas: [], altura: 0 };
+      blocos.push(anterior);
+    }
     const local = (m.local ?? "").trim();
-    const mudouDeLocal = !!local && local !== localAnterior;
-    const descricao = emLinhas(m.title, reg, CORPO, larguraDesc);
-    const notas = emLinhas(m.notas ?? "", reg, CORPO, larguraNotas);
-    linhas.push({
-      hora: mudouDeHora ? hora : "",
-      local: mudouDeLocal ? local : "",
-      descricao,
-      notas,
-      abreBloco: mudouDeHora,
-      altura: Math.max(descricao.length, notas.length, 1) * ENTRELINHA,
-    });
-    if (mudouDeHora) horaAnterior = hora;
-    if (mudouDeLocal) localAnterior = local;
+    if (local && local !== localAnterior) {
+      anterior.locais.push(...emLinhas(local, reg, CORPO, larguraLocal));
+      localAnterior = local;
+    }
+    anterior.descricao.push(...emLinhas(m.title, reg, CORPO, larguraDesc));
+    if (m.notas?.trim()) anterior.notas.push(...emLinhas(m.notas, reg, CORPO, larguraNotas));
+  }
+  for (const b of blocos) {
+    const linhas = Math.max(b.locais.length, b.descricao.length, b.notas.length, 1);
+    b.altura = linhas * ENTRELINHA + FOLGA_Y * 2;
   }
 
   // ── AS PÁGINAS ───────────────────────────────────────────────────────────
   let pagina = pdf.addPage([LARGURA, ALTURA]);
-  let y = await cabecalhoDaPrimeira(pagina, dados, bold, reg, marca);
-  y = cabecalhoDaTabela(pagina, y, bold);
+  let y = cabecalhoDaPrimeira(pagina, dados, { reg, bold, italico }, marca);
+  y = filaDosNomes(pagina, y, bold);
 
-  const chao = MARGEM + 24;
-  for (const linha of linhas) {
-    if (y - linha.altura < chao) {
+  const chao = 46;
+  let zebrada = true;
+  for (const b of blocos) {
+    if (y - b.altura < chao) {
       pagina = pdf.addPage([LARGURA, ALTURA]);
-      y = ALTURA - MARGEM;
-      y = cabecalhoDaTabela(pagina, y, bold);
+      y = ALTURA - 46;
+      y = filaDosNomes(pagina, y, bold);
     }
-    /* A régua fina só onde a hora muda: é ela que faz os cinco momentos das
-       10h30 lerem-se como UM bloco, que é o que a folha dela faz. */
-    if (linha.abreBloco) {
-      pagina.drawLine({
-        start: { x: MARGEM, y: y + 4 },
-        end: { x: FIM, y: y + 4 },
-        thickness: 0.5,
-        color: RISCO,
-      });
-    }
-    if (linha.hora) {
-      pagina.drawText(linha.hora, {
-        x: COL_HORA,
-        y: y - CORPO,
-        size: CORPO,
-        font: bold,
-        color: TINTA,
-      });
-    }
-    if (linha.local) {
-      const cabe = emLinhas(linha.local, reg, CORPO, larguraLocal)[0] ?? "";
-      pagina.drawText(cabe, {
-        x: COL_LOCAL,
-        y: y - CORPO,
-        size: CORPO,
-        font: reg,
-        color: TINTA_FRACA,
-      });
-    }
-    linha.descricao.forEach((t, i) => {
-      pagina.drawText(t, {
-        x: COL_DESC,
-        y: y - CORPO - i * ENTRELINHA,
-        size: CORPO,
-        font: reg,
-        color: TINTA,
-      });
-    });
-    linha.notas.forEach((t, i) => {
-      pagina.drawText(t, {
-        x: COL_NOTAS,
-        y: y - CORPO - i * ENTRELINHA,
-        size: CORPO,
-        font: reg,
-        color: TINTA_FRACA,
-      });
-    });
-    y -= linha.altura;
+    desenharBloco(pagina, y, b, reg, bold, zebrada);
+    y -= b.altura;
+    zebrada = !zebrada;
   }
 
   return pdf.save();
 }
 
+/** Uma linha da tabela: o fundo, os quatro contornos e o texto das quatro células. */
+function desenharBloco(
+  pagina: PDFPage,
+  topo: number,
+  b: BlocoDeHora,
+  reg: PDFFont,
+  bold: PDFFont,
+  zebrada: boolean,
+): void {
+  const base = topo - b.altura;
+  if (zebrada) {
+    pagina.drawRectangle({
+      x: X_TABELA,
+      y: base,
+      width: X_FIM - X_TABELA,
+      height: b.altura,
+      color: ZEBRA,
+    });
+  }
+  /* O contorno de TODAS as células, que é o que faz a folha dela ler-se como
+     uma grelha e não como uma lista. Sem isto, é a diferença que ela apanhou à
+     primeira: «não está nada parecido». */
+  moldura(pagina, X_TABELA, base, X_FIM, topo);
+  for (const x of [X_LOCAL, X_DESC, X_NOTAS]) {
+    pagina.drawLine({
+      start: { x, y: base },
+      end: { x, y: topo },
+      thickness: 0.5,
+      color: CONTORNO,
+    });
+  }
+
+  const primeiraLinha = topo - FOLGA_Y - CORPO;
+  pagina.drawText(b.hora, {
+    x: X_TABELA + FOLGA_X,
+    y: primeiraLinha,
+    size: CORPO,
+    font: reg,
+    color: TINTA,
+  });
+  b.locais.forEach((t, i) =>
+    pagina.drawText(t, {
+      x: X_LOCAL + FOLGA_X,
+      y: primeiraLinha - i * ENTRELINHA * 2,
+      size: CORPO,
+      font: reg,
+      color: TINTA,
+    }),
+  );
+  b.descricao.forEach((t, i) =>
+    pagina.drawText(t, {
+      x: X_DESC + FOLGA_X,
+      y: primeiraLinha - i * ENTRELINHA,
+      size: CORPO,
+      font: reg,
+      color: TINTA,
+    }),
+  );
+  b.notas.forEach((t, i) =>
+    pagina.drawText(t, {
+      x: X_NOTAS + FOLGA_X,
+      y: primeiraLinha - i * ENTRELINHA,
+      size: CORPO,
+      font: reg,
+      color: TINTA,
+    }),
+  );
+  void bold;
+}
+
+/** Um rectângulo em contorno, nos quatro lados. */
+function moldura(pagina: PDFPage, x1: number, y1: number, x2: number, y2: number): void {
+  pagina.drawRectangle({
+    x: x1,
+    y: y1,
+    width: x2 - x1,
+    height: y2 - y1,
+    borderColor: CONTORNO,
+    borderWidth: 0.5,
+  });
+}
+
+/** A fila dos nomes das colunas. Repete-se em cada página, como na folha dela. */
+function filaDosNomes(pagina: PDFPage, topo: number, bold: PDFFont): number {
+  const altura = 21;
+  const base = topo - altura;
+  pagina.drawRectangle({
+    x: X_TABELA,
+    y: base,
+    width: X_FIM - X_TABELA,
+    height: altura,
+    color: CABECALHO,
+  });
+  moldura(pagina, X_TABELA, base, X_FIM, topo);
+  const nomes: [string, number, number][] = [
+    ["HORA", X_TABELA, X_LOCAL],
+    ["LOCAL", X_LOCAL, X_DESC],
+    ["DESCRIÇÃO", X_DESC, X_NOTAS],
+    ["NOTAS", X_NOTAS, X_FIM],
+  ];
+  for (const [nome, de, ate] of nomes) {
+    if (de !== X_TABELA) {
+      pagina.drawLine({
+        start: { x: de, y: base },
+        end: { x: de, y: topo },
+        thickness: 0.5,
+        color: CONTORNO,
+      });
+    }
+    /* Centrados na coluna, como na folha dela — e não encostados à esquerda.
+       Num cabeçalho de grelha o nome pertence à COLUNA inteira. */
+    const largura = bold.widthOfTextAtSize(nome, 9.5);
+    pagina.drawText(nome, {
+      x: de + (ate - de - largura) / 2,
+      y: base + 6.5,
+      size: 9.5,
+      font: bold,
+      color: TINTA,
+    });
+  }
+  return base;
+}
+
 /**
- * O cabeçalho da primeira página: marca, título, «Timeline» e os convidados.
+ * O topo da primeira página: marca, faixa escura, «Timeline» e as contagens.
  * Devolve o `y` a que a tabela pode começar.
  */
-async function cabecalhoDaPrimeira(
+function cabecalhoDaPrimeira(
   pagina: PDFPage,
   dados: HorarioParaPdf,
-  bold: PDFFont,
-  reg: PDFFont,
+  fontes: { reg: PDFFont; bold: PDFFont; italico: PDFFont },
   marca: Awaited<ReturnType<PDFDocument["embedPng"]>>,
-): Promise<number> {
-  const larguraDaMarca = 104;
+): number {
+  const { reg, bold, italico } = fontes;
+
+  /* «Gostei do logo no pdf e da cor» — fica, e fica por cima da faixa, que é o
+     único sítio onde não disputa espaço com nada da folha dela. */
+  const larguraDaMarca = 96;
   const escala = larguraDaMarca / marca.width;
   const alturaDaMarca = marca.height * escala;
   pagina.drawImage(marca, {
     x: (LARGURA - larguraDaMarca) / 2,
-    y: ALTURA - MARGEM - alturaDaMarca,
+    y: ALTURA - 40 - alturaDaMarca,
     width: larguraDaMarca,
     height: alturaDaMarca,
   });
 
-  let y = ALTURA - MARGEM - alturaDaMarca - 22;
+  let y = ALTURA - 40 - alturaDaMarca - 22;
 
+  // ── A FAIXA ESCURA ───────────────────────────────────────────────────────
+  const alturaDaFaixa = 29;
+  pagina.drawRectangle({
+    x: X_FAIXA,
+    y: y - alturaDaFaixa,
+    width: X_FAIXA_FIM - X_FAIXA,
+    height: alturaDaFaixa,
+    color: FAIXA,
+  });
   const titulo = dados.titulo.toUpperCase();
   pagina.drawText(titulo, {
-    x: (LARGURA - bold.widthOfTextAtSize(titulo, 11)) / 2,
-    y,
-    size: 11,
-    font: bold,
-    color: TINTA,
-  });
-  y -= 18;
-
-  pagina.drawText("Timeline", {
-    x: (LARGURA - reg.widthOfTextAtSize("Timeline", 11)) / 2,
-    y,
-    size: 11,
+    x: (LARGURA - reg.widthOfTextAtSize(titulo, 10.5)) / 2,
+    y: y - alturaDaFaixa + 10,
+    size: 10.5,
     font: reg,
+    color: BRANCO,
+  });
+  y -= alturaDaFaixa + 24;
+
+  // ── «TIMELINE», A NEGRITO E EM ITÁLICO ───────────────────────────────────
+  pagina.drawText("Timeline", {
+    x: (LARGURA - italico.widthOfTextAtSize("Timeline", 10.5)) / 2,
+    y,
+    size: 10.5,
+    font: italico,
     color: TINTA,
   });
   y -= 24;
 
-  /* A folha dela abre com «Adultos · Crianças · Staff» e os números por baixo.
-     Nós sabemos os convidados e o sítio, e mais nada — as crianças e a equipa
-     não existem no modelo deste produto. Escrever «0 crianças» era apresentar
-     um dado em falta como um zero, que é precisamente o que o documento dela
-     proíbe noutro ecrã. Diz-se o que se sabe. */
-  const factos = [dados.convidados && `${dados.convidados} convidados`, dados.local]
-    .filter(Boolean)
-    .join("  ·  ");
-  if (factos) {
-    pagina.drawText(factos, {
-      x: (LARGURA - reg.widthOfTextAtSize(factos, 9)) / 2,
-      y,
-      size: 9,
-      font: reg,
-      color: TINTA_FRACA,
-    });
-    y -= 26;
-  }
-
-  return y;
-}
-
-/** A fila dos nomes das colunas. Repete-se em cada página, como na folha dela. */
-function cabecalhoDaTabela(pagina: PDFPage, y: number, bold: PDFFont): number {
-  const nomes: [string, number][] = [
-    ["HORA", COL_HORA],
-    ["LOCAL", COL_LOCAL],
-    ["DESCRIÇÃO", COL_DESC],
-    ["NOTAS", COL_NOTAS],
+  // ── A TABELA DAS CONTAGENS ───────────────────────────────────────────────
+  /**
+   * Três colunas, como na dela. As que o produto ainda não sabe ficam EM
+   * BRANCO e não a zero: um zero é uma afirmação («não vêm crianças») e o
+   * branco é a verdade («ainda não está escrito»). Escrever «0 crianças» era
+   * apresentar um dado em falta como um dado, que é o que o documento dela
+   * proíbe noutro ecrã.
+   */
+  const colunas: [string, string, number, number][] = [
+    ["Adultos", dados.adultos, X_CONTAGENS, 255],
+    ["Crianças", dados.criancas, 255, 432],
+    ["Staff", dados.staff, 432, X_CONTAGENS_FIM],
   ];
-  for (const [nome, x] of nomes) {
-    pagina.drawText(nome, { x, y: y - 9, size: 8, font: bold, color: VERDE });
-  }
-  pagina.drawLine({
-    start: { x: MARGEM, y: y - 16 },
-    end: { x: FIM, y: y - 16 },
-    thickness: 0.8,
-    color: rgb(0.6, 0.63, 0.55),
+  const alturaDaFila = 24;
+  pagina.drawRectangle({
+    x: X_CONTAGENS,
+    y: y - alturaDaFila,
+    width: X_CONTAGENS_FIM - X_CONTAGENS,
+    height: alturaDaFila,
+    color: CABECALHO,
   });
-  return y - 26;
+  for (const [rotulo, valor, de, ate] of colunas) {
+    moldura(pagina, de, y - alturaDaFila, ate, y);
+    moldura(pagina, de, y - alturaDaFila * 2, ate, y - alturaDaFila);
+    const lr = italico.widthOfTextAtSize(rotulo, 10);
+    pagina.drawText(rotulo, {
+      x: de + (ate - de - lr) / 2,
+      y: y - alturaDaFila + 8,
+      size: 10,
+      font: italico,
+      color: TINTA,
+    });
+    if (valor) {
+      const lv = reg.widthOfTextAtSize(valor, 10);
+      pagina.drawText(valor, {
+        x: de + (ate - de - lv) / 2,
+        y: y - alturaDaFila * 2 + 8,
+        size: 10,
+        font: reg,
+        color: TINTA,
+      });
+    }
+  }
+  void bold;
+
+  return y - alturaDaFila * 2 - 26;
 }

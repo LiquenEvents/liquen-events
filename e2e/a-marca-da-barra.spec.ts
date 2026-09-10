@@ -184,22 +184,78 @@ test.describe("a marca da barra do back office @movimento", () => {
     ).toBeLessThan(0.01);
 
     /**
-     * 3. E A CAIXA ESTÁ MESMO AO MEIO DA BARRA.
+     * 3. E A CAIXA ESTÁ AO MEIO DO ESPAÇO QUE TEM — QUE NÃO É O MEIO DA BARRA.
      *
-     * Ao meio da BARRA, e não a meio do que sobra entre o título e os botões —
-     * a razão está por extenso no `AdminClient.tsx`: o espaço que sobra muda de
-     * tamanho a cada vista, e a marca andava de um lado para o outro ao mudar
-     * de separador.
+     * ── ESTE CASO MUDOU DE REGRA, E A RAZÃO ESTÁ MEDIDA ──────────────────
+     *
+     * Guardava «ao meio da BARRA», com uma tolerância de 2 px. Ela olhou para
+     * o cabeçalho e escreveu «coloca mais para o lado esquerdo o logo».
+     *
+     * MEDIDO a 1440, no Calendário, com a sessão aberta:
+     *
+     *     o título ................ 40 → 204
+     *     os comandos ............. 979 → 1400
+     *     o vazio entre os dois ... 204 → 979, com o meio nos 591
+     *     a marca ................. 665 → 776, com o meio nos 720
+     *
+     * A marca estava ao meio da barra, à letra. E lia-se torta: os comandos da
+     * direita pesam 421 px contra os 164 do título, portanto o meio dos 1440
+     * encosta-a ao lado cheio e abre um buraco do lado do título.
+     *
+     * A regra nova é a que ela pediu: ao meio do VAZIO. E é isso que se mede
+     * aqui — não um número fixo, que dependia da vista, mas a distância ao
+     * ponto médio entre onde o título acaba e onde os comandos começam.
+     *
+     * A tolerância é de 24 px e não de 2, e é uma decisão e não desleixo: o CSS
+     * consegue isto com uma margem em percentagem (`pe-[18%]`, ver o
+     * `AdminClient.tsx`), que é o que faz a conta escalar do ecrã de 1024 ao de
+     * 1920 sem um número escrito à mão por cada um. Uma percentagem aproxima o
+     * meio do vazio; não o acerta ao píxel em todas as larguras. O que este
+     * guarda tem de impedir é a marca voltar ao meio da BARRA — e isso são
+     * 129 px de distância, cinco vezes a tolerância.
      */
     const barra = page.locator("header").first();
     const caixaDaBarra = (await barra.boundingBox())!;
     const caixaDaMarca = (await marca.boundingBox())!;
-    const centroDaBarra = caixaDaBarra.x + caixaDaBarra.width / 2;
     const centroDaMarca = caixaDaMarca.x + caixaDaMarca.width / 2;
+
+    const fimDoTitulo = await page.evaluate(() => {
+      const cab = document.querySelector("header");
+      const t = cab?.querySelector("h1, h2");
+      return t ? t.getBoundingClientRect().right : null;
+    });
+    const inicioDosComandos = await page.evaluate(() => {
+      const cab = document.querySelector("header");
+      if (!cab) return null;
+      const controlos = [...cab.querySelectorAll("button, a")]
+        .map((c) => c.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0)
+        // Só os da metade direita: o título também pode ser um botão.
+        .filter((r) => r.left > cab.getBoundingClientRect().width / 2);
+      return controlos.length ? Math.min(...controlos.map((r) => r.left)) : null;
+    });
+
+    expect(fimDoTitulo, "não se achou o título da vista — a medida deixou de medir").not.toBeNull();
+    expect(
+      inicioDosComandos,
+      "não se acharam os comandos da direita — a medida deixou de medir",
+    ).not.toBeNull();
+
+    const meioDoVazio = (fimDoTitulo! + inicioDosComandos!) / 2;
+    const centroDaBarra = caixaDaBarra.x + caixaDaBarra.width / 2;
+    expect(
+      Math.abs(centroDaMarca - meioDoVazio),
+      `a marca está a ${Math.abs(centroDaMarca - meioDoVazio).toFixed(1)} px do meio do vazio ` +
+        `(título acaba aos ${fimDoTitulo!.toFixed(0)}, comandos começam aos ${inicioDosComandos!.toFixed(0)})`,
+    ).toBeLessThan(24);
+
+    /* E o controlo negativo do mesmo fôlego: se alguém devolver a marca ao meio
+       da barra, isto tem de acusar. Sem esta linha, uma tolerância de 24 px num
+       vazio estreito podia deixar passar as duas posições. */
     expect(
       Math.abs(centroDaMarca - centroDaBarra),
-      `a marca está a ${Math.abs(centroDaMarca - centroDaBarra).toFixed(1)} px do meio da barra`,
-    ).toBeLessThan(2);
+      "a marca voltou ao meio da BARRA — ela pediu-a ao meio do vazio, ver o `AdminClient.tsx`",
+    ).toBeGreaterThan(24);
 
     /**
      * 4. E VÊ-SE. Um número que se pede em CSS e que agora É o que se vê.
