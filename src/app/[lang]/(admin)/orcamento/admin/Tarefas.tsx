@@ -517,7 +517,9 @@ const TaskRow = memo(function TaskRow({
           aria-label={t.title}
           /* ── 20×20 ENTRE DOIS ALVOS DE 44 ────────────────────────────────
            MEDIDO: 20×20 px, dezasseis vezes na lista, encostado ao «Editar»
-           e ao «Eliminar» que já são 44. Era o vizinho que ficou de fora.
+           e ao «Eliminar» que já eram 44. Era o vizinho que ficou de fora.
+           (Esses dois passaram para dentro do menu «⋯» na fase 09; o vizinho
+           de 44 px à direita é agora o botão do menu.)
 
            O quadrado desenhado continua com 20 px — quem cresce é o alvo à
            volta, como no rótulo da lista de pedidos. O `p-2` com `-m-2`
