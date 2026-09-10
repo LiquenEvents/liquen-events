@@ -5233,28 +5233,36 @@ export default function AdminClient({
             <div
               aria-hidden
               /*
-                ── «COLOCA MAIS PARA O LADO ESQUERDO O LOGO» ─────────────
+                ── ONDE A MARCA FICA, E AS DUAS VOLTAS QUE ISTO DEU ────────
 
-                MEDIDO a 1440, no Calendário, com a sessão aberta:
+                1. Estava ao meio da BARRA. Ela disse «coloca mais para o lado
+                   esquerdo o logo».
+                2. Movi-a para o meio do VAZIO entre o título e os comandos —
+                   129 px à esquerda, a 1440. **Fui longe demais.** Ela mandou
+                   uma captura com um círculo vermelho à direita da marca:
+                   «eu quero o logo onde marquei».
 
-                    o título ................ 40 → 204
-                    os comandos ............. 979 → 1400
-                    o vazio entre os dois ... 204 → 979, meio aos 591
-                    a marca ................. 665 → 776, meio aos 720
+                MEDIDO nessa captura (2020 px de barra):
 
-                Ou seja: ela estava centrada na BARRA e não no espaço que a
-                barra lhe deixa. Os comandos da direita pesam 421 px e o título
-                164; com a marca no meio dos 1440, ela encosta-se ao lado cheio
-                e deixa um buraco do lado do título. É isso que se vê, e é isso
-                que ela apanhou.
+                    o título acaba ......... 355
+                    os comandos começam .... 1370
+                    o meio do vazio ........ 862
+                    a marca estava em ...... 820
+                    **o círculo dela** ..... 965  →  47,8 % da largura
 
-                A margem à direita de 18% empurra o meio da marca 129 px para a
-                esquerda (com `justify-center`, o centro anda metade da margem),
-                que a põe nos 591 — o meio do vazio. Uma percentagem e não um
-                número de píxeis, para o ecrã largo e o de 1024 fazerem a mesma
-                conta.
+                Ou seja: ela quer a marca POUCO à esquerda do meio da barra, e
+                não no meio do espaço livre. As duas coisas que ela disse não
+                se contradizem — «mais para a esquerda» era um empurrão, e eu
+                li-o como uma mudança de âncora.
+
+                Com `justify-center`, uma margem à direita de `m` põe o centro
+                em `(1 − m)/2` da largura. Para 47,8 % → m = 4,5 %. A 1440 isso
+                é o meio nos 688, 32 px à esquerda do meio da barra.
+
+                Percentagem e não píxeis, para o ecrã de 1024 e o de 1920
+                fazerem a mesma conta.
               */
-              className="pointer-events-none absolute inset-0 hidden items-center justify-center pe-[18%] lg:flex"
+              className="pointer-events-none absolute inset-0 hidden items-center justify-center pe-[4.5%] lg:flex"
             >
               <SafeImage
                 /*
@@ -5486,11 +5494,16 @@ export default function AdminClient({
                       <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                     </svg>
                     <span className="hidden md:inline">Pesquisar</span>
-                    {/* Num ecrã de toque não há ⌘ nenhum para carregar: a
-                        etiqueta anuncia uma tecla que o aparelho não tem. */}
-                    <kbd className="pointer-coarse:hidden text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
-                      ⌘K
-                    </kbd>
+                    {/* ── O «⌘K» SAIU DO BOTÃO ────────────────────────────
+                        «Retirar o K», com a captura da pastilha à frente.
+
+                        O ATALHO fica e continua a funcionar — o que sai é o
+                        letreiro. E faz sentido: uma etiqueta de teclado ao lado
+                        de um botão é uma dica, e uma dica só vale enquanto é
+                        nova. Depois de a pessoa saber o atalho, aquilo passa a
+                        ser um selo permanente a ocupar largura num cabeçalho
+                        que já tinha pouca — e num ecrã de toque anunciava uma
+                        tecla que o aparelho não tem. */}
                   </button>
                 )}
                 {view === "tarefas" && (

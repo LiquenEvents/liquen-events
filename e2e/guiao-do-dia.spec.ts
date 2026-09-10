@@ -182,6 +182,18 @@ test.describe("Timelines @guiao", () => {
     await expect(page.getByRole("heading", { level: 1, name: /^Timelines$/ })).toBeVisible({
       timeout: 60_000,
     });
+    /* E O ÂMBITO VOLTA AO PRINCÍPIO, DE PROPÓSITO ────────────────────────
+       Um recarregar traz a lista nos FECHADOS outra vez, que é o estado com
+       que ela abre. A semente nasce `pendente`, portanto tem de se voltar a
+       alargar o âmbito antes de a procurar — não é um defeito a contornar, é
+       a mesma porta a ser aberta segunda vez.
+
+       Guardar a escolha entre recarregamentos seria outra decisão, e não é
+       esta que ela pediu: o que ela pediu foi PODER escolher. O filtro é da
+       sessão de trabalho e não do dia, e um âmbito que se cola sozinho
+       deixava-a a olhar para eventos que não fechou sem saber porquê. */
+    await page.getByRole("radio", { name: /^Todos os eventos/ }).click();
+
     const linhaDepois = page.getByRole("button", { name: naLista }).first();
     await expect(linhaDepois).toBeVisible({ timeout: 30_000 });
     await expect(

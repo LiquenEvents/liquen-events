@@ -105,7 +105,16 @@ function sortByTime(items: TimelineItem[]): TimelineItem[] {
   return ordenar(items);
 }
 
-type EditableField = "time" | "title" | "owner";
+/**
+ * Os campos de um momento que se editam TOCANDO NELES, na própria linha.
+ *
+ * O `local` e as `notas` entraram nesta lista quando ela perguntou «e os
+ * fornecedores… onde escrevemos?» e a seguir «eu quero conseguir editar isto».
+ * Até aí só se escreviam ao ACRESCENTAR o momento — e um campo que se escreve
+ * uma vez e nunca mais se corrige é um campo que fica errado para sempre no
+ * dia em que a montagem muda de sítio.
+ */
+type EditableField = "time" | "title" | "owner" | "local" | "notas";
 
 /**
  * Uma gravação que o servidor recusou por o guião ter mudado noutro sítio.
@@ -409,11 +418,19 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     const item = items.find((i) => i.id === id);
     if (!item) return;
     const v = draft.trim();
-    if (field === "owner") {
+    /* ── OS CAMPOS QUE PODEM FICAR VAZIOS ────────────────────────────────
+       O responsável, o local e a nota. Apagar o que lá está é uma edição
+       legítima — a montagem mudou de sítio, a nota deixou de fazer sentido —
+       e por isso o vazio GRAVA (como ausência da chave) em vez de cancelar.
+       A hora e o título são o contrário: sem eles não há momento nenhum, e
+       um vazio ali é um engano a caminho de uma linha inválida. */
+    const APAGAVEIS = { owner: "o responsável", local: "o local", notas: "a nota" } as const;
+    if (field in APAGAVEIS) {
+      const chave = field as keyof typeof APAGAVEIS;
       const next = v || undefined;
-      if (next === item.owner) return;
-      persist(`mudar o responsável de «${item.title}»`, (atuais) =>
-        atuais.map((i) => (i.id === id ? { ...i, owner: next } : i)),
+      if (next === item[chave]) return;
+      persist(`mudar ${APAGAVEIS[chave]} de «${item.title}»`, (atuais) =>
+        atuais.map((i) => (i.id === id ? { ...i, [chave]: next } : i)),
       );
       return;
     }
@@ -1195,23 +1212,59 @@ function BlocoLi({
               O local com o alfinete e a nota com o traço, e os dois em letra
               pequena: quem lê a lista está a ler o DIA, e estas duas são o
               contexto — não podem competir com o nome do momento. */}
-          {(i.local || i.notas) && (
+          {/* ── E EDITAM-SE TOCANDO NELES, COMO TUDO O RESTO DESTA LINHA ──
+              «Eu quero conseguir editar isto e quero que apareça logo ao lado
+              mudado e guardado.»
+
+              Só se escreviam ao ACRESCENTAR o momento — e um campo que se
+              escreve uma vez e nunca mais se corrige fica errado para sempre no
+              dia em que a montagem muda de sítio. Passam a abrir um campo no
+              mesmo gesto da hora, do título e do responsável, com a mesma
+              gravação: a folha ao lado muda no instante em que ela larga.
+
+              Vazios continuam a aparecer, e é o que dá para lhes tocar: um
+              campo que só existe depois de ter conteúdo não se pode preencher.
+              Fica em cinzento claro a dizer o que é. */}
+          {editing?.id === i.id && (editing.field === "local" || editing.field === "notas") ? (
+            <span className="mt-1 flex items-center gap-1">
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={editKeys}
+                aria-label={editing.field === "local" ? "Editar o local" : "Editar a nota"}
+                placeholder={editing.field === "local" ? "Onde" : "O que é preciso garantir"}
+                className="bo-input w-full px-2 py-0.5 text-xs text-[var(--bo-text)]"
+              />
+              <DesistirDaEdicao
+                onDesistir={cancelarEdicao}
+                oQue={editing.field === "local" ? "o local" : "a nota"}
+              />
+            </span>
+          ) : (
             <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-foreground/40">
-              {i.local && (
-                <span className="inline-flex items-baseline gap-1">
-                  <span aria-hidden="true">⌖</span>
-                  <span>
-                    <span className="sr-only">Local: </span>
-                    {i.local}
-                  </span>
-                </span>
-              )}
-              {i.notas && (
+              <button
+                type="button"
+                onClick={() => startEdit(i.id, "local", i.local ?? "")}
+                title="Editar o local"
+                className={`alvo-toque !justify-start inline-flex items-baseline gap-1 rounded-md text-left decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+              >
+                <span aria-hidden="true">⌖</span>
                 <span>
-                  <span className="sr-only">Nota: </span>
-                  {i.notas}
+                  <span className="sr-only">Local: </span>
+                  {i.local || <span className="text-foreground/25">Sem local</span>}
                 </span>
-              )}
+              </button>
+              <button
+                type="button"
+                onClick={() => startEdit(i.id, "notas", i.notas ?? "")}
+                title="Editar a nota"
+                className={`alvo-toque !justify-start min-w-0 flex-1 rounded-md text-left decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+              >
+                <span className="sr-only">Nota: </span>
+                {i.notas || <span className="text-foreground/25">Sem nota</span>}
+              </button>
             </p>
           )}
         </div>

@@ -184,78 +184,60 @@ test.describe("a marca da barra do back office @movimento", () => {
     ).toBeLessThan(0.01);
 
     /**
-     * 3. E A CAIXA ESTÁ AO MEIO DO ESPAÇO QUE TEM — QUE NÃO É O MEIO DA BARRA.
+     * 3. E A CAIXA ESTÁ UM POUCO À ESQUERDA DO MEIO DA BARRA.
      *
-     * ── ESTE CASO MUDOU DE REGRA, E A RAZÃO ESTÁ MEDIDA ──────────────────
+     * ── ESTE CASO MUDOU DE REGRA DUAS VEZES, E A SEGUNDA FUI EU A ERRAR ──
      *
-     * Guardava «ao meio da BARRA», com uma tolerância de 2 px. Ela olhou para
-     * o cabeçalho e escreveu «coloca mais para o lado esquerdo o logo».
+     * Guardava «ao meio da BARRA», com 2 px de tolerância. Ela disse «coloca
+     * mais para o lado esquerdo o logo», e eu mudei a ÂNCORA: passei-a para o
+     * meio do vazio entre o título e os comandos, 129 px à esquerda a 1440.
      *
-     * MEDIDO a 1440, no Calendário, com a sessão aberta:
+     * Fui longe demais. Ela respondeu com uma captura e um círculo vermelho à
+     * DIREITA de onde a marca tinha ficado: «eu quero o logo onde marquei».
      *
-     *     o título ................ 40 → 204
-     *     os comandos ............. 979 → 1400
-     *     o vazio entre os dois ... 204 → 979, com o meio nos 591
-     *     a marca ................. 665 → 776, com o meio nos 720
+     * MEDIDO nessa captura, com 2020 px de barra:
      *
-     * A marca estava ao meio da barra, à letra. E lia-se torta: os comandos da
-     * direita pesam 421 px contra os 164 do título, portanto o meio dos 1440
-     * encosta-a ao lado cheio e abre um buraco do lado do título.
+     *     o título acaba ......... 355
+     *     os comandos começam .... 1370
+     *     o meio do vazio ........ 862
+     *     a marca estava em ...... 820
+     *     **o círculo dela** ..... 965  →  47,8 % da largura da barra
      *
-     * A regra nova é a que ela pediu: ao meio do VAZIO. E é isso que se mede
-     * aqui — não um número fixo, que dependia da vista, mas a distância ao
-     * ponto médio entre onde o título acaba e onde os comandos começam.
+     * «Mais para a esquerda» era um EMPURRÃO, e eu li-o como uma mudança de
+     * âncora. A regra que fica é a que ela marcou: o centro da marca a 47,8 %
+     * da largura — pouco à esquerda do meio, e não no meio do vazio.
      *
-     * A tolerância é de 24 px e não de 2, e é uma decisão e não desleixo: o CSS
-     * consegue isto com uma margem em percentagem (`pe-[18%]`, ver o
-     * `AdminClient.tsx`), que é o que faz a conta escalar do ecrã de 1024 ao de
-     * 1920 sem um número escrito à mão por cada um. Uma percentagem aproxima o
-     * meio do vazio; não o acerta ao píxel em todas as larguras. O que este
-     * guarda tem de impedir é a marca voltar ao meio da BARRA — e isso são
-     * 129 px de distância, cinco vezes a tolerância.
+     * O guarda mede isso em percentagem e não em píxeis, porque é assim que o
+     * CSS o faz (`pe-[4.5%]`) e é o que faz o ecrã de 1024 e o de 1920 darem o
+     * mesmo número. Com `justify-center`, uma margem de 4,5 % põe o centro a
+     * (1 − 0,045)/2 = 47,75 % — 2,25 % à esquerda do meio, em QUALQUER largura.
+     *
+     * Por ser independente da largura, a janela pode ser estreita dos dois
+     * lados: 1,5 % a 3,5 %. A folga que sobra é para o arredondamento do
+     * `boundingBox` e do `object-contain`, que é menos de um píxel; a 1440 são
+     * 32,4 px medidos contra uma janela de 21,6 a 50,4.
+     *
+     * E apanha as duas regressões que interessam, uma em cada ponta: voltar ao
+     * meio da barra (0 %) e voltar a fugir para o meio do vazio (~9 % a 1440,
+     * e mais em ecrãs largos).
      */
     const barra = page.locator("header").first();
     const caixaDaBarra = (await barra.boundingBox())!;
     const caixaDaMarca = (await marca.boundingBox())!;
-    const centroDaMarca = caixaDaMarca.x + caixaDaMarca.width / 2;
-
-    const fimDoTitulo = await page.evaluate(() => {
-      const cab = document.querySelector("header");
-      const t = cab?.querySelector("h1, h2");
-      return t ? t.getBoundingClientRect().right : null;
-    });
-    const inicioDosComandos = await page.evaluate(() => {
-      const cab = document.querySelector("header");
-      if (!cab) return null;
-      const controlos = [...cab.querySelectorAll("button, a")]
-        .map((c) => c.getBoundingClientRect())
-        .filter((r) => r.width > 0 && r.height > 0)
-        // Só os da metade direita: o título também pode ser um botão.
-        .filter((r) => r.left > cab.getBoundingClientRect().width / 2);
-      return controlos.length ? Math.min(...controlos.map((r) => r.left)) : null;
-    });
-
-    expect(fimDoTitulo, "não se achou o título da vista — a medida deixou de medir").not.toBeNull();
-    expect(
-      inicioDosComandos,
-      "não se acharam os comandos da direita — a medida deixou de medir",
-    ).not.toBeNull();
-
-    const meioDoVazio = (fimDoTitulo! + inicioDosComandos!) / 2;
     const centroDaBarra = caixaDaBarra.x + caixaDaBarra.width / 2;
-    expect(
-      Math.abs(centroDaMarca - meioDoVazio),
-      `a marca está a ${Math.abs(centroDaMarca - meioDoVazio).toFixed(1)} px do meio do vazio ` +
-        `(título acaba aos ${fimDoTitulo!.toFixed(0)}, comandos começam aos ${inicioDosComandos!.toFixed(0)})`,
-    ).toBeLessThan(24);
+    const centroDaMarca = caixaDaMarca.x + caixaDaMarca.width / 2;
+    const desvio = (centroDaBarra - centroDaMarca) / caixaDaBarra.width;
 
-    /* E o controlo negativo do mesmo fôlego: se alguém devolver a marca ao meio
-       da barra, isto tem de acusar. Sem esta linha, uma tolerância de 24 px num
-       vazio estreito podia deixar passar as duas posições. */
     expect(
-      Math.abs(centroDaMarca - centroDaBarra),
-      "a marca voltou ao meio da BARRA — ela pediu-a ao meio do vazio, ver o `AdminClient.tsx`",
-    ).toBeGreaterThan(24);
+      desvio,
+      `a marca está a ${(desvio * 100).toFixed(1)}% à esquerda do meio da barra — ` +
+        "ela marcou-a a 2,2%, e um valor perto de zero é a marca a voltar ao meio",
+    ).toBeGreaterThan(0.015);
+    expect(
+      desvio,
+      `a marca está a ${(desvio * 100).toFixed(1)}% à esquerda do meio da barra — ` +
+        "acima de 3,5% é a marca a fugir outra vez para o meio do vazio, que foi o meu erro",
+    ).toBeLessThan(0.035);
 
     /**
      * 4. E VÊ-SE. Um número que se pede em CSS e que agora É o que se vê.
