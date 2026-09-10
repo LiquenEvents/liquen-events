@@ -130,6 +130,23 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("");
+  /**
+   * ── AS DUAS COLUNAS DA FOLHA DELA ──────────────────────────────────────
+   *
+   * Ela mandou a timeline a sério da Adega Fita Preta e disse «quero que faças
+   * assim mesmo». Aquela folha tem quatro colunas — HORA, LOCAL, DESCRIÇÃO,
+   * NOTAS — e nós tínhamos duas. Estas são as outras; ver a nota longa no
+   * `TimelineItem`.
+   *
+   * O LOCAL não se limpa depois de acrescentar, e é a única diferença de
+   * comportamento entre os campos desta fila: num dia de casamento a equipa
+   * está no mesmo sítio durante horas, e obrigá-la a reescrever «Fitapreta»
+   * em cada um dos cinco momentos das 10h30 é atrito puro. A NOTA limpa-se,
+   * porque uma nota é de UM momento e arrastá-la para o seguinte era escrever
+   * uma coisa que ela não escreveu.
+   */
+  const [localNovo, setLocalNovo] = useState("");
+  const [notasNovas, setNotasNovas] = useState("");
   const [duracaoNova, setDuracaoNova] = useState(SEM_DURACAO);
   // Edição inline de um campo de uma linha: commit em blur/Enter, Escape cancela.
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null);
@@ -357,6 +374,8 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       time,
       title: t,
       owner: owner.trim() || undefined,
+      local: localNovo.trim() || undefined,
+      notas: notasNovas.trim() || undefined,
       // Sem duração escolhida o campo NÃO nasce: um `duracao: 0` gravado é
       // indistinguível de «sem duração» na leitura, mas engorda o guião com
       // uma chave por momento e faz um guião novo deixar de ser igual a um
@@ -367,6 +386,8 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     setTime("");
     setTitle("");
     setOwner("");
+    // O local FICA — ver a nota em `localNovo`. A nota é de um momento e sai.
+    setNotasNovas("");
     setDuracaoNova(SEM_DURACAO);
   }
   function remove(id: string) {
@@ -832,6 +853,16 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
         />
         <Field
           as="input"
+          label="Local"
+          hideLabel
+          value={localNovo}
+          onChange={(e) => setLocalNovo(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Local"
+          containerClassName="w-32"
+        />
+        <Field
+          as="input"
           label="Responsável"
           hideLabel
           value={owner}
@@ -839,6 +870,16 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Responsável"
           containerClassName="w-40"
+        />
+        <Field
+          as="input"
+          label="Notas"
+          hideLabel
+          value={notasNovas}
+          onChange={(e) => setNotasNovas(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Notas — o que é preciso garantir"
+          containerClassName="min-w-[10rem] flex-1"
         />
         <Button variant="primary" onClick={add} disabled={!title.trim() || !time}>
           Adicionar
@@ -1145,6 +1186,33 @@ function BlocoLi({
                 {i.owner}
               </button>
             )
+          )}
+          {/* ── O LOCAL E A NOTA, QUE SÃO AS COLUNAS DA FOLHA DELA ─────────
+              Escrevem-se na linha de acrescentar e saem no PDF e no papel (ver
+              `horario-pdf.ts`); se não se vissem aqui, eram dois campos que se
+              escrevem às cegas e só se conferem depois de descarregar.
+
+              O local com o alfinete e a nota com o traço, e os dois em letra
+              pequena: quem lê a lista está a ler o DIA, e estas duas são o
+              contexto — não podem competir com o nome do momento. */}
+          {(i.local || i.notas) && (
+            <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-foreground/40">
+              {i.local && (
+                <span className="inline-flex items-baseline gap-1">
+                  <span aria-hidden="true">⌖</span>
+                  <span>
+                    <span className="sr-only">Local: </span>
+                    {i.local}
+                  </span>
+                </span>
+              )}
+              {i.notas && (
+                <span>
+                  <span className="sr-only">Nota: </span>
+                  {i.notas}
+                </span>
+              )}
+            </p>
           )}
         </div>
 

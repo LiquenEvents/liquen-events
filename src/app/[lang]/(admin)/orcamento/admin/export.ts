@@ -8,119 +8,87 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/d
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { eur0, round2 } from "@/lib/money";
 import {
-  analisarODia,
   duracaoDe,
   horaDoMinuto,
   minutosDe,
   ordemNoDia,
   ordenar,
 } from "@/lib/orcamento/guiao-do-dia";
-import { colunasPorResponsavel } from "@/lib/orcamento/guioes";
-import { horasDaJanela, janelaDoHorario, MINUTOS_POR_HORA } from "@/lib/orcamento/horario";
 import { todayKey } from "./util";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O HORÁRIO, DESENHADO PARA O PAPEL
+ * A TIMELINE NO PAPEL — A MESMA FOLHA QUE SAI NO PDF
  * ════════════════════════════════════════════════════════════════════════════
  *
- * «E quero que para imprimir seja algo assim no timeline» — com o horário de
- * uma faculdade à frente: horas a descer à esquerda em faixas com princípio e
- * fim, uma coluna por cada quem, e os blocos colocados pela hora a que começam
- * com a altura do tempo que duram.
+ * ── O DESENHO É DELA, E NÃO MEU ──────────────────────────────────────────
  *
- * O que saiu daqui era uma tabela de três colunas — hora, o quê, quem —, uma
- * linha por momento. Diz as mesmas palavras e não responde à pergunta que se
- * faz com a folha na mão no dia do evento: «são três e meia, quem está livre?».
- * Numa lista isso lê-se momento a momento; num horário vê-se.
+ * Ela mandou a timeline a sério de um casamento — a folha que a equipa levou
+ * para a Adega Fita Preta a 28 de Junho, três páginas — e escreveu «quero que
+ * faças assim mesmo para o nosso timeline». Quatro colunas:
  *
- * ── A JANELA É A MESMA DO ECRÃ, E ISSO É O PONTO ─────────────────────────
+ *     HORA · LOCAL · DESCRIÇÃO · NOTAS
  *
- * `janelaDoHorario` é a função que a `GrelhaDoDia` usa. Não é economia de
- * código: é a garantia de que a folha impressa e o ecrã põem o mesmo bloco no
- * mesmo sítio. Duas contas do mesmo arredondamento divergem no dia em que
- * alguém afinar uma delas — e um horário que discorda do ecrã descobre-se em
- * frente ao cliente.
+ * E três regras que fazem aquela folha funcionar:
  *
- * ── O QUE MUDA DO ECRÃ PARA O PAPEL É UM NÚMERO SÓ ───────────────────────
+ *  1. **A hora escreve-se uma vez.** Às 10h30 acontecem cinco coisas, e a hora
+ *     aparece na primeira — repeti-la cinco vezes faz parecer cinco momentos.
+ *  2. **O local também.** Escreve-se quando MUDA. Uma coluna com duas palavras
+ *     em três páginas diz exactamente onde o dia troca de sítio.
+ *  3. **As notas são uma coluna à parte.** «Sergey chega» é a descrição;
+ *     «enviar táxi» é a nota.
  *
- * No ecrã um minuto vale um píxel, porque a caixa rola. Numa folha não há rolo:
- * a altura é a que a folha tem. A 46 px por hora, um dia de dezassete horas
- * (09:00 → 02:00, que é o dia de evento típico desta casa) mede 782 px e cabe
- * numa página A4 com o cabeçalho por cima. Um dia mais curto fica mais folgado,
- * que é o que se quer.
+ * ── E PORQUE É QUE AQUI NÃO É A GRELHA ──────────────────────────────────
+ *
+ * Houve aqui, durante umas horas, o horário em grelha — horas a descer, uma
+ * coluna por pessoa. Saiu, e a razão está na folha dela: a grelha responde a
+ * «são três e meia, quem está livre?», e esta folha responde a «o que se
+ * segue, e o que é preciso ter pronto». A segunda é a que se faz com a folha
+ * na mão. O ecrã ficou com a primeira; o papel e o PDF ficam com esta.
+ *
+ * ── E SAI IGUAL AO PDF DE PROPÓSITO ─────────────────────────────────────
+ *
+ * O `horario-pdf.ts` desenha a mesma coisa com o `pdf-lib`. São dois
+ * desenhadores porque um faz HTML para a impressora e o outro faz um ficheiro
+ * para guardar — mas as três regras acima são as mesmas nos dois, e quem mudar
+ * uma tem de mudar a outra. Imprimir e descarregar não podem dar folhas
+ * diferentes do mesmo dia.
  */
-const ALTURA_DA_HORA_NO_PAPEL = 46;
-const LARGURA_DAS_HORAS_NO_PAPEL = 54;
+
+/** «08:30» → «08h30», que é como a folha dela escreve as horas. */
+function horaDaFolha(hhmm: string): string {
+  const encontro = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!encontro) return hhmm.trim();
+  return `${encontro[1].padStart(2, "0")}h${encontro[2]}`;
+}
 
 function horarioEmHtml(momentos: readonly TimelineItem[]): string {
-  const dia = analisarODia(momentos);
-  const janela = janelaDoHorario(dia);
-  if (!janela) {
-    // Momentos sem uma única hora legível. A lista é a única leitura honesta —
-    // desenhar-lhes uma grelha era inventar-lhes horas que ninguém escreveu.
-    return `<p class='empty'>Estes momentos não têm horas, por isso não há horário para desenhar.</p>
-      <ul>${momentos.map((t) => `<li>${escapeHtml(t.title)}</li>`).join("")}</ul>`;
-  }
+  const emOrdem = ordenar(momentos);
+  if (emOrdem.length === 0) return "<p class='empty'>Timeline não definida.</p>";
 
-  const colunas = colunasPorResponsavel(
-    dia.blocos.map((b) => ({
-      inicio: b.inicio,
-      fim: b.fim,
-      duracao: b.duracao,
-      temHora: b.temHora,
-      item: b.item,
-    })),
-  );
-  if (colunas.length === 0) return "<p class='empty'>Horário não definido.</p>";
-
-  const px = ALTURA_DA_HORA_NO_PAPEL / MINUTOS_POR_HORA;
-  const altura = (janela.fim - janela.inicio) * px;
-  const horas = horasDaJanela(janela);
-
-  // As faixas: uma por cada par de horas consecutivas, com a zebra a marcar o
-  // par. É o que faz a folha ler-se de longe — ver a mesma nota na `GrelhaDoDia`.
-  const faixas = horas
-    .slice(0, -1)
-    .map((m, i) => {
-      const topo = (m - janela.inicio) * px;
-      const zebra = i % 2 === 0 ? " hz" : "";
-      return `<div class="hfaixa${zebra}" style="top:${topo}px;height:${ALTURA_DA_HORA_NO_PAPEL}px">
-        <span class="hde">${horaDoMinuto(m)}</span><span class="hate">${horaDoMinuto(m + MINUTOS_POR_HORA)}</span>
-      </div>`;
+  let horaAnterior = "";
+  let localAnterior = "";
+  const linhas = emOrdem
+    .map((m) => {
+      const hora = horaDaFolha(m.time);
+      const mudouDeHora = hora !== horaAnterior;
+      const local = (m.local ?? "").trim();
+      const mudouDeLocal = !!local && local !== localAnterior;
+      if (mudouDeHora) horaAnterior = hora;
+      if (mudouDeLocal) localAnterior = local;
+      return `<tr class="${mudouDeHora ? "hbloco" : ""}">
+        <td class="hhora">${mudouDeHora ? escapeHtml(hora) : ""}</td>
+        <td class="hlocal">${mudouDeLocal ? escapeHtml(local) : ""}</td>
+        <td class="hdesc">${escapeHtml(m.title)}</td>
+        <td class="hnotas">${escapeHtml(m.notas ?? "")}</td>
+      </tr>`;
     })
     .join("");
 
-  const cabecalhos = colunas.map((c) => `<div class="hcab">${escapeHtml(c.nome)}</div>`).join("");
-
-  const pistas = colunas
-    .map((c) => {
-      const blocos = c.blocos
-        .map(({ bloco, carril }) => {
-          const topo = (bloco.inicio - janela.inicio) * px;
-          // Um instante não dura — tem uma hora. No papel leva a altura de uma
-          // linha escrita e um traço no cimo, que é o mesmo desenho do ecrã.
-          const instante = bloco.duracao <= 0;
-          const alto = instante ? 15 : Math.max(bloco.duracao * px, 15);
-          const largura = 100 / c.carris;
-          const esquerda = largura * carril;
-          const ate = instante ? "" : ` – ${horaDoMinuto(bloco.fim)}`;
-          return `<div class="hbloco${instante ? " hinst" : ""}" style="top:${topo}px;height:${alto}px;left:${esquerda}%;width:${largura}%">
-            <b>${escapeHtml(bloco.item.title)}</b><i>${escapeHtml(bloco.item.time)}${ate}</i>
-          </div>`;
-        })
-        .join("");
-      return `<div class="hpista" style="height:${altura}px">${blocos}</div>`;
-    })
-    .join("");
-
-  return `<div class="horario" style="--hcols:${colunas.length};--hhoras:${LARGURA_DAS_HORAS_NO_PAPEL}px">
-    <div class="hcabs"><div class="hcab hcabh"></div>${cabecalhos}</div>
-    <div class="hcorpo" style="height:${altura}px">
-      <div class="hhoras" style="height:${altura}px">${faixas}</div>
-      ${pistas}
-    </div>
-  </div>`;
+  return `<table class="horario">
+    <thead><tr><th>Hora</th><th>Local</th><th>Descrição</th><th>Notas</th></tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>`;
 }
 
 function eventTypeLabel(q: Quote): string {
@@ -826,31 +794,21 @@ export function printEventDossier(q: Quote): void {
     td.t { width: 70px; font-weight: 700; color: #525a2f; white-space: nowrap; }
     td.num { text-align: right; font-weight: 600; white-space: nowrap; }
     .tick { color: #3a5c39; font-weight: 700; }
-    /* ── O HORÁRIO ────────────────────────────────────────────────────────
-       A folha que ela mandou tem três coisas a fazer o trabalho: a moldura
-       fechada, a zebra de uma hora sim outra não, e cada faixa a dizer de que
-       hora a que hora vai. Está tudo aqui, e nada mais — os blocos são a cor
-       da casa, não um arco-íris: numa folha a preto e branco um arco-íris é
-       sete cinzentos iguais.
-
-       O print-color-adjust está lá porque, sem ele, o browser deita fora os
-       fundos ao imprimir — e sem fundos a zebra desaparece e o horário volta a
-       ser uma lista com linhas. */
-    .horario { border: 1px solid #cfcfcf; border-radius: 6px; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .hcabs { display: grid; grid-template-columns: var(--hhoras) repeat(var(--hcols), 1fr); background: #eef1e9; border-bottom: 1px solid #cfcfcf; }
-    .hcab { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #525a2f; padding: 6px 6px; text-align: center; border-left: 1px solid #dcdcdc; }
-    .hcab.hcabh { border-left: 0; }
-    .hcorpo { display: grid; grid-template-columns: var(--hhoras) repeat(var(--hcols), 1fr); position: relative; }
-    .hhoras { position: relative; border-right: 1px solid #cfcfcf; }
-    .hfaixa { position: absolute; left: 0; right: 0; border-top: 1px solid #e2e2e2; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 5px; }
-    .hfaixa.hz { background: #f4f5f0; }
-    .hfaixa .hde { font-size: 9px; color: #666; text-align: left; }
-    .hfaixa .hate { font-size: 9px; color: #999; text-align: right; }
-    .hpista { position: relative; border-left: 1px solid #dcdcdc; background-image: repeating-linear-gradient(to bottom, #e2e2e2 0 1px, transparent 1px 46px), repeating-linear-gradient(to bottom, #f4f5f0 0 46px, transparent 46px 92px); }
-    .hbloco { position: absolute; overflow: hidden; border: 1px solid #b9c6ac; background: #eaf0e4; border-radius: 3px; padding: 2px 4px; line-height: 1.15; }
-    .hbloco b { display: block; font-size: 10px; font-weight: 700; color: #2f3a26; }
-    .hbloco i { display: block; font-size: 8.5px; font-style: normal; color: #6d7a63; }
-    .hbloco.hinst { background: transparent; border: 0; border-top: 2px solid #525a2f; border-radius: 0; padding-top: 1px; }
+    /* ── A TIMELINE, NO PAPEL ─────────────────────────────────────────────
+       Quatro colunas, e o que faz a folha dela ler-se é a régua fina onde a
+       HORA muda: é ela que faz os cinco momentos das 10h30 lerem-se como um
+       bloco em vez de cinco momentos soltos. Sem régua entre as linhas do
+       mesmo bloco, e sem zebra nenhuma — a folha dela não tem, e não tem
+       porque não precisa. */
+    table.horario { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    table.horario th { text-align: left; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: #525a2f; padding: 0 6px 6px 0; border-bottom: 1.2px solid #9aa38a; }
+    table.horario td { padding: 3px 6px 3px 0; font-size: 11px; vertical-align: top; border: 0; line-height: 1.3; }
+    table.horario tr.hbloco td { padding-top: 8px; border-top: 1px solid #e0e0dd; }
+    table.horario tr.hbloco:first-child td { border-top: 0; }
+    td.hhora { width: 52px; font-weight: 700; color: #2f3a26; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.hlocal { width: 78px; color: #6d7a63; }
+    td.hdesc { color: #111; }
+    td.hnotas { width: 34%; color: #6d7a63; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; display: flex; gap: 10px; align-items: center; }
     li.done { color: #aaa; text-decoration: line-through; }

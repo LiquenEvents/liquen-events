@@ -191,6 +191,41 @@ export interface TimelineItem {
 
   /**
    * ════════════════════════════════════════════════════════════════════════
+   * ONDE, E O QUE É PRECISO SABER — AS DUAS COLUNAS QUE FALTAVAM
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Ela mandou a timeline a sério de um casamento — a folha que a equipa dela
+   * levou para a Adega Fita Preta a 28 de Junho — e disse «quero que faças
+   * assim mesmo para o nosso timeline». Aquela folha tem quatro colunas:
+   *
+   *     HORA · LOCAL · DESCRIÇÃO · NOTAS
+   *
+   * Tínhamos duas: a hora e a descrição. Estas são as outras.
+   *
+   * ── `local`, E PORQUE É QUE NÃO CHEGA O LOCAL DO EVENTO ─────────────────
+   *
+   * Porque um dia de casamento acontece em mais do que um sítio. Na folha
+   * dela, às 08h30 a equipa está na «Fitapreta» e às 14h30 os noivos estão no
+   * «Governador» — duas moradas no mesmo dia, e é a coluna do LOCAL que diz a
+   * quem lê onde tem de estar. O `location` do pedido é o sítio da FESTA, e
+   * escrevê-lo em todas as linhas dizia a coisa errada em metade delas.
+   *
+   * Vazio quer dizer «no mesmo sítio da linha de cima» — que é como a folha
+   * dela se lê, e é por isso que a coluna aparece tão pouco preenchida.
+   *
+   * ── `notas`, E PORQUE É QUE NÃO É PARTE DA DESCRIÇÃO ────────────────────
+   *
+   * Porque não é o que acontece: é o que é preciso GARANTIR para acontecer.
+   * «Sergey chega» é a descrição; «enviar táxi» é a nota. «Mariana e Fábio
+   * anunciam bolo» é a descrição; «garantir cadeira giratória em baixo + saco
+   * Cartier + bolo c/ velas» é a nota. Enfiar as duas na mesma coluna faz uma
+   * folha que se lê em voz alta e não se cumpre.
+   */
+  local?: string;
+  notas?: string;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
    * QUANTO TEMPO DURA — E PORQUE É DURAÇÃO E NÃO HORA DE FIM
    * ════════════════════════════════════════════════════════════════════════
    *

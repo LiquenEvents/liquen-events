@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { getQuote } from "@/lib/quotes-store";
+import { eventTagLabel } from "@/lib/orcamento/data";
 import { horarioEmPdf } from "@/lib/orcamento/horario-pdf";
 import { log } from "@/lib/logger";
 
@@ -40,18 +41,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const q = await getQuote(id);
     if (!q) return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
 
-    const data = q.date
-      ? new Date(`${q.date}T12:00:00`).toLocaleDateString("pt-PT", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
+    /**
+     * O título é o da folha dela: «CASAMENTO J&P 28.06.25».
+     *
+     * Três peças, e a data no formato curto que ela escreve à mão — dd.mm.aa,
+     * e não «sábado, 28 de junho de 2025». Numa folha que anda pelo bolso de
+     * dez fornecedores, a data é uma etiqueta e não uma frase.
+     */
+    const curta = q.date
+      ? (() => {
+          const [ano, mes, dia] = q.date.split("-");
+          return `${dia}.${mes}.${ano.slice(2)}`;
+        })()
       : "";
+    const titulo = [eventTagLabel(q), q.name, curta].filter(Boolean).join(" ");
 
     const bytes = await horarioEmPdf({
-      cliente: q.name ?? "",
-      data,
+      titulo: titulo || "Timeline",
+      convidados: q.guests ? String(q.guests) : "",
       local: q.location ?? "",
       momentos: q.timeline ?? [],
     });
