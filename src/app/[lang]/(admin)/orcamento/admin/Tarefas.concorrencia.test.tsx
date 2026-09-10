@@ -77,6 +77,25 @@ function caixaDe(titulo: string): HTMLElement {
   return screen.getByRole("checkbox", { name: titulo });
 }
 
+/**
+ * ── AS ACÇÕES DE UMA LINHA VIVEM TODAS NO MENU «⋯» ──────────────────────────
+ *
+ * Desde a fase 09 (`docs/APPLE-TAREFAS.md`): «Hover revela, à direita, um ⋯ que
+ * abre o mesmo menu do botão direito. Um botão, não três.» Eram duas formas da
+ * mesma lista — dois ícones soltos com rato, o menu sem ele — e passou a ser
+ * uma. O que estes testes medem (a corrida entre duas gravações) não muda;
+ * muda o caminho até ao gesto, e é por isso que ele fica escrito uma vez aqui.
+ */
+async function abrirMenuDe(user: ReturnType<typeof userEvent.setup>, titulo: string) {
+  const linha = screen.getByText(titulo).closest("div.group")!;
+  await user.click(linha.querySelector('[aria-haspopup="menu"]') as HTMLElement);
+}
+
+async function abrirEditorDe(user: ReturnType<typeof userEvent.setup>, titulo: string) {
+  await abrirMenuDe(user, titulo);
+  await user.click(await screen.findByRole("menuitem", { name: "Editar tarefa" }));
+}
+
 describe("Tarefas — reposição depois de uma gravação recusada", () => {
   it("uma tarefa riscada com sucesso continua riscada quando OUTRA gravação falha", async () => {
     const user = userEvent.setup();
@@ -88,7 +107,7 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     await waitFor(() => expect(screen.getByText("Confirmar catering")).toBeInTheDocument());
 
     // 1. Alterar o título da tarefa A — o pedido fica a meio caminho.
-    await user.click(screen.getAllByRole("button", { name: "Editar tarefa" })[0]);
+    await abrirEditorDe(user, "Confirmar catering");
     const campo = screen.getByDisplayValue("Confirmar catering");
     await user.clear(campo);
     await user.type(campo, "Confirmar catering — 60 pax");
@@ -138,7 +157,7 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     await waitFor(() => expect(screen.getByText("Confirmar catering")).toBeInTheDocument());
 
     // A gravação lenta de A (mudança de título) parte primeiro…
-    await user.click(screen.getAllByRole("button", { name: "Editar tarefa" })[0]);
+    await abrirEditorDe(user, "Confirmar catering");
     const campo = screen.getByDisplayValue("Confirmar catering");
     await user.clear(campo);
     await user.type(campo, "Confirmar catering — 60 pax");
@@ -150,8 +169,8 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     // (`ui/PerguntaDestrutiva`), em vez do `confirm()` do browser que não cabe
     // num ecrã de 375 px. O que este teste mede — a corrida entre a gravação
     // lenta de A e a eliminação de B — não muda; muda o caminho até lá.
-    const linhaB = screen.getByText("Ligar à florista").closest("div.group")!;
-    await user.click(linhaB.querySelector('[aria-label="Eliminar"]') as HTMLElement);
+    await abrirMenuDe(user, "Ligar à florista");
+    await user.click(await screen.findByRole("menuitem", { name: "Eliminar" }));
     const caixa = await screen.findByRole("dialog");
     await user.click(within(caixa).getByRole("button", { name: /^Eliminar$/ }));
     await waitFor(() => expect(screen.queryByText("Ligar à florista")).not.toBeInTheDocument());

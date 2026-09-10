@@ -110,12 +110,14 @@ export default function ListaDeTemas({
   }, []);
 
   // Um arrasto que acaba fora da lista (largado no vazio, ou cancelado com
-  // Esc) nunca dispara `dragleave` na linha certa. Sem isto ficava um realce
-  // aceso e um temporizador a contar para abrir um tema que ninguém pediu.
+  // Esc) nunca dispara `dragleave` na linha certa — ficava um temporizador a
+  // contar para abrir um tema que ninguém pediu. O REALCE não precisa de ser
+  // apagado aqui: ele é DERIVADO do arrasto (`aArrastar && sobre === t.id`),
+  // e portanto apaga-se sozinho no fotograma em que o arrasto acaba. Uma
+  // segunda cópia da mesma verdade em estado era o que obrigava a um
+  // `setState` dentro de um efeito.
   useEffect(() => {
-    if (aArrastar) return;
-    setSobre(null);
-    pararAMola();
+    if (!aArrastar) pararAMola();
   }, [aArrastar, pararAMola]);
 
   useEffect(() => pararAMola, [pararAMola]);
@@ -145,7 +147,7 @@ export default function ListaDeTemas({
       <ul className="flex flex-col gap-0.5">
         {temas.map((t) => {
           const activo = t.id === activoId;
-          const alvo = sobre === t.id;
+          const alvo = aArrastar && sobre === t.id;
           return (
             <li key={t.id}>
               <button
