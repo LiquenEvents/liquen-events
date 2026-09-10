@@ -5,7 +5,7 @@ import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/ty
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
-import { Button, Card, EmptyState, Field, PerguntaDestrutiva, cn } from "./ui";
+import { Button, CampoDeHora, Card, EmptyState, Field, PerguntaDestrutiva, cn } from "./ui";
 import { SAIDA, SAIDA_FUNDO, useSaidaDeUmSo } from "./ui/saida";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -333,13 +333,19 @@ function AddEventModal({
         />
 
         <div className="mt-3 flex gap-2">
-          <Field
-            label="Hora"
-            type="time"
-            value={form.time}
-            onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
-            containerClassName="w-32"
-          />
+          {/* A hora é o `ui/CampoDeHora` e não um `type="time"` cru — mesma
+              razão do `<select>`: a lista do nativo é desenhada pelo sistema
+              operativo e nenhum CSS desta casa lá chega. O rótulo é escrito
+              aqui porque o campo é um `role="group"` de dois controlos e não
+              um `<input>` que um `<label>` possa apontar. */}
+          <span className="flex flex-col gap-1.5">
+            <span className="bo-eyebrow text-[var(--bo-text-muted)]">Hora</span>
+            <CampoDeHora
+              ariaLabel="Hora"
+              value={form.time}
+              onChange={(time) => setForm((f) => ({ ...f, time }))}
+            />
+          </span>
           <Field
             label="Nota"
             value={form.note}

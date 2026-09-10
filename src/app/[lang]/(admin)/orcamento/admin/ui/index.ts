@@ -42,6 +42,8 @@ export type { ToolbarProps } from "./Toolbar";
 // chega. Este é o substituto da casa — com o teclado, o leitor de ecrã e o
 // formulário que o nativo dava de graça, e com o nativo mantido no dedo (a
 // justificação está no cabeçalho do ficheiro).
+export { CampoDeHora } from "./CampoDeHora";
+export type { CampoDeHoraProps } from "./CampoDeHora";
 export { Escolha } from "./Escolha";
 export type { EscolhaProps, OpcaoDeEscolha } from "./Escolha";
 

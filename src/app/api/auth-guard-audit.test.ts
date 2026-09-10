@@ -464,6 +464,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // faz desta rota o resumo mais compacto da agenda da casa. Sem sessão, nem
   // ler nem escrever.
   { path: "./guioes/route", methods: ["GET"] },
+  // O mesmo guião, desenhado em PDF para descarregar. Traz o nome do cliente,
+  // a data, o local e o nome de cada pessoa da equipa com a hora a que entra
+  // ao serviço — é o resumo interno de um dia inteiro num ficheiro. Sem sessão
+  // não sai.
+  { path: "./guioes/[id]/pdf/route", methods: ["GET"] },
   { path: "./guioes/modelos/route", methods: ["GET", "POST"] },
   { path: "./guioes/modelos/[id]/route", methods: ["DELETE"] },
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },

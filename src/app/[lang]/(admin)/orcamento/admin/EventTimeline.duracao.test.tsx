@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import EventTimeline from "./EventTimeline";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
+import { escreverHora } from "./escrever-hora";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -178,7 +179,7 @@ describe("dar duração a um momento", () => {
     const user = userEvent.setup();
     montar([]);
 
-    await user.type(screen.getByLabelText("Hora"), "19:30");
+    await escreverHora(user, "19:30");
     await user.type(screen.getByPlaceholderText("Momento…"), "Discursos");
     await user.click(screen.getByRole("combobox", { name: "Duração" }));
     await user.click(screen.getByRole("option", { name: "30 min" }));
@@ -200,7 +201,7 @@ describe("dar duração a um momento", () => {
     const user = userEvent.setup();
     montar([]);
 
-    await user.type(screen.getByLabelText("Hora"), "19:30");
+    await escreverHora(user, "19:30");
     await user.type(screen.getByPlaceholderText("Momento…"), "Discursos");
     await user.click(screen.getByRole("button", { name: "Adicionar" }));
 

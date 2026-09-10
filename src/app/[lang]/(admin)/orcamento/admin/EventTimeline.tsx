@@ -25,7 +25,7 @@ import {
   type ModeloDeGuiao,
   type MomentoDeModelo,
 } from "@/lib/orcamento/guiao-modelos";
-import { Button, Escolha, Field, EmptyState } from "./ui";
+import { Button, CampoDeHora, Escolha, Field, EmptyState } from "./ui";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -796,15 +796,17 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
 
       {/* Add row */}
       <div className="flex flex-wrap items-end gap-2">
-        <Field
-          as="input"
-          type="time"
-          label="Hora"
-          hideLabel
+        {/* ── A HORA DEIXOU DE SER UMA CAIXA DO SISTEMA ─────────────────
+            Ver `ui/CampoDeHora`: ela mandou a captura da lista azul que o
+            `<input type="time">` abre e disse «vamos melhorar isto para o
+            software da Apple e com uma boa animação». No dedo continua a ser
+            o controlo nativo, que abre a roda do sistema — trocar isso era
+            trocar uma coisa boa por uma imitação. */}
+        <CampoDeHora
+          ariaLabel="Hora"
           value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="px-2.5"
-          containerClassName="w-[104px]"
+          onChange={setTime}
+          containerClassName="shrink-0"
         />
         {/* A duração escolhe-se — não se escreve. Ver `DEGRAUS_DE_DURACAO`. E é
             o `ui/Escolha` e não um `<select>` cru: a lista de um `<select>` é
