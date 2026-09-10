@@ -51,6 +51,10 @@ const guiao = (id: string, data: string, momentos: TimelineItem[] = []): ResumoD
   evento: "Casamento",
   data,
   local: "Herdade da Maridona",
+  // Aceite por omissão: estes casos medem a ORDEM e os sinais de um guião, e
+  // um evento por fechar não muda nem uma coisa nem outra. Quem mede a escolha
+  // entre «aceites» e «todos» é o `Guioes.test.tsx`, que é onde ela vive.
+  aceite: true,
   momentos,
 });
 

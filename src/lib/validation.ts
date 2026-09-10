@@ -319,6 +319,18 @@ export const quoteUpdateSchema = z
     productionPlan: z.array(checklistItemSchema).max(500),
     payments: z.array(paymentSchema).max(500),
     timeline: z.array(timelineItemSchema).max(500),
+    /* As três contagens do topo da folha. Texto livre e curto — a folha dela
+       diz «6 crianças (1 c/ 1 ano)», e aquele parêntesis é a informação que
+       faz a diferença no dia. Ver `CabecalhoDaFolha`.
+
+       DECLARADO AQUI ou não existe: este esquema corre em `.strip()`, e uma
+       chave que não esteja escrita é apagada em SILÊNCIO, com um 200 por cima.
+       É a mesma armadilha que a `duracao` do momento documenta. */
+    folhaDaTimeline: z.object({
+      adultos: trimmed(60).optional(),
+      criancas: trimmed(60).optional(),
+      staff: trimmed(60).optional(),
+    }),
     eventSuppliers: z.array(eventSupplierSchema).max(500),
     tags: z.array(trimmed(60)).max(100),
     followUpAt: shortDate.nullish(),

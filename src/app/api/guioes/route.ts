@@ -55,29 +55,27 @@ export async function GET(request: NextRequest) {
   try {
     const hoje = Date.now();
     const guioes: ResumoDeGuiao[] = (await listQuotes())
-      // ── SÓ O QUE JÁ É TRABALHO ────────────────────────────────────────
+      // ── O QUE ENTRA NESTA LISTA, E QUEM ESCOLHE ───────────────────────
       //
-      // «Nos timelines quero que o sistema seja inteligente o suficiente para
-      // dar para fazer timelines apenas das propostas que já foram aceites.»
+      // Duas coisas dela, com uma semana de diferença entre elas, e as duas
+      // valem:
       //
-      // Três condições, e cada uma tira uma coisa diferente:
+      //  1. «Quero que o sistema seja inteligente o suficiente para dar para
+      //     fazer timelines apenas das propostas que já foram aceites.» A
+      //     lista tinha quinze eventos e treze diziam «Sem timeline» — não por
+      //     esquecimento, mas porque a maior parte ainda eram propostas por
+      //     responder.
+      //  2. «Aqui quero que dê também para escolher aqueles que quero fazer um
+      //     timeline» — com a lista a mostrar UM evento, que é o que sobrou do
+      //     corte da primeira.
       //
-      //  · `!q.archived` — arquivado é «isto já não conta». Já cá estava.
-      //  · a data — um evento sem dia não tem horas para pôr numa grelha.
-      //  · **`q.status === "aceite"`** — o novo. Um guião do dia é a folha por
-      //    que a equipa se rege no dia; fazê-la para um pedido que ainda está
-      //    a ser pensado é planear um dia que pode não acontecer. A lista dela
-      //    tinha quinze eventos e treze diziam «Sem timeline» — não por
-      //    esquecimento, mas porque a maior parte ainda eram propostas por
-      //    responder.
+      // Não se contradizem: a primeira é sobre o que se vê POR OMISSÃO, a
+      // segunda é sobre poder ver o resto. Um corte no servidor só sabe fazer
+      // a primeira, e ao fazê-la tira a segunda — por isso saiu daqui.
       //
-      // `aceite` é o topo da escada do `estado-do-pedido.ts`, e chega-se lá
-      // por três caminhos — ela marca a proposta como aceite, entra um
-      // pagamento, ou regista-se o contrato. Qualquer um deles quer dizer a
-      // mesma coisa: isto vai acontecer.
-      .filter(
-        (q) => !q.archived && q.status === "aceite" && /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? ""),
-      )
+      // A rota devolve todos os eventos com data e diz de cada um se já está
+      // `aceite`. Quem escolhe é o ecrã, e a escolha dela é a que fica.
+      .filter((q) => !q.archived && /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? ""))
       .sort(
         (a, b) =>
           Math.abs(Date.parse(`${a.date}T12:00:00`) - hoje) -
@@ -90,6 +88,7 @@ export async function GET(request: NextRequest) {
         evento: eventTagLabel(q),
         data: q.date,
         local: q.location ?? "",
+        aceite: q.status === "aceite",
         momentos: q.timeline ?? [],
       }));
 

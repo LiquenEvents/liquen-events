@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo } from "react";
 import { blocosDaFolha } from "@/lib/orcamento/folha-da-timeline";
+import { SITE } from "@/lib/site";
 import type { TimelineItem } from "@/lib/orcamento/types";
 
 /**
@@ -47,6 +48,13 @@ export interface FolhaDaTimelineProps {
   criancas?: string;
   staff?: string;
   momentos: readonly TimelineItem[];
+  /**
+   * A lista do fim da folha. Vem já composta por quem chama, porque o contacto
+   * mora no DIRECTÓRIO de fornecedores e não no evento: o evento guarda quem
+   * trabalha nele, o directório guarda o telefone de cada um. Ver a nota na
+   * rota do PDF.
+   */
+  fornecedores?: readonly { categoria: string; nome: string; contacto: string }[];
 }
 
 export function FolhaDaTimeline({
@@ -55,6 +63,7 @@ export function FolhaDaTimeline({
   criancas = "",
   staff = "",
   momentos,
+  fornecedores = [],
 }: FolhaDaTimelineProps) {
   const blocos = useMemo(() => blocosDaFolha(momentos), [momentos]);
 
@@ -171,6 +180,39 @@ export function FolhaDaTimeline({
             ))}
           </tbody>
         </table>
+
+        {/* ── OS FORNECEDORES, NO FIM, COMO NA FOLHA DELA ─────────────────
+            «E os fornecedores que escrevemos em baixo no timeline, onde
+            escrevemos?» — a pergunta que fez a olhar para esta folha.
+
+            A resposta é que se escrevem no painel de CUSTOS do evento, que é
+            onde eles já viviam antes de esta folha existir (`EventCosts`), e
+            é por isso que aqui aparecem sozinhos. O que faltava era vê-los —
+            sem isto, a pré-visualização prometia uma folha e o ficheiro dava
+            outra, que é o defeito que esta pré-visualização existe para não
+            ter. */}
+        {fornecedores.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[11px] font-semibold text-sage-700">Fornecedores</p>
+            <ul className="mt-1.5 flex flex-col gap-0.5">
+              {fornecedores.map((f, i) => (
+                <li key={i} className="text-[11px] leading-snug">
+                  <span className="font-semibold text-sage-700">{f.categoria}</span>
+                  <span className="text-[var(--bo-text-muted)]">
+                    {" – "}
+                    {[f.nome, f.contacto].filter(Boolean).join("  –  ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {/* O contacto da casa no pé, como no ficheiro — ver a nota no
+            `horario-pdf.ts`: a folha tem três páginas e anda pelas mãos de dez
+            fornecedores, e a que fica com o motorista é a do meio. */}
+        <p className="mt-4 text-right text-[10px] text-[var(--bo-text-faint)]">
+          {SITE.phoneDisplay} · {SITE.email}
+        </p>
       </div>
     </div>
   );

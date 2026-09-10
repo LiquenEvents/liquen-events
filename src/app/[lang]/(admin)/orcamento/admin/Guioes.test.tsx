@@ -57,6 +57,7 @@ const GUIOES = [
     evento: "Casamento",
     data: "2026-06-20",
     local: "Herdade da Maridona",
+    aceite: true,
     momentos: [momento("a1", "09:00", "Montagem", 120), momento("a2", "11:00", "Cerimónia", 60)],
   },
   {
@@ -65,6 +66,7 @@ const GUIOES = [
     evento: "Casamento",
     data: "2026-06-15",
     local: "Quinta do Sobral",
+    aceite: true,
     momentos: [
       momento("b1", "09:00", "Montagem", 180, "Rita"),
       momento("b2", "10:00", "Ir buscar as flores", 60, "Rita"),
@@ -76,6 +78,7 @@ const GUIOES = [
     evento: "Batizado",
     data: "2026-07-01",
     local: "Igreja de Évora",
+    aceite: true,
     momentos: [],
   },
 ];
@@ -103,10 +106,21 @@ function ligarOServidor() {
       if (url.startsWith("/api/guioes")) {
         return resposta({ guioes: GUIOES });
       }
-      gravados.push({
-        url,
-        corpo: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
-      });
+      /* ── SÓ AS ESCRITAS, QUE É O QUE O NOME DIZ ─────────────────────────
+         Isto guardava TUDO o que não fosse `/api/guioes` — incluindo leituras.
+         Passou despercebido enquanto esta vista só lia os guiões; no dia em
+         que passou a ler também o directório de fornecedores (para a folha
+         mostrar os contactos), o GET entrou na lista das gravações e um caso
+         que esperava UMA gravação viu duas.
+
+         O defeito era do ajudante e não do código: um contador de escritas que
+         conta leituras mede outra coisa. */
+      if ((init?.method ?? "GET").toUpperCase() !== "GET") {
+        gravados.push({
+          url,
+          corpo: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+        });
+      }
       return resposta({ ok: true });
     }),
   );
@@ -206,6 +220,51 @@ describe("Timelines — a lista", () => {
     expect(screen.queryByRole("button", { name: /Carla e Diogo/ })).toBeNull();
   });
 
+  it("por omissão só mostra os eventos fechados, e dá para ver os outros", async () => {
+    /**
+     * ── DUAS COISAS DELA, COM DIAS DE DIFERENÇA, E AS DUAS VALEM ──────────
+     *
+     *  1. «Quero que dê para fazer timelines APENAS das propostas que já foram
+     *     aceites.» A lista tinha quinze eventos e treze diziam «Sem timeline»,
+     *     porque a maior parte ainda eram propostas por responder.
+     *  2. «Aqui quero que dê TAMBÉM para escolher aqueles que quero fazer um
+     *     timeline» — com a lista a mostrar UM evento, que é o que sobrou do
+     *     corte da primeira.
+     *
+     * Não se contradizem: a primeira é sobre o que se vê por omissão, a
+     * segunda é sobre poder ver o resto. Houve aqui, durante umas horas, um
+     * corte no SERVIDOR — e um corte no servidor só sabe fazer a primeira: ao
+     * fazê-la, tirava a segunda sem deixar porta nenhuma.
+     *
+     * Este caso guarda as duas ao mesmo tempo, que é a única maneira de não se
+     * perder uma a arranjar a outra.
+     */
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.startsWith("/api/guioes/modelos")
+          ? resposta({ modelos: [] })
+          : resposta({
+              guioes: [
+                { ...GUIOES[0], aceite: true },
+                { ...GUIOES[1], id: "q-por-fechar", cliente: "Ainda a pensar", aceite: false },
+              ],
+            }),
+      ),
+    );
+    montar();
+
+    // 1. Por omissão, só o fechado.
+    await screen.findByRole("button", { name: /Ana e Rui/ });
+    expect(screen.queryByRole("button", { name: /Ainda a pensar/ })).toBeNull();
+
+    // 2. E o outro está a um toque, não atrás de uma parede.
+    await user.click(screen.getByRole("radio", { name: /^Todos os eventos · 2$/ }));
+    expect(screen.getByRole("button", { name: /Ainda a pensar/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Ana e Rui/ })).toBeTruthy();
+  });
+
   it("um filtro sem resultados diz que foi o filtro que mudou, não os dados", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal(
@@ -225,20 +284,14 @@ describe("Timelines — a lista", () => {
 });
 
 /**
- * ── ABRIR UMA TIMELINE JÁ NÃO É ABRIR O EDITOR ─────────────────────────────
+ * ── E O EDITOR VOLTOU A SER A PRIMEIRA COISA ────────────────────────────
  *
- * A vista abre no «Horário» — a grelha —, que foi o que ela pediu com o horário
- * da faculdade à frente. O editor continua montado por baixo, mas `hidden`, e
- * um elemento escondido não tem papel na árvore de acessibilidade: os
- * `getByRole` daqui deixavam de o encontrar, e faziam bem.
- *
- * Estes casos medem a EDIÇÃO, portanto passam a dar o toque que ela dá para
- * editar. Quem quiser medir o que se vê ao abrir, mede a grelha — e não precisa
- * deste passo.
+ * Durante uma ronda esta vista abriu no «Horário» (a grelha por pessoa) e
+ * estes casos tiveram de dar um toque em «Editar» antes de editar. O
+ * comutador saiu — «aqui basta apenas editar» —, porque a FOLHA passou a
+ * estar ao lado do editor e já não é preciso trocar de vista para ver como
+ * está a ficar. O toque a mais saiu com ele.
  */
-async function irParaEditar(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole("radio", { name: "Editar" }));
-}
 
 describe("Timelines — abrir e editar", () => {
   it("abrir um evento vai buscar o pedido inteiro e monta o editor", async () => {
@@ -254,7 +307,6 @@ describe("Timelines — abrir e editar", () => {
 
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
     expect(pedidos).toEqual(["q-pronto"]);
-    await irParaEditar(user);
     // O guião que abre é o DAQUELE evento, e não o de outro.
     expect(screen.getByRole("button", { name: "Remover 09:00 Montagem" })).toBeTruthy();
   });
@@ -278,7 +330,6 @@ describe("Timelines — abrir e editar", () => {
     await screen.findByRole("button", { name: /Carla e Diogo/ });
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
-    await irParaEditar(user);
 
     const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
     const modelo = MODELOS_DA_CASA[0];
@@ -299,7 +350,6 @@ describe("Timelines — abrir e editar", () => {
     await screen.findByRole("button", { name: /Carla e Diogo/ });
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
-    await irParaEditar(user);
 
     await escolher(
       user,

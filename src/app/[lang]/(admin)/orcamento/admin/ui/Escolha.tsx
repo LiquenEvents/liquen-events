@@ -284,6 +284,33 @@ const PELE = {
 
 /** A folga entre o campo e a lista (o `mt-1`/`mb-1`), mais um fio. */
 const MARGEM = 8;
+
+/**
+ * ── O TECTO DE UMA LISTA, E PORQUE É QUE ELE TEM DE EXISTIR ────────────────
+ *
+ * Ela mandou a captura do selector das horas aberto: vinte e quatro linhas a
+ * ocupar o ecrã inteiro, do topo ao fundo, com o campo lá em baixo. «Isto não
+ * está muito bem assim.»
+ *
+ * E a culpa não é das horas — é desta medida. A altura era
+ * `min(o que a lista queria, o espaço que há)`, e com vinte e quatro opções o
+ * que ela queria é mais do que o ecrã tem: o `min` devolvia o ecrã inteiro.
+ * Numa lista de cinco opções isso nunca se via; na primeira lista longa,
+ * viu-se logo.
+ *
+ * Uma lista que ocupa o ecrã deixou de ser uma lista e passou a ser uma
+ * página: perde-se o contexto de onde se estava, e a opção que se quer fica a
+ * meio de uma coluna sem princípio nem fim à vista.
+ *
+ * 320 px são NOVE linhas destas (as opções medem ~34 px com a folga do
+ * material), que é a ordem de grandeza a que qualquer sistema operativo põe o
+ * mesmo tecto. Acima disso rola — e o `Escolha` já abre com a opção escolhida
+ * à vista, portanto rolar não é procurar às cegas.
+ *
+ * O tecto é do ESPAÇO, e não do número de opções: uma lista de três opções com
+ * rótulos de duas linhas continua a caber inteira, que é o que se quer.
+ */
+const TECTO_DA_LISTA = 320;
 /** Meio segundo sem tocar no teclado apaga o que se escreveu. É o que o APG usa
  *  para o «escrever para saltar», e o que um `<select>` nativo faz. */
 const MEMORIA_DO_TECLADO_MS = 500;
@@ -595,7 +622,13 @@ export function Escolha({
       if (!querida) return;
       const abaixo = window.innerHeight - b.bottom - MARGEM;
       const acimaDela = b.top - MARGEM;
-      const acima = querida > abaixo && acimaDela > abaixo;
+      /* Vira-se para cima quando não cabe em baixo — e o «cabe» mede-se contra
+         a altura que a lista vai MESMO ter, já com o tecto. Sem isto, uma
+         lista de vinte e quatro opções virava-se para cima sempre que o campo
+         estivesse abaixo do meio do ecrã, mesmo tendo 320 px de sobra por
+         baixo dele. */
+      const vaiTer = Math.min(querida, TECTO_DA_LISTA);
+      const acima = vaiTer > abaixo && acimaDela > abaixo;
       const espaco = acima ? acimaDela : abaixo;
       /* SEM CHÃO MÍNIMO, E É DELIBERADO.
          A primeira correcção punha aqui um piso («nunca abaixo de duas
@@ -604,7 +637,7 @@ export function Escolha({
          sair do ecrã — agora só dois píxeis, que é pior do que setenta, porque
          passa despercebido. Uma lista curta com scroll lê-se; uma lista cortada
          fora do ecrã não. */
-      const alturaMax = Math.min(querida, Math.max(espaco, 0));
+      const alturaMax = Math.min(querida, TECTO_DA_LISTA, Math.max(espaco, 0));
       setEncaixe((antes) =>
         antes && antes.acima === acima && Math.abs(antes.alturaMax - alturaMax) < 1
           ? antes

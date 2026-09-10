@@ -7,6 +7,7 @@ import {
   CARLITO_REGULAR_TTF_B64,
 } from "@/lib/proposal-fonts";
 import { LOGO_DARK_PNG_B64 } from "@/lib/proposal-assets";
+import { SITE } from "@/lib/site";
 import { blocosDaFolha } from "./folha-da-timeline";
 import type { TimelineItem } from "./types";
 
@@ -285,6 +286,28 @@ export async function horarioEmPdf(dados: HorarioParaPdf): Promise<Uint8Array | 
       });
       y -= 14;
     }
+  }
+
+  /* ── O CONTACTO DA CASA, NO PÉ DE CADA PÁGINA ─────────────────────────────
+     «Coloca no final o número e email da Líquen na ponta.»
+
+     Em TODAS as páginas e não só na última, e a razão é a própria folha: ela
+     tem três páginas, anda pelas mãos de dez fornecedores, e a que fica com o
+     motorista da carrinha é a do meio. Um contacto que só existe na última é
+     um contacto que a maior parte da gente não tem.
+
+     No pé e em letra pequena, à direita, onde não disputa nada com a tabela:
+     não é informação do dia, é a maneira de chegar a quem o organiza. */
+  const paginas = pdf.getPages();
+  const contacto = `${SITE.phoneDisplay}  ·  ${SITE.email}`;
+  for (const p of paginas) {
+    p.drawText(contacto, {
+      x: X_FIM - reg.widthOfTextAtSize(contacto, 7.5),
+      y: 28,
+      size: 7.5,
+      font: reg,
+      color: rgb(0.55, 0.57, 0.53),
+    });
   }
 
   return pdf.save();

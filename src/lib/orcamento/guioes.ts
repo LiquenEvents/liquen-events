@@ -52,6 +52,13 @@ export interface ResumoDeGuiao {
   /** «aaaa-mm-dd». Um evento sem data não entra nesta lista — ver `ordenarGuioes`. */
   data: string;
   local: string;
+  /**
+   * Se a proposta deste evento já foi dada como aceite.
+   *
+   * É por ele que a lista mostra, por omissão, só o que já é trabalho — e é
+   * por ele que ela pode escolher ver o resto. Ver a nota longa na rota.
+   */
+  aceite: boolean;
   momentos: TimelineItem[];
 }
 

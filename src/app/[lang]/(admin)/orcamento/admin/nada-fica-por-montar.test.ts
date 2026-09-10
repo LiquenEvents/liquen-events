@@ -65,7 +65,35 @@ const ADMIN = path.join(RAIZ, "app", "[lang]", "(admin)", "orcamento", "admin");
  * um ficheiro, está a pedir uma decisão adiada — e a razão tem de dizer o que
  * falta para o ecrã ser montado, não «é código morto», que não ajuda ninguém.
  */
-const POR_MONTAR: Readonly<Record<string, string>> = {};
+const POR_MONTAR: Readonly<Record<string, string>> = {
+  /**
+   * A grelha do dia por responsável — as horas a descer, uma coluna por pessoa.
+   *
+   * ── PORQUE É QUE ESTÁ AQUI, E NÃO APAGADA ──────────────────────────────
+   *
+   * Esteve montada nas Timelines, atrás de um comutador «Horário | Editar».
+   * Ela mandou o comutador embora: «aqui basta apenas editar» — e tem razão
+   * pela razão certa, que é a folha da timeline ter passado a estar AO LADO do
+   * editor. Trocar de vista para ver como está a ficar deixou de ser preciso.
+   *
+   * Mas a pergunta a que a grelha responde não desapareceu com o comutador:
+   * **«são três e meia, quem está livre para a próxima coisa?»** A régua não
+   * lhe responde por construção — mistura toda a gente na mesma pista. E foi
+   * ela própria que pediu esta vista, com o horário de uma faculdade à frente.
+   *
+   * ── O QUE FALTA PARA A MONTAR ──────────────────────────────────────────
+   *
+   * Um sítio onde a pergunta se faça. Não é a véspera (é aí que se escreve a
+   * timeline, e é para isso que o editor serve): é o DIA, de pé, com as mãos
+   * ocupadas. O candidato é o `PainelDeHoje` — o cartão que só existe no dia
+   * do evento, no topo das Timelines —, e a decisão é dela, não minha a
+   * reboque de outra.
+   */
+  "app/[lang]/(admin)/orcamento/admin/GrelhaDoDia.tsx":
+    "Ficou sem porta quando o comutador «Horário | Editar» saiu das Timelines " +
+    "(«aqui basta apenas editar»). Responde a «quem está livre às 14:00?», que " +
+    "é pergunta do DIA do evento — falta decidir com ela se entra no cartão de hoje.",
+};
 
 function ficheiros(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {

@@ -97,13 +97,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const bytes = await horarioEmPdf({
       titulo: titulo || "Timeline",
-      /* As três contagens do topo da folha dela. Sabemos os convidados; as
-         crianças e a equipa ainda não têm onde ser escritas neste produto, e
-         por isso vão em BRANCO — um zero seria uma afirmação («não vêm
-         crianças») em vez da verdade («ainda não está escrito»). */
-      adultos: q.guests ? String(q.guests) : "",
-      criancas: "",
-      staff: "",
+      /* ── AS TRÊS CONTAGENS DO TOPO ────────────────────────────────────
+         Escritas por ela no ecrã da timeline (`folhaDaTimeline`), ao lado da
+         pré-visualização. Os adultos caem para o `guests` do pedido quando ela
+         não escreveu nada — o número do pedido é de quando o pedido foi feito
+         e o dela é o de véspera, depois das confirmações; é o dela que manda,
+         mas o do pedido é melhor do que uma célula vazia.
+
+         As outras duas ficam vazias enquanto ela não as escrever. Um zero
+         seria uma afirmação («não vêm crianças») em vez da verdade («ainda não
+         está escrito»). */
+      adultos: q.folhaDaTimeline?.adultos || (q.guests ? String(q.guests) : ""),
+      criancas: q.folhaDaTimeline?.criancas ?? "",
+      staff: q.folhaDaTimeline?.staff ?? "",
       momentos: q.timeline ?? [],
       fornecedores: await fornecedoresDoEvento(q.eventSuppliers ?? []),
     });

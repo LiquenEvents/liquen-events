@@ -182,6 +182,42 @@ export interface ChecklistItem {
   done: boolean;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CABEÇALHO DA FOLHA DA TIMELINE — QUANTA GENTE, DE CADA TIPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «E também para escrever staff e crianças etc que está no timeline.»
+ *
+ * A folha que a equipa dela leva para o evento abre com três contagens:
+ *
+ *     Adultos      Crianças                  Staff
+ *     240          6 crianças (1 c/ 1 ano)   24
+ *
+ * ── PORQUE É QUE ISTO NÃO SÃO TRÊS NÚMEROS ──────────────────────────────
+ *
+ * Porque a coluna do meio da folha dela diz «6 crianças (1 c/ 1 ano)». Aquele
+ * parêntesis é a informação que faz a diferença no dia: uma criança de um ano
+ * não come do menu infantil nem se senta a uma mesa. Um `number` deitava-o
+ * fora e obrigava-a a guardá-lo noutro sítio — que é como se perde.
+ *
+ * Texto livre, curto, e escrito por ela. O produto não tem opinião nenhuma
+ * sobre o que lá está.
+ *
+ * ── E OS ADULTOS, QUE JÁ EXISTEM ─────────────────────────────────────────
+ *
+ * O `guests` do pedido é quantos convidados o casal disse que vinham, e é o
+ * que a folha usa quando esta caixa está vazia. Escrever aqui SUBSTITUI-o —
+ * porque o número do pedido é de quando o pedido foi feito, e o da folha é o
+ * de véspera, depois das confirmações. São dois números com duas idades, e o
+ * da folha é o que manda no dia.
+ */
+export interface CabecalhoDaFolha {
+  adultos?: string;
+  criancas?: string;
+  staff?: string;
+}
+
 /** A single moment in the day-of run sheet (cronograma do evento). */
 export interface TimelineItem {
   id: string;
@@ -365,6 +401,8 @@ export interface Quote extends QuoteFormData {
   productionPlan?: ChecklistItem[];
   payments?: Payment[];
   timeline?: TimelineItem[];
+  /** As três contagens do topo da folha da timeline. Ver `CabecalhoDaFolha`. */
+  folhaDaTimeline?: CabecalhoDaFolha;
   eventSuppliers?: EventSupplier[];
   /** Free-form labels for organising/filtering (ex.: "VIP", "Outono", "Ar livre"). */
   tags?: string[];
