@@ -4216,7 +4216,12 @@ export default function AdminClient({
     definicoes: "Os números com que o estúdio faz contas",
     servicos: "As palavras que vão nas propostas, escritas com tempo",
     "fazer-proposta": "Escolhe o cliente e escreve a proposta",
-    guioes: "O guião de cada dia de evento: quem faz o quê, e a que horas",
+    /* ── A DESCRIÇÃO DAS TIMELINES SAIU, COMO A DAS TAREFAS ────────────
+       «A hierarquia do cabeçalho está invertida.» [APPLE] É a mesma regra dos
+       documentos dela: título curto que identifica a vista, e mais nada. E
+       «Timelines» já o diz — a frase que estava aqui explicava o que é uma
+       timeline a quem já está dentro da secção das timelines. */
+    guioes: "",
     /* ── A DESCRIÇÃO DAS TAREFAS SAIU ─────────────────────────────────
        «A hierarquia do cabeçalho está invertida: "Organização interna da
        equipa" acima do título, em cinzento pequeno.» [APPLE] A regra é

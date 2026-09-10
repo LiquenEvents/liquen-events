@@ -367,6 +367,31 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
   const aberto = useMemo(() => guioes.find((g) => g.id === abertoId) ?? null, [guioes, abertoId]);
 
   /**
+   * A lista visível, partida por MÊS, pela ordem em que já vinha.
+   *
+   * O ano só se escreve quando não é este — «Setembro», «Outubro», «Maio
+   * 2027». Escrever «2026» em todas as linhas de uma agenda de 2026 é ruído
+   * que se aprende a saltar, e foi essa a lição da lista dos próximos eventos
+   * do Calendário.
+   */
+  const porMes = useMemo(() => {
+    const anoActual = new Date().getFullYear();
+    const grupos: { mes: string; eventos: typeof visiveis }[] = [];
+    for (const g of visiveis) {
+      const d = new Date(`${g.data}T12:00:00`);
+      const nome = d.toLocaleDateString("pt-PT", { month: "long" });
+      const mes =
+        d.getFullYear() === anoActual
+          ? nome.charAt(0).toUpperCase() + nome.slice(1)
+          : `${nome.charAt(0).toUpperCase() + nome.slice(1)} ${d.getFullYear()}`;
+      const ultimo = grupos[grupos.length - 1];
+      if (ultimo && ultimo.mes === mes) ultimo.eventos.push(g);
+      else grupos.push({ mes, eventos: [g] });
+    }
+    return grupos;
+  }, [visiveis]);
+
+  /**
    * Abrir um guião é ir buscar o pedido inteiro.
    *
    * O `pedido` só se substitui quando a resposta é do evento que ela quis abrir
@@ -526,16 +551,42 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
               action={{ label: "Ver todos", onClick: () => setFiltro("todos") }}
             />
           ) : (
+            /* ── A LISTA PASSA A TER CABEÇALHOS DE MÊS ──────────────────────
+               O documento do Calendário dela apanha isto noutro sítio e a
+               queixa é a mesma aqui: «26 Set → 3 Out → 29 Mai 27. Sete meses de
+               intervalo sem qualquer separador. O leitor tem de descobrir
+               sozinho que não há nada entre outubro e maio.»
+
+               A lista das timelines tem exactamente essa forma — «Daqui a 23
+               dias» seguido de «Daqui a 261 dias» — e o salto de sete meses
+               fica escondido atrás de dois números que ninguém subtrai.
+
+               Com os meses escritos, o buraco passa a ser evidente em vez de
+               suspeito. E é a informação mais valiosa desta lista: sete meses
+               livres é uma decisão comercial, não um detalhe de apresentação.
+
+               Colados ao topo (`sticky`) porque a coluna rola: sem isso, a
+               meio de Julho já não se sabe em que mês se está — que é o mesmo
+               defeito com outro nome. */
             <ul className="flex flex-col gap-2">
-              {visiveis.map((g) => (
-                <li key={g.id}>
-                  <LinhaDeGuiao
-                    guiao={g}
-                    janela={janela}
-                    activo={g.id === abertoId}
-                    relogio={g.hoje ? relogio : null}
-                    aoAbrir={() => abrir(g.id)}
-                  />
+              {porMes.map(({ mes, eventos }) => (
+                <li key={mes}>
+                  <h2 className="bo-eyebrow sticky top-0 z-10 -mx-1 bg-[var(--bo-surface-sunken)]/85 px-1 py-1.5 text-[var(--bo-text-muted)] backdrop-blur">
+                    {mes}
+                  </h2>
+                  <ul className="mt-1 flex flex-col gap-2">
+                    {eventos.map((g) => (
+                      <li key={g.id}>
+                        <LinhaDeGuiao
+                          guiao={g}
+                          janela={janela}
+                          activo={g.id === abertoId}
+                          relogio={g.hoje ? relogio : null}
+                          aoAbrir={() => abrir(g.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>
@@ -569,13 +620,30 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
           ) : (
             <div className="bo-card p-[var(--bo-p-cartao)]">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                {/* ── A HIERARQUIA ESTAVA INVERTIDA, COMO NOS OUTROS ECRÃS ──
+                    «Daqui a 359 dias» estava ACIMA do nome do casal, em
+                    cinzento pequeno, na posição de maior destaque do cartão.
+                    É a mesma inversão que os três documentos dela apanham nas
+                    Tarefas, no Calendário e nos Temas: [APPLE] o título
+                    identifica a vista, e o resto é estado.
+
+                    O nome sobe para primeiro. O «daqui a tantos dias» desce
+                    para junto da data, que é o sítio onde ele quer dizer
+                    alguma coisa — «sábado, 4 de setembro · daqui a 359 dias» é
+                    uma frase; sozinho por cima de um nome é um número solto.
+
+                    E fica em `role="status"`: muda com o relógio, sem a página
+                    recarregar. */}
                 <div className="min-w-0">
-                  <p className="bo-eyebrow">{quandoPorExtenso(aberto.faltamDias)}</p>
-                  <h2 className="mt-1 text-title3 font-semibold text-[var(--bo-text)]">
+                  <h2 className="text-title3 font-semibold text-[var(--bo-text)]">
                     {aberto.cliente || "Sem nome"}
                   </h2>
-                  <p className="bo-text-muted text-sm">
+                  <p className="bo-text-muted mt-0.5 text-sm">
                     {dataPorExtenso(aberto.data)}
+                    <span role="status">
+                      {" "}
+                      · {quandoPorExtenso(aberto.faltamDias).toLowerCase()}
+                    </span>
                     {aberto.local ? ` · ${aberto.local}` : ""}
                   </p>
                 </div>
