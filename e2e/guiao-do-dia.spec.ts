@@ -182,7 +182,7 @@ test.describe("Timelines @guiao", () => {
     await expect(page.getByRole("heading", { level: 1, name: /^Timelines$/ })).toBeVisible({
       timeout: 60_000,
     });
-    /* E O ÂMBITO VOLTA AO PRINCÍPIO, DE PROPÓSITO ────────────────────────
+    /* ── E O ÂMBITO VOLTA AO PRINCÍPIO, DE PROPÓSITO ──────────────────────
        Um recarregar traz a lista nos FECHADOS outra vez, que é o estado com
        que ela abre. A semente nasce `pendente`, portanto tem de se voltar a
        alargar o âmbito antes de a procurar — não é um defeito a contornar, é
@@ -191,11 +191,32 @@ test.describe("Timelines @guiao", () => {
        Guardar a escolha entre recarregamentos seria outra decisão, e não é
        esta que ela pediu: o que ela pediu foi PODER escolher. O filtro é da
        sessão de trabalho e não do dia, e um âmbito que se cola sozinho
-       deixava-a a olhar para eventos que não fechou sem saber porquê. */
-    await page.getByRole("radio", { name: /^Todos os eventos/ }).click();
+       deixava-a a olhar para eventos que não fechou sem saber porquê.
+
+       ── E ESPERA-SE PELA HIDRATAÇÃO ANTES DE TOCAR, QUE FOI O VERMELHO ────
+
+       Isto passou aqui e falhou no CI, três vezes, sempre nesta linha. A razão
+       está escrita no `AGENTS.md`: no `next dev` da 16.3.3 o cabeçalho passou a
+       vir DESENHADO DO SERVIDOR, e por isso deixou de provar que a página está
+       viva. O `<h1>Timelines</h1>` aparecia, o toque no «Todos os eventos»
+       caía num rádio que ainda não tinha ouvinte nenhum, não acontecia NADA —
+       sem erro, sem aviso — e a lista ficava nos fechados à espera de uma
+       semente que nasce pendente.
+
+       O sinal que serve é a classe `admin-mode` no `body` (o `data-admin-mode`
+       é o irmão que vem do servidor e não serve). E o `toPass` à volta é a
+       segunda rede: entre a classe aparecer e o React ligar o `onChange` há uma
+       janela de fotogramas, e um toque perdido lá dentro é para repetir, não
+       para reprovar a passagem. */
+    await page.waitForFunction(() => document.body.classList.contains("admin-mode"), null, {
+      timeout: 60_000,
+    });
 
     const linhaDepois = page.getByRole("button", { name: naLista }).first();
-    await expect(linhaDepois).toBeVisible({ timeout: 30_000 });
+    await expect(async () => {
+      await page.getByRole("radio", { name: /^Todos os eventos/ }).click();
+      await expect(linhaDepois).toBeVisible({ timeout: 10_000 });
+    }).toPass({ timeout: 60_000 });
     await expect(
       linhaDepois,
       "a timeline gravada devia aparecer na lista com a sobreposição que ficou",
