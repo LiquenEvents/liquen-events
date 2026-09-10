@@ -18,9 +18,29 @@ import {
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { corDeTexto, metaFor } from "./status-meta";
-import { ESTADO, PRESSAO } from "./ui/movimento";
-import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
+import { ESTADO, MOLA_DE_MARCAR, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+/* As regras das fases 05 e 06 vivem em `@/lib/tarefas/listas` e não aqui: o que
+   é uma tarefa «de hoje» e o que conta como atrasada são perguntas que se
+   discutem e se testam sozinhas, longe do desenho. */
+import {
+  AGRUPAMENTOS,
+  AGRUPAMENTO_POR_OMISSAO,
+  LISTAS_INTELIGENTES,
+  LISTA_POR_OMISSAO,
+  ORDENACOES,
+  ORDENACAO_POR_OMISSAO,
+  agruparTarefas,
+  contarPorLista,
+  listasDeEvento,
+  ordemVisivel,
+  ordenarTarefas,
+  pertenceALista,
+  type Agrupamento,
+  type Lista,
+  type ListaId,
+  type Ordenacao,
+} from "@/lib/tarefas/listas";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#8a2a22" },
@@ -30,7 +50,14 @@ const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
 
 const AREAS = ["Comercial", "Produção", "Decoração", "Financeiro", "Logística", "Geral"];
 
-const PRIORITY_ORDER: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
+/**
+ * Segundo e meio entre marcar uma tarefa e ela descer para as Concluídas.
+ *
+ * O número é o dos Lembretes, e o que ele compra está escrito no `aDescansar`:
+ * é o tempo de desmarcar sem a lista saltar. Mais curto não chega para o dedo
+ * voltar atrás; mais longo e a lista parece que não percebeu o toque.
+ */
+const ESPERA_ANTES_DE_DESCER_MS = 1500;
 
 /* Os dois ícones da linha, escritos uma vez: o mesmo desenho serve os botões
    soltos do computador e os itens do menu «⋯» do dedo. */
@@ -77,15 +104,230 @@ const CaixoteIcon = (
  * `useMemo`). Com a linha atrás de `memo()` e os derivados memoizados, escrever
  * deixa de tocar na lista: nenhuma linha muda enquanto se escreve um título.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A LINHA QUE ESCREVE — A ÚLTIMA DA LISTA, COMO NOS LEMBRETES
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Fechada é um convite de uma linha: «＋ Nova tarefa». Aberta é o campo, com os
+ * quatro detalhes por baixo.
+ *
+ * ── OS ATALHOS, E PORQUE É QUE SÃO ESTES ─────────────────────────────────
+ *
+ *  · `Enter` cria **e o campo fica aberto**, vazio, à espera da seguinte.
+ *    Quem escreve tarefas escreve-as em rajada — a segunda vem a seguir à
+ *    primeira, e obrigar a um toque entre cada uma é atrito puro.
+ *  · `⇧Enter` cria e FECHA, para quem só tinha uma.
+ *  · `Esc` desiste. Com texto escrito, desiste do texto; sem texto, fecha a
+ *    linha — que é a ordem em que se espera perder as coisas.
+ *
+ * ── E O CAMPO NÃO É UMA CÁPSULA ──────────────────────────────────────────
+ *
+ * «Mini a medium são retângulos arredondados; cápsula só em large e extra
+ * large.» [APPLE] É o `bo-input` da casa, que já é o rectângulo de 10 px de
+ * todos os outros campos do produto.
+ */
+function LinhaDeEscrever({
+  aberta,
+  aoAbrir,
+  aoFechar,
+  campo,
+  titulo,
+  aoEscrever,
+  aoCriar,
+  aGravar,
+  children,
+}: {
+  aberta: boolean;
+  aoAbrir: () => void;
+  aoFechar: () => void;
+  campo: React.RefObject<HTMLInputElement | null>;
+  titulo: string;
+  aoEscrever: (v: string) => void;
+  aoCriar: (fecharDepois: boolean) => void;
+  aGravar: boolean;
+  children: React.ReactNode;
+}) {
+  if (!aberta) {
+    return (
+      <button
+        type="button"
+        onClick={aoAbrir}
+        className={`alvo-toque flex w-full items-center gap-2.5 px-5 py-3 text-left text-sm text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-3)] hover:text-[var(--bo-text)] sm:px-6 ${ESTADO} ${PRESSAO}`}
+      >
+        <span
+          aria-hidden="true"
+          className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border border-dashed border-foreground/30 text-[11px] leading-none"
+        >
+          +
+        </span>
+        Nova tarefa
+      </button>
+    );
+  }
+
+  return (
+    <div className="px-5 py-3.5 sm:px-6">
+      <input
+        ref={campo}
+        value={titulo}
+        onChange={(e) => aoEscrever(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            aoCriar(e.shiftKey);
+            return;
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            if (titulo) aoEscrever("");
+            else aoFechar();
+          }
+        }}
+        disabled={aGravar}
+        aria-label="Nova tarefa"
+        placeholder="O que há para fazer?"
+        className="bo-input w-full px-3 py-2 text-sm"
+      />
+      {children}
+      {/* Uma linha, e não um botão. O que ela precisa de saber é que o Enter
+          chega — e depois de saber uma vez, isto é ruído que se aprende a
+          saltar. Fica em `text-caption` e some com a linha ao fechar. */}
+      <p className="bo-text-muted mt-2 text-[11px]">
+        <kbd className="pointer-coarse:hidden">Enter</kbd>
+        <span className="pointer-coarse:hidden"> cria e fica pronto para a seguinte · </span>
+        <kbd className="pointer-coarse:hidden">Esc</kbd>
+        <span className="pointer-coarse:hidden"> desiste</span>
+        <span className="hidden pointer-coarse:inline">Toca fora para desistir.</span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A BARRA DAS LISTAS — «Não há listas» era o ponto 10 da auditoria
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Uma só lista plana chamada "A fazer". Correção: barra lateral com listas
+ * inteligentes — Hoje · Esta semana · Atrasadas · Sem data · Todas — e por
+ * baixo as listas por evento. Cada uma com contagem.»
+ *
+ * ── PORQUE É QUE NÃO É UMA COLUNA NO TELEMÓVEL ────────────────────────────
+ *
+ * Porque uma coluna de 224 px ao lado de um ecrã de 390 não é uma coluna, é
+ * metade do ecrã. A partir do `lg:` (1024, o corte da casa em que a barra de
+ * destinos deixa de ser gaveta) é a coluna do desenho da Parte 2; abaixo disso
+ * é a mesma fila de botões que o filtro por pessoa já é, mesmo gesto e mesmo
+ * alvo. Não há um segundo desenho a manter: é o mesmo botão com `lg:w-full`.
+ *
+ * ── E A SELECÇÃO NÃO SE DIZ SÓ COM COR ────────────────────────────────────
+ *
+ * A lista escolhida ganha fundo, ganha peso (600) e ganha `aria-pressed`. Os
+ * três, porque a cor sozinha não chega — é a regra da Parte 5 do sistema de
+ * design e é o que faz isto ler-se numa folha a preto e branco.
+ */
+function BarraDeListas({
+  eventos,
+  contas,
+  activa,
+  aoEscolher,
+}: {
+  eventos: readonly Lista[];
+  contas: ReadonlyMap<ListaId, number>;
+  activa: ListaId;
+  aoEscolher: (id: ListaId) => void;
+}) {
+  const botao = (lista: Lista) => {
+    const escolhida = lista.id === activa;
+    const porFazer = contas.get(lista.id) ?? 0;
+    return (
+      <li key={lista.id}>
+        <button
+          type="button"
+          aria-pressed={escolhida}
+          onClick={() => aoEscolher(lista.id)}
+          className={`alvo-toque flex w-auto items-center justify-between gap-2 rounded-[var(--bo-raio-controlo)] px-3 py-2 text-start text-callout lg:w-full ${ESTADO} ${PRESSAO} ${
+            escolhida
+              ? "bg-[var(--bo-accent-lavagem)] font-semibold text-[var(--bo-text)]"
+              : "text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-3)] hover:text-[var(--bo-text)]"
+          }`}
+        >
+          <span className="truncate">{lista.rotulo}</span>
+          {/* A contagem é uma dívida, não um inventário: só as por fazer. E a
+              zero fica calada — «Atrasadas 0» é o contador de zero que a
+              Parte 8 proíbe, só que ao lado de um nome em vez de por cima de
+              uma régua. */}
+          {porFazer > 0 && (
+            <span className="shrink-0 text-caption2 tabular-nums text-[var(--bo-text-faint)]">
+              {porFazer}
+            </span>
+          )}
+        </button>
+      </li>
+    );
+  };
+
+  // A largura da coluna é do contentor, lá em baixo — é ele que conhece a fila
+  // onde esta barra vive.
+  return (
+    <nav aria-label="Listas de tarefas">
+      <p className="bo-eyebrow mb-2" id="tarefas-listas">
+        Listas
+      </p>
+      <ul
+        role="list"
+        aria-labelledby="tarefas-listas"
+        className="flex flex-wrap gap-2 lg:flex-col lg:flex-nowrap lg:gap-1"
+      >
+        {LISTAS_INTELIGENTES.map(botao)}
+      </ul>
+      {/* Sem tarefas de evento nenhum não há cabeçalho «Eventos» — um título
+          seguido de nada é o defeito que a Parte 8 nomeia duas vezes. */}
+      {eventos.length > 0 && (
+        <>
+          <p className="bo-eyebrow mt-5 mb-2" id="tarefas-eventos">
+            Eventos
+          </p>
+          <ul
+            role="list"
+            aria-labelledby="tarefas-eventos"
+            className="flex flex-wrap gap-2 lg:flex-col lg:flex-nowrap lg:gap-1"
+          >
+            {eventos.map(botao)}
+          </ul>
+        </>
+      )}
+    </nav>
+  );
+}
+
 const TaskRow = memo(function TaskRow({
   t,
   overdue,
+  arrastavel,
   onToggle,
   onEdit,
   onRemove,
 }: {
   t: Task;
   overdue: boolean;
+  /**
+   * ── A COSTURA DO ARRASTAR, E ONDE ELA FICA ──────────────────────────────
+   *
+   * A fase 06 entrega «ordenação manual ACTIVA o arrastar»; o arrasto em si é
+   * a fase 09. Enquanto ela não chega, o que a linha ganha é a MARCA de que
+   * está arrastável — `data-arrastavel` — e mais nada: nem cursor de mão, nem
+   * pega desenhada. Um cursor `grab` por cima de uma linha que não se agarra é
+   * uma promessa falsa, e três botões no hover de uma linha são proibição da
+   * Parte 8.
+   *
+   * O que a fase 09 tem para fazer aqui: pendurar os manipuladores de ponteiro
+   * nesta linha quando a marca estiver posta, e chamar o
+   * `reordenarManualmente` de `@/lib/tarefas/listas` ao largar — o motor da
+   * ordem manual já está escrito e testado.
+   */
+  arrastavel: boolean;
   onToggle: (t: Task) => void;
   onEdit: (t: Task) => void;
   onRemove: (id: string) => void;
@@ -111,16 +353,34 @@ const TaskRow = memo(function TaskRow({
        No computador nada muda: tudo cabe numa fila e o título volta a cortar
        (`sm:truncate`), que é o que mantém a densidade da lista. */
     <div
+      // Ver a nota no `arrastavel`: a marca é o que a fase 09 vem procurar.
+      // `undefined` e não `false` — um atributo que diz «false» no HTML é um
+      // atributo presente, e quem o procurar com `[data-arrastavel]` apanhava
+      // a lista inteira.
+      data-arrastavel={arrastavel || undefined}
       className={`group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-[var(--bo-tinta-3)] ${ESTADO}`}
     >
-      <button
-        onClick={() => onToggle(t)}
-        // Sem nome acessível, isto era «botão» — dezasseis vezes, e é o que
-        // risca a tarefa. `aria-pressed` diz em que estado está sem depender da
-        // cor do quadrado.
-        aria-label={t.done ? "Marcar como por concluir" : "Marcar como concluída"}
-        aria-pressed={t.done}
-        /* ── 20×20 ENTRE DOIS ALVOS DE 44 ────────────────────────────────
+      {/* ── É UMA `<input type="checkbox">` A SÉRIO ───────────────────────
+          «Checkbox que não é `<input type="checkbox">`» está nas proibições
+          deste ecrã, e com razão: o que estava aqui era um `<button>` com
+          `aria-pressed`, e um botão premido não é uma caixa marcada. Um leitor
+          de ecrã lê-lhe «botão, premido» em vez de «caixa de verificação,
+          marcada»; o `Espaço` faz o que um botão faz e não o que uma caixa
+          faz; e uma lista de dezasseis não se percorre com as setas de um
+          grupo de caixas porque não é um.
+
+          A caixa real está lá, transparente e por cima do quadrado desenhado
+          (`appearance-none` mais `absolute inset-0`): é ela que recebe o
+          toque, o foco e o teclado, e o quadrado é só o que se vê. */}
+      <label
+        className={`alvo-toque relative -m-2 flex shrink-0 cursor-pointer items-center justify-center p-2 ${ESTADO} ${PRESSAO}`}
+      >
+        <input
+          type="checkbox"
+          checked={t.done}
+          onChange={() => onToggle(t)}
+          aria-label={t.title}
+          /* ── 20×20 ENTRE DOIS ALVOS DE 44 ────────────────────────────────
            MEDIDO: 20×20 px, dezasseis vezes na lista, encostado ao «Editar»
            e ao «Eliminar» que já são 44. Era o vizinho que ficou de fora.
 
@@ -129,10 +389,19 @@ const TaskRow = memo(function TaskRow({
            dá-lhe 36 px para o rato sem ocupar mais espaço na linha, e o
            `alvo-toque` leva-o aos 44 no dedo (só sob `(pointer: coarse)`,
            ver globals.css — o portátil mantém a densidade que tem). */
-        className={`alvo-toque -m-2 flex shrink-0 items-center justify-center p-2 ${ESTADO} ${PRESSAO}`}
-      >
+          className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none rounded-md"
+        />
         <span
-          className={`w-5 h-5 rounded-md border flex items-center justify-center ${ESTADO} ${t.done ? "bg-sage-600 border-sage-600" : "border-foreground/25 group-hover:border-sage-600/60"}`}
+          aria-hidden="true"
+          /* A mola só na ida. Uma caixa que salta ao DESmarcar celebrava um
+             desfazer, e o `key` é o que a faz correr outra vez a cada marcação
+             — sem ele a animação corre uma vez e nunca mais. */
+          key={t.done ? "marcada" : "por-marcar"}
+          className={`flex h-5 w-5 items-center justify-center rounded-md border ${ESTADO} peer-focus-visible:ring-2 peer-focus-visible:ring-sage-600/45 peer-focus-visible:ring-offset-2 ${
+            t.done
+              ? `border-sage-600 bg-sage-600 ${MOLA_DE_MARCAR}`
+              : "border-foreground/25 group-hover:border-sage-600/60"
+          }`}
         >
           {t.done && (
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -146,7 +415,7 @@ const TaskRow = memo(function TaskRow({
             </svg>
           )}
         </span>
-      </button>
+      </label>
       <div className="min-w-0 flex-1">
         <p
           className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"}`}
@@ -155,7 +424,19 @@ const TaskRow = memo(function TaskRow({
         </p>
         <div className="text-[10px] mt-0.5 flex items-center gap-2 flex-wrap">
           {t.dueDate && (
-            <span className={overdue ? "text-[var(--bo-perigo)]" : "text-foreground/30"}>
+            <span
+              className={
+                overdue
+                  ? "inline-flex items-center gap-1 text-[var(--bo-perigo)]"
+                  : "text-foreground/30"
+              }
+            >
+              {/* ── ATRASADA NÃO SE DIZ SÓ COM COR ─────────────────────────
+                  «Data atrasada com ícone E texto: nunca só a cor vermelha.»
+                  [APPLE] A palavra já cá estava; faltava o sinal, que é o que
+                  faz a linha destacar-se numa folha impressa a preto e branco
+                  e para quem não distingue o vermelho do cinzento. */}
+              {overdue && <span aria-hidden="true">⚠</span>}
               {overdue ? "Atrasada · " : ""}
               {new Date(t.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
                 day: "numeric",
@@ -291,10 +572,19 @@ const TaskRow = memo(function TaskRow({
   );
 });
 
-export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: string }) {
+export default function Tarefas({
+  defaultAssignee = "",
+  pedidoDeNova = 0,
+}: {
+  defaultAssignee?: string;
+  /**
+   * Sobe de um sempre que a barra de cima pede uma tarefa nova — o botão
+   * «Nova tarefa» ou o ⌘N. Ver a nota no `AdminClient`: é um contador e não um
+   * booleano porque dois toques seguidos têm de pedir duas vezes.
+   */
+  pedidoDeNova?: number;
+}) {
   const { toast } = useToast();
-  /** «Detalhes (opcional)», na caixa de escrever uma tarefa. Ver `ui/gaveta.ts`. */
-  const gaveta = useGaveta();
   const {
     data: tasks = [],
     setData: setTasks,
@@ -305,6 +595,94 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   } = useCachedList<Task[]>("tarefas", "/api/tarefas");
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
+
+  /**
+   * ── A LINHA DE ESCREVER, E QUEM A ABRE ────────────────────────────────
+   *
+   * Fechada por omissão: o conteúdo desta página são as tarefas, e um campo
+   * aberto a ocupar o topo antes de haver alguma é o cartão permanente que
+   * saiu daqui com outro nome.
+   *
+   * Abre por três caminhos, e todos acabam no mesmo sítio: o toque na última
+   * linha, o botão «Nova tarefa» da barra, e o ⌘N. Os dois últimos chegam pelo
+   * `pedidoDeNova`, e é o efeito abaixo que lhes dá o foco — abrir um campo
+   * sem lhe pôr o cursor obriga a um segundo toque para o gesto que já foi
+   * pedido.
+   */
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * MARCAR UMA TAREFA NÃO PODE FAZER A LISTA SALTAR DEBAIXO DO CURSOR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * «Ao marcar, a checkbox anima com mola, o texto ganha risco e desce a
+   * opacidade, a linha **fica no lugar durante ~1,5 s** e só depois desliza
+   * para Concluídas. Marcar e desmarcar rapidamente nunca deve fazer a lista
+   * saltar. A espera de 1,5 s não é decoração — é o que permite desmarcar sem
+   * a lista saltar debaixo do cursor. É o comportamento dos Lembretes e é a
+   * diferença entre uma lista que se usa e uma que irrita.»
+   *
+   * Ela tem razão e a razão é mecânica, não estética: sem a espera, marcar a
+   * terceira de cinco tira-a da lista, as duas de baixo sobem 44 px, e o dedo
+   * que ia marcar a quarta acerta na quinta. Quem marca três seguidas erra
+   * duas.
+   *
+   * O que fica AQUI é só o «onde se desenha». O risco, a opacidade e a mola da
+   * caixa acontecem no mesmo instante do toque — o que espera é a mudança de
+   * sítio, e mais nada.
+   *
+   * Desmarcar dentro da janela CANCELA o temporizador: a tarefa nunca chega a
+   * ir a lado nenhum, e por isso não há salto nenhum a desfazer.
+   */
+  const [aDescansar, setADescansar] = useState<ReadonlySet<string>>(new Set());
+  const temporizadores = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const mapa = temporizadores.current;
+    return () => {
+      for (const id of mapa.values()) clearTimeout(id);
+      mapa.clear();
+    };
+  }, []);
+
+  const descansar = useCallback((id: string, marcada: boolean) => {
+    const mapa = temporizadores.current;
+    const jaMarcado = mapa.get(id);
+    if (jaMarcado) {
+      clearTimeout(jaMarcado);
+      mapa.delete(id);
+    }
+    if (!marcada) {
+      // Desmarcou dentro da janela: sai do descanso e volta a ser o que era.
+      setADescansar((antes) => {
+        if (!antes.has(id)) return antes;
+        const depois = new Set(antes);
+        depois.delete(id);
+        return depois;
+      });
+      return;
+    }
+    setADescansar((antes) => new Set(antes).add(id));
+    mapa.set(
+      id,
+      setTimeout(() => {
+        mapa.delete(id);
+        setADescansar((antes) => {
+          const depois = new Set(antes);
+          depois.delete(id);
+          return depois;
+        });
+      }, ESPERA_ANTES_DE_DESCER_MS),
+    );
+  }, []);
+
+  const [aEscrever, setAEscrever] = useState(false);
+  const campoDoTitulo = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!pedidoDeNova) return;
+    setAEscrever(true);
+    // Num fotograma, para o campo já existir quando se lhe pede o foco.
+    const id = requestAnimationFrame(() => campoDoTitulo.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [pedidoDeNova]);
 
   /**
    * ── A PERGUNTA DE ELIMINAR ────────────────────────────────────────────
@@ -378,6 +756,25 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
 
   // filter
   const [who, setWho] = useState<string>("Todos");
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A LISTA ESCOLHIDA, O AGRUPAMENTO E A ORDEM — as fases 05 e 06
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Três estados e não um: a lista diz O QUE se vê, o agrupamento diz como se
+   * reparte, e a ordem diz por que fila. São perguntas independentes — «as
+   * atrasadas, por responsável, por prioridade» é uma pergunta legítima — e
+   * cada uma tem o seu selector.
+   *
+   * A `ordemManual` é a lista de ids que a fase 09 vai reordenar ao arrastar.
+   * Vive aqui e não no servidor porque o `Task` não tem campo de posição; ver
+   * o relatório dessa fase, que é onde a persistência tem de ser decidida.
+   */
+  const [lista, setLista] = useState<ListaId>(LISTA_POR_OMISSAO);
+  const [agrupamento, setAgrupamento] = useState<Agrupamento>(AGRUPAMENTO_POR_OMISSAO);
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>(ORDENACAO_POR_OMISSAO);
+  const [ordemManual, setOrdemManual] = useState<readonly string[]>([]);
 
   // inline edit
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -473,7 +870,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     if (!ok && anterior) setTasks((prev) => prev.map((t) => (t.id === id ? anterior : t)));
   }
 
-  async function add() {
+  async function add(fecharDepois = false) {
     const t = title.trim();
     if (!t || adding) return;
     setAdding(true);
@@ -507,7 +904,20 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     setPriority("normal");
     setArea("");
     setAssignee(defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "");
+    /* `Enter` deixa a linha aberta e vazia — quem escreve tarefas escreve-as em
+       rajada. `⇧Enter` fecha, para quem só tinha uma. O foco volta ao campo
+       nos dois casos em que ele continua a existir: sem isto, a gravação
+       tira-o (o campo esteve `disabled`) e a tarefa seguinte precisava de um
+       toque que ninguém pediu. */
+    if (fecharDepois) setAEscrever(false);
+    else requestAnimationFrame(() => campoDoTitulo.current?.focus());
   }
+
+  /* O `toggle` chama-se a si próprio (o «Anular» é um marcar ao contrário), e
+     um `useCallback` não se vê por dentro. O ref é a ponte, e é actualizado a
+     seguir à definição. */
+  const alternarRef = useRef<(t: Task) => void>(() => {});
+  const alternar = useCallback((t: Task) => alternarRef.current(t), []);
 
   const toggle = useCallback(
     async (task: Task) => {
@@ -520,7 +930,11 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       // volta com erro, e a primeira desmarca-se sozinha no ecrã apesar de estar
       // concluída no servidor — o desfecho que o `touch` do `tasks-store` existe
       // para impedir, só que aqui sem servidor nenhum pelo meio.
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
+      const passaAMarcada = !task.done;
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: passaAMarcada } : t)));
+      /* A linha fica no lugar durante segundo e meio — ver `aDescansar`. O
+         risco e a mola já aconteceram; o que espera é a mudança de sítio. */
+      descansar(task.id, passaAMarcada);
       const { ok } = await gravar(
         task.done
           ? `reabrir a tarefa «${task.title}»`
@@ -529,15 +943,36 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ done: !task.done }),
+          body: JSON.stringify({ done: passaAMarcada }),
         },
       );
       if (!ok) {
         setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: task.done } : t)));
+        descansar(task.id, task.done);
+        return;
+      }
+      /* ── E DESFAZER, SEMPRE ────────────────────────────────────────────
+         «Toast "Tarefa concluída — Anular".» [APPLE: desfazer sempre]
+
+         Só ao CONCLUIR. Reabrir uma tarefa não perde nada — ela volta à lista
+         onde estava —, e um aviso a oferecer desfazer uma coisa que não se
+         perdeu é ruído que ensina a ignorar os avisos que importam. */
+      if (passaAMarcada) {
+        toast(`Tarefa concluída — «${task.title}»`, "success", {
+          rotulo: "Anular",
+          /* Anular é marcar ao contrário, e passa pelo MESMO caminho: grava,
+             repõe se o servidor recusar, e cancela o descanso para a linha
+             nunca chegar a descer. Uma segunda implementação de «desmarcar»
+             era o sítio onde as duas divergiam. */
+          aoTocar: () => void alternar({ ...task, done: true }),
+        });
       }
     },
-    [setTasks, gravar],
+    [setTasks, gravar, descansar, toast, alternar],
   );
+  useEffect(() => {
+    alternarRef.current = toggle;
+  }, [toggle]);
 
   const remove = useCallback(
     async (id: string) => {
@@ -621,26 +1056,101 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     return { people: ["Todos", ...seen], openByPerson: counts };
   }, [tasks, equipa]);
 
-  // Filtrar e ordenar acontecia em CADA render — inclusive a cada tecla escrita
-  // no campo "Nova tarefa", que é estado deste componente. Só depende da lista
-  // e do filtro de pessoa.
-  const { open, done } = useMemo(() => {
-    const visible = who === "Todos" ? tasks : tasks.filter((t) => t.assignee === who);
-    const openTasks = visible.filter((t) => !t.done);
-    const doneTasks = visible.filter((t) => t.done);
-    openTasks.sort((a, b) => {
-      if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate)
-        return a.dueDate.localeCompare(b.dueDate);
-      if (a.dueDate && !b.dueDate) return -1;
-      if (!a.dueDate && b.dueDate) return 1;
-      return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-    });
-    return { open: openTasks, done: doneTasks };
-  }, [tasks, who]);
-
   const todayStr = todayKey();
 
-  function row(t: Task) {
+  /**
+   * ── AS LISTAS POR EVENTO E AS CONTAGENS NASCEM DA LISTA INTEIRA ──────────
+   *
+   * E não do que está à frente dela. Uma barra lateral cujos números mudassem
+   * com o filtro por pessoa deixava de responder à pergunta que se lhe faz —
+   * «há quanto atrasado?» — porque já estaria a responder «da Ana, há dois».
+   * O filtro por pessoa aperta o CONTEÚDO da lista escolhida; a barra continua
+   * a contar a casa toda.
+   */
+  const eventos = useMemo(() => listasDeEvento(tasks), [tasks]);
+  const contas = useMemo(
+    () => contarPorLista(tasks, todayStr, eventos),
+    [tasks, todayStr, eventos],
+  );
+
+  /**
+   * Uma lista de evento morre quando a última tarefa dela sai — e ela podia
+   * estar dentro dessa lista no momento em que risca a última. Sem esta queda
+   * para «Todas», ficava num destino que já não existe a olhar para um vazio
+   * que não é o dela.
+   */
+  const listaActiva: ListaId = contas.has(lista) ? lista : LISTA_POR_OMISSAO;
+  const rotuloDaLista =
+    [...LISTAS_INTELIGENTES, ...eventos].find((l) => l.id === listaActiva)?.rotulo ?? "";
+
+  // Filtrar e ordenar acontecia em CADA render — inclusive a cada tecla escrita
+  // no campo "Nova tarefa", que é estado deste componente. Só depende da lista
+  // escolhida, do filtro de pessoa e da ordem.
+  const { open, done } = useMemo(() => {
+    const daLista = tasks.filter((t) => pertenceALista(t, listaActiva, todayStr));
+    const visible = who === "Todos" ? daLista : daLista.filter((t) => t.assignee === who);
+    /* ── A TAREFA ACABADA DE MARCAR FICA NO LUGAR ─────────────────────────
+       Ver `aDescansar`: durante segundo e meio depois de marcada, a tarefa
+       continua a contar como «por fazer» para efeitos de ONDE se desenha.
+       Marcada continua marcada — o risco e a mola são imediatos —, o que
+       espera é a mudança de sítio. */
+    const openTasks = ordenarTarefas(
+      visible.filter((t) => !t.done || aDescansar.has(t.id)),
+      ordenacao,
+      ordemManual,
+    );
+    const doneTasks = visible.filter((t) => t.done && !aDescansar.has(t.id));
+    return { open: openTasks, done: doneTasks };
+  }, [tasks, who, aDescansar, listaActiva, todayStr, ordenacao, ordemManual]);
+
+  /* Repartir é a outra pergunta, e é a última: agrupa-se o que já está
+     ordenado, para a ordem escolhida valer DENTRO de cada cabeçalho. */
+  const grupos = useMemo(
+    () => agruparTarefas(open, agrupamento, todayStr),
+    [open, agrupamento, todayStr],
+  );
+
+  /* Quantas já passaram do prazo. É a metade da verdade que «8 por fazer»
+     esconde, e é a que faz alguém mudar de plano. */
+  const atrasadas = useMemo(
+    () => open.filter((t) => !!t.dueDate && t.dueDate < todayStr).length,
+    [open, todayStr],
+  );
+
+  /**
+   * ── «MANUAL» E «AGRUPAR» NÃO CABEM AO MESMO TEMPO, E DIZEM-NO ────────────
+   *
+   * Arrastar uma tarefa dentro de uma lista repartida por dias não é reordenar:
+   * é mudar-lhe a data ao largá-la noutro cabeçalho — outra funcionalidade,
+   * outra fase. Escolher «Manual» desfaz o agrupamento e escolher um
+   * agrupamento desfaz o «Manual».
+   *
+   * O que NÃO se faz é desactivar o selector do outro. Um controlo apagado que
+   * não explica porquê é o defeito que o ponto 6 da auditoria deste ecrã
+   * nomeia; aqui a mudança acontece à frente dela, nos dois selectores, e
+   * desfaz-se com um toque.
+   */
+  const escolherOrdenacao = (v: Ordenacao) => {
+    setOrdenacao(v);
+    if (v !== "manual") return;
+    // A ordem manual arranca IGUAL ao que está no ecrã — ver `ordemVisivel`:
+    // pedir para arrumar à mão não pode fazer a lista saltar antes de se lhe
+    // tocar.
+    setOrdemManual(ordemVisivel(grupos));
+    setAgrupamento("nenhum");
+  };
+  const escolherAgrupamento = (v: Agrupamento) => {
+    setAgrupamento(v);
+    if (v !== "nenhum" && ordenacao === "manual") setOrdenacao(ORDENACAO_POR_OMISSAO);
+  };
+
+  /**
+   * Uma linha. O `arrastavel` chega por argumento e não pelo estado porque a
+   * secção «Concluídas» usa esta mesma função: reordenar à mão o que já está
+   * feito não quer dizer nada, e um `open.map(row)` a passar o índice como
+   * segundo argumento seria a maneira silenciosa de dar a marca à linha errada.
+   */
+  function row(t: Task, arrastavel = false) {
     if (editingTaskId === t.id) {
       return (
         <div
@@ -744,6 +1254,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         key={t.id}
         t={t}
         overdue={!!t.dueDate && !t.done && t.dueDate < todayStr}
+        arrastavel={arrastavel}
         onToggle={toggle}
         onEdit={startEditTask}
         onRemove={pedirParaEliminar}
@@ -766,256 +1277,423 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-6xl">
       {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
-          Três blocos, pela ordem de leitura: escrever uma tarefa (0), escolher
-          de quem são as tarefas (1) e as listas (2). A escada é a da casa
-          (`.bo-cena` no `globals.css`): 600 ms, degraus de 20 ms, tecto ao
-          sexto, desligada em `prefers-reduced-motion`.
+          TRÊS blocos, pela ordem de leitura: as listas (0), escolher de quem
+          são as tarefas (1) e as tarefas (2). Eram dois; o primeiro degrau é
+          novo e é a barra das listas da fase 05 — entra à frente das outras
+          porque é ela que decide o que as outras duas mostram. A escada é a da
+          casa (`.bo-cena` no `globals.css`): 600 ms, degraus de 20 ms, tecto ao
+          sexto, desligada em `prefers-reduced-motion`. Ver
+          `vistas-que-se-compoem.test.ts`, que a mede.
 
           O `SkeletonList` da espera não leva degrau — um esqueleto é a espera,
           não uma apresentação. */}
-      {/* Add task — a single, obvious primary action; the optional detail fields
-          (responsável, área, prioridade, prazo) collapse behind a disclosure so
-          the daily "add a to-do" flow stays a title + one button. */}
-      <Card style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena mb-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <Field
-            containerClassName="flex-1"
-            label="Nova tarefa"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="O que há para fazer?"
+      {/* ── DUAS COLUNAS A PARTIR DE `lg`, UMA ABAIXO DISSO ─────────────────
+          «Metade do ecrã está vazia» é o ponto 22 da auditoria, e a correcção
+          dele são três colunas: listas · tarefas · detalhe. Aqui ficam as duas
+          primeiras; a terceira é a fase 08, e a largura já lhe fica reservada
+          (o `max-w-4xl` de antes não chegava para três).
+
+          `lg:` e não `md:`: é o corte da casa, o mesmo em que a barra de
+          destinos deixa de ser gaveta (ver `Cortes.contrato.test.ts`). */}
+      <div className="lg:flex lg:items-start lg:gap-6">
+        <div
+          style={{ "--cena": 0 } as React.CSSProperties}
+          className="bo-cena mb-5 lg:mb-0 lg:w-56 lg:shrink-0"
+        >
+          <BarraDeListas
+            eventos={eventos}
+            contas={contas}
+            activa={listaActiva}
+            aoEscolher={setLista}
           />
-          <Button
-            onClick={add}
-            loading={adding}
-            disabled={!title.trim()}
-            className="w-full shrink-0 sm:w-auto"
-          >
-            Adicionar
-          </Button>
         </div>
-        <details className="group mt-3" onToggle={gaveta.aoAlternar}>
-          {/* ── 122×15 NUM TELEMÓVEL ────────────────────────────────────────
-              MEDIDO a 375 px: este interruptor tinha 15 px de altura — um
-              terço do mínimo de 44 — e é a ÚNICA porta para o responsável, o
-              prazo e a área de uma tarefa nova. Num telemóvel, falhar-lhe o
-              toque é ficar sem esses campos.
 
-              Escapou a todos os varrimentos porque um `<summary>` não é
-              `<button>`, não tem `role` e não tem `tabindex` escrito: a rede da
-              ergonomia táctil não o via (agora vê — ver `ergonomia-tactil.mjs`).
-
-              `alvo-toque` cresce só sob `(pointer: coarse)`, portanto no
-              portátil a linha fica exactamente como estava; `!justify-start`
-              porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
-              a classe centra por omissão. */}
-          <summary
-            onClick={gaveta.aoTocarNoResumo}
-            className={`alvo-toque !justify-start bo-eyebrow inline-flex list-none items-center gap-1.5 text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`${SETA_DA_GAVETA} group-open:rotate-90`}
-              aria-hidden="true"
-            >
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-            Detalhes (opcional)
-          </summary>
-          {/* ── O CORPO É UM BLOCO, E NÃO QUATRO CAMPOS ────────────────────
-              Quatro campos numa grelha são uma LINHA, não quatro blocos: a
-              escada da casa é por bloco, e uma fila de campos a entrar um a um
-              lê-se como um tremor. Entra tudo junto, nos 240 ms e nos quatro
-              píxeis da `.bo-entrada` — a distância de um rótulo, porque isto
-              sai de debaixo do resumo que está mesmo por cima.
-
-              E o `gaveta.corpo` é uma CLASSE, não uma `key`: estes campos
-              guardam o que ela já escreveu, e um `key` a mudar remontava-os e
-              deitava fora o responsável e o prazo que ela acabou de escolher. */}
-          <div
-            className={`mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 ${gaveta.corpo}`}
-          >
-            {equipa.length > 0 ? (
-              <Field
-                as="select"
-                label="Responsável"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-              >
-                <option value="">Sem responsável</option>
-                {opcoesDeResponsavel(assignee).map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </Field>
-            ) : (
-              /* Sem contas nomeadas configuradas não há equipa a listar, e o
-                 campo continua a ser o de sempre. Ver a nota no `equipa`: uma
-                 lista vazia é «não sei quem são», não «não há ninguém». */
-              <Field
-                label="Responsável"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-                // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
-                // exemplo acaba por sair daqui para sítios onde não devia estar.
-                placeholder="Ex.: quem fica responsável"
-              />
-            )}
-            <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
-              <option value="">Sem área</option>
-              {AREAS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </Field>
-            <Field
-              as="select"
-              label="Prioridade"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            >
-              <option value="alta">Alta</option>
-              <option value="normal">Normal</option>
-              <option value="baixa">Baixa</option>
-            </Field>
-            <Field
-              label="Prazo"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </div>
-        </details>
-      </Card>
-
-      {/* Filter by person */}
-      {/* Segundo degrau, e um só para a fila toda: são as pessoas da equipa,
+        <div className="min-w-0 flex-1">
+          {/* Filter by person */}
+          {/* Segundo degrau, e um só para a fila toda: são as pessoas da equipa,
           não uma lista de dados — quinze botões a chegar um a um seria o
           tremor que o tecto do sexto degrau existe para evitar. */}
-      {people.length > 1 && (
-        <div
-          style={{ "--cena": 1 } as React.CSSProperties}
-          className="bo-cena flex flex-wrap gap-2 mb-5"
-        >
-          {defaultAssignee && people.includes(defaultAssignee) && (
-            <Button
-              size="sm"
-              variant={who === defaultAssignee ? "primary" : "subtle"}
-              onClick={() => setWho(who === defaultAssignee ? "Todos" : defaultAssignee)}
-              iconLeft={
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                </svg>
-              }
+          {people.length > 1 && (
+            <div
+              style={{ "--cena": 1 } as React.CSSProperties}
+              className="bo-cena flex flex-wrap gap-2 mb-5"
             >
-              Minhas tarefas
-            </Button>
-          )}
-          {people.map((p) => (
-            <Button
-              key={p}
-              size="sm"
-              variant={who === p ? "primary" : "ghost"}
-              aria-pressed={who === p}
-              onClick={() => setWho(p)}
-            >
-              {p}
-              {p !== "Todos" && (
-                <span className="ml-1 text-[11px] tabular-nums opacity-60">
-                  {openByPerson.get(p) ?? 0}
-                </span>
-              )}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {loading ? (
-        <SkeletonList rows={5} />
-      ) : (
-        /* Terceiro degrau no CONTENTOR das listas, e não em cada linha: uma
-           lista de cinquenta tarefas a entrar linha a linha lê-se como
-           lentidão. O degrau está aqui dentro, no ramo já carregado, para o
-           esqueleto de cima ficar de fora. */
-        <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
-          <Card padding="none" className="overflow-hidden">
-            <div className="px-5 sm:px-6 py-3.5 border-b border-[var(--bo-hairline)] flex items-center justify-between">
-              <p className="bo-eyebrow">A fazer ({open.length})</p>
-            </div>
-            <div className="divide-y divide-[var(--bo-hairline)]">
-              {open.length === 0 ? (
-                <EmptyState
-                  icon={
+              {defaultAssignee && people.includes(defaultAssignee) && (
+                <Button
+                  size="sm"
+                  variant={who === defaultAssignee ? "primary" : "subtle"}
+                  onClick={() => setWho(who === defaultAssignee ? "Todos" : defaultAssignee)}
+                  iconLeft={
                     <svg
-                      width="24"
-                      height="24"
+                      width="12"
+                      height="12"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="1.4"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
                       aria-hidden="true"
                     >
-                      <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
-                      <path
-                        d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
-                        strokeLinecap="round"
-                      />
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                     </svg>
                   }
-                  title="Tudo em dia"
-                  description="Não há tarefas pendentes. Adiciona uma acima para começar a organizar a equipa."
-                />
-              ) : (
-                open.map(row)
-              )}
-            </div>
-          </Card>
-
-          {done.length > 0 && (
-            <div className="mt-4">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowDone(!showDone)}
-                aria-expanded={showDone}
-                className="mb-2 tracking-[0.12em] uppercase"
-              >
-                {showDone ? "▾" : "▸"} Concluídas ({done.length})
-              </Button>
-              {showDone && (
-                <Card
-                  padding="none"
-                  className="overflow-hidden divide-y divide-[var(--bo-hairline)]"
                 >
-                  {done.map(row)}
-                </Card>
+                  Minhas tarefas
+                </Button>
+              )}
+              {people.map((p) => (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant={who === p ? "primary" : "ghost"}
+                  aria-pressed={who === p}
+                  onClick={() => setWho(p)}
+                >
+                  {p}
+                  {p !== "Todos" && (
+                    <span className="ml-1 text-[11px] tabular-nums opacity-60">
+                      {openByPerson.get(p) ?? 0}
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {loading ? (
+            <SkeletonList rows={5} />
+          ) : (
+            /* Terceiro degrau no CONTENTOR das listas, e não em cada linha: uma
+           lista de cinquenta tarefas a entrar linha a linha lê-se como
+           lentidão. O degrau está aqui dentro, no ramo já carregado, para o
+           esqueleto de cima ficar de fora. */
+            <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
+              {/* ── O CARTÃO DEIXOU DE CORTAR O QUE SAI DE DENTRO DELE ────────
+              «Isto não está bem, está a tapar, não dá para ver tudo no ecrã» —
+              com a lista da Prioridade aberta e cortada a meio, o «Alta» e o
+              «Normal» a desaparecerem na borda do cartão.
+
+              A causa é minha e é desta ronda: a caixa de escrever uma tarefa
+              passou a ser a ÚLTIMA linha da lista (fase 03), e o cartão tinha
+              `overflow-hidden`. Enquanto a criação vivia num cartão só seu lá
+              em cima, as listas dos seus campos abriam para o ar; aqui abrem
+              para dentro de uma caixa que as corta.
+
+              O `Escolha` já sabe virar a lista para cima quando não há espaço
+              — mas ele mede o ECRÃ, e quem estava a cortar era o cartão. Um
+              recorte de um antepassado não se vê de dentro.
+
+              Tira-se o recorte, e arredondam-se em vez disso a primeira e a
+              última linha: era só para isso que ele servia — para o fundo de
+              uma linha em `hover` não esquadrar os cantos do cartão. */}
+              <Card
+                padding="none"
+                className="[&>*:first-child]:rounded-t-2xl [&>*:last-child]:rounded-b-2xl"
+              >
+                {/* ── «A FAZER (0)» DEIXA DE SER UM CABEÇALHO COM UM ZERO ─────
+                «É um cabeçalho com um zero, seguido de um separador e de nada.
+                O traço a sublinhar um cabeçalho sem conteúdo por baixo.»
+
+                Duas correcções, e a segunda é a que importa:
+
+                 · com a lista VAZIA não há cabeçalho nenhum nem régua nenhuma
+                   — o estado vazio fica sozinho, que é o que ele é;
+                 · e a contagem passa a ser ESTADO da vista (`role="status"`),
+                   com as atrasadas ao lado, porque «8 por fazer» sem dizer
+                   quantas já passaram do prazo é a metade tranquilizadora da
+                   verdade.
+
+                O que ela pede e NÃO está aqui: esta contagem vive na barra de
+                cima, ao lado do nome da lista. A barra é do `AdminClient` e a
+                lista das tarefas vive aqui — passá-la para lá sem levantar o
+                estado das tarefas dava uma contagem que não mexia quando ela
+                risca uma. Entra com a fase 05, que é quando as listas passam a
+                existir e o estado tem de subir de qualquer maneira.
+
+                E a fase 05 chegou sem a levar: o nome da lista e a contagem
+                ficam AQUI, no cabeçalho do cartão. A barra de cima é do
+                `AdminClient` — que é ficheiro de outro trabalho nesta ronda — e
+                o que a impede continua a ser o mesmo: sem levantar o estado das
+                tarefas para lá, a contagem lá em cima não mexia quando ela
+                risca uma. Fica escrito no relatório desta fase. */}
+                {open.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--bo-hairline)] px-5 py-3.5 sm:px-6">
+                    <div className="min-w-0">
+                      {/* O nome da lista escolhida, que é o título desta vista
+                      enquanto a barra de cima não o souber. */}
+                      <h2 className="truncate text-headline text-[var(--bo-text)]">
+                        {rotuloDaLista}
+                      </h2>
+                      <p className="bo-eyebrow" role="status">
+                        {open.length} por fazer
+                        {atrasadas > 0 && (
+                          <span className="ml-1.5 text-[var(--bo-perigo)]">
+                            · {atrasadas} atrasada{atrasadas === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {/* ── AGRUPAR E ORDENAR (fase 06) ──────────────────────────
+                    Dois selectores e não dois menus: são escolhas com um valor
+                    actual que se lê sem abrir nada, e um `Agrupar ⌄` fechado
+                    escondia precisamente a informação que interessa — por que
+                    critério é que esta lista está repartida agora.
+
+                    Só existem com a lista cheia, como o cabeçalho: agrupar zero
+                    tarefas não é uma pergunta. */}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Escolha
+                        aria-label="Agrupar por"
+                        valor={agrupamento}
+                        aoMudar={(v) => escolherAgrupamento(v as Agrupamento)}
+                        className="px-2 py-1.5 text-caption text-[var(--bo-text-muted)]"
+                      >
+                        {AGRUPAMENTOS.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            Agrupar: {a.rotulo}
+                          </option>
+                        ))}
+                      </Escolha>
+                      <Escolha
+                        aria-label="Ordenar por"
+                        valor={ordenacao}
+                        aoMudar={(v) => escolherOrdenacao(v as Ordenacao)}
+                        className="px-2 py-1.5 text-caption text-[var(--bo-text-muted)]"
+                      >
+                        {ORDENACOES.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            Ordenar: {o.rotulo}
+                          </option>
+                        ))}
+                      </Escolha>
+                    </div>
+                  </div>
+                )}
+                <div className="divide-y divide-[var(--bo-hairline)]">
+                  {open.length === 0 ? (
+                    <EmptyState
+                      icon={
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          aria-hidden="true"
+                        >
+                          <path d="M9 11l3 3 8-8" strokeLinecap="round" strokeLinejoin="round" />
+                          <path
+                            d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      }
+                      /* ── O ESTADO VAZIO DEIXA DE MANDAR OLHAR PARA OUTRO SÍTIO
+                     «"Adiciona uma acima para começar a organizar a equipa."
+                     O estado vazio diz o passo seguinte e traz um botão;
+                     apontar para outro elemento do ecrã é sinal de que a ação
+                     não está onde devia.» [APPLE]
+
+                     Agora a acção está aqui dentro: o botão abre a mesma linha
+                     de escrever que vive no fundo da lista, e não há nada para
+                     ir procurar.
+
+                     O que NÃO está aqui, e o documento dela pede: a dica da
+                     linguagem natural («experimenta escrever "Confirmar
+                     florista amanhã às 10h"»). Ela ensina uma capacidade que é
+                     a fase 07 e ainda não existe — escrevê-la agora era
+                     prometer uma coisa que o campo não faz. Entra com ela. */
+                      title="Nada por fazer nesta lista"
+                      description="Escreve a primeira e ela fica aqui, com quem a faz e para quando."
+                      action={{ label: "Nova tarefa", onClick: () => setAEscrever(true) }}
+                    />
+                  ) : (
+                    /* ── OS GRUPOS, COM O CABEÇALHO PEGADO AO TOPO (fase 06) ────
+                   «Um seletor Agrupar por: Data · Evento · Responsável ·
+                   Nenhum, com cabeçalhos sticky. Por omissão, Data.»
+
+                   O `sticky` é o que faz a lista longa continuar a dizer ONDE
+                   se está: a rolar cinquenta linhas, o «Atrasadas» fica preso
+                   ao cimo até o «Hoje» o empurrar. Precisa de fundo OPACO —
+                   `--bo-surface`, a mesma face do cartão — porque as linhas
+                   passam por baixo dele; e é por isso que aqui não entra vidro
+                   nenhum: «vidro só no que flutua; listas, tabelas e
+                   formulários ficam opacos» (`docs/LIQUID-GLASS.md`, Parte 5).
+
+                   Um cabeçalho por grupo e nenhum quando o agrupamento é
+                   «Nenhum» — o `titulo` vem a `null` e a lista fica corrida,
+                   sem uma régua a sublinhar coisa nenhuma. */
+                    grupos.map((g) => (
+                      <section
+                        key={g.id}
+                        className="divide-y divide-[var(--bo-hairline)]"
+                        aria-labelledby={g.titulo ? `grupo-${g.id}` : undefined}
+                      >
+                        {g.titulo && (
+                          <h2
+                            id={`grupo-${g.id}`}
+                            className="sticky top-[var(--bo-cabecalho,0px)] z-10 bg-[var(--bo-surface)] px-5 py-2 text-footnote font-semibold text-[var(--bo-text-muted)] sm:px-6"
+                          >
+                            {g.titulo}
+                            {/* A contagem do grupo em `tabular-nums`, como toda a
+                            coluna de números da casa. Vem a seguir ao nome e
+                            não por baixo: é um cabeçalho de lista, não um KPI. */}
+                            <span className="ml-2 tabular-nums text-[var(--bo-text-faint)]">
+                              {g.tarefas.length}
+                            </span>
+                          </h2>
+                        )}
+                        {g.tarefas.map((t) => row(t, ordenacao === "manual"))}
+                      </section>
+                    ))
+                  )}
+                  {/* ── A ÚLTIMA LINHA DA LISTA É QUE CRIA ────────────────────
+                  «O formulário de criação é um cartão permanente no topo.
+                  Ocupa ~180 px, sempre, para uma ação ocasional. E empurra
+                  para baixo aquilo que é o conteúdo da página — as tarefas.»
+
+                  Saiu. A criação passa a ser a última linha da lista, que se
+                  transforma em campo ao tocar — é como funciona nos Lembretes,
+                  e é o sítio onde a mão já está depois de ler o que falta
+                  fazer.
+
+                  E o botão «Adicionar» saiu com ele. Era um primário
+                  DESACTIVADO como estado inicial de um ecrã vazio, que é a
+                  primeira coisa que se vê ao entrar aqui e se lê como avaria.
+                  `Enter` cria, que é o gesto que toda a gente tenta primeiro;
+                  o botão só existia para quem não o tentasse. */}
+                  <LinhaDeEscrever
+                    aberta={aEscrever}
+                    aoAbrir={() => setAEscrever(true)}
+                    aoFechar={() => setAEscrever(false)}
+                    campo={campoDoTitulo}
+                    titulo={title}
+                    aoEscrever={setTitle}
+                    aoCriar={add}
+                    aGravar={adding}
+                  >
+                    {/* ── OS DETALHES DEIXARAM DE ESTAR ATRÁS DE UMA PORTA ───────────
+                «Retira isto do opcional. Quero que apareça logo.»
+
+                Eram quatro campos — responsável, área, prioridade e prazo — dentro
+                de um `<details>` fechado, com a palavra «opcional» a dizer que não
+                valiam a pena. Valem: o responsável é a coluna por que a grelha do
+                dia se reparte, e o prazo é o que põe a tarefa na lista certa. Uma
+                tarefa escrita sem eles é uma tarefa que alguém tem de voltar a
+                abrir.
+
+                O que sai é a PORTA, não os campos: continuam a poder ficar em
+                branco. O que muda é que se vêem sem ninguém ter de os procurar.
+
+                O rótulo perde o «(opcional)» pela mesma razão — a palavra estava a
+                responder à pergunta «tenho de preencher isto?», e a resposta já
+                está no «Sem responsável» e no «Sem área» de cada campo. */}
+                    <div className="mt-3">
+                      <p className="bo-eyebrow text-[var(--bo-text-muted)]">Detalhes</p>
+                      {/* ── O CORPO É UM BLOCO, E NÃO QUATRO CAMPOS ────────────────────
+                  Quatro campos numa grelha são uma LINHA, não quatro blocos: a
+                  escada da casa é por bloco, e uma fila de campos a entrar um a um
+                  lê-se como um tremor. Entra tudo junto, nos 240 ms e nos quatro
+                  píxeis da `.bo-entrada` — a distância de um rótulo, porque isto
+                  sai de debaixo do resumo que está mesmo por cima.
+
+                  Continuam a ser UM bloco e não quatro: a escada da casa é por
+                  bloco, e uma fila de campos a entrar um a um lê-se como um
+                  tremor. */}
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {equipa.length > 0 ? (
+                          <Field
+                            as="select"
+                            label="Responsável"
+                            value={assignee}
+                            onChange={(e) => setAssignee(e.target.value)}
+                          >
+                            <option value="">Sem responsável</option>
+                            {opcoesDeResponsavel(assignee).map((n) => (
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
+                            ))}
+                          </Field>
+                        ) : (
+                          /* Sem contas nomeadas configuradas não há equipa a listar, e o
+                     campo continua a ser o de sempre. Ver a nota no `equipa`: uma
+                     lista vazia é «não sei quem são», não «não há ninguém». */
+                          <Field
+                            label="Responsável"
+                            value={assignee}
+                            onChange={(e) => setAssignee(e.target.value)}
+                            // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
+                            // exemplo acaba por sair daqui para sítios onde não devia estar.
+                            placeholder="Ex.: quem fica responsável"
+                          />
+                        )}
+                        <Field
+                          as="select"
+                          label="Área"
+                          value={area}
+                          onChange={(e) => setArea(e.target.value)}
+                        >
+                          <option value="">Sem área</option>
+                          {AREAS.map((a) => (
+                            <option key={a} value={a}>
+                              {a}
+                            </option>
+                          ))}
+                        </Field>
+                        <Field
+                          as="select"
+                          label="Prioridade"
+                          value={priority}
+                          onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                        >
+                          <option value="alta">Alta</option>
+                          <option value="normal">Normal</option>
+                          <option value="baixa">Baixa</option>
+                        </Field>
+                        <Field
+                          label="Prazo"
+                          type="date"
+                          value={dueDate}
+                          onChange={(e) => setDueDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </LinhaDeEscrever>
+                </div>
+              </Card>
+
+              {done.length > 0 && (
+                <div className="mt-4">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowDone(!showDone)}
+                    aria-expanded={showDone}
+                    className="mb-2 tracking-[0.12em] uppercase"
+                  >
+                    {showDone ? "▾" : "▸"} Concluídas ({done.length})
+                  </Button>
+                  {showDone && (
+                    <Card
+                      padding="none"
+                      className="overflow-hidden divide-y divide-[var(--bo-hairline)]"
+                    >
+                      {/* As concluídas nunca são arrastáveis: reordenar à mão o
+                      que já está feito não quer dizer nada. */}
+                      {done.map((t) => row(t))}
+                    </Card>
+                  )}
+                </div>
               )}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
           `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do

@@ -55,8 +55,26 @@ export async function GET(request: NextRequest) {
   try {
     const hoje = Date.now();
     const guioes: ResumoDeGuiao[] = (await listQuotes())
-      // Arquivado é «isto já não conta»: um pedido arquivado não aparece na
-      // lista de pedidos e não pode aparecer aqui a pedir um guião.
+      // ── O QUE ENTRA NESTA LISTA, E QUEM ESCOLHE ───────────────────────
+      //
+      // Duas coisas dela, com uma semana de diferença entre elas, e as duas
+      // valem:
+      //
+      //  1. «Quero que o sistema seja inteligente o suficiente para dar para
+      //     fazer timelines apenas das propostas que já foram aceites.» A
+      //     lista tinha quinze eventos e treze diziam «Sem timeline» — não por
+      //     esquecimento, mas porque a maior parte ainda eram propostas por
+      //     responder.
+      //  2. «Aqui quero que dê também para escolher aqueles que quero fazer um
+      //     timeline» — com a lista a mostrar UM evento, que é o que sobrou do
+      //     corte da primeira.
+      //
+      // Não se contradizem: a primeira é sobre o que se vê POR OMISSÃO, a
+      // segunda é sobre poder ver o resto. Um corte no servidor só sabe fazer
+      // a primeira, e ao fazê-la tira a segunda — por isso saiu daqui.
+      //
+      // A rota devolve todos os eventos com data e diz de cada um se já está
+      // `aceite`. Quem escolhe é o ecrã, e a escolha dela é a que fica.
       .filter((q) => !q.archived && /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? ""))
       .sort(
         (a, b) =>
@@ -70,6 +88,7 @@ export async function GET(request: NextRequest) {
         evento: eventTagLabel(q),
         data: q.date,
         local: q.location ?? "",
+        aceite: q.status === "aceite",
         momentos: q.timeline ?? [],
       }));
 

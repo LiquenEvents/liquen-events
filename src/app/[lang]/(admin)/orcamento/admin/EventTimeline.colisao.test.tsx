@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import EventTimeline from "./EventTimeline";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
+import { escreverHora } from "./escrever-hora";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -135,7 +136,7 @@ describe("Cronograma do dia — um 409 com trabalho por gravar no ecrã", () => 
     montar(MOMENTOS);
 
     await user.type(screen.getByPlaceholderText("Momento…"), "Corte do bolo");
-    await user.type(screen.getByLabelText("Hora"), "21:00");
+    await escreverHora(user, "21:00");
     await user.click(screen.getByRole("button", { name: "Adicionar" }));
     await screen.findByRole("button", { name: "Voltar a aplicar" });
 

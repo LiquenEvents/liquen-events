@@ -182,12 +182,83 @@ export interface ChecklistItem {
   done: boolean;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CABEÇALHO DA FOLHA DA TIMELINE — QUANTA GENTE, DE CADA TIPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «E também para escrever staff e crianças etc que está no timeline.»
+ *
+ * A folha que a equipa dela leva para o evento abre com três contagens:
+ *
+ *     Adultos      Crianças                  Staff
+ *     240          6 crianças (1 c/ 1 ano)   24
+ *
+ * ── PORQUE É QUE ISTO NÃO SÃO TRÊS NÚMEROS ──────────────────────────────
+ *
+ * Porque a coluna do meio da folha dela diz «6 crianças (1 c/ 1 ano)». Aquele
+ * parêntesis é a informação que faz a diferença no dia: uma criança de um ano
+ * não come do menu infantil nem se senta a uma mesa. Um `number` deitava-o
+ * fora e obrigava-a a guardá-lo noutro sítio — que é como se perde.
+ *
+ * Texto livre, curto, e escrito por ela. O produto não tem opinião nenhuma
+ * sobre o que lá está.
+ *
+ * ── E OS ADULTOS, QUE JÁ EXISTEM ─────────────────────────────────────────
+ *
+ * O `guests` do pedido é quantos convidados o casal disse que vinham, e é o
+ * que a folha usa quando esta caixa está vazia. Escrever aqui SUBSTITUI-o —
+ * porque o número do pedido é de quando o pedido foi feito, e o da folha é o
+ * de véspera, depois das confirmações. São dois números com duas idades, e o
+ * da folha é o que manda no dia.
+ */
+export interface CabecalhoDaFolha {
+  adultos?: string;
+  criancas?: string;
+  staff?: string;
+}
+
 /** A single moment in the day-of run sheet (cronograma do evento). */
 export interface TimelineItem {
   id: string;
   time: string; // "HH:MM"
   title: string;
   owner?: string; // responsável / fornecedor
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ONDE, E O QUE É PRECISO SABER — AS DUAS COLUNAS QUE FALTAVAM
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Ela mandou a timeline a sério de um casamento — a folha que a equipa dela
+   * levou para a Adega Fita Preta a 28 de Junho — e disse «quero que faças
+   * assim mesmo para o nosso timeline». Aquela folha tem quatro colunas:
+   *
+   *     HORA · LOCAL · DESCRIÇÃO · NOTAS
+   *
+   * Tínhamos duas: a hora e a descrição. Estas são as outras.
+   *
+   * ── `local`, E PORQUE É QUE NÃO CHEGA O LOCAL DO EVENTO ─────────────────
+   *
+   * Porque um dia de casamento acontece em mais do que um sítio. Na folha
+   * dela, às 08h30 a equipa está na «Fitapreta» e às 14h30 os noivos estão no
+   * «Governador» — duas moradas no mesmo dia, e é a coluna do LOCAL que diz a
+   * quem lê onde tem de estar. O `location` do pedido é o sítio da FESTA, e
+   * escrevê-lo em todas as linhas dizia a coisa errada em metade delas.
+   *
+   * Vazio quer dizer «no mesmo sítio da linha de cima» — que é como a folha
+   * dela se lê, e é por isso que a coluna aparece tão pouco preenchida.
+   *
+   * ── `notas`, E PORQUE É QUE NÃO É PARTE DA DESCRIÇÃO ────────────────────
+   *
+   * Porque não é o que acontece: é o que é preciso GARANTIR para acontecer.
+   * «Sergey chega» é a descrição; «enviar táxi» é a nota. «Mariana e Fábio
+   * anunciam bolo» é a descrição; «garantir cadeira giratória em baixo + saco
+   * Cartier + bolo c/ velas» é a nota. Enfiar as duas na mesma coluna faz uma
+   * folha que se lê em voz alta e não se cumpre.
+   */
+  local?: string;
+  notas?: string;
 
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -330,6 +401,8 @@ export interface Quote extends QuoteFormData {
   productionPlan?: ChecklistItem[];
   payments?: Payment[];
   timeline?: TimelineItem[];
+  /** As três contagens do topo da folha da timeline. Ver `CabecalhoDaFolha`. */
+  folhaDaTimeline?: CabecalhoDaFolha;
   eventSuppliers?: EventSupplier[];
   /** Free-form labels for organising/filtering (ex.: "VIP", "Outono", "Ar livre"). */
   tags?: string[];

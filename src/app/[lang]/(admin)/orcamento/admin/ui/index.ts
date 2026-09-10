@@ -42,6 +42,8 @@ export type { ToolbarProps } from "./Toolbar";
 // chega. Este é o substituto da casa — com o teclado, o leitor de ecrã e o
 // formulário que o nativo dava de graça, e com o nativo mantido no dedo (a
 // justificação está no cabeçalho do ficheiro).
+export { CampoDeHora } from "./CampoDeHora";
+export type { CampoDeHoraProps } from "./CampoDeHora";
 export { Escolha } from "./Escolha";
 export type { EscolhaProps, OpcaoDeEscolha } from "./Escolha";
 
@@ -82,3 +84,10 @@ export type { CampoDataProps } from "./CampoData";
 // mesma escala em vez de cada um escolher a sua — ver `movimento.ts` para o
 // censo que a motivou e para as três avarias silenciosas que ele encontrou.
 export { ESTADO, PRESSAO, PROGRESSO, TOQUE_MS, ESTADO_MS, PROGRESSO_MS } from "./movimento";
+
+/**
+ * A superfície de vidro. Uma por ecrã — vidro sobre vidro duplica o custo e
+ * transforma o fundo em papa cinzenta (`docs/LIQUID-GLASS.md`, Parte 5).
+ */
+export { Glass } from "./Glass";
+export type { GlassProps, SuperficieDeVidro } from "./Glass";

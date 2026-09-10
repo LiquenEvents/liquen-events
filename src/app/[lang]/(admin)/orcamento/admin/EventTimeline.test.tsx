@@ -103,3 +103,99 @@ describe("Cronograma do dia — duas remoções ao mesmo tempo", () => {
     expect(screen.getByText(/remover «17:00 Cerimónia» da timeline/)).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE ELA ESCREVE GRAVA-SE SOZINHO, SEM SAIR DO CAMPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Quero que eles alterem logo ao mesmo tempo que eu estou a escrever, como
+ * está nos números do staff e crianças, e quero que guarde automaticamente.»
+ *
+ * Antes gravava-se em `blur` ou `Enter`. O texto só existia no ecrã até ela sair
+ * do campo — e um separador fechado, um telemóvel que adormece ou um clique na
+ * linha ao lado levavam-no, sem um único aviso.
+ */
+describe("os campos da timeline gravam enquanto se escreve", () => {
+  it("escrever e parar grava, sem `blur` e sem `Enter`", async () => {
+    const user = userEvent.setup();
+    const pedidos: { timeline: TimelineItem[] }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        pedidos.push(JSON.parse(String(init?.body ?? "{}")));
+        return reply(200);
+      }),
+    );
+
+    montar(MOMENTOS);
+    await user.click(screen.getByRole("button", { name: "Montagem" }));
+    const campo = await screen.findByLabelText("Editar momento");
+    await user.clear(campo);
+    await user.type(campo, "Montagem da tenda");
+
+    /* Sem tocar em mais nada: nem `Tab`, nem `Enter`, nem um clique fora. É
+       exactamente o que acontece quando ela escreve e olha para a folha ao
+       lado. */
+    await waitFor(() => expect(pedidos.length).toBeGreaterThan(0), { timeout: 5000 });
+    const ultimo = pedidos[pedidos.length - 1].timeline;
+    expect(ultimo.find((m) => m.id === "t1")?.title).toBe("Montagem da tenda");
+  });
+
+  it("uma frase inteira dá UMA gravação e não uma por tecla", async () => {
+    /* O outro lado da mesma moeda: cada gravação leva o guião inteiro e declara
+       a versão de que partiu, portanto uma por tecla era pôr dezassete PATCH no
+       ar a colidirem uns com os outros — que é como a mensagem «a timeline
+       mudou noutro sítio» aparecia sem ninguém lhe ter tocado. */
+    const user = userEvent.setup();
+    let contagem = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        contagem++;
+        return reply(200);
+      }),
+    );
+
+    montar(MOMENTOS);
+    await user.click(screen.getByRole("button", { name: "Cerimónia" }));
+    const campo = await screen.findByLabelText("Editar momento");
+    await user.clear(campo);
+    await user.type(campo, "Cerimónia no jardim de cima");
+
+    await waitFor(() => expect(contagem).toBeGreaterThan(0), { timeout: 5000 });
+    // Uma margem, não um número exacto: o que se guarda é que não são vinte.
+    expect(contagem).toBeLessThanOrEqual(3);
+  });
+
+  it("desistir devolve o campo ao que era, e grava essa reposição", async () => {
+    /* «Escape cancela» era verdade enquanto nada tinha sido gravado. Com
+       gravação automática deixa de ser: aos 600 ms o que ela escreveu já lá
+       está. O Escape passa a DESFAZER — e a gravação da reposição é o que faz
+       disso verdade também no servidor, e não só no ecrã. */
+    const user = userEvent.setup();
+    const pedidos: { timeline: TimelineItem[] }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        pedidos.push(JSON.parse(String(init?.body ?? "{}")));
+        return reply(200);
+      }),
+    );
+
+    montar(MOMENTOS);
+    await user.click(screen.getByRole("button", { name: "Jantar" }));
+    const campo = await screen.findByLabelText("Editar momento");
+    await user.clear(campo);
+    await user.type(campo, "Jantar servido");
+    await waitFor(() => expect(pedidos.length).toBeGreaterThan(0), { timeout: 5000 });
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      const ultimo = pedidos[pedidos.length - 1].timeline;
+      expect(ultimo.find((m) => m.id === "t3")?.title).toBe("Jantar");
+    });
+    expect(screen.getByRole("button", { name: "Jantar" })).toBeTruthy();
+  });
+});

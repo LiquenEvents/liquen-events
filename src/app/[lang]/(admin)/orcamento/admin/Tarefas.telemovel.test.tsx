@@ -79,18 +79,31 @@ it("o título da tarefa quebra linha no telemóvel — só corta a partir de `sm
   expect(classes).toContain("sm:truncate");
 });
 
-it("o botão de concluir tem nome e alvo de 44 px no dedo", async () => {
+it("a caixa de concluir é uma caixa a sério, com nome e alvo de 44 px no dedo", async () => {
   await montar();
 
-  // Sem nome acessível, um leitor de ecrã anuncia «botão» — dezasseis vezes,
-  // todas iguais. E é o botão que RISCA a tarefa.
-  const concluir = screen.getByRole("button", { name: /concluir|concluída/i });
+  /**
+   * Duas coisas neste caso, e a primeira mudou.
+   *
+   * ERA um `<button aria-pressed>`. Passou a ser uma `<input
+   * type="checkbox">` — «checkbox que não é `<input type="checkbox">`» está
+   * nas proibições do documento dela. A diferença não é de gosto: um leitor de
+   * ecrã lê «botão, premido» a um e «caixa de verificação, marcada» à outra, e
+   * só a segunda diz o que aquilo é.
+   *
+   * O nome é o TÍTULO da tarefa e já não «Marcar como concluída»: numa lista
+   * de dezasseis, dezasseis caixas com o mesmo nome não se distinguem — o que
+   * distingue é a tarefa de que são.
+   */
+  const concluir = screen.getByRole("checkbox", { name: LONGA.title });
 
   // `alvo-toque` é o mínimo da casa (44×44, só sob `(pointer: coarse)` — ver
   // globals.css). O «Editar» e o «Eliminar» ao lado já o têm; este ficou de
-  // fora, e é o vizinho deles.
+  // fora, e é o vizinho deles. A classe está no `<label>` que envolve a caixa,
+  // que é o que recebe o dedo.
+  const alvo = concluir.closest("label");
   expect(
-    concluir.className.split(/\s+/),
+    alvo?.className.split(/\s+/),
     "o quadrado de concluir tem 20 px e vive entre dois alvos de 44",
   ).toContain("alvo-toque");
 });

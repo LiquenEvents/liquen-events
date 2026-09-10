@@ -72,6 +72,7 @@ import PainelDoEstudio from "./PainelDoEstudio";
 import { useLarguraDaZona } from "./useMedida";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import AEnviarAProposta from "./AEnviarAProposta";
+import { BotaoWhatsApp } from "./ui/BotaoWhatsApp";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
@@ -8933,7 +8934,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       </ListaDeBoards>
                     </ArrastoDosMoodBoards>
                     <div className="mt-3 flex flex-wrap items-center gap-4">
-                      <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBoard}>
+                      <button
+                        type="button"
+                        className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
+                        onClick={addBoard}
+                      >
                         + Adicionar mood board
                       </button>
                       {/* Fechar tudo é o gesto de quem acabou uma proposta e quer ver
@@ -9125,14 +9130,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             </button>
                           </div>
                         ))}
-                        <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={() => addPhaseItem(pi)}>
+                        <button
+                          type="button"
+                          className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
+                          onClick={() => addPhaseItem(pi)}
+                        >
                           + Adicionar tarefa
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button type="button" className={`${ADD_BTN} mt-3 ${ESTADO} ${PRESSAO}`} onClick={addPhase}>
+                <button
+                  type="button"
+                  className={`${ADD_BTN} mt-3 ${ESTADO} ${PRESSAO}`}
+                  onClick={addPhase}
+                >
                   + Adicionar fase
                 </button>
               </Section>
@@ -9459,7 +9472,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       );
                     })}
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBudgetItem}>
+                      <button
+                        type="button"
+                        className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
+                        onClick={addBudgetItem}
+                      >
                         + Adicionar item
                       </button>
                       {/* O CONTADOR, no lugar onde estava «Soma das linhas».
@@ -9804,7 +9821,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           </div>
                         );
                       })}
-                      <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBudgetExtra}>
+                      <button
+                        type="button"
+                        className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
+                        onClick={addBudgetExtra}
+                      >
                         + Adicionar valor adicional
                       </button>
                       {/* O «Somado ao total: X» que aqui estava saiu para o bloco
@@ -9873,7 +9894,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         </button>
                       </div>
                     ))}
-                    <button type="button" className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`} onClick={addBudgetRow}>
+                    <button
+                      type="button"
+                      className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
+                      onClick={addBudgetRow}
+                    >
                       + Adicionar linha
                     </button>
                   </div>
@@ -10487,8 +10512,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               {/* ── QUANDO O CASAL PREFERE WHATSAPP ─────────────────────────
                   A comunicação sai toda por email, e em Portugal é normal o
                   casal preferir WhatsApp. É aqui, mesmo depois de enviar, que
-                  o link fica mais fresco — sem esperar por um segundo pedido. */}
-              <CopiarResumo texto={resumoParaCopiar} />
+                  o link fica mais fresco — sem esperar por um segundo pedido.
+
+                  «E o mesmo quando enviamos proposta no fazer proposta.» O
+                  «Copiar resumo» já cá estava e obrigava-a a ir ao WhatsApp,
+                  abrir uma conversa e colar. O botão abre-o com a mensagem já
+                  escrita e a lista de contactos à espera — os mesmos dois
+                  passos, menos os três do meio. O copiar FICA, para quem quer
+                  o texto noutro sítio qualquer. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
+                <CopiarResumo texto={resumoParaCopiar} />
+              </div>
               <Button
                 variant="secondary"
                 size="sm"
@@ -10536,14 +10571,39 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   value={money.gross > 0 ? eur(split.sinal) : "—"}
                 />
               </dl>
-              {/* ── QUANDO O CASAL PREFERE WHATSAPP ───────────────────────
-                  Antes ainda de enviar: serve para uma revisão de uma
-                  proposta que já tinha ido antes (`linkDaProposta` de uma
-                  sessão anterior) — o resumo sai com esse link até haver um
-                  mais novo. */}
-              <div className="mt-3">
+              {/* ── QUANDO O CASAL PREFERE WHATSAPP, AQUI TAMBÉM ──────────
+                  «Gostava que também desse para enviar pelo WhatsApp no fazer
+                  a proposta.»
+
+                  O botão já existia — no painel que aparece DEPOIS de enviar.
+                  Ela procurou-o aqui, que é onde se envia, e não o encontrou:
+                  uma coisa que só aparece a seguir ao gesto não conta como
+                  estando no ecrã do gesto.
+
+                  ── E PORQUE É QUE ELE SÓ APARECE COM LINK ──────────────────
+
+                  Porque sem link a mensagem leva o nome, a data e o VALOR — e
+                  mais nada. Um casal a receber um preço sem proposta nenhuma
+                  para o ler é pior do que não receber nada, e o botão que o
+                  mandou parecia estar a funcionar.
+
+                  O link nasce ao enviar. A partir daí — revisões, segundas
+                  voltas, o casal que pediu para reenviar — ele está aqui, antes
+                  do envio, com o link da vez anterior até haver um mais novo. A
+                  linha por baixo diz isso a quem chega primeiro, porque a
+                  ausência de um botão não explica nada a ninguém. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {linkDaProposta && (
+                  <BotaoWhatsApp texto={resumoParaCopiar} rotulo="Enviar pelo WhatsApp" />
+                )}
                 <CopiarResumo texto={resumoParaCopiar} />
               </div>
+              {!linkDaProposta && (
+                <p className="bo-text-muted mt-2 text-xs leading-relaxed">
+                  O link do casal nasce ao enviar. A partir daí, o botão de WhatsApp aparece aqui e
+                  no fim — com a proposta lá dentro.
+                </p>
+              )}
               {/* ══════════════════════════════════════════════════════════
                   A LÍNGUA TAMBÉM SE ESCOLHE AQUI, ONDE SE ENVIA
                   ══════════════════════════════════════════════════════════
@@ -12115,7 +12175,9 @@ function AccoesDaFoto({
 
           `hidden com-rato:flex`: não existe até haver rato — nem desenhada nem
           a apanhar toques. */}
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 ${ESTADO} group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex`}>
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 ${ESTADO} group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex`}
+      >
         <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
           <button
             type="button"
@@ -12247,7 +12309,9 @@ function DobraDaDisposicao({
          board ao abrir a do seguinte, e o que se quer é poder comparar duas
          páginas lado a lado. */
     >
-      <summary className={`marker:content-none inline-flex list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}>
+      <summary
+        className={`marker:content-none inline-flex list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
+      >
         {/* A MESMA seta, e o mesmo tempo, do cabeçalho das secções e das duas
             setas irmãs da casa (`Overview.tsx`, `Tarefas.tsx:810`): 200 ms na
             `cubic-bezier(0, 0, 0.2, 1)`. Estava sem duração, ou seja nos 150 ms
@@ -12519,7 +12583,9 @@ function StepNav({
             >
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
-                  active ? "bg-[var(--bo-surface)]/25 text-white" : "bg-[var(--bo-tinta-10)] text-foreground/50"
+                  active
+                    ? "bg-[var(--bo-surface)]/25 text-white"
+                    : "bg-[var(--bo-tinta-10)] text-foreground/50"
                 }`}
               >
                 {sent && s.id === "enviar" ? "✓" : s.n}
@@ -12813,7 +12879,9 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
         <span className="bo-eyebrow">Só para si</span>
         <span className="text-xs text-[var(--bo-tinta-72)]">
           Margem{" "}
-          <strong className={`font-semibold ${magra ? "text-[var(--bo-perigo)]" : "text-sage-600"}`}>
+          <strong
+            className={`font-semibold ${magra ? "text-[var(--bo-perigo)]" : "text-sage-600"}`}
+          >
             {eur(total.margem)} · {Math.round(total.percentagem)}%
           </strong>
         </span>
@@ -12938,7 +13006,10 @@ function PreviewSummary({
       {/* O resumo mostra as fotos a caminho esbatidas; dizer quantas são evita
           que um PDF gerado agora — que não as leva — pareça um erro. */}
       {fotosPorConfirmar > 0 && (
-        <p aria-live="polite" className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-perigo)]">
+        <p
+          aria-live="polite"
+          className="-mt-2 mb-4 text-sm leading-relaxed text-[var(--bo-perigo)]"
+        >
           {fotosPorConfirmar === 1
             ? "1 foto ainda está a entrar na proposta e não entra num PDF gerado agora."
             : `${fotosPorConfirmar} fotos ainda estão a entrar na proposta e não entram num PDF gerado agora.`}

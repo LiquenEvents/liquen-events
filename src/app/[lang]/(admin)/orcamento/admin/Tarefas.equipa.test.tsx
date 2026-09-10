@@ -63,6 +63,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * ── ABRIR A LISTA JÁ NÃO É VER O FORMULÁRIO ──────────────────────────────
+ *
+ * O cartão de criar saiu do topo do ecrã: a criação passou a ser a última
+ * linha da lista, que só vira formulário quando se lhe toca (fase 03 do
+ * documento dela — «o formulário de criação é um cartão permanente no topo…
+ * empurra para baixo aquilo que é o conteúdo da página»).
+ *
+ * Estes casos medem o campo do RESPONSÁVEL, que vive lá dentro. Por isso
+ * passam a dar o toque que ela dá para começar a escrever uma tarefa.
+ */
 async function montar() {
   render(
     <ToastProvider>
@@ -70,6 +81,8 @@ async function montar() {
     </ToastProvider>,
   );
   await waitFor(() => expect(screen.getByText(TAREFA.title)).toBeInTheDocument());
+  fireEvent.click(screen.getByRole("button", { name: "Nova tarefa" }));
+  await screen.findByLabelText("Nova tarefa");
 }
 
 describe("com contas configuradas", () => {

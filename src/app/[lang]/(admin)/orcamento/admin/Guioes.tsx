@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Quote, TimelineItem } from "@/lib/orcamento/types";
+import type { Supplier, CabecalhoDaFolha, Quote, TimelineItem } from "@/lib/orcamento/types";
 import {
   agoraNaRegua,
   horaDoMinuto,
@@ -19,7 +19,7 @@ import {
   type TipoDeSinal,
 } from "@/lib/orcamento/guioes";
 import type { ModeloDeGuiao, MomentoDeModelo } from "@/lib/orcamento/guiao-modelos";
-import { Button, EmptyState, Segmented } from "./ui";
+import { Button, EmptyState, Field, Segmented } from "./ui";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { SkeletonList } from "./Skeleton";
@@ -27,8 +27,10 @@ import { useCachedList } from "./useCachedList";
 import { useToast } from "./Toast";
 import { printRunSheet } from "./export";
 import { ReguaDoDia } from "./ReguaDoDia";
-import { GrelhaDoDia } from "./GrelhaDoDia";
-import EventTimeline from "./EventTimeline";
+import { FolhaDaTimeline } from "./FolhaDaTimeline";
+import EventTimeline, { GRAVAR_AO_ESCREVER_MS } from "./EventTimeline";
+import { BotaoWhatsApp } from "./ui/BotaoWhatsApp";
+import { timelineParaWhatsApp } from "@/lib/whatsapp";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
@@ -81,6 +83,8 @@ interface Props {
 }
 
 type Filtro = "todos" | "por-fazer" | "problemas";
+/** Que eventos entram na lista: só os fechados, ou todos os que têm data. */
+type Ambito = "fechados" | "todos";
 
 /**
  * ── AS DUAS MANEIRAS DE OLHAR PARA O MESMO DIA ────────────────────────────
@@ -102,12 +106,20 @@ type Filtro = "todos" | "por-fazer" | "problemas";
  *    lhe responde por construção: mistura toda a gente na mesma pista, e ler
  *    «quem está livre» obriga a percorrer o dia a ler nomes.
  *
- * Uma só das duas não chegava. Só a régua deixa a pergunta dela sem ecrã; só a
- * grelha tira a edição e o «isto cabe?» — e a grelha, a editar, seria a segunda
- * gravação. Ficam as duas, com um comutador, e a régua por omissão porque é a
- * que serve nos 364 dias em que o evento não é hoje.
+ * ── E O COMUTADOR ENTRE AS DUAS SAIU ────────────────────────────────────
+ *
+ * «Aqui basta apenas editar», com a captura do comutador à frente. E ela tem
+ * razão pela razão certa: a FOLHA passou a estar ao lado do editor, portanto
+ * já não é preciso trocar de vista para ver como está a ficar. Um comutador
+ * entre duas coisas em que uma delas deixou de ser precisa é ruído com aspecto
+ * de escolha.
+ *
+ * O que fica dito, e não escondido: a `GrelhaDoDia` continua no código, com os
+ * seus testes, e neste momento **não tem porta**. A pergunta a que ela responde
+ * («quem está livre às 14:00?») continua a ser boa e continua sem ecrã — só
+ * que se faz NO DIA, de pé, e não enquanto se escreve a timeline na véspera. O
+ * sítio dela é provavelmente o cartão do dia de hoje, e isso decide-se com ela.
  */
-type VistaDoDia = "regua" | "grelha";
 
 /**
  * ── A LINGUAGEM DOS SINAIS: COR, FORMA E PALAVRA, SEMPRE AS TRÊS ──────────
@@ -259,7 +271,65 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    * manhã a saltar entre dois casamentos — voltar à régua a cada troca era
    * cobrar-lhe um toque por cada vez.
    */
-  const [vistaDoDia, setVistaDoDia] = useState<VistaDoDia>("regua");
+  /**
+   * ── A GRELHA É A VISTA, E A RÉGUA É ONDE SE ESCREVE ──────────────────────
+   *
+   * Abria na régua. Passa a abrir na grelha, porque foi isso que ela pediu com
+   * o horário da faculdade à frente: «quero que o timeline seja mesmo assim».
+   *
+   * A régua não sai nem podia sair — é o único sítio onde os momentos se
+   * escrevem, e continua a um toque. O que muda é qual das duas responde
+   * primeiro: quem abre uma timeline vem ver o dia, e só depois mexer nele.
+   */
+
+  /**
+   * ── DESCARREGAR O HORÁRIO EM PDF ────────────────────────────────────────
+   *
+   * O ficheiro vem do `/api/guioes/<id>/pdf`, desenhado no servidor — é lá que
+   * a fonte que escreve nomes portugueses já está carregada (ver o cabeçalho
+   * da rota).
+   *
+   * O `URL.createObjectURL` tem de ser revogado À MÃO: um blob que ninguém
+   * revoga fica de pé até a aba fechar, e ela abre horários o dia todo. O
+   * `setTimeout` de zero é para o clique já ter partido quando o endereço
+   * morre — revogar na mesma volta do laço deixava o download por fazer em
+   * alguns browsers.
+   */
+  const [aDescarregar, setADescarregar] = useState(false);
+  const [falhaAoDescarregar, setFalhaAoDescarregar] = useState<string | null>(null);
+
+  async function descarregarPdf(id: string) {
+    setADescarregar(true);
+    setFalhaAoDescarregar(null);
+    try {
+      const res = await fetch(`/api/guioes/${encodeURIComponent(id)}/pdf`);
+      if (!res.ok) {
+        const corpo: unknown = await res.json().catch(() => null);
+        const dito = (corpo as { error?: unknown } | null)?.error;
+        setFalhaAoDescarregar(
+          typeof dito === "string" && dito
+            ? dito
+            : "Não foi possível preparar o PDF. Tenta daqui a bocado.",
+        );
+        return;
+      }
+      const nome =
+        /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
+        "horario.pdf";
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      setFalhaAoDescarregar("Erro de ligação. Tenta novamente.");
+    } finally {
+      setADescarregar(false);
+    }
+  }
   const [abertoId, setAbertoId] = useState<string | null>(null);
   const [pedido, setPedido] = useState<Quote | null>(null);
   const [aAbrir, setAAbrir] = useState<string | null>(null);
@@ -284,27 +354,74 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    */
   const janela = useMemo(() => janelaComum(guioes), [guioes]);
 
+  /**
+   * O âmbito é o primeiro corte, e o filtro é o segundo.
+   *
+   * Por omissão «fechados», que é o que ela pediu primeiro: um guião do dia é
+   * a folha por que a equipa se rege, e fazê-la para um pedido que ainda está
+   * a ser pensado é planear um dia que pode não acontecer. Mas é uma OMISSÃO e
+   * não uma parede — daí o comutador.
+   */
+  const [ambito, setAmbito] = useState<Ambito>("fechados");
+  const noAmbito = useMemo(
+    () => (ambito === "todos" ? guioes : guioes.filter((g) => g.aceite)),
+    [guioes, ambito],
+  );
+  const contagensDoAmbito = useMemo(
+    () => ({ fechados: guioes.filter((g) => g.aceite).length, todos: guioes.length }),
+    [guioes],
+  );
+
   const contagens = useMemo(() => {
     let porFazer = 0;
     let problemas = 0;
-    for (const g of guioes) {
+    /* Contam o que está DENTRO DO ÂMBITO, e não a lista toda. Com «Fechados»
+       escolhido, um «Todos · 15» ao lado de uma lista de um era o ecrã a
+       discordar de si próprio — que é o defeito que esta vista existe para não
+       ter. */
+    for (const g of noAmbito) {
       const principal = sinalPrincipal(g.sinais);
       if (GRAVIDADE_DO_SINAL[principal.tipo] === "erro") problemas += 1;
       else if (GRAVIDADE_DO_SINAL[principal.tipo] === "por-fazer") porFazer += 1;
     }
-    return { todos: guioes.length, porFazer, problemas };
-  }, [guioes]);
+    return { todos: noAmbito.length, porFazer, problemas };
+  }, [noAmbito]);
 
   const visiveis = useMemo(() => {
-    if (filtro === "todos") return guioes;
-    return guioes.filter((g) => {
+    if (filtro === "todos") return noAmbito;
+    return noAmbito.filter((g) => {
       const gravidade = GRAVIDADE_DO_SINAL[sinalPrincipal(g.sinais).tipo];
       return filtro === "problemas" ? gravidade === "erro" : gravidade === "por-fazer";
     });
-  }, [guioes, filtro]);
+  }, [noAmbito, filtro]);
 
   const oDeHoje = useMemo(() => guioes.find((g) => g.hoje) ?? null, [guioes]);
   const aberto = useMemo(() => guioes.find((g) => g.id === abertoId) ?? null, [guioes, abertoId]);
+
+  /**
+   * A lista visível, partida por MÊS, pela ordem em que já vinha.
+   *
+   * O ano só se escreve quando não é este — «Setembro», «Outubro», «Maio
+   * 2027». Escrever «2026» em todas as linhas de uma agenda de 2026 é ruído
+   * que se aprende a saltar, e foi essa a lição da lista dos próximos eventos
+   * do Calendário.
+   */
+  const porMes = useMemo(() => {
+    const anoActual = new Date().getFullYear();
+    const grupos: { mes: string; eventos: typeof visiveis }[] = [];
+    for (const g of visiveis) {
+      const d = new Date(`${g.data}T12:00:00`);
+      const nome = d.toLocaleDateString("pt-PT", { month: "long" });
+      const mes =
+        d.getFullYear() === anoActual
+          ? nome.charAt(0).toUpperCase() + nome.slice(1)
+          : `${nome.charAt(0).toUpperCase() + nome.slice(1)} ${d.getFullYear()}`;
+      const ultimo = grupos[grupos.length - 1];
+      if (ultimo && ultimo.mes === mes) ultimo.eventos.push(g);
+      else grupos.push({ mes, eventos: [g] });
+    }
+    return grupos;
+  }, [visiveis]);
 
   /**
    * Abrir um guião é ir buscar o pedido inteiro.
@@ -326,8 +443,14 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
     const r = await carregarPedido(id);
     if (abertaRef.current !== id) return;
     setAAbrir(null);
-    if (r.ok) setPedido(r.quote);
-    else setFalhaAoAbrir(r.porque);
+    if (r.ok) {
+      setPedido(r.quote);
+      /* As contagens da folha vêm com o pedido. Sem esta linha, ela escrevia
+         «24» no staff, mudava de evento e voltava — e encontrava o campo
+         vazio com o número gravado no servidor. Um campo que esquece o que
+         mostrou é pior do que um campo que nunca o aceitou. */
+      setCabecalho(r.quote.folhaDaTimeline ?? {});
+    } else setFalhaAoAbrir(r.porque);
   }
 
   function fechar() {
@@ -345,6 +468,97 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    * não ter. O `setData` do `useCachedList` escreve na cache, portanto sair da
    * vista e voltar não ressuscita o estado antigo.
    */
+  /**
+   * O título da folha, igual ao do PDF: «CASAMENTO CAROLINA 04.09.26».
+   *
+   * A data no formato curto que ela escreve à mão — dd.mm.aa, e não «sábado, 4
+   * de setembro». Numa folha que anda pelo bolso de dez fornecedores a data é
+   * uma etiqueta, não uma frase.
+   */
+  /**
+   * ── O CABEÇALHO DA FOLHA: ADULTOS, CRIANÇAS E STAFF ─────────────────────
+   *
+   * «E também para escrever staff e crianças etc que está no timeline.»
+   *
+   * As três contagens do topo da folha dela. Escrevem-se aqui, ao lado da
+   * pré-visualização, porque é aqui que se vêem — e porque não pertencem ao
+   * cronograma (não são um momento do dia) nem aos custos (não são dinheiro).
+   *
+   * Texto livre e não números: a folha dela diz «6 crianças (1 c/ 1 ano)», e
+   * aquele parêntesis é a informação que faz a diferença no dia. Ver
+   * `CabecalhoDaFolha`.
+   *
+   * Grava com um atraso: ela escreve «24» a duas teclas, e uma gravação por
+   * tecla eram duas viagens para um valor que ainda estava a meio.
+   */
+  /**
+   * ── OS FORNECEDORES DA FOLHA ────────────────────────────────────────────
+   *
+   * «E os fornecedores que escrevemos em baixo no timeline, onde escrevemos?»
+   *
+   * Escrevem-se no painel de CUSTOS do evento (`EventCosts`), que é onde eles
+   * já viviam antes de esta folha existir — cada um com o que custa e em que
+   * pé está, que é informação de que a folha não precisa mas o evento sim.
+   * Aqui só se LÊEM.
+   *
+   * O contacto não vem do evento: vem do DIRECTÓRIO, pelo `supplierId`. O
+   * evento guarda quem trabalha nele; o directório guarda o telefone de cada
+   * um. Guardá-lo nos dois era tê-lo desactualizado num deles — e é a mesma
+   * junção que a rota do PDF faz, para a folha do ecrã e a do ficheiro não
+   * poderem discordar.
+   */
+  const directorio = useCachedList<Supplier[]>("fornecedores", "/api/fornecedores");
+  const fornecedoresDaFolha = useMemo(() => {
+    const doEvento = pedido?.eventSuppliers ?? [];
+    if (doEvento.length === 0) return [];
+    const porId = new Map((directorio.data ?? []).map((f) => [f.id, f]));
+    return doEvento.map((f) => {
+      const ficha = f.supplierId ? porId.get(f.supplierId) : undefined;
+      return {
+        categoria: f.category || "Fornecedor",
+        nome: f.name,
+        contacto: [ficha?.phone, ficha?.email].filter(Boolean).join(" · "),
+      };
+    });
+  }, [pedido, directorio.data]);
+
+  const [cabecalho, setCabecalho] = useState<CabecalhoDaFolha>({});
+  const cabecalhoPorGravar = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (cabecalhoPorGravar.current) clearTimeout(cabecalhoPorGravar.current);
+    },
+    [],
+  );
+
+  function mudarCabecalho(campo: keyof CabecalhoDaFolha, valor: string) {
+    const seguinte = { ...cabecalho, [campo]: valor };
+    setCabecalho(seguinte);
+    setPedido((prev) => (prev ? { ...prev, folhaDaTimeline: seguinte } : prev));
+    if (cabecalhoPorGravar.current) clearTimeout(cabecalhoPorGravar.current);
+    const id = pedido?.id;
+    if (!id) return;
+    cabecalhoPorGravar.current = setTimeout(() => {
+      void fetch(`/api/orcamento/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folhaDaTimeline: seguinte }),
+      }).then((res) => {
+        /* Uma gravação recusada não pode passar em silêncio: ela escreveu o
+           número, viu-o no ecrã, e voltaria amanhã sem ele. */
+        if (!res.ok) toast("Não foi possível guardar as contagens da folha.", "error");
+      });
+      /* O mesmo número dos campos da timeline, e importado de lá para não
+         poderem discordar — ver a nota no `EventTimeline.tsx`. */
+    }, GRAVAR_AO_ESCREVER_MS);
+  }
+
+  function tituloDaFolha(g: { evento: string; cliente: string; data: string }): string {
+    const [ano, mes, dia] = g.data.split("-");
+    const curta = ano && mes && dia ? `${dia}.${mes}.${ano.slice(2)}` : "";
+    return [g.evento, g.cliente, curta].filter(Boolean).join(" ") || "Timeline";
+  }
+
   function guiaoMudou(id: string, momentos: TimelineItem[]) {
     lista.setData((prev) => ({
       guioes: (prev?.guioes ?? []).map((g) => (g.id === id ? { ...g, momentos } : g)),
@@ -424,6 +638,38 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                 { value: "problemas", label: `Com problema · ${contagens.problemas}` },
               ]}
             />
+            {/* ── QUEM ENTRA NA LISTA, E QUEM ESCOLHE ─────────────────────
+                Duas coisas dela, com dias de diferença, e as duas valem:
+
+                 1. «Quero que dê para fazer timelines APENAS das propostas que
+                    já foram aceites» — a lista tinha quinze eventos e treze
+                    diziam «Sem timeline», porque a maior parte ainda eram
+                    propostas por responder;
+                 2. «Aqui quero que dê TAMBÉM para escolher aqueles que quero
+                    fazer um timeline» — com a lista a mostrar um evento só,
+                    que é o que sobrou do corte da primeira.
+
+                Não se contradizem: a primeira é sobre o que se vê por
+                omissão, a segunda é sobre poder ver o resto. O corte saiu do
+                servidor (que só sabia fazer a primeira, e ao fazê-la tirava a
+                segunda) e passou a ser esta escolha.
+
+                «Fechados» e não «aceites», porque é a palavra que ela usa para
+                um evento que vai mesmo acontecer. */}
+            <Segmented<Ambito>
+              ariaLabel="Que eventos mostrar"
+              size="sm"
+              value={ambito}
+              onChange={setAmbito}
+              options={[
+                /* «Todos os eventos» e não «Todos»: o comutador do lado tem
+                   um «Todos» seu (o do estado da timeline), e dois «Todos»
+                   lado a lado a querer dizer coisas diferentes é o ecrã a
+                   pedir que se adivinhe qual é qual. */
+                { value: "fechados", label: `Fechados · ${contagensDoAmbito.fechados}` },
+                { value: "todos", label: `Todos os eventos · ${contagensDoAmbito.todos}` },
+              ]}
+            />
           </div>
 
           {lista.loading && !lista.data ? (
@@ -453,16 +699,42 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
               action={{ label: "Ver todos", onClick: () => setFiltro("todos") }}
             />
           ) : (
+            /* ── A LISTA PASSA A TER CABEÇALHOS DE MÊS ──────────────────────
+               O documento do Calendário dela apanha isto noutro sítio e a
+               queixa é a mesma aqui: «26 Set → 3 Out → 29 Mai 27. Sete meses de
+               intervalo sem qualquer separador. O leitor tem de descobrir
+               sozinho que não há nada entre outubro e maio.»
+
+               A lista das timelines tem exactamente essa forma — «Daqui a 23
+               dias» seguido de «Daqui a 261 dias» — e o salto de sete meses
+               fica escondido atrás de dois números que ninguém subtrai.
+
+               Com os meses escritos, o buraco passa a ser evidente em vez de
+               suspeito. E é a informação mais valiosa desta lista: sete meses
+               livres é uma decisão comercial, não um detalhe de apresentação.
+
+               Colados ao topo (`sticky`) porque a coluna rola: sem isso, a
+               meio de Julho já não se sabe em que mês se está — que é o mesmo
+               defeito com outro nome. */
             <ul className="flex flex-col gap-2">
-              {visiveis.map((g) => (
-                <li key={g.id}>
-                  <LinhaDeGuiao
-                    guiao={g}
-                    janela={janela}
-                    activo={g.id === abertoId}
-                    relogio={g.hoje ? relogio : null}
-                    aoAbrir={() => abrir(g.id)}
-                  />
+              {porMes.map(({ mes, eventos }) => (
+                <li key={mes}>
+                  <h2 className="bo-eyebrow sticky top-0 z-10 -mx-1 bg-[var(--bo-surface-sunken)]/85 px-1 py-1.5 text-[var(--bo-text-muted)] backdrop-blur">
+                    {mes}
+                  </h2>
+                  <ul className="mt-1 flex flex-col gap-2">
+                    {eventos.map((g) => (
+                      <li key={g.id}>
+                        <LinhaDeGuiao
+                          guiao={g}
+                          janela={janela}
+                          activo={g.id === abertoId}
+                          relogio={g.hoje ? relogio : null}
+                          aoAbrir={() => abrir(g.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>
@@ -496,13 +768,30 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
           ) : (
             <div className="bo-card p-[var(--bo-p-cartao)]">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                {/* ── A HIERARQUIA ESTAVA INVERTIDA, COMO NOS OUTROS ECRÃS ──
+                    «Daqui a 359 dias» estava ACIMA do nome do casal, em
+                    cinzento pequeno, na posição de maior destaque do cartão.
+                    É a mesma inversão que os três documentos dela apanham nas
+                    Tarefas, no Calendário e nos Temas: [APPLE] o título
+                    identifica a vista, e o resto é estado.
+
+                    O nome sobe para primeiro. O «daqui a tantos dias» desce
+                    para junto da data, que é o sítio onde ele quer dizer
+                    alguma coisa — «sábado, 4 de setembro · daqui a 359 dias» é
+                    uma frase; sozinho por cima de um nome é um número solto.
+
+                    E fica em `role="status"`: muda com o relógio, sem a página
+                    recarregar. */}
                 <div className="min-w-0">
-                  <p className="bo-eyebrow">{quandoPorExtenso(aberto.faltamDias)}</p>
-                  <h2 className="mt-1 text-title3 font-semibold text-[var(--bo-text)]">
+                  <h2 className="text-title3 font-semibold text-[var(--bo-text)]">
                     {aberto.cliente || "Sem nome"}
                   </h2>
-                  <p className="bo-text-muted text-sm">
+                  <p className="bo-text-muted mt-0.5 text-sm">
                     {dataPorExtenso(aberto.data)}
+                    <span role="status">
+                      {" "}
+                      · {quandoPorExtenso(aberto.faltamDias).toLowerCase()}
+                    </span>
                     {aberto.local ? ` · ${aberto.local}` : ""}
                   </p>
                 </div>
@@ -518,20 +807,24 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                     `flex-wrap` faz o seu trabalho e os comandos passam para a
                     linha de baixo. */}
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  {/* ── O COMUTADOR DAS DUAS PERGUNTAS ───────────────────
-                      Ver `VistaDoDia` para porque é que são duas e não uma.
-                      Fica ao pé das acções e não por cima da régua: é uma
-                      escolha de como olhar, da mesma família do «Imprimir». */}
-                  <Segmented<VistaDoDia>
-                    ariaLabel="Como ver esta timeline"
-                    size="sm"
-                    value={vistaDoDia}
-                    onChange={setVistaDoDia}
-                    options={[
-                      { value: "regua", label: "Régua" },
-                      { value: "grelha", label: "Por pessoa" },
-                    ]}
-                  />
+                  {/* ── O COMUTADOR SAIU: «AQUI BASTA APENAS EDITAR» ─────────────
+                      Havia aqui duas vistas — «Horário» (a grelha por
+                      pessoa) e «Editar». Deixou de fazer sentido no momento
+                      em que a FOLHA passou a estar ao lado do editor: já não
+                      é preciso trocar de modo para ver como está a ficar,
+                      porque está sempre à vista. Um comutador entre duas
+                      coisas em que uma delas deixou de ser precisa é ruído
+                      com aspecto de escolha.
+
+                      ── E A GRELHA POR PESSOA FICOU SEM PORTA ─────────────
+                      Está dito e não escondido: o `GrelhaDoDia` continua no
+                      código, com os seus testes, e neste momento não há por
+                      onde lá chegar. Ela responde a uma pergunta que esta
+                      vista não responde — «são três e meia, quem está
+                      livre?» — e essa pergunta faz-se NO DIA do evento, não
+                      enquanto se escreve a timeline. O sítio dela é
+                      provavelmente o cartão do dia de hoje, e isso é uma
+                      decisão a tomar com ela. */}
                   {/* Imprimir vive AQUI e não na linha da lista, e a razão é
                       técnica: o `printRunSheet` abre uma janela, e uma janela
                       aberta depois de um `await` é bloqueada pelo browser. Na
@@ -545,11 +838,74 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                   >
                     Imprimir folha do dia…
                   </Button>
+                  {/* ── E DESCARREGAR, QUE NÃO É A MESMA COISA QUE IMPRIMIR ──
+                      «Quero que haja uma opção no timeline que seja fazer
+                      download. E que fique como a foto que mandei num PDF.»
+
+                      O «Imprimir» abre uma janela e deixa o resto com ela — o
+                      destino, a margem, e o cabeçalho que o browser mete com a
+                      data e o endereço do back office. Um ficheiro para mandar
+                      à equipa não pode levar o endereço do back office impresso
+                      no fundo.
+
+                      ── E PORQUE É QUE NÃO É UMA ÂNCORA COM `download` ──────
+
+                      Porque uma âncora não sabe ler uma recusa. A rota responde
+                      409 a uma timeline sem uma única hora escrita — que é o
+                      estado em que ela abre um evento novo — e com uma âncora
+                      isso levava-a a uma página de JSON em cru, fora do back
+                      office, com o botão «voltar» como única saída. Assim a
+                      recusa é uma frase no sítio onde ela carregou. */}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!pedido || aDescarregar}
+                    loading={aDescarregar}
+                    onClick={() => void descarregarPdf(aberto.id)}
+                  >
+                    {aDescarregar ? "A preparar…" : "Descarregar PDF"}
+                  </Button>
+                  {/* ── E PELO WHATSAPP, QUE É POR ONDE ELA MANDA ──────────
+                      «Quero que haja uma opção para partilhar logo pelo
+                      WhatsApp e apareça logo os contactos do WhatsApp.»
+
+                      O PDF é o que se imprime e se leva para a quinta; a
+                      mensagem é o que chega ao telemóvel do fornecedor na
+                      véspera. São os dois, e não um em vez do outro — por isso
+                      o botão fica ao lado do outro e não no lugar dele.
+
+                      O texto agrupa-se pelas MESMAS duas regras da folha e do
+                      ficheiro (`timelineParaWhatsApp` chama o `blocosDaFolha`):
+                      uma terceira versão do mesmo dia a andar por aí seria a
+                      que fica no telemóvel de quem está longe do papel. */}
+                  <BotaoWhatsApp
+                    texto={timelineParaWhatsApp({
+                      titulo: tituloDaFolha(aberto),
+                      adultos: cabecalho.adultos,
+                      criancas: cabecalho.criancas,
+                      staff: cabecalho.staff,
+                      momentos: pedido?.timeline ?? [],
+                    })}
+                    rotulo="WhatsApp"
+                  />
                   <Button size="sm" variant="ghost" onClick={fechar} className="lg:hidden">
                     Voltar aos guiões
                   </Button>
                 </div>
               </div>
+
+              {/* A recusa do PDF fica onde ela carregou, e não numa página de
+                  JSON fora do back office. Uma linha, `role="status"`, e some
+                  assim que ela tenta outra vez. */}
+              {falhaAoDescarregar && (
+                <p
+                  role="status"
+                  className="mb-3 flex items-start gap-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]"
+                >
+                  <span aria-hidden="true">⚠</span>
+                  <span>{falhaAoDescarregar}</span>
+                </p>
+              )}
 
               {falhaAoAbrir ? (
                 <AvisoDeFalha
@@ -566,26 +922,27 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                 </div>
               ) : (
                 <>
-                  {vistaDoDia === "grelha" && (
-                    /* A ANÁLISE É A DA LISTA, e não uma segunda conta feita
-                       aqui: é a mesma `analisarODia` sobre os mesmos momentos,
-                       e o `guiaoMudou` mantém a cache em dia a cada edição. Um
-                       `analisarODia` escrito neste sítio dava, no dia em que
-                       uma das duas fosse afinada, uma grelha a discordar da
-                       pastilha que está na linha ao lado. */
-                    <GrelhaDoDia
-                      dia={aberto.dia}
-                      agora={aberto.hoje ? relogio : null}
-                      chaveDoEvento={pedido.id}
-                    />
-                  )}
                   {/* O painel de edição fica MONTADO, escondido, e não
                       desmontado: ele guarda no seu estado o aviso do 409 com o
                       gesto por reaplicar, e desmontá-lo ao trocar de vista
                       deitava fora a única saída que ela tem para não perder o
                       que escreveu. `hidden` tira-o do ecrã e da árvore de
                       acessibilidade sem lhe tocar no estado. */}
-                  <div hidden={vistaDoDia === "grelha"}>
+                  {/* ── A EDIÇÃO E A FOLHA, LADO A LADO ─────────────────────
+                      «Quero que dê para ir vendo ao lado como está a ficar à
+                      medida que vamos preenchendo o timeline, para não termos
+                      que estar sempre a fazer download para ver como está.»
+
+                      É a queixa certa: a folha só existia depois de um
+                      download. Escrever doze momentos e descarregar doze vezes
+                      para ver se as colunas ficam bem é trabalho que o ecrã
+                      devia fazer sozinho.
+
+                      Duas colunas só a partir do `lg`. Abaixo disso a folha
+                      vai para BAIXO do editor e não desaparece: numa coluna
+                      estreita ela deixaria de se ler, mas continua a ser o que
+                      ela quer conferir depois de escrever. */}
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:items-start">
                     <EventTimeline
                       key={pedido.id}
                       quote={pedido}
@@ -593,6 +950,52 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                       modelos={modelos.data?.modelos}
                       aoGuardarComoModelo={(nome, momentos) => void guardarModelo(nome, momentos)}
                     />
+                    {/* Colada ao topo: ela escreve no fundo do editor (a linha
+                        de acrescentar) e confere no topo da folha. Sem o
+                        `sticky`, escrever o décimo momento levava a folha para
+                        fora do ecrã. */}
+                    <aside className="lg:sticky lg:top-4">
+                      <p className="bo-eyebrow mb-2 text-[var(--bo-text-muted)]">Como vai ficar</p>
+                      {/* ── AS TRÊS CONTAGENS DO TOPO DA FOLHA ────────────
+                          «E também para escrever staff e crianças etc que está
+                          no timeline.» Escrevem-se aqui porque é aqui que se
+                          vêem — a folha por baixo mostra-as no instante.
+
+                          Os adultos nascem do `guests` do pedido (é o que a
+                          caixa sugere quando está vazia) e podem ser
+                          reescritos: o número do pedido é de quando o pedido
+                          foi feito, o da folha é o de véspera, depois das
+                          confirmações. É o segundo que manda no dia. */}
+                      <div className="mb-3 grid grid-cols-3 gap-2">
+                        {(
+                          [
+                            ["adultos", "Adultos"],
+                            ["criancas", "Crianças"],
+                            ["staff", "Staff"],
+                          ] as const
+                        ).map(([campo, rotulo]) => (
+                          <Field
+                            key={campo}
+                            as="input"
+                            label={rotulo}
+                            value={cabecalho[campo] ?? ""}
+                            onChange={(e) => mudarCabecalho(campo, e.target.value)}
+                            placeholder={
+                              campo === "adultos" && pedido.guests ? String(pedido.guests) : "—"
+                            }
+                            className="px-2 py-1.5 text-xs"
+                          />
+                        ))}
+                      </div>
+                      <FolhaDaTimeline
+                        titulo={tituloDaFolha(aberto)}
+                        adultos={cabecalho.adultos || (pedido.guests ? String(pedido.guests) : "")}
+                        criancas={cabecalho.criancas ?? ""}
+                        staff={cabecalho.staff ?? ""}
+                        momentos={aberto.momentos}
+                        fornecedores={fornecedoresDaFolha}
+                      />
+                    </aside>
                   </div>
                 </>
               )}

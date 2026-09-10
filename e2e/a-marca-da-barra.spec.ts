@@ -184,22 +184,60 @@ test.describe("a marca da barra do back office @movimento", () => {
     ).toBeLessThan(0.01);
 
     /**
-     * 3. E A CAIXA ESTÁ MESMO AO MEIO DA BARRA.
+     * 3. E A CAIXA ESTÁ UM POUCO À ESQUERDA DO MEIO DA BARRA.
      *
-     * Ao meio da BARRA, e não a meio do que sobra entre o título e os botões —
-     * a razão está por extenso no `AdminClient.tsx`: o espaço que sobra muda de
-     * tamanho a cada vista, e a marca andava de um lado para o outro ao mudar
-     * de separador.
+     * ── ESTE CASO MUDOU DE REGRA DUAS VEZES, E A SEGUNDA FUI EU A ERRAR ──
+     *
+     * Guardava «ao meio da BARRA», com 2 px de tolerância. Ela disse «coloca
+     * mais para o lado esquerdo o logo», e eu mudei a ÂNCORA: passei-a para o
+     * meio do vazio entre o título e os comandos, 129 px à esquerda a 1440.
+     *
+     * Fui longe demais. Ela respondeu com uma captura e um círculo vermelho à
+     * DIREITA de onde a marca tinha ficado: «eu quero o logo onde marquei».
+     *
+     * MEDIDO nessa captura, com 2020 px de barra:
+     *
+     *     o título acaba ......... 355
+     *     os comandos começam .... 1370
+     *     o meio do vazio ........ 862
+     *     a marca estava em ...... 820
+     *     **o círculo dela** ..... 965  →  47,8 % da largura da barra
+     *
+     * «Mais para a esquerda» era um EMPURRÃO, e eu li-o como uma mudança de
+     * âncora. A regra que fica é a que ela marcou: o centro da marca a 47,8 %
+     * da largura — pouco à esquerda do meio, e não no meio do vazio.
+     *
+     * O guarda mede isso em percentagem e não em píxeis, porque é assim que o
+     * CSS o faz (`pe-[4.5%]`) e é o que faz o ecrã de 1024 e o de 1920 darem o
+     * mesmo número. Com `justify-center`, uma margem de 4,5 % põe o centro a
+     * (1 − 0,045)/2 = 47,75 % — 2,25 % à esquerda do meio, em QUALQUER largura.
+     *
+     * Por ser independente da largura, a janela pode ser estreita dos dois
+     * lados: 1,5 % a 3,5 %. A folga que sobra é para o arredondamento do
+     * `boundingBox` e do `object-contain`, que é menos de um píxel; a 1440 são
+     * 32,4 px medidos contra uma janela de 21,6 a 50,4.
+     *
+     * E apanha as duas regressões que interessam, uma em cada ponta: voltar ao
+     * meio da barra (0 %) e voltar a fugir para o meio do vazio (~9 % a 1440,
+     * e mais em ecrãs largos).
      */
     const barra = page.locator("header").first();
     const caixaDaBarra = (await barra.boundingBox())!;
     const caixaDaMarca = (await marca.boundingBox())!;
     const centroDaBarra = caixaDaBarra.x + caixaDaBarra.width / 2;
     const centroDaMarca = caixaDaMarca.x + caixaDaMarca.width / 2;
+    const desvio = (centroDaBarra - centroDaMarca) / caixaDaBarra.width;
+
     expect(
-      Math.abs(centroDaMarca - centroDaBarra),
-      `a marca está a ${Math.abs(centroDaMarca - centroDaBarra).toFixed(1)} px do meio da barra`,
-    ).toBeLessThan(2);
+      desvio,
+      `a marca está a ${(desvio * 100).toFixed(1)}% à esquerda do meio da barra — ` +
+        "ela marcou-a a 2,2%, e um valor perto de zero é a marca a voltar ao meio",
+    ).toBeGreaterThan(0.015);
+    expect(
+      desvio,
+      `a marca está a ${(desvio * 100).toFixed(1)}% à esquerda do meio da barra — ` +
+        "acima de 3,5% é a marca a fugir outra vez para o meio do vazio, que foi o meu erro",
+    ).toBeLessThan(0.035);
 
     /**
      * 4. E VÊ-SE. Um número que se pede em CSS e que agora É o que se vê.

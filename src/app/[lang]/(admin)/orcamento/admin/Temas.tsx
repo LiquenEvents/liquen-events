@@ -32,6 +32,7 @@ import {
   Toolbar,
   type AccaoDeItem,
   Escolha,
+  Glass,
 } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
@@ -1328,7 +1329,10 @@ export default function Temas() {
         />
       )}
       {blocked && (
-        <Card padding="sm" className="mb-6 border-[var(--bo-aviso)]/30 bg-[var(--bo-aviso-lavagem)]/60">
+        <Card
+          padding="sm"
+          className="mb-6 border-[var(--bo-aviso)]/30 bg-[var(--bo-aviso-lavagem)]/60"
+        >
           {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
               tem é o projecto em pausa manda-a correr o schema por nada. */}
           <p className="bo-eyebrow mb-1.5 text-[var(--bo-aviso)]">{blocked.titulo}</p>
@@ -3771,7 +3775,10 @@ function ThemeFolder({
       )}
 
       {failed.length > 0 && (
-        <Card padding="sm" className="mb-4 border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40">
+        <Card
+          padding="sm"
+          className="mb-4 border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40"
+        >
           <p className="text-sm text-[var(--bo-text)]">
             {plural(failed.length, "foto não subiu", "fotos não subiram")}. Os ficheiros ficaram
             guardados — não é preciso voltar a escolhê-los.
@@ -3845,7 +3852,10 @@ function ThemeFolder({
       {/* O QUE NÃO FOI LEVADO para outro tema. Vermelho e persistente: é um
           número em que ela tem de agir, e as fotos continuam aqui. */}
       {copyReport && (
-        <Card padding="sm" className="mb-4 border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40">
+        <Card
+          padding="sm"
+          className="mb-4 border-[var(--bo-perigo)]/25 bg-[var(--bo-perigo-lavagem)]/40"
+        >
           <p className="text-sm text-[var(--bo-text)]">
             {copyReport.failed.length > 0
               ? `${copyReport.failed.length} de ${
@@ -3893,11 +3903,47 @@ function ThemeFolder({
       {(selectedCount > 0 || emBloco) && (
         <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
           {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-sage-600/25 bg-[var(--bo-surface)]/95 px-4 py-3 backdrop-blur">
+            /* ── A PRIMEIRA SUPERFÍCIE DE VIDRO A SÉRIO DA CASA ──────────
+               «Aplica-o a uma superfície só — e olha para ela num ecrã com
+               fotografias por trás. É onde o efeito se prova.»
+               (`docs/LIQUID-GLASS.md`, Parte 7, ponto 3.)
+
+               É esta. A Parte 6 manda o vidro para «a barra de filtros» dos
+               Temas e deixa os cartões opacos, e esta é a barra que flutua
+               neste ecrã: fica colada ao topo enquanto a grelha de fotografias
+               lhe passa por baixo. O documento dela pedia a barra do portal do
+               cliente, e essa não existe — o portal é um documento que rola,
+               sem sub-navegação nem barra de preço. Trocá-la por esta mantém a
+               condição que interessa (fotografias a mexer por trás) e não
+               inventa um ecrã para provar um material.
+
+               O que estava aqui era `backdrop-blur` com o fundo a 95%: o
+               «frosted glass» que a Parte 1 diagnostica, e opaco ao ponto de o
+               desfoque não se ver.
+
+               ── E PORQUE É QUE O FUNDO É 78% E NÃO MENOS ──────────────────
+               Porque a Parte 5 diz que o texto sobre vidro precisa de fundo
+               próprio, e este texto não tem nenhum. MEDIDO, no pior caso de
+               cada tema — foto preta por baixo em claro, foto branca em
+               escuro:
+
+                   fundo   texto 82%        dica 72%
+                   70%     6,73 / 4,55      4,88 / 3,95   ← a dica reprova
+                   78%     7,97 / 5,86      6,03 / 4,95   ✓
+                   86%     9,27 / 7,56      —             (vidro por ver)
+
+               Os 78% são o ponto onde o vidro se vê E o pior caso continua
+               acima de 4,5:1. A dica sobe de 64% para 72% de tinta pela mesma
+               conta: a 64% reprovava a qualquer opacidade que deixasse ver o
+               material. Continua a ler-se como secundária — 72 contra 82. */
+            <Glass
+              superficie="barra"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-sage-600/25 bg-[var(--bo-surface)]/78 px-4 py-3"
+            >
               <p className="text-sm text-[var(--bo-text)]">
                 {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
               </p>
-              <span className="bo-text-muted hidden text-xs sm:inline">
+              <span className="hidden text-xs text-[var(--bo-tinta-72)] sm:inline">
                 Shift + clique seleciona tudo o que está pelo meio.
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -3942,7 +3988,7 @@ function ThemeFolder({
                   Remover
                 </Button>
               </div>
-            </div>
+            </Glass>
           )}
           {emBloco && (
             /* Fundo opaco por baixo: o cartão da espera é translúcido de

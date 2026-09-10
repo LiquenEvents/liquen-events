@@ -29,11 +29,18 @@ import { BLOCO_DA_GAVETA, CORPO_DA_GAVETA, SETA_DA_GAVETA, useGaveta } from "./u
 const RAIZ = "src/app/[lang]/(admin)/orcamento/admin/";
 const CSS = readFileSync("src/app/globals.css", "utf8");
 
-/** Os sete `<details>` destes sete ficheiros, e quantos há em cada um. */
+/**
+ * Os seis `<details>` destes seis ficheiros, e quantos há em cada um.
+ *
+ * Eram sete. O do `Tarefas.tsx` era o «Detalhes (opcional)» de uma tarefa nova
+ * — responsável, área, prioridade e prazo — e saiu porque ela o mandou sair:
+ * «retira isto do opcional, quero que apareça logo». A gaveta desapareceu, os
+ * campos ficaram. Não é uma gaveta a deixar de cumprir o contrato desta lista:
+ * é uma gaveta a deixar de existir.
+ */
 const SITIOS: [ficheiro: string, quantos: number][] = [
   ["Overview.tsx", 1], // «Mais do painel» — o único com o corpo em vários blocos
   ["StatsDashboard.tsx", 1], // a `Section`, usada sete vezes na vista
-  ["Tarefas.tsx", 1], // «Detalhes (opcional)» de uma tarefa nova
   ["ServicesEditor.tsx", 1], // «Atalhos de teclado»
   ["EmailDoEnvio.tsx", 1], // «Ver como o cliente o recebe»
   ["FechosMeta.tsx", 1], // «ver o que ficou de fora»

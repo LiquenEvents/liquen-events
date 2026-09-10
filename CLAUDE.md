@@ -39,3 +39,39 @@ MONTA o `EventTimeline` que já existe** em vez de ter um editor próprio. Um
 segundo editor de guiões ao lado do primeiro é o defeito que a Parte −1 do
 sistema de design manda evitar — e, aqui, seriam dois ecrãs a discordar sobre o
 mesmo dia num papel que se entrega à equipa na manhã do evento.
+
+# E o vidro tem o seu
+
+`docs/LIQUID-GLASS.md` é o documento dela sobre o material — porque é que um
+`backdrop-filter: blur()` não é Liquid Glass, o que é preciso acrescentar-lhe, e
+a tabela de valores por superfície. O motor está em `src/lib/liquid-glass.ts` e a
+ponte para React em `ui/Glass.tsx`.
+
+A **Parte −1** regista as quatro decisões em que a execução se afastou do
+documento — a primeira superfície não é a que ele nomeia (a barra do portal do
+cliente não existe), o `cluster()` ficou de fora até haver o que fundir, as
+curvas `linear()` já cá estavam, e o `position` do `.lg` vive no JS e não no CSS.
+
+E as duas regras da Parte 5 que nenhum ficheiro consegue fazer cumprir sozinho,
+portanto ficam aqui: **uma camada de vidro por ecrã** — vidro sobre vidro
+transforma o fundo em papa cinzenta —, e **vidro só no que flutua**; listas,
+tabelas e formulários ficam opacos. Antes de pôr um `<Glass>` num ecrã, conta os
+que já lá estão.
+
+# E há três ecrãs com documento próprio à espera
+
+`docs/APPLE-TAREFAS.md`, `docs/APPLE-CALENDARIO.md` e `docs/APPLE-TEMAS.md` são
+os três documentos dela para reconstruir esses ecrãs segundo o sistema da Apple.
+Cada um abre com uma tabela **auditada no código** — não de memória — do que já
+está feito e do que falta, no formato do `docs/LOGIN.md`. Lê a tabela antes de
+refazer seja o que for.
+
+Ela escolheu a ordem: **«prefiro as tarefas primeiro»**. Em resumo, hoje:
+Tarefas cinco fases de onze; Temas nenhuma inteira mas quase todas começadas
+(o ecrã já tinha muito feito antes do documento); Calendário por começar — só
+existe a vista de mês, e as de dia, semana e ano são metade daquele documento.
+
+Estes três andaram perdidos: chegaram pelo chat e nunca ficaram guardados. O do
+Liquid Glass fez o mesmo caminho e só se recuperou por sorte. **Um documento que
+ela manda guarda-se em `docs/` no mesmo dia** — é isso que impede o próximo de
+se perder.

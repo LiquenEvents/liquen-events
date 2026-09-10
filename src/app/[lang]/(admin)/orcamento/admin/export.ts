@@ -3,7 +3,7 @@
  *  - CSV download (Excel/Numbers/Sheets friendly, UTF-8 BOM + ; separator for PT)
  *  - Printable run-sheet for an event (opens an isolated print window)
  */
-import type { Quote } from "@/lib/orcamento/types";
+import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { eur0, round2 } from "@/lib/money";
@@ -15,6 +15,81 @@ import {
   ordenar,
 } from "@/lib/orcamento/guiao-do-dia";
 import { todayKey } from "./util";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A TIMELINE NO PAPEL — A MESMA FOLHA QUE SAI NO PDF
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * ── O DESENHO É DELA, E NÃO MEU ──────────────────────────────────────────
+ *
+ * Ela mandou a timeline a sério de um casamento — a folha que a equipa levou
+ * para a Adega Fita Preta a 28 de Junho, três páginas — e escreveu «quero que
+ * faças assim mesmo para o nosso timeline». Quatro colunas:
+ *
+ *     HORA · LOCAL · DESCRIÇÃO · NOTAS
+ *
+ * E três regras que fazem aquela folha funcionar:
+ *
+ *  1. **A hora escreve-se uma vez.** Às 10h30 acontecem cinco coisas, e a hora
+ *     aparece na primeira — repeti-la cinco vezes faz parecer cinco momentos.
+ *  2. **O local também.** Escreve-se quando MUDA. Uma coluna com duas palavras
+ *     em três páginas diz exactamente onde o dia troca de sítio.
+ *  3. **As notas são uma coluna à parte.** «Sergey chega» é a descrição;
+ *     «enviar táxi» é a nota.
+ *
+ * ── E PORQUE É QUE AQUI NÃO É A GRELHA ──────────────────────────────────
+ *
+ * Houve aqui, durante umas horas, o horário em grelha — horas a descer, uma
+ * coluna por pessoa. Saiu, e a razão está na folha dela: a grelha responde a
+ * «são três e meia, quem está livre?», e esta folha responde a «o que se
+ * segue, e o que é preciso ter pronto». A segunda é a que se faz com a folha
+ * na mão. O ecrã ficou com a primeira; o papel e o PDF ficam com esta.
+ *
+ * ── E SAI IGUAL AO PDF DE PROPÓSITO ─────────────────────────────────────
+ *
+ * O `horario-pdf.ts` desenha a mesma coisa com o `pdf-lib`. São dois
+ * desenhadores porque um faz HTML para a impressora e o outro faz um ficheiro
+ * para guardar — mas as três regras acima são as mesmas nos dois, e quem mudar
+ * uma tem de mudar a outra. Imprimir e descarregar não podem dar folhas
+ * diferentes do mesmo dia.
+ */
+
+/** «08:30» → «08h30», que é como a folha dela escreve as horas. */
+function horaDaFolha(hhmm: string): string {
+  const encontro = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!encontro) return hhmm.trim();
+  return `${encontro[1].padStart(2, "0")}h${encontro[2]}`;
+}
+
+function horarioEmHtml(momentos: readonly TimelineItem[]): string {
+  const emOrdem = ordenar(momentos);
+  if (emOrdem.length === 0) return "<p class='empty'>Timeline não definida.</p>";
+
+  let horaAnterior = "";
+  let localAnterior = "";
+  const linhas = emOrdem
+    .map((m) => {
+      const hora = horaDaFolha(m.time);
+      const mudouDeHora = hora !== horaAnterior;
+      const local = (m.local ?? "").trim();
+      const mudouDeLocal = !!local && local !== localAnterior;
+      if (mudouDeHora) horaAnterior = hora;
+      if (mudouDeLocal) localAnterior = local;
+      return `<tr class="${mudouDeHora ? "hbloco" : ""}">
+        <td class="hhora">${mudouDeHora ? escapeHtml(hora) : ""}</td>
+        <td class="hlocal">${mudouDeLocal ? escapeHtml(local) : ""}</td>
+        <td class="hdesc">${escapeHtml(m.title)}</td>
+        <td class="hnotas">${escapeHtml(m.notas ?? "")}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<table class="horario">
+    <thead><tr><th>Hora</th><th>Local</th><th>Descrição</th><th>Notas</th></tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>`;
+}
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
@@ -630,22 +705,8 @@ export function printEventDossier(q: Quote): void {
   // Mesma ordem e mesmo intervalo do guião do dia — ver a nota no `printRunSheet`.
   const timeline = ordenar(q.timeline ?? []);
   const sectionTimeline = `<section>
-    <h2>Cronograma do dia</h2>
-    ${
-      timeline.length
-        ? `<table><tbody>${timeline
-            .map((t) => {
-              const inicio = minutosDe(t.time);
-              const dur = duracaoDe(t);
-              const quando =
-                inicio !== null && dur > 0
-                  ? `${escapeHtml(t.time)} → ${horaDoMinuto(ordemNoDia(t.time) + dur)}`
-                  : escapeHtml(t.time || "—");
-              return `<tr><td class="t">${quando}</td><td>${escapeHtml(t.title)}</td><td class="grey">${escapeHtml(t.owner ?? "")}</td></tr>`;
-            })
-            .join("")}</tbody></table>`
-        : "<p class='empty'>Cronograma não definido.</p>"
-    }
+    <h2>Horário do dia</h2>
+    ${timeline.length ? horarioEmHtml(timeline) : "<p class='empty'>Horário não definido.</p>"}
   </section>`;
 
   const checklist = q.checklist ?? [];
@@ -733,6 +794,21 @@ export function printEventDossier(q: Quote): void {
     td.t { width: 70px; font-weight: 700; color: #525a2f; white-space: nowrap; }
     td.num { text-align: right; font-weight: 600; white-space: nowrap; }
     .tick { color: #3a5c39; font-weight: 700; }
+    /* ── A TIMELINE, NO PAPEL ─────────────────────────────────────────────
+       Quatro colunas, e o que faz a folha dela ler-se é a régua fina onde a
+       HORA muda: é ela que faz os cinco momentos das 10h30 lerem-se como um
+       bloco em vez de cinco momentos soltos. Sem régua entre as linhas do
+       mesmo bloco, e sem zebra nenhuma — a folha dela não tem, e não tem
+       porque não precisa. */
+    table.horario { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    table.horario th { text-align: left; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: #525a2f; padding: 0 6px 6px 0; border-bottom: 1.2px solid #9aa38a; }
+    table.horario td { padding: 3px 6px 3px 0; font-size: 11px; vertical-align: top; border: 0; line-height: 1.3; }
+    table.horario tr.hbloco td { padding-top: 8px; border-top: 1px solid #e0e0dd; }
+    table.horario tr.hbloco:first-child td { border-top: 0; }
+    td.hhora { width: 52px; font-weight: 700; color: #2f3a26; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.hlocal { width: 78px; color: #6d7a63; }
+    td.hdesc { color: #111; }
+    td.hnotas { width: 34%; color: #6d7a63; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; display: flex; gap: 10px; align-items: center; }
     li.done { color: #aaa; text-decoration: line-through; }

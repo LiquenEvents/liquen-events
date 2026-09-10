@@ -57,6 +57,7 @@ const GUIOES = [
     evento: "Casamento",
     data: "2026-06-20",
     local: "Herdade da Maridona",
+    aceite: true,
     momentos: [momento("a1", "09:00", "Montagem", 120), momento("a2", "11:00", "Cerimónia", 60)],
   },
   {
@@ -65,6 +66,7 @@ const GUIOES = [
     evento: "Casamento",
     data: "2026-06-15",
     local: "Quinta do Sobral",
+    aceite: true,
     momentos: [
       momento("b1", "09:00", "Montagem", 180, "Rita"),
       momento("b2", "10:00", "Ir buscar as flores", 60, "Rita"),
@@ -76,6 +78,7 @@ const GUIOES = [
     evento: "Batizado",
     data: "2026-07-01",
     local: "Igreja de Évora",
+    aceite: true,
     momentos: [],
   },
 ];
@@ -103,10 +106,21 @@ function ligarOServidor() {
       if (url.startsWith("/api/guioes")) {
         return resposta({ guioes: GUIOES });
       }
-      gravados.push({
-        url,
-        corpo: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
-      });
+      /* ── SÓ AS ESCRITAS, QUE É O QUE O NOME DIZ ─────────────────────────
+         Isto guardava TUDO o que não fosse `/api/guioes` — incluindo leituras.
+         Passou despercebido enquanto esta vista só lia os guiões; no dia em
+         que passou a ler também o directório de fornecedores (para a folha
+         mostrar os contactos), o GET entrou na lista das gravações e um caso
+         que esperava UMA gravação viu duas.
+
+         O defeito era do ajudante e não do código: um contador de escritas que
+         conta leituras mede outra coisa. */
+      if ((init?.method ?? "GET").toUpperCase() !== "GET") {
+        gravados.push({
+          url,
+          corpo: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
+        });
+      }
       return resposta({ ok: true });
     }),
   );
@@ -206,6 +220,51 @@ describe("Timelines — a lista", () => {
     expect(screen.queryByRole("button", { name: /Carla e Diogo/ })).toBeNull();
   });
 
+  it("por omissão só mostra os eventos fechados, e dá para ver os outros", async () => {
+    /**
+     * ── DUAS COISAS DELA, COM DIAS DE DIFERENÇA, E AS DUAS VALEM ──────────
+     *
+     *  1. «Quero que dê para fazer timelines APENAS das propostas que já foram
+     *     aceites.» A lista tinha quinze eventos e treze diziam «Sem timeline»,
+     *     porque a maior parte ainda eram propostas por responder.
+     *  2. «Aqui quero que dê TAMBÉM para escolher aqueles que quero fazer um
+     *     timeline» — com a lista a mostrar UM evento, que é o que sobrou do
+     *     corte da primeira.
+     *
+     * Não se contradizem: a primeira é sobre o que se vê por omissão, a
+     * segunda é sobre poder ver o resto. Houve aqui, durante umas horas, um
+     * corte no SERVIDOR — e um corte no servidor só sabe fazer a primeira: ao
+     * fazê-la, tirava a segunda sem deixar porta nenhuma.
+     *
+     * Este caso guarda as duas ao mesmo tempo, que é a única maneira de não se
+     * perder uma a arranjar a outra.
+     */
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.startsWith("/api/guioes/modelos")
+          ? resposta({ modelos: [] })
+          : resposta({
+              guioes: [
+                { ...GUIOES[0], aceite: true },
+                { ...GUIOES[1], id: "q-por-fechar", cliente: "Ainda a pensar", aceite: false },
+              ],
+            }),
+      ),
+    );
+    montar();
+
+    // 1. Por omissão, só o fechado.
+    await screen.findByRole("button", { name: /Ana e Rui/ });
+    expect(screen.queryByRole("button", { name: /Ainda a pensar/ })).toBeNull();
+
+    // 2. E o outro está a um toque, não atrás de uma parede.
+    await user.click(screen.getByRole("radio", { name: /^Todos os eventos · 2$/ }));
+    expect(screen.getByRole("button", { name: /Ainda a pensar/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Ana e Rui/ })).toBeTruthy();
+  });
+
   it("um filtro sem resultados diz que foi o filtro que mudou, não os dados", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal(
@@ -223,6 +282,16 @@ describe("Timelines — a lista", () => {
     expect(screen.getByText(/Mudou o filtro, não os dados/)).toBeTruthy();
   });
 });
+
+/**
+ * ── E O EDITOR VOLTOU A SER A PRIMEIRA COISA ────────────────────────────
+ *
+ * Durante uma ronda esta vista abriu no «Horário» (a grelha por pessoa) e
+ * estes casos tiveram de dar um toque em «Editar» antes de editar. O
+ * comutador saiu — «aqui basta apenas editar» —, porque a FOLHA passou a
+ * estar ao lado do editor e já não é preciso trocar de vista para ver como
+ * está a ficar. O toque a mais saiu com ele.
+ */
 
 describe("Timelines — abrir e editar", () => {
   it("abrir um evento vai buscar o pedido inteiro e monta o editor", async () => {
@@ -255,25 +324,47 @@ describe("Timelines — abrir e editar", () => {
     expect(screen.queryByText("Cronograma do Dia")).toBeNull();
   });
 
-  it("juntar um modelo grava os momentos do modelo na timeline do evento", async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    montar();
-    await screen.findByRole("button", { name: /Carla e Diogo/ });
-    await user.click(linhaDe("Carla e Diogo"));
-    await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
+  it(
+    "juntar um modelo grava os momentos do modelo na timeline do evento",
+    { timeout: 20_000 },
+    async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      montar();
+      await screen.findByRole("button", { name: /Carla e Diogo/ });
+      await user.click(linhaDe("Carla e Diogo"));
+      await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
 
-    const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
-    const modelo = MODELOS_DA_CASA[0];
-    await escolher(user, escolha, modelo.nome);
+      const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
+      const modelo = MODELOS_DA_CASA[0];
+      await escolher(user, escolha, modelo.nome);
 
-    await waitFor(() => expect(gravados).toHaveLength(1));
-    expect(gravados[0].url).toBe("/api/orcamento/q-vazio");
-    const timeline = gravados[0].corpo.timeline as TimelineItem[];
-    expect(timeline.map((t) => t.title)).toEqual(modelo.momentos.map((t) => t.title));
-    // Cada momento nasce com id próprio — sem isso, reaplicar o gesto depois de
-    // um 409 punha uma segunda cópia no guião.
-    expect(new Set(timeline.map((t) => t.id)).size).toBe(timeline.length);
-  });
+      /* ── O TECTO É EXPLÍCITO, E A RAZÃO ESTÁ NO `beforeEach` ─────────────
+       Este ficheiro corre com `useFakeTimers({ shouldAdvanceTime: true })`: o
+       relógio é falso mas anda sozinho, a passo do relógio verdadeiro, e quem
+       o faz andar é um intervalo no laço de eventos.
+
+       Numa passagem completa — dez mil testes, vários processos — esse laço
+       fica esfomeado. O tempo REAL passa à mesma, o tempo FALSO fica para
+       trás, e o `waitFor`, que conta no falso, esgota o orçamento do teste sem
+       nunca ter chegado a esperar o que julga estar a esperar. MEDIDO: passa
+       sozinho (10/10), e falhou em duas de três passagens completas — sempre
+       aqui, sempre com zero gravações em vez de uma.
+
+       Vinte segundos não afrouxam a asserção: continua a ser UMA gravação, com
+       o mesmo destino e o mesmo corpo. Afrouxam a paciência — que era o que
+       estava a medir a carga da máquina em vez do produto. E o tecto do CASO
+       sobe com ele: o do `it` são 5 s, e um `waitFor` mais paciente do que o
+       teste que o contém nunca chega a ganhar. Foi o meu primeiro remendo, e
+       não serviu para nada. */
+      await waitFor(() => expect(gravados).toHaveLength(1), { timeout: 15_000 });
+      expect(gravados[0].url).toBe("/api/orcamento/q-vazio");
+      const timeline = gravados[0].corpo.timeline as TimelineItem[];
+      expect(timeline.map((t) => t.title)).toEqual(modelo.momentos.map((t) => t.title));
+      // Cada momento nasce com id próprio — sem isso, reaplicar o gesto depois de
+      // um 409 punha uma segunda cópia no guião.
+      expect(new Set(timeline.map((t) => t.id)).size).toBe(timeline.length);
+    },
+  );
 
   it("a lista fica em dia com o que se editou, sem recarregar a página", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

@@ -100,6 +100,20 @@ test.describe("Timelines @guiao", () => {
     }).toPass({ timeout: 120_000 });
 
     // ── 2. A LISTA TRAZ O EVENTO SEMEADO ────────────────────────────────────
+    //
+    // ── PRIMEIRO, ALARGAR O ÂMBITO ────────────────────────────────────────
+    // A lista abre nos eventos FECHADOS, que é o que ela pediu: «quero que dê
+    // para fazer timelines apenas das propostas que já foram aceites». O
+    // pedido que esta suite semeia entra pela porta pública e nasce
+    // `pendente` — como qualquer pedido de um casal —, portanto não está lá.
+    //
+    // O toque em «Todos os eventos» é o que ela dá quando quer preparar um dia
+    // que ainda não fechou, e é a outra metade do mesmo pedido dela: «aqui
+    // quero que dê também para escolher aqueles que quero fazer um timeline».
+    // Marcar a semente como aceite era mais curto e media menos: passava a
+    // provar o caminho fácil e deixava este por provar.
+    await page.getByRole("radio", { name: /^Todos os eventos/ }).click();
+
     // Pelo nome ACESSÍVEL da linha, que é o que uma pessoa com leitor de ecrã
     // ouve: a data, o cliente e o estado do guião.
     const linha = page.getByRole("button", { name: naLista }).first();
@@ -168,8 +182,41 @@ test.describe("Timelines @guiao", () => {
     await expect(page.getByRole("heading", { level: 1, name: /^Timelines$/ })).toBeVisible({
       timeout: 60_000,
     });
+    /* ── E O ÂMBITO VOLTA AO PRINCÍPIO, DE PROPÓSITO ──────────────────────
+       Um recarregar traz a lista nos FECHADOS outra vez, que é o estado com
+       que ela abre. A semente nasce `pendente`, portanto tem de se voltar a
+       alargar o âmbito antes de a procurar — não é um defeito a contornar, é
+       a mesma porta a ser aberta segunda vez.
+
+       Guardar a escolha entre recarregamentos seria outra decisão, e não é
+       esta que ela pediu: o que ela pediu foi PODER escolher. O filtro é da
+       sessão de trabalho e não do dia, e um âmbito que se cola sozinho
+       deixava-a a olhar para eventos que não fechou sem saber porquê.
+
+       ── E ESPERA-SE PELA HIDRATAÇÃO ANTES DE TOCAR, QUE FOI O VERMELHO ────
+
+       Isto passou aqui e falhou no CI, três vezes, sempre nesta linha. A razão
+       está escrita no `AGENTS.md`: no `next dev` da 16.3.3 o cabeçalho passou a
+       vir DESENHADO DO SERVIDOR, e por isso deixou de provar que a página está
+       viva. O `<h1>Timelines</h1>` aparecia, o toque no «Todos os eventos»
+       caía num rádio que ainda não tinha ouvinte nenhum, não acontecia NADA —
+       sem erro, sem aviso — e a lista ficava nos fechados à espera de uma
+       semente que nasce pendente.
+
+       O sinal que serve é a classe `admin-mode` no `body` (o `data-admin-mode`
+       é o irmão que vem do servidor e não serve). E o `toPass` à volta é a
+       segunda rede: entre a classe aparecer e o React ligar o `onChange` há uma
+       janela de fotogramas, e um toque perdido lá dentro é para repetir, não
+       para reprovar a passagem. */
+    await page.waitForFunction(() => document.body.classList.contains("admin-mode"), null, {
+      timeout: 60_000,
+    });
+
     const linhaDepois = page.getByRole("button", { name: naLista }).first();
-    await expect(linhaDepois).toBeVisible({ timeout: 30_000 });
+    await expect(async () => {
+      await page.getByRole("radio", { name: /^Todos os eventos/ }).click();
+      await expect(linhaDepois).toBeVisible({ timeout: 10_000 });
+    }).toPass({ timeout: 60_000 });
     await expect(
       linhaDepois,
       "a timeline gravada devia aparecer na lista com a sobreposição que ficou",

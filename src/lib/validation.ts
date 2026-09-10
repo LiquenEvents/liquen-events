@@ -258,6 +258,27 @@ const timelineItemSchema = z.object({
     .min(0)
     .max(24 * 60)
     .optional(),
+  /**
+   * ── ONDE E O QUE É PRECISO GARANTIR ────────────────────────────────────
+   *
+   * As duas colunas do meio da folha dela. Entraram no `TimelineItem` e no
+   * ecrã, e NÃO entraram aqui — que é o defeito contra o qual o comentário da
+   * `duracao`, três linhas acima, está escrito. O `.strip()` apagava-as em
+   * silêncio, com 200, e fazia duas coisas ao mesmo tempo:
+   *
+   *  1. o local e a nota que ela escrevia desapareciam ao gravar;
+   *  2. e a gravação SEGUINTE respondia 409 — porque o ecrã dizia ter partido
+   *     de um guião COM local e notas e o servidor tinha um SEM, e a conferência
+   *     da base (`api/orcamento/[id]`) via, correctamente, duas listas
+   *     diferentes. A mensagem «a timeline mudou noutro sítio» era verdadeira à
+   *     letra: tinha mudado, ao passar por aqui.
+   *
+   * Os tectos são os da folha: um local é um nome de sítio («Adega Fitapreta»),
+   * uma nota é uma frase curta («enviar táxi»), e nenhuma das duas é um campo
+   * onde se escreva um parágrafo.
+   */
+  local: trimmed(200).optional(),
+  notas: trimmed(500).optional(),
 });
 
 const paymentSchema = z.object({
@@ -319,6 +340,18 @@ export const quoteUpdateSchema = z
     productionPlan: z.array(checklistItemSchema).max(500),
     payments: z.array(paymentSchema).max(500),
     timeline: z.array(timelineItemSchema).max(500),
+    /* As três contagens do topo da folha. Texto livre e curto — a folha dela
+       diz «6 crianças (1 c/ 1 ano)», e aquele parêntesis é a informação que
+       faz a diferença no dia. Ver `CabecalhoDaFolha`.
+
+       DECLARADO AQUI ou não existe: este esquema corre em `.strip()`, e uma
+       chave que não esteja escrita é apagada em SILÊNCIO, com um 200 por cima.
+       É a mesma armadilha que a `duracao` do momento documenta. */
+    folhaDaTimeline: z.object({
+      adultos: trimmed(60).optional(),
+      criancas: trimmed(60).optional(),
+      staff: trimmed(60).optional(),
+    }),
     eventSuppliers: z.array(eventSupplierSchema).max(500),
     tags: z.array(trimmed(60)).max(100),
     followUpAt: shortDate.nullish(),

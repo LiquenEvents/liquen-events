@@ -20,13 +20,12 @@ import {
   type BlocoDoDia,
 } from "@/lib/orcamento/guiao-do-dia";
 import {
-  CRONOGRAMA_BASE,
   modeloAPartirDoGuiao,
   momentosDoModelo,
   type ModeloDeGuiao,
   type MomentoDeModelo,
 } from "@/lib/orcamento/guiao-modelos";
-import { Button, Escolha, Field, EmptyState } from "./ui";
+import { Button, CampoDeHora, Escolha, Field, EmptyState } from "./ui";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -106,7 +105,30 @@ function sortByTime(items: TimelineItem[]): TimelineItem[] {
   return ordenar(items);
 }
 
-type EditableField = "time" | "title" | "owner";
+/**
+ * Os campos de um momento que se editam TOCANDO NELES, na própria linha.
+ *
+ * O `local` e as `notas` entraram nesta lista quando ela perguntou «e os
+ * fornecedores… onde escrevemos?» e a seguir «eu quero conseguir editar isto».
+ * Até aí só se escreviam ao ACRESCENTAR o momento — e um campo que se escreve
+ * uma vez e nunca mais se corrige é um campo que fica errado para sempre no
+ * dia em que a montagem muda de sítio.
+ */
+/**
+ * Quanto tempo se espera, depois da última tecla, antes de gravar.
+ *
+ * Vive aqui e é IMPORTADO pelo `Guioes.tsx` em vez de lá estar escrito outra
+ * vez. Ela pediu que os campos da timeline gravassem «como está nos números do
+ * staff e crianças» — se os dois números viverem em sítios diferentes, um dia
+ * um deles muda e passam a ser duas velocidades a fingir que são a mesma.
+ *
+ * 600 ms: acima disto uma pessoa que escreve depressa passa por um pensamento
+ * inteiro sem nada ficar gravado; abaixo, uma frase de dez palavras manda meia
+ * dúzia de gravações que ninguém pediu.
+ */
+export const GRAVAR_AO_ESCREVER_MS = 600;
+
+type EditableField = "time" | "title" | "owner" | "local" | "notas";
 
 /**
  * Uma gravação que o servidor recusou por o guião ter mudado noutro sítio.
@@ -131,6 +153,23 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("");
+  /**
+   * ── AS DUAS COLUNAS DA FOLHA DELA ──────────────────────────────────────
+   *
+   * Ela mandou a timeline a sério da Adega Fita Preta e disse «quero que faças
+   * assim mesmo». Aquela folha tem quatro colunas — HORA, LOCAL, DESCRIÇÃO,
+   * NOTAS — e nós tínhamos duas. Estas são as outras; ver a nota longa no
+   * `TimelineItem`.
+   *
+   * O LOCAL não se limpa depois de acrescentar, e é a única diferença de
+   * comportamento entre os campos desta fila: num dia de casamento a equipa
+   * está no mesmo sítio durante horas, e obrigá-la a reescrever «Fitapreta»
+   * em cada um dos cinco momentos das 10h30 é atrito puro. A NOTA limpa-se,
+   * porque uma nota é de UM momento e arrastá-la para o seguinte era escrever
+   * uma coisa que ela não escreveu.
+   */
+  const [localNovo, setLocalNovo] = useState("");
+  const [notasNovas, setNotasNovas] = useState("");
   const [duracaoNova, setDuracaoNova] = useState(SEM_DURACAO);
   // Edição inline de um campo de uma linha: commit em blur/Enter, Escape cancela.
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null);
@@ -321,10 +360,6 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     ]);
   }
 
-  function seed() {
-    aplicarMomentos("gerar o cronograma-base", CRONOGRAMA_BASE);
-  }
-
   /**
    * Guardar o que está no ecrã como modelo.
    *
@@ -362,6 +397,8 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       time,
       title: t,
       owner: owner.trim() || undefined,
+      local: localNovo.trim() || undefined,
+      notas: notasNovas.trim() || undefined,
       // Sem duração escolhida o campo NÃO nasce: um `duracao: 0` gravado é
       // indistinguível de «sem duração» na leitura, mas engorda o guião com
       // uma chave por momento e faz um guião novo deixar de ser igual a um
@@ -372,6 +409,8 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     setTime("");
     setTitle("");
     setOwner("");
+    // O local FICA — ver a nota em `localNovo`. A nota é de um momento e sai.
+    setNotasNovas("");
     setDuracaoNova(SEM_DURACAO);
   }
   function remove(id: string) {
@@ -382,22 +421,111 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     );
   }
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * GRAVA ENQUANTO ELA ESCREVE — «como está nos números do staff e crianças»
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Antes gravava-se em `blur` ou `Enter`. Parece inofensivo e não é: o texto
+   * só existia no ecrã até ela sair do campo, e um separador fechado, um
+   * telemóvel que adormece ou um clique na linha ao lado levavam-no. As
+   * contagens da folha já gravavam sozinhas (`Guioes.tsx`, `mudarCabecalho`), e
+   * ela apanhou a diferença — dois campos no mesmo ecrã com duas promessas
+   * diferentes sobre o que acontece ao que se escreve.
+   *
+   * Os 600 ms são os mesmos das contagens, e não é preguiça de copiar: é a
+   * mesma pergunta («parou de escrever?») e duas respostas diferentes no mesmo
+   * ecrã seriam duas velocidades a fingir que são uma.
+   *
+   * ── E O `ESCAPE` PASSOU A SER DESFAZER, PORQUE TINHA DE PASSAR ─────────
+   *
+   * «Escape cancela» era verdade enquanto nada tinha sido gravado. Com gravação
+   * automática deixa de ser: aos 600 ms o que ela escreveu JÁ está guardado, e
+   * um `Escape` que só fechasse o campo prometia uma coisa e fazia outra.
+   *
+   * Passa a repor o valor com que o campo abriu — e a GRAVAR essa reposição, se
+   * entretanto se gravou alguma coisa. Continua a ser «deixa isto como estava»,
+   * que é o que ela quer dizer quando carrega em Escape; o que muda é que agora
+   * é verdade também no servidor.
+   */
+  const porGravar = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** O valor com que o campo abriu — o destino do Escape e do ✕. */
+  const valorAoAbrir = useRef("");
+
+  useEffect(
+    () => () => {
+      if (porGravar.current) clearTimeout(porGravar.current);
+    },
+    [],
+  );
+
   function startEdit(id: string, field: EditableField, current: string) {
+    /* Trocar de campo com uma gravação em fila grava-a JÁ, e não a deita fora:
+       o que ela escreveu no campo anterior é dela, e um clique noutro sítio não
+       é um pedido para o esquecer. */
+    if (porGravar.current) {
+      clearTimeout(porGravar.current);
+      porGravar.current = null;
+      if (editing) gravarCampo(editing.id, editing.field, draft);
+    }
     setEditing({ id, field });
     setDraft(current);
+    valorAoAbrir.current = current;
   }
+
+  /** Escreve, e marca a gravação para daqui a pouco. */
+  function escreverNoCampo(v: string) {
+    setDraft(v);
+    if (!editing) return;
+    const { id, field } = editing;
+    if (porGravar.current) clearTimeout(porGravar.current);
+    porGravar.current = setTimeout(() => {
+      porGravar.current = null;
+      gravarCampo(id, field, v);
+    }, GRAVAR_AO_ESCREVER_MS);
+  }
+
+  /** Fecha o campo, gravando já o que estiver em fila. */
   function commitEdit() {
     if (!editing) return;
     const { id, field } = editing;
+    if (porGravar.current) {
+      clearTimeout(porGravar.current);
+      porGravar.current = null;
+    }
     setEditing(null); // fecha já — o blur que se segue não volta a fazer commit
+    gravarCampo(id, field, draft);
+  }
+
+  /** Deixa o campo como estava — no ecrã e, se já lá chegou, no servidor. */
+  function desistirDoCampo() {
+    if (porGravar.current) {
+      clearTimeout(porGravar.current);
+      porGravar.current = null;
+    }
+    const aberto = editing;
+    const original = valorAoAbrir.current;
+    setEditing(null);
+    if (aberto) gravarCampo(aberto.id, aberto.field, original);
+  }
+
+  function gravarCampo(id: string, field: EditableField, texto: string) {
     const item = items.find((i) => i.id === id);
     if (!item) return;
-    const v = draft.trim();
-    if (field === "owner") {
+    const v = texto.trim();
+    /* ── OS CAMPOS QUE PODEM FICAR VAZIOS ────────────────────────────────
+       O responsável, o local e a nota. Apagar o que lá está é uma edição
+       legítima — a montagem mudou de sítio, a nota deixou de fazer sentido —
+       e por isso o vazio GRAVA (como ausência da chave) em vez de cancelar.
+       A hora e o título são o contrário: sem eles não há momento nenhum, e
+       um vazio ali é um engano a caminho de uma linha inválida. */
+    const APAGAVEIS = { owner: "o responsável", local: "o local", notas: "a nota" } as const;
+    if (field in APAGAVEIS) {
+      const chave = field as keyof typeof APAGAVEIS;
       const next = v || undefined;
-      if (next === item.owner) return;
-      persist(`mudar o responsável de «${item.title}»`, (atuais) =>
-        atuais.map((i) => (i.id === id ? { ...i, owner: next } : i)),
+      if (next === item[chave]) return;
+      persist(`mudar ${APAGAVEIS[chave]} de «${item.title}»`, (atuais) =>
+        atuais.map((i) => (i.id === id ? { ...i, [chave]: next } : i)),
       );
       return;
     }
@@ -410,7 +538,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
   }
   function editKeys(e: React.KeyboardEvent) {
     if (e.key === "Enter") commitEdit();
-    if (e.key === "Escape") setEditing(null);
+    if (e.key === "Escape") desistirDoCampo();
   }
 
   /**
@@ -589,7 +717,9 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
             </ul>
           ) : (
             <p className="bo-text-muted mt-1 text-sm">
-              {seguinte.terminado ? "A timeline chegou ao fim." : "Não há nada marcado neste momento."}
+              {seguinte.terminado
+                ? "A timeline chegou ao fim."
+                : "Não há nada marcado neste momento."}
             </p>
           )}
 
@@ -724,8 +854,20 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
             </svg>
           }
           title="Timeline por preencher"
-          description="Gera um cronograma-base para um dia de evento típico e adapta os momentos a este evento."
-          action={{ label: "Gerar cronograma-base", onClick: seed }}
+          /* ── O «GERAR CRONOGRAMA-BASE» SAIU, E FOI ELA QUE O MANDOU SAIR ──
+             «Quero retirar isto de gerar cronograma. Quero apenas ser eu a
+             fazer sozinha.»
+
+             O botão punha nove momentos de um dia de evento TÍPICO num guião
+             que é de um evento concreto — e depois o trabalho dela era apagar
+             o que não servia, que é mais trabalho do que escrever o que serve.
+             O estado vazio passa a apontar para onde se escreve: a linha do
+             fundo, que já lá está e é por onde ela entra.
+
+             Os modelos ficam: «Juntar modelo…» é escolha dela, momento a
+             momento, e o «Guardar como modelo…» é como eles nascem — do
+             trabalho dela, e não de um dia inventado. */
+          description="Escreve o primeiro momento na linha do fundo — a hora, o que acontece e quem faz."
         />
       ) : (
         <div className="mb-5">
@@ -772,11 +914,11 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
                 )}
                 editing={editing}
                 draft={draft}
-                setDraft={setDraft}
+                setDraft={escreverNoCampo}
                 commitEdit={commitEdit}
                 editKeys={editKeys}
                 startEdit={startEdit}
-                cancelarEdicao={() => setEditing(null)}
+                cancelarEdicao={desistirDoCampo}
                 commitDuracao={commitDuracao}
                 remove={remove}
               />
@@ -787,15 +929,17 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
 
       {/* Add row */}
       <div className="flex flex-wrap items-end gap-2">
-        <Field
-          as="input"
-          type="time"
-          label="Hora"
-          hideLabel
+        {/* ── A HORA DEIXOU DE SER UMA CAIXA DO SISTEMA ─────────────────
+            Ver `ui/CampoDeHora`: ela mandou a captura da lista azul que o
+            `<input type="time">` abre e disse «vamos melhorar isto para o
+            software da Apple e com uma boa animação». No dedo continua a ser
+            o controlo nativo, que abre a roda do sistema — trocar isso era
+            trocar uma coisa boa por uma imitação. */}
+        <CampoDeHora
+          ariaLabel="Hora"
           value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="px-2.5"
-          containerClassName="w-[104px]"
+          onChange={setTime}
+          containerClassName="shrink-0"
         />
         {/* A duração escolhe-se — não se escreve. Ver `DEGRAUS_DE_DURACAO`. E é
             o `ui/Escolha` e não um `<select>` cru: a lista de um `<select>` é
@@ -821,6 +965,16 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
         />
         <Field
           as="input"
+          label="Local"
+          hideLabel
+          value={localNovo}
+          onChange={(e) => setLocalNovo(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Local"
+          containerClassName="w-32"
+        />
+        <Field
+          as="input"
           label="Responsável"
           hideLabel
           value={owner}
@@ -828,6 +982,16 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Responsável"
           containerClassName="w-40"
+        />
+        <Field
+          as="input"
+          label="Notas"
+          hideLabel
+          value={notasNovas}
+          onChange={(e) => setNotasNovas(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Notas — o que é preciso garantir"
+          containerClassName="min-w-[10rem] flex-1"
         />
         <Button variant="primary" onClick={add} disabled={!title.trim() || !time}>
           Adicionar
@@ -846,6 +1010,12 @@ interface BlocoProps {
   emChoque: boolean;
   editing: { id: string; field: EditableField } | null;
   draft: string;
+  /**
+   * Escrever no campo aberto. NÃO é o `setState` cru: é o `escreverNoCampo` do
+   * pai, que além de pôr a letra no ecrã marca a gravação para daqui a 600 ms.
+   * O nome fica por ser o que o filho faz com ela — escrever o rascunho —, e a
+   * gravação não é assunto deste componente.
+   */
   setDraft: (v: string) => void;
   commitEdit: () => void;
   editKeys: (e: React.KeyboardEvent) => void;
@@ -1134,6 +1304,69 @@ function BlocoLi({
                 {i.owner}
               </button>
             )
+          )}
+          {/* ── O LOCAL E A NOTA, QUE SÃO AS COLUNAS DA FOLHA DELA ─────────
+              Escrevem-se na linha de acrescentar e saem no PDF e no papel (ver
+              `horario-pdf.ts`); se não se vissem aqui, eram dois campos que se
+              escrevem às cegas e só se conferem depois de descarregar.
+
+              O local com o alfinete e a nota com o traço, e os dois em letra
+              pequena: quem lê a lista está a ler o DIA, e estas duas são o
+              contexto — não podem competir com o nome do momento. */}
+          {/* ── E EDITAM-SE TOCANDO NELES, COMO TUDO O RESTO DESTA LINHA ──
+              «Eu quero conseguir editar isto e quero que apareça logo ao lado
+              mudado e guardado.»
+
+              Só se escreviam ao ACRESCENTAR o momento — e um campo que se
+              escreve uma vez e nunca mais se corrige fica errado para sempre no
+              dia em que a montagem muda de sítio. Passam a abrir um campo no
+              mesmo gesto da hora, do título e do responsável, com a mesma
+              gravação: a folha ao lado muda no instante em que ela larga.
+
+              Vazios continuam a aparecer, e é o que dá para lhes tocar: um
+              campo que só existe depois de ter conteúdo não se pode preencher.
+              Fica em cinzento claro a dizer o que é. */}
+          {editing?.id === i.id && (editing.field === "local" || editing.field === "notas") ? (
+            <span className="mt-1 flex items-center gap-1">
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={editKeys}
+                aria-label={editing.field === "local" ? "Editar o local" : "Editar a nota"}
+                placeholder={editing.field === "local" ? "Onde" : "O que é preciso garantir"}
+                className="bo-input w-full px-2 py-0.5 text-xs text-[var(--bo-text)]"
+              />
+              <DesistirDaEdicao
+                onDesistir={cancelarEdicao}
+                oQue={editing.field === "local" ? "o local" : "a nota"}
+              />
+            </span>
+          ) : (
+            <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-foreground/40">
+              <button
+                type="button"
+                onClick={() => startEdit(i.id, "local", i.local ?? "")}
+                title="Editar o local"
+                className={`alvo-toque !justify-start inline-flex items-baseline gap-1 rounded-md text-left decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+              >
+                <span aria-hidden="true">⌖</span>
+                <span>
+                  <span className="sr-only">Local: </span>
+                  {i.local || <span className="text-foreground/25">Sem local</span>}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => startEdit(i.id, "notas", i.notas ?? "")}
+                title="Editar a nota"
+                className={`alvo-toque !justify-start min-w-0 flex-1 rounded-md text-left decoration-dotted underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+              >
+                <span className="sr-only">Nota: </span>
+                {i.notas || <span className="text-foreground/25">Sem nota</span>}
+              </button>
+            </p>
           )}
         </div>
 

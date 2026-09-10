@@ -1382,6 +1382,41 @@ export default function AdminClient({
    */
   /** Já desceu o suficiente para o cabeçalho encolher? Ver `ui/adaptativo.ts`. */
   const desceu = useDesceu();
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * O CABEÇALHO MEDE-SE, PARA QUEM COLA POR BAIXO DELE SABER ONDE PARAR
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * A barra do topo é `sticky top-0`. Qualquer `<h2 sticky top-0>` dentro de
+   * uma vista pede o mesmo zero — e desaparece por baixo dela, levando com ele
+   * a primeira linha da secção, que passa a estar tapada e a não se poder tocar.
+   *
+   * A altura NÃO é uma constante: o cabeçalho encolhe quando a página desce
+   * (`desceu`), muda com o `pt-safe` de um telemóvel com entalhe, e cresce se o
+   * título partir em duas linhas. Um número escrito à mão fica errado no dia em
+   * que qualquer uma dessas coisas mudar, e não se queixa — está escrito por
+   * extenso no `carregamento/[eventId]/Carregamento.tsx`, que é onde a casa
+   * pagou esta lição.
+   *
+   * `ResizeObserver` e não um `useEffect` com `offsetHeight`: o encolher é uma
+   * transição, e uma medição tirada no fotograma do render apanha a altura de
+   * antes.
+   */
+  const cabecalhoRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = cabecalhoRef.current;
+    if (!el) return;
+    const publicar = () =>
+      document.documentElement.style.setProperty("--bo-cabecalho", `${el.offsetHeight}px`);
+    publicar();
+    const ro = new ResizeObserver(publicar);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--bo-cabecalho");
+    };
+  }, []);
   /** Pedido escolhido na vista "Fazer proposta".
    *
    *  Vive aqui e não dentro da vista porque a vista desmonta ao mudar de
@@ -2497,16 +2532,42 @@ export default function AdminClient({
   const janelaAberta = newQuoteOpen || shortcutsOpen || ajudaOpen || restoreOpen;
   const janelaAbertaRef = useRef(false);
   const paletteAbertaRef = useRef(false);
+  /* A vista, num ref, pela mesma razão que as outras duas aqui em cima: o
+     ouvinte de teclado monta-se uma vez e fecharia sobre a vista do primeiro
+     desenho. Sem isto, o ⌘N das Tarefas ou nunca disparava ou disparava em
+     todas as vistas — conforme a que estivesse aberta ao montar. */
+  const viewRef = useRef(view);
   useEffect(() => {
     janelaAbertaRef.current = janelaAberta;
     paletteAbertaRef.current = paletteOpen;
-  }, [janelaAberta, paletteOpen]);
+    viewRef.current = view;
+  }, [janelaAberta, paletteOpen, view]);
 
   // Global keyboard shortcuts. ⌘K works anywhere; the rest are ignored while
   // typing so they never fight with form fields.
   useEffect(() => {
     let lastG = 0; // timestamp of the last "g" press, for the "g then key" chord
     const onKey = (e: KeyboardEvent) => {
+      /* ── ⌘N NAS TAREFAS ────────────────────────────────────────────────
+         Antes do teste do «a escrever», e de propósito: ⌘N é um atalho com
+         modificador, e um atalho com modificador não colide com o que se está
+         a escrever num campo — é para isso que o modificador serve. Quem está
+         a escrever uma tarefa e faz ⌘N quer a seguinte, que é exactamente o
+         que isto faz.
+
+         Só nas Tarefas: noutra vista o ⌘N do browser (janela nova) continua a
+         ser dela. */
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "n" &&
+        viewRef.current === "tarefas"
+      ) {
+        if (janelaAbertaRef.current || paletteAbertaRef.current) return;
+        e.preventDefault();
+        setPedidoDeNovaTarefa((n) => n + 1);
+        return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         // A paleta também não se abre por baixo de outra janela; fechá-la com o
         // mesmo atalho continua a valer, que é o que ⌘K faz quando ela é a que
@@ -4116,6 +4177,24 @@ export default function AdminClient({
   ]);
   const mostrarAccoesDePedidos = ACOES_DE_PEDIDOS.has(view);
 
+  /**
+   * ── A ACÇÃO PRIMÁRIA DAS TAREFAS VIVE NA BARRA, COMO NAS OUTRAS VISTAS ──
+   *
+   * «Não há ação primária na toolbar. Todos os outros ecrãs têm "+ Novo".
+   * Este não tem — porque a criação está num cartão permanente no conteúdo.»
+   *
+   * A regra é uma acção primária e uma só, sempre no fim da barra, e a
+   * consistência entre ecrãs é o que faz um produto ler-se como um produto.
+   *
+   * O que passa daqui para baixo é um CONTADOR e não uma função: a caixa de
+   * escrever vive dentro das `Tarefas` (é a última linha da lista, ver a fase
+   * 03 do documento dela), e o que a barra faz é pedir-lhe que abra. Um
+   * contador porque carregar duas vezes seguidas tem de pedir duas vezes — um
+   * booleano ficava preso a `true` e o segundo toque não fazia nada.
+   */
+  const [pedidoDeNovaTarefa, setPedidoDeNovaTarefa] = useState(0);
+  const pedirNovaTarefa = useCallback(() => setPedidoDeNovaTarefa((n) => n + 1), []);
+
   const VIEW_TITLES: Record<View, string> = {
     overview: "Visão Geral",
     pedidos: "Pedidos",
@@ -4172,8 +4251,19 @@ export default function AdminClient({
     definicoes: "Os números com que o estúdio faz contas",
     servicos: "As palavras que vão nas propostas, escritas com tempo",
     "fazer-proposta": "Escolhe o cliente e escreve a proposta",
-    guioes: "O guião de cada dia de evento: quem faz o quê, e a que horas",
-    tarefas: "Organização interna da equipa",
+    /* ── A DESCRIÇÃO DAS TIMELINES SAIU, COMO A DAS TAREFAS ────────────
+       «A hierarquia do cabeçalho está invertida.» [APPLE] É a mesma regra dos
+       documentos dela: título curto que identifica a vista, e mais nada. E
+       «Timelines» já o diz — a frase que estava aqui explicava o que é uma
+       timeline a quem já está dentro da secção das timelines. */
+    guioes: "",
+    /* ── A DESCRIÇÃO DAS TAREFAS SAIU ─────────────────────────────────
+       «A hierarquia do cabeçalho está invertida: "Organização interna da
+       equipa" acima do título, em cinzento pequeno.» [APPLE] A regra é
+       título curto que identifica a vista, e mais nada — e "Tarefas" já o
+       diz. Vazio como a Visão Geral, que é o outro sítio onde o título se
+       basta a si próprio. */
+    tarefas: "",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
     material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
@@ -5124,6 +5214,23 @@ export default function AdminClient({
               tremor de quem pára o dedo em cima do limiar. Nenhum ouvinte
               novo. */}
           <header
+            ref={cabecalhoRef}
+            /* ── E O CABEÇALHO DIZ A SUA ALTURA A QUEM COLA POR BAIXO DELE ──
+               Ele é `sticky top-0` com 81 px. Um `<h2 sticky top-0>` dentro de
+               uma lista pede o MESMO zero — e a lista é a que perde: o
+               cabeçalho de grupo desliza para debaixo desta barra e some, com o
+               primeiro item da secção tapado por ela.
+
+               A casa já apanhou este defeito uma vez, no carregamento de
+               material, e a lição está escrita lá por extenso: «um número
+               escrito à mão que descreve a altura de outra coisa fica errado no
+               dia em que essa outra coisa muda, e não se queixa». Custou dois
+               passeios de telemóvel e cento e vinte segundos a tentar tocar num
+               botão tapado.
+
+               Por isso não se escreve 81 em lado nenhum: o cabeçalho MEDE-SE e
+               publica `--bo-cabecalho`, e quem cola por baixo pede essa
+               variável. Muda a barra, muda o encosto, sem ninguém ir procurar. */
             /* O FIO DO CABEÇALHO: 150 ms, e ainda não é o degrau da casa.
                Devia ser o `ESTADO` (120 ms) como o resto. Não é, porque o
                `fio-do-cabecalho.test.ts` prende aqui a classe
@@ -5177,7 +5284,37 @@ export default function AdminClient({
             */}
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"
+              /*
+                ── ONDE A MARCA FICA, E AS DUAS VOLTAS QUE ISTO DEU ────────
+
+                1. Estava ao meio da BARRA. Ela disse «coloca mais para o lado
+                   esquerdo o logo».
+                2. Movi-a para o meio do VAZIO entre o título e os comandos —
+                   129 px à esquerda, a 1440. **Fui longe demais.** Ela mandou
+                   uma captura com um círculo vermelho à direita da marca:
+                   «eu quero o logo onde marquei».
+
+                MEDIDO nessa captura (2020 px de barra):
+
+                    o título acaba ......... 355
+                    os comandos começam .... 1370
+                    o meio do vazio ........ 862
+                    a marca estava em ...... 820
+                    **o círculo dela** ..... 965  →  47,8 % da largura
+
+                Ou seja: ela quer a marca POUCO à esquerda do meio da barra, e
+                não no meio do espaço livre. As duas coisas que ela disse não
+                se contradizem — «mais para a esquerda» era um empurrão, e eu
+                li-o como uma mudança de âncora.
+
+                Com `justify-center`, uma margem à direita de `m` põe o centro
+                em `(1 − m)/2` da largura. Para 47,8 % → m = 4,5 %. A 1440 isso
+                é o meio nos 688, 32 px à esquerda do meio da barra.
+
+                Percentagem e não píxeis, para o ecrã de 1024 e o de 1920
+                fazerem a mesma conta.
+              */
+              className="pointer-events-none absolute inset-0 hidden items-center justify-center pe-[4.5%] lg:flex"
             >
               <SafeImage
                 /*
@@ -5409,11 +5546,36 @@ export default function AdminClient({
                       <path d="m21 21-4.3-4.3" strokeLinecap="round" />
                     </svg>
                     <span className="hidden md:inline">Pesquisar</span>
-                    {/* Num ecrã de toque não há ⌘ nenhum para carregar: a
-                        etiqueta anuncia uma tecla que o aparelho não tem. */}
-                    <kbd className="pointer-coarse:hidden text-[8px] border border-[var(--bo-hairline-strong)] rounded px-1 py-0.5 ml-0.5">
-                      ⌘K
-                    </kbd>
+                    {/* ── O «⌘K» SAIU DO BOTÃO ────────────────────────────
+                        «Retirar o K», com a captura da pastilha à frente.
+
+                        O ATALHO fica e continua a funcionar — o que sai é o
+                        letreiro. E faz sentido: uma etiqueta de teclado ao lado
+                        de um botão é uma dica, e uma dica só vale enquanto é
+                        nova. Depois de a pessoa saber o atalho, aquilo passa a
+                        ser um selo permanente a ocupar largura num cabeçalho
+                        que já tinha pouca — e num ecrã de toque anunciava uma
+                        tecla que o aparelho não tem. */}
+                  </button>
+                )}
+                {view === "tarefas" && (
+                  <button
+                    onClick={pedirNovaTarefa}
+                    aria-label="Nova tarefa"
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
+                    title="Escrever uma tarefa (⌘N)"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                    >
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                    </svg>
+                    <span className="hidden sm:inline">Nova tarefa</span>
                   </button>
                 )}
                 {mostrarAccoesDePedidos && (
@@ -5592,7 +5754,11 @@ export default function AdminClient({
           {/* ── Calendário ── */}
           {view === "calendario" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Calendario quotes={activeQuotes} onOpen={openQuote} />
+              <Calendario
+                quotes={activeQuotes}
+                onOpen={openQuote}
+                onFazerProposta={irFazerAProposta}
+              />
             </div>
           )}
 
@@ -5674,7 +5840,7 @@ export default function AdminClient({
           {/* ── Tarefas ── */}
           {view === "tarefas" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Tarefas defaultAssignee={userName} />
+              <Tarefas defaultAssignee={userName} pedidoDeNova={pedidoDeNovaTarefa} />
             </div>
           )}
 

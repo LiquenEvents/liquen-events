@@ -22,14 +22,36 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
 import { SAIDA_FOLHA, SAIDA_MS, semMovimento, useSaidaAdiada } from "./ui/saida";
 
 type ToastKind = "success" | "error" | "info";
+/**
+ * ── O QUE UM AVISO PODE OFERECER ALÉM DE SE FECHAR ──────────────────────────
+ *
+ * «Permitir desfazer sempre, rotulando a ação e mostrando o resultado.»
+ * [APPLE] Três dos documentos dela pedem a mesma coisa pelo mesmo nome: um
+ * «Anular» dentro do aviso — a tarefa concluída, o evento movido, a fotografia
+ * removida.
+ *
+ * Fica opcional e fica SÓ isto: um rótulo e o que fazer. Nem ícone, nem
+ * segundo botão, nem cor própria — um aviso com duas acções é um diálogo mal
+ * disfarçado, e um diálogo pede-se com o `PerguntaDestrutiva` que já existe.
+ *
+ * Tocar na acção FECHA o aviso: quem anulou já viu o resultado, e deixar a
+ * caixa aberta a oferecer anular uma coisa já anulada é a porta para anular
+ * duas vezes.
+ */
+export interface AccaoDoAviso {
+  rotulo: string;
+  aoTocar: () => void;
+}
+
 interface Toast {
   id: string;
   kind: ToastKind;
   message: string;
+  accao?: AccaoDoAviso;
 }
 
 interface ToastApi {
-  toast: (message: string, kind?: ToastKind) => void;
+  toast: (message: string, kind?: ToastKind, accao?: AccaoDoAviso) => void;
 }
 
 const ToastContext = createContext<ToastApi>({ toast: () => {} });
@@ -310,9 +332,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   // The auto-dismiss timer now lives in each ToastItem so it can be paused on
   // hover/focus — the provider just enqueues.
-  const toast = useCallback((message: string, kind: ToastKind = "info") => {
+  const toast = useCallback((message: string, kind: ToastKind = "info", accao?: AccaoDoAviso) => {
     const id = idUnico();
-    setToasts((prev) => [...prev, { id, kind, message }].slice(-MAX_TOASTS));
+    setToasts((prev) => [...prev, { id, kind, message, accao }].slice(-MAX_TOASTS));
   }, []);
 
   /**
@@ -759,6 +781,22 @@ function ToastItem({
         style={{ background: DOT[toast.kind] }}
       />
       <p className="flex-1 text-[var(--bo-tinta-72)] text-sm leading-snug">{toast.message}</p>
+      {/* A acção antes do fecho, e não depois: lê-se «Tarefa concluída ·
+          Anular · ×», que é a ordem em que se decide. Um alvo de toque a
+          sério, como o × ao lado — este é o botão que desfaz, e falhá-lo num
+          telemóvel é ficar com o que se queria desfazer. */}
+      {toast.accao && (
+        <button
+          type="button"
+          onClick={() => {
+            toast.accao?.aoTocar();
+            aoFechar();
+          }}
+          className={`alvo-toque -my-2 shrink-0 rounded-full px-2 py-2 text-sm font-medium text-[var(--bo-accent)] underline underline-offset-[3px] hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
+        >
+          {toast.accao.rotulo}
+        </button>
+      )}
       {/* ── 9×14 PX, E É O BOTÃO QUE FECHA UM AVISO ──────────────────────
           MEDIDO a 375 px: nove píxeis de largura por catorze de altura. É o
           alvo mais pequeno de todo o back office, e está no elemento que
