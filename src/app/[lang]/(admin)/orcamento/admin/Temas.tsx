@@ -5050,6 +5050,12 @@ function ThemeFolder({
           const files = Array.from(e.dataTransfer?.files ?? []);
           void handleDrop(entries, files);
         }}
+        // A marca por onde os testes encontram esta caixa. Era a classe
+        // `border-dashed`, e deixou de servir no dia em que o tracejado passou
+        // a existir só durante um arrasto (fase 07) — um selector que depende
+        // de um estado transitório é um selector que encontra a zona de largar
+        // metade das vezes.
+        data-zona-de-largar=""
         // `@container`: é ESTA caixa que o `GRELHA_DE_FOTOS` mede. A largura
         // dela não acompanha a da janela a partir de `lg`, onde a navegação
         // passa a ocupar 256 px em fluxo — a conta toda está no comentário do

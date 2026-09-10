@@ -207,6 +207,52 @@ interface Props {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
+/** As quatro vistas do documento, pela ordem do comutador e dos atalhos. */
+type Vista = "dia" | "semana" | "mes" | "ano";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ⌘1 A ⌘4 — E PORQUE É QUE ESTAS TECLAS NÃO CHOCAM COM AS QUE JÁ HÁ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O ponto 18 da auditoria dela pede `⌘1–4` para as vistas, `⌘T` para hoje,
+ * `⌘N` para novo evento e as setas para navegar. Antes de escolher, o censo do
+ * que o `AdminClient.tsx` já ouve — que é o dono do teclado global desta casa e
+ * onde NÃO se toca:
+ *
+ *   · `⌘K` — a paleta de comandos, em todas as vistas;
+ *   · `⌘N` — nova tarefa, e SÓ quando a vista aberta é «tarefas»
+ *     (`viewRef.current === "tarefas"`). No calendário está livre;
+ *   · teclas soltas `n`, `/`, `?` e o acorde `g` + destino — e todas essas são
+ *     ignoradas quando há um modificador carregado (`if (typing || e.metaKey ||
+ *     e.ctrlKey || e.altKey) return`), portanto nada do que está aqui lhes
+ *     toca.
+ *
+ * Os ouvintes deste ficheiro registam-se ANTES do dele — os efeitos dos filhos
+ * correm primeiro em React —, mas isso não é o que evita o choque: o que o
+ * evita é a lista acima não se cruzar com esta.
+ *
+ * ── E O `⌘T` NÃO CHEGA A ESTE CÓDIGO NUM SEPARADOR DE BROWSER ─────────────
+ *
+ * `⌘T`/`Ctrl+T` é «separador novo», e é dos atalhos que o browser NÃO entrega
+ * à página: o `preventDefault` não o apanha. Fica ligado à mesma — numa janela
+ * de aplicação instalada (PWA) chega cá, e é o atalho que o documento nomeia —
+ * mas não podia ser o único caminho para «Hoje», senão a fase 10 entregava uma
+ * tecla que nunca dispara.
+ *
+ * Por isso há também o `T` SOLTO, sem modificador. Não é invenção: é o que a
+ * web faz há anos (Google Calendar usa `t` para hoje, `d`/`w`/`m`/`y` para as
+ * vistas), e está livre neste ecrã. A única cautela é o acorde `g`+`t` do
+ * `AdminClient`, que leva às Tarefas: um `t` a menos de 900 ms de um `g` é
+ * dele, e este ficheiro deixa-o passar (ver `ultimoG`).
+ */
+const VISTA_DA_TECLA: Readonly<Record<string, Vista>> = {
+  "1": "dia",
+  "2": "semana",
+  "3": "mes",
+  "4": "ano",
+};
+
 // Add-event dialog with LOCAL form state. Extracted from Calendario so typing a
 // title/time/note re-renders only this small dialog — not the parent and its
 // 42-cell month grid + upcoming list. onCreate persists the completed payload
@@ -800,6 +846,97 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     });
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     NAVEGAR — UMA PORTA POR UNIDADE, E AS DUAS A MANTEREM-SE DE ACORDO
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  /**
+   * Ir para um DIA. Leva o `cursor` atrás quando o mês muda, para trocar de
+   * vista a seguir cair no sítio certo — ver o comentário do `diaAncora`.
+   */
+  const irParaDia = useCallback((iso: string) => {
+    if (!isDateKey(iso)) return;
+    setDiaAncora(iso);
+    const [a, m] = iso.split("-").map(Number);
+    setCursor((antes) =>
+      antes.getFullYear() === a && antes.getMonth() === m - 1 ? antes : new Date(a, m - 1, 1),
+    );
+    setSelectedDay(null);
+  }, []);
+
+  /** Os dias que a vista à frente mostra. Vazio no mês e no ano. */
+  const diasDaVista = useMemo(() => {
+    if (vista === "dia") return [diaAncora];
+    if (vista === "semana") return diasDaSemana(diaAncora);
+    return [];
+  }, [vista, diaAncora]);
+
+  /**
+   * Trocar de vista, com as duas âncoras a acertarem-se.
+   *
+   * A regra é «não perder o sítio»: quem estava a olhar para o dia 12 e pede a
+   * semana quer a semana DO DIA 12, e quem estava em Julho e pede o dia quer um
+   * dia de Julho — não o de hoje, que pode estar a um ano de distância. Quando
+   * o mês à vista é o de hoje, o dia escolhido é hoje; caso contrário é o dia 1,
+   * que é o princípio daquilo que ela estava a ver.
+   */
+  const trocarDeVista = useCallback(
+    (proxima: Vista) => {
+      setVista((anterior) => {
+        const eraDeHoras = anterior === "dia" || anterior === "semana";
+        const vaiParaHoras = proxima === "dia" || proxima === "semana";
+        if (!eraDeHoras && vaiParaHoras) {
+          const prefixo = `${year}-${pad2(month + 1)}`;
+          setDiaAncora(selectedDay ?? (todayStr.startsWith(prefixo) ? todayStr : `${prefixo}-01`));
+        }
+        if (eraDeHoras && !vaiParaHoras) {
+          const [a, m] = diaAncora.split("-").map(Number);
+          setCursor(new Date(a, m - 1, 1));
+        }
+        return proxima;
+      });
+      // O painel do dia aponta para um dia da grelha do mês; noutra vista essa
+      // grelha sai do ecrã e ele ficaria a apontar para nada.
+      setSelectedDay(null);
+    },
+    [year, month, selectedDay, todayStr, diaAncora],
+  );
+
+  /**
+   * As setas ‹ › e as teclas ← →: andam sempre na UNIDADE que está à vista.
+   * Trocar de vista e continuar a saltar de mês seria o botão a mentir.
+   */
+  const navegar = useCallback(
+    (sentido: 1 | -1) => {
+      if (vista === "dia") return irParaDia(maisDias(diaAncora, sentido));
+      if (vista === "semana") return irParaDia(maisDias(diaAncora, 7 * sentido));
+      if (vista === "ano") return goTo(new Date(year + sentido, month, 1));
+      return goTo(new Date(year, month + sentido, 1));
+    },
+    // `goTo` é uma função do corpo do componente e é reescrita a cada desenho;
+    // não entra nas dependências para não refazer isto a cada tecla. O que ela
+    // fecha (`setCursor`, `setSelectedDay`) é estável.
+     
+    [vista, diaAncora, year, month, irParaDia],
+  );
+
+  /** «Hoje» — repõe as DUAS âncoras, senão só metade das vistas obedecia. */
+  const irParaHoje = useCallback(() => {
+    const hoje = todayKey();
+    setDiaAncora(hoje);
+    const d = new Date();
+    setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
+    setSelectedDay(null);
+  }, []);
+
+  /** O nome da unidade nas setas, para o rótulo dizer o que o gesto faz. */
+  const UNIDADE: Record<Vista, string> = {
+    dia: "Dia",
+    semana: "Semana",
+    mes: "Mês",
+    ano: "Ano",
+  };
+
   /**
    * ════════════════════════════════════════════════════════════════════════
    * «PRÓXIMOS EVENTOS» — OS QUE VÃO MESMO ACONTECER
@@ -901,6 +1038,202 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
       month: "long",
     });
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     O BOTÃO DIREITO — FASE 10, PONTO 17
+     ══════════════════════════════════════════════════════════════════════════
+
+     «Não há menu de contexto no evento nem no dia.» As listas são as do
+     documento, com uma amputação que fica dita porque é uma decisão e não um
+     esquecimento:
+
+       · o menu do evento pede `Duplicar`, `Mudar de dia…` e `Alterar tipo`. O
+         `/api/calendario` desta casa tem POST e DELETE e **não tem PATCH** —
+         não há forma de mudar uma marcação sem a apagar e criar outra, e isso
+         troca-lhe o `id`, perde o `createdAt` e, se a criação falhar depois de
+         o apagar, perde a marcação. Sem Anular (fase 09) isso não se faz.
+         Fica o `Duplicar`, que é um POST e mais nada;
+       · em troca entra o `Ver na vista de dia`, que o documento pede no menu
+         do DIA e que aqui serve o evento pela mesma razão: passou a haver
+         vista de dia para onde ir.
+
+     O menu é o `MenuDeContexto.tsx` que a biblioteca de temas já usa — a mesma
+     peça, o mesmo material, a mesma saída. Um segundo menu ancorado ao ponteiro
+     nesta casa era a segunda família que a Parte −1 do sistema de design manda
+     não criar. */
+
+  /** Ver um dia na vista de dia — a saída comum dos três menus. */
+  const verNaVistaDeDia = useCallback((data: string) => {
+    setDiaAncora(data);
+    setSelectedDay(null);
+    setVista("dia");
+  }, []);
+
+  /** Uma cópia de uma marcação, no mesmo dia. É um POST e mais nada. */
+  async function duplicarMarcacao(ev: CalendarEvent) {
+    await createEvent({
+      title: `${ev.title} (cópia)`,
+      kind: ev.kind,
+      time: ev.time ?? "",
+      note: ev.note ?? "",
+      date: ev.date,
+    });
+  }
+
+  function menuDaMarcacao(ev: CalendarEvent, x: number, y: number): PedidoDeMenu {
+    const accoes: AccaoDeItem[] = [
+      { id: "dia", rotulo: "Ver na vista de dia", onAccao: () => verNaVistaDeDia(ev.date) },
+      { id: "duplicar", rotulo: "Duplicar", onAccao: () => void duplicarMarcacao(ev) },
+      {
+        id: "remover",
+        rotulo: "Remover",
+        destrutiva: true,
+        // Pela pergunta da casa, como o clique na etiqueta: um menu não é
+        // licença para apagar sem perguntar.
+        onAccao: () => pedirParaRemover(ev.id, ev.title),
+      },
+    ];
+    return { x, y, sobre: ev.title, accoes };
+  }
+
+  function menuDoPedido(q: Quote, data: string, x: number, y: number): PedidoDeMenu {
+    const accoes: AccaoDeItem[] = [
+      { id: "abrir", rotulo: "Abrir pedido", onAccao: () => onOpen(q) },
+      {
+        id: "proposta",
+        rotulo: "Fazer proposta",
+        // A mesma porta da lista dos próximos eventos, e a mesma queda para o
+        // `onOpen` quando ela não é dada. Ver as `props`.
+        onAccao: () => (onFazerProposta ?? onOpen)(q),
+      },
+      { id: "dia", rotulo: "Ver na vista de dia", onAccao: () => verNaVistaDeDia(data) },
+    ];
+    return { x, y, sobre: q.name, accoes };
+  }
+
+  function menuDoDia(data: string, x: number, y: number): PedidoDeMenu {
+    const accoes: AccaoDeItem[] = [
+      { id: "novo", rotulo: "Novo evento", onAccao: () => openAdd(data, "evento") },
+      // Reticências porque abrem uma caixa a pedir mais — a regra de escrita
+      // da casa, e a do documento («Nova nota…», «Fechar datas…»).
+      { id: "nota", rotulo: "Nova nota…", onAccao: () => openAdd(data, "nota") },
+      { id: "fechar", rotulo: "Fechar este dia…", onAccao: () => openAdd(data, "bloqueio") },
+      { id: "ver", rotulo: "Ver na vista de dia", onAccao: () => verNaVistaDeDia(data) },
+    ];
+    return { x, y, sobre: dayLabelLong(data), accoes };
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     O QUE AS VISTAS DE DIA E DE SEMANA MOSTRAM — FASES 06 E 08
+     ══════════════════════════════════════════════════════════════════════════
+
+     As entradas são construídas AQUI e não lá dentro, de propósito: a cor de um
+     pedido vem do ESTADO e a de uma marcação vem do TIPO, e essas duas regras
+     já estão escritas neste ficheiro para a grelha do mês. Uma segunda tradução
+     dentro do `VistasDeHoras.tsx` era um segundo sítio para elas discordarem —
+     e o dia em que discordassem, o mesmo evento tinha duas cores conforme o
+     botão em que se carregou.
+
+     E é também isto que faz os quatro CALENDÁRIOS filtrarem as vistas novas: as
+     marcações vêm do `eventsByDay`, que já é a lista filtrada. */
+  const diasParaHoras: DiaDeHoras[] = useMemo(
+    () =>
+      diasDaVista.map((data) => {
+        const entradas: EntradaDeHoras[] = [
+          ...(byDay.get(data) ?? []).map((q) => ({
+            chave: `q:${q.id}`,
+            // Um pedido é pintado pelo ESTADO, como na grelha do mês, e a
+            // palavra do estado vai no nome acessível — é o que o
+            // `Calendario.estado-nao-e-so-cor.test.tsx` guarda.
+            cor: STATUS_COLOR[q.status],
+            titulo: q.name,
+            rotulo: `Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`,
+            dica: `${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`,
+            onAbrir: () => onOpen(q),
+            onMenu: (x: number, y: number) => setMenu(menuDoPedido(q, data, x, y)),
+          })),
+          ...(eventsByDay.get(data) ?? []).map((ev) => ({
+            chave: `e:${ev.id}`,
+            cor: TIPO_META[ev.kind].cor,
+            marca: <GlifoDoTipo kind={ev.kind} />,
+            hora: ev.time,
+            titulo: ev.title,
+            rotulo: `Remover ${TIPO_META[ev.kind].label}: ${ev.title}`,
+            dica: `${TIPO_META[ev.kind].label}: ${ev.title} (clique para remover)`,
+            onAbrir: () => pedirParaRemover(ev.id, ev.title),
+            onMenu: (x: number, y: number) => setMenu(menuDaMarcacao(ev, x, y)),
+            riscarNoHover: true,
+          })),
+        ];
+        return { data, entradas };
+      }),
+    // As funções do corpo (`menuDoPedido`, `pedirParaRemover`, …) são
+    // reescritas a cada desenho e não entram aqui: o que elas fecham é estado
+    // e `props`, e ambos já estão na lista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [diasDaVista, byDay, eventsByDay, onOpen],
+  );
+
+  /**
+   * Quantas coisas tem a vista à frente — contadas por IDENTIDADE, como no
+   * `monthTotal`: um casamento de três dias que atravesse a semana é UM evento
+   * e não três.
+   */
+  const contagemDaVista = useMemo(() => {
+    const vistos = new Set<string>();
+    for (const d of diasDaVista) {
+      for (const q of byDay.get(d) ?? []) vistos.add(`q:${q.id}`);
+      for (const e of eventsByDay.get(d) ?? []) vistos.add(`e:${e.id}`);
+    }
+    return vistos.size;
+  }, [diasDaVista, byDay, eventsByDay]);
+
+  /**
+   * O TÍTULO da vista é a unidade que ela mostra — a regra que o documento fixa
+   * para o mês («o mês é o título da vista») e que vale para as quatro.
+   *
+   * O ramo do MÊS não passa por aqui: fica escrito à letra no `<h3>`, porque o
+   * `entrada-do-calendario.test.ts` procura a expressão `{MONTHS[month]} {year}`
+   * no código-fonte deste ficheiro e mede o que está imediatamente antes dela
+   * (a letra de display e o `clamp`). Está lá comentado porquê.
+   */
+  const tituloDaVista =
+    vista === "ano"
+      ? String(year)
+      : vista === "semana"
+        ? tituloDaSemana(diasDaVista)
+        : `${Number(diaAncora.slice(8, 10))} de ${MONTHS[Number(diaAncora.slice(5, 7)) - 1]} ${diaAncora.slice(0, 4)}`;
+
+  /** O nome do dia da semana de uma data — a linha de estado da vista de dia. */
+  const nomeDoDiaDaSemana = (iso: string) =>
+    DIAS_DA_SEMANA[(new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7].nome;
+
+  /**
+   * A linha por baixo do título: o ESTADO da vista, e muda com os filtros.
+   *
+   * Cada vista responde à sua pergunta. No ano é «quantos dias já não dão»; no
+   * mês, quantos eventos há; no dia e na semana, o mesmo mas na unidade certa —
+   * escrever «3 eventos este mês» por cima de uma quarta-feira era a linha a
+   * falar de outra coisa que não o que está desenhado por baixo dela.
+   */
+  const estadoDaVista =
+    vista === "ano"
+      ? fechadosDoAno === 0
+        ? "Ano todo livre"
+        : `${fechadosDoAno} dia${fechadosDoAno !== 1 ? "s" : ""} fechado${fechadosDoAno !== 1 ? "s" : ""} este ano`
+      : vista === "mes"
+        ? monthTotal === 0
+          ? "Sem eventos este mês"
+          : `${monthTotal} evento${monthTotal !== 1 ? "s" : ""} este mês`
+        : vista === "dia"
+          ? `${nomeDoDiaDaSemana(diaAncora)} · ${
+              contagemDaVista === 0
+                ? "nada marcado"
+                : `${contagemDaVista} evento${contagemDaVista !== 1 ? "s" : ""}`
+            }`
+          : contagemDaVista === 0
+            ? "Sem eventos esta semana"
+            : `${contagemDaVista} evento${contagemDaVista !== 1 ? "s" : ""} esta semana`;
+
   /* ── QUEM SEGURA O «NOVO NO CALENDÁRIO» OS 200 MS ────────────────────────
      O estado é daqui, portanto o nó é segurado daqui. O `modalDate` cai para
      `null` no instante do gesto — é ele que fecha, que destranca a página e que
@@ -930,6 +1263,110 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
         year: "numeric",
       })
     : "";
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     O TECLADO — FASE 10
+     ══════════════════════════════════════════════════════════════════════════
+
+     `⌘1–4` trocam de vista · `⌘T` (e o `T` solto) volta a hoje · `⌘N` cria
+     neste dia · `←`/`→` andam na unidade à vista · `⌥←`/`⌥→` andam de MÊS, em
+     qualquer vista.
+
+     O censo do que já existe e a razão de cada escolha estão no `VISTA_DA_TECLA`
+     lá em cima — incluindo porque é que o `⌘T` não chega cá num separador de
+     browser e porque é que há um `T` solto ao lado dele.
+
+     ── O QUE ESTE OUVINTE NÃO FAZ ──────────────────────────────────────────
+     · não dispara com um diálogo desta vista aberto — o «Novo no calendário»,
+       a pergunta de remover e o menu de contexto têm teclado próprio (o menu
+       trata o `Escape` com `stopPropagation`);
+     · não dispara sobre um evento que outra peça já tratou (`defaultPrevented`)
+       — é o que impede as setas de andarem de dia enquanto elas estão a mudar
+       de segmento dentro do comutador das vistas, que também as usa;
+     · e as teclas SOLTAS não disparam enquanto se escreve. As de modificador
+       disparam: é para isso que o modificador serve, e é a regra que o ⌘N das
+       Tarefas já segue. */
+  useEffect(() => {
+    /** O instante do último `g` — o acorde de navegação do `AdminClient`. */
+    let ultimoG = 0;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (modalDate !== null || aRemover || menu) return;
+
+      const alvo = e.target as HTMLElement | null;
+      const aEscrever =
+        !!alvo &&
+        (alvo.tagName === "INPUT" ||
+          alvo.tagName === "TEXTAREA" ||
+          alvo.tagName === "SELECT" ||
+          alvo.isContentEditable);
+
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        const proxima = VISTA_DA_TECLA[e.key];
+        if (proxima) {
+          e.preventDefault();
+          trocarDeVista(proxima);
+          return;
+        }
+        const tecla = e.key.toLowerCase();
+        if (tecla === "t") {
+          e.preventDefault();
+          irParaHoje();
+        } else if (tecla === "n") {
+          e.preventDefault();
+          // O dia em que ela está: o que abriu no painel, o da vista de dia,
+          // ou o primeiro da semana. No mês e no ano, hoje — que é o único dia
+          // que a vista inteira tem em comum.
+          openAdd(selectedDay ?? diasDaVista[0] ?? todayStr);
+        }
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        if (aEscrever) return;
+        const sentido = e.key === "ArrowRight" ? 1 : -1;
+        e.preventDefault();
+        // `⌥←`/`⌥→` é sempre o MÊS, em qualquer vista — o ponto 18 da auditoria
+        // dá-lhe esse nome, e é o salto grande de que a vista de dia precisa.
+        if (e.altKey) goTo(new Date(year, month + sentido, 1));
+        else navegar(sentido);
+        return;
+      }
+
+      if (aEscrever || e.altKey) return;
+
+      const tecla = e.key.toLowerCase();
+      if (tecla === "g") {
+        ultimoG = Date.now();
+        return;
+      }
+      // Um `t` a menos de 900 ms de um `g` é o acorde «ir para as Tarefas» do
+      // `AdminClient`, e é dele. A janela é a mesma que ele usa.
+      const acorde = Date.now() - ultimoG < 900;
+      ultimoG = 0;
+      if (tecla === "t" && !acorde) {
+        e.preventDefault();
+        irParaHoje();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // `goTo` e `openAdd` são funções do corpo e não entram: o que elas fecham
+    // é estado e já está na lista.
+     
+  }, [
+    modalDate,
+    aRemover,
+    menu,
+    trocarDeVista,
+    irParaHoje,
+    navegar,
+    year,
+    month,
+    selectedDay,
+    diasDaVista,
+    todayStr,
+  ]);
 
   const selectedQuotes = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
   const selectedEvents = selectedDay ? (eventsByDay.get(selectedDay) ?? []) : [];
@@ -1015,26 +1452,23 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 className="font-display leading-tight text-[var(--bo-text)]"
                 style={{ fontSize: "clamp(26px, 3.5vw, 36px)" }}
               >
-                {/* No ano, o título é o ANO. É a mesma regra do documento —
-                    o título da vista é a unidade que ela mostra — e o `<>…</>`
-                    guarda a expressão do mês tal e qual, que é o que o
-                    `entrada-do-calendario.test.ts` mede. */}
-                {vista === "ano" ? (
-                  year
-                ) : (
+                {/* O título é a UNIDADE que a vista mostra: o dia, a semana,
+                    o mês ou o ano. O ramo do mês fica escrito aqui à letra —
+                    e primeiro — porque o `entrada-do-calendario.test.ts`
+                    procura a expressão `{MONTHS[month]} {year}` no código
+                    deste ficheiro e mede os 400 caracteres antes dela à
+                    procura da letra de display e do `clamp`. Os outros três
+                    vêm do `tituloDaVista`, calculado acima. */}
+                {vista === "mes" ? (
                   <>
                     {MONTHS[month]} {year}
                   </>
+                ) : (
+                  tituloDaVista
                 )}
               </h3>
               <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1.5">
-                {vista === "ano"
-                  ? fechadosDoAno === 0
-                    ? "Ano todo livre"
-                    : `${fechadosDoAno} dia${fechadosDoAno !== 1 ? "s" : ""} fechado${fechadosDoAno !== 1 ? "s" : ""} este ano`
-                  : monthTotal === 0
-                    ? "Sem eventos este mês"
-                    : `${monthTotal} evento${monthTotal !== 1 ? "s" : ""} este mês`}
+                {estadoDaVista}
               </p>
             </div>
             {/* ── ESTA FILA DEIXOU DE PODER SER `shrink-0` ──────────────────
@@ -1054,21 +1488,30 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 pela borda. E a lição de medição fica dita — 375 px é o caso
                 estreito desta casa, não 390. Eu tinha medido a 390 e não vi. */}
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-              {/* ── O COMUTADOR DAS VISTAS ────────────────────────────────
-                  Duas das quatro que o documento pede. Fica ANTES do
-                  «Exportar» porque trocar de vista é a acção frequente e
-                  exportar é a rara — a ordem da barra é a ordem do uso. */}
+              {/* ── O COMUTADOR DAS QUATRO VISTAS ─────────────────────────
+                  Fica ANTES do «Exportar» porque trocar de vista é a acção
+                  frequente e exportar é a rara — a ordem da barra é a ordem do
+                  uso. A ordem dos segmentos é a da app do Mac, e é a mesma dos
+                  atalhos: ⌘1 Dia, ⌘2 Semana, ⌘3 Mês, ⌘4 Ano.
+
+                  ── A CONTA DA LARGURA, A 375 PX ────────────────────────────
+                  Passou de dois segmentos para quatro, e esta fila já saiu uma
+                  vez pela borda por ter ganho um comando (está escrito no
+                  bloco acima). Com `text-xs` (12 px) e `px-3`:
+                    Dia ~20+24 · Semana ~46+24 · Mês ~26+24 · Ano ~25+24
+                  = 213 px com a folga do carril. A coluna do calendário tem
+                  343 px a 375, portanto o comutador cabe inteiro numa linha e
+                  o que quebra para baixo é a cápsula da navegação — que é o
+                  que o `min-w-0 flex-wrap` desta fila já garante. O
+                  «Exportar» continua fora do telemóvel (`hidden sm:`). */}
               <Segmented
                 size="sm"
                 ariaLabel="Vista do calendário"
                 value={vista}
-                onChange={(v) => {
-                  setVista(v);
-                  // O painel do dia aponta para um dia da grelha do mês; no ano
-                  // essa grelha sai do ecrã e ele ficaria a apontar para nada.
-                  setSelectedDay(null);
-                }}
+                onChange={trocarDeVista}
                 options={[
+                  { value: "dia", label: "Dia" },
+                  { value: "semana", label: "Semana" },
                   { value: "mes", label: "Mês" },
                   { value: "ano", label: "Ano" },
                 ]}
@@ -1085,20 +1528,19 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
               <div
                 className="flex items-center rounded-xl border border-[var(--bo-hairline)] p-0.5"
                 role="group"
-                aria-label={vista === "ano" ? "Navegação do ano" : "Navegação do mês"}
+                aria-label={`Navegação d${vista === "semana" ? "a" : "o"} ${UNIDADE[vista].toLowerCase()}`}
               >
                 <Button
                   variant="ghost"
                   size="sm"
-                  /* No ano, as setas andam de ANO. É o mesmo gesto na mesma
-                     tecla a mover a unidade que está à vista — trocar de vista
-                     e continuar a saltar de mês seria o botão a mentir. */
-                  onClick={() =>
-                    goTo(
-                      vista === "ano" ? new Date(year - 1, month, 1) : new Date(year, month - 1, 1),
-                    )
-                  }
-                  aria-label={vista === "ano" ? "Ano anterior" : "Mês anterior"}
+                  /* As setas andam sempre na unidade que está à VISTA — o dia
+                     na vista de dia, a semana na de semana, e por aí. É o mesmo
+                     gesto na mesma tecla a mover o que se está a ver; trocar de
+                     vista e continuar a saltar de mês seria o botão a mentir.
+                     A conta está no `navegar`, que é o que as teclas ←/→ também
+                     chamam — um caminho só. */
+                  onClick={() => navegar(-1)}
+                  aria-label={`${UNIDADE[vista]} anterior`}
                   className="w-8 pointer-coarse:w-11 px-0"
                 >
                   <svg
@@ -1118,22 +1560,18 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    const d = new Date();
-                    goTo(new Date(d.getFullYear(), d.getMonth(), 1));
-                  }}
+                  /* Repõe as DUAS âncoras — o mês do cursor e o dia das vistas
+                     de horas. Só o mês, e «Hoje» na vista de dia não fazia
+                     nada. É a mesma porta do ⌘T e do `T`. */
+                  onClick={irParaHoje}
                 >
                   Hoje
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() =>
-                    goTo(
-                      vista === "ano" ? new Date(year + 1, month, 1) : new Date(year, month + 1, 1),
-                    )
-                  }
-                  aria-label={vista === "ano" ? "Ano seguinte" : "Mês seguinte"}
+                  onClick={() => navegar(1)}
+                  aria-label={`${UNIDADE[vista]} seguinte`}
                   className="w-8 pointer-coarse:w-11 px-0"
                 >
                   <svg
@@ -1179,6 +1617,25 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 goTo(new Date(year, mes, 1));
                 setVista("mes");
               }}
+            />
+          ) : vista === "dia" || vista === "semana" ? (
+            /* ── AS VISTAS DE HORAS — FASES 06 E 08 ──────────────────────
+               A mesma peça com um dia ou com sete: a semana É a vista de dia
+               sete vezes, e a razão de não serem dois componentes está escrita
+               no `VistasDeHoras.tsx`.
+
+               Recebe as entradas já traduzidas (`diasParaHoras`) porque a cor
+               de um pedido vem do estado e a de uma marcação vem do tipo — as
+               duas regras vivem neste ficheiro, ao lado da grelha do mês que
+               também as usa. */
+            <VistaDeHoras
+              dias={diasParaHoras}
+              hoje={todayStr}
+              onAdicionar={(data) => openAdd(data)}
+              onMenuDoDia={(data, x, y) => setMenu(menuDoDia(data, x, y))}
+              /* Só na semana: carregar no cabeçalho de uma coluna abre esse
+                 dia. Na vista de dia não há para onde ir — já lá se está. */
+              onAbrirDia={verNaVistaDeDia}
             />
           ) : (
             <>
@@ -1326,6 +1783,14 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                           else openAdd(key);
                         }
                       }}
+                      /* O botão direito num DIA — fase 10, ponto 17. As
+                         etiquetas lá dentro têm menu próprio e travam a bolha
+                         (ver o `onMenu` do `ChipDoDia`), portanto este só
+                         dispara no espaço do dia. */
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setMenu(menuDoDia(key, e.clientX, e.clientY));
+                      }}
                       /* Sem `min-h` próprio: a altura da célula é a linha da
                          grelha (`minmax(--celula, 1fr)`), e dois mínimos a
                          decidir a mesma altura é como uma delas fica para
@@ -1394,6 +1859,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                               titulo={q.name}
                               rotulo={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
                               dica={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                              onMenu={(x, y) => setMenu(menuDoPedido(q, key, x, y))}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onOpen(q);
@@ -1408,6 +1874,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                               titulo={ev.title}
                               rotulo={`Remover ${TIPO_META[ev.kind].label}: ${ev.title}`}
                               dica={`${TIPO_META[ev.kind].label}: ${ev.title} (clique para remover)`}
+                              onMenu={(x, y) => setMenu(menuDaMarcacao(ev, x, y))}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 pedirParaRemover(ev.id, ev.title);
@@ -1704,14 +2171,22 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
           each open. Its form state is local, so typing never touches the grid. */}
       {dataDoModal && (
         <AddEventModal
-          key={dataDoModal}
+          /* A chave leva o TIPO: sem ele, escolher «Nova nota…» e a seguir
+             «Fechar este dia…» no mesmo dia não remontava a caixa e o tipo
+             ficava no da primeira vez. */
+          key={`${dataDoModal}:${tipoDoModal}`}
           aberto={modalDate !== null}
           date={dataDoModal}
           dateLabel={modalDateLabel}
+          tipoInicial={tipoDoModal}
           onClose={fecharOModal}
           onCreate={createEvent}
         />
       )}
+
+      {/* O menu do botão direito — dos dias e das etiquetas, nas três vistas
+          que têm dias desenhados. É o `MenuDeContexto` da casa. */}
+      <MenuDeContexto pedido={menu} onFechar={fecharMenu} />
 
       {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
           Folha inferior no telemóvel — ao pé do polegar, e não no topo do ecrã

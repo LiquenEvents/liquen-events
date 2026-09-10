@@ -27,6 +27,7 @@ import { interpretarTarefa, type Interpretacao } from "@/lib/tarefas/linguagem-n
 import {
   AGRUPAMENTOS,
   AGRUPAMENTO_POR_OMISSAO,
+  amanha,
   LISTAS_INTELIGENTES,
   LISTA_POR_OMISSAO,
   ORDENACOES,
@@ -37,11 +38,16 @@ import {
   ordemVisivel,
   ordenarTarefas,
   pertenceALista,
+  reordenarManualmente,
   type Agrupamento,
   type Lista,
   type ListaId,
   type Ordenacao,
 } from "@/lib/tarefas/listas";
+/* A ordem manual GUARDADA — a outra metade da fase 09. O `listas.ts` diz qual
+   é a ordem; este diz o que se grava para ela sobreviver a um recarregamento. */
+import { ordemGuardada, posicoesDepoisDeMover } from "@/lib/tarefas/posicoes";
+import { TarefaDetalhe } from "./TarefaDetalhe";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#8a2a22" },
@@ -93,6 +99,74 @@ const CaixoteIcon = (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+  </svg>
+);
+
+/* Os ícones do menu da linha (fase 09). «Dentro de um grupo, ou todos têm
+   ícone ou nenhum tem» [APPLE, 9.8] — e este menu tem-nos todos, portanto os
+   itens novos trazem o seu. O desenho é o mínimo que se lê a 14 px. */
+const VistoIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+
+const RelogioIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
+const SetaIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 19V5M5 12l7-7 7 7" />
+  </svg>
+);
+
+const SetaBaixoIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 5v14M19 12l-7 7-7-7" />
   </svg>
 );
 
@@ -478,11 +552,34 @@ const TaskRow = memo(function TaskRow({
         </span>
       </label>
       <div className="min-w-0 flex-1">
-        <p
-          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"}`}
+        {/* ── O TÍTULO É A PORTA DO PAINEL DE DETALHE (fase 08) ─────────────
+            Era um `<p>`. Passa a botão porque passou a fazer alguma coisa:
+            abre o detalhe da tarefa na coluna do lado.
+
+            ── E PORQUE É QUE O NOME ACESSÍVEL NÃO É O TÍTULO ───────────────
+            Porque a caixa de verificação ao lado já se chama assim
+            (`aria-label={t.title}`), e dois elementos com o MESMO nome na
+            mesma lista mandam quem ouve o ecrã adivinhar em qual está — e
+            partem qualquer passeio que procure por nome. «Abrir «X»» CONTÉM o
+            texto visível, que é o que a WCAG 2.5.3 exige de um rótulo que não
+            seja igual ao que está escrito.
+
+            A linha inteira não é clicável de propósito: um `div` com `onClick`
+            por cima de uma caixa de verificação e de um menu é um alvo que
+            engole os cliques dos outros dois, e não se alcança com o teclado
+            sem lhe inventar um `tabIndex` que compete com o que já lá está. */}
+        <button
+          type="button"
+          data-abrir
+          onClick={() => onEscolher(t)}
+          aria-label={`Abrir «${t.title}»`}
+          title={t.title}
+          className={`block w-full text-start text-sm break-words sm:truncate ${ESTADO} ${
+            t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"
+          }`}
         >
           {t.title}
-        </p>
+        </button>
         <div className="text-[10px] mt-0.5 flex items-center gap-2 flex-wrap">
           {t.dueDate && (
             <span
@@ -546,67 +643,43 @@ const TaskRow = memo(function TaskRow({
             {metaFor(PRIORITY_META, t.priority).label}
           </span>
         )}
-        {/* ══ AS ACÇÕES DA TAREFA, EM DUAS FORMAS ═══════════════════════════
-            A mesma lista desenhada de duas maneiras, e quem escolhe é o CSS
-            (`com-rato:` / `sem-rato:`, globals.css) — não o JavaScript, para
-            não haver um primeiro desenho errado a piscar antes do certo.
+        {/* ══ AS ACÇÕES DA TAREFA — UM BOTÃO, E O MESMO DO BOTÃO DIREITO ════
+            «Hover revela, à direita, um `⋯` que abre o mesmo menu do botão
+            direito. **Um botão, não três.**» (Parte 3 do documento) E o ponto
+            20: «não há menu de contexto» — este é ele.
 
-            COM RATO: os dois ícones soltos, revelados ao pairar. É o desenho
-            que estava, e fica byte a byte igual.
+            ── O QUE MUDOU, E O QUE SE PAGA POR ISSO ────────────────────────
+            Estavam aqui DUAS formas da mesma lista: com rato, o lápis e o
+            caixote soltos; sem rato, um «⋯». A razão de a segunda existir está
+            medida e continua verdadeira — a 375×667 com dedo eram 40 alvos de
+            44 px visíveis ao mesmo tempo em 20 linhas, e com o menu passam a
+            20. O que mudou é que a PRIMEIRA deixou de chegar: as acções desta
+            fase (concluir, hoje, amanhã, mover para cima, mover para baixo)
+            não cabem soltas numa linha sem a encher de ícones, e um menu que
+            só existe no dedo era pôr metade delas fora do alcance de quem
+            trabalha ao computador — que é onde ela passa o dia.
 
-            SEM RATO: um «⋯» só. MEDIDO a 375×667 com dedo: 40 alvos de 44 px
-            visíveis ao mesmo tempo em 20 linhas, dois por linha, dentro de uma
-            fila que já tinha o título, o prazo, a área e a prioridade. Com o
-            menu passam a 20 — um por linha.
+            Custo, dito à frente: com rato, «Editar tarefa» passa de um clique
+            a dois. Compensa-o o painel de detalhe da fase 08, onde as notas,
+            os passos e as ligações se escrevem sem abrir menu nenhum, e onde o
+            «Editar tarefa» está à vista.
 
-            E MEDIDO a 768×1024 com dedo (o iPad em retrato): ZERO dos 40
-            visíveis. 768 passa dos 640 do `sm:` sem ganhar rato nenhum,
-            portanto `sm:opacity-0` disparava e não havia como o desfazer —
-            editar e eliminar uma tarefa não existiam ali. Esse era o defeito
-            grave; o de cima é o que se vê.
+            ── E AS SETE ACÇÕES, PELAS REGRAS DA PARTE 9.8 ──────────────────
+            Cinco a oito itens; o que está indisponível OCULTA-SE em vez de
+            esbater («Marcar como concluída» numa tarefa já concluída não
+            aparece, e o mover só existe com a ordem manual ligada); a
+            destrutiva no fim, a vermelho, separada — o `MenuDeAccoes` põe-lhe
+            o filete sozinho; e NENHUM atalho de teclado escrito ao lado de um
+            item, que é proibição da Apple para menus de contexto.
 
-            «Eliminar» vai para dentro do menu, com separador e a vermelho:
-            no dedo, apagar encostado a editar é um engano à espera. */}
-        {/* `com-rato:contents` e não `com-rato:flex`: a caixa existe para poder
-            desaparecer sem rato, mas COM rato tem de desaparecer ela própria —
-            com `display: contents` os dois botões voltam a ser filhos directos
-            da fila, com o espaçamento da fila. MEDIDO com `flex`: 5959 píxeis
-            diferentes a 1280×900, porque um `gap-2` novo se metia onde o
-            `gap-x-3` da linha mandava. É o mesmo truque que o `sm:contents`
-            aqui ao lado já usa, e pela mesma razão. */}
-        <div className="hidden com-rato:contents">
-          {!t.done && (
-            <button
-              onClick={() => onEdit(t)}
-              /* ── UM ALVO DE 13 PX AO LADO DE «ELIMINAR» ──────────────────────
-                 MEDIDO num 390×844 com `(pointer: coarse)`: este botão dava
-                 13×13 px e o de eliminar 14×14, a 12 px um do outro. O mínimo da
-                 casa é 44 (`.alvo-toque` em globals.css, e é lá que ele existe —
-                 só no dedo, para o portátil manter a densidade que tem); o da
-                 WCAG 2.2 AA é 24, e com rato nem isso se cumpria.
-
-                 `alvo-toque` resolve o dedo; o `p-1.5` resolve o rato — leva o
-                 desenho de 13 para 25 px SEM crescer a linha (a coluna do título
-                 já mede 34) e sem margens negativas, que era o que voltaria a
-                 encostar os dois um ao outro. O ícone continua com 13 px. */
-              className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-sage-600 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
-              aria-label="Editar tarefa"
-            >
-              {LapisIcon}
-            </button>
-          )}
-          <button
-            onClick={() => onRemove(t.id)}
-            // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
-            // este é o que apaga, portanto é o que mais custa acertar ao lado.
-            className={`alvo-toque p-1.5 text-foreground/20 sem-rato:text-[var(--bo-text-muted)] hover:text-[var(--bo-perigo)] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0 ${ESTADO} ${PRESSAO}`}
-            aria-label="Eliminar"
-          >
-            {CaixoteIcon}
-          </button>
-        </div>
+            O que o ponto 20 pede e não está aqui: «Escolher data…»,
+            «Atribuir a…» e «Prioridade». Os três são submenus — um nível de
+            profundidade que o `ui/MenuDeAccoes` não tem —, e os três já se
+            fazem no «Editar tarefa», que é o item logo acima. Um segundo menu
+            escrito ao lado do primeiro para lhes dar casa era a família
+            duplicada que a Parte −1 do sistema de design manda não criar. */}
         <MenuDeAccoes
-          className="com-rato:hidden shrink-0"
+          className="shrink-0"
           sobre={t.title}
           accoes={[
             ...(t.done
@@ -619,6 +692,52 @@ const TaskRow = memo(function TaskRow({
                     onAccao: () => onEdit(t),
                   } satisfies AccaoDeItem,
                 ]),
+            {
+              id: "concluir",
+              // Um item comutável com o rótulo variável, e nunca dois itens.
+              // [APPLE, 9.7]
+              rotulo: t.done ? "Voltar a abrir" : "Marcar como concluída",
+              icone: VistoIcon,
+              onAccao: () => onToggle(t),
+            },
+            ...(t.done
+              ? []
+              : (
+                  [
+                    { id: "hoje", rotulo: "Hoje", icone: RelogioIcon, quando: "hoje" },
+                    { id: "amanha", rotulo: "Amanhã", icone: RelogioIcon, quando: "amanha" },
+                  ] as const
+                ).map(
+                  (a) =>
+                    ({
+                      id: a.id,
+                      rotulo: a.rotulo,
+                      icone: a.icone,
+                      onAccao: () => onPrazo(t, a.quando),
+                    }) satisfies AccaoDeItem,
+                )),
+            /* ── A ALTERNATIVA AO ARRASTO ─────────────────────────────────
+               «Oferece sempre alternativa por menu ou teclado. Arrastar nunca
+               é o único caminho.» [APPLE] Só aparecem com a ordenação
+               «Manual», que é a única em que reordenar quer dizer alguma
+               coisa — noutra ordem, mover uma linha para cima era uma ordem
+               que o `sort` seguinte desfazia à frente dela. */
+            ...(arrastavel
+              ? ([
+                  {
+                    id: "subir",
+                    rotulo: "Mover para cima",
+                    icone: SetaIcon,
+                    onAccao: () => onMover(t.id, -1),
+                  },
+                  {
+                    id: "descer",
+                    rotulo: "Mover para baixo",
+                    icone: SetaBaixoIcon,
+                    onAccao: () => onMover(t.id, 1),
+                  },
+                ] satisfies AccaoDeItem[])
+              : []),
             {
               id: "eliminar",
               rotulo: "Eliminar",
@@ -874,6 +993,27 @@ export default function Tarefas({
   const [agrupamento, setAgrupamento] = useState<Agrupamento>(AGRUPAMENTO_POR_OMISSAO);
   const [ordenacao, setOrdenacao] = useState<Ordenacao>(ORDENACAO_POR_OMISSAO);
   const [ordemManual, setOrdemManual] = useState<readonly string[]>([]);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A TAREFA ESCOLHIDA — a que o painel de detalhe mostra (fase 08)
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Um id e não a tarefa: a lista é optimista e a tarefa muda de identidade a
+   * cada gravação. Guardar o objecto dava um painel a mostrar a versão de antes
+   * de ela lhe ter tocado — e a mostrar uma tarefa que já foi eliminada.
+   */
+  const [escolhida, setEscolhida] = useState<string | null>(null);
+
+  /* ── O ARRASTO (fase 09) ────────────────────────────────────────────────
+     Duas coisas em estado, porque as duas se DESENHAM: qual é a linha que
+     está a ser arrastada (fica a meia opacidade) e onde é que ela entra (a
+     linha de inserção). O resto do arrasto vive em refs — os manipuladores
+     montam-se uma vez e não podem fechar sobre o valor do primeiro desenho. */
+  const [aArrastar, setAArrastar] = useState<string | null>(null);
+  const [alvoDoArrasto, setAlvoDoArrasto] = useState<string | "fim" | null>(null);
+  const aArrastarRef = useRef<string | null>(null);
+  const alvoRef = useRef<string | "fim" | null>(null);
 
   // inline edit
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -1154,6 +1294,34 @@ export default function Tarefas({
     [remove],
   );
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * GRAVAR UNS CAMPOS DE UMA TAREFA — o caminho do painel e do menu
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `saveEditTask` grava a linha de edição inteira; isto grava um punhado de
+   * campos. É o mesmo desenho — optimista à ida, ESTA tarefa reposta se o
+   * servidor recusar (e não a lista, ver a nota no `toggle`) — e passa pelo
+   * mesmo `gravar`, para a frase do erro continuar a dizer QUAL tarefa e o quê.
+   *
+   * Devolve `ok` porque quem chama pode precisar de saber: o painel de detalhe
+   * não celebra uma gravação que não aconteceu.
+   */
+  const gravarCampos = useCallback(
+    async (id: string, campos: Partial<Task>, oQue: string): Promise<boolean> => {
+      const anterior = tasksRef.current.find((t) => t.id === id);
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...campos } : t)));
+      const { ok } = await gravar(oQue, `/api/tarefas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(campos),
+      });
+      if (!ok && anterior) setTasks((prev) => prev.map((t) => (t.id === id ? anterior : t)));
+      return ok;
+    },
+    [gravar, setTasks],
+  );
+
   // Uma passagem só: as pessoas, e quantas tarefas por fazer tem cada uma. Antes
   // cada botão de pessoa varria a lista toda (`tasks.filter`) a cada render.
   const { people, openByPerson } = useMemo(() => {
@@ -1263,16 +1431,302 @@ export default function Tarefas({
   const escolherOrdenacao = (v: Ordenacao) => {
     setOrdenacao(v);
     if (v !== "manual") return;
-    // A ordem manual arranca IGUAL ao que está no ecrã — ver `ordemVisivel`:
-    // pedir para arrumar à mão não pode fazer a lista saltar antes de se lhe
-    // tocar.
-    setOrdemManual(ordemVisivel(grupos));
+    /**
+     * ── DE ONDE VEM A ORDEM MANUAL AO SER LIGADA ────────────────────────
+     *
+     * Duas origens, e a pergunta que as separa é «já houve uma arrumação?».
+     *
+     *  · NUNCA houve: arranca igual ao que está no ecrã (`ordemVisivel`).
+     *    Pedir para arrumar à mão não pode fazer a lista saltar antes de se
+     *    lhe tocar — é a razão escrita no `ordemVisivel`, e continua de pé.
+     *  · JÁ houve: arranca da ordem GUARDADA (`ordemGuardada`, pelas
+     *    posições). Aqui a lista salta, e é suposto: saltar para a arrumação
+     *    que ela própria fez é o motivo de a termos gravado. O contrário —
+     *    ligar «Manual» e receber a ordem por data — apagava-lhe o trabalho
+     *    ao primeiro arrasto seguinte.
+     *
+     * Em qualquer dos casos a ordem tem de conter a lista TODA e não só o que
+     * está à frente dela: um filtro por pessoa ou uma lista de evento mostram
+     * um pedaço, e as tarefas de fora não podem perder o sítio por não
+     * estarem à vista.
+     */
+    const visiveis = ordemVisivel(grupos);
+    const guardada = ordemGuardada(tasks);
+    const base = tasks.some((t) => typeof t.posicao === "number") ? guardada : visiveis;
+    const resto = guardada.filter((id) => !base.includes(id));
+    setOrdemManual([...base, ...resto]);
     setAgrupamento("nenhum");
   };
   const escolherAgrupamento = (v: Agrupamento) => {
     setAgrupamento(v);
     if (v !== "nenhum" && ordenacao === "manual") setOrdenacao(ORDENACAO_POR_OMISSAO);
   };
+
+  /* A ordem do que está à frente dela, e a ordem manual inteira, em refs: os
+     manipuladores do arrasto montam-se uma vez e não podem fechar sobre o
+     valor do primeiro desenho. */
+  const idsVisiveis = useMemo(() => open.map((t) => t.id), [open]);
+  const idsVisiveisRef = useRef(idsVisiveis);
+  const ordemManualRef = useRef(ordemManual);
+  useEffect(() => {
+    idsVisiveisRef.current = idsVisiveis;
+    ordemManualRef.current = ordemManual;
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * REORDENAR — e a ordem sobrevive ao recarregamento (fase 09)
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `reordenarManualmente` (em `lib/tarefas/listas`) diz qual é a ordem nova;
+   * `posicoesDepoisDeMover` (em `lib/tarefas/posicoes`) diz o que se GRAVA para
+   * ela lá continuar amanhã. As duas são puras e estão testadas sozinhas; o que
+   * está aqui é só a ligação entre elas e o ecrã.
+   *
+   * A ordem que se move é a MANUAL INTEIRA e não a que está à vista: com um
+   * filtro por pessoa ligado, mexer numa linha não pode reatribuir sítio às
+   * tarefas que o filtro escondeu.
+   */
+  const gravarOrdem = useCallback(
+    (ordem: readonly string[], mover: string) => {
+      /* As tarefas que já não existem saem antes de se calcular seja o que for:
+         um id fantasma na ordem manual (uma tarefa eliminada noutro
+         separador) obrigava a renumerar a lista toda e, pior, mandava um
+         `PATCH` a um endereço que responde 404. */
+      const existentes = ordem.filter((id) => tasksRef.current.some((t) => t.id === id));
+      const escritas = posicoesDepoisDeMover(
+        existentes,
+        (id) => tasksRef.current.find((t) => t.id === id)?.posicao,
+        mover,
+      );
+      for (const e of escritas) {
+        void gravarCampos(e.id, { posicao: e.posicao }, "guardar a ordem das tarefas");
+      }
+    },
+    [gravarCampos],
+  );
+
+  const aplicarOrdem = useCallback(
+    (mover: string, destino: string | null) => {
+      const base = ordemManualRef.current.length
+        ? [...ordemManualRef.current]
+        : [...idsVisiveisRef.current];
+      const nova = reordenarManualmente(base, mover, destino);
+      // Largar uma linha onde ela já estava não é um movimento: nem se grava,
+      // nem se avisa, nem se oferece desfazer uma coisa que não aconteceu.
+      if (nova.length === base.length && nova.every((id, i) => id === base[i])) return;
+      setOrdemManual(nova);
+      gravarOrdem(nova, mover);
+
+      /* ── O ANÚNCIO, E O DESFAZER ──────────────────────────────────────────
+         «Arrasto com alternativa por menu e anúncio em `role="status"`»
+         (Parte 6) e «permite desfazer sempre» [APPLE, 12.4]. O aviso da casa é
+         as duas coisas: tem `role="status"`, portanto quem ouve o ecrã recebe
+         o resultado do gesto, e leva o «Anular» que repõe a ordem anterior —
+         e que a volta a gravar, senão o desfazer durava até ao recarregamento
+         seguinte.
+
+         A posição é contada na lista VISÍVEL: «3 de 12» tem de bater com o que
+         ela consegue contar com o dedo no ecrã, e não com o total escondido. */
+      const visiveis = nova.filter((id) => idsVisiveisRef.current.includes(id));
+      const onde = visiveis.indexOf(mover);
+      const titulo = tasksRef.current.find((t) => t.id === mover)?.title ?? "Tarefa";
+      toast(`«${titulo}» movida — ${onde + 1} de ${visiveis.length}`, "success", {
+        rotulo: "Anular",
+        aoTocar: () => {
+          setOrdemManual(base);
+          gravarOrdem(base, mover);
+        },
+      });
+    },
+    [gravarOrdem, toast],
+  );
+
+  /**
+   * «Mover para cima» / «Mover para baixo» — a alternativa ao arrasto, que
+   * nunca pode ser o único caminho. [APPLE, 12.4]
+   *
+   * Conta-se na lista VISÍVEL (é a que ela vê) e aplica-se à manual inteira. A
+   * assimetria entre as duas direcções não é um lapso: `reordenarManualmente`
+   * insere ANTES do destino, portanto subir uma casa é «antes do vizinho de
+   * cima» e descer uma casa é «antes do vizinho do vizinho» — ou no fim, se
+   * não houver segundo vizinho.
+   */
+  const mover = useCallback(
+    (id: string, direccao: -1 | 1) => {
+      const visiveis = idsVisiveisRef.current;
+      const i = visiveis.indexOf(id);
+      if (i < 0) return;
+      if (direccao === -1) {
+        if (i === 0) return;
+        aplicarOrdem(id, visiveis[i - 1]);
+      } else {
+        if (i >= visiveis.length - 1) return;
+        aplicarOrdem(id, visiveis[i + 2] ?? null);
+      }
+    },
+    [aplicarOrdem],
+  );
+
+  /* ── OS QUATRO MOMENTOS DO ARRASTO ────────────────────────────────────────
+     Arrasto nativo do browser (`draggable`) e não ponteiros à mão: dá de graça
+     a imagem translúcida da linha, o scroll automático do contentor e o
+     regresso à origem quando o largar falha — três coisas que a Parte 12.4
+     exige e que uma reimplementação em `pointermove` teria de refazer pior.
+     Onde o nativo não chega é no dedo, e é por isso que o menu tem «Mover para
+     cima» e «Mover para baixo». */
+  const limparArrasto = useCallback(() => {
+    aArrastarRef.current = null;
+    alvoRef.current = null;
+    setAArrastar(null);
+    setAlvoDoArrasto(null);
+  }, []);
+
+  const arrastar = useMemo(
+    () => ({
+      comecar: (e: React.DragEvent<HTMLDivElement>) => {
+        const id = e.currentTarget.dataset.tarefa;
+        if (!id) return;
+        aArrastarRef.current = id;
+        setAArrastar(id);
+        e.dataTransfer.effectAllowed = "move";
+        // Sem dados no `dataTransfer` o Firefox não chega a começar o arrasto.
+        e.dataTransfer.setData("text/plain", id);
+      },
+      porCima: (e: React.DragEvent<HTMLDivElement>) => {
+        if (!aArrastarRef.current) return;
+        // Sem o `preventDefault` o browser recusa o largar — é assim que ele
+        // distingue um destino que aceita de um que não aceita.
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const id = e.currentTarget.dataset.tarefa;
+        if (!id) return;
+        /* Metade de cima da linha, entra ANTES dela; metade de baixo, entra
+           antes da seguinte — que é o mesmo que dizer «depois desta». É o que
+           faz a linha de inserção cair entre duas linhas e não em cima de uma,
+           e o que permite chegar ao fim da lista. */
+        const caixa = e.currentTarget.getBoundingClientRect();
+        const emCima = e.clientY < caixa.top + caixa.height / 2;
+        const visiveis = idsVisiveisRef.current;
+        const i = visiveis.indexOf(id);
+        const alvo = emCima ? id : (visiveis[i + 1] ?? "fim");
+        if (alvo === alvoRef.current) return;
+        alvoRef.current = alvo;
+        setAlvoDoArrasto(alvo);
+      },
+      largar: (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const oQue = aArrastarRef.current;
+        const alvo = alvoRef.current;
+        limparArrasto();
+        if (oQue && alvo) aplicarOrdem(oQue, alvo === "fim" ? null : alvo);
+      },
+      acabar: limparArrasto,
+    }),
+    [aplicarOrdem, limparArrasto],
+  );
+
+  /** «Hoje» e «Amanhã» do menu da linha — o prazo sem abrir o editor. */
+  const porPrazo = useCallback(
+    (t: Task, quando: "hoje" | "amanha") => {
+      const dia = quando === "hoje" ? todayStr : amanha(todayStr);
+      void gravarCampos(
+        t.id,
+        { dueDate: dia },
+        `pôr «${t.title}» para ${quando === "hoje" ? "hoje" : "amanhã"}`,
+      );
+    },
+    [gravarCampos, todayStr],
+  );
+
+  const escolher = useCallback((t: Task) => setEscolhida(t.id), []);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O TECLADO DA LISTA (fase 09, ponto 21)
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Vive num `onKeyDown` do contentor da lista e não num ouvinte da janela: os
+   * atalhos globais do back office (⌘K, ⌘N, `g`+tecla) são do `AdminClient`, e
+   * uma segunda escuta na janela a disputar as mesmas teclas é como se perde a
+   * conta a quem responde a quê. Aqui só respondem teclas premidas DENTRO da
+   * lista.
+   *
+   *  · `↓` / `↑` — linha seguinte e anterior. Movem o foco para o título, que é
+   *    o que abre o detalhe: é o percurso que a Parte 12.2 descreve («ao entrar
+   *    na tabela, foca a primeira linha»).
+   *  · `⌘⌫` — eliminar. Passa pela mesma pergunta do botão, e não por um
+   *    caminho só do teclado: uma tarefa apagada por engano com a mão no
+   *    modificador errado não tem volta.
+   *  · `⇧F10` e a tecla de menu — o menu da linha, que é o que o Windows e o
+   *    macOS já ensinaram a toda a gente. [Sistema de design, 12.3]
+   *
+   * O que o documento pede e NÃO está aqui, com a razão:
+   *
+   *  · `Espaço` a marcar a linha focada. O foco, nesta lista, está num BOTÃO —
+   *    o título —, e o `Espaço` num botão é o que o activa. Roubar-lho para
+   *    marcar a caixa era partir o teclado de um botão para dar um atalho a
+   *    uma caixa que está a um `⇧Tab` de distância e que já responde ao
+   *    `Espaço` como manda a norma.
+   *  · `⌘1`–`⌘5` a trocar de lista. São os atalhos com que o browser troca de
+   *    SEPARADOR, e «nunca reutilizes um atalho padrão para outra ação» é
+   *    regra da Apple e da casa. As cinco listas estão a um toque, com
+   *    contagem e com `aria-pressed`.
+   *  · `⌘F` a filtrar. Nesta casa o `⌘F` é a pesquisa global (e a do browser),
+   *    e o filtro por pessoa desta vista é uma fila de botões à vista.
+   */
+  const teclasDaLista = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const alvo = e.target as HTMLElement | null;
+      const linha = alvo?.closest?.("[data-tarefa]") as HTMLElement | null;
+      if (!linha) return;
+      const id = linha.dataset.tarefa;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        // A escrever dentro da linha de edição, as setas são do campo.
+        if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
+        const linhas = [
+          ...(linha
+            .closest("[data-lista-de-tarefas]")
+            ?.querySelectorAll<HTMLElement>("[data-tarefa]") ?? []),
+        ];
+        const seguinte = linhas[linhas.indexOf(linha) + (e.key === "ArrowDown" ? 1 : -1)];
+        const abrir = seguinte?.querySelector<HTMLElement>("[data-abrir]");
+        if (!abrir) return;
+        e.preventDefault();
+        abrir.focus();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
+        if (!id) return;
+        e.preventDefault();
+        pedirParaEliminar(id);
+        return;
+      }
+
+      if ((e.shiftKey && e.key === "F10") || e.key === "ContextMenu") {
+        // O menu é o do `ui/MenuDeAccoes` e não tem porta imperativa nenhuma —
+        // abre-se pelo seu botão. Carregar-lhe no botão é abrir o MESMO menu, e
+        // é o que impede uma segunda implementação de menu ao lado da primeira
+        // (Parte −1 do sistema de design).
+        const botao = linha.querySelector<HTMLElement>('[aria-haspopup="menu"]');
+        if (!botao) return;
+        e.preventDefault();
+        botao.click();
+      }
+    },
+    [pedirParaEliminar],
+  );
+
+  /** O botão direito abre o mesmo menu — ver a nota no `⇧F10`, acima. */
+  const menuDoBotaoDireito = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const linha = (e.target as HTMLElement)?.closest?.("[data-tarefa]") as HTMLElement | null;
+    const botao = linha?.querySelector<HTMLElement>('[aria-haspopup="menu"]');
+    if (!botao) return;
+    e.preventDefault();
+    botao.click();
+  }, []);
 
   /**
    * Uma linha. O `arrastavel` chega por argumento e não pelo estado porque a
@@ -1385,9 +1839,25 @@ export default function Tarefas({
         t={t}
         overdue={!!t.dueDate && !t.done && t.dueDate < todayStr}
         arrastavel={arrastavel}
+        escolhida={escolhida === t.id}
+        /* A linha de inserção do arrasto. «Depois» só existe na ÚLTIMA linha
+           visível — é a única maneira de dizer «no fim» com uma linha que se
+           desenha entre duas. */
+        marca={
+          alvoDoArrasto === t.id
+            ? "antes"
+            : alvoDoArrasto === "fim" && idsVisiveis[idsVisiveis.length - 1] === t.id
+              ? "depois"
+              : null
+        }
+        aArrastar={aArrastar === t.id}
         onToggle={toggle}
         onEdit={startEditTask}
         onRemove={pedirParaEliminar}
+        onEscolher={escolher}
+        onPrazo={porPrazo}
+        onMover={mover}
+        onArrastar={arrastar}
       />
     );
   }
@@ -1407,26 +1877,45 @@ export default function Tarefas({
   }
 
   return (
-    <div className="max-w-6xl">
+    <div
+      className="max-w-6xl"
+      /* ── `Esc` FECHA O DETALHE ────────────────────────────────────────────
+         «Esc cancela sempre a camada de topo» (12.3). Num campo de texto não:
+         aí o `Esc` é o de desistir do que se está a escrever, e é assim que a
+         linha de escrever e a de editar já o usam. */
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || !escolhida) return;
+        const alvo = e.target as HTMLElement | null;
+        if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
+        setEscolhida(null);
+      }}
+    >
       {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
-          TRÊS blocos, pela ordem de leitura: as listas (0), escolher de quem
-          são as tarefas (1) e as tarefas (2). Eram dois; o primeiro degrau é
-          novo e é a barra das listas da fase 05 — entra à frente das outras
-          porque é ela que decide o que as outras duas mostram. A escada é a da
-          casa (`.bo-cena` no `globals.css`): 600 ms, degraus de 20 ms, tecto ao
-          sexto, desligada em `prefers-reduced-motion`. Ver
-          `vistas-que-se-compoem.test.ts`, que a mede.
+          QUATRO blocos, pela ordem de leitura: as listas (0), escolher de quem
+          são as tarefas (1), as tarefas (2) e o detalhe da escolhida (3). O
+          último é novo e é o painel da fase 08 — entra depois das tarefas
+          porque é delas que ele fala. A escada é a da casa (`.bo-cena` no
+          `globals.css`): 600 ms, degraus de 20 ms, tecto ao sexto, desligada em
+          `prefers-reduced-motion`. Ver `vistas-que-se-compoem.test.ts`, que a
+          mede — e que também põe o tecto nos quatro blocos, onde esta vista
+          agora está.
 
           O `SkeletonList` da espera não leva degrau — um esqueleto é a espera,
           não uma apresentação. */}
-      {/* ── DUAS COLUNAS A PARTIR DE `lg`, UMA ABAIXO DISSO ─────────────────
+      {/* ── TRÊS COLUNAS A PARTIR DE `lg`, UMA ABAIXO DISSO ─────────────────
           «Metade do ecrã está vazia» é o ponto 22 da auditoria, e a correcção
-          dele são três colunas: listas · tarefas · detalhe. Aqui ficam as duas
-          primeiras; a terceira é a fase 08, e a largura já lhe fica reservada
-          (o `max-w-4xl` de antes não chegava para três).
+          dele são três colunas: listas · tarefas · detalhe. As três estão cá:
+          a terceira é a fase 08, e a largura já lhe estava reservada (o
+          `max-w-4xl` de antes não chegava).
 
           `lg:` e não `md:`: é o corte da casa, o mesmo em que a barra de
-          destinos deixa de ser gaveta (ver `Cortes.contrato.test.ts`). */}
+          destinos deixa de ser gaveta (ver `Cortes.contrato.test.ts`).
+
+          MEDIDO a 1024 (o `lg` justo): 224 px de listas + 288 de detalhe + dois
+          intervalos de 24 deixam 424 px à coluna do meio, que é o que a linha
+          de tarefa precisa para mostrar o título e a data sem quebrar — a fila
+          só parte abaixo de `sm`. A 1280 são 680, e a 1440 (o `max-w-6xl`
+          cheio) são 592 mais o ar que sobra fora do contentor. */}
       <div className="lg:flex lg:items-start lg:gap-6">
         <div
           style={{ "--cena": 0 } as React.CSSProperties}
@@ -1500,7 +1989,19 @@ export default function Tarefas({
            lista de cinquenta tarefas a entrar linha a linha lê-se como
            lentidão. O degrau está aqui dentro, no ramo já carregado, para o
            esqueleto de cima ficar de fora. */
-            <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena">
+            <div
+              style={{ "--cena": 2 } as React.CSSProperties}
+              className="bo-cena"
+              /* ── ONDE O TECLADO E O BOTÃO DIREITO DA LISTA VIVEM ───────────
+                 Num contentor e não em cada linha: um manipulador por linha
+                 desfazia o `memo()` de todas elas a cada desenho, e é
+                 exactamente o que o cabeçalho do `TaskRow` diz para não
+                 acontecer. A tecla borbulha até aqui e a linha descobre-se pelo
+                 `data-tarefa` de quem a recebeu. */
+              data-lista-de-tarefas
+              onKeyDown={teclasDaLista}
+              onContextMenu={menuDoBotaoDireito}
+            >
               {/* ── O CARTÃO DEIXOU DE CORTAR O QUE SAI DE DENTRO DELE ────────
               «Isto não está bem, está a tapar, não dá para ver tudo no ecrã» —
               com a lista da Prioridade aberta e cortada a meio, o «Alta» e o
