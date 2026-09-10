@@ -916,6 +916,30 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     // `goTo` é uma função do corpo do componente e é reescrita a cada desenho;
     // não entra nas dependências para não refazer isto a cada tecla. O que ela
     // fecha (`setCursor`, `setSelectedDay`) é estável.
+
+    [vista, diaAncora, year, month, irParaDia],
+  );
+
+  /**
+   * `⌥←`/`⌥→` — o salto de MÊS, em qualquer vista (ponto 18 da auditoria).
+   *
+   * Nas vistas de horas isso é mover o DIA âncora um mês, e não só o cursor: o
+   * cursor é o que a grelha do mês lê, e mexer-lhe com a vista de dia à frente
+   * mudava um número que não está desenhado em lado nenhum — a tecla parecia
+   * avariada. O dia do mês é preservado, e encosta-se ao último quando o mês de
+   * destino é mais curto (31 de Janeiro + 1 mês = 28 de Fevereiro).
+   */
+  const navegarDeMes = useCallback(
+    (sentido: 1 | -1) => {
+      if (vista !== "dia" && vista !== "semana") {
+        return goTo(new Date(year, month + sentido, 1));
+      }
+      const [a, m, d] = diaAncora.split("-").map(Number);
+      const ultimo = new Date(a, m + sentido, 0).getDate();
+      const alvo = new Date(a, m - 1 + sentido, Math.min(d, ultimo));
+      irParaDia(`${alvo.getFullYear()}-${pad2(alvo.getMonth() + 1)}-${pad2(alvo.getDate())}`);
+    },
+    // `goTo` é do corpo do componente — ver a nota do `navegar`.
      
     [vista, diaAncora, year, month, irParaDia],
   );
@@ -1328,7 +1352,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
         e.preventDefault();
         // `⌥←`/`⌥→` é sempre o MÊS, em qualquer vista — o ponto 18 da auditoria
         // dá-lhe esse nome, e é o salto grande de que a vista de dia precisa.
-        if (e.altKey) goTo(new Date(year, month + sentido, 1));
+        if (e.altKey) navegarDeMes(sentido);
         else navegar(sentido);
         return;
       }
@@ -1353,7 +1377,6 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     return () => window.removeEventListener("keydown", onKey);
     // `goTo` e `openAdd` são funções do corpo e não entram: o que elas fecham
     // é estado e já está na lista.
-     
   }, [
     modalDate,
     aRemover,
@@ -1361,6 +1384,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     trocarDeVista,
     irParaHoje,
     navegar,
+    navegarDeMes,
     year,
     month,
     selectedDay,

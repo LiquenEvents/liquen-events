@@ -2961,6 +2961,29 @@ function ThemeFolder({
    * Repô-las de memória com o `reinsertAt` desenhava uma grelha de imagens
    * partidas — o que se repõe é o pedido, não o objecto.
    */
+  /**
+   * ── O REGRESSO DE UM DROP FALHADO ─────────────────────────────────────
+   *
+   * «Falha no drop: REGRESSO ANIMADO à origem com `--ease-reposition`.»
+   * [APPLE], Parte 4 e Parte 5 (475 ms).
+   *
+   * Metade disto é do browser e não se lhe toca: a imagem de arrasto a voar de
+   * volta ao sítio é comportamento nativo do HTML5 drag-and-drop, e a única
+   * forma de a substituir era trocar tudo isto por `pointer events` — o que
+   * custaria o largar de FICHEIROS e de PASTAS do computador, que é o gesto
+   * de origem desta grelha e o único que o HTML5 sabe fazer.
+   *
+   * A outra metade é nossa, e é a que faltava: a célula de onde a fotografia
+   * saiu está a 40% enquanto o arrasto anda, e voltava a 100% num corte de
+   * 150 ms — o degrau de um estado a mudar. Não é um estado: é um objecto que
+   * voltou para o lugar, e por isso volta com a curva e a duração de
+   * reposicionar. Guarda-se o `path` e não o índice, porque a grelha pode
+   * ter-se arrumado pelo meio.
+   *
+   * `dropEffect === "none"` é o sinal que a norma dá para «isto não foi
+   * largado em lado nenhum» — Esc a meio, ou largado fora de um destino.
+   */
+  const [aRegressar, setARegressar] = useState<string | null>(null);
   const [aMover, setAMover] = useState<{ feito: number; total: number } | null>(null);
   const [anuncio, setAnuncio] = useState("");
   const [recarga, setRecarga] = useState(0);
@@ -5187,11 +5210,20 @@ function ThemeFolder({
                       vestirOArrasto(e, lote.length);
                       aoArrastar?.(true);
                     }}
-                    onDragEnd={() => {
+                    onDragEnd={(e) => {
+                      // Ver a nota do `aRegressar`: `none` é a norma a dizer
+                      // que isto não foi largado em destino nenhum.
+                      const falhou = e.dataTransfer?.dropEffect === "none";
                       setDragFrom(null);
                       setDragOver(null);
                       aoArrastar?.(false);
+                      setARegressar(falhou ? im.path : null);
                     }}
+                    // O regresso acaba quando acaba — sem temporizador a
+                    // repetir o número que já está no token. Deixá-lo aceso
+                    // punha esta célula (e só ela) a responder ao rato em
+                    // 475 ms para sempre.
+                    onTransitionEnd={() => setARegressar((p) => (p === im.path ? null : p))}
                     onDragOver={(e) => {
                       if (dragFrom === null) return;
                       // Sem isto o browser recusa a largada.
@@ -5229,6 +5261,12 @@ function ThemeFolder({
                     } ${dragFrom === i ? "opacity-40" : ""} ${
                       dragOver === i && dragFrom !== null && dragFrom !== i
                         ? "ring-2 ring-sage-600"
+                        : ""
+                    } ${
+                      // Os tokens do documento, lidos do `:root` — nem o
+                      // número nem a curva se escrevem aqui.
+                      aRegressar === im.path
+                        ? "motion-safe:[transition-duration:var(--transition-duration-reposition)] motion-safe:[transition-timing-function:var(--ease-reposition)]"
                         : ""
                     }`}
                   >
