@@ -159,7 +159,25 @@ test.describe("Biblioteca de Temas", () => {
         );
       }
       await expect(addPhotos).toBeVisible();
-      await expect(page.getByRole("button", { name: literal(themeName) })).toBeVisible();
+      /*
+       * ── ANCORADO AO NOME INTEIRO, E PORQUÊ ────────────────────────────
+       * Com a vista dividida (fase 06 do documento dos Temas), o nome do
+       * tema aberto passou a estar em DOIS sítios legítimos: a linha da
+       * coluna da esquerda, cujo nome acessível é «<tema> 0 fotos», e o
+       * título, que é o botão de renomear e se chama só «<tema>».
+       *
+       * O localizador sem âncora apanhava os dois e o Playwright recusava-se
+       * a escolher — «strict mode violation», três vezes seguidas no CI.
+       *
+       * O que esta linha quer provar é que o ECRÃ DO TEMA abriu, e a prova
+       * disso é o título. Ancora-se ao nome inteiro em vez de se enfraquecer
+       * para `.first()`: com `.first()`, o dia em que o título desaparecesse
+       * este passeio continuava verde por causa da coluna. É a mesma âncora
+       * que a linha do cartão, mais abaixo, já usa.
+       */
+      await expect(
+        page.getByRole("button", { name: new RegExp("^" + literal(themeName).source + "$") }),
+      ).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
 
       // The id is needed to probe the routes below the way the browser does.
