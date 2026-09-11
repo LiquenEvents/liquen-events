@@ -99,6 +99,15 @@ const SEM_AFUNDAR: { ficheiro: string; marca: string; porque: string }[] = [
     marca: "fixed inset-0 z-50 flex flex-col bg-black/92",
     porque: "véu do lightbox",
   },
+  // O palco nasceu quando o Quick Look ganhou o FLIP: é a caixa que anima da
+  // miniatura até ao tamanho grande, e o `onClick` só fecha quando o toque cai
+  // NELA e não na fotografia. Afundá-la 2% afundava a fotografia com ela, a
+  // meio da própria animação de abertura.
+  {
+    ficheiro: "orcamento/admin/PhotoLightbox.tsx",
+    marca: "relative flex h-full w-full items-center justify-center",
+    porque: "o palco do FLIP à volta da foto — fechar ao falhar o alvo",
+  },
   {
     ficheiro: "orcamento/admin/LupaDeFotos.tsx",
     marca: "fixed inset-0 z-[80]",

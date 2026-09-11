@@ -588,7 +588,7 @@ const TaskRow = memo(function TaskRow({
              inline-flex` numa camada, e um título centrado a meio da linha não
              é um título de lista. No computador nada disto existe — a regra
              vive dentro de `(pointer: coarse)`. */
-          className={`alvo-toque block w-full text-start text-sm break-words sm:truncate ${ESTADO} ${
+          className={`alvo-toque block w-full text-start text-sm break-words sm:truncate ${ESTADO} ${PRESSAO} ${
             t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"
           }`}
         >

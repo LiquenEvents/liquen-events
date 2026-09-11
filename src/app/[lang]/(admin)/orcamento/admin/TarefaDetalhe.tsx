@@ -256,7 +256,7 @@ function Corpo({
                tem um nome escrito à mão e mais nada —, e aí fica o nome. */
             <a
               href={localizeHref(`/orcamento/admin/evento/${tarefa.quoteId}`, locale)}
-              className={`text-[var(--bo-accent)] underline decoration-dotted underline-offset-2 hover:decoration-solid ${ESTADO}`}
+              className={`text-[var(--bo-accent)] underline decoration-dotted underline-offset-2 hover:decoration-solid ${ESTADO} ${PRESSAO}`}
             >
               {tarefa.clientName || "Abrir o evento"}
             </a>
@@ -370,7 +370,7 @@ function Corpo({
                 href={a.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`min-w-0 flex-1 truncate py-1.5 text-callout text-[var(--bo-accent)] underline decoration-dotted underline-offset-2 hover:decoration-solid ${ESTADO}`}
+                className={`min-w-0 flex-1 truncate py-1.5 text-callout text-[var(--bo-accent)] underline decoration-dotted underline-offset-2 hover:decoration-solid ${ESTADO} ${PRESSAO}`}
                 title={a.url}
               >
                 {a.nome}
