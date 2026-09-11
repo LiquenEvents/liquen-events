@@ -1537,7 +1537,8 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                   363), portanto a cápsula QUEBRA para a linha de baixo — que é
                   precisamente o que o `min-w-0 flex-wrap` desta fila existe
                   para fazer, em vez de a seta de avançar sair pela borda. O
-                  «Exportar» continua fora do telemóvel (`hidden sm:`). */}
+                  «Exportar» continua fora do telemóvel (`max-sm:hidden` — ver a nota
+                  no próprio botão: o `hidden sm:` NÃO o escondia). */}
               <Segmented
                 size="sm"
                 ariaLabel="Vista do calendário"
@@ -1555,7 +1556,23 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                 size="sm"
                 onClick={() => exportIcs(quotes)}
                 title="Exportar para calendário (.ics)"
-                className="hidden sm:inline-flex"
+                /* `max-sm:hidden` e NÃO `hidden sm:inline-flex`.
+                   ────────────────────────────────────────────────────────
+                   O idioma habitual não esconde NADA aqui, e foi medido: a
+                   375 px este botão desenhava-se a 78x32 com a classe
+                   `hidden` posta. O `<Button>` traz `inline-flex` de origem,
+                   e na folha compilada o `.inline-flex` sai DEPOIS do
+                   `.hidden` — mesma especificidade, ganha o último. O
+                   `display: flex` que o browser relata é esse `inline-flex`
+                   transformado por o botão ser filho de um `flex`.
+
+                   O `max-sm:hidden` vive dentro de um `@media`, que é
+                   emitido depois das utilidades simples, e por isso ganha.
+
+                   A varredura que apanhou isto está no `admin-mobile.spec.ts`
+                   e é de uma linha: procurar `.hidden` com `display` que não
+                   seja `none`. Em seis vistas a 375 px, este era o único. */
+                className="max-sm:hidden"
               >
                 Exportar
               </Button>
