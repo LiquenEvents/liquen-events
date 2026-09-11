@@ -159,7 +159,25 @@ test.describe("Biblioteca de Temas", () => {
         );
       }
       await expect(addPhotos).toBeVisible();
-      await expect(page.getByRole("button", { name: literal(themeName) })).toBeVisible();
+      /*
+       * ── ANCORADO AO NOME INTEIRO, E PORQUÊ ────────────────────────────
+       * Com a vista dividida (fase 06 do documento dos Temas), o nome do
+       * tema aberto passou a estar em DOIS sítios legítimos: a linha da
+       * coluna da esquerda, cujo nome acessível é «<tema> 0 fotos», e o
+       * título, que é o botão de renomear e se chama só «<tema>».
+       *
+       * O localizador sem âncora apanhava os dois e o Playwright recusava-se
+       * a escolher — «strict mode violation», três vezes seguidas no CI.
+       *
+       * O que esta linha quer provar é que o ECRÃ DO TEMA abriu, e a prova
+       * disso é o título. Ancora-se ao nome inteiro em vez de se enfraquecer
+       * para `.first()`: com `.first()`, o dia em que o título desaparecesse
+       * este passeio continuava verde por causa da coluna. É a mesma âncora
+       * que a linha do cartão, mais abaixo, já usa.
+       */
+      await expect(
+        page.getByRole("button", { name: new RegExp("^" + literal(themeName).source + "$") }),
+      ).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
 
       // The id is needed to probe the routes below the way the browser does.
@@ -170,7 +188,22 @@ test.describe("Biblioteca de Temas", () => {
       expect(themeId, `o tema "${themeName}" devia estar na lista da API`).not.toBe("");
 
       // ── 2. Vê-lo listado ──────────────────────────────────────────────
-      await page.getByRole("button", { name: /← Temas/ }).click();
+      /*
+       * ── A SAÍDA MUDOU DE SÍTIO COM O SPLIT VIEW ───────────────────────
+       * Este passeio corre em Desktop Chrome, 1280 px — acima de `lg`. Aí o
+       * «← Temas» está `lg:hidden` de propósito (Parte 6 do documento: no
+       * split view ele desaparece), e o caminho de volta é o primeiro item da
+       * coluna da esquerda, «Todos os temas». Ter os dois seriam duas saídas
+       * com nomes diferentes para o mesmo sítio.
+       *
+       * ── E PORQUE É QUE ISTO CUSTOU DOIS MINUTOS A DIAGNOSTICAR ────────
+       * Um `click()` espera pela visibilidade SEM limite próprio: fica preso
+       * até ao tecto do passeio inteiro. Por isso a falha não aparecia aqui —
+       * aparecia a cento e vinte segundos daqui, na limpeza do `finally`, a
+       * dizer «apiRequestContext.delete: timeout» e a apontar para uma linha
+       * que não tinha culpa nenhuma.
+       */
+      await page.getByRole("button", { name: /^Todos os temas$/ }).click();
       /* ── O NOME EXACTO, E NÃO «CONTÉM» ────────────────────────────────
          Este localizador era uma expressão que só pedia que o nome do tema
          aparecesse no rótulo, e passou a casar com DOIS botões: o cartão, que

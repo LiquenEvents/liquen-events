@@ -71,7 +71,15 @@ async function pedirParaEliminar(user: ReturnType<typeof userEvent.setup>) {
   );
   await waitFor(() => expect(screen.getByText("Ligar à florista")).toBeInTheDocument());
   const linha = screen.getByText("Ligar à florista").closest("div.group")!;
-  await user.click(linha.querySelector('[aria-label="Eliminar"]') as HTMLElement);
+  /* ── O CAMINHO ATÉ AO «ELIMINAR» MUDOU NA FASE 09 ────────────────────────
+     As acções da linha eram duas formas — dois ícones soltos com rato, um «⋯»
+     sem ele — e passaram a ser uma só: o menu, em qualquer ponteiro. «Hover
+     revela um ⋯ que abre o mesmo menu do botão direito: um botão, não três»
+     (`docs/APPLE-TAREFAS.md`, Parte 3). O que este teste prova não muda — a
+     pergunta da casa, com o nome da tarefa lá dentro. Muda o toque que lá
+     chega. */
+  await user.click(linha.querySelector('[aria-haspopup="menu"]') as HTMLElement);
+  await user.click(await screen.findByRole("menuitem", { name: "Eliminar" }));
 }
 
 describe("a pergunta de eliminar uma tarefa", () => {

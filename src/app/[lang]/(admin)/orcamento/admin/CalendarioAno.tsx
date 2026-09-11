@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { CalendarEvent, Quote } from "@/lib/orcamento/types";
 import {
+  DIAS_DA_SEMANA,
   anoDoCalendario,
   nomeDoDia,
   resumoDoMes,
@@ -81,15 +82,14 @@ import { cn } from "./ui";
  * isso o nome inteiro vai no `aria-label` de cada cabeçalho de coluna e o
  * visível fica `aria-hidden`.
  */
-const INICIAIS: readonly { inicial: string; nome: string }[] = [
-  { inicial: "S", nome: "Segunda-feira" },
-  { inicial: "T", nome: "Terça-feira" },
-  { inicial: "Q", nome: "Quarta-feira" },
-  { inicial: "Q", nome: "Quinta-feira" },
-  { inicial: "S", nome: "Sexta-feira" },
-  { inicial: "S", nome: "Sábado" },
-  { inicial: "D", nome: "Domingo" },
-];
+const INICIAIS: readonly { inicial: string; nome: string }[] = DIAS_DA_SEMANA.map((d) => ({
+  // A inicial é DERIVADA do «Seg» e não escrita à mão ao lado dele: assim não
+  // há maneira de as duas discordarem. A lista dos sete vive no
+  // `lib/orcamento/ano-do-calendario` porque este ecrã tem agora quatro vistas
+  // a nomear os mesmos dias — ver o comentário dela.
+  inicial: d.curto[0],
+  nome: d.nome,
+}));
 
 /** As semanas de um mês: linhas de sete, com `null` nas células vazias. */
 function semanas(m: MesDoAno): (DiaDoAno | null)[][] {

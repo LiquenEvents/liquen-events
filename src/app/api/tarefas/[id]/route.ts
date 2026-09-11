@@ -18,6 +18,16 @@ const ALLOWED: (keyof Task)[] = [
   "clientName",
   "assignee",
   "area",
+  /* Os campos do painel de detalhe (fase 08) e a ordem manual (fase 09). Esta
+     lista é a PRIMEIRA das duas peneiras — o que não estiver aqui nem chega ao
+     `taskUpdateSchema`, e desaparece com 200 e sem erro, tal como o que não
+     estiver declarado lá. Duas listas a ter de concordar é a armadilha que o
+     `validation.tarefas.test.ts` guarda do lado do esquema; aqui fica o
+     lembrete de que são duas. */
+  "notas",
+  "subtarefas",
+  "anexos",
+  "posicao",
 ];
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

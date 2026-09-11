@@ -32,10 +32,10 @@ Auditado no `Temas.tsx` (4346 linhas) contra a tabela da **Parte 8**.
 | 03 | Menus | **parcial** — o `⋯` é um `MenuDeAccoes`; não há menu do botão direito |
 | 04 | Filtros | **por fazer** — há ordenação e a vista de arquivo, não os cinco filtros nomeados |
 | 05 | Seleção | **parcial** — clique e `Shift` funcionam, e a barra de seleção é a superfície de vidro; falta `⌘A` |
-| 06 | Split view | **por fazer** |
-| 07 | Grelha de fotografias | **parcial** — sem `auto-fill` nem rácio fixo |
-| 08 | Arrasto | **parcial** — arrasta-se; falta o badge, o spring loading e o Anular |
-| 09 | Quick Look | **parcial** — o `PhotoLightbox` existe; falta o FLIP a partir da miniatura |
+| 06 | Split view | **feito** — `ListaDeTemas.tsx`: coluna de 16rem a partir de `lg`, com capa, contagem, estrela do fixado e `aria-current` na linha aberta. O corte é em `lg` (1024) e não nos 1200 px do documento, porque esta casa tem três larguras e o `Cortes.contrato.test.ts` prende-as — justificado por escrito no código. O «← Temas» ganhou `lg:hidden` e a saída passa a ser «Todos os temas», primeiro item da coluna |
+| 07 | Grelha de fotografias | **feito** — `aspect-[4/3]`, `gap-3` e `repeat(auto-fill,minmax(180px,1fr))` a partir de 24rem de contentor, com `grid-cols-2` por baixo: o `auto-fill` sozinho dá UMA coluna nos 309 px que um telemóvel de 375 dá a esta grelha. O tracejado passou a existir só durante o arrasto de ficheiros |
+| 08 | Arrasto | **feito** — carga própria (`application/x-liquen-fotos`), crachá do número no arrasto múltiplo, spring loading a 1 s, `role="status"` com a frase da Parte 4, e **Anular** que move de volta e RELÊ a pasta (os caminhos e os URLs assinados mudam no servidor; repor de memória dava imagens partidas). «Mover para…» entrou no menu da fotografia, que é a alternativa obrigatória sem rato |
+| 09 | Quick Look | **feito** — `Espaço` na célula abre, e o FLIP parte do rectângulo da miniatura com as curvas do `:root`. O `PhotoLightbox` foi ESTENDIDO (ganhou a prop `origem`), não substituído — as setas, o `Esc`, o trinco do scroll e a cascata do plano B já lá estavam. **Ressalva:** a ARIA manda o `Espaço` alternar uma `role="checkbox"` e o documento manda-o abrir o Quick Look; ficou o Quick Look, e o alternar não se perde porque o `Enter` num `<button>` dispara `click`. Fecha-se a sério na fase 11, quando a célula passar a `role="gridcell"` |
 | 10 | Estados | **parcial** — há `skeleton`; faltam os outros três |
 | 11 | Teclado e acessibilidade | **por fazer** — sem `role="grid"` |
 

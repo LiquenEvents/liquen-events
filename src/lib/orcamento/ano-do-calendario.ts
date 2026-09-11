@@ -82,6 +82,32 @@ export const MESES = [
   "Dezembro",
 ] as const;
 
+/**
+ * OS DIAS DA SEMANA, COM A SEMANA A COMEÇAR À SEGUNDA — uma lista só.
+ *
+ * Havia três a dizer o mesmo no mesmo ecrã: o `WEEKDAYS` do `Calendario.tsx`
+ * (os três caracteres do cabeçalho da grelha do mês), o `INICIAIS` do
+ * `CalendarioAno.tsx` (a inicial e o nome por extenso dos mini-meses), e a
+ * vista de semana ia acrescentar uma quarta. Três listas a nomear os mesmos
+ * sete dias é como se descobre, um dia, que uma delas começa ao domingo.
+ *
+ * O `curto` é o que a grelha do mês escreve; a INICIAL é o `curto[0]`, e não
+ * um terceiro campo — «Seg» e «S» não podem discordar se um deles for
+ * derivado do outro. O `nome` é o que vai nos rótulos acessíveis, porque as
+ * iniciais repetem-se (S/T/Q/Q/S/S/D) e sozinhas não se leriam.
+ *
+ * Segunda-feira primeiro: locale `pt-PT`, Parte 9.6 do sistema de design.
+ */
+export const DIAS_DA_SEMANA = [
+  { curto: "Seg", nome: "Segunda-feira" },
+  { curto: "Ter", nome: "Terça-feira" },
+  { curto: "Qua", nome: "Quarta-feira" },
+  { curto: "Qui", nome: "Quinta-feira" },
+  { curto: "Sex", nome: "Sexta-feira" },
+  { curto: "Sáb", nome: "Sábado" },
+  { curto: "Dom", nome: "Domingo" },
+] as const;
+
 export type EstadoDoDia = "livre" | "marcado" | "fechado";
 
 export interface DiaDoAno {
@@ -119,8 +145,16 @@ function ehData(v: string | undefined | null): v is string {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
 
-/** Soma dias a uma data "yyyy-mm-dd", devolvendo no mesmo formato. */
-function maisDias(iso: string, dias: number): string {
+/**
+ * Soma dias a uma data "yyyy-mm-dd", devolvendo no mesmo formato.
+ *
+ * Exportada porque a vista de semana precisa de recuar até à segunda-feira e
+ * de avançar sete dias a partir dela (`diasDaSemana`, no
+ * `dia-do-calendario.ts`). Escrever a mesma conta lá era ter duas maneiras de
+ * somar um dia no mesmo ecrã — e são precisamente as contas de datas que
+ * discordam em silêncio quando muda a hora legal.
+ */
+export function maisDias(iso: string, dias: number): string {
   const d = new Date(`${iso}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) return "";
   d.setUTCDate(d.getUTCDate() + dias);

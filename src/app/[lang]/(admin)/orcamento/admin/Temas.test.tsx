@@ -27,9 +27,12 @@ async function confirmarRemocao() {
   });
 }
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import Temas, {
   COLUNAS,
   GRELHA_DE_FOTOS,
+  PISO_DA_CELULA_PX,
   contarFotosDaBiblioteca,
   desdeQuando,
   mergePage,
@@ -210,8 +213,28 @@ function preenchimento(): number {
 }
 
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
-const dropZone = () => document.querySelector("div.border-dashed") as HTMLElement;
-const imgs = () => Array.from(document.querySelectorAll("img"));
+/**
+ * A zona de largar, encontrada por marca e não por classe.
+ *
+ * Era `div.border-dashed`. Deixou de servir na fase 07 do
+ * `docs/APPLE-TEMAS.md`: «o tracejado de destino só existe durante um arrasto»
+ * (critério 8), portanto em repouso já não há classe nenhuma por onde lhe
+ * pegar. O `data-zona-de-largar` é a marca estável, e está escrita no
+ * `Temas.tsx` com a razão ao lado.
+ */
+const dropZone = () => document.querySelector("[data-zona-de-largar]") as HTMLElement;
+/**
+ * As `<img>` da GRELHA DE FOTOS, e não as da página toda.
+ *
+ * Era `document.querySelectorAll("img")`, e passou a apanhar uma capa a mais
+ * por cada tema no dia em que o split view (fase 06) pôs a lista de temas ao
+ * lado da pasta — cada linha dessa lista tem a sua miniatura de 40 px. Contar
+ * as capas da navegação como fotos do tema fazia dezoito testes lerem sempre
+ * mais uma foto do que a grelha mostra.
+ *
+ * Fora de uma pasta não há zona de largar, e aí a pergunta é a de sempre.
+ */
+const imgs = () => Array.from((dropZone() ?? document).querySelectorAll("img"));
 
 /**
  * As fotos que a grelha está mesmo a mostrar.
@@ -864,9 +887,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
     const cartao = await acharCartaoDoTema(/Clássico Intemporal/);
 
     fireEvent.click(screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ })[0]);
-    const doBotao = screen
-      .getAllByRole("menuitem")
-      .map((m) => m.textContent);
+    const doBotao = screen.getAllByRole("menuitem").map((m) => m.textContent);
     expect(doBotao).toContain("Juntar a outro tema…");
     fireEvent.keyDown(document, { key: "Escape" });
 
@@ -885,9 +906,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
     expect(itens[itens.length - 1]).toBe("Eliminar tema…");
 
     fireEvent.click(screen.getByRole("menuitem", { name: "Eliminar tema…" }));
-    expect(
-      await screen.findByText(/Eliminar o tema «Clássico Intemporal»/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/Eliminar o tema «Clássico Intemporal»/)).toBeTruthy();
   });
 
   /**
@@ -2661,14 +2680,58 @@ describe("temPoucasFotos", () => {
  * distraída apagaria. A medição verdadeira está na régua; isto é o alarme.
  */
 describe("Grelha de fotos de um tema — ergonomia de toque", () => {
-  it("começa em DUAS colunas e só chega a três quando há largura", () => {
-    // Duas colunas a 375 px dão células de 150,5 px, que é o que permite três
-    // alvos de 44 px sem eles se tocarem. As três colunas voltam quando a ZONA
-    // DE LARGAR chega a 22rem — ver a tabela no comentário do `GRELHA_DE_FOTOS`.
+  it("começa em DUAS colunas, e só larga o piso quando o `auto-fill` já dá duas", () => {
+    // Duas colunas a 375 px dão células de 148,5 px, que é o que permite três
+    // alvos de 44 px sem eles se tocarem.
+    //
+    // A fase 07 do `docs/APPLE-TEMAS.md` trocou a escada de cinco degraus por
+    // um `repeat(auto-fill, minmax(180px, 1fr))` — mas `auto-fill` sozinho dá
+    // UMA coluna abaixo de 372 px de contentor, e 309 px é exactamente o que
+    // um telemóvel de 375 dá a esta grelha. Por isso o `auto-fill` só entra a
+    // 24rem (384 px), a primeira largura onde ele próprio já dá duas.
     expect(GRELHA_DE_FOTOS).toContain("grid-cols-2");
-    expect(GRELHA_DE_FOTOS).toContain("@min-[22rem]:grid-cols-3");
-    // A três colunas SEM condição nenhuma é exactamente o defeito medido.
-    expect(GRELHA_DE_FOTOS).not.toMatch(/(^|\s)grid-cols-3(\s|$)/);
+    expect(GRELHA_DE_FOTOS).toContain(
+      "@min-[24rem]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]",
+    );
+    // Uma coluna só, ou três sem condição nenhuma, são o defeito medido.
+    expect(GRELHA_DE_FOTOS).not.toMatch(/(^|\s)grid-cols-[13](\s|$)/);
+  });
+
+  /**
+   * ── E A CÉLULA TEM DE TER ALTURA PARA ELES ─────────────────────────────
+   *
+   * Rede nova, e nasceu de uma sobreposição real. A fase 07 pôs a célula a
+   * 4:3, ou seja 25% mais baixa do que a quadrada de antes — e a 320 px o alvo
+   * de cima (`×`, que APAGA a foto) passava a sobrepor-se 5,2 px ao de baixo
+   * (`↑`). Num toque na zona sobreposta ganha quem vem depois no DOM: o `×`.
+   *
+   * O piso está escrito no `Temas.tsx` com a conta ao lado; aqui refaz-se a
+   * conta a partir dos números que a decidem, para o dia em que alguém mexer
+   * num deles.
+   */
+  it("a célula 4:3 nunca fica mais baixa do que os três alvos que carrega", () => {
+    const MARGEM = 4; // `top-1` / `bottom-1`
+    const ALVO = 44; // `.alvo-toque`
+    const INTERVALO = 8; // o mínimo entre dois alvos, já fixado nesta casa
+    expect(PISO_DA_CELULA_PX).toBe(2 * MARGEM + 2 * ALVO + INTERVALO);
+
+    // E o piso vale MESMO: está na célula, na que está a subir e no esqueleto
+    // — as três têm de ter a mesma geometria, senão a grelha salta quando uma
+    // se torna a outra.
+    const fonte = readFileSync(
+      join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/Temas.tsx"),
+      "utf8",
+    );
+    const comRacio = fonte.match(/aspect-\[4\/3\][^"`]*/g) ?? [];
+    // A capa do CARTÃO de tema também é 4:3 e não tem alvos por cima; as da
+    // GRELHA são as que vivem numa célula com botões.
+    const daGrelha = comRacio.filter((c) => c.includes("rounded-lg"));
+    expect(daGrelha.length).toBeGreaterThanOrEqual(3);
+    for (const classe of daGrelha) {
+      expect(classe, `\`${classe}\` é 4:3 e não tem piso de altura`).toContain(
+        `min-h-[${PISO_DA_CELULA_PX}px]`,
+      );
+    }
   });
 
   it("dá 44 px de alvo aos três botões de cada foto", async () => {
@@ -2725,25 +2788,42 @@ const JANELAS = [375, 640, 1024, 1440] as const;
 
 /** `w-64` da navegação — `fixed` (fora do fluxo) até `lg`, `sticky` daí para cima. */
 const BARRA_LATERAL = 256;
-/** O `gap-2` da grelha. */
-const GAP_DA_GRELHA = 8;
+/** O `gap-3` da grelha — os 12 px que a fase 07 do `docs/APPLE-TEMAS.md`
+ *  fixa («gap de 12»), no lugar do `gap-2` de antes. */
+const GAP_DA_GRELHA = 12;
 /** O número que o comentário do `GRELHA_DE_FOTOS` fixa como piso. */
 const PISO_DA_CELULA = 111;
 
 /** O `px` do `VIEW_WRAP` do `AdminClient`, por lado: px-4 / sm:px-6 / lg:px-10. */
 const respiroDaVista = (janela: number) => (janela >= 1024 ? 40 : janela >= 640 ? 24 : 16);
 
+/** A coluna de temas do split view (`lg:grid-cols-[16rem_…]`) mais o `gap-4`
+ *  entre ela e a grelha. Só existe a partir de `lg` — ver a fase 06. */
+const COLUNA_DO_SPLIT = 256 + 16;
+
 /**
  * A largura ÚTIL da zona de largar — que é o contentor que a grelha mede.
  *
  * Janela − barra lateral (só a partir de `lg`, onde ela entra no fluxo) − o
- * `px` da vista dos dois lados − a moldura de 1 px e o `p-4` da própria zona
- * de largar dos dois lados. Dá 309 px a 375, 558 a 640, 654 a 1024 e 1070 a
- * 1440.
+ * `px` da vista dos dois lados − a coluna do split view (também só a partir de
+ * `lg`) − a moldura de 1 px e o `p-4` da própria zona de largar dos dois
+ * lados. Dá 309 px a 375, 558 a 640, 382 a 1024 e 798 a 1440.
+ *
+ * Os dois números de cima não mexeram; os dois de baixo encolheram no dia em
+ * que a lista de temas passou a viver ao lado das fotografias. É por isso que
+ * este cálculo tem de a conhecer: sem ela, a rede continuava a medir 654 px
+ * numa caixa que passou a ter 382 — e o piso de 111 px deixava de ser medido
+ * exactamente na largura onde ele já tinha falhado uma vez.
  */
 function zonaDeLargar(janela: number): number {
-  const emFluxo = janela - (janela >= 1024 ? BARRA_LATERAL : 0);
-  return Math.min(emFluxo, 1600) - 2 * respiroDaVista(janela) - 2 * (1 + 16);
+  const desktop = janela >= 1024;
+  const emFluxo = janela - (desktop ? BARRA_LATERAL : 0);
+  return (
+    Math.min(emFluxo, 1600) -
+    2 * respiroDaVista(janela) -
+    (desktop ? COLUNA_DO_SPLIT : 0) -
+    2 * (1 + 16)
+  );
 }
 
 type Contexto = { janela: number; contentor: number };
@@ -2801,15 +2881,37 @@ function ligada(variante: string, ctx: Contexto): boolean {
   );
 }
 
+/**
+ * Quantas colunas é que um `repeat(auto-fill, minmax(M, 1fr))` dá.
+ *
+ * É a conta do CSS Grid, e é a única forma de esta rede continuar a medir a
+ * célula depois de a fase 07 trocar a escada de degraus por um `auto-fill`:
+ * cabem `n` faixas de `M` px enquanto `n·M + (n−1)·gap ≤ largura`, e nunca
+ * menos do que uma.
+ */
+function colunasDoAutoFill(minimo: number, largura: number): number {
+  return Math.max(1, Math.floor((largura + GAP_DA_GRELHA) / (minimo + GAP_DA_GRELHA)));
+}
+
 /** As colunas que estão MESMO a valer neste contexto. */
 function colunasEm(className: string, ctx: Contexto): number {
   let n = 0;
   for (const classe of className.split(/\s+/).filter(Boolean)) {
     const partes = separar(classe);
     const utilitario = partes.pop()!;
-    const m = /^grid-cols-(\d+)$/.exec(utilitario);
-    if (!m) continue;
-    if (partes.every((v) => ligada(v, ctx))) n = Number(m[1]);
+    const fixas = /^grid-cols-(\d+)$/.exec(utilitario);
+    const auto = /^grid-cols-\[repeat\(auto-fill,minmax\((\d+)px,1fr\)\)\]$/.exec(utilitario);
+    if (!fixas && !auto) {
+      // Uma forma de `grid-cols-[…]` que esta rede não sabe resolver é uma
+      // grelha que ela deixaria de medir em silêncio — que é exactamente o
+      // defeito que a fez existir.
+      if (/^grid-cols-\[/.test(utilitario)) {
+        throw new Error(`\`${utilitario}\` não é uma forma que esta rede saiba resolver`);
+      }
+      continue;
+    }
+    if (!partes.every((v) => ligada(v, ctx))) continue;
+    n = fixas ? Number(fixas[1]) : colunasDoAutoFill(Number(auto![1]), ctx.contentor);
   }
   if (n === 0) throw new Error(`a grelha não declara colunas nenhumas em ${JSON.stringify(ctx)}`);
   return n;
@@ -2836,7 +2938,7 @@ describe("o resolvedor de classes desta rede (senão isto passava por vacuidade)
   });
 
   it("sabe onde vive a zona de largar em cada janela", () => {
-    expect(JANELAS.map(zonaDeLargar)).toEqual([309, 558, 654, 1070]);
+    expect(JANELAS.map(zonaDeLargar)).toEqual([309, 558, 382, 798]);
   });
 });
 
@@ -2902,8 +3004,10 @@ describe("a célula da grelha de fotos nunca desce abaixo do piso de 111 px", ()
       contentor,
       "as fotos vivem numa grelha com degraus `@min-[…]`, e um `@container` que não existe faz esses degraus medirem o elemento errado",
     ).not.toBeNull();
-    // E é a zona de largar, não um invólucro qualquer lá em cima.
-    expect(contentor!.className).toContain("border-dashed");
+    // E é a zona de largar, não um invólucro qualquer lá em cima. A marca é o
+    // `data-zona-de-largar` e não a classe `border-dashed`: desde a fase 07 o
+    // tracejado só existe durante um arrasto (critério 8 do documento).
+    expect(contentor!.hasAttribute("data-zona-de-largar")).toBe(true);
   });
 });
 

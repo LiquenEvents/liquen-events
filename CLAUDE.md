@@ -66,10 +66,18 @@ Cada um abre com uma tabela **auditada no código** — não de memória — do 
 está feito e do que falta, no formato do `docs/LOGIN.md`. Lê a tabela antes de
 refazer seja o que for.
 
-Ela escolheu a ordem: **«prefiro as tarefas primeiro»**. Em resumo, hoje:
-Tarefas cinco fases de onze; Temas nenhuma inteira mas quase todas começadas
-(o ecrã já tinha muito feito antes do documento); Calendário por começar — só
-existe a vista de mês, e as de dia, semana e ano são metade daquele documento.
+Ela escolheu a ordem: **«prefiro as tarefas primeiro»**. Em resumo, hoje —
+e cada tabela é que manda, isto é só o mapa:
+
+  · **Tarefas**: dez de onze. Falta a 11, acessibilidade;
+  · **Calendário**: as quatro vistas existem (dia, semana, mês, ano). Faltam a
+    09 (arrastar) e a 11 (acessibilidade); a 01, a 05 e a 10 estão parciais;
+  · **Temas**: a 06, a 07, a 08 e a 09 ficaram feitas; a 01, a 02, a 03, a 05
+    e a 10 estão parciais, e a 04 e a 11 por fazer.
+
+Repara que a 11 é a mesma nos três — é a acessibilidade, e nos três é a mesma
+troca: passar as grelhas de `role="button"` a `role="grid"` com `gridcell`.
+Três ecrãs a pedir a mesma peça é sinal de que se faz de uma vez, e não três.
 
 Estes três andaram perdidos: chegaram pelo chat e nunca ficaram guardados. O do
 Liquid Glass fez o mesmo caminho e só se recuperou por sorte. **Um documento que

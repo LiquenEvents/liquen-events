@@ -70,15 +70,29 @@ describe("content-visibility nas grelhas de fotos", () => {
    * entre uma célula saltada que ocupa o mesmo espaço de sempre e uma que
    * colapsa para zero e faz a barra de deslocamento dar um coice.
    */
-  it("a célula saltável é ela própria quadrada", () => {
+  it("a célula saltável traz proporção fixa no próprio invólucro", () => {
+    /*
+     * Fixa-se a PROPRIEDADE, não um valor.
+     *
+     * Este caso já chumbou uma vez por dizer `aspect-square` à letra, quando a
+     * grelha dos temas passou a 4:3 — uma mudança pedida pelo documento, e o
+     * teste a acusá-la como defeito. O que impede o colapso não é ser
+     * quadrada: é a célula ter uma proporção qualquer, porque `contain: size`
+     * faz o browser dimensionar a célula saltada COMO SE não tivesse conteúdo,
+     * e é da proporção que sai a altura.
+     *
+     * O `aspect-auto` fica de fora de propósito: é o valor que devolve a
+     * altura ao conteúdo, e é exactamente o defeito que este caso apanha.
+     */
+    const PROPORCAO = /\baspect-(?!auto\b)[\w[\]/.-]+/;
     for (const { onde, fonte } of GRELHAS) {
       // Todas as ocorrências da classe, com o resto do `className` à volta.
       const usos = [...fonte.matchAll(/celula-saltavel[^"`]*/g)].map((m) => m[0]);
       expect(usos.length, `${onde} não usa a classe`).toBeGreaterThan(0);
       for (const uso of usos) {
         expect(
-          uso.includes("aspect-square"),
-          `${onde}: célula saltável sem aspect-square no próprio invólucro — colapsa ao ser saltada`,
+          PROPORCAO.test(uso),
+          `${onde}: célula saltável sem proporção fixa no próprio invólucro — colapsa ao ser saltada. Encontrei «${uso.trim()}»`,
         ).toBe(true);
       }
     }

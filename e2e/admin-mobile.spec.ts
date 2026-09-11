@@ -245,6 +245,42 @@ async function expectErgonomiaTactil(page: Page, label: string) {
   }).toPass({ timeout: 10_000 });
 }
 
+/**
+ * ── UM `hidden` QUE NÃO ESCONDE É PIOR QUE NENHUM ──────────────────────────
+ *
+ * Nasceu de uma coisa vista com os olhos e não por um teste: a 375 px o botão
+ * «Exportar» do calendário aparecia na barra de ferramentas COM a classe
+ * `hidden` posta, e um comentário ao lado a garantir que estava «fora do
+ * telemóvel». Media 78x32.
+ *
+ * A causa é de Tailwind e não do calendário: o `<Button>` da casa traz
+ * `inline-flex` de origem, e na folha compilada o `.inline-flex` sai DEPOIS do
+ * `.hidden`. Mesma especificidade, ganha o último — portanto `hidden` perde
+ * para qualquer primitivo que já declare um `display`. O `max-sm:hidden` vive
+ * num `@media`, que é emitido depois, e ganha.
+ *
+ * O defeito é invisível de três maneiras: o `className` diz `hidden`, o
+ * `toBeVisible` de quem escreveu o teste nunca é chamado sobre ele, e a
+ * medição de alvos não olha para coisas que deviam estar ausentes. Só uma
+ * varredura o apanha, e é de uma linha.
+ */
+async function expectHiddenEscondeMesmo(page: Page, label: string) {
+  const mentirosos = await page.evaluate(() =>
+    [...document.querySelectorAll(".hidden")]
+      .filter((e) => getComputedStyle(e).display !== "none")
+      .map((e) => {
+        const r = e.getBoundingClientRect();
+        return `${e.tagName.toLowerCase()} «${(e.textContent || "").trim().slice(0, 30)}» ${Math.round(r.width)}x${Math.round(r.height)} → display:${getComputedStyle(e).display}`;
+      }),
+  );
+  expect(
+    mentirosos,
+    `${label}: elemento(s) com a classe \`hidden\` a desenharem-se na mesma. ` +
+      "Um primitivo que já declare `display` (o `<Button>` traz `inline-flex`) ganha ao " +
+      "`hidden`, porque sai depois na folha. Usa `max-sm:hidden`, que vive num `@media`.",
+  ).toEqual([]);
+}
+
 async function auditarUmaVez(page: Page, label: string) {
   const r = (await page.evaluate(AUDITOR)) as {
     examinados: number;
@@ -457,6 +493,7 @@ test.describe("Back office — mobile", () => {
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
       await expectErgonomiaTactil(page, view.nav.source);
+      await expectHiddenEscondeMesmo(page, view.nav.source);
 
       // O TÍTULO NÃO PODE FICAR CORTADO A MEIO DE UMA PALAVRA.
       // O `truncate` do cabeçalho impede-o de partir em duas linhas, mas em
