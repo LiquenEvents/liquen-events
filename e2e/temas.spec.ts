@@ -188,7 +188,22 @@ test.describe("Biblioteca de Temas", () => {
       expect(themeId, `o tema "${themeName}" devia estar na lista da API`).not.toBe("");
 
       // ── 2. Vê-lo listado ──────────────────────────────────────────────
-      await page.getByRole("button", { name: /← Temas/ }).click();
+      /*
+       * ── A SAÍDA MUDOU DE SÍTIO COM O SPLIT VIEW ───────────────────────
+       * Este passeio corre em Desktop Chrome, 1280 px — acima de `lg`. Aí o
+       * «← Temas» está `lg:hidden` de propósito (Parte 6 do documento: no
+       * split view ele desaparece), e o caminho de volta é o primeiro item da
+       * coluna da esquerda, «Todos os temas». Ter os dois seriam duas saídas
+       * com nomes diferentes para o mesmo sítio.
+       *
+       * ── E PORQUE É QUE ISTO CUSTOU DOIS MINUTOS A DIAGNOSTICAR ────────
+       * Um `click()` espera pela visibilidade SEM limite próprio: fica preso
+       * até ao tecto do passeio inteiro. Por isso a falha não aparecia aqui —
+       * aparecia a cento e vinte segundos daqui, na limpeza do `finally`, a
+       * dizer «apiRequestContext.delete: timeout» e a apontar para uma linha
+       * que não tinha culpa nenhuma.
+       */
+      await page.getByRole("button", { name: /^Todos os temas$/ }).click();
       /* ── O NOME EXACTO, E NÃO «CONTÉM» ────────────────────────────────
          Este localizador era uma expressão que só pedia que o nome do tema
          aparecesse no rótulo, e passou a casar com DOIS botões: o cartão, que
