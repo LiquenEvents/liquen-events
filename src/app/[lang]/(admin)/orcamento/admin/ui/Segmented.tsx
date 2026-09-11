@@ -221,7 +221,23 @@ export function Segmented<T extends string>({
             tabIndex={i === entryIndex ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cn(
-              `relative inline-flex items-center gap-1.5 rounded-full font-medium ${ESTADO} ${PRESSAO}`,
+              /* ── `alvo-toque`: O PISO DE 44 px, E PORQUE É NO PRIMITIVO ───
+                 Um rótulo curto não chega sozinho aos 44 px de largura. O
+                 passeio `admin-mobile.spec.ts` apanhou-o no CI com o nome à
+                 frente — «42x44px "Dia"», o primeiro segmento do comutador de
+                 vistas do calendário —, e mediu 42 onde a conta em papel dava
+                 43,9: a régua do browser é que manda, e estava 2 px abaixo.
+
+                 Fica AQUI e não no calendário porque o defeito não é do
+                 calendário: é de qualquer rótulo curto em qualquer comutador,
+                 e o próximo que nascesse com «Ver» ou «Tudo» repetia-o. A
+                 classe só existe dentro de `(pointer: coarse)`, portanto no
+                 computador nada muda de tamanho.
+
+                 O `display: inline-flex` que ela impõe já cá estava; o que
+                 acrescenta é o centrar, que é o que se quer quando o piso
+                 estica a pílula para lá do que o rótulo ocupa. */
+              `alvo-toque relative inline-flex items-center gap-1.5 rounded-full font-medium ${ESTADO} ${PRESSAO}`,
               pad,
               active
                 ? // O fundo próprio é a rede de antes de a pílula existir. Sai
