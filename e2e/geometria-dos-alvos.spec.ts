@@ -236,6 +236,67 @@ test.describe("D1 · a barra de gravação do pedido", () => {
       `com a gaveta no fim, no centro do botão está ${onde.quem} (caixa ${onde.caixa?.top}→${onde.caixa?.bottom}, janela ${onde.janela?.altura})`,
     ).toBe(true);
   });
+
+  /**
+   * ── E A FAIXA DA BARRA DE DESTINOS NÃO LHE TOCA ──────────────────────────
+   *
+   * Os dois casos acima perguntam «quem está NAQUELE PONTO?». É a pergunta
+   * certa para o rato, e foi ela que apanhou a barra do estúdio. Mas para ESTE
+   * defeito ela é uma moeda ao ar, e isso ficou medido:
+   *
+   *   · a faixa da barra vai de 816 a 900 num ecrã de 900 (a cápsula que
+   *     flutua lá dentro, de 816 a 888), e o «Guardar alterações» nascia de
+   *     821 a 853 — DENTRO dela;
+   *   · só que a cápsula mede o que o conteúdo dela mede, e o centro do botão
+   *     cai a 1202 px. Nesta máquina a cápsula acaba a 1113 e o ponto escapa
+   *     por 89 px; no CI, com outras larguras de letra, ela chega mais à
+   *     direita e o ponto acerta. O mesmo código, o mesmo ecrã, dois
+   *     resultados — e o vermelho só apareceu no CI.
+   *
+   * Portanto o que aqui se guarda não é um ponto: é que a CAIXA do botão não
+   * entra na FAIXA da barra. Isso não depende de letras, nem de quantos
+   * destinos a cápsula tem hoje, nem de a proposta ser comprida ou curta.
+   *
+   * A faixa que se mede é a da `<nav>` e não a da cápsula, de propósito: o topo
+   * é o mesmo (816) e a LARGURA da cápsula é precisamente a coisa que varia de
+   * máquina para máquina. Medir a `<nav>` é medir a linha por onde nada do que
+   * se tem de tocar pode passar.
+   *
+   * Medido antes e depois da correcção, no mesmo 1440×900: a caixa do botão ia
+   * de 798 a 830 com a faixa a começar em 816 (14 px por baixo dela); passou a
+   * 730→762, com 54 px de ar. A conta está em `lib/orcamento/barra-de-destinos.ts`.
+   */
+  test("e a faixa da barra de destinos não lhe toca", async ({ page }) => {
+    exigirLogin(await entrarNoBackOffice(page));
+    await garantirPedido(page);
+    await irPara(page, /^Pedidos/);
+    await page.locator("table tbody tr").first().click();
+    await abrirOPainelDoPedido(page);
+    const local = page.locator('input[placeholder="Local do evento…"]');
+    await expect(local).toBeVisible();
+    await local.fill("Herdade da Medição IV");
+    await expect(page.getByRole("button", { name: /^Guardar alterações$/ })).toBeVisible();
+
+    const medida = await page.evaluate(() => {
+      const botao = document.querySelector("#estado-da-gravacao-do-pedido ~ button");
+      const barra = document.querySelector('nav[aria-label="Navegação do back office"]');
+      if (!botao || !barra) return null;
+      const b = botao.getBoundingClientRect();
+      const n = barra.getBoundingClientRect();
+      return {
+        botao: { top: Math.round(b.top), bottom: Math.round(b.bottom) },
+        faixaDaBarra: { top: Math.round(n.top), bottom: Math.round(n.bottom) },
+      };
+    });
+    expect(medida, "não se encontrou o botão de guardar ou a barra de destinos").not.toBeNull();
+
+    expect(
+      medida!.botao.bottom <= medida!.faixaDaBarra.top,
+      `a caixa do «Guardar alterações» vai de ${medida!.botao.top} a ${medida!.botao.bottom} e a ` +
+        `faixa da barra de destinos começa em ${medida!.faixaDaBarra.top} — o botão está debaixo ` +
+        `dela, e um botão tapado não se distingue de um botão avariado`,
+    ).toBe(true);
+  });
 });
 
 test.describe("D1 · e ninguém se põe por cima dela", () => {

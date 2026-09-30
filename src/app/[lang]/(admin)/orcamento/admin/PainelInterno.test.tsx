@@ -30,6 +30,7 @@ function montar(props: Partial<Parameters<typeof PainelInterno>[0]> = {}) {
   const onCusto = vi.fn();
   const onDeslocacao = vi.fn();
   const onKm = vi.fn();
+  const onCarrinhas = vi.fn();
   render(
     <PainelInterno
       doc={doc()}
@@ -39,14 +40,30 @@ function montar(props: Partial<Parameters<typeof PainelInterno>[0]> = {}) {
       onCusto={onCusto}
       onDeslocacao={onDeslocacao}
       onKm={onKm}
+      onCarrinhas={onCarrinhas}
       {...props}
     />,
   );
-  return { onCusto, onDeslocacao, onKm };
+  return { onCusto, onDeslocacao, onKm, onCarrinhas };
 }
 
-/** Abre a gaveta — está fechada por omissão, e é isso que a torna discreta. */
-const abrir = () => userEvent.click(screen.getByRole("button", { name: /Só para ti/ }));
+/**
+ * GARANTE que a gaveta está aberta, em vez de a abrir às cegas.
+ *
+ * Isto era um clique seco, e estava certo enquanto o painel nascesse fechado.
+ * Ela pediu-o aberto por omissão — e um clique seco passaria a FECHÁ-LO: os
+ * vinte casos abaixo procurariam campos que o próprio ajudante tinha acabado de
+ * esconder, e o ficheiro inteiro ficava vermelho por uma razão que não era a
+ * dele.
+ *
+ * Perguntar primeiro faz o ajudante dizer o que quer dizer — «a partir daqui
+ * está aberto» — e deixa de ter opinião sobre em que estado ele nasce. Se a
+ * omissão voltar a mudar um dia, estes casos não mexem.
+ */
+const abrir = async () => {
+  if (screen.queryByLabelText("Custo da linha 1")) return;
+  await userEvent.click(screen.getByRole("button", { name: /Só para ti/ }));
+};
 
 /** A sede que as definições devolvem neste teste. Évora, salvo dito ao contrário. */
 let base = "Évora";
@@ -83,12 +100,93 @@ afterEach(() => {
 });
 
 describe("discrição", () => {
-  it("abre fechado e diz, no rótulo, que não sai no PDF", () => {
+  /**
+   * ── NASCE ABERTO, POR PEDIDO DELA ─────────────────────────────────────
+   *
+   * «Coloca esta barra já aberta por definição.»
+   *
+   * Este caso dizia o contrário, e dizia-o com uma razão boa: os custos e a
+   * margem não ficarem no ecrã quando alguém passa ao lado. A razão continua
+   * verdadeira; o que mudou é quem decide se vale a troca, e é ela.
+   *
+   * O que este caso guarda agora é o que NÃO se perdeu na troca: a promessa
+   * escrita no rótulo — «nunca sai no PDF» —, que é a que protege o cliente e
+   * não depende de a gaveta estar aberta ou fechada.
+   */
+  it("nasce aberto, e o rótulo continua a prometer que não sai no PDF", () => {
     montar();
-    // O número mais sensível da casa não fica aberto num ecrã que se roda para
-    // o lado quando alguém passa.
     expect(screen.getByText(/nunca sai no PDF/)).toBeTruthy();
+    expect(
+      screen.queryByLabelText("Custo da linha 1"),
+      "o painel devia nascer aberto — foi o que ela pediu",
+    ).not.toBeNull();
+  });
+
+  /**
+   * E o interruptor continua a ser um interruptor: um toque fecha-o. Sem este
+   * caso, «aberto por omissão» podia ter sido feito prendendo-o aberto.
+   */
+  it("e continua a fechar-se num toque", async () => {
+    montar();
+    await userEvent.click(screen.getByRole("button", { name: /Só para ti/ }));
     expect(screen.queryByLabelText("Custo da linha 1")).toBeNull();
+  });
+});
+
+describe("quantas carrinhas vão", () => {
+  /**
+   * Pedido dela: «nós temos duas carrinhas para os eventos. ou seja se forem
+   * duas ou se forem uma ou mais carrinhas».
+   */
+  it("escreve no documento quantas são", async () => {
+    const { onCarrinhas } = montar({ doc: doc({ location: "Lisboa" }) });
+    await abrir();
+    await userEvent.type(screen.getByLabelText(/Carrinhas/i), "2");
+    expect(onCarrinhas).toHaveBeenLastCalledWith(2);
+  });
+
+  /**
+   * O caso que interessa ao bolso: com duas carrinhas o valor da deslocação
+   * é o dobro, e vê-se no ecrã antes de entrar na proposta.
+   */
+  /**
+   * O caso que interessa ao bolso. Lê-se o EURO que está no ecrã, e não a
+   * fórmula: é o número que acaba na proposta, e um teste que só confirmasse a
+   * frase «2 carrinhas» passaria com a conta por multiplicar.
+   */
+  it("com duas, o valor no ecrã é o dobro", async () => {
+    /**
+     * O valor DA DESLOCAÇÃO, e não o primeiro euro do ecrã — o painel tem
+     * vários (custos, margem, total). Chega-se-lhe pela fórmula, que é a única
+     * linha que diz «/km», e lê-se o parágrafo inteiro onde ela vive.
+     */
+    const valorNoEcra = () => {
+      const t = screen.getByText(/\/km/).closest("p")?.textContent ?? "";
+      const m = /([\d\u00a0\s.]+,\d{2})\s*€/.exec(t) ?? /([\d\u00a0\s.]+)\s*€/.exec(t);
+      if (!m) throw new Error(`não encontrei um valor em «${t}»`);
+      return Number(m[1].replace(/[\u00a0\s.]/g, "").replace(",", "."));
+    };
+
+    montar({ doc: doc({ location: "Lisboa", kmDeslocacao: 150 }) });
+    await abrir();
+    const uma = valorNoEcra();
+    expect(uma).toBeGreaterThan(0);
+    expect(screen.queryByText(/carrinhas/)).toBeNull();
+    cleanup();
+
+    montar({ doc: doc({ location: "Lisboa", kmDeslocacao: 150, carrinhasDeslocacao: 2 }) });
+    await abrir();
+    // Arredonda-se uma vez no fim, por isso tolera-se o cêntimo de diferença
+    // entre `arredondar(x × 2)` e `2 × arredondar(x)`.
+    expect(Math.abs(valorNoEcra() - uma * 2)).toBeLessThanOrEqual(1);
+    // E diz-se na fórmula, que é como ela confirma de relance.
+    expect(screen.getByText(/2 carrinhas/)).toBeTruthy();
+  });
+
+  it("e sem dizer nada não aparece contagem nenhuma na fórmula", async () => {
+    montar({ doc: doc({ location: "Lisboa", kmDeslocacao: 150 }) });
+    await abrir();
+    expect(screen.queryByText(/carrinhas/)).toBeNull();
   });
 });
 
@@ -535,6 +633,7 @@ describe("apagar uma linha do meio", () => {
         onCusto={onCusto}
         onDeslocacao={vi.fn()}
         onKm={vi.fn()}
+        onCarrinhas={vi.fn()}
       />,
     );
     await abrir();
@@ -555,6 +654,7 @@ describe("apagar uma linha do meio", () => {
         onCusto={onCusto}
         onDeslocacao={vi.fn()}
         onKm={vi.fn()}
+        onCarrinhas={vi.fn()}
       />,
     );
 

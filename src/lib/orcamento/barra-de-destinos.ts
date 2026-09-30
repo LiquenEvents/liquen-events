@@ -110,3 +110,64 @@ export type EstadoDoEcra = {
 export function barraDeveSumir(estado: EstadoDoEcra): boolean {
   return estado.detalheSobreposto || estado.tecladoAberto;
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * E O ESPAÇO QUE ELA OCUPA TEM DE SER GUARDADO POR QUEM FICA POR BAIXO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A barra passou a FICAR no computador (é a regra acima, e é o defeito que ela
+ * relatou a fechar). Só que ficar não é de graça: uma barra que flutua colada
+ * ao fundo do ecrã tapa o que estiver debaixo dela, e o que está debaixo dela
+ * na coluna de detalhe de um pedido é a barra «Guardar alterações».
+ *
+ * A coluna de detalhe mede quanto ecrã lhe sobra a partir de onde começa (ver
+ * `alturaDoDetalhe`, no `AdminClient`), e reservava 16 px no fundo — 1rem de
+ * folga, que era tudo o que lá precisava de estar quando a barra de destinos
+ * não existia nesta largura. Passou a existir: a coluna ficou a acabar DENTRO
+ * da barra, e o pé dela é onde vive o botão de guardar.
+ *
+ * MEDIDO num 1440×900, com a coluna à altura máxima: a faixa da barra vai de
+ * 816 a 900 — 84 px, que são 72 da cápsula mais 12 de folga por baixo — e o
+ * «Guardar alterações» nasceu de 821 a 853, inteiro debaixo dela.
+ *
+ * Repara que o token `--bo-barra-inferior` diz 86 px e a barra MEDE 84. Os
+ * dois números são desta casa e discordam em 2 px desde que a cápsula subiu
+ * para 72; é a razão de se medir o elemento em vez de se copiar o token.
+ *
+ * É a MESMA correcção que o corpo da vista já tinha levado, e pela mesma razão
+ * (lá é o `pb-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))]`, e
+ * o `lg:pb-0` caiu quando a barra passou a estar nas duas larguras). Faltava
+ * esta: a coluna de detalhe não é filha desse recuo — é `sticky`, e mede-se
+ * sozinha.
+ *
+ * ── PORQUE É QUE UM BOTÃO TAPADO É PIOR DO QUE UM BOTÃO QUE FALTA ─────────
+ *
+ * Um botão que falta procura-se noutro sítio. Um botão que está à vista e não
+ * responde ao rato não tem explicação nenhuma do lado de quem carrega: o clique
+ * acerta no vidro da barra, não acontece nada, e o que se conclui é que guardar
+ * está avariado — num ecrã onde o que se perde são alterações a uma proposta.
+ */
+
+/**
+ * Quanto ECRÃ sobra para a coluna de detalhe, a partir de onde ela começa.
+ *
+ * `topoDaLinha` é o topo da linha da grelha no documento (a coluna é `sticky`,
+ * portanto o topo dela própria mentiria sobre onde começa), e
+ * `alturaDaBarra` é a altura que a barra de destinos ocupa no fundo — o que
+ * há de reservar para o pé da coluna não entrar por baixo dela.
+ *
+ * O `CHAO` é o que impede uma janela muito baixa de dar uma coluna onde não
+ * cabe nada: mais vale uma coluna curta que rola.
+ */
+export const CHAO_DA_COLUNA_DE_DETALHE_PX = 320;
+
+export function alturaQueSobraParaODetalhe(
+  alturaDaJanela: number,
+  topoDaLinha: number,
+  alturaDaBarra: number,
+): number {
+  const barra = Number.isFinite(alturaDaBarra) && alturaDaBarra > 0 ? alturaDaBarra : 0;
+  const sobra = Math.round(alturaDaJanela - topoDaLinha - barra);
+  return Math.max(sobra, CHAO_DA_COLUNA_DE_DETALHE_PX);
+}

@@ -4652,12 +4652,24 @@ describe("a margem no bloco dos totais", () => {
     expect(screen.queryByText("Só para si")).toBeNull();
   });
 
+  /**
+   * ── PORQUE É QUE ISTO PASSOU A `getAllByText` ─────────────────────────────
+   * O painel «Só para si» nascia fechado, e a margem só existia uma vez no
+   * ecrã — no crachá do resumo. Ela pediu-o aberto por omissão («coloca esta
+   * barra já aberta por definição»), e agora a margem está nos DOIS sítios: no
+   * crachá e dentro do painel. Não é duplicação a corrigir; é o resumo a
+   * resumir o que está aberto por baixo.
+   *
+   * O que se guarda continua a ser o mesmo — «a margem aparece» —, e guarda-se
+   * com um piso (`length` ≥ 1) em vez de exigir exactamente uma, que era uma
+   * afirmação sobre a dobra e não sobre a margem.
+   */
   it("com custos, mostra a margem em euros e em percentagem", async () => {
     comCustos([400, 600], [1000, 1000]);
     renderStudio();
     await screen.findByText("Só para si");
     // 2000 cobrados, 1000 de custos → 1000 € e 50%.
-    expect(screen.getByText(/50%/)).toBeTruthy();
+    expect(screen.getAllByText(/50%/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Não sai no PDF/)).toBeTruthy();
   });
 
@@ -4674,7 +4686,11 @@ describe("a margem no bloco dos totais", () => {
     comCustos([900, 900], [1000, 1000]);
     renderStudio();
     await screen.findByText("Só para si");
-    expect(await screen.findByText(/Abaixo dos \d+% que definiu/)).toBeTruthy();
+    // Mesma razão do caso acima: com o painel aberto por omissão, o aviso está
+    // no crachá do resumo e dentro do painel.
+    await waitFor(() =>
+      expect(screen.getAllByText(/Abaixo dos \d+% que definiu/).length).toBeGreaterThan(0),
+    );
   });
 });
 

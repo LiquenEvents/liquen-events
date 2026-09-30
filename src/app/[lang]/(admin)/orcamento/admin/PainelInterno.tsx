@@ -65,6 +65,24 @@ const LIMITES_KM = {
 } as const;
 
 /**
+ * Carrinhas: pelo menos uma, e um tecto que é uma rede contra o dedo escorregar
+ * e não uma opinião sobre a frota. Seis carrinhas num evento é absurdo; 60,
+ * escrito por engano, multiplicava a deslocação por sessenta numa proposta que
+ * segue para um cliente.
+ *
+ * `vazioVale`: apagar o campo é «uma», que é a omissão — e não um erro a pintar
+ * a caixa de vermelho enquanto ela apaga para escrever outro número.
+ */
+const LIMITES_CARRINHAS = {
+  min: 1,
+  max: 6,
+  inteiro: true,
+  vazioVale: true,
+  nome: "número de carrinhas",
+  exemplo: "2",
+} as const;
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * O CAMPO QUE FAZ A CONTA VALER PARA QUALQUER SÍTIO DO PAÍS
  * ═══════════════════════════════════════════════════════════════════════════
@@ -158,6 +176,85 @@ function CampoKm({
   );
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * QUANTAS CARRINHAS FAZEM ESTA VIAGEM
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela: «nós temos duas carrinhas para os eventos. ou seja se forem duas
+ * ou se forem uma ou mais carrinhas».
+ *
+ * Fica ao LADO dos quilómetros, e não numa linha sua: são as duas metades da
+ * mesma pergunta — «que estrada é» e «quantas vezes se faz». Separá-las punha
+ * a segunda longe do número que ela muda.
+ *
+ * Vazio é UMA, e é por isso que não há sugestão nenhuma a preencher: uma
+ * carrinha é o que acontece quase sempre, e um campo pré-cheio com «2» fazia
+ * subir o preço de todas as propostas sem ninguém decidir.
+ */
+function CampoCarrinhas({
+  carrinhas,
+  onCarrinhas,
+}: {
+  /** O que está gravado no documento. `undefined` = uma. */
+  carrinhas: number | undefined;
+  onCarrinhas: (n: number | null) => void;
+}) {
+  const idErro = useId();
+  const [texto, setTexto] = useState(() => (carrinhas === undefined ? "" : String(carrinhas)));
+  const [erro, setErro] = useState<string | null>(null);
+  const emitido = useRef<number | null>(carrinhas ?? null);
+  useEffect(() => {
+    const externo = carrinhas ?? null;
+    if (externo === emitido.current) return;
+    emitido.current = externo;
+    setTexto(externo === null ? "" : String(externo));
+    setErro(null);
+  }, [carrinhas]);
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1">
+      <label className="flex items-center gap-2">
+        <span className="text-[11px] text-[var(--bo-text-muted)]">Carrinhas</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={texto}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? idErro : undefined}
+          onChange={(e) => {
+            const escrito = e.target.value;
+            setTexto(escrito);
+            const leitura = lerNumero(escrito, LIMITES_CARRINHAS);
+            if (!leitura.ok) {
+              setErro(leitura.porque);
+              return;
+            }
+            setErro(null);
+            emitido.current = leitura.valor;
+            onCarrinhas(leitura.valor);
+          }}
+          className={`bo-input w-14 px-2 py-1.5 text-xs${erro ? " border-[var(--bo-perigo)]" : ""}`}
+        />
+        <span className="text-[11px] text-foreground/45">
+          {(carrinhas ?? 1) > 1 ? "carrinhas" : "carrinha"}
+        </span>
+      </label>
+      {erro ? (
+        <span id={idErro} className="text-[10px] leading-relaxed text-[var(--bo-perigo)]">
+          {erro}
+        </span>
+      ) : (
+        <span className="text-[10px] leading-relaxed text-foreground/40">
+          {carrinhas === undefined
+            ? "Vazio conta como uma. Escreve 2 quando saírem as duas — o gasóleo, as portagens e o desgaste são a dobrar."
+            : "O custo por quilómetro é multiplicado por este número."}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   doc: ProposalDoc;
   /** O pedido a que a proposta responde — dá o local e o nº de convidados. */
@@ -169,6 +266,14 @@ interface Props {
   onCusto: (i: number, custo: number | null) => void;
   /** Acrescenta a deslocação aos valores adicionais da proposta. */
   onDeslocacao: (label: string, valueText: string) => void;
+  /**
+   * Escreve (ou apaga) quantas carrinhas vão a este evento, NO DOCUMENTO.
+   *
+   * `null` apaga o campo — e apagado quer dizer UMA, que é a omissão. Não há
+   * aqui a distinção entre «não decidi» e um valor: uma viagem faz-se sempre
+   * com pelo menos uma carrinha.
+   */
+  onCarrinhas: (n: number | null) => void;
   /**
    * Escreve (ou apaga) os quilómetros até ao local NO DOCUMENTO.
    *
@@ -186,8 +291,28 @@ export default function PainelInterno({
   onCusto,
   onDeslocacao,
   onKm,
+  onCarrinhas,
 }: Props) {
-  const [aberto, setAberto] = useState(false);
+  /**
+   * ── NASCE ABERTO, E FOI ELA QUE O DECIDIU ──────────────────────────────
+   *
+   * Palavras dela, com uma captura desta barra: «coloca esta barra já aberta
+   * por definição».
+   *
+   * Nascia fechado, e por uma razão escrita: são custos e margem, e não é o
+   * que se quer no ecrã quando alguém está ao lado a ver. Essa razão continua
+   * a ser verdade — o que mudou é quem decide se vale a troca, e é ela: é o
+   * escritório dela e é ela que sabe quem lhe passa por trás.
+   *
+   * O que se ganha é coerência com o resto do estúdio. Este painel era a ÚNICA
+   * excepção ao princípio que o `Section` do `ProposalStudio.tsx` já segue por
+   * escrito — «abrir a proposta mostra a proposta». Deixa de haver excepção.
+   *
+   * O que NÃO muda: o rótulo continua a dizer «nunca sai no PDF», que é a
+   * promessa que interessa, e o interruptor continua lá para fechar quando ela
+   * quiser. Fechar continua a ser um gesto de um toque.
+   */
+  const [aberto, setAberto] = useState(true);
   // As definições da casa — o gasóleo e a margem mínima — lidas uma vez por
   // página e partilhadas com o bloco dos totais (ver `definicoes-da-proposta`).
   const { deslocacao: parametros, margemMinima } = useDefinicoesDaProposta();
@@ -234,10 +359,14 @@ export default function PainelInterno({
   const local = doc.location || quote.location;
   const sugerido = useMemo(() => kmSugerido(local, parametros.base), [local, parametros.base]);
   const kmEscritos = doc.kmDeslocacao;
+  /* Ausente quer dizer UMA — ver `ProposalDoc.carrinhasDeslocacao`. Não se
+     normaliza aqui para 1: o campo precisa de distinguir «vazio» de «1» para
+     saber que frase de ajuda mostrar, e o motor já trata a ausência. */
+  const carrinhas = doc.carrinhasDeslocacao;
 
   const deslocacao = useMemo(
-    () => sugerirDeslocacao(local, parametros, { km: kmEscritos }),
-    [local, parametros, kmEscritos],
+    () => sugerirDeslocacao(local, parametros, { km: kmEscritos, carrinhas }),
+    [local, parametros, kmEscritos, carrinhas],
   );
 
   /**
@@ -329,11 +458,11 @@ export default function PainelInterno({
       </button>
 
       {/* ── O PAINEL ABRE DE ONDE SE CARREGOU ──────────────────────────────
-          «Só para ti» nasce fechado de propósito — são custos e margem, e não
-          é o que se quer aberto quando alguém está a espreitar por cima do
-          ombro. O que faltava era a outra metade: ao abrir, o painel inteiro
-          aparecia num fotograma por baixo do botão, e o resto da página saltava
-          para dar-lhe lugar.
+          «Só para ti» nasce ABERTO desde que ela o pediu (ver o `useState` lá
+          em cima, onde está a razão). A entrada continua a valer, e é para o
+          gesto de reabrir depois de fechar: sem ela, o painel inteiro aparecia
+          num fotograma por baixo do botão e o resto da página saltava para lhe
+          dar lugar.
 
           `.bo-entrada` — 240 ms e QUATRO píxeis, a distância de um rótulo. É a
           medida certa e não os oito de uma folha: este painel não vem de fora
@@ -516,7 +645,10 @@ export default function PainelInterno({
             {/* Os quilómetros primeiro, porque são o que decide tudo o resto —
                 e porque é aqui que um sítio fora da tabela deixa de ser um
                 beco sem saída. */}
-            <CampoKm km={kmEscritos} sugerido={sugerido} base={parametros.base} onKm={onKm} />
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-1">
+              <CampoKm km={kmEscritos} sugerido={sugerido} base={parametros.base} onKm={onKm} />
+              <CampoCarrinhas carrinhas={carrinhas} onCarrinhas={onCarrinhas} />
+            </div>
 
             {deslocacao === null ? (
               <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">

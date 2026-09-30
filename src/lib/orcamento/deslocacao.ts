@@ -52,6 +52,27 @@ import { BASE_OMISSAO, kmEntre, localizar } from "@/lib/geo/portugal";
  * da empresa em todos os casamentos fora de Évora — decisão dela, e é o que
  * `idaEVolta` diz.
  *
+ * ── E QUANTAS CARRINHAS VÃO ────────────────────────────────────────────────
+ * Palavras dela: «nós temos duas carrinhas para os eventos. ou seja se forem
+ * duas ou se forem uma ou mais carrinhas».
+ *
+ * Esta conta assumia UMA. Num evento em que saem as duas, o gasóleo, as
+ * portagens e o desgaste são a dobrar — e a proposta cobrava metade, com a
+ * diferença a sair do bolso da empresa. É o mesmo defeito que o `idaEVolta`
+ * fechou, noutro eixo.
+ *
+ * É um facto de CADA evento e não uma regra da casa: às vezes vai uma, às
+ * vezes vão as duas, e um dia podem ser três com uma alugada. Por isso entra
+ * pelas `opts` (ao lado dos quilómetros escritos) e não pelos parâmetros.
+ *
+ * A OMISSÃO É UMA, e é uma decisão: nenhuma proposta antiga muda de preço por
+ * causa desta alteração. Quem quiser as duas di-lo em cada proposta, e vê-o
+ * escrito na fórmula.
+ *
+ * A isenção à volta de casa não se multiplica por carrinhas: é uma promessa
+ * sobre a DISTÂNCIA feita ao cliente local, e continua a valer com uma ou com
+ * três.
+ *
  * ── A ISENÇÃO À VOLTA DE CASA ──────────────────────────────────────────────
  * Continua a valer: é o que as condições gerais prometem por escrito, e mexer
  * nela muda o que um cliente local paga. Aqui traduz-se em quilómetros — a 40
@@ -147,6 +168,8 @@ export interface SugestaoDeslocacao {
   /** Os quilómetros que se cobram (o dobro, com ida e volta). */
   kmCobrados: number;
   custoKm: ReturnType<typeof custoPorKm>;
+  /** Quantas carrinhas fazem a viagem. Uma, salvo dito ao contrário. */
+  carrinhas: number;
   /** O valor a cobrar, em euros, arredondado ao euro. */
   valor: number;
   /** Caiu dentro da isenção — o valor é zero por regra, não por engano. */
@@ -178,6 +201,19 @@ export interface SugestaoDeslocacao {
 function kmEscritos(km: number | null | undefined): number | null {
   if (typeof km !== "number" || !Number.isFinite(km) || km < 0) return null;
   return km;
+}
+
+/**
+ * Quantas carrinhas fazem esta viagem — pelo menos uma, e sempre inteiras.
+ *
+ * Meia carrinha não existe, e um campo a meio de ser escrito dá `NaN`. Tudo o
+ * que não seja um número de carrinhas conta como UMA: é a resposta que não
+ * muda o preço de nada, e este número entra numa multiplicação que acaba na
+ * proposta de um cliente.
+ */
+function quantasCarrinhas(n: number | null | undefined): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1;
+  return Math.max(1, Math.floor(n));
 }
 
 /**
@@ -213,7 +249,7 @@ const eur = (n: number) =>
 export function sugerirDeslocacao(
   local: string | null | undefined,
   parametros: Partial<ParametrosDeslocacao> = {},
-  opts: { aproximado?: boolean; km?: number | null } = {},
+  opts: { aproximado?: boolean; km?: number | null; carrinhas?: number | null } = {},
 ): SugestaoDeslocacao | null {
   const p: ParametrosDeslocacao = { ...PARAMETROS_OMISSAO, ...parametros };
 
@@ -225,9 +261,16 @@ export function sugerirDeslocacao(
   const origemDosKm = escritos === null ? "tabela" : "escritos";
 
   const custoKm = custoPorKm(p);
+  const carrinhas = quantasCarrinhas(opts.carrinhas);
   const isento = kmSoIda <= Math.max(0, p.franquiaKm);
   const kmCobrados = isento ? 0 : kmSoIda * (p.idaEVolta ? 2 : 1);
-  const valor = Math.round(kmCobrados * custoKm.total);
+  /* Os quilómetros COBRADOS ficam os do percurso — é a distância ao sítio, e
+     não muda por irem duas carrinhas. O que multiplica é o CUSTO: cada
+     carrinha gasta o seu gasóleo, paga a sua portagem e desgasta-se. Manter os
+     km como estão é o que deixa a fórmula legível: «300 km × 2 × 0,33 €/km ×
+     2 carrinhas» lê-se; «600 km» com duas carrinhas seria um número que
+     ninguém percorreu. */
+  const valor = Math.round(kmCobrados * custoKm.total * carrinhas);
 
   /**
    * «Aproximado» é o que o ecrã usa para pôr (ou não) o `≈`. Um número escrito
@@ -242,14 +285,20 @@ export function sugerirDeslocacao(
     kmSoIda,
     kmCobrados,
     custoKm,
+    carrinhas,
     valor,
     isento,
     provavelAlojamento: kmSoIda >= KM_PARA_DORMIR_FORA,
     aproximado: Boolean(aproximado),
     origemDosKm,
+    /* A fórmula é o que responde a «porquê este valor?», portanto as
+       carrinhas aparecem nela — mas só quando são mais do que uma. Escrever
+       «× 1 carrinha» em todas as propostas era ruído numa linha que existe
+       para ser lida de relance. */
     formula: isento
       ? `${kmSoIda} km — dentro dos ${p.franquiaKm} km sem deslocação a cobrar`
-      : `${kmSoIda} km ${p.idaEVolta ? "× 2 (ida e volta) " : ""}× ${eur(custoKm.total)}/km`,
+      : `${kmSoIda} km ${p.idaEVolta ? "× 2 (ida e volta) " : ""}× ${eur(custoKm.total)}/km` +
+        (carrinhas > 1 ? ` × ${carrinhas} carrinhas` : ""),
   };
 }
 

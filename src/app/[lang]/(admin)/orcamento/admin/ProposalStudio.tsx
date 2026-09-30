@@ -10058,6 +10058,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   return { ...d, kmDeslocacao: km };
                 })
               }
+              /**
+               * Quantas carrinhas vão — mesma casa e mesma razão que os
+               * quilómetros: é um facto DESTE evento, e fica congelado nele.
+               *
+               * `null` APAGA o campo, e apagado quer dizer uma. Escrever 1 aqui
+               * daria o mesmo preço, mas deixava no documento um número que
+               * ninguém decidiu — e nas propostas antigas a ausência é o que
+               * garante que nenhuma muda de preço por este campo existir.
+               */
+              onCarrinhas={(n) =>
+                setDoc((d) => {
+                  if (n === null) {
+                    const { carrinhasDeslocacao: _fora, ...resto } = d;
+                    void _fora;
+                    return resto;
+                  }
+                  return { ...d, carrinhasDeslocacao: n };
+                })
+              }
               onDeslocacao={(label, valueText) => {
                 // Se já lá está uma linha de deslocação, actualiza-se essa em
                 // vez de acrescentar uma segunda — duas linhas de deslocação
@@ -12564,9 +12583,11 @@ function DobraDaDisposicao({
  * a dobra que ninguém pediu AGORA — nem o automatismo, nem a memória entre
  * visitas. Abrir a proposta mostra a proposta.
  *
- * A excepção é o «Só para ti» (`PainelInterno.tsx`), que nasce fechado de
- * propósito e por outra razão: são custos e margem, e não é isso que se quer
- * no ecrã quando alguém está ao lado a ver.
+ * E DEIXOU DE HAVER EXCEPÇÃO. O «Só para ti» (`PainelInterno.tsx`) nascia
+ * fechado por outra razão — são custos e margem, e não é isso que se quer no
+ * ecrã quando alguém está ao lado a ver. Ela pediu-o aberto («coloca esta barra
+ * já aberta por definição»), e a razão antiga continua verdadeira: o que mudou
+ * é quem decide se vale a troca. O princípio passa a valer sem ressalvas.
  */
 function Section({
   title,

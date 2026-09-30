@@ -79,6 +79,114 @@ describe("a conta da viagem", () => {
   });
 });
 
+describe("quantas carrinhas vão", () => {
+  /**
+   * Pedido dela: «nós temos duas carrinhas para os eventos. ou seja se forem
+   * duas ou se forem uma ou mais carrinhas».
+   *
+   * O que estes casos guardam, por ordem de importância:
+   *
+   *  1. que a OMISSÃO não mexe em nada — nenhuma proposta antiga muda de preço
+   *     por este campo passar a existir. É o caso que mais interessa, porque a
+   *     falha dele sai em dinheiro na proposta de um cliente;
+   *  2. que duas carrinhas custam mesmo o dobro;
+   *  3. que um número absurdo não multiplica um preço.
+   */
+  it("sem dizer nada, é uma — e o valor é exactamente o de antes", () => {
+    const antes = sugerirDeslocacao("Lisboa")!;
+    const explicito = sugerirDeslocacao("Lisboa", {}, { carrinhas: 1 })!;
+    expect(antes.carrinhas).toBe(1);
+    expect(explicito.valor).toBe(antes.valor);
+  });
+
+  /**
+   * ── E O ARREDONDAMENTO É UMA VEZ, NO FIM ────────────────────────────────
+   *
+   * Este caso começou por dizer `tres.valor === uma.valor * 3` e chumbou por
+   * UM euro (755 contra 756). O motor é que estava certo: arredonda uma só vez,
+   * no fim, e é a mesma regra que o `custoPorKm` já segue e explica («o total
+   * NÃO é a soma dos três já arredondados»).
+   *
+   * Multiplicar um valor JÁ arredondado é que acumula o erro — e com três
+   * carrinhas para o Porto dava um euro que não existe em conta nenhuma. Por
+   * isso a expectativa parte dos quilómetros e do custo por quilómetro, como o
+   * motor faz, e não de um preço já fechado.
+   */
+  it("duas carrinhas custam o dobro de uma", () => {
+    const uma = sugerirDeslocacao("Lisboa")!;
+    const duas = sugerirDeslocacao("Lisboa", {}, { carrinhas: 2 })!;
+    expect(duas.carrinhas).toBe(2);
+    expect(duas.valor).toBe(Math.round(uma.kmCobrados * uma.custoKm.total * 2));
+  });
+
+  it("três também, e a conta é linear", () => {
+    const uma = sugerirDeslocacao("Porto")!;
+    const tres = sugerirDeslocacao("Porto", {}, { carrinhas: 3 })!;
+    expect(tres.valor).toBe(Math.round(uma.kmCobrados * uma.custoKm.total * 3));
+    // E cresce mesmo — sem isto, um motor que ignorasse as carrinhas passava.
+    expect(tres.valor).toBeGreaterThan(uma.valor * 2);
+  });
+
+  it("arredonda uma vez no fim, e não a cada carrinha", () => {
+    const uma = sugerirDeslocacao("Porto")!;
+    const tres = sugerirDeslocacao("Porto", {}, { carrinhas: 3 })!;
+    // Se arredondasse por carrinha, isto seria 756 e não 755.
+    expect(tres.valor).not.toBe(uma.valor * 3);
+    expect(Math.abs(tres.valor - uma.valor * 3)).toBeLessThanOrEqual(2);
+  });
+
+  /**
+   * Os quilómetros são a ESTRADA e não mudam por irem duas carrinhas. Sem este
+   * caso, alguém podia implementar a multiplicação nos km — daria o mesmo
+   * preço e escreveria na proposta uma distância que ninguém percorreu.
+   */
+  it("mas os quilómetros continuam a ser os do percurso", () => {
+    const uma = sugerirDeslocacao("Lisboa")!;
+    const duas = sugerirDeslocacao("Lisboa", {}, { carrinhas: 2 })!;
+    expect(duas.kmSoIda).toBe(uma.kmSoIda);
+    expect(duas.kmCobrados).toBe(uma.kmCobrados);
+  });
+
+  it("diz na fórmula quantas são — e cala-se quando é uma só", () => {
+    expect(sugerirDeslocacao("Lisboa", {}, { carrinhas: 2 })!.formula).toContain("2 carrinhas");
+    expect(sugerirDeslocacao("Lisboa")!.formula).not.toContain("carrinha");
+  });
+
+  /**
+   * A isenção é uma promessa sobre a DISTÂNCIA feita ao cliente local. Não se
+   * multiplica: duas carrinhas a 30 km continuam dentro dela.
+   */
+  it("e a isenção do distrito continua a valer com duas", () => {
+    expect(sugerirDeslocacao("Évora", {}, { carrinhas: 2 })!.valor).toBe(0);
+  });
+
+  /**
+   * O CONTROLO NEGATIVO: tudo o que não é um número de carrinhas conta como
+   * UMA. Este número entra numa multiplicação que acaba no preço que um cliente
+   * paga; meia carrinha, zero carrinhas ou um campo a meio de ser escrito não
+   * podem lá chegar.
+   */
+  it.each([
+    ["vazio", null],
+    ["indefinido", undefined],
+    ["zero", 0],
+    ["negativo", -2],
+    ["a meio de escrever", Number.NaN],
+    ["infinito", Number.POSITIVE_INFINITY],
+    ["meia carrinha", 1.5],
+  ])("com %s conta como uma", (_nome, valor) => {
+    const s = sugerirDeslocacao("Lisboa", {}, { carrinhas: valor as number })!;
+    const uma = sugerirDeslocacao("Lisboa")!;
+    expect(s.carrinhas).toBe(1);
+    expect(s.valor).toBe(uma.valor);
+  });
+
+  /** Duas e meia arredonda para baixo — não se cobram meias carrinhas. */
+  it("duas e meia são duas", () => {
+    expect(sugerirDeslocacao("Lisboa", {}, { carrinhas: 2.7 })!.carrinhas).toBe(2);
+  });
+});
+
 describe("a isenção do distrito de Évora", () => {
   it("dentro da franquia não se cobra, e diz-se que é por regra", () => {
     // É o que as condições gerais prometem por escrito. Zero aqui não é um

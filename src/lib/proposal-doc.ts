@@ -490,6 +490,28 @@ export interface ProposalDoc {
    * este campo tem de distinguir `0` de `undefined`, nunca com um `||`.
    */
   kmDeslocacao?: number;
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * QUANTAS CARRINHAS VÃO A ESTE EVENTO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «nós temos duas carrinhas para os eventos. ou seja se forem
+   * duas ou se forem uma ou mais carrinhas».
+   *
+   * A conta da deslocação assumia uma. Quando saem as duas, o gasóleo, as
+   * portagens e o desgaste são a dobrar, e a proposta cobrava metade — com a
+   * diferença a sair do bolso da empresa.
+   *
+   * ── PORQUE É QUE VIVE AQUI E NÃO NAS DEFINIÇÕES ─────────────────────────
+   * Pela mesma razão que o {@link kmDeslocacao}: é um facto DESTE evento. Num
+   * casamento de 200 pessoas saem as duas; num jantar de 30 vai uma; um dia
+   * podem ser três com uma alugada. Não é uma regra da casa — é o que
+   * aconteceu nesta proposta, e fica congelado nela.
+   *
+   * AUSENTE quer dizer UMA, e é uma decisão: nenhuma proposta escrita antes
+   * disto muda de preço por este campo passar a existir.
+   */
+  carrinhasDeslocacao?: number;
   guests: string; // "150 pax"
   ceremony?: string; // "Civil, simbólica"
   time?: string; // "A definir"
