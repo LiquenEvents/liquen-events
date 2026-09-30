@@ -21,6 +21,16 @@ A versão fica: fecha um crítico. E o produto está bom — o que se parte é o
 servidor de DESENVOLVIMENTO, que é onde três suites de passeios têm de correr
 porque precisam de GRAVAR (o servidor de produção recusa escritas sem Supabase).
 
+**REMEDIDO na 16.3.8** (a subida que fecha o RCE do `next/og`, GHSA-vcvr-r3jv-pc5j):
+a linha do COOKIE continua igual — pôr `?v=temas` grava `liquen-admin-view=temas`,
+e reabrir `/orcamento/admin` sem parâmetro cai na Visão Geral **e reescreve o
+cookie para `overview`**. A tabela vale na mesma, e as consequências práticas
+aqui em baixo também.
+
+A linha do SEM REDE não foi remedida: precisa de um service worker e de cortar a
+rede, e tem passeio próprio com guarda contra produção
+(`e2e/o-ecra-volta-vivo-sem-rede.spec.ts`). Fica por medir, e está dito.
+
 Consequências práticas, se um passeio ficar vermelho sem razão aparente:
 
   · não semeies a secção pelo `localStorage` — pede-a pelo endereço público,
