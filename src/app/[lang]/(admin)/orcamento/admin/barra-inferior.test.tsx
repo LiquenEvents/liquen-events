@@ -49,6 +49,45 @@ function ficheirosDoBackOffice(dir = RAIZ, acc: string[] = []): string[] {
 }
 
 describe("a barra de destinos do telemóvel", () => {
+  /**
+   * ── E QUANDO É QUE ELA SE AFASTA ────────────────────────────────────────
+   *
+   * Uma colaboradora dela disse que a barra «nem sempre aparece» e que «às
+   * vezes não está em lado nenhum». A causa estava aqui: a barra saía do ecrã
+   * com um `selected` sozinho — ou seja, sempre que houvesse um pedido aberto.
+   *
+   * Abaixo de 1280 px isso está certo: o detalhe é uma folha modal. A partir de
+   * 1280 é uma COLUNA ao lado da lista, e o ecrã não fica modal nenhum. Como a
+   * barra é hoje a ÚNICA navegação que existe («a barra substitui o menu»),
+   * abrir um pedido no portátil apagava o menu do ecrã inteiro.
+   *
+   * A regra passou a viver num módulo puro, provado à parte
+   * (`lib/orcamento/barra-de-destinos.ts`). Este caso guarda a OUTRA ponta: que
+   * é essa regra que a barra usa, e não uma condição escrita aqui à mão que
+   * pode voltar a divergir dela.
+   */
+  it("esconde-se pela regra do módulo, e não por um `selected` solto", () => {
+    expect(
+      ADMIN,
+      "a barra deixou de usar `barraDeveSumir` — a regra voltou a estar escrita à mão",
+    ).toContain("barraDeveSumir({");
+
+    // E a regra tem de receber as DUAS metades. Um `detalheSobreposto` que
+    // ignore o `isDetailOverlay` é exactamente o defeito de origem, agora
+    // escondido atrás de um nome melhor.
+    expect(ADMIN).toMatch(/detalheSobreposto:\s*!!selected\s*&&\s*isDetailOverlay/);
+
+    /**
+     * O CONTROLO NEGATIVO: que não ficou para trás um `selected ?` a decidir
+     * translação nenhuma. Sem esta linha, acrescentar a regra nova e esquecer
+     * de tirar a antiga passava neste ficheiro e não mudava nada no ecrã.
+     */
+    expect(
+      ADMIN,
+      "sobrou um `selected ? translate-y-full` — a regra antiga ainda decide",
+    ).not.toMatch(/selected\s*\?\s*"translate-y-full"/);
+  });
+
   it("declara a sua altura num token, e não num número solto", () => {
     expect(CSS).toMatch(/--bo-barra-inferior:\s*\d+px/);
   });
@@ -260,8 +299,7 @@ describe("a barra de destinos do telemóvel", () => {
     // coisa de tudo o resto, e só o abridor o tem.
     const abridores = ADMIN.split("\n").filter(
       (l, i, ls) =>
-        l.includes('aria-label="Mais destinos"') &&
-        (ls[i + 1] ?? "").includes("aria-expanded"),
+        l.includes('aria-label="Mais destinos"') && (ls[i + 1] ?? "").includes("aria-expanded"),
     );
     expect(abridores.length, "há mais do que um abridor da gaveta").toBe(1);
   });

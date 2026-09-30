@@ -11065,7 +11065,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            Continua a publicar a sua altura em `--bo-barra-accao` para o aviso
            do `Toast` se afastar dela, e continua a pousar à altura da barra de
            destinos — as duas coisas que este bloco já garantia. */
-        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:py-3"
+        /* ── E DEIXOU DE SER UMA LAJE VAZIA DE BORDO A BORDO ──────────────
+           Palavras dela, com a captura deste ecrã num portátil: «esta barra de
+           pré-visualizar aqui não está muito bem».
+
+           Estava, e era de medida: a barra ocupava a largura inteira do estúdio
+           — as três colunas, o formulário e o painel do «que vai sair» — para
+           transportar uma frase e um botão. Tudo o resto era vidro por encher.
+           E logo por cima da cápsula dos destinos, que também flutua: duas
+           lajes empilhadas a comerem o fundo do ecrã.
+
+           `sm:w-fit` faz a barra medir o que tem. `sm:ml-auto` encosta-a à
+           direita — e é ISSO que preserva a decisão que este bloco já tinha
+           tomado e explicado: «o botão NÃO se mexe para a esquerda (…) a acção
+           principal a saltar de sítio entre passos custa mais do que o vazio».
+           Sendo o botão o elemento mais à direita de uma barra encostada à
+           direita, a borda dele fica no mesmo x nos três passos — que é o que
+           aquela decisão queria, e que a laje só conseguia à custa do vazio.
+
+           `max-w-full` porque numa janela estreita o total escrito por extenso
+           pode pedir mais do que há; aí volta a caber e o `truncate` do
+           parágrafo faz o resto.
+
+           Abaixo de `sm` nada disto se aplica: no telemóvel a barra é a largura
+           do ecrã, e o `mr-auto` do parágrafo continua a ser quem separa o
+           estado da decisão. */
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:ml-auto sm:w-fit sm:max-w-full sm:py-3"
       >
         {step === "conteudo" && (
           <>
