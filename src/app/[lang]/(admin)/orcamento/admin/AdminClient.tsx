@@ -25,7 +25,11 @@ import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orca
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
 import { formatPrice } from "@/lib/orcamento/pricing";
-import { barraDeveSumir, tecladoAberto } from "@/lib/orcamento/barra-de-destinos";
+import {
+  alturaQueSobraParaODetalhe,
+  barraDeveSumir,
+  tecladoAberto,
+} from "@/lib/orcamento/barra-de-destinos";
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { lerNumero } from "@/lib/numero-escrito";
@@ -1732,11 +1736,41 @@ export default function AdminClient({
    * se resolve só com CSS: a altura que sobra depende de ONDE a coluna começa,
    * e onde ela começa mede-se.
    *
+   * ── E DEPOIS A BARRA DE DESTINOS PASSOU A FICAR, E FOI OUTRA VEZ ─────────
+   *
+   * A medição acima reservava 16 px no fundo (a folga de 1rem do `calc`). Era
+   * o número certo enquanto o fundo do ecrã estivesse vazio nesta largura —
+   * e deixou de estar: a barra de destinos ficou a FICAR com um pedido aberto
+   * (`barraDeveSumir`), porque aqui o detalhe é uma coluna e não uma folha
+   * modal. A coluna reservava 16 px, e o mesmo botão «Guardar alterações»
+   * voltou a ficar inalcançável — agora por estar TAPADO em vez de estar
+   * abaixo da dobra.
+   *
+   * MEDIDO num 1440×900: a faixa da barra vai de 816 a 900 (84 px — 72 da
+   * cápsula mais 12 de folga), e o botão nascia de 821 a 853, dentro dela. O
+   * token `--bo-barra-inferior` diz 86; a barra MEDE 84. São dois números
+   * diferentes para a mesma coisa, e é por isso que se mede o elemento.
+   *
+   * O que se reserva agora é a altura MEDIDA da barra. A conta, a razão e o
+   * controlo negativo estão em `lib/orcamento/barra-de-destinos.ts`.
+   *
    * `null` até à primeira medição — e nessa altura vale a classe do Tailwind,
-   * que é o comportamento de antes. Nunca se aplica no telemóvel: lá a gaveta é
+   * que reserva o mesmo pelo token. Nunca se aplica no telemóvel: lá a gaveta é
    * `fixed inset-y-0` e já está certa (medida: 775→844 num ecrã de 844).
    */
   const [alturaDoDetalhe, setAlturaDoDetalhe] = useState<number | null>(null);
+  /**
+   * A barra de destinos, para a coluna de detalhe lhe poder MEDIR a altura.
+   *
+   * É uma referência e não um `querySelector` pelo `aria-label` de propósito.
+   * O nome acessível da barra é o que vinte passeios do Playwright usam para
+   * dizer «já estou dentro do back office», e um `barra-inferior.test.tsx`
+   * recorta o bloco da `<nav>` a partir da PRIMEIRA vez que esse nome aparece
+   * no ficheiro para medir o que lá está dentro. Escrever o nome uma segunda
+   * vez aqui em cima passava esse recorte a começar no sítio errado — e foi o
+   * que ele apanhou. Uma referência não tem nome para colidir.
+   */
+  const barraDeDestinosRef = useRef<HTMLElement | null>(null);
   /**
    * A barra lateral está fora do ecrã (gaveta), e não encostada como coluna?
    *
@@ -2758,11 +2792,40 @@ export default function AdminClient({
 
     const medir = () => {
       const topo = linha.getBoundingClientRect().top + window.scrollY;
-      // A mesma folga de 1rem que o `calc(100vh-7rem)` já reservava no fundo.
-      const sobra = Math.round(window.innerHeight - topo - 16);
-      // Um chão para janelas muito baixas: mais vale uma coluna curta que rola
-      // do que uma coluna de 100 px onde não cabe nada.
-      setAlturaDoDetalhe(Math.max(sobra, 320));
+      /**
+       * ── E O QUE SE RESERVA NO FUNDO É A BARRA, NÃO UMA FOLGA ───────────
+       *
+       * Aqui estava um 16 — a folga de 1rem do `calc(100vh-7rem)`, que era
+       * tudo o que precisava de estar no fundo enquanto a barra de destinos
+       * não existia nesta largura. Passou a existir e a FICAR (é a regra do
+       * `barraDeveSumir`), e ocupa 86 px: a coluna acabava 70 px por baixo
+       * dela, com o «Guardar alterações» — que vive no pé desta coluna —
+       * inteiro debaixo do vidro. A conta e a medição estão em
+       * `lib/orcamento/barra-de-destinos.ts`.
+       *
+       * MEDE-SE A BARRA em vez de se copiar o token. Não é desconfiança do
+       * token: é que o que tem de ser evitado é o ESTORVO, e o estorvo é o
+       * elemento — com o recuo dele, com o entalhe do ecrã somado e com a
+       * altura que ele tiver no dia em que alguém lhe mexer. Dois «56px» em
+       * ficheiros diferentes já discordaram uma vez nesta casa (ver o recuo
+       * do corpo da vista, mais abaixo); um número medido não pode discordar
+       * de si próprio. O token fica como recurso para quando a barra ainda
+       * não está desenhada.
+       */
+      const barra = barraDeDestinosRef.current;
+      /**
+       * O recurso lê-se do `body` e não do `documentElement`: os tokens do
+       * back office vivem todos num `body:is(.admin-mode, …)` — é a separação
+       * do CSS que a Parte −1 do `docs/DESIGN-SYSTEM.md` manda —, e no
+       * `documentElement` este nome não existe. MEDIDO: ali devolve string
+       * vazia, o `parseFloat` dá `NaN`, e um `NaN` aqui reservava ZERO, que é
+       * exactamente o defeito que isto fecha. Um recurso que não funciona é
+       * pior do que não ter recurso, porque não se nota.
+       */
+      const alturaDaBarra = barra
+        ? barra.getBoundingClientRect().height
+        : parseFloat(getComputedStyle(document.body).getPropertyValue("--bo-barra-inferior"));
+      setAlturaDoDetalhe(alturaQueSobraParaODetalhe(window.innerHeight, topo, alturaDaBarra));
     };
 
     medir();
@@ -4829,6 +4892,10 @@ export default function AdminClient({
             Continua escondida enquanto uma gaveta de detalhe está aberta: é
             uma superfície modal, e a barra só lhe sobreporia o rodapé. */}
         <nav
+          /* Quem mede a altura dela é a coluna de detalhe, para não lhe acabar
+             por baixo. A referência existe para essa medição não ter de
+             procurar a barra por um seletor — ver `barraDeDestinosRef`. */
+          ref={barraDeDestinosRef}
           /**
            * ── O NOME SEGUE A COISA ────────────────────────────────────────
            *
@@ -6660,7 +6727,7 @@ export default function AdminClient({
                        fotograma a fotograma. */
                     className={`${
                       painelASair ? SAIDA : "bo-entrada"
-                    } fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-[var(--bo-surface)] shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]`}
+                    } fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-[var(--bo-surface)] shadow-[var(--bo-sombra-modal)] xl:shadow-none sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border border-[var(--bo-hairline)] max-h-[100dvh] xl:max-h-[calc(100vh-6rem-var(--bo-barra-inferior)-env(safe-area-inset-bottom))]`}
                     /* A saída larga os toques dentro da própria classe; o
                        `inert` é a mesma frase dita ao teclado e ao leitor de
                        ecrã. Sem ele, durante 200 ms havia um painel a
