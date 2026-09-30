@@ -3209,6 +3209,69 @@ body:has([data-orcamento-mode]) .scroll-progress {
 .field-line:focus {
   background-size: 100% 2px;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   E O ANEL GENÉRICO SAI DAQUI — PORQUE ESTE CAMPO JÁ TEM O SEU
+   ══════════════════════════════════════════════════════════════════════════
+
+   Palavras dela, com uma captura do «Local / Região» ao ser tocado: «no
+   orçamento eu não quero ao carregar nas coisas fique com esse quadrado verde
+   à volta. retira isso.»
+
+   ── O QUE ESTAVA MESMO A ACONTECER, MEDIDO ────────────────────────────────
+
+   Num Chromium, a clicar com o RATO no campo e a ler o que o browser calcula:
+
+       outline ......... solid 2px rgba(76, 97, 80, .95), offset 2px
+       border-bottom ... 1px rgb(99, 122, 95)   ← já mudou para moss
+       background-size .. 100% 2px              ← o filete já está desenhado
+
+   Três indicadores de foco no mesmo campo ao mesmo tempo. O «quadrado verde»
+   é o primeiro; os outros dois são os que este ficheiro desenhou de propósito.
+
+   E aparece ao RATO, não só ao teclado: o `:focus-visible` casa sempre num
+   campo de escrever, por especificação — o browser assume que quem lá clica
+   vai escrever. Portanto não há gesto nenhum em que ela não o veja.
+
+   ── PORQUE É QUE O `focus:outline-none` DO CAMPO NÃO CHEGAVA ──────────────
+
+   O `ffInputCls` já pedia `focus:outline-none`, e perdia. É a armadilha que o
+   cabeçalho longo deste ficheiro já conta, outra vez: em Tailwind v4 o CSS SEM
+   CAMADA ganha a QUALQUER utilitário, e o `:focus-visible` global é sem
+   camada. Um utilitário não podia lá chegar; uma regra sem camada pode, e é
+   esta.
+
+   ── PORQUE É QUE ISTO NÃO É «TIRAR O ANEL» ────────────────────────────────
+
+   Porque não se tira indicador nenhum: tira-se o TERCEIRO. O que fica é o que
+   a Parte 18 do `docs/DESIGN-SYSTEM.md` exige — um substituto —, e é mais
+   forte do que o anel que sai:
+
+     · o filete de 2px em moss a toda a largura do campo (`.field-line:focus`,
+       logo acima, cujo próprio comentário diz «é um indicador de foco e nunca
+       pode desaparecer (WCAG 2.4.7)»);
+     · a borda de baixo a passar de `foreground/45` para moss sólido;
+     · a etiqueta flutuante a subir.
+
+   Três sinais, e nenhum deles é o quadrado de que ela se queixa.
+
+   ── E O QUE NÃO SE MEXE ───────────────────────────────────────────────────
+
+   O anel global fica para o resto do sítio inteiro. Isto é uma excepção
+   NOMEADA, e só onde há substituto provado: `.field-line`, que existe apenas
+   no formulário de orçamento. Um campo novo que nasça sem esta classe continua
+   a receber o anel, que é o comportamento certo para quem não desenhou o seu.
+
+   O `forced-colors` mais abaixo continua a repor um `outline` do sistema em
+   toda a gente — quem usa contraste forçado não perde nada aqui. */
+.field-line:focus-visible {
+  outline: none;
+}
+@media (forced-colors: active) {
+  .field-line:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
 /* Movimento reduzido: o filete continua a APARECER a toda a largura — é um
    indicador de foco e nunca pode desaparecer (WCAG 2.4.7) —, só deixa de se
    desenhar da esquerda para a direita. */
