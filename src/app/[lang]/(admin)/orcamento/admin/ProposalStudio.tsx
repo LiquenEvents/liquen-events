@@ -11089,8 +11089,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
            Abaixo de `sm` nada disto se aplica: no telemóvel a barra é a largura
            do ecrã, e o `mr-auto` do parágrafo continua a ser quem separa o
-           estado da decisão. */
-        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:ml-auto sm:w-fit sm:max-w-full sm:py-3"
+           estado da decisão.
+
+           ── E AR ENTRE AS DUAS PEÇAS QUE FLUTUAM ──────────────────────────
+           MEDIDO a 1440×900 depois de a barra passar a abraçar o conteúdo: o
+           fundo dela ficava aos 814 px e o topo da cápsula dos destinos aos
+           816. DOIS píxeis. Duas superfícies de vidro a dois píxeis uma da
+           outra não se lêem como duas coisas — lêem-se como uma mancha só com
+           um risco no meio, que é o contrário do que flutuar quer dizer.
+
+           A soma ganha o `--bo-barra-folga`: o MESMO ar que a cápsula já tem
+           do bordo do ecrã. Não é um número afinado a olho — é o token do ar
+           desta casa, aplicado ao vão entre duas peças em vez de ao vão entre
+           uma peça e a moldura. Ficam 14 px, e lêem-se como duas. */
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:ml-auto sm:w-fit sm:max-w-full sm:py-3"
       >
         {step === "conteudo" && (
           <>
