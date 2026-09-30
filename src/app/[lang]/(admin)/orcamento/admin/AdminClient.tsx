@@ -25,6 +25,7 @@ import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orca
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
 import { formatPrice } from "@/lib/orcamento/pricing";
+import { barraDeveSumir, tecladoAberto } from "@/lib/orcamento/barra-de-destinos";
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { lerNumero } from "@/lib/numero-escrito";
@@ -1503,6 +1504,12 @@ export default function AdminClient({
   // is an inline sticky column. Only the overlay should behave as a dialog (focus
   // trap, aria-modal, scroll lock) — the inline panel must not trap focus.
   const [isDetailOverlay, setIsDetailOverlay] = useState(false);
+  /**
+   * O teclado do sistema está a ocupar o fundo do ecrã? Ver
+   * `lib/orcamento/barra-de-destinos.ts` — a regra e o porquê vivem lá, num
+   * módulo puro, para se poderem provar sem browser.
+   */
+  const [tecladoNoEcra, setTecladoNoEcra] = useState(false);
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -2706,6 +2713,27 @@ export default function AdminClient({
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
+  }, []);
+
+  /**
+   * ── E A OUTRA METADE: O TECLADO DO TELEMÓVEL ────────────────────────────
+   *
+   * Mede-se a diferença entre a janela de LAYOUT e a VISUAL. Os dois motores
+   * mexem na segunda quando o teclado sobe, incluindo o iOS, que não mexe na
+   * primeira. A conta e o limiar estão em `lib/orcamento/barra-de-destinos.ts`.
+   *
+   * Sem `visualViewport` — jsdom, e browsers antigos — isto fica um no-op e a
+   * barra comporta-se como antes. É o lado seguro: o defeito que estamos a
+   * fechar é ela FALTAR.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const ver = () => setTecladoNoEcra(tecladoAberto(window.innerHeight, vv.height));
+    ver();
+    vv.addEventListener("resize", ver);
+    return () => vv.removeEventListener("resize", ver);
   }, []);
 
   /**
@@ -4821,7 +4849,27 @@ export default function AdminClient({
            */
           aria-label="Navegação do back office"
           className={`pointer-events-none fixed bottom-0 inset-x-0 z-30 flex items-end justify-center gap-2 px-[var(--bo-barra-folga)] motion-safe:transition-transform motion-safe:duration-300 ${
-            selected ? "translate-y-full" : "translate-y-0"
+            /* ── A REGRA VIVE NUM SÍTIO SÓ, E DIZ-SE EM VOZ ALTA ──────────
+               «A barra está sempre, excepto quando alguma coisa modal tomou
+               conta do ecrã ou o teclado tomou conta do fundo dele.»
+
+               Aqui estava `selected` sozinho, e era o defeito que a
+               colaboradora dela relatou: abaixo de 1280 px o detalhe de um
+               pedido é uma folha modal, mas a partir de 1280 é uma COLUNA ao
+               lado da lista — e a barra saía nos dois casos. Como a barra é
+               hoje a única navegação que há («a barra substitui o menu»), abrir
+               um pedido no portátil apagava o menu do ecrã inteiro.
+
+               O `isDetailOverlay` já existia e já era usado para decidir o que
+               é modal (trinco do scroll, armadilha de foco, `aria-modal`). O
+               que faltava era esta peça usar a mesma resposta que as outras
+               três. */
+            barraDeveSumir({
+              detalheSobreposto: !!selected && isDetailOverlay,
+              tecladoAberto: tecladoNoEcra,
+            })
+              ? "translate-y-full"
+              : "translate-y-0"
           }`}
           // A folga por baixo SOMA-SE ao entalhe: no iPhone há a barra de
           // gestos do sistema por baixo de tudo, e uma cápsula que flutue a 12
