@@ -7187,8 +7187,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     [idiomaDoPdf, doc],
   );
 
+  /* ── `@container`: A CAIXA DE QUEM A BARRA DE BAIXO É FILHA ──────────────
+     A barra de acção do estúdio é filha DESTE div, e não do
+     `@container/estudio` — o que a deixava sem contentor nenhum acima dela:
+     qualquer `@min-[…]:` escrito nela resolvia para nada, em silêncio.
+
+     MEDIDO num Chromium, com a janela sempre a 1440:
+
+         estúdio sozinho .......... esta caixa tem 1360 px
+         com o painel de detalhe .. esta caixa tem  712 px
+
+     É a diferença que o `o-estudio-pergunta-a-caixa.test.ts` existe para
+     apanhar, e apanhou-me: escrevi a barra com `sm:` e a janela dizia «1440,
+     larga» enquanto a caixa tinha 712.
+
+     `container-type: inline-size` só contém o eixo em linha, e não há nada
+     `fixed` neste ficheiro para a contenção prender — verificado antes de a
+     pôr. */
   return (
-    <div className="border-t border-[var(--bo-hairline-strong)] pt-5">
+    <div className="@container border-t border-[var(--bo-hairline-strong)] pt-5">
       {/* EMPILHA no telemóvel, em vez de repartir a largura.
           O que estava aqui era um `flex` em linha com o texto de um lado e três
           botões do outro, marcados `shrink-0`. A 375 px os botões ficavam com
@@ -11087,9 +11104,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            pode pedir mais do que há; aí volta a caber e o `truncate` do
            parágrafo faz o resto.
 
-           Abaixo de `sm` nada disto se aplica: no telemóvel a barra é a largura
-           do ecrã, e o `mr-auto` do parágrafo continua a ser quem separa o
-           estado da decisão.
+           ── E A PERGUNTA É À CAIXA, NÃO À JANELA ──────────────────────────
+           Escrevi isto primeiro com `sm:`, e o `o-estudio-pergunta-a-caixa`
+           chumbou-o — com razão, e é a rede a fazer o seu trabalho. O estúdio
+           desenha-se em DOIS sítios: a página inteira e o painel de detalhe,
+           que tem tecto próprio. Com a janela a 1440 a fila do painel tem 712,
+           portanto um `sm:` (640 de JANELA) estaria satisfeito sem dizer nada
+           sobre o espaço que a barra tem de facto.
+
+           `@min-[40rem]:` pergunta à caixa mais próxima — o `@container` que este
+           bloco passou a declarar, e que é mesmo a caixa de quem esta barra é
+           filha. MEDIDA: 1360 px com o estúdio sozinho, 712 com o painel de
+           detalhe aberto, a janela a 1440 nos dois casos. 40rem é a mesma
+           medida que o ficheiro já usa noutras decisões de coluna.
+
+           O `max-w-full` fica solto: não é uma decisão de largura, é uma rede
+           para o total escrito por extenso não empurrar a barra para fora.
+
+           Abaixo disso nada se aplica: a barra é a largura da caixa, e o
+           `mr-auto` do parágrafo continua a ser quem separa o estado da
+           decisão.
 
            ── E AR ENTRE AS DUAS PEÇAS QUE FLUTUAM ──────────────────────────
            MEDIDO a 1440×900 depois de a barra passar a abraçar o conteúdo: o
@@ -11102,7 +11136,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            do bordo do ecrã. Não é um número afinado a olho — é o token do ar
            desta casa, aplicado ao vão entre duas peças em vez de ao vão entre
            uma peça e a moldura. Ficam 14 px, e lêem-se como duas. */
-        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] sm:ml-auto sm:w-fit sm:max-w-full sm:py-3"
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit sm:py-3"
       >
         {step === "conteudo" && (
           <>
