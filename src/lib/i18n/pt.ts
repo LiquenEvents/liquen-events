@@ -440,7 +440,7 @@ export const pt = {
       },
       {
         q: "Como funciona o processo de orçamentação?",
-        a: "Após o primeiro contacto e uma conversa inicial, preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
+        a: "Após o primeiro contacto e uma conversa inicial, elaboramos uma proposta personalizada e detalhada, acompanhada de um orçamento claro e transparente. Cada elemento é apresentado de forma rigorosa, para que saiba exatamente o que está incluído, sem surpresas nem custos ocultos.",
       },
       {
         q: "Trabalham com diferentes orçamentos?",
@@ -582,7 +582,7 @@ export const pt = {
     heroEyebrow: "O que oferecemos",
     heroTitle: ["Cada evento,", "uma história", "por contar"],
     heroLead:
-      "Casamentos, eventos de empresa e celebrações privadas. Desenhamos a decoração à volta do que tem em mente e do orçamento com que conta.",
+      "Casamentos, eventos empresariais e celebrações privadas. Desenvolvemos cada projeto de decoração de forma personalizada, tendo em consideração a sua visão, as suas necessidades e o orçamento disponível.",
     nav: ["Celebrações", "Empresas"],
     interludeEyebrow: "Líquen Events",
     interludeTitle: "Mais de 100 eventos desde 2018.",
@@ -616,7 +616,7 @@ export const pt = {
           },
           {
             title: "Batizados & Comunhões",
-            desc: "Celebrações familiares íntimas e cheias de significado, organizadas com carinho.",
+            desc: "Celebrações familiares íntimas e repletas de significado, cuidadosamente planeadas e organizadas com todo o cuidado.",
           },
           {
             title: "Festas de Aniversário",
@@ -624,7 +624,7 @@ export const pt = {
           },
           {
             title: "Aluguer de Viaturas Clássicas",
-            desc: "Carros clássicos com motorista para uma chegada de sonho, da entrada da noiva ao transporte dos convidados.",
+            desc: "Carros clássicos com motorista para tornar cada chegada verdadeiramente especial, desde a entrada da noiva ao transporte dos convidados.",
           },
         ],
       },
@@ -643,7 +643,7 @@ export const pt = {
     seoEyebrow: "Onde atuamos",
     seoTitle: "Vamos ter consigo",
     seoText:
-      "Casamentos, eventos corporativos e celebrações, do conceito à execução. Onde quer que seja o seu evento, levamos connosco a nossa equipa e a nossa rede de fornecedores.",
+      "Casamentos, eventos corporativos e celebrações, desde o conceito à concretização. Onde quer que tenha lugar o seu evento, levamos connosco a nossa equipa e uma rede de fornecedores de confiança, assegurando uma execução cuidada e personalizada.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",

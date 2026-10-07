@@ -132,8 +132,10 @@ export const SERVICES: ServiceDetail[] = [
     hero: "/imagens/EW1_1332.jpg",
     ogImage: "/imagens/EW1_1404.jpg",
     intro: [
-      "Produzimos congressos, seminários, retiros de empresa, cerimónias de entrega de prémios e jantares corporativos. Trabalhamos com empresas, universidades e instituições públicas, de reuniões de equipa a eventos de várias centenas de pessoas.",
-      "Tratamos da cenografia, da decoração e da logística de montagem no espaço, articulamos com os restantes fornecedores, do catering ao apoio técnico, e ficamos com a coordenação no próprio dia. Quando há convidados de fora, ajudamos também a articular a tradução simultânea, o alojamento e os transfers.",
+      "Congressos, seminários, retiros empresariais, cerimónias de entrega de prémios e jantares corporativos. Criamos e produzimos eventos para empresas, universidades e instituições públicas, desde reuniões e encontros de equipa a grandes eventos com várias centenas de participantes.",
+      "Da cenografia e decoração à logística e montagem no espaço, asseguramos uma gestão integrada de cada projeto. Coordenamos todos os parceiros envolvidos, do catering ao apoio técnico, e acompanhamos o evento no próprio dia para garantir que tudo decorre de forma fluida e profissional.",
+      "Para eventos com convidados nacionais ou internacionais, podemos também apoiar na articulação da tradução simultânea, alojamento e transfers, proporcionando uma experiência completa e cuidadosamente coordenada.",
+      "Um único parceiro para transformar o seu evento corporativo numa experiência profissional, diferenciadora e memorável.",
     ],
     includes: [
       "Congressos",
@@ -177,8 +179,10 @@ export const SERVICES: ServiceDetail[] = [
     ],
     hero: "/imagens/DaniGui_JantarFesta_130.jpg",
     intro: [
-      "Aniversários, festas temáticas e celebrações privadas, de festas de criança a jantares de adultos. O conceito é desenhado à volta do tema que tiver em mente, e não escolhido de um catálogo.",
-      "Tratamos do conceito, da decoração e da coordenação no dia da festa, e articulamos com os fornecedores que faltarem, do catering à animação. Quanto mais cedo falarmos, mais fácil é garantir a data, mas conseguimos entrar perto do dia consoante a dimensão da festa.",
+      "Aniversários, festas temáticas e celebrações privadas, pensados ao detalhe para tornar cada ocasião verdadeiramente especial. Desde festas infantis a jantares e celebrações para adultos, criamos ambientes únicos a partir do tema, da personalidade e daquilo que idealiza, sem soluções pré-definidas.",
+      "Da criação do conceito à decoração e coordenação no dia do evento, acompanhamos cada etapa para que tudo aconteça de forma harmoniosa e sem preocupações. Sempre que necessário, articulamos também com os restantes fornecedores, do catering à animação, garantindo que todos os elementos estão alinhados.",
+      "Quanto mais cedo começarmos a planear, maior será a possibilidade de assegurar a data e cuidar de cada detalhe com tempo. Ainda assim, adaptamo-nos a diferentes necessidades e podemos assumir a organização mesmo numa fase mais próxima do evento, de acordo com a sua dimensão e complexidade.",
+      "A sua ideia é o ponto de partida. Nós tratamos de a transformar numa celebração memorável.",
     ],
     includes: [
       "Conceito e tema da festa",
@@ -218,8 +222,9 @@ export const SERVICES: ServiceDetail[] = [
     keywords: ["decoração de batizados", "decoração de comunhões", "celebração familiar"],
     hero: "/imagens/DaniGui_JantarFesta_26.jpg",
     intro: [
-      "Os batizados e as comunhões são momentos de família que ficam para a vida. A Líquen Events cria a decoração destas celebrações, íntimas ou de maior escala, sempre com o mesmo cuidado.",
-      "Decoramos a cerimónia e depois o almoço ou o jantar, com o mesmo conceito nos dois espaços, para que não pareçam duas festas diferentes. O resto do dia fica para a família.",
+      "Os batizados e as comunhões são momentos especiais em família, que permanecem na memória ao longo da vida. A Líquen Events cria a decoração destas celebrações, sejam elas mais íntimas ou de maior dimensão, sempre com o mesmo cuidado e atenção ao detalhe.",
+      "Cuidamos da decoração da cerimónia e, posteriormente, do almoço ou jantar, assegurando a continuidade do mesmo conceito em ambos os espaços, para que toda a celebração se desenvolva de forma harmoniosa e coerente.",
+      "Assim, cabe à família simplesmente desfrutar do dia e de cada momento em conjunto.",
     ],
     includes: [
       "Conceito e cenografia da celebração",
