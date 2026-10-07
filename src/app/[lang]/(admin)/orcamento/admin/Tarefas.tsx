@@ -207,6 +207,7 @@ function LinhaDeEscrever({
   aoAbrir,
   aoFechar,
   campo,
+  botao,
   titulo,
   aoEscrever,
   aoCriar,
@@ -217,6 +218,8 @@ function LinhaDeEscrever({
   aoAbrir: () => void;
   aoFechar: () => void;
   campo: React.RefObject<HTMLInputElement | null>;
+  /** O botão que ocupa o lugar do campo quando ele fecha — para onde o foco volta. */
+  botao: React.RefObject<HTMLButtonElement | null>;
   titulo: string;
   aoEscrever: (v: string) => void;
   aoCriar: (fecharDepois: boolean) => void;
@@ -226,6 +229,7 @@ function LinhaDeEscrever({
   if (!aberta) {
     return (
       <button
+        ref={botao}
         type="button"
         onClick={aoAbrir}
         className={`alvo-toque flex w-full items-center gap-2.5 px-5 py-3 text-left text-sm text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-3)] hover:text-[var(--bo-text)] sm:px-6 ${ESTADO} ${PRESSAO}`}
@@ -259,7 +263,20 @@ function LinhaDeEscrever({
             else aoFechar();
           }
         }}
-        disabled={aGravar}
+        /* ── `readOnly` E NÃO `disabled`: O FOCO FICA ONDE ESTÁ ────────────
+           Um campo desactivado deixa de poder ter foco, e o que estava focado
+           passa a `<body>`. MEDIDO: com `disabled`, `document.activeElement`
+           ficava em `BODY` enquanto a tarefa gravava, e só voltava ao campo
+           depois — por um `requestAnimationFrame` a apostar numa re-desenho
+           que nem sempre chega a tempo.
+
+           E é nessa janela que quem escreve «em rajada» (a intenção escrita
+           aqui em cima) já começou a tarefa seguinte: as teclas caíam nos
+           atalhos globais da página, onde «g» seguido de uma letra muda de
+           vista. `readOnly` engole-as no campo em vez de as entregar à página,
+           e `aria-busy` diz a quem ouve que o campo está a gravar. */
+        readOnly={aGravar}
+        aria-busy={aGravar || undefined}
         aria-label="Nova tarefa"
         placeholder="O que há para fazer?"
         className="bo-input w-full px-3 py-2 text-sm"
@@ -334,7 +351,23 @@ function BarraDeListas({
               Parte 8 proíbe, só que ao lado de um nome em vez de por cima de
               uma régua. */}
           {porFazer > 0 && (
-            <span className="shrink-0 text-caption2 tabular-nums text-[var(--bo-text-faint)]">
+            /* ── A CONTAGEM LÊ-SE SOBRE O FUNDO ONDE ESTÁ ─────────────────
+               `--bo-text-faint` mede 4,77:1 sobre BRANCO — é a conta que o
+               `globals.css` fez e que o `escada-da-tinta.test.ts` guarda — mas
+               a lista escolhida não está sobre branco: está sobre a lavagem do
+               acento (`#e2e6e3`), e aí o mesmo texto mede 4,45:1. MEDIDO pelo
+               axe no ecrã, em computador e telemóvel: «insufficient color
+               contrast of 4.45 … Expected 4.5:1».
+
+               É um número que diz quantas faltam, portanto é informação — e o
+               nível terciário «nunca carrega informação» (Parte 4.3). Na lista
+               escolhida usa o degrau de cima; nas outras, sobre branco, o que
+               estava já passava. */
+            <span
+              className={`shrink-0 text-caption2 tabular-nums ${
+                escolhida ? "text-[var(--bo-text-muted)]" : "text-[var(--bo-text-faint)]"
+              }`}
+            >
               {porFazer}
             </span>
           )}
@@ -433,9 +466,9 @@ const TaskRow = memo(function TaskRow({
    * linha que está atrás de um `memo()`.
    */
   onArrastar: {
-    comecar: (e: React.DragEvent<HTMLDivElement>) => void;
-    porCima: (e: React.DragEvent<HTMLDivElement>) => void;
-    largar: (e: React.DragEvent<HTMLDivElement>) => void;
+    comecar: (e: React.DragEvent<HTMLElement>) => void;
+    porCima: (e: React.DragEvent<HTMLElement>) => void;
+    largar: (e: React.DragEvent<HTMLElement>) => void;
     acabar: () => void;
   };
 }) {
@@ -459,7 +492,7 @@ const TaskRow = memo(function TaskRow({
          linha 2 · prioridade, editar e eliminar, todos com o tamanho da casa.
        No computador nada muda: tudo cabe numa fila e o título volta a cortar
        (`sm:truncate`), que é o que mantém a densidade da lista. */
-    <div
+    <li
       // Ver a nota no `arrastavel`: a marca é o que a fase 09 vem procurar.
       // `undefined` e não `false` — um atributo que diz «false» no HTML é um
       // atributo presente, e quem o procurar com `[data-arrastavel]` apanhava
@@ -508,7 +541,7 @@ const TaskRow = memo(function TaskRow({
           (`appearance-none` mais `absolute inset-0`): é ela que recebe o
           toque, o foco e o teclado, e o quadrado é só o que se vê. */}
       <label
-        className={`alvo-toque relative -m-2 flex shrink-0 cursor-pointer items-center justify-center p-2 ${ESTADO} ${PRESSAO}`}
+        className={`alvo-toque relative -m-2 flex shrink-0 cursor-pointer items-center justify-center p-2 com-rato:-m-2.5 com-rato:p-2.5 ${ESTADO} ${PRESSAO}`}
       >
         <input
           type="checkbox"
@@ -523,9 +556,11 @@ const TaskRow = memo(function TaskRow({
 
            O quadrado desenhado continua com 20 px — quem cresce é o alvo à
            volta, como no rótulo da lista de pedidos. O `p-2` com `-m-2`
-           dá-lhe 36 px para o rato sem ocupar mais espaço na linha, e o
-           `alvo-toque` leva-o aos 44 no dedo (só sob `(pointer: coarse)`,
-           ver globals.css — o portátil mantém a densidade que tem). */
+           dava 36 px ao rato; a Parte 6 pede 40 («checkbox com 18 px visuais
+           e 40 px de alvo»), e `com-rato:p-2.5 com-rato:-m-2.5` leva-o lá sem
+           ocupar mais espaço na linha — MEDIDO: 36×36 antes, 40×40 depois, com
+           a linha com a mesma altura. O `alvo-toque` leva-o aos 44 no dedo
+           (só sob `(pointer: coarse)`, ver globals.css) e aí nada mudou. */
           className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none rounded-md"
         />
         <span
@@ -587,8 +622,16 @@ const TaskRow = memo(function TaskRow({
              `block` a seguir por ordem: o `.alvo-toque` põe `display:
              inline-flex` numa camada, e um título centrado a meio da linha não
              é um título de lista. No computador nada disto existe — a regra
-             vive dentro de `(pointer: coarse)`. */
-          className={`alvo-toque block w-full text-start text-sm break-words sm:truncate ${ESTADO} ${PRESSAO} ${
+             vive dentro de `(pointer: coarse)`.
+
+             ── E COM RATO, QUE TAMBÉM TINHA 20 PX ──────────────────────────
+             MEDIDO num 1440×900: 278×20. A Parte 6 pede alvos de 40 px, e a
+             linha não tem altura para os dar à letra. O `py-2.5` com `-my-2.5`
+             alarga a área que responde sem mexer na altura da linha; o
+             `relative` é o que a põe POR CIMA da linha de data e área logo
+             abaixo, que de outro modo ficava com a metade de baixo do alvo
+             (um irmão posterior pinta-se por cima de um anterior sem posição). */
+          className={`alvo-toque relative block w-full text-start text-sm break-words com-rato:-my-2.5 com-rato:py-2.5 sm:truncate ${ESTADO} ${PRESSAO} ${
             t.done ? "text-foreground/30 line-through" : "text-[var(--bo-tinta-72)]"
           }`}
         >
@@ -639,10 +682,27 @@ const TaskRow = memo(function TaskRow({
             className="hidden sm:flex items-center gap-1.5 shrink-0"
             title={`Responsável: ${t.assignee}`}
           >
-            <span className="w-5 h-5 rounded-full bg-sage-600 text-white flex items-center justify-center text-[9px] font-bold">
+            {/* ── O NOME INTEIRO, NUNCA SÓ A INICIAL ─────────────────────────
+                «Responsável com `aria-label` do nome completo, nunca só as
+                iniciais.» (Parte 6) Medido antes: sem `aria-label`, e a
+                inicial lia-se solta («C») antes do nome.
+
+                A inicial passa a muda (`aria-hidden`) — é desenho, e o nome ao
+                lado já diz tudo — e o nome ganha o contexto que lhe faltava:
+                «Responsável: Catarina Almeida». É texto escondido e não um
+                `aria-label` num `<span>` de propósito: um `aria-label` num
+                elemento sem papel não é anunciado de forma fiável, e o texto
+                está sempre na árvore. */}
+            <span
+              aria-hidden="true"
+              className="w-5 h-5 rounded-full bg-sage-600 text-white flex items-center justify-center text-[9px] font-bold"
+            >
               {t.assignee.slice(0, 1).toUpperCase()}
             </span>
-            <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
+            <span className="text-foreground/35 text-[10px]">
+              <span className="sr-only">Responsável: </span>
+              {t.assignee}
+            </span>
           </span>
         )}
         {!t.done && (
@@ -654,6 +714,9 @@ const TaskRow = memo(function TaskRow({
               color: corDeTexto(metaFor(PRIORITY_META, t.priority).color),
             }}
           >
+            {/* «Alta» sozinho não diz de quê. O prefixo escondido é o que faz
+                «Prioridade: Alta» (Parte 6). */}
+            <span className="sr-only">Prioridade: </span>
             {metaFor(PRIORITY_META, t.priority).label}
           </span>
         )}
@@ -762,7 +825,7 @@ const TaskRow = memo(function TaskRow({
           ]}
         />
       </div>
-    </div>
+    </li>
   );
 });
 
@@ -870,13 +933,69 @@ export default function Tarefas({
 
   const [aEscrever, setAEscrever] = useState(false);
   const campoDoTitulo = useRef<HTMLInputElement | null>(null);
+  /**
+   * ── O FOCO ESPERA PELO CAMPO, E NÃO POR UM FOTOGRAMA ────────────────────
+   *
+   * Isto pedia o foco com `requestAnimationFrame`, na aposta de que num
+   * fotograma o campo já estaria desenhado. Aposta que só ganha de um lado:
+   *
+   *   · o botão «Nova tarefa» chega por um `onClick` do React — um evento
+   *     discreto, que desenha de imediato — e o campo já existe quando o
+   *     fotograma chega;
+   *   · o ⌘N chega por um ouvinte NATIVO da janela (`AdminClient`), cujo
+   *     `setState` o React agenda como tarefa normal, e essa pode vir DEPOIS
+   *     do fotograma. O `campoDoTitulo.current` ainda era `null`, o foco não ia
+   *     para lado nenhum e ficava no `<body>`.
+   *
+   * MEDIDO num Chromium, duas vezes seguidas: ⌘N → `document.activeElement` é
+   * `BODY`, com o campo já aberto. E o que se escreve a seguir não é perdido
+   * por ser inofensivo: cai nos atalhos globais da página («g» seguido de uma
+   * letra muda de vista), que foi como a sonda saiu do ecrã das Tarefas a
+   * meio de «Chamar fotógrafo».
+   *
+   * Agora são dois passos que não dependem de relógio nenhum: o pedido levanta
+   * uma bandeira e abre a linha; e quem dá o foco é o efeito que corre QUANDO
+   * a linha abriu, que é o único momento em que há campo. Se já estava aberta
+   * (⌘N outra vez, vindo de outro sítio), o campo existe e foca-se logo.
+   */
+  const queroFoco = useRef(false);
   useEffect(() => {
     if (!pedidoDeNova) return;
+    if (campoDoTitulo.current) {
+      campoDoTitulo.current.focus();
+      return;
+    }
+    queroFoco.current = true;
     setAEscrever(true);
-    // Num fotograma, para o campo já existir quando se lhe pede o foco.
-    const id = requestAnimationFrame(() => campoDoTitulo.current?.focus());
-    return () => cancelAnimationFrame(id);
   }, [pedidoDeNova]);
+  useEffect(() => {
+    if (!aEscrever || !queroFoco.current) return;
+    queroFoco.current = false;
+    campoDoTitulo.current?.focus();
+  }, [aEscrever]);
+  /**
+   * ── E QUANDO O CAMPO FECHA, O FOCO NÃO CAI PARA O `<body>` ──────────────
+   *
+   * O campo que fecha é o elemento focado, e desaparece. «Nunca mudes o foco
+   * sem acção da pessoa. Excepção única: quando o elemento focado desaparece
+   * durante navegação por teclado — move para um vizinho.» (Parte 12.2)
+   *
+   * MEDIDO: `Esc` com o campo vazio deixava `document.activeElement` em
+   * `BODY`, e quem navega por teclado voltava ao princípio da página. O
+   * vizinho é o botão «Nova tarefa», que ocupa o mesmo sítio — e cobre os
+   * dois caminhos que fecham o campo: o `Esc` e o `Shift+Enter`.
+   */
+  const botaoDeAbrir = useRef<HTMLButtonElement | null>(null);
+  const devolverFoco = useRef(false);
+  const fecharEscrever = useCallback(() => {
+    devolverFoco.current = true;
+    setAEscrever(false);
+  }, []);
+  useEffect(() => {
+    if (aEscrever || !devolverFoco.current) return;
+    devolverFoco.current = false;
+    botaoDeAbrir.current?.focus();
+  }, [aEscrever]);
 
   /**
    * ── A PERGUNTA DE ELIMINAR ────────────────────────────────────────────
@@ -1214,7 +1333,7 @@ export default function Tarefas({
        nos dois casos em que ele continua a existir: sem isto, a gravação
        tira-o (o campo esteve `disabled`) e a tarefa seguinte precisava de um
        toque que ninguém pediu. */
-    if (fecharDepois) setAEscrever(false);
+    if (fecharDepois) fecharEscrever();
     else requestAnimationFrame(() => campoDoTitulo.current?.focus());
   }
 
@@ -1619,7 +1738,7 @@ export default function Tarefas({
 
   const arrastar = useMemo(
     () => ({
-      comecar: (e: React.DragEvent<HTMLDivElement>) => {
+      comecar: (e: React.DragEvent<HTMLElement>) => {
         const id = e.currentTarget.dataset.tarefa;
         if (!id) return;
         aArrastarRef.current = id;
@@ -1628,7 +1747,7 @@ export default function Tarefas({
         // Sem dados no `dataTransfer` o Firefox não chega a começar o arrasto.
         e.dataTransfer.setData("text/plain", id);
       },
-      porCima: (e: React.DragEvent<HTMLDivElement>) => {
+      porCima: (e: React.DragEvent<HTMLElement>) => {
         if (!aArrastarRef.current) return;
         // Sem o `preventDefault` o browser recusa o largar — é assim que ele
         // distingue um destino que aceita de um que não aceita.
@@ -1649,7 +1768,7 @@ export default function Tarefas({
         alvoRef.current = alvo;
         setAlvoDoArrasto(alvo);
       },
-      largar: (e: React.DragEvent<HTMLDivElement>) => {
+      largar: (e: React.DragEvent<HTMLElement>) => {
         e.preventDefault();
         const oQue = aArrastarRef.current;
         const alvo = alvoRef.current;
@@ -1780,7 +1899,7 @@ export default function Tarefas({
   function row(t: Task, arrastavel = false) {
     if (editingTaskId === t.id) {
       return (
-        <div
+        <li
           key={t.id}
           className="px-4 py-3 border-b border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)]"
         >
@@ -1872,7 +1991,7 @@ export default function Tarefas({
               </Button>
             </div>
           </div>
-        </div>
+        </li>
       );
     }
 
@@ -2224,7 +2343,16 @@ export default function Tarefas({
                             </span>
                           </h2>
                         )}
-                        {g.tarefas.map((t) => row(t, ordenacao === "manual"))}
+                        {/* ── `<ul role="list">` E `<li>`, COMO A PARTE 6 MANDA ────
+                            Eram `<div>`s soltas dentro de um `<section>`: quem
+                            ouve o ecrã não ouvia «lista, 5 itens», e não tinha
+                            como saltar de linha em linha nem saber quantas há.
+                            O `role="list"` repete o que `ul` já é de propósito:
+                            o Safari tira a semântica de lista a uma `ul` sem
+                            marcadores, e é isso que o CSS desta casa faz. */}
+                        <ul role="list" className="divide-y divide-[var(--bo-hairline)]">
+                          {g.tarefas.map((t) => row(t, ordenacao === "manual"))}
+                        </ul>
                       </section>
                     ))
                   )}
@@ -2246,7 +2374,8 @@ export default function Tarefas({
                   <LinhaDeEscrever
                     aberta={aEscrever}
                     aoAbrir={() => setAEscrever(true)}
-                    aoFechar={() => setAEscrever(false)}
+                    aoFechar={fecharEscrever}
+                    botao={botaoDeAbrir}
                     campo={campoDoTitulo}
                     titulo={title}
                     aoEscrever={setTitle}
@@ -2416,7 +2545,9 @@ export default function Tarefas({
                     >
                       {/* As concluídas nunca são arrastáveis: reordenar à mão o
                       que já está feito não quer dizer nada. */}
-                      {done.map((t) => row(t))}
+                      <ul role="list" className="divide-y divide-[var(--bo-hairline)]">
+                        {done.map((t) => row(t))}
+                      </ul>
                     </Card>
                   )}
                 </div>

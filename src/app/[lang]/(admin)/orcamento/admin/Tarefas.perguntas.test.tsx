@@ -70,7 +70,7 @@ async function pedirParaEliminar(user: ReturnType<typeof userEvent.setup>) {
     </ToastProvider>,
   );
   await waitFor(() => expect(screen.getByText("Ligar à florista")).toBeInTheDocument());
-  const linha = screen.getByText("Ligar à florista").closest("div.group")!;
+  const linha = screen.getByText("Ligar à florista").closest("[data-tarefa]")!;
   /* ── O CAMINHO ATÉ AO «ELIMINAR» MUDOU NA FASE 09 ────────────────────────
      As acções da linha eram duas formas — dois ícones soltos com rato, um «⋯»
      sem ele — e passaram a ser uma só: o menu, em qualquer ponteiro. «Hover
