@@ -226,10 +226,7 @@ describe("e em inglês, com o mesmo desenho", () => {
    */
   it("e o esqueleto é o mesmo do português", () => {
     const esqueleto = (h: string) =>
-      h
-        .replace(/>[^<]*</g, "><")
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/ (lang|alt)="[^"]*"/g, "");
+      h.replace(/>[^<]*</g, "><").replace(/ (lang|alt)="[^"]*"/g, "");
     expect(esqueleto(emailPedidoRecebido(EN).html)).toBe(
       esqueleto(emailPedidoRecebido(EXEMPLO).html),
     );
