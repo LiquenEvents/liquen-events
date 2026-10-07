@@ -283,13 +283,23 @@ describe("POST /api/orcamento", () => {
       expect(equipa.text ?? "").toContain("Decoração: Cocktail · Mesas do jantar · Seating plan");
     });
 
-    it("são devolvidos ao casal no email de confirmação", async () => {
-      // A preocupação do João era o automático soar impessoal. Repetir de
-      // volta o que a pessoa escolheu é o que faz parecer que alguém leu.
+    /**
+     * ── JÁ NÃO VÃO NO EMAIL AO CLIENTE — E É DECISÃO, NÃO ESQUECIMENTO ──────
+     *
+     * Este caso garantia o contrário: a preocupação do João era o automático
+     * soar impessoal, e repetir de volta o que a pessoa escolheu fazia parecer
+     * que alguém leu. O email «Pedido recebido» passou a ser o desenho dela
+     * (`docs/email-pedido-recebido-apple.html`), cujo cartão «O seu pedido.» tem
+     * cinco linhas — Evento, Data, Convidados, Local, Espaço — e a regra dela é
+     * não lhe alterar textos. A decoração continua a ir no email à EQUIPA (o
+     * caso de cima), que é onde decide o trabalho.
+     */
+    it("ficam no email à equipa, e o do cliente segue o desenho dela", async () => {
       await enviarTudo({ form: comDecor });
       const cliente = sendMailMock.mock.calls[1][0];
-      expect(cliente.text ?? "").toContain("Cocktail");
-      expect(cliente.text ?? "").toContain("Seating plan");
+      expect(cliente.text ?? "").not.toContain("Decoração:");
+      expect(cliente.text ?? "").not.toContain("Seating plan");
+      expect(sendMailMock.mock.calls[0][0].text ?? "").toContain("Seating plan");
     });
 
     it("um identificador inventado não passa para os emails", async () => {
@@ -387,11 +397,16 @@ describe("POST /api/orcamento", () => {
       expect(equipa.text ?? "").not.toContain("civil-religiosa");
     });
 
-    it("são devolvidos ao cliente na confirmação", async () => {
+    /**
+     * O ESPAÇO é devolvido ao cliente — é uma das cinco linhas do desenho dela.
+     * O tipo de CERIMÓNIA não: o cartão «O seu pedido.» não o tem, e fica no
+     * email à equipa (o caso de cima). Ver a nota no caso da decoração.
+     */
+    it("o espaço é devolvido ao cliente; a cerimónia fica para a equipa", async () => {
       await enviarTudo({ form: comAmbos });
       const cliente = sendMailMock.mock.calls[1][0];
-      expect(cliente.text ?? "").toContain("Civil e religiosa");
-      expect(cliente.text ?? "").toContain("Exterior");
+      expect(cliente.text ?? "").toContain("Espaço: Exterior");
+      expect(cliente.text ?? "").not.toContain("Civil e religiosa");
     });
 
     it("um identificador inventado não passa para os emails", async () => {
@@ -706,8 +721,8 @@ describe("a etiqueta do evento no email de confirmação", () => {
     const texto = (cliente.text ?? "").toLowerCase();
     expect(texto).not.toContain("for your other");
     expect(texto).not.toContain("event: outro");
-    // A frase confirma o que se sabe mesmo: a data.
-    expect(cliente.text ?? "").toContain("for 15 May 2027");
+    // Confirma o que se sabe mesmo: a data, na linha dela do cartão.
+    expect(cliente.text ?? "").toContain("Date: 15 May 2027");
   });
 
   it("o nome que o cliente deu ao evento continua a ganhar ao tipo", async () => {
