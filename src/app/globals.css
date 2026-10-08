@@ -4734,12 +4734,20 @@ html.fontes-por-assentar .barra-consentimento {
    E some sozinha: `:has()` lê a PRESENÇA da barra no DOM, e é o React que a
    tira de lá quando a pessoa escolhe. Nesse instante o sítio recupera os
    110 px — a menos de 500 ms de um clique da pessoa, portanto fora do CLS. */
+/* MEDIDO OUTRA VEZ quando a barra passou a cartão num canto («quero isto
+   pequeno num canto transparente tipo apple»), com o mesmo toque emulado e
+   nas duas línguas. O que conta agora é o que o cartão OCUPA a partir do fundo
+   (altura + os 12 px de ar por baixo dele):
+     · 320 e 360 px → 159 px (147 de cartão)
+     · 390 a 639 px → 139 px (127)
+     · 640 e acima  → 145 px (133 — o cartão tem 22 rem e o texto quebra)
+   Daí 168 px e 156 px, com a mesma folga de antes. */
 body:has(.barra-consentimento) {
-  --reserva-consentimento: 152px;
+  --reserva-consentimento: 168px;
 }
 @media (min-width: 640px) {
   body:has(.barra-consentimento) {
-    --reserva-consentimento: 84px;
+    --reserva-consentimento: 156px;
   }
 }
 

@@ -230,7 +230,25 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
        * reserva declarada no CSS continue a ser maior do que esta caixa —
        * `e2e/consentimento-geometria.spec.ts` mede as duas e obriga a isso.
        */
-      className="barra-consentimento fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 px-5 py-3.5 sm:px-8 sm:py-4"
+      /**
+       * ── PEQUENO, NUM CANTO, TRANSLÚCIDO ───────────────────────────────
+       * Palavras dela, com a captura da barra verde de bordo a bordo: «quero
+       * isto pequeno num canto transparente tipo apple».
+       *
+       * Passa a um cartão: no telemóvel com ar dos lados e cantos redondos;
+       * a partir de 640 px com 22 rem, encostado ao canto de baixo à
+       * esquerda — o direito é dos botões flutuantes (WhatsApp e o pedido de
+       * orçamento). O fundo é a noite da casa a 75 % com desfoque: lê-se o
+       * que está por trás, e o texto branco fica acima de 6:1 mesmo sobre uma
+       * página branca (75 % de #12160f sobre branco dá ~#4e504c).
+       *
+       * O desfoque que o bloco de cima tirou por custo volta, mas sobre uma
+       * fracção da área: era uma superfície de largura total (1440 × 74);
+       * agora é um cartão de 352 × ~150. A reserva de espaço (ver
+       * `--reserva-consentimento` em globals.css) foi medida outra vez para
+       * esta forma.
+       */
+      className="barra-consentimento fixed inset-x-3 z-[70] rounded-2xl border border-white/12 bg-noite/75 px-4 py-3.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-xl backdrop-saturate-150 sm:inset-x-auto sm:left-5 sm:w-[22rem]"
       style={{
         // Fora das rotas sociais nada muda: `bottom: 0` (da classe) e o
         // preenchimento a respeitar a zona segura do iPhone.
@@ -239,14 +257,15 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
         // barra soma-se à zona segura porque a própria barra já a reserva por
         // dentro — sem isso, o banner ficaria a tapar-lhe a parte de baixo
         // num telefone com barra de gestos.
-        paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
+        // O cartão flutua: a zona segura entra na DISTÂNCIA ao fundo, e não
+        // no enchimento de dentro (que era o desenho da barra encostada).
         bottom: acimaDaBarra
-          ? `calc(${ALTURA_BARRA_FIXA_PX}px + env(safe-area-inset-bottom))`
-          : undefined,
+          ? `calc(${ALTURA_BARRA_FIXA_PX}px + 0.75rem + env(safe-area-inset-bottom))`
+          : "calc(0.75rem + env(safe-area-inset-bottom))",
       }}
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <p className="text-[12.5px] leading-relaxed text-white/80">
+      <div className="flex flex-col gap-3">
+        <p className="text-[12.5px] leading-relaxed text-white/85">
           {t.text}{" "}
           <Link
             href={localizeHref("/privacidade", locale)}
@@ -263,18 +282,18 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
             com toque emulado, e a igualdade que a CNPD pede também é de alvo —
             se recusar fosse mais fácil de falhar do que aceitar, o
             consentimento deixava de ser livre por via do dedo. */}
-        <div className="flex flex-shrink-0 items-center gap-2.5">
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => choose(false)}
-            className="alvo-toque border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
+            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-noite"
           >
             {t.decline}
           </button>
           <button
             type="button"
             onClick={() => choose(true)}
-            className="alvo-toque border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
+            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-noite"
           >
             {t.accept}
           </button>
