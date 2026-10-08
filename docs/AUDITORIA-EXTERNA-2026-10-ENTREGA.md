@@ -12,7 +12,7 @@ para `main`, nem migrações aplicadas.
 | S2 | feito | `Canonical` sem `www`, `Expires` 2027-12-31, sem a nota interna e sem a `Policy` do GitHub. | `public/.well-known/security.txt` |
 | S3 | feito | Ao público sai só `{"status":"ok"}`, sem tocar na base de dados. O detalhe exige `Authorization: Bearer <HEALTH_TOKEN>`, comparado em tempo constante. Sem a variável definida, ninguém vê o detalhe. | `src/app/api/health/route.ts`, `README.md`, `.env.example` |
 | S4 | **não feito — o impacto primeiro** | Nonces na CSP obrigam a gerar cada página a cada pedido: todas as páginas estáticas do sítio passavam a dinâmicas. Medido na galeria: 43 scripts, nenhum com nonce, e 42 violações com a CSP estrita. Paraste-me aqui, e eu parei. | `next.config.ts` (comentário com a medição) |
-| S5 / C3 | feito | `/.env`, `/backup.zip` e `/pagina-que-nao-existe` devolvem **404** (antes 200, com a página inicial nos dois primeiros). O 404 lê-se sem JavaScript, em PT e EN. | `src/app/global-not-found.tsx`, `src/app/[lang]/layout.tsx`, `src/proxy.ts`, `next.config.ts` |
+| S5 / C3 | feito | `/.env`, `/backup.zip` e `/pagina-que-nao-existe` devolvem **404** (antes 200, com a página inicial nos dois primeiros). O 404 lê-se sem JavaScript, em PT e EN. Tem o logótipo, os caminhos de sempre e o WhatsApp, mas **não tem o menu completo**: com o menu, o Next punha-o no pacote de todas as rotas (o CI apanhou +25 KB na proposta). Sem ele, a proposta desce para 82 KB. | `src/app/global-not-found.tsx`, `src/app/[lang]/layout.tsx`, `src/proxy.ts`, `next.config.ts` |
 | B1 | migração escrita, **não aplicada** | Confirmado antes: o servidor usa sempre a chave secreta (`getSupabase()`), e não há Supabase no browser. | `db/migracoes/20261008_b1_revogar_anon_e_authenticated.sql` |
 | B2 | migração escrita, **não aplicada** | `next_invoice_seq` com `search_path = ''`. | `db/migracoes/20261008_b2_next_invoice_seq_search_path.sql`, `db/schema.sql` |
 | B4 | migração escrita, **não aplicada** | Índices para as cinco chaves estrangeiras sem índice. | `db/migracoes/20261008_b4_indices_das_chaves_estrangeiras.sql`, `db/schema.sql` |
@@ -186,6 +186,10 @@ Com as regras por omissão aparece também o vector de teste público do
 RFC 6238 em `totp.test.ts`.
 
 ## Problemas novos que encontrei
+
+- O 404 global com o menu completo aumentava o JavaScript de **todas** as
+  rotas (é como o Next trata o `global-not-found`). Corrigido no próprio S5 —
+  a proposta do casal ficou em 82 KB, abaixo do que tinha antes.
 
 - `/servicos/nao-existe` e `/s/abc` também respondiam 200; agora 404.
 - `/orcamento/confirmacao/LIQ-X` responde 200 com «Pedido Recebido» para
