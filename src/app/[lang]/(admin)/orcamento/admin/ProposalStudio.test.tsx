@@ -9819,3 +9819,39 @@ describe("o esqueleto da miniatura", () => {
     }
   });
 });
+
+/**
+ * Achados n.º 5, 16 e 17 da auditoria: «-500» via-se negativo e contava +500;
+ * «0» voltava sozinho ao valor anterior; «150%» de sinal voltava a 30% — os
+ * três sem uma palavra.
+ */
+describe("o que não é um valor diz-se, e não se grava", () => {
+  it("«-500» e «0» dizem porquê e não mexem no total", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    const valor = await screen.findByLabelText(/^Valor \(sem IVA\)/);
+    await user.clear(valor);
+    await user.type(valor, "-500");
+    expect(await screen.findByText(/não pode ser negativo/)).toBeTruthy();
+    await user.clear(valor);
+    await user.type(valor, "0");
+    expect(await screen.findByText(/Com 0 € não há proposta a enviar/)).toBeTruthy();
+    await user.clear(valor);
+    await user.type(valor, "4000");
+    expect(screen.queryByText(/não pode ser negativo|Com 0 € não há/)).toBeNull();
+  });
+
+  it("um sinal fora de 1–99 fica escrito, com a razão, e o documento não muda", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    const sinal = await screen.findByLabelText("Percentagem do sinal");
+    await user.clear(sinal);
+    await user.type(sinal, "150");
+    expect((sinal as HTMLInputElement).value).toBe("150");
+    expect(document.getElementById("sinal-erro")?.textContent).toMatch(/entre 1% e 99%/);
+    await user.tab();
+    expect((sinal as HTMLInputElement).value).toBe("30");
+  });
+});

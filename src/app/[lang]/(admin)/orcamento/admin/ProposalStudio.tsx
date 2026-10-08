@@ -180,7 +180,7 @@ import {
   dinheiroDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur, eurDocumento, montanteNaLingua, round2 } from "@/lib/money";
+import { eur, eurDocumento, montanteNaLingua, round2, SINAL_POR_OMISSAO } from "@/lib/money";
 import { resumoDaPropostaParaCopiar } from "@/lib/email-proposta-textos";
 import { linkDoWhatsApp } from "@/lib/whatsapp";
 import { randomId } from "./util";
@@ -1606,6 +1606,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
   // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
   const [totalInput, setTotalInput] = useState<string>("");
+  /** Porque é que o que está escrito no «Valor (sem IVA)» não conta — ver
+   *  `onTotalInput`. */
+  const [erroDoTotal, setErroDoTotal] = useState<string | null>(null);
+  /** O que está escrito na caixa do sinal enquanto não é uma percentagem
+   *  válida (achado n.º 17) — `null` mostra a do documento. */
+  const [sinalEscrito, setSinalEscrito] = useState<string | null>(null);
+  /** A percentagem do sinal quando ela entrou na caixa — é para lá que se volta
+   *  se o que escrever deixar de ser válido. */
+  const sinalAntes = useRef(SINAL_POR_OMISSAO);
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   /**
@@ -3663,7 +3672,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // caixa do total a meio de ela estar a escrever o valor.
     camposTocados.current.add("__total");
     setTotalInput(raw);
-    const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
+    /**
+     * ── O QUE NÃO É UM VALOR DIZ-SE, E NÃO SE GRAVA ─────────────────────────
+     *
+     * Achado n.º 5: «-500» via-se -500 e contava +500 (o `parseMoneyText` lê
+     * os algarismos e deixa o sinal de fora) — e era +500 que ia para o pedido.
+     * Achado n.º 16: «0» voltava sozinho ao valor anterior, sem uma palavra.
+     * Nos dois casos o campo fica com o que ela escreveu, diz porquê, e nada
+     * se grava até haver um valor a sério.
+     */
+    const negativo = /-\s*[\d.,]/.test(raw);
+    const lido = raw.trim() === "" ? undefined : parseMoneyText(raw);
+    if (negativo) {
+      setErroDoTotal(
+        "O valor não pode ser negativo. Um desconto escreve-se como linha do orçamento.",
+      );
+      return;
+    }
+    if (lido === 0) {
+      setErroDoTotal("Com 0 € não há proposta a enviar — escreve o valor dos serviços.");
+      return;
+    }
+    setErroDoTotal(null);
+    const base = lido;
     writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
     persistirPreco(base);
   }
@@ -10355,6 +10386,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   placeholder="3000"
                   data-campo="totalAmount"
                   containerClassName={realce("totalAmount")}
+                  error={erroDoTotal ?? undefined}
                   hint={
                     desvio
                       ? `Escrito à mão — a soma dos serviços com preço é ${eur(desvio.soma)}`
@@ -10565,12 +10597,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             type="number"
                             min={1}
                             max={99}
-                            value={pctSinal}
+                            value={sinalEscrito ?? pctSinal}
                             onChange={(e) => {
-                              const n = Number.parseInt(e.target.value, 10);
-                              patch({ depositPercent: Number.isFinite(n) ? n : undefined });
+                              // Achado n.º 17: «150» voltava a 30 sem mensagem (o
+                              // motor só aceita de 1 a 99). Fica o que ela
+                              // escreveu, com a razão por baixo, e só uma
+                              // percentagem válida chega ao documento.
+                              //
+                              // Escrito tecla a tecla, «150» passa por «15», que é
+                              // válido: por isso, quando o texto deixa de ser
+                              // válido, volta-se ao valor de ANTES de ela começar.
+                              const raw = e.target.value;
+                              const n = Number.parseInt(raw, 10);
+                              if (Number.isFinite(n) && n >= 1 && n <= 99) {
+                                setSinalEscrito(null);
+                                patch({ depositPercent: n });
+                              } else {
+                                setSinalEscrito(raw);
+                                patch({ depositPercent: sinalAntes.current });
+                              }
                             }}
+                            onFocus={() => {
+                              sinalAntes.current = pctSinal;
+                            }}
+                            onBlur={() => setSinalEscrito(null)}
                             aria-label="Percentagem do sinal"
+                            aria-invalid={sinalEscrito != null || undefined}
+                            aria-describedby={sinalEscrito != null ? "sinal-erro" : undefined}
                             className="bo-input w-16 px-1.5 py-0.5 text-center text-xs"
                           />
                           %
@@ -10578,6 +10631,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       }
                       valor={eur(totais.sinal)}
                     />
+                    {sinalEscrito != null && (
+                      <p
+                        id="sinal-erro"
+                        role="alert"
+                        className="text-[11px] text-[var(--bo-perigo)]"
+                      >
+                        O sinal é entre 1% e 99%. Fica nos {pctSinal}% enquanto não escreveres
+                        outro.
+                      </p>
+                    )}
                     <LinhaDeTotal rotulo={`Saldo ${100 - pctSinal}%`} valor={eur(totais.saldo)} />
                   </dl>
                   {/* ── A BASE, DITA AQUI TAMBÉM ──────────────────────────────
