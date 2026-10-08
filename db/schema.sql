@@ -577,6 +577,9 @@ create table if not exists public.material_list_items (
 
 create index if not exists material_list_items_list_idx
   on public.material_list_items (list_id);
+-- A outra chave estrangeira (auditoria externa, B4).
+create index if not exists material_list_items_item_idx
+  on public.material_list_items (item_id);
 
 -- ── Regras: o que a PROPOSTA implica em material ────────────────
 -- Editáveis pela equipa, de propósito. Uma condição por regra, sem E/OU:
@@ -597,6 +600,10 @@ create table if not exists public.material_rules (
   position    integer not null default 0,
   updated_at  timestamptz not null default now()
 );
+
+-- As duas chaves estrangeiras (auditoria externa, B4).
+create index if not exists material_rules_item_id_idx on public.material_rules (item_id);
+create index if not exists material_rules_list_id_idx on public.material_rules (list_id);
 
 -- ── Checklist de material POR EVENTO ────────────────────────────
 -- É uma CÓPIA das listas base, não uma referência: mudar uma lista base não
@@ -791,6 +798,7 @@ create table if not exists public.message_links (
 );
 
 create index if not exists message_links_quote_id_idx on public.message_links (quote_id);
+create index if not exists message_links_proposal_id_idx on public.message_links (proposal_id);
 
 -- ── Passkeys (WebAuthn) ─────────────────────────────────────────
 -- Uma linha por DISPOSITIVO registado, não por pessoa: quem tem telemóvel e
@@ -1016,6 +1024,9 @@ create table if not exists public.biblioteca_foto_etiquetas (
 
 create index if not exists biblioteca_foto_etiquetas_etiqueta_idx
   on public.biblioteca_foto_etiquetas (etiqueta_id);
+-- A outra chave estrangeira (auditoria externa, B4).
+create index if not exists biblioteca_foto_etiquetas_path_idx
+  on public.biblioteca_foto_etiquetas (path);
 
 -- ── Os temas passam a poder ser filtros ─────────────────────────
 -- Colunas acrescentadas à tabela que já existe, em vez de uma tabela nova: é
