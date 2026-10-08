@@ -185,6 +185,19 @@ export type SafeImageProps = Omit<ImageProps, "src" | "loader" | "onError" | "on
    * imagens que ainda partiam com a avaria simulada, 10 eram heróis.
    */
   initialLoader?: (p: ImageLoaderProps) => string;
+  /**
+   * O desfoque passa à fotografia em 300 ms, em vez de num salto (auditoria
+   * externa, A6). Só para imagens `fill` com `blurDataURL`.
+   *
+   * Não se esconde a fotografia à espera do JavaScript — sem JavaScript, ou
+   * numa hidratação lenta, ela nunca apareceria. Faz-se o contrário: DEPOIS de
+   * hidratar, e só se a fotografia ainda não chegou, põe-se por CIMA dela uma
+   * cópia do desfoque (o mesmo que o `next/image` já desenha por baixo); quando
+   * ela chega, essa cópia esbate-se. O HTML do servidor fica igual ao de
+   * sempre, e uma fotografia que já tinha chegado não ganha camada nenhuma.
+   * É opacidade, não movimento: fica também com movimento reduzido.
+   */
+  aparecer?: boolean;
 };
 
 export default function SafeImage({
@@ -194,6 +207,7 @@ export default function SafeImage({
   blurDataURL,
   unavailableLabel,
   initialLoader,
+  aparecer = false,
   fill,
   width,
   height,
@@ -230,8 +244,12 @@ export default function SafeImage({
     [],
   );
 
+  /** A6: «espera» = o véu de desfoque está por cima; «saida» = a esbater-se. */
+  const [veu, setVeu] = useState<"nenhum" | "espera" | "saida">("nenhum");
+
   const handleLoad = useCallback(() => {
     attemptsRef.current = 0;
+    setVeu((v) => (v === "espera" ? "saida" : v));
   }, []);
 
   const handleError = useCallback(() => {
@@ -262,6 +280,19 @@ export default function SafeImage({
   }, [original]);
 
   const ligarAoErro = useImageErrorRef(handleError);
+
+  // A `ref` do `<img>`: o ouvinte de erro de sempre, e — com `aparecer` — o
+  // véu, que só se põe se a fotografia ainda não tiver chegado.
+  const ligarImg = useCallback(
+    (img: HTMLImageElement | null) => {
+      const largar = ligarAoErro(img);
+      if (aparecer && blurDataURL && img && !(img.complete && img.naturalWidth > 0)) {
+        setVeu((v) => (v === "nenhum" ? "espera" : v));
+      }
+      return largar;
+    },
+    [ligarAoErro, aparecer, blurDataURL],
+  );
 
   // ── Recuperação depois de esgotar as tentativas ─────────────────────────
   // Reentrar no ecrã (saiu e voltou) ou o regresso da rede dão nova
@@ -393,8 +424,20 @@ export default function SafeImage({
           // NÃO passar `onError` aqui. Ver a nota grande acima: é ele que faz o
           // next/image reatribuir `img.src = img.src` na montagem e abortar o
           // pedido em voo. O erro é ouvido pela `ref`, que cobre o mesmo caso.
-          ref={ligarAoErro}
+          ref={ligarImg}
           {...rest}
+        />
+      )}
+      {fill && veu !== "nenhum" && !exhausted && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={blurDataURL}
+          alt=""
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-foto-chega ${
+            veu === "saida" ? "opacity-0" : "opacity-100"
+          }`}
+          onTransitionEnd={() => setVeu("nenhum")}
         />
       )}
       {/*

@@ -388,6 +388,8 @@ export default async function ServiceDetailPage({
                   fill
                   sizes={`(max-width: 1024px) 50vw, ${dvw}`}
                   quality={75}
+                  // A6: o desfoque esbate-se em 300 ms quando a foto chega.
+                  aparecer
                   className="object-cover transition-transform duration-foto-zoom group-hover:scale-[1.03]"
                 />
               </div>
