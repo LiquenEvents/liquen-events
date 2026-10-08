@@ -2161,7 +2161,7 @@ export default function Temas() {
         // não a apresentação do que chegou.
         <div className={`grid ${COLUNAS[densidade]}`}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bo-skeleton aspect-[4/3] rounded-2xl" aria-hidden />
+            <div key={i} className="bo-skeleton aspect-[4/3] rounded-tile" aria-hidden />
           ))}
           <p className="sr-only">A carregar temas…</p>
         </div>
@@ -2375,10 +2375,10 @@ export default function Temas() {
                    escuro a sombra quase não se vê, e é a regra: lá quem separa
                    é a luminosidade (`--bo-surface` sobre `--bo-chao`).
 
-                   O raio fica: `rounded-2xl` são os 20 px do degrau «painel»
-                   da escada concêntrica. O documento pede 12, o token de
-                   cartão da casa (`--radius-card`) diz 16, e nenhum dos dois
-                   é decisão a tomar aqui — fica dito no relatório.
+                   O raio é o `--radius-tile`, 12 px: era `rounded-2xl` (os 20
+                   do degrau «painel»), o documento pedia 12 e o cartão da casa
+                   diz 16. A escolha não era deste ficheiro — foi dela: «sim à
+                   sombra, cantos a 12». O token e a razão estão no `tema.css`.
 
                    `h-full`: a célula da grelha já estica à altura da fila
                    (`align-items: stretch`), mas o cartão dentro dela não a
@@ -2387,7 +2387,7 @@ export default function Temas() {
                    (critério 2 da Parte 8) só se cumpre se o cartão encher a
                    célula — medido a 1440, a primeira fila tinha fundos a 508,
                    523 e 525 px. */
-                className={`block h-full w-full overflow-hidden rounded-2xl bg-[var(--bo-surface)] text-left shadow-[var(--bo-sombra-repouso)] hover:shadow-[var(--bo-sombra-erguida)] ${ESTADO} ${PRESSAO}`}
+                className={`block h-full w-full overflow-hidden rounded-tile bg-[var(--bo-surface)] text-left shadow-[var(--bo-sombra-repouso)] hover:shadow-[var(--bo-sombra-erguida)] ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm

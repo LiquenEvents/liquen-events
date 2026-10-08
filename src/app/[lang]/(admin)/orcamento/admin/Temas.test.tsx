@@ -1333,6 +1333,20 @@ describe("Biblioteca de Temas — o cartão", () => {
   });
 
   /**
+   * «Raio 12 px» (Parte 3, `ThemeCard`), e a decisão dela: «sim à sombra,
+   * cantos a 12». O cartão tem UM raio, o do token — e o token tem os 12.
+   */
+  it("o cartão tem os cantos a 12, pelo token do mosaico", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9 }]));
+    renderTemas();
+    const botao = await acharCartaoDoTema(/Terracotta/);
+    const raios = botao.className.split(/\s+/).filter((c) => /^rounded(?:-|$)/.test(c));
+    expect(raios).toEqual(["rounded-tile"]);
+    const tema = readFileSync(join(process.cwd(), "src/app/tema.css"), "utf8");
+    expect(tema).toMatch(/--radius-tile:\s*12px;/);
+  });
+
+  /**
    * «headline/600, line-clamp 2, altura reservada» e «caption, --fg-tertiary,
    * tabular-nums» (Parte 3). Eram `text-[14px]` e o cinzento de apoio.
    */
