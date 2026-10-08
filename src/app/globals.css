@@ -4761,6 +4761,18 @@ body:has(.barra-consentimento) {
 .piso-flutuante {
   bottom: calc(1.25rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
 }
+/* O botão do WhatsApp, que vive no canto DIREITO. A partir de 640 px o aviso de
+   cookies é um cartão no canto esquerdo e não o tapa, portanto lá não sobe com
+   a reserva — fica a 1 rem do fundo («coloca o wats mais baixo»). Abaixo disso
+   o cartão ocupa a largura toda e a reserva volta a contar. */
+.piso-flutuante-direita {
+  bottom: calc(1rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+}
+@media (min-width: 640px) {
+  .piso-flutuante-direita {
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+}
 @media (min-width: 1024px) {
   .piso-flutuante-lg {
     bottom: calc(1.75rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));

@@ -238,9 +238,12 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
        * Passa a um cartão: no telemóvel com ar dos lados e cantos redondos;
        * a partir de 640 px com 22 rem, encostado ao canto de baixo à
        * esquerda — o direito é dos botões flutuantes (WhatsApp e o pedido de
-       * orçamento). O fundo é a noite da casa a 75 % com desfoque: lê-se o
-       * que está por trás, e o texto branco fica acima de 6:1 mesmo sobre uma
-       * página branca (75 % de #12160f sobre branco dá ~#4e504c).
+       * orçamento). O fundo é o verde da Líquen («coloca isto da cor da
+       * liquen, aquele verde») a 85 % com desfoque: lê-se o que está por
+       * trás. É o `sage-700` e não o `sage-500` da marca porque o texto é
+       * branco: 85 % de #39513f sobre uma página branca dá ~#576b5c, e o
+       * branco a 90 % fica perto de 5:1 por cima dele; o verde da marca no
+       * mesmo sítio não chegava aos 4,5.
        *
        * O desfoque que o bloco de cima tirou por custo volta, mas sobre uma
        * fracção da área: era uma superfície de largura total (1440 × 74);
@@ -248,7 +251,7 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
        * `--reserva-consentimento` em globals.css) foi medida outra vez para
        * esta forma.
        */
-      className="barra-consentimento fixed inset-x-3 z-[70] rounded-2xl border border-white/12 bg-noite/75 px-4 py-3.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-xl backdrop-saturate-150 sm:inset-x-auto sm:left-5 sm:w-[22rem]"
+      className="barra-consentimento fixed inset-x-3 z-[70] rounded-2xl border border-white/12 bg-sage-700/85 px-4 py-3.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-xl backdrop-saturate-150 sm:inset-x-auto sm:left-5 sm:w-[22rem]"
       style={{
         // Fora das rotas sociais nada muda: `bottom: 0` (da classe) e o
         // preenchimento a respeitar a zona segura do iPhone.
@@ -286,14 +289,14 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
           <button
             type="button"
             onClick={() => choose(false)}
-            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-noite"
+            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-sage-800"
           >
             {t.decline}
           </button>
           <button
             type="button"
             onClick={() => choose(true)}
-            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-noite"
+            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-sage-800"
           >
             {t.accept}
           </button>
