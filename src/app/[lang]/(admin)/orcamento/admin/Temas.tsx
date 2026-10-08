@@ -38,6 +38,7 @@ import {
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { capaDaFoto, comCapa, type CapaDoCartao } from "./capa-do-cartao";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { useSaidaDeUmSo } from "./ui/saida";
 import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
@@ -1378,20 +1379,16 @@ export default function Temas() {
   /** Mantém o cartão do tema a par do que a pasta diz. A pasta é a fonte de
    *  verdade: a contagem passa a ser a que o servidor devolveu (e `truncated`
    *  com ela), e um `imageCount` que estava a `null` fica finalmente conhecido.
-   *  `coverUrl` a `undefined` quer dizer "não se sabe" — o cartão fica como
-   *  está; a `null` quer dizer "a pasta está vazia". */
+   *  `capa` a `undefined` quer dizer "não se sabe" — o cartão fica como está;
+   *  a `null` quer dizer "a pasta está vazia". Os campos da capa mudam todos
+   *  juntos — ver `comCapa`. */
   const syncCard = useCallback((id: string, s: FolderState) => {
     setThemes((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              imageCount: s.total,
-              truncated: s.truncated,
-              coverUrl: s.coverUrl === undefined ? t.coverUrl : (s.coverUrl ?? undefined),
-            }
-          : t,
-      ),
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const contado = { ...t, imageCount: s.total, truncated: s.truncated };
+        return s.capa === undefined ? contado : comCapa(contado, capaDaFoto(s.capa));
+      }),
     );
   }, []);
 
@@ -1715,9 +1712,9 @@ export default function Temas() {
                   .sort((a, b) => a.name.localeCompare(b.name, "pt")),
               )
             }
-            onCover={(coverPath, coverUrl) =>
+            onCover={(coverPath, capa) =>
               setThemes((prev) =>
-                prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
+                prev.map((t) => (t.id === open.id ? { ...comCapa(t, capa), coverPath } : t)),
               )
             }
             onDelete={() => setAEliminar(open)}
@@ -2634,8 +2631,10 @@ export default function Temas() {
 interface FolderState {
   total: number | null;
   truncated: boolean;
-  /** `undefined` = não se sabe (deixar o cartão como está); `null` = pasta vazia. */
-  coverUrl?: string | null;
+  /** A fotografia da capa, inteira — e não só o endereço: o cartão precisa
+   *  dos quatro campos dela (ver `capa-do-cartao.ts`). `undefined` = não se
+   *  sabe (deixar o cartão como está); `null` = pasta vazia. */
+  capa?: ThemeImage | null;
 }
 
 /** Uma foto que não subiu, com o ficheiro guardado para se poder repetir. */
@@ -3051,7 +3050,9 @@ function ThemeFolder({
   onBack: () => void;
   onFolderState: (state: FolderState) => void;
   onRename: (name: string) => void;
-  onCover: (coverPath: string, coverUrl?: string) => void;
+  /** A capa mudou. Vai com os campos TODOS da fotografia nova — ver
+   *  `capa-do-cartao.ts`, e o defeito que ele fecha. */
+  onCover: (coverPath: string, capa: CapaDoCartao) => void;
   /** Chegaram `added` fotos ao tema `destId` — o cartão dele tem de somar.
    *  Um número NEGATIVO subtrai, que é o que o «Anular» de um arrasto pede. */
   onCopiedTo: (destId: string, added: number) => void;
@@ -3317,7 +3318,6 @@ function ThemeFolder({
    *  dentro do upload e da remoção punha o cartão a par de uma lista já
    *  ultrapassada — a contagem ficava a divergir da grelha. */
   const cover = coverPath ? images.find((i) => i.path === coverPath) : images[0];
-  const coverUrl = cover?.thumbUrl || cover?.url;
   useEffect(() => {
     if (loading || total === null) return;
     notify.current({
@@ -3326,9 +3326,9 @@ function ThemeFolder({
       // Uma capa escolhida que ainda não foi carregada (está numa página
       // adiante) não se sabe resolver: melhor não mexer no cartão do que
       // trocar-lhe a capa pela foto mais recente.
-      coverUrl: coverPath && !cover ? undefined : (coverUrl ?? null),
+      capa: coverPath && !cover ? undefined : (cover ?? null),
     });
-  }, [loading, total, truncated, coverPath, cover, coverUrl]);
+  }, [loading, total, truncated, coverPath, cover]);
 
   // Enquanto sobem fotos, fechar o separador perde o que falta. O browser
   // mostra o seu próprio aviso — é o único que ele deixa aparecer aqui.
@@ -4441,7 +4441,7 @@ function ThemeFolder({
       return;
     }
     setCoverPath(im.path);
-    onCover(im.path, im.thumbUrl || im.url);
+    onCover(im.path, capaDaFoto(im));
     clearSelection();
     // AQUI NÃO SE DIZ NADA, e é de propósito. A capa só muda depois de o
     // servidor confirmar, e o que ele confirmou aparece na própria foto que ela

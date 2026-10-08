@@ -3445,6 +3445,58 @@ describe("a pasta de um tema diz o que mudou", () => {
     expect(screen.queryByText("Tema renomeado.")).toBeNull();
   });
 
+  /**
+   * A capa nova no CARTÃO, e não só na pasta.
+   *
+   * O cartão desenha quatro endereços da mesma fotografia — a derivada, o AVIF
+   * que o `<picture>` oferece primeiro, o original de reserva e o borrão. A
+   * troca mudava só o primeiro: o AVIF ficava da capa antiga e, como o
+   * `<source>` ganha ao `<img>`, o cartão continuava a mostrá-la.
+   */
+  it("trocar a capa troca os quatro campos do cartão, não só o endereço", async () => {
+    const comLqip = (n: number): ThemeImage => ({
+      ...photo(n, true),
+      lqip: `data:image/webp;base64,LQIP${n}`,
+    });
+    route("GET /api/temas", () =>
+      ok([
+        {
+          ...THEME,
+          imageCount: 2,
+          coverUrl: "https://cdn.test/thumb-1.jpg",
+          coverAvif: "https://cdn.test/avif-1.avif",
+          coverFallbackUrl: "https://cdn.test/foto-1.jpg",
+          coverLqip: "data:image/webp;base64,LQIP1",
+        },
+      ]),
+    );
+    route("GET /api/temas/t1/imagens", () =>
+      ok({ ok: true, images: [comLqip(1), comLqip(2)], total: 2 }),
+    );
+    route("PATCH /api/temas/t1", () => ok({ ...THEME, coverPath: "t1/foto-2.jpg" }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 2 de 2" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Definir como capa" }));
+    });
+    // De volta à grelha dos cartões.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "← Temas" }));
+    });
+
+    const cartao = await acharCartaoDoTema(/Terracotta/);
+    const img = cartao.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("https://cdn.test/thumb-2.jpg");
+    // O AVIF da capa ANTIGA não pode continuar à frente da nova.
+    expect(cartao.querySelector('source[type="image/avif"]')).toBeNull();
+    expect(img.style.backgroundImage).toContain("LQIP2");
+    // E o plano B é o original da NOVA.
+    fireEvent.error(img);
+    expect(img.getAttribute("src")).toBe("https://cdn.test/foto-2.jpg");
+  });
+
   it("definir a capa NÃO diz nada — a etiqueta aparece na própria foto", async () => {
     route("GET /api/temas", () => ok([{ ...THEME, imageCount: 2 }]));
     route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 2, true), total: 2 }));
