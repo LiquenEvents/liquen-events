@@ -1631,9 +1631,13 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
-    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    // Logo a seguir — é o segundo clique do duplo clique.
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    const gerar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    // Os dois cliques no MESMO instante, como um duplo clique — com `fireEvent`,
+    // que é síncrono. Com `await user.click` + `findByRole` pelo meio, o CI
+    // lento deixava passar mais de 400 ms entre os dois, e aí o «Confirmar»
+    // aceitava, e bem: já não era um duplo clique.
+    fireEvent.click(gerar);
+    fireEvent.click(screen.getByRole("button", { name: /^Confirmar$/ }));
     expect(corpos("proposta-doc", "POST")).toHaveLength(0);
     // Depois de a ler, confirma.
     await confirmarEnvio(user);
