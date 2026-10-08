@@ -93,7 +93,10 @@ afterEach(() => {
 describe("confirmação de um pedido sem email", () => {
   it("diz-lhe que não vai receber a confirmação por escrito", () => {
     comPedido({ email: "", phone: "912345678" });
-    expect(screen.getByText(tc.semEmailNotaPlural)).toBeInTheDocument();
+    // No singular, como o email «Pedido recebido» — casais incluídos
+    // (achado n.º 27: a página era a única a falar no plural).
+    expect(screen.getByText(tc.semEmailNota)).toBeInTheDocument();
+    expect(screen.queryByText(tc.semEmailNotaPlural)).toBeNull();
   });
 
   it("e a lista de passos deixa de prometer uma proposta por email", () => {

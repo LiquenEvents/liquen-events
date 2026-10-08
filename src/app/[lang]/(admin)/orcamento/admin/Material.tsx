@@ -693,66 +693,90 @@ function Catalogo() {
           gravação em curso, o formulário de adicionar) aparecem por um gesto
           dela e não à chegada da vista, e partir o ecrã em pedaços só para
           haver mais degraus é o que faz uma vista ficar agitada. */}
-      <Toolbar style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena">
-        <input
-          className="bo-input max-w-xs"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Procurar material…"
-          aria-label="Procurar material"
-        />
-        <Escolha className="w-auto" valor={cat} aoMudar={setCat} aria-label="Filtrar por categoria">
-          {/* `<option>` sem `value`: o valor é o TEXTO, como no nativo. É a
-              regra que o `Escolha` copia de propósito, para migrações destas
-              não trocarem um valor por um rótulo em silêncio. */}
-          <option>Todas</option>
-          {MATERIAL_CATEGORIES.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </Escolha>
-        <Escolha
-          containerClassName="w-auto"
-          valor={kind}
-          aoMudar={(v) => setKind(v as "Todos" | MaterialKind)}
-          aria-label="Filtrar por tipo"
-        >
-          <option value="Todos">Todos</option>
-          <option value="reutilizavel">Reutilizável</option>
-          <option value="consumivel">Consumível</option>
-        </Escolha>
-        {emFalta.length > 0 && (
-          <Button
-            size="sm"
-            variant={soEmFalta ? "primary" : "ghost"}
-            onClick={() => setSoEmFalta((v) => !v)}
-          >
-            Abaixo do mínimo ({emFalta.length})
-          </Button>
-        )}
-        {/* ── `flex-wrap`, e a razão é medida ──────────────────────────────
-            "Exportar" + "Importar CSV" + "Adicionar" somam ~331 px com os
-            intervalos, e este era o único `flex` do ecrã sem quebra de linha
-            (o `Toolbar` à volta já quebra, e as Listas base e as Regras — que
-            partilham a página — não tinham o problema). A 320 px isso
-            empurrava o documento para 337: a página inteira passava a medir
-            mais do que o ecrã, e como o `body` tem `overflow-x: clip` o que
-            saía não ficava por arrastar, ficava CORTADO — o "Adicionar", que
-            é o botão que cria material.
-            Com `flex-wrap` os três passam à linha de baixo quando não cabem.
-            A 375 px nada muda: aí cabem. */}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="ghost" onClick={exportar}>
-            Exportar
-          </Button>
-          <Button size="sm" variant="ghost" onClick={pedirFicheiro}>
-            Importar CSV
-          </Button>
-          <Button size="sm" onClick={() => setAdding((v) => !v)}>
-            {PlusIcon}
-            Adicionar
-          </Button>
-        </div>
-      </Toolbar>
+      {/* ── A MESMA BARRA DAS OUTRAS VISTAS ───────────────────────────────
+          Achado n.º 23 da auditoria: a pesquisa daqui era um `bo-input` nu —
+          fina, sem lupa, mais baixa do que os seletores ao lado — e os botões
+          caíam soltos numa segunda linha. Passa a ser a do Inventário: o
+          `Toolbar` com `start` (procurar e filtrar) e `end` (agir). */}
+      <Toolbar
+        style={{ "--cena": 0 } as React.CSSProperties}
+        className="bo-cena"
+        start={
+          <>
+            <div className="relative w-full max-w-md sm:w-72">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+              </svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Procurar material…"
+                aria-label="Procurar material"
+                className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+              />
+            </div>
+            <Escolha
+              valor={cat}
+              aoMudar={setCat}
+              aria-label="Filtrar por categoria"
+              containerClassName="sm:w-44"
+              className="px-3 py-2.5 text-sm text-[var(--bo-tinta-72)]"
+            >
+              {/* `<option>` sem `value`: o valor é o TEXTO, como no nativo. É a
+                  regra que o `Escolha` copia de propósito, para migrações destas
+                  não trocarem um valor por um rótulo em silêncio. */}
+              <option>Todas</option>
+              {MATERIAL_CATEGORIES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Escolha>
+            <Escolha
+              valor={kind}
+              aoMudar={(v) => setKind(v as "Todos" | MaterialKind)}
+              aria-label="Filtrar por tipo"
+              containerClassName="sm:w-40"
+              className="px-3 py-2.5 text-sm text-[var(--bo-tinta-72)]"
+            >
+              <option value="Todos">Todos</option>
+              <option value="reutilizavel">Reutilizável</option>
+              <option value="consumivel">Consumível</option>
+            </Escolha>
+            {emFalta.length > 0 && (
+              <Button
+                size="sm"
+                variant={soEmFalta ? "primary" : "ghost"}
+                onClick={() => setSoEmFalta((v) => !v)}
+              >
+                Abaixo do mínimo ({emFalta.length})
+              </Button>
+            )}
+          </>
+        }
+        end={
+          <>
+            <Button size="sm" variant="ghost" onClick={exportar}>
+              Exportar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={pedirFicheiro}>
+              Importar CSV
+            </Button>
+            <Button size="sm" onClick={() => setAdding((v) => !v)}>
+              {PlusIcon}
+              Adicionar
+            </Button>
+          </>
+        }
+      />
 
       <input
         ref={fileRef}

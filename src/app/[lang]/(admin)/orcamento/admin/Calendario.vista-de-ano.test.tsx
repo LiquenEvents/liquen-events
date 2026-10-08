@@ -70,9 +70,15 @@ describe("chega-se à vista de ano a partir do ecrã", () => {
     await montar();
     expect(screen.getByRole("radio", { name: "Mês" })).toBeChecked();
     // A grelha do mês está montada…
-    expect(screen.getByRole("group", { name: "Calendário de Setembro 2026" })).toBeInTheDocument();
-    // …e as doze do ano não, que é o que faz esta ser a vista de abertura.
-    expect(screen.queryAllByRole("grid")).toHaveLength(0);
+    expect(screen.getByRole("grid", { name: "Calendário de Setembro 2026" })).toBeInTheDocument();
+    // …e as doze do ano não, que é o que faz esta ser a vista de abertura. (A
+    // do mês passou a ser também uma `grid` — achado n.º 24 —, por isso conta-se
+    // tudo o que NÃO é ela.)
+    expect(
+      screen
+        .queryAllByRole("grid")
+        .filter((g) => g.getAttribute("aria-label") !== "Calendário de Setembro 2026"),
+    ).toHaveLength(0);
   });
 
   it("«Ano» troca a grelha do mês pelos doze mini-meses", async () => {

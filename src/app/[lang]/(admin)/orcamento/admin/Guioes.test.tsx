@@ -265,6 +265,25 @@ describe("Timelines — a lista", () => {
     expect(screen.getByRole("button", { name: /Ana e Rui/ })).toBeTruthy();
   });
 
+  /** Achado n.º 21: sem eventos fechados, abria a dizer «Mudou o filtro, não os
+   *  dados» a quem não tinha mudado nada. */
+  it("sem nenhum evento fechado, diz isso e leva aos outros", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.startsWith("/api/guioes/modelos")
+          ? resposta({ modelos: [] })
+          : resposta({ guioes: [{ ...GUIOES[0], aceite: false }] }),
+      ),
+    );
+    montar();
+    expect(await screen.findByText("Ainda nenhum evento fechado")).toBeTruthy();
+    expect(screen.queryByText(/Mudou o filtro/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Ver todos os eventos" }));
+    expect(await screen.findByRole("button", { name: /Ana e Rui/ })).toBeTruthy();
+  });
+
   it("um filtro sem resultados diz que foi o filtro que mudou, não os dados", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     vi.stubGlobal(

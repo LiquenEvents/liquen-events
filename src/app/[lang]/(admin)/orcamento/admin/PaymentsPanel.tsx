@@ -690,7 +690,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 <path d="M4 12.5 9.5 18 20 6.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </p>
-            <p className={`${ROTULO} text-sage-600/60`}>Em falta</p>
+            <p className={`${ROTULO} text-[var(--bo-accent)]`}>Em falta</p>
           </div>
         ) : (
           <div

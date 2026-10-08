@@ -220,7 +220,7 @@ describe("o «Novo no calendário» devolve o foco a quem o abriu", () => {
       </ToastProvider>,
     );
     await screen.findByLabelText(/Remover Reunião: Prova de bolo/);
-    fireEvent.click(screen.getByRole("button", { name: /^10 de .*Enter para ver/ }));
+    fireEvent.click(screen.getByRole("gridcell", { name: /, 10 de .*Enter para ver/ }));
     const abridor = screen.getByRole("button", { name: "Adicionar" });
     abridor.focus();
     fireEvent.click(abridor);
@@ -276,7 +276,9 @@ describe("os dois menus «⋯» já devolviam o foco, e continuam a devolver", (
     render(
       <MenuDeAccoes
         sobre="Terracotta"
-        accoes={[{ id: "dup", rotulo: "Duplicar", onAccao: () => feito.push(document.activeElement) }]}
+        accoes={[
+          { id: "dup", rotulo: "Duplicar", onAccao: () => feito.push(document.activeElement) },
+        ]}
       />,
     );
     const abridor = screen.getByRole("button", { name: "Acções de Terracotta" });
@@ -291,7 +293,10 @@ describe("os dois menus «⋯» já devolviam o foco, e continuam a devolver", (
 
   it("`MenuDeAccoes`: e o Escape também", async () => {
     render(
-      <MenuDeAccoes sobre="Terracotta" accoes={[{ id: "dup", rotulo: "Duplicar", onAccao: () => {} }]} />,
+      <MenuDeAccoes
+        sobre="Terracotta"
+        accoes={[{ id: "dup", rotulo: "Duplicar", onAccao: () => {} }]}
+      />,
     );
     const abridor = screen.getByRole("button", { name: "Acções de Terracotta" });
     abridor.focus();
@@ -303,7 +308,11 @@ describe("os dois menus «⋯» já devolviam o foco, e continuam a devolver", (
 
   it("`MoreMenu`: escolher uma acção devolve o foco ao abridor", async () => {
     const feito: unknown[] = [];
-    render(<MoreMenu items={[{ label: "Imprimir", onClick: () => feito.push(document.activeElement) }]} />);
+    render(
+      <MoreMenu
+        items={[{ label: "Imprimir", onClick: () => feito.push(document.activeElement) }]}
+      />,
+    );
     const abridor = screen.getByRole("button", { name: "Mais" });
     abridor.focus();
     fireEvent.click(abridor);

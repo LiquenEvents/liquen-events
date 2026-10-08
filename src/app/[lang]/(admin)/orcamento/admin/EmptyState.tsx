@@ -53,7 +53,7 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
          */
         <button
           onClick={action.onClick}
-          className={`alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-full bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO}`}
+          className={`alvo-toque mt-3.5 sm:mt-5 px-4 py-2 rounded-full bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.15em] uppercase hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO}`}
         >
           {action.label}
         </button>

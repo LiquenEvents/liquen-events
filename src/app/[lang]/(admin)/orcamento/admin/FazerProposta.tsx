@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
@@ -59,8 +60,10 @@ const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
     classe: "bg-sage-600/10 text-sage-600 ring-1 ring-inset ring-sage-600/30",
   },
   em_revisao: { label: "Aguardar resposta", classe: "bg-sage-600/18 text-sage-600" },
-  cotado: { label: "Proposta enviada", classe: "bg-sage-600/25 text-sage-600" },
-  aceite: { label: "Ganho", classe: "bg-sage-600/35 text-sage-600" },
+  // A tinta do texto e não o verde: sobre o fundo verde mais carregado destas
+  // duas, o verde dava 3,4 e 3,9:1 (achado n.º 25).
+  cotado: { label: "Proposta enviada", classe: "bg-sage-600/25 text-[var(--bo-text)]" },
+  aceite: { label: "Ganho", classe: "bg-sage-600/35 text-[var(--bo-text)]" },
   rejeitado: { label: "Perdido", classe: "bg-[var(--bo-tinta-10)] text-foreground/30" },
 };
 
@@ -161,10 +164,7 @@ export default function FazerProposta({
   const procurados = useMemo(() => {
     const t = procuraAdiada.trim().toLowerCase();
     const bate = (q: Quote) =>
-      !t ||
-      [q.name, q.email, q.location, q.id, tipoDeEvento(q)]
-        .filter(Boolean)
-        .some((c) => String(c).toLowerCase().includes(t));
+      !t || casaComAProcura(t, [q.name, q.email, q.location, q.id, tipoDeEvento(q)]);
 
     return quotes
       .filter((q) => !q.archived && bate(q))
@@ -391,7 +391,7 @@ export default function FazerProposta({
               aria-pressed={filtro === f.id}
               className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] ${MOV_ESTADO} ${PRESSAO} ${
                 filtro === f.id
-                  ? "bg-[var(--bo-seleccao)] text-white "
+                  ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] "
                   : /* `hover:bg-…-6` era o MESMO token do fundo em repouso: a
                        pastilha não escolhida não mudava de fundo ao passar o
                        rato. Sobe um degrau na escada de tinta da casa (3/6/10). */
@@ -467,7 +467,7 @@ export default function FazerProposta({
                           className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] uppercase ring-1 ring-inset ${
                             choque === "grave"
                               ? "bg-[var(--bo-perigo)]/15 text-[var(--bo-perigo)] ring-[var(--bo-perigo)]/45"
-                              : "bg-[var(--bo-aviso-tom)]/18 text-[var(--bo-aviso)] ring-[var(--bo-aviso-tom)]/45"
+                              : "bg-[var(--bo-aviso-tom)]/12 text-[var(--bo-aviso)] ring-[var(--bo-aviso-tom)]/45"
                           }`}
                         >
                           Data ocupada

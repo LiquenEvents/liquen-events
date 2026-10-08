@@ -6,10 +6,8 @@ import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import { ASPETO_POR_OMISSAO, type LayoutDeMoodboard } from "@/lib/proposal-geometria";
 import { layoutDoBoard as layoutEfectivo, ordemDasFotos } from "@/lib/proposal-moodboard";
 import PreviaDaPagina from "./PreviaDaPagina";
-import { CORTES } from "./ui/adaptativo";
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
-import { useMedida } from "./useMedida";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

@@ -55,7 +55,7 @@ async function criarPedido(page: Page, nome: string): Promise<string> {
         category: "particulares",
         eventType: "casamentos",
         eventName: "Casamento",
-        date: "2027-06-10",
+        date: "2099-06-10",
         guests: 120,
         location: "Herdade da Maridona, Glória",
       },

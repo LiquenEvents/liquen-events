@@ -10,6 +10,7 @@ import {
   type StoredProposalDraft,
 } from "@/lib/proposal-drafts";
 import { log } from "@/lib/logger";
+import { juntarRascunhos } from "@/lib/rascunho-juntar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,7 +154,44 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const chave = idDoRascunho(request, id);
     const current = await getProposalDraft(chave);
     const base = typeof body.baseUpdatedAt === "string" ? body.baseUpdatedAt : null;
-    const overwrote = Boolean(current && base && current.updatedAt !== base);
+    const alguemGravouEntretanto = Boolean(current && base && current.updatedAt !== base);
+
+    /**
+     * ── JUNTAR CAMPO A CAMPO, QUANDO SE SABE O QUE CADA UM MUDOU ──────────
+     *
+     * Achado n.º 6 da auditoria — ver `rascunho-juntar.ts`. Quem grava manda
+     * os `campos` que mudou desde a última conversa com o servidor e o valor
+     * que eles tinham (`base`). Com isso, o que a outra pessoa mudou noutros
+     * campos fica, e só o campo em que as duas mexeram é escrito por cima.
+     *
+     * Um cliente que não mande `campos` (um separador aberto antes desta
+     * versão) continua a ter o comportamento antigo: a última escrita inteira.
+     */
+    const ehDoc = (v: unknown): v is Record<string, unknown> =>
+      !!v && typeof v === "object" && !Array.isArray(v);
+    const campos =
+      Array.isArray(body.campos) && body.campos.every((c: unknown) => typeof c === "string")
+        ? (body.campos as string[])
+        : null;
+    let docAGravar: unknown = body.doc;
+    let juntou = false;
+    let conflitos: string[] = [];
+    if (
+      alguemGravouEntretanto &&
+      campos &&
+      ehDoc(body.base) &&
+      ehDoc(current?.doc) &&
+      ehDoc(body.doc)
+    ) {
+      const j = juntarRascunhos(current.doc, body.doc, campos, body.base);
+      docAGravar = j.doc;
+      juntou = true;
+      conflitos = j.conflitos;
+    }
+    // «Escrevi por cima do trabalho de alguém» só quando é verdade: sem
+    // junção, sempre que alguém gravou entretanto; com junção, só se as duas
+    // pessoas mexeram no mesmo campo.
+    const overwrote = alguemGravouEntretanto && (!juntou || conflitos.length > 0);
 
     /**
      * ══════════════════════════════════════════════════════════════════════
@@ -204,7 +242,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { draft: saved, persistencia } = await saveProposalDraft(
       chave,
-      body.doc,
+      docAGravar,
       whoIsSaving(request),
     );
     if (!persistencia.gravado) {
@@ -248,8 +286,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       ...(persistencia.duradouro ? {} : { onde: persistencia.onde, aviso: avisoDeSitioEfemero() }),
       updatedAt: saved.updatedAt,
       overwrote,
-      ...(overwrote && current?.savedBy ? { previousBy: current.savedBy } : {}),
+      ...(alguemGravouEntretanto && current?.savedBy ? { previousBy: current.savedBy } : {}),
       ...(resgate ? { resgate, resgateEm: current?.updatedAt } : {}),
+      // O documento como ficou, para o estúdio pôr no ecrã o que veio da outra
+      // pessoa — sem isto ela continuava a ver a sua versão como a gravada.
+      ...(juntou ? { juntou: true as const, doc: docAGravar, conflitos } : {}),
     } satisfies {
       ok: true;
       guardado: true;
@@ -261,6 +302,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       previousBy?: string;
       resgate?: string;
       resgateEm?: string;
+      juntou?: true;
+      doc?: unknown;
+      conflitos?: string[];
     });
   } catch (err) {
     log.error("proposta-rascunho PUT falhou", err, { id });

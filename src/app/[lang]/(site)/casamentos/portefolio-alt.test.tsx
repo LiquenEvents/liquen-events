@@ -43,7 +43,8 @@ vi.mock("next/image", () => ({
       blurDataURL: _blurDataURL,
       ...rest
     } = props;
-    // eslint-disable-next-line @next/next/no-img-element
+    // O `alt` vem nas props — é ele que este teste verifica.
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...rest} />;
   },
 }));

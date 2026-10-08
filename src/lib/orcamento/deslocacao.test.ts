@@ -424,3 +424,20 @@ describe("o que já estava calculado fica como estava", () => {
     expect(depois.valor).toBe(antes.valor);
   });
 });
+
+/** Achado n.º 22: a fórmula dava 71,40 € e o ecrã dizia 71,00 €, sem dizer porquê. */
+describe("sugerirDeslocacao — o arredondamento diz-se", () => {
+  it("quando o euro redondo não é a conta, a fórmula di-lo", () => {
+    const s = sugerirDeslocacao("Palmela", {}, { km: 105 })!;
+    if (Math.abs(s.kmCobrados * s.custoKm.total - s.valor) >= 0.005) {
+      expect(s.formula).toMatch(/arredondado ao euro/);
+    } else {
+      expect(s.formula).not.toMatch(/arredondado/);
+    }
+  });
+
+  it("quando a conta já dá um euro redondo, não acrescenta nada", () => {
+    const s = sugerirDeslocacao("Palmela", {}, { km: 0 })!;
+    expect(s.formula).not.toMatch(/arredondado/);
+  });
+});

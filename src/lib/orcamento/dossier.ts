@@ -1,7 +1,7 @@
 /**
  * Dossier do Evento — modelo de domínio *puro* e *client-safe*.
  *
- * De propósito NÃO importa `server-only`, nenhum `*-store.ts` nem `portal-token`:
+ * De propósito NÃO importa `server-only` nem nenhum `*-store.ts`:
  * é partilhado pela página servidor (que agrega os dados) e pelos componentes de
  * cliente (cabeçalho, métricas, stepper), tal como `money.ts`. Toda a matemática
  * do cockpit vive aqui — uma fonte única, testável sem montar React nem tocar na
@@ -407,7 +407,6 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
  */
 export type NextActionKind =
   | "proposta"
-  | "portal"
   | "sinal"
   | "saldo"
   | "producao"
@@ -445,10 +444,14 @@ export function nextAction(stage: EventStage, d: DossierData): NextAction {
         kind: "proposta",
       };
     case "proposta_enviada":
+      // Mandava «Abrir portal do cliente». O portal saiu (achado n.º 37,
+      // decisão dela); quando o casal aceita, o pedido muda sozinho. O que
+      // fica a fazer é acompanhar — e reenviar, se for preciso, é na zona da
+      // comunicação, como a proposta.
       return {
-        label: "Abrir portal do cliente",
-        hint: "Proposta enviada — a aguardar aceitação. Acompanha pelo portal.",
-        kind: "portal",
+        label: "Acompanhar a proposta",
+        hint: "Proposta enviada — a aguardar a resposta do casal. Quando aceitar, o pedido muda sozinho.",
+        kind: "proposta",
       };
     case "aceite":
       // Já não manda «Emitir fatura de sinal»: a factura é emitida noutro

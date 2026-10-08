@@ -157,7 +157,7 @@ function FloatingField({
  *  do componente) para que `EscolhaUnica`, aqui abaixo, use exactamente a mesma
  *  — duas legendas parecidas mas diferentes notam-se logo. */
 const labelCls =
-  "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
+  "block text-[10.5px] font-medium text-foreground/70 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
 
 /**
  * Grupo de escolha ÚNICA e OPCIONAL, em pastilhas — o mesmo desenho das outras
@@ -199,7 +199,7 @@ function EscolhaUnica({
       <legend id={legendId} className={labelCls}>
         {legend}
       </legend>
-      {hint && <p className="mt-2 mb-4 text-[12px] leading-relaxed text-foreground/50">{hint}</p>}
+      {hint && <p className="mt-2 mb-4 text-[12px] leading-relaxed text-foreground/70">{hint}</p>}
       <div
         role="group"
         aria-labelledby={legendId}
@@ -219,7 +219,7 @@ function EscolhaUnica({
               className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                 active
                   ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
-                  : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+                  : "border-foreground/12 text-foreground/70 hover:border-moss/40 hover:text-foreground/85"
               }`}
             >
               {english ? o.en : o.label}
@@ -1011,7 +1011,7 @@ export default function OrcamentoForm({
                       className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                         active
                           ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
-                          : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+                          : "border-foreground/12 text-foreground/70 hover:border-moss/40 hover:text-foreground/85"
                       }`}
                     >
                       {to.eventTypeLabels[i] ?? o.label}
@@ -1055,7 +1055,7 @@ export default function OrcamentoForm({
                 <legend id="of-decor-legend" className={labelCls}>
                   {to.labelDecor}
                 </legend>
-                <p className="mt-2 mb-4 text-[12px] leading-relaxed text-foreground/50">
+                <p className="mt-2 mb-4 text-[12px] leading-relaxed text-foreground/70">
                   {to.hintDecor}
                 </p>
                 <div
@@ -1077,7 +1077,7 @@ export default function OrcamentoForm({
                         className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                           active
                             ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
-                            : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+                            : "border-foreground/12 text-foreground/70 hover:border-moss/40 hover:text-foreground/85"
                         }`}
                       >
                         {locale.startsWith("en") ? p.en : p.pt}
@@ -1175,7 +1175,7 @@ export default function OrcamentoForm({
                     formulário cuja força é ser curto. */}
                 {guestsFlexible && (
                   <div className="mt-2">
-                    <p className="mb-2 text-[11px] leading-relaxed text-foreground/50">
+                    <p className="mb-2 text-[11px] leading-relaxed text-foreground/70">
                       {to.hintPessoasAprox}
                     </p>
                     <div
@@ -1200,7 +1200,7 @@ export default function OrcamentoForm({
                             className={`px-3 py-1.5 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.1em] uppercase border transition-[background-color,border-color,color] duration-200 ${
                               active
                                 ? "bg-moss border-moss text-white"
-                                : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+                                : "border-foreground/12 text-foreground/70 hover:border-moss/40 hover:text-foreground/85"
                             }`}
                           >
                             {locale.startsWith("en") ? r.en : r.label}
@@ -1321,7 +1321,7 @@ export default function OrcamentoForm({
                 coisa que se pergunta depois numa frase. */}
             {ehCasamento && nome.trim().length > 0 && (
               <div>
-                <p className="mb-3 text-[11px] tracking-[0.14em] uppercase text-foreground/55">
+                <p className="mb-3 text-[11px] tracking-[0.14em] uppercase text-foreground/70">
                   {to.labelNoivos}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
@@ -1363,7 +1363,7 @@ export default function OrcamentoForm({
                     />
                   </FloatingField>
                 </div>
-                <p className="mt-2 text-[11px] text-foreground/55">{to.hintNoivos}</p>
+                <p className="mt-2 text-[11px] text-foreground/70">{to.hintNoivos}</p>
               </div>
             )}
 

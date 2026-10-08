@@ -5,10 +5,11 @@ import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { MenuDeAccoes, TabelaOuCartoes, type AccaoDeItem } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { Button, Card, EmptyState, PerguntaDestrutiva, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { useCachedList } from "./useCachedList";
-import { corDeTexto, metaFor } from "./status-meta";
+import { metaFor, tintaDoRotulo } from "./status-meta";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import {
   lugaresNoCliente,
@@ -22,6 +23,17 @@ const eur = (n: number) =>
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 0,
+  }).format(n || 0);
+/** O valor de UMA proposta, com cêntimos — achado n.º 11: a coluna dizia
+ *  «5473 €» de uma proposta de 5.473,40 €. Os totais dos cartões de cima
+ *  continuam arredondados (são uma ordem de grandeza, não um número a
+ *  conferir). */
+const eurCentimos = (n: number) =>
+  new Intl.NumberFormat("pt-PT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n || 0);
 
 const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
@@ -138,7 +150,7 @@ function EstadoChip({ p }: { p: Proposal }) {
   return (
     <span
       className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
-      style={{ background: `${meta.color}1f`, color: corDeTexto(meta.color) }}
+      style={{ background: `${meta.color}1f`, color: tintaDoRotulo(meta.color) }}
     >
       {meta.label}
     </span>
@@ -431,6 +443,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       if (p.status === "enviada") pending += 1;
       if (p.status === "rascunho") porEnviar += 1;
     }
+    const porEnviarLista = unique.filter((p) => p.status === "rascunho");
     // O denominador são as propostas OFERECIDAS. Uma que nunca saiu de casa não
     // pode ser aceite nem recusada — contá-la baixava a taxa de aceitação por
     // uma falha do servidor de correio, que não é uma resposta de ninguém.
@@ -438,9 +451,20 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
     const acceptRate = oferecidas ? Math.round((won / oferecidas) * 100) : 0;
     // Quantos PEDIDOS distintos têm proposta. É o denominador de tudo o que
     // está aqui em cima, e passou a estar no ecrã — ver a nota dos KPIs.
-    return { totalSent, totalWon, acceptRate, pending, porEnviar, pedidos: unique.length };
+    return {
+      totalSent,
+      totalWon,
+      acceptRate,
+      pending,
+      porEnviar,
+      porEnviarLista,
+      pedidos: unique.length,
+    };
   }, [proposals]);
-  const { totalSent, totalWon, acceptRate, pending, porEnviar, pedidos } = stats;
+  const { totalSent, totalWon, acceptRate, pending, porEnviar, porEnviarLista, pedidos } = stats;
+  /** O pedido de uma proposta, se este ecrã souber abri-lo. */
+  const pedidoDa = (p: Proposal) => (onOpenQuote ? quotesById.get(p.quoteId) : undefined);
+  const soUmPorEnviar = porEnviarLista.length === 1 ? pedidoDa(porEnviarLista[0]) : undefined;
 
   const filterOptions: SegmentedOption<ProposalStatus | "all">[] = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -660,7 +684,25 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
               {porEnviar !== 1 ? "s" : ""} mas por enviar
             </strong>{" "}
             — o email não saiu e o cliente não recebeu nada. Abre o pedido e envia outra vez: é a
-            mesma proposta, não se cria outra.
+            mesma proposta, não se cria outra.{" "}
+            {/* Achado n.º 11: o aviso mandava abrir o pedido e não levava lá. */}
+            {soUmPorEnviar ? (
+              <button
+                type="button"
+                onClick={() => handleOpenQuote(soUmPorEnviar)}
+                className={`alvo-toque font-semibold underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+              >
+                Abrir o pedido
+              </button>
+            ) : porEnviar > 1 ? (
+              <button
+                type="button"
+                onClick={() => setFilter("rascunho")}
+                className={`alvo-toque font-semibold underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+              >
+                Ver as {porEnviar}
+              </button>
+            ) : null}
           </p>
         </div>
       )}
@@ -761,6 +803,16 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
               chaveDe={(p) => p.id}
               legenda="Propostas"
               ordemInicial={{ chave: "cliente", ascendente: true }}
+              // Achado n.º 11: clicar numa linha não fazia nada. Abre o pedido —
+              // é de lá que se revê, reenvia ou acompanha a proposta.
+              aoAbrir={
+                onOpenQuote
+                  ? (p) => {
+                      const pedido = quotesById.get(p.quoteId);
+                      if (pedido) handleOpenQuote(pedido);
+                    }
+                  : undefined
+              }
               colunas={[
                 {
                   chave: "cliente",
@@ -808,52 +860,81 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 },
                 {
                   chave: "valor",
-                  cabecalho: "Valor",
+                  // Com IVA — é o que o casal paga. Os Pedidos mostram o mesmo
+                  // pedido sem IVA, e diz-se dos dois lados (achado n.º 29).
+                  cabecalho: "Valor c/ IVA",
                   alinharADireita: true,
                   ordenar: (a, b) => a.total - b.total,
                   celula: (p) => (
                     <span className="font-semibold tabular-nums text-[var(--bo-text)]">
-                      {eur(p.total)}
+                      {eurCentimos(p.total)}
                     </span>
                   ),
                 },
                 {
                   chave: "accoes",
+                  interactiva: true,
                   cabecalho: "",
                   largura: "w-12",
                   alinharADireita: true,
+                  // O menu vive DENTRO da linha clicável: sem isto, escolher
+                  // «Apagar» também abria o pedido por baixo.
                   celula: (p) => (
-                    <MenuDeAccoes
-                      sobre={p.clientName}
-                      accoes={accoesDa(p)}
-                      soltasNoEcraGrande={0}
-                    />
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <MenuDeAccoes
+                        sobre={p.clientName}
+                        accoes={accoesDa(p)}
+                        soltasNoEcraGrande={0}
+                      />
+                    </span>
                   ),
                 },
               ]}
-              cartao={(p) => (
+              // O cartão traz o seu botão (ver em baixo): um `<button>` à volta
+              // dele inteiro punha o menu das acções dentro de outro botão.
+              semMoldura
+              cartao={(p) => {
                 // O cartão mostra QUATRO coisas — cliente, estado, validade e
                 // valor. A tabela mostra seis; aqui as outras duas custavam a
                 // legibilidade das que decidem.
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--bo-text)]">
+                const pedido = pedidoDa(p);
+                const resumo = (
+                  <>
+                    <span className="block text-sm font-medium text-[var(--bo-text)]">
                       <span className="truncate align-middle">{p.clientName}</span>
                       {lugares.get(p.id) && <LugarDoCliente lugar={lugares.get(p.id)!} />}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
                       <EstadoChip p={p} />
                       <ValidadeChip p={p} />
+                    </span>
+                  </>
+                );
+                return (
+                  <div className="flex items-start gap-3 p-3.5">
+                    {pedido ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenQuote(pedido)}
+                        className={`alvo-toque min-w-0 flex-1 text-left ${ESTADO} ${PRESSAO}`}
+                      >
+                        {resumo}
+                      </button>
+                    ) : (
+                      <div className="min-w-0 flex-1">{resumo}</div>
+                    )}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="text-sm font-semibold tabular-nums text-[var(--bo-text)]">
+                        {eurCentimos(p.total)}
+                        <span className="ml-1 text-[11px] font-normal text-[var(--bo-text-muted)]">
+                          c/ IVA
+                        </span>
+                      </span>
+                      <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="text-sm font-semibold tabular-nums text-[var(--bo-text)]">
-                      {eur(p.total)}
-                    </span>
-                    <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />
-                  </div>
-                </div>
-              )}
+                );
+              }}
             />
           </div>
         )}

@@ -634,7 +634,7 @@ test.describe("D5 · as colunas escondidas da tabela de Pedidos", () => {
           category: "particulares",
           eventType: "casamentos",
           eventName: "Casamento",
-          date: "2028-09-15",
+          date: "2099-09-15",
           guests: 200,
           location: "Quinta do Vale das Amoreiras Velhas, Estrada Nacional 118, km 42, Loures",
         },

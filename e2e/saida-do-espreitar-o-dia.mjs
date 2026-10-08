@@ -162,7 +162,7 @@ window.sairFlip = () => new Promise((r) => {
     s.style.transition = "none";
     s.style.transform = "translateY(" + alturaEnv + "px)";
   });
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
   requestAnimationFrame(() => requestAnimationFrame(() => {
     seguintes.forEach((s) => {
       s.style.transition = "transform " + DUR + "ms " + CURVA;
@@ -185,13 +185,13 @@ window.sairFlip = () => new Promise((r) => {
 window.encurtar = (n) => {
   const r = document.getElementById("resto");
   while (r.children.length > n) r.lastElementChild.remove();
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
 };
 
 // D · o controlo: tirar o painel e deixar a página fechar o espaço.
 window.sairSeco = () => new Promise((r) => {
   env().remove();
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
   setTimeout(r, DUR + 60);
 });
 </script></body></html>`;
@@ -283,14 +283,14 @@ await pagina.setContent(PAGINA);
 const sticky = await pagina.evaluate(() => {
   const topo = document.getElementById("topo");
   window.scrollTo(0, 400);
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
   const colado = topo.getBoundingClientRect().top;
   // A forma real: o que se translada é um invólucro com o cabeçalho lá dentro.
   const inv = document.createElement("div");
   document.body.insertBefore(inv, document.body.firstChild);
   while (document.body.children.length > 1) inv.appendChild(document.body.children[1]);
   inv.style.transform = "translateY(24px)";
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
   const comTransform = topo.getBoundingClientRect().top;
   return { colado, comTransform };
 });
@@ -309,7 +309,7 @@ const salto = await pagina2.evaluate(() => {
   // painel do dia é uma fatia grande do que a página tem para rolar.
   window.encurtar(14);
   window.scrollTo(0, document.documentElement.scrollHeight);
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
   const antesScroll = window.scrollY;
   // A testemunha é a GRELHA DO MÊS: está por CIMA do painel, está no ecrã, e é
   // para ela que a pessoa está a olhar quando fecha o dia.
@@ -321,7 +321,7 @@ const salto = await pagina2.evaluate(() => {
   // O primeiro gesto do FLIP, e só ele: o painel sai de fluxo.
   env.style.height = "0px";
   painel.style.position = "absolute";
-  document.body.offsetHeight;
+  document.body.getBoundingClientRect(); // força a disposição
   return {
     alturaPainel: +h.toFixed(0),
     scrollAntes: antesScroll,

@@ -217,7 +217,7 @@ describe("⌘N — criar no dia em que se está", () => {
 describe("o botão direito", () => {
   it("num dia da grelha do mês abre as quatro acções do dia", async () => {
     await montar();
-    fireEvent.contextMenu(screen.getByLabelText(/^12 de Setembro de 2026 — /));
+    fireEvent.contextMenu(screen.getByLabelText(/, 12 de Setembro de 2026 — /));
 
     const menu = await screen.findByRole("menu");
     expect(within(menu).getByRole("menuitem", { name: "Novo evento" })).toBeInTheDocument();
@@ -228,7 +228,7 @@ describe("o botão direito", () => {
 
   it("«Fechar este dia…» abre a caixa JÁ com «Data fechada» escolhida", async () => {
     await montar();
-    fireEvent.contextMenu(screen.getByLabelText(/^12 de Setembro de 2026 — /));
+    fireEvent.contextMenu(screen.getByLabelText(/, 12 de Setembro de 2026 — /));
     const menu = await screen.findByRole("menu");
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Fechar este dia…" }));
 
@@ -243,7 +243,7 @@ describe("o botão direito", () => {
 
   it("«Ver na vista de dia» leva mesmo a esse dia", async () => {
     await montar();
-    fireEvent.contextMenu(screen.getByLabelText(/^12 de Setembro de 2026 — /));
+    fireEvent.contextMenu(screen.getByLabelText(/, 12 de Setembro de 2026 — /));
     const menu = await screen.findByRole("menu");
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Ver na vista de dia" }));
 

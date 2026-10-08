@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useFocusTrap } from "./useFocusTrap";
@@ -183,15 +184,11 @@ export default function CommandPalette({
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const navMatches = navCommands.filter((c) => !q || c.label.toLowerCase().includes(q));
+    const navMatches = navCommands.filter((c) => !q || casaComAProcura(q, [c.label]));
 
     const quoteMatches: Command[] = q
       ? quotes
-          .filter((quote) =>
-            [quote.name, quote.email, quote.id, quote.phone]
-              .filter(Boolean)
-              .some((v) => String(v).toLowerCase().includes(q)),
-          )
+          .filter((quote) => casaComAProcura(q, [quote.name, quote.email, quote.id, quote.phone]))
           .slice(0, 6)
           .map((quote) => ({
             id: `quote-${quote.id}`,

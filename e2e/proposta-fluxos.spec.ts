@@ -44,7 +44,7 @@ async function criarPedido(page: Page, nome: string): Promise<string> {
         category: "particulares",
         eventType: "casamentos",
         eventName: "Casamento",
-        date: "2027-06-10",
+        date: "2099-06-10",
         guests: 120,
         location: "Herdade da Maridona, Glória",
       },
@@ -245,7 +245,7 @@ test.describe("Fazer uma proposta @propostas", () => {
     // Esta é a única forma de esta funcionalidade fazer mal em vez de bem:
     // uma proposta enviada com o nome ou a data de outro casamento.
     await expect(page.getByLabel(/^Clientes$/)).toHaveValue(nome);
-    await expect(page.getByLabel(/^Data$/)).toHaveValue("10 de junho de 2027");
+    await expect(page.getByLabel(/^Data$/)).toHaveValue("10 de junho de 2099");
     await expect(page.getByLabel(/^Local$/)).toHaveValue("Herdade da Maridona, Glória");
     await expect(page.getByLabel(/^Convidados$/)).toHaveValue("120 pax");
     // A cerimónia era do dia de outra pessoa e o pedido não a traz.

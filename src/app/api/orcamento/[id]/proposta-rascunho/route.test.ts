@@ -297,6 +297,57 @@ describe("PUT /api/orcamento/[id]/proposta-rascunho", () => {
     expect(st.save).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * Achado n.º 6 da auditoria: duas pessoas, campos diferentes. A Ana mudou o
+   * «Local» e gravou; a Catarina, a partir da versão antiga, muda a «Hora». O
+   * «Local» da Ana desaparecia do rascunho principal.
+   */
+  it("junta campo a campo quando quem grava diz o que mudou", async () => {
+    st.stored = {
+      doc: { location: "Évora", time: "16h" },
+      updatedAt: "2026-07-28T22:30:00.000Z",
+      savedBy: "Ana",
+    };
+    const res = await PUT(
+      ...req("PUT", {
+        doc: { location: "Sintra", time: "17h" },
+        baseUpdatedAt: "2026-07-28T22:00:00.000Z",
+        campos: ["time"],
+        base: { time: "16h" },
+      }),
+    );
+    const body = await res.json();
+    expect(st.save).toHaveBeenCalledWith("q-1", { location: "Évora", time: "17h" }, undefined);
+    expect(body.juntou).toBe(true);
+    expect(body.doc).toEqual({ location: "Évora", time: "17h" });
+    // Ninguém foi pisado: não há aviso de sobreposição nem gaveta — mas o nome
+    // de quem mexeu vem, para o estúdio o poder dizer.
+    expect(body.overwrote).toBe(false);
+    expect(body.resgate).toBeUndefined();
+    expect(body.previousBy).toBe("Ana");
+  });
+
+  it("o mesmo campo pelas duas: fica o último, e a outra versão vai para a gaveta", async () => {
+    st.stored = {
+      doc: { location: "Évora", time: "16h" },
+      updatedAt: "2026-07-28T22:30:00.000Z",
+    };
+    const res = await PUT(
+      ...req("PUT", {
+        doc: { location: "Porto", time: "16h" },
+        baseUpdatedAt: "2026-07-28T22:00:00.000Z",
+        campos: ["location"],
+        base: { location: "Sintra" },
+      }),
+    );
+    const body = await res.json();
+    expect(body.juntou).toBe(true);
+    expect(body.conflitos).toEqual(["location"]);
+    expect(body.overwrote).toBe(true);
+    expect(body.resgate).toBe("q-1--sobreposto");
+    expect(st.save).toHaveBeenCalledWith("q-1", { location: "Porto", time: "16h" }, undefined);
+  });
+
   it("não avisa quando ninguém mexeu no meio", async () => {
     st.stored = { doc: { ref: "a" }, updatedAt: "2026-07-28T22:30:00.000Z" };
     const res = await PUT(

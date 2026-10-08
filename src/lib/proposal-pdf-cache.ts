@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";

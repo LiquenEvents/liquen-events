@@ -11,11 +11,10 @@ import {
   MODELOS_A_PEDIDO,
   textoDoCorpo,
 } from "@/lib/email-modelos";
-import { arrumarLigacao, ROTULO_DO_PORTAL } from "@/lib/email-ligacoes";
+import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import { eurDocumento } from "@/lib/money";
-import { createPortalToken } from "@/lib/portal-token";
-import { portalPath } from "@/lib/portal-link";
-import { SITE } from "@/lib/site";
+import { listProposalsForQuote } from "@/lib/proposals-store";
+import { enderecoDaProposta } from "@/lib/proposta-link-curto";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
@@ -98,16 +97,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: erro }, { status: 400 });
     }
 
-    // O `{link}` destes emails é o PORTAL do cliente — o sítio onde ele vê a
-    // proposta, o contrato e os pagamentos. Não é o link de aceitação de uma
-    // proposta: esse pertence ao email que a leva.
-    const portalUrl = `${SITE.url}${portalPath(createPortalToken(quote.id))}`;
+    // O `{link}` destes emails apontava ao PORTAL do cliente, que deixou de
+    // existir — achado n.º 37 da auditoria, e decisão dela: «não há portal do
+    // cliente e se há não quero que haja». Os modelos da casa não o usam; um
+    // modelo dela que o use leva a página da proposta mais recente. Sem
+    // proposta, o `{link}` fica vazio e o modelo é recusado com a razão — não
+    // sai um email com uma ligação para lado nenhum.
+    const ultima = (await listProposalsForQuote(quote.id))[0];
+    const linkDaProposta = ultima ? await enderecoDaProposta(ultima.id, quote.id) : "";
     const sinal = sinalPago(quote.payments);
 
     const preparado = await modeloParaEnvioAPedido(
       chave,
       marcadoresDoPedido(quote, {
-        link: portalUrl,
+        link: linkDaProposta,
         // Vazio quando ainda não entrou sinal nenhum — e é esse vazio que faz
         // o modelo do sinal ser RECUSADO em vez de dizer «recebemos ».
         valor: sinal > 0 ? eurDocumento(sinal) : "",
@@ -146,13 +149,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     /**
-     * O link do portal também leva um token, e também não se escreve por
-     * extenso ao cliente — ver `email-ligacoes.ts`. O texto simples deriva do
+     * O link da proposta leva um código, e não se escreve por extenso ao
+     * cliente — ver `email-ligacoes.ts`. O texto simples deriva do
      * HTML já arrumado, para as duas versões dizerem o mesmo.
      *
      * Quem assina é quem carregou no botão. Ver `email-assinatura.ts`.
      */
-    const corpo = arrumarLigacao(preparado.html, { url: portalUrl, rotulo: ROTULO_DO_PORTAL });
+    const corpo = arrumarLigacao(preparado.html, {
+      url: linkDaProposta,
+      rotulo: ROTULO_DA_PROPOSTA,
+    });
     const email = emailAoCliente({
       html: corpo,
       texto: textoDoCorpo(corpo),

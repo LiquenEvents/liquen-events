@@ -29,6 +29,7 @@ import {
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
+  soMudaramOsIds,
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -58,6 +59,7 @@ import {
   eventTypeName,
 } from "@/lib/orcamento/data";
 import { log } from "@/lib/logger";
+import { camposMudados, mesmoValor } from "@/lib/rascunho-juntar";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
 import { pedirVezDeImagemPesada } from "./fila-de-imagens";
@@ -102,8 +104,8 @@ import {
   corrigirGralha,
   corrigirTudo,
   gralhasDoDocumento,
-  lerCampo,
   seccaoDoCampo,
+  tirarSimbolos,
   type CampoDeTexto,
   type CampoPublicado,
 } from "@/lib/proposal-ortografia";
@@ -177,8 +179,9 @@ import {
   dinheiroDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur, eurDocumento, montanteNaLingua, round2 } from "@/lib/money";
+import { eur, eurDocumento, montanteNaLingua, round2, SINAL_POR_OMISSAO } from "@/lib/money";
 import { resumoDaPropostaParaCopiar } from "@/lib/email-proposta-textos";
+import { linkDoWhatsApp } from "@/lib/whatsapp";
 import { randomId } from "./util";
 import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -1078,6 +1081,13 @@ export function textoDoAdicional(escrito: string, modo: ModoDeIvaDoAdicional): s
  * tem a tabela, ou a chave não a pode escrever). Nesses, tentar outra vez dá
  * exactamente a mesma resposta e só atrasa o aviso.
  */
+/**
+ * Quanto tempo a pergunta do envio tem de estar à vista antes de o «Confirmar»
+ * aceitar um clique. Um duplo clique são ~120 ms entre os dois; 400 ms tira o
+ * segundo de lá com folga e é menos do que alguém demora a ler a frase.
+ */
+const CONFIRMAR_ENVIO_APOS_MS = 400;
+
 const GRAVACAO_TENTATIVAS = 3;
 const GRAVACAO_PAUSA_MS = 400;
 const GRAVACAO_TECTO_MS = 10000;
@@ -1108,6 +1118,10 @@ export type ResultadoDaGravacao =
       /** Quando é que essa versão tinha sido gravada — é a hora que dá à
        *  pessoa a noção do que está em jogo antes de decidir. */
       resgateEm?: string;
+      /** O servidor juntou esta gravação com a de outra pessoa, campo a campo
+       *  (achado n.º 6 — ver `rascunho-juntar.ts`), e `doc` é como ficou. */
+      juntou?: boolean;
+      doc?: Record<string, unknown>;
       /**
        * O sítio onde ficou sobrevive a um deploy?
        *
@@ -1137,7 +1151,17 @@ export type ResultadoDaGravacao =
     }
   /** Não ficou no servidor. O trabalho está no ecrã e na cópia local — e é isso
    *  mesmo que a pessoa tem de ouvir, com estas palavras. */
-  | { estado: "so-local"; porque?: string };
+  | {
+      estado: "so-local";
+      porque?: string;
+      /** O servidor recusou porque a sessão caiu (401) — não é avaria nenhuma:
+       *  basta entrar outra vez (achado n.º 34). */
+      sessaoExpirada?: boolean;
+    };
+
+function ehObjecto(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
 
 /** Um `fetch` com tecto de tempo próprio. Sem ele, uma rede que aceita a
  *  ligação e nunca responde deixa a gravação pendurada para sempre — e o
@@ -1159,9 +1183,15 @@ async function fetchComTecto(url: string, init: RequestInit, ms: number): Promis
  */
 export async function gravarRascunhoNoServidor(
   quoteId: string,
-  corpo: { doc: unknown; baseUpdatedAt: string | null },
+  corpo: {
+    doc: unknown;
+    baseUpdatedAt: string | null;
+    campos?: string[];
+    base?: Record<string, unknown>;
+  },
 ): Promise<ResultadoDaGravacao> {
   let porque: string | undefined;
+  let sessaoExpirada = false;
   for (let tentativa = 1; tentativa <= GRAVACAO_TENTATIVAS; tentativa++) {
     try {
       const res = await fetchComTecto(
@@ -1182,11 +1212,17 @@ export async function gravarRascunhoNoServidor(
           previousBy: typeof dados?.previousBy === "string" ? dados.previousBy : undefined,
           resgate: typeof dados?.resgate === "string" ? dados.resgate : undefined,
           resgateEm: typeof dados?.resgateEm === "string" ? dados.resgateEm : undefined,
+          juntou: dados?.juntou === true,
+          doc:
+            dados?.juntou === true && dados.doc && typeof dados.doc === "object"
+              ? (dados.doc as Record<string, unknown>)
+              : undefined,
           duradouro: typeof dados?.duradouro === "boolean" ? dados.duradouro : undefined,
           aviso: typeof dados?.aviso === "string" ? dados.aviso : undefined,
         };
       }
       porque = typeof dados?.erro === "string" ? dados.erro : undefined;
+      sessaoExpirada = res.status === 401;
       // Um 4xx é o pedido que está errado, e repeti-lo dá o mesmo. Um 503
       // `permanente` é a instalação que está incompleta — também dá o mesmo.
       if (res.status < 500 || dados?.permanente === true) break;
@@ -1199,7 +1235,7 @@ export async function gravarRascunhoNoServidor(
       await new Promise((r) => setTimeout(r, GRAVACAO_PAUSA_MS * tentativa));
     }
   }
-  return { estado: "so-local", porque };
+  return { estado: "so-local", porque, ...(sessaoExpirada ? { sessaoExpirada } : {}) };
 }
 
 /**
@@ -1365,6 +1401,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     docRef.current = doc;
   }, [doc]);
   const [copiarAberto, setCopiarAberto] = useState(false);
+  /** Quando apareceu a pergunta «Enviar para…?» — ver `CONFIRMAR_ENVIO_APOS_MS`. */
+  const perguntaDoEnvioDesde = useRef(0);
+  const [copiaSubstitui, setCopiaSubstitui] = useState<string | null>(null);
   /**
    * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
    *
@@ -1566,6 +1605,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
   // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
   const [totalInput, setTotalInput] = useState<string>("");
+  /** Porque é que o que está escrito no «Valor (sem IVA)» não conta — ver
+   *  `onTotalInput`. */
+  const [erroDoTotal, setErroDoTotal] = useState<string | null>(null);
+  /** O que está escrito na caixa do sinal enquanto não é uma percentagem
+   *  válida (achado n.º 17) — `null` mostra a do documento. */
+  const [sinalEscrito, setSinalEscrito] = useState<string | null>(null);
+  /** A percentagem do sinal quando ela entrou na caixa — é para lá que se volta
+   *  se o que escrever deixar de ser válido. */
+  const sinalAntes = useRef(SINAL_POR_OMISSAO);
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   /**
@@ -2088,8 +2136,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   /** `updatedAt` do rascunho do servidor tal como o lemos — é com isto que o
    *  servidor deteta que alguém gravou por cima entretanto. */
   const serverStamp = useRef<string | null>(null);
+  /** O documento tal como o servidor o tem, da última vez que se falou com
+   *  ele. É a base contra a qual se diz «mudei estes campos» — ver
+   *  `camposMudados`. */
+  const docDoServidor = useRef<Record<string, unknown> | null>(null);
   /** Já avisámos desta gravação cruzada? (uma vez chega; não a cada gravação) */
   const warnedOverwrite = useRef(false);
+  const avisouJuncao = useRef(false);
   /**
    * ══════════════════════════════════════════════════════════════════════════
    * O TRABALHO QUE ESTA SESSÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
@@ -2419,14 +2472,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *     aviso que aparece sempre é um aviso que se aprende a ignorar.
    */
   const registarSoLocal = useCallback(
-    (porque?: string) => {
+    (porque?: string, sessaoExpirada = false) => {
       setSoNesteComputador({ porque });
       if (avisouSoLocal.current) return;
       avisouSoLocal.current = true;
+      // Achado n.º 34: com a sessão caída, «fala com quem gere a instalação»
+      // mandava procurar uma avaria que não existe. Basta entrar outra vez.
       toast(
-        `Este rascunho está guardado SÓ NESTE COMPUTADOR — não chegou ao servidor.${
-          porque ? ` ${porque}` : ""
-        } Não feche o separador sem falar com quem gere a instalação: noutro dispositivo esta proposta não existe.`,
+        sessaoExpirada
+          ? "A tua sessão expirou e este rascunho ficou guardado SÓ NESTE COMPUTADOR. Não feches o separador: entra outra vez e continua — a gravação seguinte já chega ao servidor."
+          : `Este rascunho está guardado SÓ NESTE COMPUTADOR — não chegou ao servidor.${
+              porque ? ` ${porque}` : ""
+            } Não feche o separador sem falar com quem gere a instalação: noutro dispositivo esta proposta não existe.`,
         "error",
       );
     },
@@ -2484,19 +2541,49 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     async (docGravavel: unknown): Promise<ResultadoDaGravacao> => {
       setAGravarNoServidor((n) => n + 1);
       try {
+        // O que mudou desde a última conversa com o servidor — é isto que lhe
+        // deixa juntar esta gravação com a de outra pessoa campo a campo, em
+        // vez de a última escrita levar o documento inteiro (achado n.º 6).
+        const enviado = ehObjecto(docGravavel) ? docGravavel : null;
+        const desde = docDoServidor.current;
         const r = await gravarRascunhoNoServidor(quote.id, {
           doc: docGravavel,
           baseUpdatedAt: serverStamp.current,
+          ...(enviado && desde ? camposMudados(desde, enviado) : {}),
         });
         if (r.estado === "guardado") {
           if (r.updatedAt) serverStamp.current = r.updatedAt;
+          docDoServidor.current = r.doc ?? enviado;
+          // O que veio da outra pessoa vai para o ecrã — mas só nos campos em
+          // que esta não mexeu entretanto (a gravação demora; ela pode ter
+          // continuado a escrever).
+          const junto = r.doc;
+          if (junto && enviado) {
+            setDoc((d) => {
+              const atual = d as unknown as Record<string, unknown>;
+              const novo: Record<string, unknown> = { ...atual };
+              let mudou = false;
+              for (const k of new Set([...Object.keys(junto), ...Object.keys(enviado)])) {
+                if (mesmoValor(junto[k], enviado[k])) continue;
+                if (!mesmoValor(atual[k], enviado[k])) continue;
+                // Nunca se APAGA um campo do ecrã por causa de uma junção: o
+                // documento do estúdio tem a forma inteira, e um campo que lhe
+                // falte (os Serviços, por exemplo) deita abaixo o editor que o
+                // desenha. Vindo vazio do servidor, fica o que está.
+                if (junto[k] === undefined) continue;
+                novo[k] = junto[k];
+                mudou = true;
+              }
+              return mudou ? (novo as unknown as StudioDoc) : d;
+            });
+          }
           marcarGuardadoNoServidor();
           // Só um `false` EXPLÍCITO alarma — ver `duradouro`. Um servidor que
           // não diga nada é tratado como sempre foi.
           if (r.duradouro === false) registarNaoDura(r.aviso);
           else marcarQueDura();
         } else {
-          registarSoLocal(r.porque);
+          registarSoLocal(r.porque, r.sessaoExpirada);
         }
         return r;
       } finally {
@@ -2545,6 +2632,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (!active) return;
       if (draft) {
         serverStamp.current = typeof draft.updatedAt === "string" ? draft.updatedAt : null;
+        docDoServidor.current = ehObjecto(draft.doc) ? draft.doc : null;
       }
 
       const carimboDoServidor = draft ? Date.parse(draft.updatedAt ?? "") || 0 : 0;
@@ -3149,6 +3237,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // Alguém gravou entre a nossa leitura e esta escrita. A nossa versão
         // fica (a última vence), mas dizê-lo é o mínimo — desaparecer com o
         // trabalho de outra pessoa em silêncio, não.
+        // Juntou-se sem pisar ninguém: dizê-lo uma vez, para ela saber porque
+        // é que apareceu no ecrã texto que não escreveu.
+        if (r.juntou && !r.overwrote && !avisouJuncao.current) {
+          avisouJuncao.current = true;
+          const quem = r.previousBy ? `por ${r.previousBy}` : "noutro sítio";
+          toast(
+            `Este rascunho estava a ser alterado ${quem}. Juntei as duas versões: o que mudaste ficou teu, e o que mudaram lá já está no ecrã.`,
+            "info",
+          );
+        }
         if (r.overwrote && !warnedOverwrite.current) {
           warnedOverwrite.current = true;
           /**
@@ -3577,7 +3675,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // caixa do total a meio de ela estar a escrever o valor.
     camposTocados.current.add("__total");
     setTotalInput(raw);
-    const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
+    /**
+     * ── O QUE NÃO É UM VALOR DIZ-SE, E NÃO SE GRAVA ─────────────────────────
+     *
+     * Achado n.º 5: «-500» via-se -500 e contava +500 (o `parseMoneyText` lê
+     * os algarismos e deixa o sinal de fora) — e era +500 que ia para o pedido.
+     * Achado n.º 16: «0» voltava sozinho ao valor anterior, sem uma palavra.
+     * Nos dois casos o campo fica com o que ela escreveu, diz porquê, e nada
+     * se grava até haver um valor a sério.
+     */
+    const negativo = /-\s*[\d.,]/.test(raw);
+    const lido = raw.trim() === "" ? undefined : parseMoneyText(raw);
+    if (negativo) {
+      setErroDoTotal(
+        "O valor não pode ser negativo. Um desconto escreve-se como linha do orçamento.",
+      );
+      return;
+    }
+    if (lido === 0) {
+      setErroDoTotal("Com 0 € não há proposta a enviar — escreve o valor dos serviços.");
+      return;
+    }
+    setErroDoTotal(null);
+    const base = lido;
     writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
     persistirPreco(base);
   }
@@ -3632,15 +3752,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * para escrever o dinheiro na língua do documento (ver `money.ts`) — para o
    * valor aqui não discordar do valor que o documento em anexo mostra.
    */
-  const resumoParaCopiar = resumoDaPropostaParaCopiar(
-    {
-      clientNames: doc.clientNames ?? "",
-      eventDate: camposDoEventoNaLingua(doc, idiomaDoPdf).eventDate ?? "",
-      aPagar: montanteNaLingua(eurDocumento(totais.aPagar), idiomaDoPdf),
-      link: linkDaProposta ?? undefined,
-    },
-    idiomaDoPdf,
-  );
+  const resumoComLink = (link: string | undefined) =>
+    resumoDaPropostaParaCopiar(
+      {
+        clientNames: doc.clientNames ?? "",
+        eventDate: camposDoEventoNaLingua(doc, idiomaDoPdf).eventDate ?? "",
+        aPagar: montanteNaLingua(eurDocumento(totais.aPagar), idiomaDoPdf),
+        link,
+      },
+      idiomaDoPdf,
+    );
+  const resumoParaCopiar = resumoComLink(linkDaProposta ?? undefined);
   // O desvio do total escrito à mão. Vive aqui em cima porque é lido em dois
   // sítios: na dica do campo e no aviso com o botão que o arruma.
   const desvio = desalinhamento(doc, money.base);
@@ -4455,6 +4577,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * — «rascunho limpo — 0 páginas, 0 fotografias» é ruído com aritmética.
    */
   function oQueOLimparLevou(d: StudioDoc): string {
+    const partes = trabalhoNoDocumento(d);
+    return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
+  }
+
+  /** O trabalho que o documento tem, dito por partes — para o «Rascunho
+   *  limpo — levou…» e para a pergunta do «Criar a partir de…». */
+  function trabalhoNoDocumento(d: StudioDoc): string[] {
     const fotos = d.moodBoards.reduce((n, b) => n + b.images.length, 0);
     const paginas = d.moodBoards.filter((b) => b.images.length > 0).length;
     const servicos = (d.serviceGroups ?? []).reduce((n, g) => n + (g.items ?? []).length, 0);
@@ -4467,7 +4596,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       servicos > 0 ? `${servicos} ${servicos === 1 ? "serviço" : "serviços"}` : null,
       orcamento > 0 ? `${orcamento} ${orcamento === 1 ? "linha" : "linhas"} de orçamento` : null,
     ].filter((x): x is string => x !== null);
-    return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
+    return partes;
   }
 
   /**
@@ -4613,6 +4742,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // E no servidor — senão o rascunho limpo aqui reaparecia no dispositivo
     // seguinte, que é precisamente o que guardá-lo lá veio resolver.
     serverStamp.current = null;
+    docDoServidor.current = null;
     warnedOverwrite.current = false;
     void fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, { method: "DELETE" }).catch(() => {
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
@@ -5039,10 +5169,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     (update: (prev: StudioDoc["serviceGroups"]) => StudioDoc["serviceGroups"]) => {
       // Ver `camposTocados`: o editor de serviços é o outro caminho por onde a
       // PESSOA escreve, e é onde o texto perdido foi medido primeiro.
-      camposTocados.current.add("serviceGroups");
+      //
+      // MAS SÓ QUANDO ELA ESCREVEU. O editor também passa por aqui ao montar,
+      // para dar ids às linhas que vêm sem eles — e contar isso como escrita
+      // fazia o merge do rascunho do servidor pôr de lado os Serviços que ele
+      // trazia; a gravação seguinte apagava-os do servidor. Medido: abrir a
+      // proposta noutro computador deixava os Serviços vazios (relatório da
+      // auditoria, n.º 1). `soMudaramOsIds` separa as duas coisas.
       setDoc((d) => {
         const next = update(d.serviceGroups);
-        return next === d.serviceGroups ? d : { ...d, serviceGroups: next };
+        if (next === d.serviceGroups) return d;
+        if (!soMudaramOsIds(d.serviceGroups, next)) camposTocados.current.add("serviceGroups");
+        return { ...d, serviceGroups: next };
       });
     },
     [],
@@ -6452,6 +6590,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
     setBusy("send");
     setConfirmSend(false);
+    /**
+     * ── O WHATSAPP ABRE-SE AQUI, AINDA DENTRO DO CLIQUE ─────────────────────
+     *
+     * Achado n.º 4: com «Por onde segue: WhatsApp», o WhatsApp nunca abria. O
+     * link só existe quando o servidor responde, e um separador aberto DEPOIS
+     * de um `await` é bloqueado pelo browser (já não é o gesto dela). Abre-se
+     * vazio agora, e aponta-se para o WhatsApp quando o link chegar; se o envio
+     * não chegar lá, fecha-se.
+     */
+    let janelaDoWhatsApp: Window | null = null;
+    let whatsAppAberto = false;
+    if (canal === "whatsapp") {
+      try {
+        janelaDoWhatsApp = window.open("", "_blank") ?? null;
+        if (janelaDoWhatsApp) janelaDoWhatsApp.opener = null;
+      } catch {
+        janelaDoWhatsApp = null;
+      }
+    }
     try {
       const comecou = Date.now();
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
@@ -6561,7 +6718,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
        * (isso não se perde), mas o botão continua lá para ela poder corrigir o
        * contacto e enviar a sério.
        */
-      const saiu = Boolean(data?.emailed);
+      // E o WhatsApp que ela escolheu também conta como ter seguido (achado
+      // n.º 4): o servidor marca-a como «enviada» e devolve o link.
+      const saiu =
+        Boolean(data?.emailed) || (data?.semEmailPorEscolha === true && data?.estado === "enviada");
       /**
        * ══════════════════════════════════════════════════════════════════════
        * PRIMEIRO O QUE ACONTECEU, DEPOIS O QUE ESTAVA LÁ DENTRO
@@ -6626,7 +6786,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
              próxima pessoa não carregar no botão que falta. */
           toast(
             canal === "whatsapp"
-              ? "Proposta gerada — falta mandá-la"
+              ? janelaDoWhatsApp
+                ? "Proposta pronta — o WhatsApp abriu com o link. Escolhe o casal e carrega em enviar."
+                : "Proposta pronta — falta mandá-la: é o botão «Mandar por WhatsApp»."
               : "Proposta enviada ao cliente",
             "success",
           );
@@ -6639,10 +6801,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         setSent(true);
         onSent?.();
       }
+      if (saiu && janelaDoWhatsApp && typeof data?.acceptUrl === "string") {
+        janelaDoWhatsApp.location.href = linkDoWhatsApp(resumoComLink(data.acceptUrl));
+        whatsAppAberto = true;
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
     } finally {
       setBusy(null);
+      // Não seguiu (ou parou para perguntar pelos cortes): o separador vazio
+      // não fica aberto a fingir que alguma coisa vai acontecer.
+      if (janelaDoWhatsApp && !whatsAppAberto) {
+        try {
+          janelaDoWhatsApp.close();
+        } catch {
+          /* já fechado */
+        }
+      }
     }
   }
 
@@ -7245,7 +7420,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           {/* A acção principal desta secção: quase todas as propostas são uma
               variação de uma anterior. É a única aqui a verde. */}
-          <Button size="sm" onClick={() => setCopiarAberto(true)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              // Achado n.º 7: a cópia só pergunta se houver trabalho a perder
+              // — escrito nesta sessão, ou num rascunho que já estava gravado.
+              // Uma proposta acabada de abrir, com o que veio do pedido, não
+              // pergunta nada (um aviso sempre ligado ensina a não o ler).
+              const houveTrabalho =
+                camposTocados.current.size > 0 || docDoServidor.current != null || jaGravou.current;
+              const partes = trabalhoNoDocumento(doc);
+              setCopiaSubstitui(
+                houveTrabalho ? (partes.length > 0 ? partes.join(", ") : "texto escrito") : null,
+              );
+              setCopiarAberto(true);
+            }}
+          >
             Criar a partir de…
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setNomeModelo(doc.eventType || "")}>
@@ -7443,6 +7633,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         clienteAtual={quote.name ?? ""}
         onEscolhido={aplicarCopia}
         toast={toast}
+        substitui={copiaSubstitui}
       />
 
       {/* Passos do fluxo — sempre visível, dá o sentido de "onde estou / o que
@@ -7737,7 +7928,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
                 <Field
                   label="Clientes"
-                  value={doc.clientNames}
+                  value={doc.clientNames ?? ""}
                   onChange={(e) => {
                     confirmado("clientNames");
                     patch({ clientNames: e.target.value });
@@ -7748,7 +7939,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Field
                   label="Tipo de evento"
-                  value={doc.eventType}
+                  value={doc.eventType ?? ""}
                   onChange={(e) => {
                     confirmado("eventType");
                     patch({ eventType: e.target.value });
@@ -7759,7 +7950,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Field
                   label="Data"
-                  value={doc.eventDate}
+                  value={doc.eventDate ?? ""}
                   onChange={(e) => {
                     confirmado("eventDate");
                     patch({ eventDate: e.target.value });
@@ -7771,7 +7962,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <Field
                   label="Local"
                   list="sug-locais"
-                  value={doc.location}
+                  value={doc.location ?? ""}
                   onChange={(e) => {
                     confirmado("location");
                     patch({ location: e.target.value });
@@ -7782,7 +7973,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Field
                   label="Convidados"
-                  value={doc.guests}
+                  value={doc.guests ?? ""}
                   onChange={(e) => {
                     confirmado("guests");
                     patch({ guests: e.target.value });
@@ -7865,7 +8056,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 )}
                 <Field
                   label="Título interno (opcional)"
-                  value={doc.ref}
+                  value={doc.ref ?? ""}
                   onChange={(e) => {
                     setRefEdited(true);
                     patch({ ref: e.target.value });
@@ -9675,7 +9866,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <Field
                         containerClassName="min-w-0 grow basis-[14rem]"
                         label="Rótulo do total"
-                        value={doc.totalLabel}
+                        value={doc.totalLabel ?? ""}
                         onChange={(e) => patch({ totalLabel: e.target.value })}
                         data-campo="totalLabel"
                         placeholder="Valor Total Decoração"
@@ -10198,6 +10389,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   placeholder="3000"
                   data-campo="totalAmount"
                   containerClassName={realce("totalAmount")}
+                  error={erroDoTotal ?? undefined}
                   hint={
                     desvio
                       ? `Escrito à mão — a soma dos serviços com preço é ${eur(desvio.soma)}`
@@ -10408,12 +10600,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             type="number"
                             min={1}
                             max={99}
-                            value={pctSinal}
+                            value={sinalEscrito ?? pctSinal}
                             onChange={(e) => {
-                              const n = Number.parseInt(e.target.value, 10);
-                              patch({ depositPercent: Number.isFinite(n) ? n : undefined });
+                              // Achado n.º 17: «150» voltava a 30 sem mensagem (o
+                              // motor só aceita de 1 a 99). Fica o que ela
+                              // escreveu, com a razão por baixo, e só uma
+                              // percentagem válida chega ao documento.
+                              //
+                              // Escrito tecla a tecla, «150» passa por «15», que é
+                              // válido: por isso, quando o texto deixa de ser
+                              // válido, volta-se ao valor de ANTES de ela começar.
+                              const raw = e.target.value;
+                              const n = Number.parseInt(raw, 10);
+                              if (Number.isFinite(n) && n >= 1 && n <= 99) {
+                                setSinalEscrito(null);
+                                patch({ depositPercent: n });
+                              } else {
+                                setSinalEscrito(raw);
+                                patch({ depositPercent: sinalAntes.current });
+                              }
                             }}
+                            onFocus={() => {
+                              sinalAntes.current = pctSinal;
+                            }}
+                            onBlur={() => setSinalEscrito(null)}
                             aria-label="Percentagem do sinal"
+                            aria-invalid={sinalEscrito != null || undefined}
+                            aria-describedby={sinalEscrito != null ? "sinal-erro" : undefined}
                             className="bo-input w-16 px-1.5 py-0.5 text-center text-xs"
                           />
                           %
@@ -10421,6 +10634,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       }
                       valor={eur(totais.sinal)}
                     />
+                    {sinalEscrito != null && (
+                      <p
+                        id="sinal-erro"
+                        role="alert"
+                        className="text-[11px] text-[var(--bo-perigo)]"
+                      >
+                        O sinal é entre 1% e 99%. Fica nos {pctSinal}% enquanto não escreveres
+                        outro.
+                      </p>
+                    )}
                     <LinhaDeTotal rotulo={`Saldo ${100 - pctSinal}%`} valor={eur(totais.saldo)} />
                   </dl>
                   {/* ── A BASE, DITA AQUI TAMBÉM ──────────────────────────────
@@ -10972,6 +11195,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   toast(`«${g.escrita}» passou a «${g.sugerida}» — ${g.rotulo}.`, "info");
                 }}
                 onIr={(g) => irParaCampo(g.campo)}
+                onTirarSimbolos={(s) => {
+                  setDoc((d) => tirarSimbolos(d, s));
+                  toast(`Tirei ${s.simbolos.join(" ")} — ${s.rotulo}.`, "info");
+                }}
+                onIrAosSimbolos={(s) => irParaCampo(s.campo)}
                 onCorrigirTudo={() => {
                   const quantas = gralhasDoDocumento(doc as ProposalDoc).length;
                   setDoc((d) => corrigirTudo(d));
@@ -11740,7 +11968,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <Button variant="ghost" onClick={() => setConfirmSend(false)}>
                     Cancelar
                   </Button>
-                  <Button variant="primary" onClick={() => void send()} disabled={busy !== null}>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      // Achado n.º 3: o «Confirmar» aparece onde estava a ponta
+                      // direita do «Gerar e enviar», e o segundo clique de um
+                      // duplo clique enviava sem a pergunta chegar a ser vista.
+                      // Confirmar pede um gesto NOVO, depois de a ler.
+                      if (
+                        performance.now() - perguntaDoEnvioDesde.current <
+                        CONFIRMAR_ENVIO_APOS_MS
+                      ) {
+                        return;
+                      }
+                      void send();
+                    }}
+                    disabled={busy !== null}
+                  >
                     Confirmar
                   </Button>
                 </div>
@@ -11761,7 +12005,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Button
                   variant="primary"
-                  onClick={() => setConfirmSend(true)}
+                  onClick={() => {
+                    perguntaDoEnvioDesde.current = performance.now();
+                    setConfirmSend(true);
+                  }}
                   disabled={busy !== null || !canSend}
                   /**
                    * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────

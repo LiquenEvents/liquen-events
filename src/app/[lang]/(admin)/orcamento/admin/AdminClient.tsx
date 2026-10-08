@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { resumoDoEnvio } from "./envio-da-mensagem";
 import { rolarAteVer } from "@/lib/motion/rolar";
 
@@ -96,15 +97,7 @@ import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
-import {
-  NAV,
-  CORE_NAV,
-  MORE_NAV,
-  BARRA_INFERIOR,
-  ROTULO_CURTO,
-  vistaValida,
-  type View,
-} from "./nav";
+import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, ROTULO_CURTO, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
 import { Escolha } from "./ui/Escolha";
 import {
@@ -600,6 +593,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       chave: "sel",
       cabecalho: "",
       largura: "w-10",
+      interactiva: true,
       celula: (q) => (
         <label className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <input
@@ -1050,6 +1044,12 @@ const QuoteCard = memo(function QuoteCard({
             {q.quotedPrice ? (
               <span className="text-sage-600 text-[13px] font-semibold">
                 {formatPrice(q.quotedPrice)}
+                {/* Achado n.º 29: este é SEM IVA, e as Propostas mostram o
+                    mesmo pedido COM IVA — sem o rótulo, eram dois números
+                    diferentes para a mesma coisa. */}
+                <span className="ml-1 text-[11px] font-normal text-[var(--bo-text-muted)]">
+                  s/ IVA
+                </span>
               </span>
             ) : q.priceBreakdown?.total ? (
               <span className="bo-text-muted text-[13px]">
@@ -1058,6 +1058,9 @@ const QuoteCard = memo(function QuoteCard({
             ) : null}
             <span className="bo-text-faint text-[12px]">
               {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
+                // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
+                // diferentes entre a meia-noite e a uma — erro de hidratação.
+                timeZone: "Europe/Lisbon",
                 day: "numeric",
                 month: "short",
               })}
@@ -1284,6 +1287,28 @@ export default function AdminClient({
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState<QuoteStatus>("pendente");
+  /**
+   * Achado n.º 19 da auditoria: pôr um pedido em «Ganho» à mão criava um
+   * contrato ligado a uma proposta que nunca tinha chegado ao cliente — sem
+   * nada no ecrã a dizê-lo. Ao escolher «Ganho», pergunta-se ao servidor se
+   * alguma proposta deste pedido seguiu (`acceptUrl` do GET do envio); se não,
+   * fica o aviso por baixo do seletor. Não trava: pode ter sido aceite de boca.
+   */
+  const [ganhoSemProposta, setGanhoSemProposta] = useState<string | null>(null);
+  const escolherEstado = (novo: QuoteStatus) => {
+    setEditStatus(novo);
+    setGanhoSemProposta(null);
+    if (novo !== "aceite" || !selected || selected.status === "aceite") return;
+    const id = selected.id;
+    void fetch(`/api/orcamento/${id}/proposta-doc`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j && j.acceptUrl == null) setGanhoSemProposta(id);
+      })
+      .catch(() => {
+        /* sem resposta não se inventa um aviso */
+      });
+  };
   const [editAssigned, setEditAssigned] = useState("");
   const [editLostReason, setEditLostReason] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -1771,15 +1796,6 @@ export default function AdminClient({
    * que ele apanhou. Uma referência não tem nome para colidir.
    */
   const barraDeDestinosRef = useRef<HTMLElement | null>(null);
-  /**
-   * A barra lateral está fora do ecrã (gaveta), e não encostada como coluna?
-   *
-   * Abaixo de `lg` a barra é uma gaveta que vive em `-translate-x-full` quando
-   * fechada: continua no DOM, com tamanho, apenas empurrada para fora. A partir
-   * de `lg` é uma coluna sempre visível. Sem saber em qual dos dois estamos não
-   * há como marcá-la inerte só no caso certo.
-   */
-  const [navEhGaveta, setNavEhGaveta] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
   /**
@@ -2723,19 +2739,6 @@ export default function AdminClient({
      que nunca chegava a correr. */
   useCamadaDeHistoria(navOpen, () => setNavOpen(false));
   useCamadaDeHistoria(!!selected, () => closeDetail());
-
-  // A barra lateral é gaveta abaixo de `lg` (1024px) — o mesmo ponto de corte
-  // do `lg:sticky` / `lg:translate-x-0` que a desenha. Mesmo guarda do efeito
-  // abaixo: sem `matchMedia` (SSR / jsdom) fica em `false`, que é o estado
-  // seguro — nunca marca inerte uma barra que possa estar visível.
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mq = window.matchMedia("(max-width: 1023px)");
-    const update = () => setNavEhGaveta(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
 
   // Track whether the detail panel is currently a modal overlay (below xl) so the
   // dialog/focus-trap behaviour is gated to that state. matchMedia may be absent
@@ -3985,8 +3988,10 @@ export default function AdminClient({
       list = list.filter((x) => (x.tags ?? []).includes(tagFilter));
     }
     if (q) {
+      // Sem acentos e com o telefone em qualquer formato — ver `procura.ts`
+      // (achado n.º 10: «evora» dava zero resultados).
       list = list.filter((x) =>
-        [
+        casaComAProcura(q, [
           x.name,
           x.email,
           x.phone,
@@ -3996,9 +4001,7 @@ export default function AdminClient({
           x.assignedTo,
           x.contractRef,
           ...(x.tags ?? []),
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q)),
+        ]),
       );
     }
     const sorted = [...list];
@@ -5677,7 +5680,7 @@ export default function AdminClient({
                   <button
                     onClick={pedirNovaTarefa}
                     aria-label="Nova tarefa"
-                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
                     title="Escrever uma tarefa (⌘N)"
                   >
                     <svg
@@ -5697,7 +5700,7 @@ export default function AdminClient({
                   <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
-                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
                     title="Criar pedido manualmente"
                   >
                     <svg
@@ -6346,7 +6349,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -6356,7 +6359,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -6370,7 +6373,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -7280,7 +7283,12 @@ export default function AdminClient({
                                   <select
                                     id="pedido-estado"
                                     value={editStatus}
-                                    onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
+                                    onChange={(e) => escolherEstado(e.target.value as QuoteStatus)}
+                                    aria-describedby={
+                                      ganhoSemProposta === selected.id && editStatus === "aceite"
+                                        ? "pedido-estado-aviso"
+                                        : undefined
+                                    }
                                     className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
                                   >
                                     {STATUS_OPTIONS.map((s) => (
@@ -7289,6 +7297,17 @@ export default function AdminClient({
                                       </option>
                                     ))}
                                   </select>
+                                  {ganhoSemProposta === selected.id && editStatus === "aceite" && (
+                                    <p
+                                      id="pedido-estado-aviso"
+                                      role="status"
+                                      className="mt-1.5 text-xs leading-relaxed text-[var(--bo-aviso)]"
+                                    >
+                                      Nenhuma proposta deste pedido chegou ao cliente. Marcar como
+                                      Ganho cria o contrato na mesma — se foi aceite de boca, está
+                                      certo; senão, envia primeiro a proposta.
+                                    </p>
+                                  )}
                                 </div>
                                 <div>
                                   <label htmlFor="pedido-preco" className="bo-eyebrow block mb-1.5">
@@ -7705,7 +7724,10 @@ export default function AdminClient({
                         {selected.notes && (
                           <div>
                             <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                            <p className="rounded-lg bg-[var(--bo-tinta-6)] p-3 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                            {/* `whitespace-pre-line`: o casal escreve em
+                                parágrafos, e «Linha 1 Linha 2» numa linha só
+                                era outra coisa (achado n.º 35). */}
+                            <p className="rounded-lg bg-[var(--bo-tinta-6)] p-3 text-xs leading-relaxed whitespace-pre-line text-[var(--bo-tinta-72)]">
                               {selected.notes}
                             </p>
                           </div>
@@ -7714,6 +7736,9 @@ export default function AdminClient({
                         <p className="text-[10px] text-foreground/50">
                           Submetido em{" "}
                           {new Date(selected.submittedAt).toLocaleString("pt-PT", {
+                            // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
+                            // diferentes entre a meia-noite e a uma — erro de hidratação.
+                            timeZone: "Europe/Lisbon",
                             day: "numeric",
                             month: "long",
                             year: "numeric",

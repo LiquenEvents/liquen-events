@@ -198,7 +198,7 @@ describe("o calendário", () => {
         <Calendario quotes={[]} onOpen={vi.fn()} />
       </ToastProvider>,
     );
-    const dia = await screen.findByRole("button", { name: new RegExp(`^${DIA} de `) });
+    const dia = await screen.findByRole("gridcell", { name: new RegExp(`, ${DIA} de `) });
     fireEvent.click(dia);
     const fechar = await screen.findByRole("button", { name: "Fechar dia" });
     // O painel é o cartão que envolve o cabeçalho onde este botão vive.

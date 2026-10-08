@@ -2,7 +2,6 @@ import {
   COVER_SLOTS,
   DEFAULT_VALID_DAYS,
   depositPercentOf,
-  resolveProposalMoney,
   type ProposalDoc,
 } from "@/lib/proposal-doc";
 import { dinheiroDaProposta, precosDe } from "@/lib/proposal-budget";

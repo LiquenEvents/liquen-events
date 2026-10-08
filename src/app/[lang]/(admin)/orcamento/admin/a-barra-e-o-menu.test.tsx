@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
@@ -184,15 +184,6 @@ function montar(quote: Quote) {
   );
 }
 
-/** Abre o painel de detalhe do pedido: é onde os separadores vivem. */
-async function abrirPedido(nome = "Ana Marques") {
-  const sidebar = screen.getByRole("complementary");
-  fireEvent.click(within(sidebar).getByRole("button", { name: /Pedidos/ }));
-  await act(async () => {
-    fireEvent.click(screen.getByText(nome));
-  });
-}
-
 beforeEach(() => {
   localStorage.clear();
 });
@@ -202,9 +193,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A barra lateral. É `role="complementary"` — o `<aside>`. */
-const barra = () => screen.getByRole("complementary");
-
 /**
  * A cápsula que flutua. Chama-se «Navegação do back office» porque É a
  * navegação do back office — a coluna acabou, e o nome mudou-se atrás do
@@ -212,8 +200,7 @@ const barra = () => screen.getByRole("complementary");
  * «já estou dentro»; deixá-lo na lista que passou a `lg:hidden` punha-os
  * todos à espera de uma coisa invisível.
  */
-const barraDeBaixo = () =>
-  screen.getByRole("navigation", { name: "Navegação do back office" });
+const barraDeBaixo = () => screen.getByRole("navigation", { name: "Navegação do back office" });
 /** A gaveta. É `role="complementary"` — o `<aside>`. */
 const gaveta = () => screen.getByRole("complementary");
 
@@ -228,16 +215,12 @@ const gaveta = () => screen.getByRole("complementary");
  * inteiro, porque quem ouve o ecrã só tem a palavra. A identidade de um destino
  * é esse nome, e é por ele que estes casos passam a procurar.
  */
-const nomeDe = (b: Element) =>
-  (b.getAttribute("aria-label") ?? b.textContent ?? "").trim();
+const nomeDe = (b: Element) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim();
 
 describe("a barra de baixo é o menu do back office", () => {
   it("leva TODOS os destinos, e não só os quatro do dia", () => {
     montar(makeQuote());
-    const naBarra = within(barraDeBaixo())
-      .getAllByRole("button")
-      .map(nomeDe)
-      .filter(Boolean);
+    const naBarra = within(barraDeBaixo()).getAllByRole("button").map(nomeDe).filter(Boolean);
     const faltam = NAV.filter((n) => !naBarra.includes(n.label)).map((n) => n.label);
     expect(faltam, `destinos que a barra não tem: ${faltam.join(", ")}`).toEqual([]);
   });

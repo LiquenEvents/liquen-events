@@ -130,3 +130,19 @@ const TEXTO_LEGIVEL: Record<string, string> = {
 export function corDeTexto(cor: string): string {
   return TEXTO_LEGIVEL[cor.toLowerCase()] ?? cor;
 }
+
+/**
+ * A tinta de um rótulo desta paleta NOS DOIS TEMAS.
+ *
+ * Achado n.º 14 da auditoria: o `corDeTexto` foi afinado contra fundos claros,
+ * e no modo Escuro as pastilhas ficavam a 1,9–2,9:1 («Alta» em vermelho-escuro
+ * sobre castanho-escuro). Em escuro escreve-se o MESMO tom misturado com
+ * branco — a pastilha continua a ler-se como «a vermelha», e passa os 4,5:1.
+ *
+ * Serve para `style.color`. O `light-dark()` resolve-se no elemento, com o
+ * `color-scheme` que o back office põe no `body` (automático, Claro ou Escuro).
+ * Para contas de contraste (os testes), usa-se o `corDeTexto`.
+ */
+export function tintaDoRotulo(cor: string): string {
+  return `light-dark(${corDeTexto(cor)}, color-mix(in srgb, ${cor} 45%, white))`;
+}

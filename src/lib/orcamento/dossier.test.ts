@@ -436,7 +436,8 @@ describe("paidTotal — o «Recebido» de um evento", () => {
 describe("nextAction", () => {
   it("maps each stage to a sensible kind", () => {
     expect(nextAction("lead", data()).kind).toBe("proposta");
-    expect(nextAction("proposta_enviada", data()).kind).toBe("portal");
+    // Era «portal»; o portal saiu (achado n.º 37). Acompanhar é na comunicação.
+    expect(nextAction("proposta_enviada", data()).kind).toBe("proposta");
     expect(nextAction("aceite", data()).kind).toBe("sinal");
     expect(nextAction("sinal_pago", data()).kind).toBe("producao");
     expect(nextAction("em_producao", data()).kind).toBe("producao");

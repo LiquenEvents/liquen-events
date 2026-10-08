@@ -10,7 +10,7 @@
  *       Novo · Aguardar resposta · Proposta enviada · Ganho · Perdido
  *   · Fases do Dossier — STAGE_LABELS em src/lib/orcamento/dossier.ts
  *   · "Timeline" (a folha de operações do dia), "Mood boards",
- *     "Portal do cliente", filtro "VIP" — todos presentes na UI de admin.
+ *     filtro "VIP" — todos presentes na UI de admin.
  */
 
 /** Uma etapa do percurso de um trabalho, do primeiro contacto ao dia do evento. */
@@ -143,10 +143,6 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "Apagar",
     def: "Eliminar um pedido em definitivo. Ao contrário de arquivar, esta ação não pode ser anulada, por isso pedimos sempre confirmação antes.",
-  },
-  {
-    term: "Portal do cliente",
-    def: "A página privada, só de leitura, onde o cliente vê a proposta e acompanha o seu evento. Abre-se por um link que enviamos; ninguém sem o link lá chega.",
   },
   {
     term: "VIP",

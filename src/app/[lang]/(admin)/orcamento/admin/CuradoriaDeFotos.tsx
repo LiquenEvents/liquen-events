@@ -313,6 +313,9 @@ export function CuradoriaDeFotos({
             {incluidas.map((d) => {
               const im = images.find((i) => i.path === d.path);
               return (
+                // Miniatura de um endereço assinado e passageiro: o `next/image`
+                // não tem o que optimizar aqui (mesma regra do `PreviaDaPagina`).
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={d.path}
                   src={im?.thumbUrl || im?.url || ""}
@@ -400,6 +403,7 @@ export function CuradoriaDeFotos({
         }`}
       >
         {foto && (
+          // eslint-disable-next-line @next/next/no-img-element -- endereço assinado, ver acima
           <img
             src={foto.url || foto.thumbUrl || ""}
             alt=""

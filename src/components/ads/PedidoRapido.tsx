@@ -289,7 +289,23 @@ export default function PedidoRapido({
           <label className={ROTULO} htmlFor={`${id}-data`}>
             {textos.data}
           </label>
-          <input id={`${id}-data`} name="data" type="date" required className={CAMPO} />
+          <input
+            id={`${id}-data`}
+            name="data"
+            type="date"
+            required
+            className={CAMPO}
+            // Achado n.º 12: sem `min`, aceitava datas passadas. Posto ao
+            // tocar no campo e não no desenho: a página é pré-gerada, e um
+            // `min` do servidor seria o dia da compilação. É o dia DE QUEM
+            // PREENCHE, como no formulário do site.
+            onFocus={(e) => {
+              const agora = new Date();
+              const mes = String(agora.getMonth() + 1).padStart(2, "0");
+              const dia = String(agora.getDate()).padStart(2, "0");
+              e.currentTarget.min = `${agora.getFullYear()}-${mes}-${dia}`;
+            }}
+          />
         </div>
         <div>
           <label className={ROTULO} htmlFor={`${id}-convidados`}>

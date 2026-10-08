@@ -319,3 +319,37 @@ describe("firstError", () => {
     if (!r.success) expect(typeof firstError(r.error)).toBe("string");
   });
 });
+
+/** Achado n.º 12: o servidor aceitava datas que não existem e datas passadas. */
+describe("quoteFormSchema — a data do evento", () => {
+  const com = (date: string) => quoteFormSchema.safeParse({ name: "João", email: "j@x.pt", date });
+
+  it("vazio é «Ainda a definir», e vale", () => {
+    expect(com("").success).toBe(true);
+  });
+
+  it("um dia que existe, no futuro, vale", () => {
+    const daqui = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+    expect(com(daqui).success).toBe(true);
+  });
+
+  it.each(["2099-02-30", "2099-13-01", "20999-01-01", "amanhã!", "12/06/2099"])(
+    "«%s» não é um dia do calendário",
+    (v) => {
+      const r = com(v);
+      expect(r.success).toBe(false);
+      expect(JSON.stringify(r.error?.issues)).toContain("Data inválida");
+    },
+  );
+
+  it("uma data que já passou é recusada, com a razão", () => {
+    const r = com("2020-06-10");
+    expect(r.success).toBe(false);
+    expect(JSON.stringify(r.error?.issues)).toContain("já passou");
+  });
+
+  it("ontem ainda passa — quem preenche pode estar noutro fuso", () => {
+    const ontem = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    expect(com(ontem).success).toBe(true);
+  });
+});

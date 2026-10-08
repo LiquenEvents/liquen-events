@@ -993,3 +993,62 @@ export function corrigirTudo<T extends Partial<ProposalDoc>>(doc: T): T {
   for (const g of gralhasDoDocumento(doc)) saida = corrigirGralha(saida, g);
   return saida;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE NÃO SAI NO PDF — achado n.º 32 da auditoria
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Um emoji num título («Decoração Floral 💐») desaparecia do PDF sem aviso: as
+ * letras do documento não o têm, e a geração tira-o em silêncio para não
+ * imprimir um «?». O estúdio continuava a mostrá-lo, portanto ela via uma
+ * coisa e o casal recebia outra.
+ *
+ * Não se tenta adivinhar a fonte aqui (a cobertura exacta só se sabe no
+ * servidor, com o ficheiro da letra aberto). Avisa-se do que NUNCA sai: os
+ * pictogramas e as bandeiras. Os três que o WinAnsi tem — ©, ® e ™ — imprimem
+ * e ficam de fora.
+ */
+export interface SimbolosQueNaoSaem {
+  campo: CampoPublicado;
+  rotulo: string;
+  /** Os símbolos, cada um uma vez, pela ordem em que aparecem. */
+  simbolos: string[];
+  texto: string;
+}
+
+/** Um pictograma, com o que se lhe cola (variação de cor, tom de pele, junções
+ *  de família, a segunda letra de uma bandeira). Constante: não é montada a
+ *  partir de texto de ninguém. */
+const PICTOGRAMA =
+  /(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:[\u{FE0E}\u{FE0F}\u{20E3}\u{1F3FB}-\u{1F3FF}]|\u{200D}\p{Extended_Pictographic}|\p{Regional_Indicator})*/gu;
+const IMPRIMEM = new Set(["©", "®", "™"]);
+
+function pictogramasDe(texto: string): string[] {
+  return [...texto.matchAll(PICTOGRAMA)]
+    .map((m) => m[0])
+    .filter((s) => !IMPRIMEM.has(s.replace(/[\u{FE0E}\u{FE0F}]/gu, "")));
+}
+
+export function simbolosQueNaoSaem(doc: Partial<ProposalDoc>): SimbolosQueNaoSaem[] {
+  const achados: SimbolosQueNaoSaem[] = [];
+  for (const { campo, rotulo } of camposPublicados(doc)) {
+    const texto = lerCampo(doc, campo);
+    if (!texto) continue;
+    const simbolos = [...new Set(pictogramasDe(texto))];
+    if (simbolos.length > 0) achados.push({ campo, rotulo, simbolos, texto });
+  }
+  return achados;
+}
+
+/** O campo sem os símbolos que não saem — e sem o espaço duplo que ficaria no
+ *  sítio deles. */
+export function tirarSimbolos<T extends Partial<ProposalDoc>>(doc: T, s: SimbolosQueNaoSaem): T {
+  const texto = lerCampo(doc, s.campo);
+  if (texto === undefined) return doc;
+  const novo = texto
+    .replace(PICTOGRAMA, (m) => (IMPRIMEM.has(m.replace(/[\u{FE0E}\u{FE0F}]/gu, "")) ? m : ""))
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+  return novo === texto ? doc : escreverCampo(doc, s.campo, novo);
+}

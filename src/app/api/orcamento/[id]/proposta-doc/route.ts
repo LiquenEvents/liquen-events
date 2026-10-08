@@ -4,7 +4,6 @@ import type { Proposal } from "@/lib/orcamento/types";
 import {
   type ProposalDoc,
   withProposalDefaults,
-  resolveProposalMoney,
   resolveValidUntil,
   MAX_PROPOSAL_DOC_BYTES,
 } from "@/lib/proposal-doc";
@@ -661,7 +660,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * o dedo duas vezes no mesmo botão, que é outra coisa.
      */
     const JANELA_DE_REPETICAO_MS = 3 * 60_000;
-    const jaSeguiu = irmasAnteriores.find(
+    let jaSeguiu = irmasAnteriores.find(
       (p) =>
         p.status === "enviada" &&
         !!p.versaoSelo &&
@@ -669,6 +668,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         !!p.sentAt &&
         Date.now() - Date.parse(p.sentAt) < JANELA_DE_REPETICAO_MS,
     );
+    /**
+     * ── «ENVIADA» JÁ NÃO QUER DIZER SÓ «O EMAIL SAIU» ──────────────────────
+     *
+     * Desde o achado n.º 4, escolher o WhatsApp também deixa a proposta
+     * «enviada» — sem email nenhum. Se ela a marcou pelo WhatsApp e, um minuto
+     * depois, decide mandá-la também por email, isto não é uma repetição: o
+     * email nunca saiu. Um email que saiu deixa sempre a sua linha no registo
+     * de envios; sem essa linha, não houve email a repetir. (Se o registo não
+     * responder, fica a trava de sempre: é o lado seguro.)
+     */
+    const pedeEmail = body?.porEmail !== false;
+    if (jaSeguiu && pedeEmail) {
+      const alvo = jaSeguiu;
+      try {
+        const envios = await listarEnvios(id);
+        if (!envios.some((e) => e.propostaId === alvo.id)) jaSeguiu = undefined;
+      } catch {
+        /* sem registo, a trava fica — ver acima */
+      }
+    }
     /**
      * ══════════════════════════════════════════════════════════════════════
      * A TRAVA TEM DE OLHAR PARA O FACTO DO ENVIO, E NÃO PARA O ESTADO
@@ -731,6 +750,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           "O cliente JÁ recebeu esta proposta há instantes — o email saiu, e o que tinha " +
           "falhado foi só a marcação do estado deste lado. Não se enviou outra vez, e o " +
           "link é o mesmo que ele tem.",
+      });
+    }
+    if (jaSeguiu && !pedeEmail) {
+      // A mesma proposta marcada duas vezes pelo WhatsApp: não se cria outra,
+      // e não se diz que saiu um email que ninguém mandou.
+      return NextResponse.json({
+        ok: true,
+        id: jaSeguiu.id,
+        emailed: false,
+        semEmailPorEscolha: true,
+        estado: "enviada",
+        acceptUrl: await enderecoDaProposta(jaSeguiu.id, id),
+        missingImages,
+        truncations,
+        pdfBytes: pdfBuffer.byteLength,
+        repetido: true,
+        repetidoAviso:
+          "Esta proposta já tinha sido marcada como enviada pelo WhatsApp há instantes. " +
+          "O link é o mesmo.",
       });
     }
     if (jaSeguiu) {
@@ -1419,7 +1457,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      *  variável e não `proposal.status`: o objecto já foi entregue à camada de
      *  gravação, e mudá-lo por baixo dela seria mentir a quem o guardou.) */
     let estado = proposal.status;
-    if (emailed) {
+    /**
+     * ── SEGUIU: PELO EMAIL, OU PELO WHATSAPP QUE ELA ESCOLHEU ──────────────
+     *
+     * Achado n.º 4 da auditoria. Com «Por onde segue: WhatsApp», a proposta
+     * ficava «rascunho», a resposta vinha sem link e o estúdio dizia «o EMAIL
+     * NÃO SAIU — o cliente não recebeu nada». O WhatsApp nunca abria. O
+     * comentário do `porEmail`, lá em cima, prometia o contrário: «o link do
+     * casal nasce à mesma — é ele que vai no WhatsApp».
+     *
+     * Escolher o WhatsApp é dizer «sou eu que lho mando». A proposta passa a
+     * «enviada», o pedido sobe a «Proposta enviada», e o link volta na
+     * resposta para o estúdio abrir o WhatsApp com ele. A cópia do email
+     * (`registarEnvio`) continua só para o email: não houve email a copiar.
+     */
+    const seguiu = emailed || semEmailPorEscolha;
+    if (seguiu) {
       const sentAt = new Date().toISOString();
 
       /**
@@ -1443,43 +1496,44 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * `catch` à volta custa uma linha e vale a garantia — do lado dela, a
        * proposta seguiu, e um erro aqui só a fazia carregar em Enviar outra vez.
        */
-      try {
-        await registarEnvio(id, {
-          enviadoEm: sentAt,
-          para: String(quote.email ?? ""),
-          porQuem: quem.nome,
-          // A chave do modelo de onde o corpo partiu, para se saber de que
-          // texto se partiu. Vazia quando o envio não passou pelo ecrã novo.
-          modelo: typeof body?.modelo === "string" ? body.modelo : "",
-          idioma: idioma === "en" ? "en" : "pt",
-          assunto: assuntoDoEcra ?? doModelo?.assunto ?? t.assunto,
-          // O CORPO tal e qual, em texto, já com a ligação resolvida. Sem corpo
-          // escrito à mão fica o texto simples do email que saiu — é o que há, e
-          // é o que se quer reler.
-          texto: escrito ? escrito.texto : email.text,
-          anexo: { nome: nomeDoAnexo, bytes: pdfBuffer.byteLength },
-          propostaId: proposal.id,
-        });
-      } catch (e) {
-        log.error("proposta-doc: o email saiu mas a cópia não ficou guardada", e, { id });
-        /**
-         * MELHOR ESFORÇO QUE FALHA TEM DE SER DITO.
-         *
-         * Isto era só um `log.error`, e a resposta saía
-         * `{ok:true, emailed:true, estado:"enviada"}` — o toast dizia «Proposta
-         * enviada ao cliente» e mais nada. O que se perde não é ruído: é a
-         * resposta à pergunta «o que é que nós lhes escrevemos?», que não existe
-         * em mais lado nenhum (o modelo é só o ponto de partida, e o rascunho é
-         * o documento, não o email). Está escrito em `envios-de-proposta.ts`.
-         *
-         * Não pode deitar abaixo um envio que já aconteceu — por isso continua a
-         * ser melhor esforço. O que muda é sair pelo nome, como o `docError` e o
-         * `estadoError` já saem.
-         */
-        copiaError =
-          "O email seguiu para o cliente, mas a CÓPIA do que lhe escrevemos não ficou " +
-          "guardada. O envio está feito; o que se perde é poder reler o texto mais tarde.";
-      }
+      if (emailed)
+        try {
+          await registarEnvio(id, {
+            enviadoEm: sentAt,
+            para: String(quote.email ?? ""),
+            porQuem: quem.nome,
+            // A chave do modelo de onde o corpo partiu, para se saber de que
+            // texto se partiu. Vazia quando o envio não passou pelo ecrã novo.
+            modelo: typeof body?.modelo === "string" ? body.modelo : "",
+            idioma: idioma === "en" ? "en" : "pt",
+            assunto: assuntoDoEcra ?? doModelo?.assunto ?? t.assunto,
+            // O CORPO tal e qual, em texto, já com a ligação resolvida. Sem corpo
+            // escrito à mão fica o texto simples do email que saiu — é o que há, e
+            // é o que se quer reler.
+            texto: escrito ? escrito.texto : email.text,
+            anexo: { nome: nomeDoAnexo, bytes: pdfBuffer.byteLength },
+            propostaId: proposal.id,
+          });
+        } catch (e) {
+          log.error("proposta-doc: o email saiu mas a cópia não ficou guardada", e, { id });
+          /**
+           * MELHOR ESFORÇO QUE FALHA TEM DE SER DITO.
+           *
+           * Isto era só um `log.error`, e a resposta saía
+           * `{ok:true, emailed:true, estado:"enviada"}` — o toast dizia «Proposta
+           * enviada ao cliente» e mais nada. O que se perde não é ruído: é a
+           * resposta à pergunta «o que é que nós lhes escrevemos?», que não existe
+           * em mais lado nenhum (o modelo é só o ponto de partida, e o rascunho é
+           * o documento, não o email). Está escrito em `envios-de-proposta.ts`.
+           *
+           * Não pode deitar abaixo um envio que já aconteceu — por isso continua a
+           * ser melhor esforço. O que muda é sair pelo nome, como o `docError` e o
+           * `estadoError` já saem.
+           */
+          copiaError =
+            "O email seguiu para o cliente, mas a CÓPIA do que lhe escrevemos não ficou " +
+            "guardada. O envio está feito; o que se perde é poder reler o texto mais tarde.";
+        }
 
       try {
         const gravado = await updateProposal(proposal.id, { status: "enviada", sentAt });
@@ -1504,10 +1558,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
          * ela precisa de saber é que o cliente JÁ recebeu, e que o que falta é
          * uma correcção deste lado.
          */
-        estadoError =
-          "O email seguiu para o cliente — ele JÁ a recebeu. O que falhou foi a marcação " +
-          "deste lado: a proposta ficou como «por enviar» e o Quadro pode não a mostrar na " +
-          "coluna certa. Não é preciso reenviar nada.";
+        estadoError = emailed
+          ? "O email seguiu para o cliente — ele JÁ a recebeu. O que falhou foi a marcação " +
+            "deste lado: a proposta ficou como «por enviar» e o Quadro pode não a mostrar na " +
+            "coluna certa. Não é preciso reenviar nada."
+          : "A proposta está gravada, mas não ficou marcada como enviada: o Quadro pode não " +
+            "a mostrar na coluna certa.";
       }
     }
 
@@ -1560,7 +1616,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * depende de o correio ter funcionado.
        */
       await updateQuoteWith(id, (actual) => {
-        const transicao = emailed
+        const transicao = seguiu
           ? transicaoDoPedido({
               acontecimento: "proposta_enviada",
               estadoActual: actual.status,
@@ -1671,6 +1727,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * mas sem email": esse link nunca chegou ao casal, e dá-lo ao estúdio
        * era oferecer para colar num WhatsApp um link que ninguém recebeu.
        */
+      // E no caminho do WhatsApp (achado n.º 4) é ESTE o link que ela manda.
       acceptUrl: estado === "enviada" ? acceptUrl : null,
       missingImages,
       truncations,

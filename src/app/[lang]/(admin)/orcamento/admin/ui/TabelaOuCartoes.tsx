@@ -38,6 +38,13 @@ export interface Coluna<T> {
    *  assim que se ganha densidade no ecrã grande sem apertar o médio. */
   soLargo?: boolean;
   alinharADireita?: boolean;
+  /**
+   * A célula tem um controlo próprio (uma caixa de selecção, um menu). O botão
+   * que abre a linha pelo teclado não pode ir para dentro dela — ficava um
+   * controlo dentro de outro, que um leitor de ecrã lê mal (achado n.º 24) —,
+   * por isso vai para a primeira coluna que não tenha isto.
+   */
+  interactiva?: boolean;
   /** Largura fixa (classe do Tailwind), para colunas de números ou de ícones. */
   largura?: string;
 }
@@ -394,6 +401,11 @@ export function TabelaOuCartoes<T>({
   }
 
   const visiveis = colunas.filter((c) => !c.soLargo || largo);
+  /** Onde vai o botão que abre a linha pelo teclado — ver `interactiva`. */
+  const indiceDoAbrir = Math.max(
+    0,
+    visiveis.findIndex((c) => !c.interactiva),
+  );
 
   return (
     /**
@@ -519,7 +531,7 @@ export function TabelaOuCartoes<T>({
                       linha (o nome do casal, o número da factura). Sem isto a
                       tabela era inutilizável sem rato, que é o defeito mais
                       fácil de introduzir aqui e o mais difícil de notar. */}
-                  {aoAbrir && i === 0 ? (
+                  {aoAbrir && i === indiceDoAbrir ? (
                     <button
                       type="button"
                       onClick={(e) => {

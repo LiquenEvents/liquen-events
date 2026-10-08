@@ -390,6 +390,30 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
+/**
+ * Carregar no «Confirmar» do envio como uma pessoa: depois de a pergunta estar
+ * à vista. O botão ignora cliques nos primeiros 400 ms — é o que impede o
+ * segundo clique de um duplo clique de enviar a proposta (achado n.º 3).
+ */
+async function confirmarEnvio(user: { click: (el: Element) => Promise<void> }) {
+  const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
+  await new Promise((r) => setTimeout(r, 450));
+  await user.click(botao);
+}
+
+/** Só o DOCUMENTO de cada gravação do rascunho. O corpo leva também a `base`
+ *  dos campos que mudaram (achado n.º 6 — o valor de ANTES, para o servidor
+ *  juntar duas pessoas campo a campo), e isso não é o que fica gravado. */
+function docsGravados(parte: string): string[] {
+  return corpos(parte).map((c) => {
+    try {
+      return JSON.stringify(JSON.parse(c).doc ?? null);
+    } catch {
+      return c;
+    }
+  });
+}
+
 beforeEach(() => {
   localStorage.clear();
   seletor.marcadores.length = 0;
@@ -1530,7 +1554,7 @@ describe("a disposição das fotos do mood board", () => {
     pedidos = [];
     await user.click(screen.getByRole("radio", { name: /^Automático/ }));
     await waitFor(() => {
-      const gravado = corpos("proposta-rascunho").at(-1) ?? "";
+      const gravado = docsGravados("proposta-rascunho").at(-1) ?? "";
       expect(gravado).toContain("Cerimónia");
       expect(gravado).not.toContain('"layout"');
     });
@@ -1596,6 +1620,30 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     expect(within(alerta).getByText(/Verifica antes de enviar/)).toBeTruthy();
   });
 
+  /**
+   * Achado n.º 3 da auditoria: o «Confirmar» aparece exactamente onde estava a
+   * ponta direita do «Gerar e enviar ao cliente». Um duplo clique ali enviava
+   * a proposta sem a pergunta chegar a ser vista.
+   */
+  it("o segundo clique de um duplo clique não confirma o envio", async () => {
+    seedDraft(2);
+    propostaDoc = reply({ json: { ok: true, emailed: true } });
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    const gerar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    // Os dois cliques no MESMO instante, como um duplo clique — com `fireEvent`,
+    // que é síncrono. Com `await user.click` + `findByRole` pelo meio, o CI
+    // lento deixava passar mais de 400 ms entre os dois, e aí o «Confirmar»
+    // aceitava, e bem: já não era um duplo clique.
+    fireEvent.click(gerar);
+    fireEvent.click(screen.getByRole("button", { name: /^Confirmar$/ }));
+    expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+    // Depois de a ler, confirma.
+    await confirmarEnvio(user);
+    await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
+  });
+
   it("o envio avisa das duas perdas ao mesmo tempo, sem as confundir", async () => {
     seedDraft(2);
     propostaDoc = reply({
@@ -1611,7 +1659,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     // Enviar exige duas carregadas: a acção e a confirmação.
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     const alerta = await screen.findByRole("alert");
     const texto = alerta.textContent ?? "";
@@ -1647,7 +1695,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     // A pergunta, com os dois cortes escritos por extenso.
     expect(await screen.findByText(/O documento sai com conteúdo cortado/)).toBeTruthy();
@@ -1682,7 +1730,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
     await user.click(await screen.findByRole("button", { name: /Voltar e corrigir/ }));
 
     // Um envio só — o que fez a pergunta.
@@ -1898,7 +1946,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     const enviar = screen.getByRole("button", { name: /Gerar e enviar ao cliente/ });
     expect(enviar).toBeEnabled();
     await user.click(enviar);
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
     expect(corpo).not.toContain("pending:");
@@ -2674,7 +2722,7 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     const alerta = await screen.findByRole("alert");
     expect(alerta.textContent ?? "").toMatch(/email de cliente válido/i);
@@ -4240,7 +4288,7 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     // documentos antigos não conhecem.
     await user.click(interruptor());
     await waitFor(
-      () => expect(corpos("proposta-rascunho").at(-1) ?? "").not.toContain("forma-da-foto"),
+      () => expect(docsGravados("proposta-rascunho").at(-1) ?? "").not.toContain("forma-da-foto"),
       { timeout: 3000 },
     );
   });
@@ -5379,7 +5427,7 @@ describe("gerar a proposta em inglês", () => {
 
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5393,7 +5441,7 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5427,7 +5475,7 @@ describe("gerar a proposta em inglês", () => {
 
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5507,7 +5555,7 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5604,7 +5652,7 @@ describe("o botão «Copiar resumo»", () => {
     renderStudio();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
     await screen.findByRole("button", { name: "Enviar de novo / nova revisão" });
 
     await user.click(screen.getByRole("button", { name: "Copiar resumo" }));
@@ -5676,7 +5724,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
   }
 
   it("o que ela escreve na caixa segue no pedido de envio", async () => {
@@ -6622,7 +6670,12 @@ describe("a lista das fotos e o que sobrevive a um deployment", () => {
 
     // A montagem: os dois mood boards, com as fotos e pela ordem em que ela as
     // pôs. É isto que não pode depender do endereço.
-    await screen.findByDisplayValue("Cerimónia");
+    //
+    // «Cerimónia» aparece DUAS vezes: o título do mood board e a linha dos
+    // Serviços. Este teste procurava-a uma vez só, e passava porque os Serviços
+    // do servidor NÃO voltavam — era o achado n.º 1 da auditoria (o carimbo
+    // dos ids contava como «ela escreveu» e tirava os Serviços da fusão).
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia")).toHaveLength(2));
     await screen.findByDisplayValue("Copo de água");
     await waitFor(() => expect(celulas()).toHaveLength(4));
 
@@ -7183,7 +7236,7 @@ describe("o email do passo 3 viaja com o envio", () => {
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
   }
 
   it("o texto que está na caixa é o que segue, com o assunto e o modelo", async () => {
@@ -9768,5 +9821,41 @@ describe("o esqueleto da miniatura", () => {
       );
       expect(c.querySelector("[data-a-carregar]")).toBeNull();
     }
+  });
+});
+
+/**
+ * Achados n.º 5, 16 e 17 da auditoria: «-500» via-se negativo e contava +500;
+ * «0» voltava sozinho ao valor anterior; «150%» de sinal voltava a 30% — os
+ * três sem uma palavra.
+ */
+describe("o que não é um valor diz-se, e não se grava", () => {
+  it("«-500» e «0» dizem porquê e não mexem no total", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    const valor = await screen.findByLabelText(/^Valor \(sem IVA\)/);
+    await user.clear(valor);
+    await user.type(valor, "-500");
+    expect(await screen.findByText(/não pode ser negativo/)).toBeTruthy();
+    await user.clear(valor);
+    await user.type(valor, "0");
+    expect(await screen.findByText(/Com 0 € não há proposta a enviar/)).toBeTruthy();
+    await user.clear(valor);
+    await user.type(valor, "4000");
+    expect(screen.queryByText(/não pode ser negativo|Com 0 € não há/)).toBeNull();
+  });
+
+  it("um sinal fora de 1–99 fica escrito, com a razão, e o documento não muda", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    const sinal = await screen.findByLabelText("Percentagem do sinal");
+    await user.clear(sinal);
+    await user.type(sinal, "150");
+    expect((sinal as HTMLInputElement).value).toBe("150");
+    expect(document.getElementById("sinal-erro")?.textContent).toMatch(/entre 1% e 99%/);
+    await user.tab();
+    expect((sinal as HTMLInputElement).value).toBe("30");
   });
 });

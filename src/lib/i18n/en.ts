@@ -724,63 +724,6 @@ export const en: Dict = {
     dateLocale: "en-GB",
   },
 
-  portal: {
-    title: "Líquen Events Client Portal",
-    eyebrow: "Client Portal",
-    greeting: "Hello",
-    intro:
-      "Here you'll find everything about your event with us in one place: the proposal, the terms, payments and next steps.",
-    dateLocale: "en-GB",
-    // Ver `pt.ts`: os nomes dos tipos de evento vivem em `orcamento/data.ts`.
-    // Aqui fica só o que se diz quando não há tipo nenhum.
-    eventFallbackEmpresa: "Corporate Event",
-    eventFallbackParticular: "Event",
-    semData: "Date to be confirmed",
-    semLocal: "Location to be confirmed",
-    // Ver `pt.ts`: mesma frase para um token forjado e para um pedido apagado,
-    // de propósito, para nunca revelar se um identificador existe.
-    linkInvalidTitle: "This link is no longer valid",
-    linkInvalidBody:
-      "This link to your client area is no longer valid. Contact us and we will gladly send you a new one.",
-    proposta: {
-      title: "Proposal",
-      statusLabel: "Status",
-      status: {
-        rascunho: "In preparation",
-        enviada: "Sent, awaiting your response",
-        aceite: "Accepted",
-        rejeitada: "Declined",
-      },
-      totalLabel: "Total",
-      download: "Download proposal (PDF)",
-      none: "No proposal is available yet. We're preparing it and will let you know as soon as it's ready.",
-    },
-    contrato: {
-      title: "Contract",
-      aceite: "Terms accepted on {date} by {name} (v{version}).",
-      download: "Download contract (PDF)",
-      pendingTitle: "Acceptance pending",
-      pendingBody:
-        "Once you've reviewed the proposal, let us know by email or by phone whether you'd like to go ahead. We look forward to hearing from you.",
-    },
-    pagamentos: {
-      title: "Payments",
-      // The base, stated — see the pt dictionary for why.
-      intro:
-        "Payment is staged: a {sinal}% deposit to reserve the date and the {saldo}% balance before the event, both calculated on the total payable (VAT included).",
-      scheduleTitle: "Expected schedule",
-      // Percentages are filled in from the PROPOSAL — see the pt dictionary.
-      sinal: "Deposit ({sinal}%)",
-      saldo: "Balance ({saldo}%)",
-      semTotal: "The payment schedule becomes available once the proposal is ready.",
-    },
-    proximos: {
-      title: "Next steps",
-      body: "If you have any questions about the proposal, the terms or payments, we're here to help. Just reply to our email or use the contacts below.",
-      contactTitle: "Get in touch",
-    },
-  },
-
   errors: {
     notFoundEyebrow: "Page not found",
     notFoundTitle: "This path doesn't exist.",

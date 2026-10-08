@@ -51,8 +51,7 @@ const PESADAS: { rota: string; faz: string; minimo: number }[] = [
   // A rota do aceite do cliente saiu (ver `nada-de-aceitar-por-botao.test.ts`):
   // a proposta passa a ser aceite pela conversa, e marcada no back office.
   { rota: "proposta/[token]/pdf", faz: "serve o PDF da proposta ao cliente", minimo: 20 },
-  { rota: "portal/[token]/proposta-pdf", faz: "o mesmo, pelo portal", minimo: 20 },
-  { rota: "portal/[token]/contrato-pdf", faz: "o contrato, pelo portal", minimo: 20 },
+  // As duas do portal saíram com ele (achado n.º 37 da auditoria).
   { rota: "backup", faz: "lê treze conjuntos de dados inteiros", minimo: 60 },
   { rota: "backup/restore", faz: "reescreve treze conjuntos de dados", minimo: 60 },
   { rota: "material/importar", faz: "importação em bloco", minimo: 30 },

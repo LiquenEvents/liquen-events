@@ -72,6 +72,9 @@ const SUPERFICIES: Record<string, string> = {
  */
 const SOBRE: Record<string, string> = {
   "--bo-sobre-acento": "--bo-accent",
+  // A tinta dos botões e filtros SELECCIONADOS (achado n.º 14: eram
+  // `text-white`, que no escuro ficava branco sobre o verde-claro, 1,13:1).
+  "--bo-sobre-seleccao": "--bo-seleccao",
 };
 
 /** WCAG 2.x, luminância relativa. */
@@ -252,9 +255,7 @@ describe("o contraste das cores escritas à mão", () => {
     for (const { cor, onde } of coresDeTexto()) {
       // Uma tinta com fundo nomeado mede-se lá, e só lá.
       const nomeDoFundo = SOBRE[cor];
-      const fundoNomeado = nomeDoFundo
-        ? resolver(`var(${nomeDoFundo})`, "#ffffff", TOKENS)
-        : null;
+      const fundoNomeado = nomeDoFundo ? resolver(`var(${nomeDoFundo})`, "#ffffff", TOKENS) : null;
       const superficies: [string, string][] = fundoNomeado
         ? [[`o acento (${nomeDoFundo})`, fundoNomeado]]
         : Object.entries(SUPERFICIES);

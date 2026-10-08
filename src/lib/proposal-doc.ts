@@ -309,6 +309,30 @@ export function withServiceIds(groups: readonly ServiceGroup[]): ServiceGroup[] 
   return changed ? next : (groups as ServiceGroup[]);
 }
 
+/**
+ * Entre `antes` e `depois` só mudaram os ids? Então ninguém escreveu nada.
+ *
+ * O editor de serviços chama {@link withServiceIds} ao montar (os grupos que
+ * vêm do pedido, ou de um rascunho antigo, não têm ids). Isso passava pelo
+ * mesmo caminho de uma tecla, e o estúdio contava-o como «ela escreveu nos
+ * Serviços» — com o resultado de, ao abrir noutro computador, pôr de lado os
+ * Serviços que o servidor trazia e gravar por cima o vazio. Quem decide se a
+ * pessoa escreveu tem de saber distinguir as duas coisas, e é esta a pergunta.
+ */
+export function soMudaramOsIds(
+  antes: readonly ServiceGroup[] | undefined,
+  depois: readonly ServiceGroup[] | undefined,
+): boolean {
+  const semIds = (gs: readonly ServiceGroup[] | undefined) =>
+    JSON.stringify(
+      (gs ?? []).map(({ id: _g, items, ...g }) => ({
+        ...g,
+        items: (items ?? []).map(({ id: _i, ...it }) => it),
+      })),
+    );
+  return semIds(antes) === semIds(depois);
+}
+
 /** Id de uma página de inspiração que ainda não tem nenhum — DERIVADO DA
  *  POSIÇÃO, como o dos serviços e pelas mesmas razões (ver
  *  {@link withServiceIds}: um id sorteado faria o mesmo documento serializar

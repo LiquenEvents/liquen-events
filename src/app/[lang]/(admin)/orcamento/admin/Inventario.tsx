@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { useMemo, useState, useDeferredValue, type ReactNode } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
@@ -554,13 +555,7 @@ export default function Inventario() {
       .filter((i) => {
         if (cat !== "Todas" && i.category !== cat) return false;
         if (cond !== "Todos" && i.condition !== cond) return false;
-        if (
-          q &&
-          ![i.name, i.category, i.location, i.notes]
-            .filter(Boolean)
-            .some((v) => v!.toLowerCase().includes(q))
-        )
-          return false;
+        if (q && !casaComAProcura(q, [i.name, i.category, i.location, i.notes])) return false;
         return true;
       })
       .slice()
@@ -1037,6 +1032,7 @@ export default function Inventario() {
                 },
                 {
                   chave: "accoes",
+                  interactiva: true,
                   cabecalho: "Ações",
                   alinharADireita: true,
                   largura: "w-32",

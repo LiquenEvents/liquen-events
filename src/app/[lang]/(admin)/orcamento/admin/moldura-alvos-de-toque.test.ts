@@ -89,11 +89,11 @@ function blocoQueContem(fonte: string, ancora: string): string {
 
 describe("o dossier do evento, ao dedo", () => {
   /**
-   * As quatro ferramentas da barra. Três delas IMPRIMEM ou descarregam: falhar
-   * o toque não custa um toque repetido, custa um dossier na impressora.
+   * As ferramentas da barra. Todas IMPRIMEM ou descarregam: falhar o toque não
+   * custa um toque repetido, custa um dossier na impressora. (O «Copiar link do
+   * portal» e o «Abrir portal» saíram com o portal — achado n.º 37.)
    */
   it.each([
-    ["onClick={copyPortalLink}", "copiar o link do portal"],
     ["onClick={() => printEventDossier(quote)}", "imprimir o dossier"],
     ["onClick={() => printRunSheet(quote)}", "a timeline"],
     ["onClick={() => downloadEventIcs(quote)}", "o .ics"],
@@ -101,19 +101,15 @@ describe("o dossier do evento, ao dedo", () => {
     expect(blocoQueContem(CABECALHO, accao)).toContain("alvo-toque");
   });
 
-  it("dá 44 px ao «Abrir portal», que era o mais pequeno da barra (38×32)", () => {
-    // O TOOL_LINK é partilhado; basta-lhe estar na declaração.
-    expect(CABECALHO).toMatch(/const TOOL_LINK =\s*\n\s*"alvo-toque /);
-  });
-
   it("separa os alvos da barra em 8 px, e não nos 6 que tinha", () => {
     expect(CABECALHO).toContain("gap-1.5 pointer-coarse:gap-2 mt-4");
   });
 
   it("levanta o botão da próxima acção de 40 para 44 px", () => {
-    // Os três estados (portal, zona, desactivado) sobem juntos: um cartão em
-    // que a altura do botão muda com o estado lê-se como um salto.
-    expect(CABECALHO.match(/h-10 pointer-coarse:h-11 px-4/g)).toHaveLength(3);
+    // Os estados (zona e desactivado) sobem juntos: um cartão em que a altura
+    // do botão muda com o estado lê-se como um salto. Eram três; o do portal
+    // saiu com ele (achado n.º 37).
+    expect(CABECALHO.match(/h-10 pointer-coarse:h-11 px-4/g)).toHaveLength(2);
     expect(CABECALHO).not.toMatch(/h-10 px-4 bg-/);
   });
 

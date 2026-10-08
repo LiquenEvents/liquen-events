@@ -93,9 +93,7 @@ afterEach(() => {
 });
 
 function montar() {
-  return render(
-    <DossierClient data={DADOS} portalUrl="/pt/portal/abc" lang="pt" userName="Equipa" />,
-  );
+  return render(<DossierClient data={DADOS} lang="pt" userName="Equipa" />);
 }
 
 describe("Dossier — uma entrada do registo que o servidor recusa", () => {

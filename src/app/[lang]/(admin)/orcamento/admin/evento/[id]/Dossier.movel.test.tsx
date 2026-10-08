@@ -62,9 +62,7 @@ const QUOTE = {
 const DADOS: DossierData = { quote: QUOTE, proposal: null, contract: null };
 
 function desenhar() {
-  return render(
-    <DossierClient data={DADOS} portalUrl="/pt/portal/abc" lang="pt" userName="Catarina" />,
-  );
+  return render(<DossierClient data={DADOS} lang="pt" userName="Catarina" />);
 }
 
 /** Rolar a página de verdade: o `useDesceu` lê `window.scrollY` no evento. */
@@ -118,8 +116,8 @@ describe("o cabeçalho do dossier encolhe assim que ela começa a descer", () =>
     desenhar();
     rolar(400);
     expect(titulo().textContent).toBe("Ana e Rui");
-    // A barra de ferramentas do cabeçalho: partilhar, imprimir, calendário.
-    expect(screen.getByTitle(/Copiar o link privado do portal/)).toBeTruthy();
+    // A barra de ferramentas do cabeçalho: imprimir e calendário (o «Copiar
+    // link do portal» saiu com o portal — achado n.º 37).
     expect(screen.getByTitle(/Imprimir o dossier completo/)).toBeTruthy();
     expect(screen.getByTitle(/Descarregar .ics/)).toBeTruthy();
   });

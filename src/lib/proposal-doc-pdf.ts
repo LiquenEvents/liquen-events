@@ -889,12 +889,6 @@ export async function renderProposalDocPdfWithReport(
   const noteUndrawn: NoteUndrawn = (b64) => {
     undrawn.add(b64);
   };
-  /** Corta a `max` linhas E DIZ quantas ficaram de fora. Usar sempre isto em
-   *  vez de `.slice(0, max)`: o `.slice` é mudo, este não. */
-  const clampLines = (lines: string[], max: number, where: string): string[] => {
-    note(where, lines.length - max, "linhas");
-    return lines.slice(0, max);
-  };
 
   const pdf = await PDFDocument.create();
   // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes
@@ -1594,7 +1588,17 @@ export async function renderProposalDocPdfWithReport(
        * vazio, e o vazio já tem caminho.
        */
       const rotulo = (it.label ?? "").trim();
-      if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label ?? ""] };
+      // SÓ RÓTULO TAMBÉM SE PARTE — achado n.º 2 da auditoria. Era medido como
+      // UMA linha (`[it.label]`): o «Enter» que ela escreveu e a linha comprida
+      // demais eram desenhados em várias, e a linha seguinte ficava por cima.
+      // A altura que se mede tem de ser a altura que se desenha.
+      if (!it.desc) {
+        return {
+          lab: "",
+          dx: DESC_X,
+          lines: wrap(f.reg, it.label ?? "", descSize, MEDIDA_DOS_SERVICOS),
+        };
+      }
       // SEM RÓTULO NÃO HÁ DOIS PONTOS. Uma linha de serviço só com descrição
       // desenhava o separador à mesma e saía «: Floral arch.» — uma frase a
       // começar por dois pontos, que se lê como software estragado. O rótulo é

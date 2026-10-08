@@ -70,6 +70,16 @@ interface Props {
   clienteAtual: string;
   onEscolhido: (e: Escolha) => void;
   toast?: (mensagem: string, tipo?: "success" | "error") => void;
+  /**
+   * O trabalho que já está nesta proposta, dito por palavras («2 serviços, 1
+   * página de inspiração»), ou `null` quando não há nada a perder.
+   *
+   * Achado n.º 7 da auditoria: escolher uma linha aplicava a cópia por cima do
+   * que estava escrito, sem perguntar. Havia um «Anular» de 10 s, e depois
+   * disso o texto dela tinha desaparecido. Com isto, a primeira escolha só
+   * pergunta; copiar é a segunda.
+   */
+  substitui?: string | null;
 }
 
 type Linha =
@@ -140,6 +150,7 @@ export default function CriarAPartirDe({
   clienteAtual,
   onEscolhido,
   toast,
+  substitui = null,
 }: Props) {
   const [modelos, setModelos] = useState<ModeloProposta[]>([]);
   const [propostas, setPropostas] = useState<ResumoProposta[]>([]);
@@ -147,6 +158,8 @@ export default function CriarAPartirDe({
   /** A leitura falhou — o ecrã tem de dizer isso, e não «não há nada». */
   const [naoDeuParaLer, setNaoDeuParaLer] = useState(false);
   const [aCopiar, setACopiar] = useState<string | null>(null);
+  /** A linha escolhida que ainda espera o «sim» — ver `substitui`. */
+  const [aConfirmar, setAConfirmar] = useState<string | null>(null);
   const [procura, setProcura] = useState("");
   const [ativo, setAtivo] = useState(0);
   // O gancho devolve o `ref` e trata do ciclo do foco; o Esc é aqui em baixo,
@@ -162,6 +175,8 @@ export default function CriarAPartirDe({
   useEffect(() => {
     if (!open) return;
     let vivo = true;
+    // Fechar e voltar a abrir esquece a pergunta que ficou por responder.
+    setAConfirmar(null);
     setACarregar(true);
     setNaoDeuParaLer(false);
     // Uma resposta que não seja 2xx traz `{error: …}` no corpo, não a lista.
@@ -234,8 +249,13 @@ export default function CriarAPartirDe({
   }, [modelos, propostas, procura, clienteAtual]);
 
   const escolher = useCallback(
-    async (linha: Linha) => {
+    async (linha: Linha, confirmado = false) => {
       if (aCopiar) return;
+      if (substitui && !confirmado) {
+        setAConfirmar(linha.id);
+        return;
+      }
+      setAConfirmar(null);
       setACopiar(linha.id);
       try {
         const corpo =
@@ -257,7 +277,7 @@ export default function CriarAPartirDe({
         setACopiar(null);
       }
     },
-    [aCopiar, quoteId, onEscolhido, onClose, toast],
+    [aCopiar, substitui, quoteId, onEscolhido, onClose, toast],
   );
 
   const teclas = (e: React.KeyboardEvent) => {
@@ -450,6 +470,28 @@ export default function CriarAPartirDe({
                   de propósito — o botão está desactivado, e o que está
                   dentro de um botão desactivado não é lido por toda a
                   gente. */}
+                {/* ── A PERGUNTA, DEBAIXO DA LINHA QUE ELA ESCOLHEU ─────────
+                  E não por cima do sítio onde clicou: um duplo clique não a
+                  pode responder por ela (o «Substituir» fica noutro lugar). */}
+                {aConfirmar === linha.id && !aTrabalhar && (
+                  <div
+                    role="alert"
+                    className="mt-1 rounded-xl bg-[var(--bo-aviso-tom)]/10 px-4 py-3 text-xs leading-relaxed text-[var(--bo-aviso)]"
+                  >
+                    <p>
+                      Esta proposta já tem trabalho ({substitui}). Copiar substitui-o — ficam 10
+                      segundos para anular, e depois perde-se.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => setAConfirmar(null)}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => void escolher(linha, true)}>
+                        Substituir
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {aTrabalhar && (
                   <EmCurso
                     className="mt-1"

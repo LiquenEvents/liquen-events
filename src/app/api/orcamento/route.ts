@@ -735,6 +735,25 @@ export async function POST(request: NextRequest) {
       await createQuote(quote);
       persisted = true;
     } catch (storeErr) {
+      /**
+       * ── O GÉMEO QUE CHEGOU AO MESMO TEMPO ──────────────────────────────
+       *
+       * Achado n.º 18 da auditoria: dois envios SIMULTÂNEOS do mesmo pedido
+       * (a rede repete o POST) passam os dois pela verificação de cima, e o
+       * segundo a gravar leva «chave duplicada» (23505). Seguia o caminho da
+       * gravação falhada — e a equipa recebia o email duas vezes.
+       *
+       * Se o pedido com este id já lá está, a gravação não falhou: foi o
+       * primeiro dos dois a fazê-la. Responde-se como a repetição de cima, sem
+       * email nenhum — o do primeiro já está a caminho.
+       */
+      if (submissionId) {
+        const jaGravado = await getQuote(id).catch(() => null);
+        if (jaGravado) {
+          log.info("orcamento: envio repetido em simultâneo — o primeiro já gravou", { id });
+          return NextResponse.json({ id, status: "ok" });
+        }
+      }
       log.error("orcamento: persistência falhou", storeErr, { id });
     }
 

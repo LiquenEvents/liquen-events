@@ -4,7 +4,6 @@ import { join } from "node:path";
 import type { Metadata } from "next";
 
 import { generateMetadata as metaProposta } from "../(privado)/proposta/[token]/page";
-import { generateMetadata as metaPortal } from "./portal/[token]/page";
 import { LOCALES } from "@/lib/i18n";
 
 /**
@@ -69,10 +68,6 @@ describe("títulos das páginas que o cliente abre por link", () => {
     {
       nome: `/${lang}/proposta/[token]`,
       meta: () => metaProposta({ params: Promise.resolve({ lang, token: "nao-resolve" }) }),
-    },
-    {
-      nome: `/${lang}/portal/[token]`,
-      meta: () => metaPortal({ params: Promise.resolve({ lang, token: "nao-resolve" }) }),
     },
   ]);
 

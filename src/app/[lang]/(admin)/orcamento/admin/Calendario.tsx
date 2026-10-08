@@ -51,6 +51,51 @@ import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
  * listas a nomear os mesmos sete dias no MESMO ecrã.
  */
 const WEEKDAYS: readonly string[] = DIAS_DA_SEMANA.map((d) => d.curto);
+
+/**
+ * O dia para onde uma tecla leva, na grelha do mês — ou `null` se a tecla não
+ * é de navegação. A Parte 8 do `docs/APPLE-CALENDARIO.md`: setas dia a dia,
+ * `Home`/`End` princípio e fim da semana (que começa à segunda), `PageUp`/
+ * `PageDown` o mesmo dia no mês ao lado (encostado ao fim do mês, se não
+ * existir: 31 de Janeiro → 28 de Fevereiro).
+ */
+export function diaPelaTecla(iso: string, tecla: string): string | null {
+  const [a, m, d] = iso.split("-").map(Number);
+  const data = new Date(a, m - 1, d, 12);
+  const diaDaSemana = (data.getDay() + 6) % 7; // segunda = 0
+  const mais = (dias: number) => new Date(a, m - 1, d + dias, 12);
+  let alvo: Date;
+  switch (tecla) {
+    case "ArrowLeft":
+      alvo = mais(-1);
+      break;
+    case "ArrowRight":
+      alvo = mais(1);
+      break;
+    case "ArrowUp":
+      alvo = mais(-7);
+      break;
+    case "ArrowDown":
+      alvo = mais(7);
+      break;
+    case "Home":
+      alvo = mais(-diaDaSemana);
+      break;
+    case "End":
+      alvo = mais(6 - diaDaSemana);
+      break;
+    case "PageUp":
+    case "PageDown": {
+      const salto = tecla === "PageUp" ? -1 : 1;
+      const ultimo = new Date(a, m - 1 + salto + 1, 0).getDate();
+      alvo = new Date(a, m - 1 + salto, Math.min(d, ultimo), 12);
+      break;
+    }
+    default:
+      return null;
+  }
+  return `${alvo.getFullYear()}-${pad2(alvo.getMonth() + 1)}-${pad2(alvo.getDate())}`;
+}
 /**
  * Os nomes dos meses vêm do módulo que faz as contas do ano
  * (`lib/orcamento/ano-do-calendario`), e não de uma segunda lista aqui.
@@ -605,6 +650,16 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   const [aRemover, setARemover] = useState<{ id: string; title: string } | null>(null);
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  /** O dia da grelha do mês com o foco — ver «O FOCO ITINERANTE». */
+  const [focoDia, setFocoDia] = useState<string | null>(null);
+  const grelhaRef = useRef<HTMLDivElement>(null);
+  /** Pôr o foco no dia depois de desenhar (pode ser noutro mês). */
+  const focarDepois = useRef(false);
+  useEffect(() => {
+    if (!focarDepois.current || !focoDia) return;
+    focarDepois.current = false;
+    grelhaRef.current?.querySelector<HTMLElement>(`[data-dia="${focoDia}"]`)?.focus();
+  });
 
   /**
    * ══════════════════════════════════════════════════════════════════════
@@ -845,6 +900,24 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
       inMonth: d.getMonth() === month,
     });
   }
+
+  /* ── O FOCO ITINERANTE DA GRELHA DO MÊS (achado n.º 24) ─────────────────
+     Um dia só no fio do Tab: o que tem o foco, senão o escolhido, senão hoje,
+     senão o dia 1. As setas mudam-no; se saírem do mês, o mês muda com elas. */
+  const prefixoDoMes = `${year}-${pad2(month + 1)}`;
+  const diaComFoco = focoDia?.startsWith(prefixoDoMes)
+    ? focoDia
+    : selectedDay?.startsWith(prefixoDoMes)
+      ? selectedDay
+      : todayStr.startsWith(prefixoDoMes)
+        ? todayStr
+        : `${prefixoDoMes}-01`;
+  const focarDia = (iso: string) => {
+    const [a, m] = iso.split("-").map(Number);
+    if (a !== year || m - 1 !== month) setCursor(new Date(a, m - 1, 1));
+    focarDepois.current = true;
+    setFocoDia(iso);
+  };
 
   /* ══════════════════════════════════════════════════════════════════════════
      NAVEGAR — UMA PORTA POR UNIDADE, E AS DUAS A MANTEREM-SE DE ACORDO
@@ -1734,39 +1807,53 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
                   A célula a 375 px era 44,7 com o cartão e passou a 48,1: os
                   24 px de margem que o cartão comia estão nas sete colunas. */}
+              {/* ── UMA GRELHA A SÉRIO (achado n.º 24, fase 11 do documento) ──
+                  Era um `role="group"` de `role="button"`, com botões lá
+                  dentro — controlos dentro de controlos, que um leitor de ecrã
+                  lê mal. Passa a `grid` de linhas (`row`, com `display:
+                  contents` para não mexer na disposição) e dias (`gridcell`):
+                  as setas andam dia a dia, `Home`/`End` vão ao princípio e ao
+                  fim da semana, `PageUp`/`PageDown` mudam de mês, `Enter` e
+                  `Espaço` abrem o dia. Só UM dia está no fio do Tab (o foco
+                  itinerante), e hoje leva `aria-current="date"`. */}
               <div
-                role="group"
+                ref={grelhaRef}
+                role="grid"
                 aria-label={`Calendário de ${MONTHS[month]} ${year}`}
                 className="grid grid-cols-7 gap-px bg-[var(--bo-hairline)] [--celula:3.25rem] sm:[--celula:6rem] lg:min-h-[calc(100dvh-21rem)]"
                 style={{ gridTemplateRows: `repeat(${semanas}, minmax(var(--celula), 1fr))` }}
               >
-                {cells.map((c, indice) => {
-                  if (!c.inMonth) {
-                    return (
-                      <div
-                        key={c.key}
-                        aria-hidden="true"
-                        /* ── OS DIAS DO MÊS AO LADO, ESBATIDOS ─────────────
+                {Array.from({ length: semanas }, (_, semana) => (
+                  <div key={`semana-${semana}`} role="row" className="contents">
+                    {cells.slice(semana * 7, semana * 7 + 7).map((c, j) => {
+                      const indice = semana * 7 + j;
+                      if (!c.inMonth) {
+                        return (
+                          <div
+                            key={c.key}
+                            role="gridcell"
+                            aria-hidden="true"
+                            /* ── OS DIAS DO MÊS AO LADO, ESBATIDOS ─────────────
                            O ponto 10 dela: «31 de agosto e 1 a 4 de outubro
                            parecem dias de setembro». Passam a ter o fundo
                            recuado da casa e o número no tom mais calmo que a
                            escada dá — não estão desligados, estão noutro mês,
                            e a grelha tem de o dizer sem se partir em duas. */
-                        className="bg-[var(--bo-surface-sunken)] p-1.5 sm:p-2"
-                      >
-                        <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/25">
-                          {c.day}
-                        </span>
-                      </div>
-                    );
-                  }
-                  const key = c.key;
-                  const dayQuotes = byDay.get(key) ?? [];
-                  const dayEvents = eventsByDay.get(key) ?? [];
-                  const isToday = key === todayStr;
-                  const isSelected = key === selectedDay;
-                  const total = dayQuotes.length + dayEvents.length;
-                  /* ── O QUE CABE NUMA CÉLULA, E O QUE VAI PARA O «+N MAIS» ──
+                            className="bg-[var(--bo-surface-sunken)] p-1.5 sm:p-2"
+                          >
+                            <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/25">
+                              {c.day}
+                            </span>
+                          </div>
+                        );
+                      }
+                      const key = c.key;
+                      const dayQuotes = byDay.get(key) ?? [];
+                      const dayEvents = eventsByDay.get(key) ?? [];
+                      const isToday = key === todayStr;
+                      const isSelected = key === selectedDay;
+                      const total = dayQuotes.length + dayEvents.length;
+                      /* ── O QUE CABE NUMA CÉLULA, E O QUE VAI PARA O «+N MAIS» ──
                      UMA fila só, e a ordem é a do dia: os pedidos primeiro —
                      a data é deles, e é por causa deles que o dia está
                      ocupado —, as marcações a seguir.
@@ -1779,19 +1866,19 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                      mais 3 de intervalo — 18 + 3×23 = 87, com 9 de folga.
                      Quando não cabem, a última linha é o «+N mais», portanto
                      mostram-se duas: 2 + 1 continua a dar três. */
-                  const CABEM = 3;
-                  const doDia = [
-                    ...dayQuotes.map((q) => ({ pedido: q, marcacao: null })),
-                    ...dayEvents.map((ev) => ({ pedido: null, marcacao: ev })),
-                  ];
-                  const mostrados = total > CABEM ? doDia.slice(0, CABEM - 1) : doDia;
-                  const hiddenCount = total - mostrados.length;
-                  // On very narrow screens the chips collapse into plain dots.
-                  const dots = [
-                    ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
-                    ...dayEvents.map((ev) => TIPO_META[ev.kind].cor),
-                  ].slice(0, 4);
-                  /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
+                      const CABEM = 3;
+                      const doDia = [
+                        ...dayQuotes.map((q) => ({ pedido: q, marcacao: null })),
+                        ...dayEvents.map((ev) => ({ pedido: null, marcacao: ev })),
+                      ];
+                      const mostrados = total > CABEM ? doDia.slice(0, CABEM - 1) : doDia;
+                      const hiddenCount = total - mostrados.length;
+                      // On very narrow screens the chips collapse into plain dots.
+                      const dots = [
+                        ...dayQuotes.map((q) => STATUS_COLOR[q.status]),
+                        ...dayEvents.map((ev) => TIPO_META[ev.kind].cor),
+                      ].slice(0, 4);
+                      /* ── O DIA TEM DE DIZER DE QUE ANO É ────────────────────────
                  O nome acessível da célula era «9 de Janeiro — 2 eventos», sem
                  ANO. Num calendário em que se anda para trás e para a frente
                  mês a mês — e esta casa fecha datas com um ano e meio de
@@ -1803,76 +1890,90 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
 
                  O ano vem do `year` que a própria grelha já usa para se
                  desenhar, portanto não há segunda fonte para discordar. */
-                  const dayLabel = `${c.day} de ${MONTHS[month]} de ${year}${isToday ? " (hoje)" : ""} — ${
-                    total > 0
-                      ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
-                      : "Enter para adicionar"
-                  }`;
-                  return (
-                    <div
-                      key={key}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={dayLabel}
-                      aria-pressed={isSelected || undefined}
-                      onClick={(e) => {
-                        /* Um clique NASCIDO dentro do popover do «+N mais» já
+                      const dayLabel = `${nomeDoDiaDaSemana(key)}, ${c.day} de ${MONTHS[month]} de ${year}${isToday ? " (hoje)" : ""} — ${
+                        total > 0
+                          ? `${total} evento${total !== 1 ? "s" : ""}; Enter para ver`
+                          : "Enter para adicionar"
+                      }`;
+                      return (
+                        <div
+                          key={key}
+                          role="gridcell"
+                          data-dia={key}
+                          tabIndex={key === diaComFoco ? 0 : -1}
+                          aria-label={dayLabel}
+                          aria-selected={isSelected}
+                          aria-current={isToday ? "date" : undefined}
+                          onFocus={(e) => {
+                            if (e.target === e.currentTarget) setFocoDia(key);
+                          }}
+                          onClick={(e) => {
+                            /* Um clique NASCIDO dentro do popover do «+N mais» já
                            foi tratado lá: é o mesmo dia, mas não é um gesto
                            dirigido à célula. Sem isto, escolher uma linha do
                            popover fechava-o e abria por baixo o painel do dia
                            — duas respostas para um toque só. */
-                        if ((e.target as HTMLElement).closest("[data-mais-do-dia]")) return;
-                        // A day with entries opens the peek; an empty day goes
-                        // straight to "add" — the fastest path either way.
-                        if (total > 0) setSelectedDay(isSelected ? null : key);
-                        else openAdd(key);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          if (total > 0) setSelectedDay(isSelected ? null : key);
-                          else openAdd(key);
-                        }
-                      }}
-                      /* O botão direito num DIA — fase 10, ponto 17. As
+                            if ((e.target as HTMLElement).closest("[data-mais-do-dia]")) return;
+                            // A day with entries opens the peek; an empty day goes
+                            // straight to "add" — the fastest path either way.
+                            if (total > 0) setSelectedDay(isSelected ? null : key);
+                            else openAdd(key);
+                          }}
+                          onKeyDown={(e) => {
+                            // Só quando o foco está no DIA: as etiquetas lá dentro
+                            // são botões e têm o seu Enter.
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              if (total > 0) setSelectedDay(isSelected ? null : key);
+                              else openAdd(key);
+                              return;
+                            }
+                            const destino = diaPelaTecla(key, e.key);
+                            if (destino) {
+                              e.preventDefault();
+                              focarDia(destino);
+                            }
+                          }}
+                          /* O botão direito num DIA — fase 10, ponto 17. As
                          etiquetas lá dentro têm menu próprio e travam a bolha
                          (ver o `onMenu` do `ChipDoDia`), portanto este só
                          dispara no espaço do dia. */
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setMenu(menuDoDia(key, e.clientX, e.clientY));
-                      }}
-                      /* Sem `min-h` próprio: a altura da célula é a linha da
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setMenu(menuDoDia(key, e.clientX, e.clientY));
+                          }}
+                          /* Sem `min-h` próprio: a altura da célula é a linha da
                          grelha (`minmax(--celula, 1fr)`), e dois mínimos a
                          decidir a mesma altura é como uma delas fica para
                          trás. */
-                      className={`group relative bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
-                        isSelected
-                          ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
-                          : isToday
-                            ? "hover:bg-sage-600/[0.03]"
-                            : "hover:bg-sage-600/[0.025]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        {isToday ? (
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white text-[10px] font-semibold tabular-nums">
-                            {c.day}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/40 px-0.5">
-                            {c.day}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          tabIndex={-1}
-                          aria-label={`Adicionar a ${c.day} de ${MONTHS[month]}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAdd(key);
-                          }}
-                          /* ── 13×14 PX, TRINTA E CINCO A COMPETIR NA GRELHA ────
+                          className={`group relative bg-[var(--bo-surface)] p-1 sm:p-1.5 ${ESTADO} ${PRESSAO} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sage-600/60 ${
+                            isSelected
+                              ? "ring-1 ring-inset ring-sage-600/45 bg-sage-600/[0.04]"
+                              : isToday
+                                ? "hover:bg-sage-600/[0.03]"
+                                : "hover:bg-sage-600/[0.025]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            {isToday ? (
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-600 text-white text-[10px] font-semibold tabular-nums">
+                                {c.day}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] sm:text-[11px] tabular-nums text-foreground/40 px-0.5">
+                                {c.day}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              aria-label={`Adicionar a ${c.day} de ${MONTHS[month]}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAdd(key);
+                              }}
+                              /* ── 13×14 PX, TRINTA E CINCO A COMPETIR NA GRELHA ────
                          MEDIDO a 1440×900: `13.1×14` px cada. Este «+» nunca é
                          desenhado no dedo (`pointer-coarse:!hidden`), portanto
                          a régua é a do rato — e a da WCAG 2.2 AA (2.5.8) são
@@ -1882,13 +1983,13 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                          `size-6` é só a CAIXA que recebe o clique: o «+» fica
                          com o mesmo `text-sm`, centrado, e como a célula tem
                          96 px de chão a linha do topo não empurra nada. */
-                          className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
-                        >
-                          +
-                        </button>
-                      </div>
+                              className={`hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-sage-600/0 group-hover:text-sage-600/60 hover:!text-sage-600 text-sm leading-none ${ESTADO} ${PRESSAO}`}
+                            >
+                              +
+                            </button>
+                          </div>
 
-                      {/* ── AS ETIQUETAS (de `sm` para cima) ─────────────────
+                          {/* ── AS ETIQUETAS (de `sm` para cima) ─────────────────
                           A fase 03 inteira: cor por tipo, hora antes do
                           título, truncatura com reticências, e o «+N mais» com
                           popover. O desenho da etiqueta está no `ChipDoDia`.
@@ -1896,82 +1997,86 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                           `min-w-0` na pilha, senão as etiquetas empurram a
                           célula em vez de truncarem dentro dela — é a regra do
                           `truncate` dentro de uma grelha. */}
-                      <div className="hidden sm:flex flex-col gap-[3px] mt-1 min-w-0">
-                        {mostrados.map(({ pedido: q, marcacao: ev }) =>
-                          q ? (
-                            <ChipDoDia
-                              key={`q:${q.id}`}
-                              /* O pedido é pintado pelo ESTADO e não pelo tipo:
+                          <div className="hidden sm:flex flex-col gap-[3px] mt-1 min-w-0">
+                            {mostrados.map(({ pedido: q, marcacao: ev }) =>
+                              q ? (
+                                <ChipDoDia
+                                  key={`q:${q.id}`}
+                                  /* O pedido é pintado pelo ESTADO e não pelo tipo:
                                  é o que a casa já fazia no ponto de 6 px, e o
                                  estado é o que muda de semana para semana.
                                  A palavra vai no nome acessível, como manda o
                                  `Calendario.estado-nao-e-so-cor.test.tsx`. */
-                              cor={STATUS_COLOR[q.status]}
-                              titulo={q.name}
-                              rotulo={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                              dica={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
-                              onMenu={(x, y) => setMenu(menuDoPedido(q, key, x, y))}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpen(q);
-                              }}
-                            />
-                          ) : ev ? (
-                            <ChipDoDia
-                              key={`e:${ev.id}`}
-                              cor={TIPO_META[ev.kind].cor}
-                              marca={<GlifoDoTipo kind={ev.kind} />}
-                              hora={ev.time}
-                              titulo={ev.title}
-                              rotulo={`Remover ${TIPO_META[ev.kind].label}: ${ev.title}`}
-                              dica={`${TIPO_META[ev.kind].label}: ${ev.title} (clique para remover)`}
-                              onMenu={(x, y) => setMenu(menuDaMarcacao(ev, x, y))}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                pedirParaRemover(ev.id, ev.title);
-                              }}
-                              className="hover:line-through"
-                            />
-                          ) : null,
-                        )}
-                        {hiddenCount > 0 && (
-                          <MaisDoDia
-                            quantos={hiddenCount}
-                            dia={dayLabelLong(key)}
-                            /* As três colunas da direita abrem o popover para
+                                  cor={STATUS_COLOR[q.status]}
+                                  titulo={q.name}
+                                  rotulo={`Abrir pedido de ${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                                  dica={`${q.name} — ${eventTypeLabel(q)} — ${estadoEmPalavra(q.status)}`}
+                                  onMenu={(x, y) => setMenu(menuDoPedido(q, key, x, y))}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpen(q);
+                                  }}
+                                />
+                              ) : ev ? (
+                                <ChipDoDia
+                                  key={`e:${ev.id}`}
+                                  cor={TIPO_META[ev.kind].cor}
+                                  marca={<GlifoDoTipo kind={ev.kind} />}
+                                  hora={ev.time}
+                                  titulo={ev.title}
+                                  rotulo={`Remover ${TIPO_META[ev.kind].label}: ${ev.title}`}
+                                  dica={`${TIPO_META[ev.kind].label}: ${ev.title} (clique para remover)`}
+                                  onMenu={(x, y) => setMenu(menuDaMarcacao(ev, x, y))}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    pedirParaRemover(ev.id, ev.title);
+                                  }}
+                                  className="hover:line-through"
+                                />
+                              ) : null,
+                            )}
+                            {hiddenCount > 0 && (
+                              <MaisDoDia
+                                quantos={hiddenCount}
+                                dia={dayLabelLong(key)}
+                                /* As três colunas da direita abrem o popover para
                                dentro: o `body` desta casa tem `overflow-x:
                                clip` e o que sai pela borda direita não se
                                alcança com o dedo nem com a barra. */
-                            aoFim={indice % 7 >= 4}
-                          >
-                            <LinhasDoDia
-                              quotes={dayQuotes}
-                              marcacoes={dayEvents}
-                              onAbrir={onOpen}
-                              onRemover={pedirParaRemover}
-                            />
-                          </MaisDoDia>
-                        )}
-                      </div>
+                                aoFim={indice % 7 >= 4}
+                              >
+                                <LinhasDoDia
+                                  quotes={dayQuotes}
+                                  marcacoes={dayEvents}
+                                  onAbrir={onOpen}
+                                  onRemover={pedirParaRemover}
+                                />
+                              </MaisDoDia>
+                            )}
+                          </div>
 
-                      {/* Dots (below sm) — chips would overflow tiny cells */}
-                      {dots.length > 0 && (
-                        <div className="flex sm:hidden flex-wrap gap-[3px] mt-1.5 px-0.5">
-                          {dots.map((color, di) => (
-                            <span
-                              key={di}
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ background: color }}
-                            />
-                          ))}
-                          {total > dots.length && (
-                            <span className="text-foreground/35 text-[8px] leading-[6px]">+</span>
+                          {/* Dots (below sm) — chips would overflow tiny cells */}
+                          {dots.length > 0 && (
+                            <div className="flex sm:hidden flex-wrap gap-[3px] mt-1.5 px-0.5">
+                              {dots.map((color, di) => (
+                                <span
+                                  key={di}
+                                  className="w-1.5 h-1.5 rounded-full"
+                                  style={{ background: color }}
+                                />
+                              ))}
+                              {total > dots.length && (
+                                <span className="text-foreground/35 text-[8px] leading-[6px]">
+                                  +
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
 
               {/* ── A LEGENDA SAIU DAQUI, E NÃO FOI SUBSTITUÍDA POR NADA ───
@@ -2176,8 +2281,10 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                         {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
                         {new Date(q.date + "T12:00:00").getFullYear() !==
                           new Date().getFullYear() && (
+                          // Era «Jun 27», que se lê «27 de Junho» (achado n.º 30).
+                          // O apóstrofo diz que é o ano.
                           <span className="ml-0.5">
-                            {String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
+                            ’{String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
                           </span>
                         )}
                       </p>

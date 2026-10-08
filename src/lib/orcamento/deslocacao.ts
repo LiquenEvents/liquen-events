@@ -270,7 +270,12 @@ export function sugerirDeslocacao(
      km como estão é o que deixa a fórmula legível: «300 km × 2 × 0,33 €/km ×
      2 carrinhas» lê-se; «600 km» com duas carrinhas seria um número que
      ninguém percorreu. */
-  const valor = Math.round(kmCobrados * custoKm.total * carrinhas);
+  const exacto = kmCobrados * custoKm.total * carrinhas;
+  const valor = Math.round(exacto);
+  /* Achado n.º 22: «105 km × 2 × 0,34 €/km» dá 71,40 € e o ecrã dizia 71,00 €
+     — o valor é arredondado ao euro de propósito, mas a fórmula não o dizia e
+     lia-se como uma conta errada. Diz-se quando o arredondamento mexeu. */
+  const arredondado = Math.abs(exacto - valor) >= 0.005;
 
   /**
    * «Aproximado» é o que o ecrã usa para pôr (ou não) o `≈`. Um número escrito
@@ -298,7 +303,8 @@ export function sugerirDeslocacao(
     formula: isento
       ? `${kmSoIda} km — dentro dos ${p.franquiaKm} km sem deslocação a cobrar`
       : `${kmSoIda} km ${p.idaEVolta ? "× 2 (ida e volta) " : ""}× ${eur(custoKm.total)}/km` +
-        (carrinhas > 1 ? ` × ${carrinhas} carrinhas` : ""),
+        (carrinhas > 1 ? ` × ${carrinhas} carrinhas` : "") +
+        (arredondado ? ` = ${eur(cent(exacto))}, arredondado ao euro` : ""),
   };
 }
 

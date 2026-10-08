@@ -17,7 +17,7 @@ import {
 } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
-import { corDeTexto, metaFor } from "./status-meta";
+import { metaFor, tintaDoRotulo } from "./status-meta";
 import { ESTADO, MOLA_DE_MARCAR, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { interpretarTarefa, type Interpretacao } from "@/lib/tarefas/linguagem-natural";
@@ -711,7 +711,7 @@ const TaskRow = memo(function TaskRow({
             style={{
               background: `${metaFor(PRIORITY_META, t.priority).color}22`,
               // A cor de ESCREVER, não a de preencher: medido 2,40:1 antes.
-              color: corDeTexto(metaFor(PRIORITY_META, t.priority).color),
+              color: tintaDoRotulo(metaFor(PRIORITY_META, t.priority).color),
             }}
           >
             {/* «Alta» sozinho não diz de quê. O prefixo escondido é o que faz
@@ -2239,8 +2239,13 @@ export default function Tarefas({
                     critério é que esta lista está repartida agora.
 
                     Só existem com a lista cheia, como o cabeçalho: agrupar zero
-                    tarefas não é uma pergunta. */}
-                    <div className="flex shrink-0 items-center gap-2">
+                    tarefas não é uma pergunta.
+
+                    E partem linha quando não cabem (achado n.º 15): eram
+                    `shrink-0`, dois seletores de 194 px num telemóvel de 390, e
+                    a página inteira ficava com 453 px — encolhida, com uma faixa
+                    branca à direita e a barra de baixo esticada. */}
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <Escolha
                         aria-label="Agrupar por"
                         valor={agrupamento}

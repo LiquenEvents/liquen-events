@@ -99,7 +99,7 @@ async function garantirUmPedido(page: Page): Promise<void> {
         category: "particulares",
         eventType: "casamentos",
         eventName: "Casamento",
-        date: "2028-05-20",
+        date: "2099-05-20",
         guests: 80,
         location: "Herdade da Maridona, Glória",
       },

@@ -108,17 +108,14 @@ async function montar(quotes: Quote[], marcacoes: CalendarEvent[]) {
   }
 }
 
-const grelha = () => screen.getByRole("group", { name: /Calendário de Janeiro 2026/ });
+const grelha = () => screen.getByRole("grid", { name: /Calendário de Janeiro 2026/ });
 
 describe("fase 02 — a grelha a toda a largura", () => {
   it("não vive dentro de um cartão", async () => {
     await montar([PEDIDO], []);
     // O `Card` desta casa é `rounded-2xl` com moldura. Se a grelha voltar a
     // ter um por cima, voltam os 60 px de cada lado que o ponto 7 mediu.
-    expect(
-      grelha().closest(".rounded-2xl"),
-      "a grelha voltou para dentro de um cartão",
-    ).toBeNull();
+    expect(grelha().closest(".rounded-2xl"), "a grelha voltou para dentro de um cartão").toBeNull();
   });
 
   it("as semanas repartem a altura disponível, em vez de a deixarem sobrar", async () => {
