@@ -35,6 +35,7 @@ import Temas, {
   PISO_DA_CELULA_PX,
   contarFotosDaBiblioteca,
   desdeQuando,
+  fraseDeEliminar,
   mergePage,
   moveItem,
   ordenarTemas,
@@ -3785,5 +3786,56 @@ describe("Biblioteca de Temas — os menus da Fase 2", () => {
       "aria-checked",
       "true",
     );
+  });
+});
+
+/**
+ * ── A PERGUNTA DE ELIMINAR DIZ OS NÚMEROS (T3) ────────────────────────────
+ *
+ * «Uma confirmação que diz quantas fotos e propostas são afectadas.» Dizia
+ * «as propostas já feitas com estas fotos não são afectadas» — sem número.
+ */
+describe("Biblioteca de Temas — eliminar diz quantas fotos e propostas", () => {
+  it("as frases, no singular e no plural, e os casos sem número", () => {
+    expect(fraseDeEliminar({ imageCount: 5 }, 2)).toEqual({
+      fotos: "Desaparecem 5 fotografias.",
+      propostas: "Está em 2 propostas — essas guardam as fotos que usam e não mudam.",
+    });
+    expect(fraseDeEliminar({ imageCount: 1 }, 1)).toEqual({
+      fotos: "Desaparece 1 fotografia.",
+      propostas: "Está em 1 proposta — essa guarda as fotos que usa e não muda.",
+    });
+    // Nenhuma proposta: não há nada a dizer sobre elas.
+    expect(fraseDeEliminar({ imageCount: 5 }, 0).propostas).toBeNull();
+    // A contagem truncada é um mínimo; a pasta ilegível não tem número.
+    expect(fraseDeEliminar({ imageCount: 500, truncated: true }, 0).fotos).toBe(
+      "Desaparecem 500+ fotografias.",
+    );
+    expect(fraseDeEliminar({ imageCount: null }, 0).fotos).toBe(
+      "Desaparecem as fotografias que estiverem lá dentro.",
+    );
+    expect(fraseDeEliminar({ imageCount: 0 }, 0).fotos).toMatch(/vazia/);
+    // Sem a contagem de usos, fica a frase de antes — que continua verdadeira.
+    expect(fraseDeEliminar({ imageCount: 5 }, null).propostas).toBe(
+      "As propostas já feitas com estas fotos não são afectadas.",
+    );
+  });
+
+  it("a confirmação mostra N fotografias e M propostas, e que não se anula", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 7 }]));
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 3 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    // O número de propostas já chegou ao cartão.
+    await screen.findByText(/3 propostas/);
+    fireEvent.click(accaoNoMenuDoTema(/Terracotta/, "Eliminar tema…"));
+    const caixa = await screen.findByRole("dialog");
+    expect(within(caixa).getByText("Desaparecem 7 fotografias.")).toBeTruthy();
+    expect(
+      within(caixa).getByText(
+        "Está em 3 propostas — essas guardam as fotos que usam e não mudam.",
+      ),
+    ).toBeTruthy();
+    expect(within(caixa).getByText("Esta acção não pode ser anulada.")).toBeTruthy();
   });
 });

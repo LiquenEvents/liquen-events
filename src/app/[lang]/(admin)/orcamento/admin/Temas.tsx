@@ -259,6 +259,43 @@ const ICONE_CAPA = svgDoMenu(
   </>,
 );
 
+/**
+ * O que a pergunta de eliminar um tema diz, com os números.
+ *
+ * As FOTOGRAFIAS: a contagem pode ser desconhecida (pasta ilegível —
+ * `imageCount === null`), um mínimo (`truncated`, «500+») ou zero (a pasta
+ * está vazia), e as três versões têm de fazer sentido.
+ *
+ * As PROPOSTAS: `propostas` é o número que o cartão mostra (`usos`, sem os
+ * rascunhos). Com zero não há nada a dizer; sem número (a contagem ainda não
+ * chegou, ou falhou) fica a frase de antes, que continua verdadeira: ao
+ * eliminar, o servidor copia para cada proposta as fotos que ela usa
+ * (`theme-materializar.ts`), e é por isso que elas não mudam.
+ */
+export function fraseDeEliminar(
+  t: Pick<ThemeSummary, "imageCount" | "truncated">,
+  propostas: number | null,
+): { fotos: string; propostas: string | null } {
+  const n = t.imageCount;
+  const fotos =
+    t.imageCount === null
+      ? "Desaparecem as fotografias que estiverem lá dentro."
+      : n === 0
+        ? "A pasta está vazia: não desaparece nenhuma fotografia."
+        : n === 1 && !t.truncated
+          ? "Desaparece 1 fotografia."
+          : `Desaparecem ${n}${t.truncated ? "+" : ""} fotografias.`;
+  const frasePropostas =
+    propostas === null
+      ? "As propostas já feitas com estas fotos não são afectadas."
+      : propostas === 0
+        ? null
+        : propostas === 1
+          ? "Está em 1 proposta — essa guarda as fotos que usa e não muda."
+          : `Está em ${propostas} propostas — essas guardam as fotos que usam e não mudam.`;
+  return { fotos, propostas: frasePropostas };
+}
+
 /** A tecla que pede o menu de contexto: a tecla de menu, ou Shift+F10. */
 function teclaDeMenu(e: React.KeyboardEvent): boolean {
   return e.key === "ContextMenu" || (e.shiftKey && e.key === "F10");
@@ -1802,30 +1839,35 @@ export default function Temas() {
    * da lista como de dentro da pasta aberta, e esse ramo devolve outro
    * componente. Sem isto, a pergunta pedida lá dentro não tinha onde aparecer.
    *
-   * O que se perde vai numa LISTA e não espremido no meio de uma frase — é
-   * para isso que a `oQueSePerde` existe. A contagem de fotos pode ser
-   * desconhecida (pasta ilegível) ou um mínimo (contagem truncada), e as três
-   * versões têm de fazer sentido.
+   * ── COM OS NÚMEROS, E NÃO COM UMA PROMESSA GERAL ──────────────────────
+   * T3 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`: «uma confirmação que diz
+   * quantas fotos e propostas são afectadas». Dizia «as propostas já feitas
+   * com estas fotos não são afectadas» — verdade, mas sem número nenhum. Passa
+   * a dizer quantas fotografias desaparecem e em quantas propostas o tema
+   * está, e porque é que essas não mudam. As frases vêm do `fraseDeEliminar`;
+   * só a última, a irreversível, vai a vermelho.
    */
+  const frasesDeEliminar = aEliminar
+    ? fraseDeEliminar(aEliminar, usos ? (usos[aEliminar.id] ?? 0) : null)
+    : null;
   const perguntaDeEliminar = (
     <PerguntaDestrutiva
       aberto={!!aEliminar}
       onFechar={() => setAEliminar(null)}
       titulo={`Eliminar o tema «${aEliminar?.name ?? ""}»?`}
-      oQueSePerde={
-        aEliminar
-          ? [
-              aEliminar.imageCount === null
-                ? "As fotografias que estiverem lá dentro"
-                : aEliminar.imageCount > 0
-                  ? `${aEliminar.imageCount}${aEliminar.truncated ? "+" : ""} ${
-                      aEliminar.imageCount === 1 ? "fotografia" : "fotografias"
-                    }`
-                  : "A pasta, que está vazia",
-            ]
-          : []
+      aviso={
+        frasesDeEliminar && (
+          <>
+            <span className="block text-[var(--bo-text)]">{frasesDeEliminar.fotos}</span>
+            {frasesDeEliminar.propostas && (
+              <span className="mt-1 block text-[var(--bo-tinta-72)]">
+                {frasesDeEliminar.propostas}
+              </span>
+            )}
+            <span className="mt-3 block">Esta acção não pode ser anulada.</span>
+          </>
+        )
       }
-      aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
       rotuloConfirmar="Eliminar o tema"
       onConfirmar={() => {
         const t = aEliminar;
