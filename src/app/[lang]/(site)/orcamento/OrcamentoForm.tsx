@@ -891,7 +891,7 @@ export default function OrcamentoForm({
             // `alvo-toque`: MEDIDO a 375 px com toque emulado, 72×17 px — falha
             // a altura mínima por mais de metade. É o único caminho de volta
             // ao sítio a partir do painel de imagem num tablet de toque.
-            className="alvo-toque text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
+            className="alvo-toque pointer-fine:py-1 pointer-fine:-my-1 text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
           >
             ← {to.back}
           </Link>
@@ -1462,7 +1462,7 @@ export default function OrcamentoForm({
                 // (164×17 em inglês) — falha a altura mínima por mais de
                 // metade, ao lado do botão de enviar, a acção alternativa a
                 // quem prefere WhatsApp.
-                className="alvo-toque inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
+                className="alvo-toque pointer-fine:py-1 pointer-fine:-my-1 inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {to.ouWhatsApp}

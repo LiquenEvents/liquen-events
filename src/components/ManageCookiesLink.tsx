@@ -14,7 +14,7 @@ export default function ManageCookiesLink({ locale }: { locale: Locale }) {
       // `alvo-toque`: media 73×17 px no telemóvel, ao lado dos dois links de
       // legais que agora também o levam. É por aqui que se RETIRA o
       // consentimento, e o RGPD exige que retirar seja tão fácil como dar.
-      className="alvo-toque link-line hover:text-white transition-colors"
+      className="alvo-toque link-line pointer-fine:pt-2 pointer-fine:-mt-2 hover:text-white transition-colors"
     >
       {label}
     </button>

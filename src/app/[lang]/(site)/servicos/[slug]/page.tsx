@@ -178,7 +178,7 @@ export default async function ServiceDetailPage({
               <li>
                 <Link
                   href={localizeHref("/", locale)}
-                  className="alvo-toque hover:text-cream transition-colors"
+                  className="alvo-toque pointer-fine:py-1.5 hover:text-cream transition-colors"
                 >
                   {t.nav.inicio}
                 </Link>
@@ -189,7 +189,7 @@ export default async function ServiceDetailPage({
               <li>
                 <Link
                   href={localizeHref("/servicos", locale)}
-                  className="alvo-toque hover:text-cream transition-colors"
+                  className="alvo-toque pointer-fine:py-1.5 hover:text-cream transition-colors"
                 >
                   {t.nav.servicos}
                 </Link>

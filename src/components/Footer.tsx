@@ -176,7 +176,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   <li key={slug}>
                     <Link
                       href={localizeHref(`/servicos/${slug}`, locale)}
-                      className="alvo-toque link-line text-[13px] text-white/75 hover:text-white transition-colors duration-300"
+                      className="alvo-toque link-line pointer-fine:pt-1.5 pointer-fine:-mt-1.5 text-[13px] text-white/75 hover:text-white transition-colors duration-300"
                     >
                       {t.footer.serviceLinks[i]}
                     </Link>
@@ -198,7 +198,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                     direita. Em ponteiro fino não fazem nada. */}
                 <a
                   href={`mailto:${SITE.email}`}
-                  className="alvo-toque link-line justify-center sm:justify-end hover:text-white transition-colors duration-300"
+                  className="alvo-toque link-line pointer-fine:pt-1.5 pointer-fine:-mt-1.5 justify-center sm:justify-end hover:text-white transition-colors duration-300"
                 >
                   {SITE.email}
                 </a>
@@ -209,7 +209,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   event="PhoneClick"
                   trackProps={{ origem: "footer" }}
                   href={`tel:${SITE.phone}`}
-                  className="alvo-toque link-line justify-center sm:justify-end hover:text-white transition-colors duration-300"
+                  className="alvo-toque link-line pointer-fine:pt-1.5 pointer-fine:-mt-1.5 justify-center sm:justify-end hover:text-white transition-colors duration-300"
                 >
                   {SITE.phoneDisplay}
                 </TrackedAnchor>
@@ -227,13 +227,13 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
             <div className="flex items-center gap-5 text-[11px] text-white/55 tracking-wide">
               <Link
                 href={localizeHref("/privacidade", locale)}
-                className="alvo-toque link-line hover:text-white transition-colors"
+                className="alvo-toque link-line pointer-fine:pt-2 pointer-fine:-mt-2 hover:text-white transition-colors"
               >
                 {t.footer.privacidade}
               </Link>
               <Link
                 href={localizeHref("/termos", locale)}
-                className="alvo-toque link-line hover:text-white transition-colors"
+                className="alvo-toque link-line pointer-fine:pt-2 pointer-fine:-mt-2 hover:text-white transition-colors"
               >
                 {t.footer.termos}
               </Link>
