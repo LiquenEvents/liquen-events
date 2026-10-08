@@ -473,6 +473,28 @@ describe("MenuDeAccoes", () => {
   });
 
   /**
+   * O `tamanho="pequeno"` nasceu para o «⋯» que pousa numa fotografia (28 px à
+   * vista, 40 de alvo). Os outros quatro ecrãs não o pedem e não podem mudar:
+   * o «⋯» de linha continua nos 44, sem pastilha lá dentro.
+   */
+  it("o tamanho por omissão continua nos 44, e o pequeno é 40 de alvo com 28 à vista", async () => {
+    simularAparelho(DESKTOP);
+    const { unmount } = render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" />);
+    const normal = await screen.findByRole("button", { name: "Acções de Terracotta" });
+    expect(normal.className.split(/\s+/)).toContain("h-11");
+    expect(normal.querySelector("span")).toBeNull();
+    unmount();
+
+    render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" tamanho="pequeno" pastilha="vidro" />);
+    const pequeno = await screen.findByRole("button", { name: "Acções de Terracotta" });
+    expect(pequeno.className.split(/\s+/)).toEqual(expect.arrayContaining(["h-10", "w-10"]));
+    const pastilha = pequeno.querySelector("span")!;
+    expect(pastilha.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["h-7", "w-7", "vidro"]),
+    );
+  });
+
+  /**
    * ── O FOCO TEM DE VOLTAR AO BOTÃO QUE ABRIU ────────────────────────────────
    *
    * As duas saídas do menu — o Escape e escolher uma acção — apagam o elemento

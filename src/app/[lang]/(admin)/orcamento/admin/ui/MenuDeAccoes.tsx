@@ -33,12 +33,21 @@ import { SAIDA, useSaidaDeUmSo } from "./saida";
  * JavaScript, zero piscar, e o mesmo desenho do lado do servidor.
  */
 
+/** O glifo do «⋯», o mesmo nos dois tamanhos. */
+const RETICENCIAS = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <circle cx="5" cy="12" r="1.6" />
+    <circle cx="12" cy="12" r="1.6" />
+    <circle cx="19" cy="12" r="1.6" />
+  </svg>
+);
+
 /**
  * ── ESCONDIDO EM REPOUSO, SÓ COM RATO, E DE VOLTA COM O FOCO NA LINHA ─────
  *
  * Eram três maneiras de reaparecer: o rato sobre o `group` (a linha, o
  * cartão), e o foco de teclado no PRÓPRIO botão. Faltava a do meio: o foco de
- * teclado noutra coisa da mesma linha. Medido no cartão de tema: o Tab pousa
+ * teclado noutra coisa da mesma linha. No cartão de tema: o Tab pousa
  * primeiro no botão do cartão (que abre o tema) e o «⋯» continuava a zero de
  * opacidade — quem anda de teclado não tinha como saber que havia um menu ali
  * até o Tab seguinte cair num botão que não se via. O `docs/APPLE-TEMAS.md`
@@ -75,6 +84,31 @@ export interface MenuDeAccoesProps {
   /** Quantas acções aparecem soltas (em vez de dentro do menu) quando há
    *  espaço. As restantes ficam no "…". */
   soltasNoEcraGrande?: number;
+  /**
+   * O tamanho do «⋯».
+   *
+   *  · `normal` — 44 px, o de sempre: a linha de uma tabela, um cartão de
+   *    lista. O alvo e o desenho são a mesma caixa.
+   *  · `pequeno` — 28 px VISÍVEIS dentro de 40 px de ALVO. É o «⋯» que pousa
+   *    em cima de uma fotografia: «botão glass, 28px» e «o `⋯` sobre a imagem
+   *    tem 28 px visuais e 40 px de alvo» (`docs/APPLE-TEMAS.md`, Partes 3 e
+   *    7). Um círculo de 44 tapava um quarto da largura de um cartão
+   *    compacto; o de 28 deixa ver a fotografia, e o alvo não encolhe com
+   *    ele. No dedo, o `.alvo-toque` leva o alvo aos 44 da casa e a pastilha
+   *    continua nos 28.
+   *
+   * Só o gatilho muda: as acções soltas (`soltasNoEcraGrande`) são botões
+   * de linha e ficam nos 44.
+   */
+  tamanho?: "normal" | "pequeno";
+  /**
+   * O material da pastilha visível em `pequeno` — no cartão de tema, o vidro
+   * claro. Vai DENTRO do botão, e não à volta dele, para esconder-e-mostrar
+   * com o mesmo `opacity` do glifo: um véu escuro parado com um glifo
+   * invisível lá dentro era o defeito que a caixa de fora obrigava a evitar
+   * à mão. Sem `pequeno` não é usado.
+   */
+  pastilha?: string;
   className?: string;
 }
 
@@ -95,8 +129,11 @@ export function MenuDeAccoes({
   accoes,
   sobre,
   soltasNoEcraGrande = 0,
+  tamanho = "normal",
+  pastilha,
   className,
 }: MenuDeAccoesProps) {
+  const pequeno = tamanho === "pequeno";
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
   const abridorRef = useRef<HTMLButtonElement>(null);
@@ -191,17 +228,30 @@ export function MenuDeAccoes({
             aria-expanded={aberto}
             onClick={() => setAberto((v) => !v)}
             className={cn(
-              `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
+              `alvo-toque flex items-center justify-center ${ESTADO} ${PRESSAO}`,
+              pequeno
+                ? /* O alvo de 40 é transparente e redondo (o anel de foco
+                     segue-o); quem se vê é a pastilha lá dentro. Sem a lavagem
+                     do `active:` — um quadrado cinzento de 40 px por cima de
+                     uma fotografia era um segundo desenho por trás do primeiro.
+                     A pressão continua a ser o `PRESSAO`. */
+                  "h-10 w-10 rounded-full"
+                : "h-11 w-11 rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
               // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
               // menu deixava o menu a flutuar sem nada que o segurasse.
               aberto ? "opacity-100" : ESCONDIDO_COM_RATO,
             )}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <circle cx="5" cy="12" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="19" cy="12" r="1.6" />
-            </svg>
+            {pequeno ? (
+              <span
+                aria-hidden="true"
+                className={cn("flex h-7 w-7 items-center justify-center rounded-full", pastilha)}
+              >
+                {RETICENCIAS}
+              </span>
+            ) : (
+              RETICENCIAS
+            )}
           </button>
 
           {(aberto || aSairAgora) && (

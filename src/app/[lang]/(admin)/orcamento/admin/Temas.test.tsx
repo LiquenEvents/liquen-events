@@ -1169,12 +1169,29 @@ describe("Biblioteca de Temas — um botão sobre a fotografia", () => {
     const grupo = await screen.findByRole("group", { name: "Terracotta" });
     expect(grupo.className.split(/\s+/)).toContain("group");
     const gatilho = within(grupo).getByRole("button", { name: "Acções de Terracotta" });
-    const caixa = gatilho.parentElement!;
-    for (const no of [caixa, gatilho]) {
-      const classes = no.className.split(/\s+/);
-      expect(classes).toContain("com-rato:opacity-0");
-      expect(classes).toContain("com-rato:group-focus-within:opacity-100");
-    }
+    const classes = gatilho.className.split(/\s+/);
+    expect(classes).toContain("com-rato:opacity-0");
+    expect(classes).toContain("com-rato:group-focus-within:opacity-100");
+    // O vidro vive DENTRO do gatilho desde a Fase 02 (a `pastilha`), e por
+    // isso esconde-se e volta com o mesmo `opacity` — já não há uma caixa de
+    // fora a repetir as variantes à mão.
+    expect(gatilho.querySelector(".bo-vidro-claro")).not.toBeNull();
+  });
+
+  /**
+   * Fase 02: «botão glass, 28px» e «28 px visuais e 40 px de alvo» (Partes 3 e
+   * 7). Era o «⋯» de linha, 44 × 44, com o vidro a toda a volta.
+   */
+  it("o «⋯» sobre a capa tem 28 px à vista e 40 px de alvo", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    const gatilho = within(grupo).getByRole("button", { name: "Acções de Terracotta" });
+    const alvo = gatilho.className.split(/\s+/);
+    expect(alvo).toEqual(expect.arrayContaining(["h-10", "w-10", "alvo-toque"]));
+    expect(alvo).not.toContain("h-11");
+    const pastilha = gatilho.querySelector(".bo-vidro-claro")!;
+    expect(pastilha.className.split(/\s+/)).toEqual(expect.arrayContaining(["h-7", "w-7"]));
   });
 
   /** A estrela era um chip aceso sobre a fotografia; a informação não se
@@ -1297,6 +1314,47 @@ describe("Biblioteca de Temas — o cartão", () => {
     // A altura das duas linhas fica reservada mesmo com um nome curto, senão a
     // grelha perdia a linha de base entre cartões vizinhos.
     expect(titulo.className).toMatch(/min-h-/);
+  });
+
+  /**
+   * Fase 02, ponto 11: «cartões delimitados por borda em vez de sombra», e a
+   * Parte 9 proíbe «borda a marcar elevação». A sombra é a de repouso da casa
+   * e ergue-se sob o rato; nunca `scale` no hover.
+   */
+  it("o cartão eleva-se por sombra, e não por borda", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9 }]));
+    renderTemas();
+    const botao = await acharCartaoDoTema(/Terracotta/);
+    const classes = botao.className.split(/\s+/);
+    expect(classes).toContain("shadow-[var(--bo-sombra-repouso)]");
+    expect(classes).toContain("hover:shadow-[var(--bo-sombra-erguida)]");
+    expect(classes.filter((c) => /^(?:hover:)?border(?:-|$)/.test(c))).toEqual([]);
+    expect(classes.filter((c) => /scale/.test(c) && c.startsWith("hover:"))).toEqual([]);
+  });
+
+  /**
+   * «headline/600, line-clamp 2, altura reservada» e «caption, --fg-tertiary,
+   * tabular-nums» (Parte 3). Eram `text-[14px]` e o cinzento de apoio.
+   */
+  it("o nome usa o tipo da casa, e os números alinham", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
+    );
+    renderTemas();
+    const titulo = await screen.findByText("Terracotta", { selector: "p" });
+    const t = titulo.className.split(/\s+/);
+    expect(t).toContain("text-headline");
+    expect(
+      t.filter((c) => /^text-\[\d/.test(c)),
+      "tamanho escrito à mão",
+    ).toEqual([]);
+    // Duas entrelinhas do `text-headline` (1,375rem) = 2,75rem = `min-h-11`.
+    expect(t).toContain("min-h-11");
+    const rasto = screen.getByText(/9 fotos/);
+    const r = rasto.className.split(/\s+/);
+    expect(r).toEqual(
+      expect.arrayContaining(["tabular-nums", "text-caption", "text-[var(--bo-texto-terciario)]"]),
+    );
   });
 
   it("os números vão todos no mesmo rasto", async () => {
@@ -2691,8 +2749,18 @@ describe("desdeQuando", () => {
     expect(desdeQuando(dias(0), agora)).toBe("hoje");
     expect(desdeQuando(dias(1), agora)).toBe("ontem");
     expect(desdeQuando(dias(9), agora)).toBe("há 9 dias");
-    expect(desdeQuando(dias(60), agora)).toBe("há 2 meses");
-    expect(desdeQuando(dias(400), agora)).toBe("há 1 ano");
+    expect(desdeQuando(dias(29), agora)).toBe("há 29 dias");
+  });
+
+  /**
+   * Fase 02, ponto 13: «a partir de 30 dias mostra a data». Era «há 2 meses» e
+   * «há 1 ano» — dois temas com «há 1 ano» podiam estar onze meses afastados.
+   * Mudou de propósito; o formato é o da casa, `DD/MM/AAAA`.
+   */
+  it("a partir de 30 dias diz a data, e não «há N meses»", () => {
+    expect(desdeQuando(dias(30), agora)).toBe("06/07/2026");
+    expect(desdeQuando(dias(60), agora)).toBe("06/06/2026");
+    expect(desdeQuando(dias(400), agora)).toBe("01/07/2025");
   });
 
   /** Um relógio trocado (ou uma escrita acabada de acontecer) não pode produzir

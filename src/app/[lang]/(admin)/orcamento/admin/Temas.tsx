@@ -552,6 +552,20 @@ export const GRELHA_DE_FOTOS =
  * completo. Datas futuras (relógios trocados) contam como hoje, em vez de
  * dizerem "há -2 dias".
  */
+/**
+ * Quando foi mexido, como se diz — até um mês. Depois disso, a data.
+ *
+ * Ponto 13 da auditoria do `docs/APPLE-TEMAS.md`: «mantém o relativo e
+ * acrescenta `title` com a data completa; a partir de 30 dias mostra a data».
+ * «Há 2 meses» já não responde à pergunta de trabalho («foi antes ou depois do
+ * casamento dos Ferreira?»), e dois temas com «há 1 ano» podem estar onze
+ * meses afastados. Abaixo dos 30 dias o relativo é mais preciso do que a data
+ * de relance; a partir daí é ao contrário.
+ *
+ * A data vai no formato da casa, `DD/MM/AAAA` (Parte 9.6 do sistema de
+ * design), e não por extenso: está no fim de uma linha que trunca, e a
+ * versão longa continua no `title` (`dataPorExtenso`).
+ */
 export function desdeQuando(iso: string | undefined, agora = Date.now()): string {
   if (!iso) return "";
   const t = Date.parse(iso);
@@ -560,10 +574,11 @@ export function desdeQuando(iso: string | undefined, agora = Date.now()): string
   if (dias <= 0) return "hoje";
   if (dias === 1) return "ontem";
   if (dias < 30) return `há ${dias} dias`;
-  const meses = Math.floor(dias / 30);
-  if (meses < 12) return `há ${meses} ${meses === 1 ? "mês" : "meses"}`;
-  const anos = Math.floor(meses / 12);
-  return `há ${anos} ${anos === 1 ? "ano" : "anos"}`;
+  return new Date(t).toLocaleDateString("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -2282,11 +2297,24 @@ export default function Temas() {
                   ganha é a ordem do Tailwind e não a ordem em que estão
                   escritos. MEDIDO antes de os separar: o menu esticava-se aos
                   165,5 px do cartão inteiro. */}
-              <div className="absolute right-2 top-2 z-10">
+              {/* `right-1 top-1` e não `right-2 top-2`: o que se põe no
+                  canto é o ALVO de 40 px, e a pastilha de 28 fica 6 px para
+                  dentro dele — o círculo que se vê assenta a 10 px das
+                  arestas, dentro do arco do canto do cartão. */}
+              <div className="absolute right-1 top-1 z-10">
                 <MenuDeAccoes
                   sobre={t.name}
                   accoes={accoesDoTema(t)}
-                  /* ── O VIDRO CLARO VIAJA COM O BOTÃO ────────────────────
+                  /* ── 28 px À VISTA, 40 px DE ALVO ───────────────────────
+                     «Botão glass, 28px» (Parte 3) e «o `⋯` sobre a imagem tem
+                     28 px visuais e 40 px de alvo» (Parte 7). Era o «⋯» de
+                     linha, 44 × 44, com o vidro na caixa de fora — um círculo
+                     escuro de 44 px por cima da capa, um quarto da largura de
+                     um cartão compacto. O tamanho é uma opção do próprio
+                     `MenuDeAccoes` (`tamanho="pequeno"`), e não classes por
+                     cima das dele. No dedo o `.alvo-toque` leva o alvo aos 44.
+
+                     ── O VIDRO CLARO VIAJA DENTRO DO BOTÃO ────────────────
                      O «⋯» pousa EM CIMA de uma fotografia, e o `MenuDeAccoes`
                      traz tinta de texto normal (`--bo-text-muted`) — que sobre
                      uma capa clara desaparece. A conta já estava feita para os
@@ -2296,20 +2324,16 @@ export default function Temas() {
                      `globals.css`). Sem desfoque de propósito — um por cartão
                      eram noventa numa biblioteca de trinta.
 
-                     O véu acompanha o botão a aparecer e a desaparecer, com as
-                     MESMAS variantes que ele usa por dentro: senão ficava um
-                     círculo escuro em repouso com o glifo invisível lá dentro.
-
-                     `group-focus-within` e não só `focus-within`: o Tab pousa
-                     PRIMEIRO no botão do cartão, que é irmão desta caixa e não
-                     filho — e com `focus-within` o véu e o glifo ficavam a
-                     zero enquanto o cartão tinha o foco, e o «⋯» só se via
-                     quando o Tab seguinte já estava nele. «Só aparece no hover
-                     ou quando o cartão tem foco de teclado — senão é
-                     inacessível por teclado» (Parte 3). O `group` é o
-                     contentor do cartão, aqui em cima, e o foco dentro dele
-                     cobre os dois casos (cartão e o próprio «⋯»). */
-                  className="bo-vidro-claro rounded-full opacity-100 [&>button]:text-white com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
+                     Vivia na caixa de fora, que tinha de repetir à mão as
+                     variantes de esconder do botão (senão ficava um círculo
+                     escuro em repouso com o glifo invisível lá dentro). Agora
+                     é a `pastilha`, DENTRO do botão: esconde-se e mostra-se
+                     com o mesmo `opacity` do glifo, incluindo com o foco de
+                     teclado no cartão (o `group-focus-within` do
+                     `MenuDeAccoes`), e não há duas listas para manter
+                     iguais. */
+                  tamanho="pequeno"
+                  pastilha="bo-vidro-claro text-white"
                 />
               </div>
               <button
@@ -2329,7 +2353,25 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] text-left hover:border-sage-600/40 ${ESTADO} ${PRESSAO}`}
+                /* ── SOMBRA, E NÃO BORDA ──────────────────────────────────
+                   Ponto 11 da auditoria: «cartões delimitados por borda em vez
+                   de sombra. Em modo claro a elevação faz-se por sombra.» E a
+                   Parte 9 proíbe «borda a marcar elevação». Era um fio de 10 %
+                   em repouso que ganhava o acento sob o rato; passa a sombra de
+                   repouso que se ergue sob o rato — o único efeito de hover de
+                   um cartão (Parte 12.1 do sistema de design), sem `scale`. O
+                   `ESTADO` já anima `box-shadow` nos 150 ms do degrau
+                   interactivo, com a `--ease-interactive`: é a linha «Hover do
+                   cartão» da tabela da Parte 5, sem tempo novo nenhum. Os dois
+                   tokens e a razão de existirem estão no `globals.css`. Em
+                   escuro a sombra quase não se vê, e é a regra: lá quem separa
+                   é a luminosidade (`--bo-surface` sobre `--bo-chao`).
+
+                   O raio fica: `rounded-2xl` são os 20 px do degrau «painel»
+                   da escada concêntrica. O documento pede 12, o token de
+                   cartão da casa (`--radius-card`) diz 16, e nenhum dos dois
+                   é decisão a tomar aqui — fica dito no relatório. */
+                className={`block w-full overflow-hidden rounded-2xl bg-[var(--bo-surface)] text-left shadow-[var(--bo-sombra-repouso)] hover:shadow-[var(--bo-sombra-erguida)] ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -2407,9 +2449,19 @@ export default function Temas() {
                       Vai sempre, e não só quando corta — saber SE corta exige
                       medir o nó depois de desenhado, e uma dica que repete o
                       nome que está à vista não incomoda ninguém. */}
+                  {/* ── O TIPO DA CASA, E NÃO UM NÚMERO ESCRITO À MÃO ──────
+                      Era `text-[14px] leading-snug`. O `ThemeCard` da Parte 3
+                      pede «headline/600», e o mapeamento da Parte 6.3 do
+                      sistema de design diz o mesmo de qualquer «nome em
+                      lista». O `text-headline` traz tamanho, entrelinha e
+                      peso de uma vez (15/22, 600). A altura reservada passa a
+                      ser DUAS ENTRELINHAS do token — `min-h-11` = 2,75rem =
+                      2 × 1,375rem —, e não 2,7em, que com a entrelinha nova
+                      já não chegava às duas linhas e voltava a desalinhar a
+                      fila. */}
                   <p
                     title={t.name}
-                    className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-[var(--bo-text)]"
+                    className="line-clamp-2 min-h-11 text-headline text-[var(--bo-text)]"
                   >
                     {t.name}
                   </p>
@@ -2429,7 +2481,13 @@ export default function Temas() {
                       tem, quantas vezes saiu, e há quanto tempo não lhe tocam.
                       Com `truncate`, o que cai primeiro é a data — que é a
                       menos decisiva das três, e é por isso que está no fim. */}
-                  <p className="bo-text-muted mt-0.5 truncate text-xs">
+                  {/* «caption, --fg-tertiary, tabular-nums» (Parte 3). Os
+                      algarismos com a mesma largura são o que deixa «9 fotos»
+                      e «14 fotos» alinharem de cartão para cartão, e a cor é
+                      o terceiro papel de texto da casa
+                      (`--bo-texto-terciario`, 4,7:1 sobre o cartão branco e
+                      5,7:1 sobre o escuro, os números da Parte 5.2). */}
+                  <p className="mt-0.5 truncate text-caption tabular-nums text-[var(--bo-texto-terciario)]">
                     {photoCountLabel(t.imageCount, t.truncated)}
                     {/* «7 propostas» ou «Nunca usado» — a segunda é a metade
                         mais útil: é o que distingue um tema que a biblioteca
@@ -2458,7 +2516,9 @@ export default function Temas() {
                         que se lê de relance numa grelha de 28) e a data
                         inteira vai no `title`, que é o que responde quando a
                         pergunta passa a ser «isto foi antes ou depois do
-                        casamento dos Ferreira?». */}
+                        casamento dos Ferreira?». A partir dos 30 dias a
+                        própria linha passa a dizer a data — ver
+                        `desdeQuando`. */}
                     {t.imageCount !== null && desdeQuando(t.updatedAt) ? (
                       <span title={dataPorExtenso(t.updatedAt)}>
                         {` · ${desdeQuando(t.updatedAt)}`}
