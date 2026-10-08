@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CriarAPartirDe from "./CriarAPartirDe";
 
@@ -171,5 +171,72 @@ describe("CriarAPartirDe — enquanto copia", () => {
 
     await waitFor(() => expect(onEscolhido).toHaveBeenCalled());
     expect(screen.queryByText(/A copiar as 14 fotos/i)).toBeNull();
+  });
+});
+
+/**
+ * Achado n.º 7 da auditoria: escolher uma linha aplicava a cópia por cima do
+ * que estava escrito, sem perguntar — e o «Anular» só durava dez segundos.
+ */
+describe("CriarAPartirDe — quando há trabalho a perder", () => {
+  const proposta = {
+    id: "p1",
+    quoteId: "q1",
+    clientName: "Ana Marques",
+    createdAt: "2026-05-01T10:00:00.000Z",
+    status: "cotado",
+    temDoc: true,
+    grupos: 1,
+    moodBoards: 0,
+    linhas: 0,
+    fotos: 0,
+  };
+  const montar = (substitui: string | null) => {
+    const onEscolhido = vi.fn();
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") return resposta({ doc: {}, camposAMudar: [] });
+      return String(url).includes("modelos") ? resposta({ modelos: [] }) : resposta([proposta]);
+    });
+    render(
+      <CriarAPartirDe
+        open
+        onClose={vi.fn()}
+        quoteId="q2"
+        clienteAtual="Outra"
+        onEscolhido={onEscolhido}
+        substitui={substitui}
+      />,
+    );
+    return onEscolhido;
+  };
+  const copias = () => fetchMock.mock.calls.filter(([, i]) => i?.method === "POST").length;
+
+  it("pergunta antes de copiar, e «Cancelar» não copia nada", async () => {
+    const onEscolhido = montar("2 serviços");
+    const user = userEvent.setup();
+    await user.click(await screen.findByText("Ana Marques"));
+    const pergunta = screen.getByRole("alert");
+    expect(pergunta.textContent).toMatch(/já tem trabalho \(2 serviços\)/);
+    expect(copias()).toBe(0);
+    await user.click(within(pergunta).getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(copias()).toBe(0);
+    expect(onEscolhido).not.toHaveBeenCalled();
+  });
+
+  it("«Substituir» copia", async () => {
+    const onEscolhido = montar("2 serviços");
+    const user = userEvent.setup();
+    await user.click(await screen.findByText("Ana Marques"));
+    await user.click(screen.getByRole("button", { name: "Substituir" }));
+    await waitFor(() => expect(onEscolhido).toHaveBeenCalled());
+  });
+
+  it("sem trabalho nenhum, copia logo", async () => {
+    const onEscolhido = montar(null);
+    const user = userEvent.setup();
+    await user.click(await screen.findByText("Ana Marques"));
+    await waitFor(() => expect(onEscolhido).toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

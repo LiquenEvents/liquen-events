@@ -59,6 +59,7 @@ import {
   eventTypeName,
 } from "@/lib/orcamento/data";
 import { log } from "@/lib/logger";
+import { camposMudados, mesmoValor } from "@/lib/rascunho-juntar";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
 import { pedirVezDeImagemPesada } from "./fila-de-imagens";
@@ -1109,6 +1110,10 @@ export type ResultadoDaGravacao =
       /** Quando é que essa versão tinha sido gravada — é a hora que dá à
        *  pessoa a noção do que está em jogo antes de decidir. */
       resgateEm?: string;
+      /** O servidor juntou esta gravação com a de outra pessoa, campo a campo
+       *  (achado n.º 6 — ver `rascunho-juntar.ts`), e `doc` é como ficou. */
+      juntou?: boolean;
+      doc?: Record<string, unknown>;
       /**
        * O sítio onde ficou sobrevive a um deploy?
        *
@@ -1140,6 +1145,10 @@ export type ResultadoDaGravacao =
    *  mesmo que a pessoa tem de ouvir, com estas palavras. */
   | { estado: "so-local"; porque?: string };
 
+function ehObjecto(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
 /** Um `fetch` com tecto de tempo próprio. Sem ele, uma rede que aceita a
  *  ligação e nunca responde deixa a gravação pendurada para sempre — e o
  *  indicador ficaria eternamente em «a guardar…», que é outra maneira de
@@ -1160,7 +1169,12 @@ async function fetchComTecto(url: string, init: RequestInit, ms: number): Promis
  */
 export async function gravarRascunhoNoServidor(
   quoteId: string,
-  corpo: { doc: unknown; baseUpdatedAt: string | null },
+  corpo: {
+    doc: unknown;
+    baseUpdatedAt: string | null;
+    campos?: string[];
+    base?: Record<string, unknown>;
+  },
 ): Promise<ResultadoDaGravacao> {
   let porque: string | undefined;
   for (let tentativa = 1; tentativa <= GRAVACAO_TENTATIVAS; tentativa++) {
@@ -1183,6 +1197,11 @@ export async function gravarRascunhoNoServidor(
           previousBy: typeof dados?.previousBy === "string" ? dados.previousBy : undefined,
           resgate: typeof dados?.resgate === "string" ? dados.resgate : undefined,
           resgateEm: typeof dados?.resgateEm === "string" ? dados.resgateEm : undefined,
+          juntou: dados?.juntou === true,
+          doc:
+            dados?.juntou === true && dados.doc && typeof dados.doc === "object"
+              ? (dados.doc as Record<string, unknown>)
+              : undefined,
           duradouro: typeof dados?.duradouro === "boolean" ? dados.duradouro : undefined,
           aviso: typeof dados?.aviso === "string" ? dados.aviso : undefined,
         };
@@ -1366,6 +1385,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     docRef.current = doc;
   }, [doc]);
   const [copiarAberto, setCopiarAberto] = useState(false);
+  const [copiaSubstitui, setCopiaSubstitui] = useState<string | null>(null);
   /**
    * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
    *
@@ -2089,8 +2109,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   /** `updatedAt` do rascunho do servidor tal como o lemos — é com isto que o
    *  servidor deteta que alguém gravou por cima entretanto. */
   const serverStamp = useRef<string | null>(null);
+  /** O documento tal como o servidor o tem, da última vez que se falou com
+   *  ele. É a base contra a qual se diz «mudei estes campos» — ver
+   *  `camposMudados`. */
+  const docDoServidor = useRef<Record<string, unknown> | null>(null);
   /** Já avisámos desta gravação cruzada? (uma vez chega; não a cada gravação) */
   const warnedOverwrite = useRef(false);
+  const avisouJuncao = useRef(false);
   /**
    * ══════════════════════════════════════════════════════════════════════════
    * O TRABALHO QUE ESTA SESSÃO ESMAGOU, E DE ONDE SE VAI BUSCAR
@@ -2485,12 +2510,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     async (docGravavel: unknown): Promise<ResultadoDaGravacao> => {
       setAGravarNoServidor((n) => n + 1);
       try {
+        // O que mudou desde a última conversa com o servidor — é isto que lhe
+        // deixa juntar esta gravação com a de outra pessoa campo a campo, em
+        // vez de a última escrita levar o documento inteiro (achado n.º 6).
+        const enviado = ehObjecto(docGravavel) ? docGravavel : null;
+        const desde = docDoServidor.current;
         const r = await gravarRascunhoNoServidor(quote.id, {
           doc: docGravavel,
           baseUpdatedAt: serverStamp.current,
+          ...(enviado && desde ? camposMudados(desde, enviado) : {}),
         });
         if (r.estado === "guardado") {
           if (r.updatedAt) serverStamp.current = r.updatedAt;
+          docDoServidor.current = r.doc ?? enviado;
+          // O que veio da outra pessoa vai para o ecrã — mas só nos campos em
+          // que esta não mexeu entretanto (a gravação demora; ela pode ter
+          // continuado a escrever).
+          const junto = r.doc;
+          if (junto && enviado) {
+            setDoc((d) => {
+              const atual = d as unknown as Record<string, unknown>;
+              const novo: Record<string, unknown> = { ...atual };
+              let mudou = false;
+              for (const k of new Set([...Object.keys(junto), ...Object.keys(enviado)])) {
+                if (mesmoValor(junto[k], enviado[k])) continue;
+                if (!mesmoValor(atual[k], enviado[k])) continue;
+                if (junto[k] === undefined) delete novo[k];
+                else novo[k] = junto[k];
+                mudou = true;
+              }
+              return mudou ? (novo as unknown as StudioDoc) : d;
+            });
+          }
           marcarGuardadoNoServidor();
           // Só um `false` EXPLÍCITO alarma — ver `duradouro`. Um servidor que
           // não diga nada é tratado como sempre foi.
@@ -2546,6 +2597,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (!active) return;
       if (draft) {
         serverStamp.current = typeof draft.updatedAt === "string" ? draft.updatedAt : null;
+        docDoServidor.current = ehObjecto(draft.doc) ? draft.doc : null;
       }
 
       const carimboDoServidor = draft ? Date.parse(draft.updatedAt ?? "") || 0 : 0;
@@ -3150,6 +3202,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // Alguém gravou entre a nossa leitura e esta escrita. A nossa versão
         // fica (a última vence), mas dizê-lo é o mínimo — desaparecer com o
         // trabalho de outra pessoa em silêncio, não.
+        // Juntou-se sem pisar ninguém: dizê-lo uma vez, para ela saber porque
+        // é que apareceu no ecrã texto que não escreveu.
+        if (r.juntou && !r.overwrote && !avisouJuncao.current) {
+          avisouJuncao.current = true;
+          const quem = r.previousBy ? `por ${r.previousBy}` : "noutro sítio";
+          toast(
+            `Este rascunho estava a ser alterado ${quem}. Juntei as duas versões: o que mudaste ficou teu, e o que mudaram lá já está no ecrã.`,
+            "info",
+          );
+        }
         if (r.overwrote && !warnedOverwrite.current) {
           warnedOverwrite.current = true;
           /**
@@ -4456,6 +4518,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * — «rascunho limpo — 0 páginas, 0 fotografias» é ruído com aritmética.
    */
   function oQueOLimparLevou(d: StudioDoc): string {
+    const partes = trabalhoNoDocumento(d);
+    return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
+  }
+
+  /** O trabalho que o documento tem, dito por partes — para o «Rascunho
+   *  limpo — levou…» e para a pergunta do «Criar a partir de…». */
+  function trabalhoNoDocumento(d: StudioDoc): string[] {
     const fotos = d.moodBoards.reduce((n, b) => n + b.images.length, 0);
     const paginas = d.moodBoards.filter((b) => b.images.length > 0).length;
     const servicos = (d.serviceGroups ?? []).reduce((n, g) => n + (g.items ?? []).length, 0);
@@ -4468,7 +4537,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       servicos > 0 ? `${servicos} ${servicos === 1 ? "serviço" : "serviços"}` : null,
       orcamento > 0 ? `${orcamento} ${orcamento === 1 ? "linha" : "linhas"} de orçamento` : null,
     ].filter((x): x is string => x !== null);
-    return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
+    return partes;
   }
 
   /**
@@ -4614,6 +4683,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // E no servidor — senão o rascunho limpo aqui reaparecia no dispositivo
     // seguinte, que é precisamente o que guardá-lo lá veio resolver.
     serverStamp.current = null;
+    docDoServidor.current = null;
     warnedOverwrite.current = false;
     void fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, { method: "DELETE" }).catch(() => {
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
@@ -7254,7 +7324,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           {/* A acção principal desta secção: quase todas as propostas são uma
               variação de uma anterior. É a única aqui a verde. */}
-          <Button size="sm" onClick={() => setCopiarAberto(true)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              // Achado n.º 7: a cópia só pergunta se houver trabalho a perder
+              // — escrito nesta sessão, ou num rascunho que já estava gravado.
+              // Uma proposta acabada de abrir, com o que veio do pedido, não
+              // pergunta nada (um aviso sempre ligado ensina a não o ler).
+              const houveTrabalho =
+                camposTocados.current.size > 0 || docDoServidor.current != null || jaGravou.current;
+              const partes = trabalhoNoDocumento(doc);
+              setCopiaSubstitui(
+                houveTrabalho ? (partes.length > 0 ? partes.join(", ") : "texto escrito") : null,
+              );
+              setCopiarAberto(true);
+            }}
+          >
             Criar a partir de…
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setNomeModelo(doc.eventType || "")}>
@@ -7452,6 +7537,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         clienteAtual={quote.name ?? ""}
         onEscolhido={aplicarCopia}
         toast={toast}
+        substitui={copiaSubstitui}
       />
 
       {/* Passos do fluxo — sempre visível, dá o sentido de "onde estou / o que
@@ -7746,7 +7832,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
                 <Field
                   label="Clientes"
-                  value={doc.clientNames}
+                  value={doc.clientNames ?? ""}
                   onChange={(e) => {
                     confirmado("clientNames");
                     patch({ clientNames: e.target.value });
@@ -7757,7 +7843,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Field
                   label="Tipo de evento"
-                  value={doc.eventType}
+                  value={doc.eventType ?? ""}
                   onChange={(e) => {
                     confirmado("eventType");
                     patch({ eventType: e.target.value });
@@ -7768,7 +7854,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Field
                   label="Data"
-                  value={doc.eventDate}
+                  value={doc.eventDate ?? ""}
                   onChange={(e) => {
                     confirmado("eventDate");
                     patch({ eventDate: e.target.value });
@@ -7780,7 +7866,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <Field
                   label="Local"
                   list="sug-locais"
-                  value={doc.location}
+                  value={doc.location ?? ""}
                   onChange={(e) => {
                     confirmado("location");
                     patch({ location: e.target.value });
@@ -7791,7 +7877,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Field
                   label="Convidados"
-                  value={doc.guests}
+                  value={doc.guests ?? ""}
                   onChange={(e) => {
                     confirmado("guests");
                     patch({ guests: e.target.value });
@@ -7874,7 +7960,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 )}
                 <Field
                   label="Título interno (opcional)"
-                  value={doc.ref}
+                  value={doc.ref ?? ""}
                   onChange={(e) => {
                     setRefEdited(true);
                     patch({ ref: e.target.value });
@@ -9684,7 +9770,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <Field
                         containerClassName="min-w-0 grow basis-[14rem]"
                         label="Rótulo do total"
-                        value={doc.totalLabel}
+                        value={doc.totalLabel ?? ""}
                         onChange={(e) => patch({ totalLabel: e.target.value })}
                         data-campo="totalLabel"
                         placeholder="Valor Total Decoração"

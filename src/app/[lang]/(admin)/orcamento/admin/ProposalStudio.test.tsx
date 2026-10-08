@@ -390,6 +390,19 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
+/** Só o DOCUMENTO de cada gravação do rascunho. O corpo leva também a `base`
+ *  dos campos que mudaram (achado n.º 6 — o valor de ANTES, para o servidor
+ *  juntar duas pessoas campo a campo), e isso não é o que fica gravado. */
+function docsGravados(parte: string): string[] {
+  return corpos(parte).map((c) => {
+    try {
+      return JSON.stringify(JSON.parse(c).doc ?? null);
+    } catch {
+      return c;
+    }
+  });
+}
+
 beforeEach(() => {
   localStorage.clear();
   seletor.marcadores.length = 0;
@@ -1530,7 +1543,7 @@ describe("a disposição das fotos do mood board", () => {
     pedidos = [];
     await user.click(screen.getByRole("radio", { name: /^Automático/ }));
     await waitFor(() => {
-      const gravado = corpos("proposta-rascunho").at(-1) ?? "";
+      const gravado = docsGravados("proposta-rascunho").at(-1) ?? "";
       expect(gravado).toContain("Cerimónia");
       expect(gravado).not.toContain('"layout"');
     });
@@ -4240,7 +4253,7 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     // documentos antigos não conhecem.
     await user.click(interruptor());
     await waitFor(
-      () => expect(corpos("proposta-rascunho").at(-1) ?? "").not.toContain("forma-da-foto"),
+      () => expect(docsGravados("proposta-rascunho").at(-1) ?? "").not.toContain("forma-da-foto"),
       { timeout: 3000 },
     );
   });
@@ -6622,7 +6635,12 @@ describe("a lista das fotos e o que sobrevive a um deployment", () => {
 
     // A montagem: os dois mood boards, com as fotos e pela ordem em que ela as
     // pôs. É isto que não pode depender do endereço.
-    await screen.findByDisplayValue("Cerimónia");
+    //
+    // «Cerimónia» aparece DUAS vezes: o título do mood board e a linha dos
+    // Serviços. Este teste procurava-a uma vez só, e passava porque os Serviços
+    // do servidor NÃO voltavam — era o achado n.º 1 da auditoria (o carimbo
+    // dos ids contava como «ela escreveu» e tirava os Serviços da fusão).
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia")).toHaveLength(2));
     await screen.findByDisplayValue("Copo de água");
     await waitFor(() => expect(celulas()).toHaveLength(4));
 
