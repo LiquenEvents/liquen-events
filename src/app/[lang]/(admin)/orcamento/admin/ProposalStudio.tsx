@@ -152,7 +152,6 @@ import { depositPercentOf } from "@/lib/proposal-doc";
 import {
   ASPETO_POR_OMISSAO,
   alturaDaLegenda,
-  aspetoDaCapa,
   caixasDoMoodboard,
   layoutSugerido,
   linhasDaLegendaAprox,
@@ -6353,12 +6352,35 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
+  /**
+   * ── A TABELA ABRE COM UMA LINHA PRONTA ─────────────────────────────────
+   *
+   * Palavras dela, com a captura dos cabeçalhos sem nada por baixo: «eu quero
+   * que isto aqui esteja aberto por definição». Sem adicionais, a secção
+   * mostrava «Descrição · Valor · IVA» e um «+ Adicionar» — um clique a mais
+   * para começar a escrever.
+   *
+   * A linha vazia é SÓ do ecrã: não entra na proposta até se escrever nela
+   * (`updateBudgetExtra` cria-a nesse momento), e mesmo que entrasse vazia o
+   * PDF já salta as linhas sem descrição nem valor (`proposal-doc-pdf`).
+   */
+  const extrasAVista: { label: string; valueText: string }[] =
+    (doc.budgetExtras ?? []).length > 0 ? (doc.budgetExtras ?? []) : [{ label: "", valueText: "" }];
+  const soLinhaPorEscrever = (doc.budgetExtras ?? []).length === 0;
+
   function addBudgetExtra() {
     // Uma linha nova nasce vazia: não há valor nenhum para somar ainda.
     definirExtras([...(doc.budgetExtras ?? []), { label: "", valueText: "" }]);
   }
   function updateBudgetExtra(i: number, p: Partial<{ label: string; valueText: string }>) {
-    definirExtras((doc.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)));
+    const extras = doc.budgetExtras ?? [];
+    // A linha que se mostra aberta sem existir (ver `extrasAVista`): a primeira
+    // coisa escrita nela é o que a cria.
+    if (extras.length === 0 && i === 0) {
+      definirExtras([{ label: "", valueText: "", ...p }]);
+      return;
+    }
+    definirExtras(extras.map((r, j) => (j === i ? { ...r, ...p } : r)));
   }
   /**
    * O valor escrito no campo numérico, já normalizado e com o IVA da linha.
@@ -6369,14 +6391,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * `textoDoAdicional`.
    */
   function definirValorDoAdicional(i: number, escrito: string) {
-    const linha = (doc.budgetExtras ?? [])[i];
+    const linha = extrasAVista[i];
     if (!linha) return;
     const modo = modoDoAdicional(linha.valueText ?? "", doc.vatRate ?? DEFAULT_VAT_RATE);
     updateBudgetExtra(i, { valueText: textoDoAdicional(escrito, modo) });
   }
   /** Troca o IVA que a linha declara, mantendo o número que lá está. */
   function definirIvaDoAdicional(i: number, modo: ModoDeIvaDoAdicional) {
-    const linha = (doc.budgetExtras ?? [])[i];
+    const linha = extrasAVista[i];
     if (!linha) return;
     updateBudgetExtra(i, { valueText: textoDoAdicional(linha.valueText ?? "", modo) });
   }
@@ -8106,6 +8128,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 A causa de fundo está corrigida acima; isto é a rede por baixo:
                 mesmo que a coluna volte a apertar, as capas empilham em vez de
                 se espremerem. */}
+              {/* ── AS FOTOGRAFIAS ENCHEM O CARTÃO ──────────────────────────────
+                  Palavras dela, em três capturas seguidas: «isto aqui também
+                  está enorme» (cada tira com ~630 px de altura), depois
+                  «coloca isto mais bonito», e por fim, sobre duas tiras
+                  estreitas encostadas à esquerda: «não gosto. quero as fotos
+                  a preencher o retângulo».
+
+                  As duas capas ocupam a largura toda do cartão, meia cada, e
+                  uma altura fixa de 256 px — cabem as duas no ecrã com a
+                  secção à volta. Perde-se a pré-visualização do recorte exacto
+                  da tira (era o `aspeto` da capa), e o que a substitui é o
+                  NÚMERO: a etiqueta por cima de cada fotografia diz quanto
+                  dela fica de fora no PDF, medido pela mesma conta de antes.
+                  A explicação, igual para as duas, diz-se uma vez por baixo. */}
               <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
                 {[0, 1].map((idx) => {
                   const path = doc.coverImages?.[idx];
@@ -8144,7 +8180,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
                   const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
                   return (
-                    <div key={idx}>
+                    <div key={idx} className="relative">
                       {path ? (
                         <>
                           <Thumb
@@ -8160,9 +8196,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             // esperam pela fila das fotos que estão fora do ecrã.
                             priority
                             onRemove={() => removeCoverAt(idx)}
-                            // A forma REAL da tira de capa, e não um 4:3 que o
-                            // documento nunca desenha. Ver `aspeto` em `Thumb`.
-                            aspeto={aspetoDaCapa()}
+                            className="h-64 w-full"
                             // Medir aqui é o que dá o número do aviso de baixo —
                             // a mesma medida que os mood boards já faziam, na
                             // célula que já está no ecrã e sem pedir nada ao
@@ -8172,15 +8206,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
                             refDoc={path}
                           />
-                          {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                            <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]">
-                              A tira da capa é quase duas vezes mais alta do que larga:{" "}
-                              <strong className="font-medium">
-                                esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
-                              </strong>
-                              . Uma fotografia ao alto perde menos.
-                            </p>
-                          )}
+                          {/* O nome do lado e, se perder muito, o número — numa
+                              etiqueta escura por cima da fotografia, como o
+                              «×» de remover que já lá vive. */}
+                          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white">
+                            {idx === 0 ? "Esquerda" : "Direita"}
+                            {perdaDaCapa > PERDA_QUE_SE_AVISA && (
+                              <>
+                                {" · "}
+                                <span className="tabular-nums">
+                                  perde {Math.round(perdaDaCapa * 100)}% da área
+                                </span>
+                              </>
+                            )}
+                          </span>
                         </>
                       ) : (
                         <>
@@ -8218,6 +8257,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   );
                 })}
               </div>
+              {[0, 1].some((i) => {
+                const p = doc.coverImages?.[i];
+                const a = p ? aspetosDasFotos[p] : undefined;
+                return a ? perdaNaCapa(a) > PERDA_QUE_SE_AVISA : false;
+              }) && (
+                <p className="mt-3 max-w-prose text-caption text-[var(--bo-text-muted)]">
+                  A tira da capa é quase duas vezes mais alta do que larga, por isso a fotografia é
+                  cortada dos lados. Uma fotografia ao alto perde menos.
+                </p>
+              )}
             </Section>
 
             {/* Service groups */}
@@ -9985,7 +10034,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <span>IVA da linha</span>
                         <span className="w-5" />
                       </div>
-                      {(doc.budgetExtras ?? []).map((ex, i) => {
+                      {extrasAVista.map((ex, i) => {
                         const modo = modoDoAdicional(
                           ex.valueText ?? "",
                           doc.vatRate ?? DEFAULT_VAT_RATE,
@@ -10024,20 +10073,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                 placeholder="Deslocação da equipa Líquen"
                                 aria-label="Descrição da linha adicional"
                               />
-                              {caixaDeIngles(
-                                { tipo: "extraRotulo", i },
-                                "Descrição da linha adicional",
-                                {
-                                  className:
-                                    "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
-                                  placeholder: "Líquen team travel",
-                                  // EMPILHADA: esta já vive numa célula estreita
-                                  // de uma grelha de dois (o rótulo à esquerda, o
-                                  // valor à direita). Parti-la outra vez ao meio
-                                  // dava duas caixas onde não cabe «Deslocação».
-                                  empilhada: true,
-                                },
-                              )}
+                              {!soLinhaPorEscrever &&
+                                caixaDeIngles(
+                                  { tipo: "extraRotulo", i },
+                                  "Descrição da linha adicional",
+                                  {
+                                    className:
+                                      "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                    placeholder: "Líquen team travel",
+                                    // EMPILHADA: esta já vive numa célula estreita
+                                    // de uma grelha de dois (o rótulo à esquerda, o
+                                    // valor à direita). Parti-la outra vez ao meio
+                                    // dava duas caixas onde não cabe «Deslocação».
+                                    empilhada: true,
+                                  },
+                                )}
                             </div>
                             {/* ── UM CAMPO DE DINHEIRO, NÃO UM CAMPO DE TEXTO ──
                               Chamava-se «Valor (texto)» e aceitava o que lhe
@@ -10079,14 +10129,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               <option value="acrescer">+ IVA</option>
                               <option value="incluido">IVA incluído</option>
                             </select>
-                            <button
-                              type="button"
-                              className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
-                              onClick={() => removeBudgetExtra(i)}
-                              aria-label="Remover linha adicional"
-                            >
-                              ×
-                            </button>
+                            {soLinhaPorEscrever ? (
+                              // A linha ainda não existe: não há o que remover.
+                              // A célula fica, para a grelha não mudar de forma.
+                              <span className="w-5" aria-hidden="true" />
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
+                                onClick={() => removeBudgetExtra(i)}
+                                aria-label="Remover linha adicional"
+                              >
+                                ×
+                              </button>
+                            )}
                             {/* O que fica escrito na proposta, à letra. É a única
                               forma de ela ver que «1500» e «+ IVA» viram
                               «1 500,00 € + IVA» no papel — e de um texto livre
@@ -11383,7 +11439,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            do bordo do ecrã. Não é um número afinado a olho — é o token do ar
            desta casa, aplicado ao vão entre duas peças em vez de ao vão entre
            uma peça e a moldura. Ficam 14 px, e lêem-se como duas. */
-        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit sm:py-3"
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-1.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit"
       >
         {step === "conteudo" && (
           <>
@@ -11645,6 +11701,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 certeza sem esperar pelos 800 ms. */}
               {soNesteComputador && (
                 <Button
+                  size="sm"
                   variant="secondary"
                   onClick={guardarAgora}
                   loading={aGuardarAgora}
@@ -11654,6 +11711,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </Button>
               )}
               <Button
+                size="sm"
                 variant="primary"
                 onClick={() => setStep("prever")}
                 iconRight={<span aria-hidden="true">→</span>}
@@ -11666,7 +11724,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
         {step === "prever" && (
           <>
-            <Button variant="ghost" onClick={() => setStep("conteudo")}>
+            <Button size="sm" variant="ghost" onClick={() => setStep("conteudo")}>
               ← Conteúdo
             </Button>
             {/* ══════════════════════════════════════════════════════════════
@@ -11743,7 +11801,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
                 />
               ) : (
-                <Button variant="secondary" onClick={preview} disabled={busy !== null}>
+                <Button size="sm" variant="secondary" onClick={preview} disabled={busy !== null}>
                   Descarregar PDF
                 </Button>
               )}
@@ -11786,7 +11844,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                   Em ecrã largo abre sempre: lá a barra tem espaço, e a única
                   razão para o encurtar era a que não existe. */}
-              <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
+              {/* ── E AGORA UMA LINHA SÓ, EM QUALQUER ECRÃ ─────────────────
+                  Palavras dela, com a captura desta barra e da do passo 3:
+                  «coloca estas barras muito mais finas de modo a não estarem
+                  a atrapalhar o trabalho de por trás». No ecrã largo o texto
+                  inteiro ocupava uma linha só para ele, e a barra tinha três
+                  andares (voltar · idioma e PDF · ressalva · «Rever e
+                  enviar»).
+
+                  Com «Português» fica a frase curta, À VISTA e na mesma fila
+                  dos controlos — continua dito, antes do clique, que o inglês
+                  muda o documento. O texto inteiro fica para o leitor de ecrã
+                  (`sr-only`) e abre à vista quando se escolhe «Inglês», que é
+                  quando passa a ser a consequência do que ela fez. */}
+              <p
+                className={
+                  idiomaDoPdf === "en"
+                    ? "w-full text-right text-[11px] leading-snug text-foreground/50"
+                    : "order-first text-[11px] leading-snug text-foreground/50"
+                }
+              >
                 {idiomaDoPdf === "en" ? (
                   <>
                     Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
@@ -11796,8 +11873,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   </>
                 ) : (
                   <>
-                    <span className="sm:hidden">Em inglês muda a moldura do documento.</span>
-                    <span className="hidden sm:inline">
+                    <span aria-hidden="true">Em inglês muda a moldura do documento.</span>
+                    <span className="sr-only">
                       Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
                       data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
                       «EN»; o que ficar em branco sai em português. Os valores continuam à
@@ -11853,6 +11930,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 })()}
             </div>
             <Button
+              size="sm"
               variant="primary"
               onClick={() => setStep("enviar")}
               iconRight={<span aria-hidden="true">→</span>}
@@ -11865,6 +11943,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         {step === "enviar" && !sent && (
           <>
             <Button
+              size="sm"
               variant="ghost"
               onClick={() => setStep("prever")}
               // A meio de um envio, voltar atrás não cancela nada — o pedido já
@@ -11910,6 +11989,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button
+                    size="sm"
                     variant="primary"
                     onClick={() => void send(true)}
                     disabled={busy !== null}
@@ -11917,6 +11997,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     Enviar assim mesmo
                   </Button>
                   <Button
+                    size="sm"
                     variant="ghost"
                     onClick={() => {
                       setCortesPorConfirmar(null);
@@ -11965,10 +12046,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   a pagar.
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setConfirmSend(false)}>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmSend(false)}>
                     Cancelar
                   </Button>
                   <Button
+                    size="sm"
                     variant="primary"
                     onClick={() => {
                       // Achado n.º 3: o «Confirmar» aparece onde estava a ponta
@@ -11996,7 +12078,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  coisa.» A razão já existia — vivia no `title`, que num iPhone
                  não aparece. Passa a estar escrita ao lado do botão, com cada
                  falta a saltar para onde se resolve. */
-              <div className="ml-auto flex flex-col items-end gap-2">
+              /* «Vai para …» AO LADO do botão e não por cima: eram dois
+                 andares para uma frase de uma linha («barras muito mais
+                 finas»). Quando há faltas, a caixa que as explica quebra para
+                 cima sozinha (`flex-wrap`) — aí a altura é a mensagem. */
+              <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
                 <PorqueNaoDaParaEnviar
                   faltas={faltas}
                   fotosPorConfirmar={fotosPorConfirmar}
@@ -12004,6 +12090,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   onIr={(f) => irParaAFalta(f.seccao, f.campo)}
                 />
                 <Button
+                  size="sm"
                   variant="primary"
                   onClick={() => {
                     perguntaDoEnvioDesde.current = performance.now();
@@ -12041,7 +12128,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         )}
 
         {step === "enviar" && sent && (
-          <Button variant="ghost" onClick={() => setStep("conteudo")}>
+          <Button size="sm" variant="ghost" onClick={() => setStep("conteudo")}>
             ← Voltar ao conteúdo
           </Button>
         )}

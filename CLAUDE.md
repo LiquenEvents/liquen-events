@@ -88,3 +88,14 @@ Estes três andaram perdidos: chegaram pelo chat e nunca ficaram guardados. O do
 Liquid Glass fez o mesmo caminho e só se recuperou por sorte. **Um documento que
 ela manda guarda-se em `docs/` no mesmo dia** — é isso que impede o próximo de
 se perder.
+
+# E as propostas e os temas, todos juntos, também têm o seu
+
+`docs/PROPOSTAS-E-TEMAS-APPLE.md` é o plano dela em seis fases (bases, Temas,
+estúdio, PDF, fotografias, proposta web). A **Parte −1** regista o que ela
+respondeu quando o comparei com o código: **fica a barra de baixo**, **o
+logótipo fica ao centro**, **fica o Geist**, e **usam-se os tokens que já
+existem** — nenhuma segunda família, contraste ≥ 4,5:1. Lê-a antes de seguir
+o §6 à letra: quase todos os valores de lá já existem cá com outro nome, e
+alguns dos nomes de lá (`--text-*`, `--accent`, `--ease-sheet`) já querem dizer
+outra coisa nesta casa.

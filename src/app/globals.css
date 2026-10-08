@@ -3045,38 +3045,6 @@ body::before {
   animation: lb-open-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ── Lightbox cinematográfico — slideshow ── */
-/* Ken Burns: deriva lenta enquanto a foto está em exibição no slideshow. */
-@keyframes lb-kenburns {
-  from {
-    opacity: 0;
-    transform: scale(1.04);
-  }
-  12% {
-    opacity: 1;
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.11);
-  }
-}
-.lb-kenburns {
-  animation: lb-kenburns 5.6s cubic-bezier(0.33, 0, 0.2, 1) both;
-  will-change: transform;
-}
-/* Barra de progresso — preenche em sincronia com o ritmo do slideshow. */
-@keyframes lb-progress {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-.lb-progress {
-  animation: lb-progress 5s linear both;
-}
-
 /* ── Hero CSS animations (no JS — always in viewport on load) ── */
 /* Only .anim-3 is used (the hero CTA row); .anim-0/1/2 were orphaned. */
 .anim-3 {
@@ -4597,16 +4565,6 @@ body:has([data-orcamento-mode]) .eyebrow {
   .lb-open-in {
     animation: none;
   }
-  .lb-kenburns {
-    animation: none;
-    opacity: 1;
-    /* No animation for these users, so don't leave a permanent compositor-layer
-       hint behind (mirrors the .g-reveal / .cl-reveal reduced-motion cleanup). */
-    will-change: auto;
-  }
-  .lb-progress {
-    animation: none;
-  }
 }
 
 /* ── Galeria — revelação em cascata ao scroll ──
@@ -4776,12 +4734,20 @@ html.fontes-por-assentar .barra-consentimento {
    E some sozinha: `:has()` lê a PRESENÇA da barra no DOM, e é o React que a
    tira de lá quando a pessoa escolhe. Nesse instante o sítio recupera os
    110 px — a menos de 500 ms de um clique da pessoa, portanto fora do CLS. */
+/* MEDIDO OUTRA VEZ quando a barra passou a cartão num canto («quero isto
+   pequeno num canto transparente tipo apple»), com o mesmo toque emulado e
+   nas duas línguas. O que conta agora é o que o cartão OCUPA a partir do fundo
+   (altura + os 12 px de ar por baixo dele):
+     · 320 e 360 px → 159 px (147 de cartão)
+     · 390 a 639 px → 139 px (127)
+     · 640 e acima  → 145 px (133 — o cartão tem 22 rem e o texto quebra)
+   Daí 168 px e 156 px, com a mesma folga de antes. */
 body:has(.barra-consentimento) {
-  --reserva-consentimento: 152px;
+  --reserva-consentimento: 168px;
 }
 @media (min-width: 640px) {
   body:has(.barra-consentimento) {
-    --reserva-consentimento: 84px;
+    --reserva-consentimento: 156px;
   }
 }
 
@@ -4794,6 +4760,18 @@ body:has(.barra-consentimento) {
    esta classe não deve escrever `bottom-*` ao lado dela. */
 .piso-flutuante {
   bottom: calc(1.25rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+}
+/* O botão do WhatsApp, que vive no canto DIREITO. A partir de 640 px o aviso de
+   cookies é um cartão no canto esquerdo e não o tapa, portanto lá não sobe com
+   a reserva — fica a 1 rem do fundo («coloca o wats mais baixo»). Abaixo disso
+   o cartão ocupa a largura toda e a reserva volta a contar. */
+.piso-flutuante-direita {
+  bottom: calc(1rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+}
+@media (min-width: 640px) {
+  .piso-flutuante-direita {
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
 }
 @media (min-width: 1024px) {
   .piso-flutuante-lg {

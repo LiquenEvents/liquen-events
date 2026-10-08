@@ -872,8 +872,21 @@ export default function OrcamentoForm({
   // the logo sitting on top of the photo.
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] lg:pt-20">
-      {/* ── Painel imagem (esquerda) ── */}
-      <aside className="relative hidden lg:block overflow-hidden">
+      {/* ── Painel imagem (esquerda) ──
+          Palavras dela, com três capturas a descer a página: «isto não está
+          bom assim...». O painel esticava à altura da coluna do formulário
+          (~1600 px a 1440), e o título «Conte-nos a sua ideia», encostado ao
+          fundo dele, só aparecia quando se chegava ao botão de enviar — quem
+          entrava via só árvores escuras ao lado de um formulário.
+
+          Passa a ter a altura do ecrã e a ficar preso (`sticky`) enquanto o
+          formulário desce. O `top` é a altura da barra do sítio já encolhida
+          (76 px, `Navbar.tsx`), que é fixa e nunca se esconde; a altura é o
+          ecrã menos essa barra, para o painel acabar no fundo do ecrã. O título
+          deixa de estar no fundo e vai para o meio (`my-auto`): à chegada, com
+          a barra ainda alta, o fundo do painel fica um pouco abaixo da dobra,
+          e o título no meio fica à vista na mesma. */}
+      <aside className="relative hidden lg:block overflow-hidden lg:sticky lg:top-[76px] lg:h-[calc(100svh-76px)] lg:self-start">
         <Image
           src="/imagens/DaniGui_JantarFesta_1.jpg"
           placeholder="blur"
@@ -885,7 +898,7 @@ export default function OrcamentoForm({
           className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/35 to-[#080808]/55" />
-        <div className="absolute inset-0 flex flex-col justify-between p-12 xl:p-16">
+        <div className="absolute inset-0 flex flex-col p-12 xl:p-16">
           <Link
             href={localizeHref("/", locale)}
             // `alvo-toque`: MEDIDO a 375 px com toque emulado, 72×17 px — falha
@@ -895,7 +908,7 @@ export default function OrcamentoForm({
           >
             ← {to.back}
           </Link>
-          <div>
+          <div className="my-auto">
             <p className="text-cream/70 text-[10px] tracking-[0.5em] uppercase mb-7 flex items-center gap-3">
               <span className="w-6 h-px bg-gold/60 flex-shrink-0" />
               {to.eyebrow}

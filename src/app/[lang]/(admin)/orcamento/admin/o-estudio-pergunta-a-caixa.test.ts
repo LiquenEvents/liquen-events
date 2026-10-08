@@ -56,7 +56,6 @@ const COM_MOTIVO: Record<string, string> = {
   "sm:shrink-0": "dívida conhecida — fila curta, por medir",
   "sm:items-start": "dívida conhecida — alinhamento, por medir",
   "sm:justify-between": "dívida conhecida — alinhamento, por medir",
-  "sm:py-3": "dívida conhecida — folga, por medir",
 };
 
 /**
