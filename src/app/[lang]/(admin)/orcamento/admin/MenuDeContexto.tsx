@@ -1,8 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import type { AccaoDeItem } from "./ui";
+import { SeparadorDoMenu, separadorAntesDe, teclasDoMenu } from "./ui/MenuDeAccoes";
+import { SAIDA, useSaidaDeUmSo } from "./ui/saida";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -68,6 +70,51 @@ export function MenuDeContexto({
   const painelRef = useRef<HTMLDivElement>(null);
 
   /**
+   * ── E O MENU SAI, COMO O DO «⋯» ───────────────────────────────────────────
+   *
+   * Fechava a seco: o `pedido` passava a `null` e o painel desaparecia entre
+   * dois fotogramas. Passa a ter a saída da casa (`.bo-saida`, 200 ms, e
+   * nenhuma para quem pediu menos movimento — vem do `useSaidaDeUmSo`).
+   *
+   * O que se desenha a sair é o ÚLTIMO pedido, guardado em estado e ajustado
+   * DURANTE o desenho (o padrão do React para reagir a uma prop — o mesmo do
+   * `useNoEcraAteSair` dos Temas): quando a saída começa o `pedido` já é
+   * `null`, e sem isto não havia nada para desenhar.
+   */
+  const aSair = useSaidaDeUmSo(!!pedido);
+  const [ultimo, setUltimo] = useState<PedidoDeMenu | null>(pedido);
+  if (pedido && pedido !== ultimo) setUltimo(pedido);
+  const desenhado = pedido ?? (aSair ? ultimo : null);
+
+  /**
+   * ── O FOCO VOLTA A QUEM ABRIU ─────────────────────────────────────────────
+   *
+   * A mesma regra do «⋯»: o foco entra no menu ao abrir, e sem o devolver ele
+   * caía no `<body>` ao fechar — o Tab seguinte recomeçava no princípio da
+   * página, longe do cartão onde se estava. Guarda-se quem tinha o foco no
+   * instante em que o menu foi pedido (o cartão do Shift+F10, a célula do
+   * botão direito) e devolve-se-lhe no Escape e ao escolher um item.
+   *
+   * O clique FORA não devolve: aí o foco vai para onde se carregou. Rolar ou
+   * mudar o tamanho da janela só devolve se o foco estava DENTRO do menu — e
+   * sem rolar a página até à origem, que era desfazer a rolagem que fechou o
+   * menu.
+   */
+  const origem = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!pedido) return;
+    const activo = document.activeElement as HTMLElement | null;
+    // Um segundo pedido com o menu aberto não troca a origem pelo próprio menu.
+    if (!activo || activo === document.body || painelRef.current?.contains(activo)) return;
+    origem.current = activo;
+  }, [pedido]);
+  const devolverFoco = (semRolar = false) => {
+    const o = origem.current;
+    origem.current = null;
+    if (o?.isConnected) o.focus(semRolar ? { preventScroll: true } : undefined);
+  };
+
+  /**
    * ── A POSIÇÃO CORRIGE-SE ANTES DE O ECRÃ PINTAR ───────────────────────────
    *
    * O painel nasce no ponteiro (é o `style` do JSX) e aqui mede-se para o
@@ -86,8 +133,16 @@ export function MenuDeContexto({
     const { width, height } = el.getBoundingClientRect();
     const maxX = Math.max(MARGEM, window.innerWidth - width - MARGEM);
     const maxY = Math.max(MARGEM, window.innerHeight - height - MARGEM);
-    el.style.left = `${Math.min(Math.max(MARGEM, pedido.x), maxX)}px`;
-    el.style.top = `${Math.min(Math.max(MARGEM, pedido.y), maxY)}px`;
+    const x = Math.min(Math.max(MARGEM, pedido.x), maxX);
+    const y = Math.min(Math.max(MARGEM, pedido.y), maxY);
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    // ── E CRESCE A PARTIR DO PONTEIRO ─────────────────────────────────────
+    // «`transform-origin` no canto de origem» (Parte 9.7). A origem é o
+    // sítio onde se carregou, medido a partir do canto do painel DEPOIS de
+    // encostado — se o menu teve de fugir da borda, cresce na direcção do
+    // ponteiro e não de um canto que ficou longe dele.
+    el.style.transformOrigin = `${pedido.x - x}px ${pedido.y - y}px`;
   }, [pedido]);
 
   /**
@@ -111,18 +166,32 @@ export function MenuDeContexto({
         // Parar aqui: com selecção activa, o `Escape` da grelha limpa-a — e
         // fechar um menu não é limpar uma selecção.
         e.stopPropagation();
+        devolverFoco();
         onFechar();
       }
     };
-    document.addEventListener("pointerdown", fora);
+    const mexeu = () => {
+      const dentro = !!painelRef.current?.contains(document.activeElement);
+      if (dentro) devolverFoco(true);
+      else origem.current = null;
+      onFechar();
+    };
+    const foraEsquece = (e: PointerEvent) => {
+      // Carregar fora: o foco vai para onde se carregou, e a origem esquece-se.
+      if (painelRef.current && !painelRef.current.contains(e.target as Node)) {
+        origem.current = null;
+      }
+      fora(e);
+    };
+    document.addEventListener("pointerdown", foraEsquece);
     document.addEventListener("keydown", tecla, true);
-    window.addEventListener("scroll", onFechar, true);
-    window.addEventListener("resize", onFechar);
+    window.addEventListener("scroll", mexeu, true);
+    window.addEventListener("resize", mexeu);
     return () => {
-      document.removeEventListener("pointerdown", fora);
+      document.removeEventListener("pointerdown", foraEsquece);
       document.removeEventListener("keydown", tecla, true);
-      window.removeEventListener("scroll", onFechar, true);
-      window.removeEventListener("resize", onFechar);
+      window.removeEventListener("scroll", mexeu, true);
+      window.removeEventListener("resize", mexeu);
     };
   }, [pedido, onFechar]);
 
@@ -130,44 +199,51 @@ export function MenuDeContexto({
   // percorre com o teclado é um menu que metade das acções não tem.
   useEffect(() => {
     if (!pedido) return;
-    painelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    painelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
   }, [pedido]);
 
-  if (!pedido) return null;
+  if (!desenhado) return null;
 
-  const itens = pedido.accoes;
+  const itens = desenhado.accoes;
 
   return (
     <div
       ref={painelRef}
-      role="menu"
-      aria-label={`Acções de ${pedido.sobre}`}
+      /* A SAIR, ISTO JÁ NÃO É UM MENU — a mesma regra do «⋯»: sem `role`, sem
+         nome, fora do fio do teclado. O `pointer-events` vem dentro da
+         `.bo-saida`. */
+      role={aSair ? undefined : "menu"}
+      aria-label={aSair ? undefined : `Acções de ${desenhado.sobre}`}
+      aria-hidden={aSair || undefined}
+      inert={aSair}
+      onKeyDown={teclasDoMenu}
       // O sítio onde se carregou. O `useLayoutEffect` acima encosta-o para
       // dentro se não couber, antes de isto chegar ao ecrã.
-      style={{ left: pedido.x, top: pedido.y }}
+      style={{ left: desenhado.x, top: desenhado.y }}
       className={
-        "bo-material bo-material-desfoque bo-entrada fixed z-50 min-w-48 overflow-hidden " +
-        "p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)]"
+        "bo-material bo-material-desfoque fixed z-50 min-w-48 overflow-hidden " +
+        "p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] " +
+        (aSair ? SAIDA : "bo-entrada bo-entrada-menu")
       }
     >
       {itens.map((a, i) => {
         // A mesma regra do menu do «⋯»: um filete antes da primeira acção
-        // destrutiva, que fica no FIM da lista. É o que impede o toque
-        // distraído em «Eliminar» quando se queria o item de cima.
-        const primeiraDestrutiva = a.destrutiva && !itens.slice(0, i).some((x) => x.destrutiva);
+        // destrutiva, que fica no FIM da lista — é o que impede o toque
+        // distraído em «Eliminar» quando se queria o item de cima —, e um no
+        // começo de cada grupo que a lista declare (`separadorAntes`).
+        const filete = separadorAntesDe(itens, i);
         return (
           <Fragment key={a.id}>
-            {primeiraDestrutiva && i > 0 && (
-              <div
-                aria-hidden="true"
-                className="mx-2.5 my-1 border-t border-[var(--bo-hairline)]"
-              />
-            )}
+            {filete && <SeparadorDoMenu semantico={filete === "semantico"} />}
             <button
               type="button"
               role="menuitem"
               disabled={a.desativada}
               onClick={() => {
+                // Devolver o foco ANTES da acção, como no «⋯»: se ela abrir
+                // um diálogo, é a origem que a armadilha de foco memoriza
+                // para devolver no fim.
+                devolverFoco();
                 onFechar();
                 a.onAccao();
               }}

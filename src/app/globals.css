@@ -3982,6 +3982,37 @@ body[data-menu-open] .whatsapp-fixed {
 .bo-entrada-fundo {
   --bo-entrada-y: 0px;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   O MENU CRESCE A PARTIR DE QUEM O ABRIU
+   ══════════════════════════════════════════════════════════════════════════
+
+   «O menu cresce a partir do botão, com `--ease-quick`, e `transform-origin`
+   no canto de origem» (Parte 9.7 do `docs/DESIGN-SYSTEM.md`), e a tabela da
+   Parte 5 do `docs/APPLE-TEMAS.md` dá-lhe o número: 325 ms. Os dois menus da
+   casa (o do «⋯», `ui/MenuDeAccoes.tsx`, e o do botão direito,
+   `MenuDeContexto.tsx`) entravam com a `.bo-entrada` nua — 240 ms de
+   deslocação, sem escala nenhuma, e por isso sem sítio de onde crescer.
+
+   Isto não é uma entrada nova: é a MESMA `.bo-entrada` (o mesmo `@keyframes`,
+   os mesmos 4 px), com três coisas reescritas a partir de tokens que já
+   existem — a duração (`--transition-duration-quick`), a curva (`--ease-
+   quick`, a mola) e a escala de chegada das caixas convocadas
+   (`--bo-escala-chegada`). O `transform-origin` é de quem a usa: o «⋯» cresce
+   do canto de cima à direita, o do botão direito do ponteiro.
+
+   Quem pediu menos movimento não vê nada disto: o `animation: none` da regra
+   de baixo apaga o nome da animação, e sem nome não há duração nem curva. */
+.bo-entrada-menu {
+  --bo-entrada-escala: var(--bo-escala-chegada);
+  animation-duration: var(--transition-duration-quick);
+}
+/* A mola é um `linear()`; quem não o entende fica com a curva da
+   `.bo-entrada` — o mesmo recuo da regra da folha, aqui em cima. */
+@supports (animation-timing-function: linear(0, 1)) {
+  .bo-entrada-menu {
+    animation-timing-function: var(--ease-quick);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .bo-entrada {
     animation: none;

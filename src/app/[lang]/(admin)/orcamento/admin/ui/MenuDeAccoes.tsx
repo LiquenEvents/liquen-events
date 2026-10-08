@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as TeclaDoReact,
+  type ReactNode,
+} from "react";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
 import { SAIDA, useSaidaDeUmSo } from "./saida";
@@ -74,6 +81,86 @@ export interface AccaoDeItem {
    *  espera de acontecer. */
   destrutiva?: boolean;
   desativada?: boolean;
+  /**
+   * Um filete ANTES deste item — o começo de um grupo.
+   *
+   * «Agrupa com separadores» (Parte 9.7 do `docs/DESIGN-SYSTEM.md`): o menu
+   * do tema tem quatro grupos («Abrir · Pré-visualizar | Adicionar… ·
+   * Renomear… · Definir capa… | …»), e o filete que já existia só sabia
+   * separar a primeira destrutiva. Este é declarado por quem escreve a lista,
+   * porque só ela sabe onde acaba um grupo.
+   *
+   * Desenha-se com `role="separator"` — é estrutura que o leitor de ecrã
+   * anuncia, e não enfeite. Ignorado no primeiro item desenhado (um filete
+   * no topo não separa nada). Num item que é também a primeira destrutiva
+   * desenha-se UM filete, este. Quem não usa o campo fica com o desenho de
+   * sempre, sem `role="separator"` nenhum.
+   */
+  separadorAntes?: boolean;
+}
+
+/**
+ * O filete entre dois grupos de um menu — o mesmo traço nos dois menus (o do
+ * «⋯» e o do botão direito), com a folga da pastilha para as três fronteiras
+ * verticais (moldura, filete, pastilha) lerem como uma coluna só.
+ *
+ * `semantico` diz se é um separador A SÉRIO (`separadorAntes`) ou o filete
+ * antigo antes da primeira destrutiva, que continua decorativo para não mudar
+ * o que os outros ecrãs dizem a quem ouve.
+ */
+export function SeparadorDoMenu({ semantico }: { semantico: boolean }) {
+  return (
+    <div
+      {...(semantico ? { role: "separator" } : { "aria-hidden": "true" })}
+      className="mx-2.5 my-1 border-t border-[var(--bo-hairline)]"
+    />
+  );
+}
+
+/** O filete que vai antes do item `i` de uma lista desenhada, se algum. */
+export function separadorAntesDe(
+  itens: readonly AccaoDeItem[],
+  i: number,
+): "semantico" | "decorativo" | null {
+  if (i === 0) return null;
+  const a = itens[i];
+  if (a.separadorAntes) return "semantico";
+  const primeiraDestrutiva = a.destrutiva && !itens.slice(0, i).some((x) => x.destrutiva);
+  return primeiraDestrutiva ? "decorativo" : null;
+}
+
+/**
+ * ── AS SETAS DENTRO DE UM MENU ─────────────────────────────────────────────
+ *
+ * ↓ e ↑ andam pelos itens (e dão a volta), Home e End vão às pontas. Os
+ * filetes não contam (não são `menuitem`) e os itens desactivados também não.
+ * É o teclado que o padrão de menu do APG pede, e é o mesmo nos dois menus.
+ *
+ * `stopPropagation` de propósito: por cima de um menu há ecrãs com as suas
+ * próprias setas (a lista das Tarefas anda de linha em linha com elas). Uma
+ * seta dentro do menu é do menu; deixá-la subir punha a lista a saltar por
+ * baixo dele.
+ */
+export function teclasDoMenu(e: TeclaDoReact<HTMLElement>): void {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+  const itens = Array.from(
+    e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'),
+  );
+  if (itens.length === 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const agora = itens.indexOf(document.activeElement as HTMLButtonElement);
+  const proximo =
+    e.key === "Home"
+      ? 0
+      : e.key === "End"
+        ? itens.length - 1
+        : e.key === "ArrowDown"
+          ? (agora + 1) % itens.length
+          : agora <= 0
+            ? itens.length - 1
+            : agora - 1;
+  itens[proximo].focus();
 }
 
 export interface MenuDeAccoesProps {
@@ -137,6 +224,10 @@ export function MenuDeAccoes({
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
   const abridorRef = useRef<HTMLButtonElement>(null);
+  /* O foco NÃO entra sozinho no menu ao abrir, e as setas no próprio «⋯»
+     não o abrem: há ecrãs (as Tarefas) em que ↓/↑ num botão de uma linha
+     anda de linha em linha, e o Tab a seguir ao «⋯» já cai no primeiro item.
+     As setas são de quem já está DENTRO do menu — ver `teclasDoMenu`. */
 
   // Reabrir a meio da saída traz o menu de volta: o `aberto` é que manda, e
   // não a marca — a regra vem de dentro do gancho.
@@ -256,6 +347,7 @@ export function MenuDeAccoes({
 
           {(aberto || aSairAgora) && (
             <div
+              onKeyDown={teclasDoMenu}
               /* A SAIR, ISTO JÁ NÃO É UM MENU. O nó fica montado 200 ms para
                  ter o que animar, mas para quem ouve o ecrã e para quem anda de
                  Tab a escolha acabou no instante do gesto: sem `role`, sem
@@ -280,15 +372,24 @@ export function MenuDeAccoes({
                    num sítio só. */
                 "bo-material bo-material-desfoque p-[var(--bo-material-folga)]",
                 "shadow-[var(--bo-sombra-suspensa)]",
-                aSairAgora ? SAIDA : "bo-entrada",
+                /* ── CRESCE A PARTIR DO «⋯» ────────────────────────────────
+                   «Menu a abrir: 325 ms, `--ease-quick`, `transform-origin`
+                   no botão» (Parte 5 do `docs/APPLE-TEMAS.md`; Parte 9.7 do
+                   sistema de design). A `.bo-entrada-menu` só reescreve a
+                   duração, a curva e a escala da `.bo-entrada` com os tokens
+                   da casa — ver o `globals.css`. O painel pende do canto de
+                   cima à direita do «⋯» (`right-0 top-full`), e é desse canto
+                   que cresce. */
+                "origin-top-right",
+                aSairAgora ? SAIDA : "bo-entrada bo-entrada-menu",
               )}
             >
               {noMenu.map((a, i) => {
                 // Uma linha a separar antes da primeira destrutiva: é o que
                 // impede o toque distraído em "Eliminar" quando se queria
-                // "Duplicar", que fica logo por cima.
-                const primeiraDestrutiva =
-                  a.destrutiva && !noMenu.slice(0, i).some((x) => x.destrutiva);
+                // "Duplicar", que fica logo por cima. E uma no começo de cada
+                // grupo que a lista declare (`separadorAntes`).
+                const filete = separadorAntesDe(noMenu, i);
                 return (
                   <Fragment key={a.id}>
                     {/* ── O FILETE SAIU DE DENTRO DO ITEM ───────────────────
@@ -299,12 +400,7 @@ export function MenuDeAccoes({
                         Passa a ser um elemento seu, entre as duas linhas, com
                         a folga da pastilha — para as três fronteiras verticais
                         (moldura, filete, pastilha) lerem como uma coluna só. */}
-                    {primeiraDestrutiva && i > 0 && (
-                      <div
-                        aria-hidden="true"
-                        className="mx-2.5 my-1 border-t border-[var(--bo-hairline)]"
-                      />
-                    )}
+                    {filete && <SeparadorDoMenu semantico={filete === "semantico"} />}
                     <button
                       type="button"
                       role="menuitem"
