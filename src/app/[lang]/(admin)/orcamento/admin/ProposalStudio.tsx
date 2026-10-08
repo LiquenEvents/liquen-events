@@ -8146,34 +8146,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   return (
                     <div key={idx}>
                       {path ? (
-                        <>
-                          <Thumb
-                            url={assetUrls[path]}
-                            // A cascata, do mais leve para o mais pesado. Ver
-                            // `assetMedias`: o degrau do meio poupa ~900 KB por
-                            // célula sempre que a miniatura falha.
-                            planoB={[assetMedias[path], assetOriginais[path]]}
-                            estadoDosUrls={estadoDosUrls}
-                            aoTentarDeNovo={() => void tentarBuscarFotos()}
-                            aoMorrer={marcarUrlMorto}
-                            // As capas são duas e estão no topo do passo: nunca
-                            // esperam pela fila das fotos que estão fora do ecrã.
-                            priority
-                            onRemove={() => removeCoverAt(idx)}
-                            // A forma REAL da tira de capa, e não um 4:3 que o
-                            // documento nunca desenha. Ver `aspeto` em `Thumb`.
-                            aspeto={aspetoDaCapa()}
-                            // Medir aqui é o que dá o número do aviso de baixo —
-                            // a mesma medida que os mood boards já faziam, na
-                            // célula que já está no ecrã e sem pedir nada ao
-                            // servidor.
-                            onMedida={(a) => registarAspeto(path, a)}
-                            pendente={isPendingImage(path)}
-                            onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
-                            refDoc={path}
-                          />
+                        /* ── PEQUENA, COM O AVISO AO LADO ─────────────────────
+                           Palavras dela, com a captura: «isto aqui também está
+                           enorme». A miniatura enchia meia coluna e, com a
+                           forma da tira (quase 1:2), ficava com ~630 px de
+                           altura — duas capas tapavam o ecrã inteiro para se
+                           escolher uma fotografia. Fica com 96 px de largura
+                           (a forma continua a ser a da tira, que é o que ela
+                           precisa de ver) e o aviso do corte passa para o
+                           lado, onde há largura para ele. */
+                        <div className="flex items-start gap-3">
+                          <div className="w-24 shrink-0">
+                            <Thumb
+                              url={assetUrls[path]}
+                              // A cascata, do mais leve para o mais pesado. Ver
+                              // `assetMedias`: o degrau do meio poupa ~900 KB por
+                              // célula sempre que a miniatura falha.
+                              planoB={[assetMedias[path], assetOriginais[path]]}
+                              estadoDosUrls={estadoDosUrls}
+                              aoTentarDeNovo={() => void tentarBuscarFotos()}
+                              aoMorrer={marcarUrlMorto}
+                              // As capas são duas e estão no topo do passo: nunca
+                              // esperam pela fila das fotos que estão fora do ecrã.
+                              priority
+                              onRemove={() => removeCoverAt(idx)}
+                              // A forma REAL da tira de capa, e não um 4:3 que o
+                              // documento nunca desenha. Ver `aspeto` em `Thumb`.
+                              aspeto={aspetoDaCapa()}
+                              // Medir aqui é o que dá o número do aviso de baixo —
+                              // a mesma medida que os mood boards já faziam, na
+                              // célula que já está no ecrã e sem pedir nada ao
+                              // servidor.
+                              onMedida={(a) => registarAspeto(path, a)}
+                              pendente={isPendingImage(path)}
+                              onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
+                              refDoc={path}
+                            />
+                          </div>
                           {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                            <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]">
+                            <p className="min-w-0 text-xs leading-relaxed text-[var(--bo-perigo)]">
                               A tira da capa é quase duas vezes mais alta do que larga:{" "}
                               <strong className="font-medium">
                                 esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
@@ -8181,7 +8192,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               . Uma fotografia ao alto perde menos.
                             </p>
                           )}
-                        </>
+                        </div>
                       ) : (
                         <>
                           <UploadArea
