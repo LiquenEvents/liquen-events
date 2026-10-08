@@ -89,8 +89,8 @@ export interface AccaoDeItem {
    * Um filete ANTES deste item — o começo de um grupo.
    *
    * «Agrupa com separadores» (Parte 9.7 do `docs/DESIGN-SYSTEM.md`): o menu
-   * do tema tem quatro grupos («Abrir · Pré-visualizar | Adicionar… ·
-   * Renomear… · Definir capa… | …»), e o filete que já existia só sabia
+   * do tema tem três grupos («Abrir · Adicionar… · Renomear… · Definir
+   * capa… | Favorito · Arquivar · Juntar… | Eliminar…»), e o filete que já existia só sabia
    * separar a primeira destrutiva. Este é declarado por quem escreve a lista,
    * porque só ela sabe onde acaba um grupo.
    *

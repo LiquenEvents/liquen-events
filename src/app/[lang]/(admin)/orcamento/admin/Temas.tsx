@@ -229,13 +229,6 @@ const ICONE_ABRIR = svgDoMenu(
     <path d="M20 14v-1M4 6v10a2 2 0 0 0 2 2h4" />
   </>,
 );
-/** Um olho: ver sem abrir. */
-const ICONE_PRE_VISUALIZAR = svgDoMenu(
-  <>
-    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-    <circle cx="12" cy="12" r="2.8" />
-  </>,
-);
 /** Uma fotografia com um «+». */
 const ICONE_ADICIONAR = svgDoMenu(
   <>
@@ -305,17 +298,6 @@ function teclaDeMenu(e: React.KeyboardEvent): boolean {
 interface PedidoAPasta {
   temaId: string;
   accao: "adicionar" | "renomear" | "capa";
-}
-
-/** O «Pré-visualizar» de um tema, a partir da lista — ver `preVisualizar`. */
-interface PreVisualizacao {
-  tema: ThemeSummary;
-  images: ThemeImage[];
-  index: number;
-  /** A capa do cartão, de onde o visualizador cresce; `null` = do centro. */
-  origem: DOMRect | null;
-  /** Quem tinha o foco ao pedir — é para lá que ele volta ao fechar. */
-  de: HTMLElement | null;
 }
 
 const SearchIcon = (
@@ -1223,62 +1205,6 @@ export default function Temas() {
   );
 
   /**
-   * ── «PRÉ-VISUALIZAR» UM TEMA SEM O ABRIR ───────────────────────────────
-   *
-   * O primeiro item do menu do tema, ao lado de «Abrir»: ver as fotografias
-   * em grande sem sair da grelha de cartões. Pede a primeira página da pasta
-   * (a mesma que a abertura pede) e abre o visualizador que a pasta já usa —
-   * o `PhotoLightbox`, com as setas, o Esc e o plano B —, a crescer da capa
-   * do cartão quando ele está à vista. Não é uma segunda lupa: é a mesma, com
-   * outra lista de fotografias.
-   *
-   * Falhar a leitura diz porquê (`porqueNaoLeu`), num aviso: não há ecrã
-   * nenhum aberto onde a frase pudesse ficar.
-   */
-  const [preVer, setPreVer] = useState<PreVisualizacao | null>(null);
-  const [aTransferirDaLupa, setATransferirDaLupa] = useState(false);
-  const preVisualizar = useCallback(
-    async (t: ThemeSummary) => {
-      // O menu já devolveu o foco ao «⋯» (ou ao cartão): é para lá que volta.
-      const de = document.activeElement as HTMLElement | null;
-      const capa = Array.from(document.querySelectorAll<HTMLElement>("[data-capa-do-tema]")).find(
-        (el) => el.dataset.capaDoTema === t.id,
-      );
-      const origem = capa?.getBoundingClientRect() ?? null;
-      const oQue = `as fotografias de "${t.name}"`;
-      let res: Response;
-      try {
-        res = await fetch(
-          `/api/temas/${encodeURIComponent(t.id)}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
-          { cache: "no-store" },
-        );
-      } catch {
-        toast(porqueNaoLeu(oQue, null).mensagem, "error");
-        return;
-      }
-      const corpo = await res.json().catch(() => null);
-      if (!res.ok) {
-        toast(porqueNaoLeu(oQue, res, corpo).mensagem, "error");
-        return;
-      }
-      const { images } = paginaDaResposta(corpo);
-      if (images.length === 0) {
-        toast(`"${t.name}" ainda não tem fotografias.`, "info");
-        return;
-      }
-      setPreVer({ tema: t, images, index: 0, origem, de });
-    },
-    [toast],
-  );
-  const fecharPreVer = useCallback(() => {
-    setPreVer(null);
-    preVer?.de?.focus?.();
-  }, [preVer]);
-  // Segurado montado os 200 ms da saída, como a lupa da pasta.
-  const aSairDaPreVer = useSaidaDeUmSo(preVer !== null);
-  const preVerNoEcra = useNoEcraAteSair(preVer !== null, aSairDaPreVer, preVer);
-
-  /**
    * As acções de um tema, como DADOS — a forma é de quem as desenha.
    *
    * A MESMA lista no «⋯» do cartão, no botão direito e no «⋯» do cabeçalho da
@@ -1291,13 +1217,22 @@ export default function Temas() {
    *
    * «Juntar a outro tema…» não está no documento e fica, no grupo de
    * arrumação, antes do destrutivo: é o ÚNICO caminho geral para fundir dois
-   * temas (o aviso de nomes parecidos só cobre pares parecidos). Ficou assim
-   * decidido na Fase 2; o menu passa a ter nove itens em quatro grupos.
+   * temas (o aviso de nomes parecidos só cobre pares parecidos).
+   *
+   * ── OITO ITENS EM TRÊS GRUPOS, DECISÃO DELA ──────────────────────────────
+   * Com «Juntar…» o menu chegava a nove itens em quatro grupos, acima do que a
+   * Apple aconselha (cinco a oito, no máximo três grupos), e no telemóvel,
+   * aberto para cima, escondia o «Abrir» debaixo do cabeçalho. Perguntado, ela
+   * respondeu «podes» a encurtar: sai «Pré-visualizar» (dentro da pasta a
+   * barra de espaço continua a abrir a fotografia em grande) e o «Abrir» junta-
+   * se ao grupo do que se faz ao tema. Ficam: Abrir · Adicionar fotografias… ·
+   * Renomear… · Definir capa… | Favorito · Arquivar · Juntar a outro tema… |
+   * Eliminar tema…
    *
    * Itens que não servem escondem-se em vez de se esbaterem (Parte 9.8):
-   * «Pré-visualizar» e «Definir capa…» numa pasta vazia, e «Abrir» dentro da
-   * própria pasta (`naPasta`). Os filetes vão no primeiro item que ficou de
-   * cada grupo (`emGrupos`).
+   * «Definir capa…» numa pasta vazia, e «Abrir» dentro da própria pasta
+   * (`naPasta`). Os filetes vão no primeiro item que ficou de cada grupo
+   * (`emGrupos`).
    */
   const accoesDoTema = useCallback(
     (t: ThemeSummary, { naPasta = false }: { naPasta?: boolean } = {}): AccaoDeItem[] => {
@@ -1322,18 +1257,6 @@ export default function Temas() {
                   },
                 },
               ]),
-          ...(temFotos
-            ? [
-                {
-                  id: "pre-visualizar",
-                  rotulo: "Pré-visualizar",
-                  icone: ICONE_PRE_VISUALIZAR,
-                  onAccao: () => void preVisualizar(t),
-                },
-              ]
-            : []),
-        ],
-        [
           {
             id: "adicionar",
             rotulo: "Adicionar fotografias…",
@@ -1464,7 +1387,7 @@ export default function Temas() {
         ],
       );
     },
-    [alternarMarca, pedirAPasta, podeTrocarDeTema, preVisualizar],
+    [alternarMarca, pedirAPasta, podeTrocarDeTema],
   );
   // Filtrar fora da tecla: com poucos temas é imperceptível, e mantém o campo
   // instantâneo quando a lista cresce (é o mesmo padrão do Inventário).
@@ -1877,25 +1800,6 @@ export default function Temas() {
     />
   );
 
-  /** O visualizador do «Pré-visualizar» — nos dois ramos, como a pergunta. */
-  const lupaDoTema = preVerNoEcra && (
-    <PhotoLightbox
-      aberto={preVer !== null}
-      images={preVerNoEcra.images}
-      index={preVerNoEcra.index}
-      onIndexChange={(i) => setPreVer((p) => (p ? { ...p, index: i } : p))}
-      onClose={fecharPreVer}
-      onDownload={async (im, i) => {
-        setATransferirDaLupa(true);
-        const ok = await downloadOne(im.url, downloadName(im, preVerNoEcra.tema.name, i));
-        setATransferirDaLupa(false);
-        if (!ok) toast("Não foi possível transferir a foto.", "error");
-      }}
-      downloading={aTransferirDaLupa}
-      origem={preVerNoEcra.origem}
-    />
-  );
-
   if (open) {
     return (
       /* ══════════════════════════════════════════════════════════════════
@@ -1996,7 +1900,6 @@ export default function Temas() {
           />
         </div>
         {perguntaDeEliminar}
-        {lupaDoTema}
       </div>
     );
   }
@@ -2863,7 +2766,8 @@ export default function Temas() {
                         {` · ${desdeQuando(t.updatedAt)}`}
                       </span>
                     ) : null}
-                    {/* A BANDEIRA DO FIXADO, que era o chip aceso por cima da
+                    {/* A BANDEIRA DO FAVORITO (era «Fixado no topo»; a palavra
+                        passou a ser a do menu e do filtro), que era o chip aceso por cima da
                         fotografia. Fica no fim da linha, como no desenho do
                         `ThemeCard` (Parte 3), e leva nome escrito: um glifo
                         sozinho não diz nada a quem ouve o ecrã. */}
@@ -2871,7 +2775,7 @@ export default function Temas() {
                       <span className="text-[var(--bo-accent)]">
                         {" · "}
                         <span aria-hidden="true">★</span>
-                        <span className="sr-only">Fixado no topo</span>
+                        <span className="sr-only">Favorito</span>
                       </span>
                     ) : null}
                   </p>
@@ -2940,7 +2844,6 @@ export default function Temas() {
           `z-index` — e é `fixed`, portanto não é a grelha que o recorta. */}
       <MenuDeContexto pedido={menu} onFechar={fecharMenu} />
       {perguntaDeEliminar}
-      {lupaDoTema}
     </div>
   );
 }

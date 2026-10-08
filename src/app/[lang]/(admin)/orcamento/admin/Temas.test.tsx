@@ -1199,13 +1199,14 @@ describe("Biblioteca de Temas — um botão sobre a fotografia", () => {
 
   /** A estrela era um chip aceso sobre a fotografia; a informação não se
    *  perdeu, mudou de sítio — para o rasto de números, com nome escrito. */
-  it("um tema fixado di-lo na linha dos números, e não por cima da capa", async () => {
+  it("um tema favorito di-lo na linha dos números, e não por cima da capa", async () => {
     route("GET /api/temas", () =>
       ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, favorito: true }]),
     );
     renderTemas();
     const grupo = await screen.findByRole("group", { name: "Terracotta" });
-    expect(within(grupo).getByText("Fixado no topo")).toBeTruthy();
+    // «Favorito», a palavra do menu e do filtro (era «Fixado no topo»).
+    expect(within(grupo).getByText("Favorito")).toBeTruthy();
   });
 
   /**
@@ -1431,7 +1432,9 @@ describe("Biblioteca de Temas — o cartão", () => {
     // quando não cabe (o desenho da Parte 3), em vez de cortar a data a meio.
     const rasto = screen.getByText(/9 fotos · 4 propostas/);
     expect(rasto.className).toMatch(/\bline-clamp-2\b/);
-    expect(rasto.className, "`truncate` cortava a data absoluta a meio").not.toMatch(/\btruncate\b/);
+    expect(rasto.className, "`truncate` cortava a data absoluta a meio").not.toMatch(
+      /\btruncate\b/,
+    );
   });
 
   it("o cartão enche a célula da grelha, para a fila ter uma altura só", async () => {
@@ -1442,7 +1445,9 @@ describe("Biblioteca de Temas — o cartão", () => {
     await acharCartaoDoTema(/Terracotta/);
     const rasto = screen.getByText(/9 fotos/);
     const cartao = rasto.closest("button")!;
-    expect(cartao.className, "sem `h-full`, um rasto de duas linhas desalinha a fila").toMatch(/\bh-full\b/);
+    expect(cartao.className, "sem `h-full`, um rasto de duas linhas desalinha a fila").toMatch(
+      /\bh-full\b/,
+    );
   });
 
   /**
@@ -3578,14 +3583,14 @@ describe("a pasta de um tema diz o que mudou", () => {
  * ════════════════════════════════════════════════════════════════════════════
  *
  * Parte 3 do `docs/APPLE-TEMAS.md` e T3 do `PROPOSTAS-E-TEMAS-APPLE.md`. O
- * menu do tema tem quatro grupos (mais «Juntar a outro tema…», que ficou), o
+ * menu do tema tem oito itens em três grupos — ela respondeu «podes» a
+ * encurtá-lo: saiu «Pré-visualizar» e ficou «Juntar a outro tema…» —, o
  * «Eliminar tema» sai do cabeçalho da pasta para o «⋯» dele, e os três itens
  * que só a pasta sabe fazer abrem-na a fazê-los.
  */
 describe("Biblioteca de Temas — os menus da Fase 2", () => {
   const ORDEM_DO_TEMA = [
     "Abrir",
-    "Pré-visualizar",
     "Adicionar fotografias…",
     "Renomear…",
     "Definir capa…",
@@ -3600,17 +3605,18 @@ describe("Biblioteca de Temas — os menus da Fase 2", () => {
     route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, n, true), total: n }));
   };
 
-  it("o menu do tema vem pela ordem do documento, em quatro grupos", async () => {
+  it("o menu do tema tem oito itens em três grupos", async () => {
     comFotos();
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
     fireEvent.click(screen.getByRole("button", { name: "Acções de Terracotta" }));
     const menu = screen.getByRole("menu");
     expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(ORDEM_DO_TEMA);
-    expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(3);
+    expect(ORDEM_DO_TEMA).toHaveLength(8);
+    expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(2);
   });
 
-  it("numa pasta vazia, «Pré-visualizar» e «Definir capa…» escondem-se", async () => {
+  it("numa pasta vazia, «Definir capa…» esconde-se, e não há «Pré-visualizar»", async () => {
     route("GET /api/temas", () => ok([{ ...THEME, imageCount: 0 }]));
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
@@ -3729,19 +3735,6 @@ describe("Biblioteca de Temas — os menus da Fase 2", () => {
     expect(callsTo("PATCH /api/temas/t1")).toBe(0);
   });
 
-  it("«Pré-visualizar» abre as fotografias em grande sem abrir o tema", async () => {
-    comFotos();
-    renderTemas();
-    await acharCartaoDoTema(/Terracotta/);
-    const item = accaoNoMenuDoTema(/Terracotta/, "Pré-visualizar");
-    await act(async () => {
-      fireEvent.click(item);
-    });
-    expect(await screen.findByRole("dialog", { name: "Foto 1 de 3" })).toBeTruthy();
-    // A grelha de cartões continua por baixo: o tema não foi aberto.
-    expect(screen.queryByRole("button", { name: "Adicionar fotos" })).toBeNull();
-  });
-
   it("menu da foto: «Abrir tamanho real» abre o original num separador novo", async () => {
     comFotos();
     const abrir = vi.spyOn(window, "open").mockReturnValue(null);
@@ -3832,9 +3825,7 @@ describe("Biblioteca de Temas — eliminar diz quantas fotos e propostas", () =>
     const caixa = await screen.findByRole("dialog");
     expect(within(caixa).getByText("Desaparecem 7 fotografias.")).toBeTruthy();
     expect(
-      within(caixa).getByText(
-        "Está em 3 propostas — essas guardam as fotos que usam e não mudam.",
-      ),
+      within(caixa).getByText("Está em 3 propostas — essas guardam as fotos que usam e não mudam."),
     ).toBeTruthy();
     expect(within(caixa).getByText("Esta acção não pode ser anulada.")).toBeTruthy();
   });
