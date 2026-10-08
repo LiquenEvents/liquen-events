@@ -11,6 +11,7 @@ import HeroWarm from "@/components/HeroWarm";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import SmoothScroll from "@/components/motion/SmoothScroll";
 import type { Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -124,7 +125,7 @@ export default function CromadoDoSitio({
         aparecer aos 400 ms — uma navegação normal monta isto, não pinta um
         pixel, e desmonta.
       */}
-      <AvisoDeCarregamento locale={locale} />
+      <AvisoDeCarregamento rotulo={getDictionary(locale).common.aAbrir} />
       <StickyCTA />
       <Navbar />
       {/* tabIndex=-1 so the skip link actually MOVES keyboard focus into

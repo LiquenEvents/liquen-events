@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { localizeHref } from "@/lib/i18n";
+import { localizeHref } from "@/lib/i18n/config";
 import { useTranslations } from "@/components/LocaleProvider";
 import { waHref } from "@/data";
 

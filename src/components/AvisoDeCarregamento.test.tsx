@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { AvisoDeCarregamento } from "./AvisoDeCarregamento";
+import { pt } from "@/lib/i18n/pt";
+import { en } from "@/lib/i18n/en";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -61,18 +63,18 @@ afterEach(() => {
 
 describe("o aviso de que uma página está a demorar", () => {
   it("não existe no ecrã enquanto não se clicar em nada", () => {
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     expect(visivel()).toBe(false);
   });
 
   it("aparece ao clicar num link interno, e sai quando a página chega", () => {
-    const { rerender } = render(<AvisoDeCarregamento locale="pt" />);
+    const { rerender } = render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     clicar("/pt/galeria");
     expect(visivel()).toBe(true);
 
     // A chegada: o caminho passou a ser outro.
     H.caminho = "/pt/galeria";
-    act(() => rerender(<AvisoDeCarregamento locale="pt" />));
+    act(() => rerender(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />));
     expect(visivel(), "chegou — o aviso não tem mais nada a dizer").toBe(false);
   });
 
@@ -83,7 +85,7 @@ describe("o aviso de que uma página está a demorar", () => {
      * nunca acontecia — o logótipo a respirar por cima de uma página que já lá
      * estava, até ao tecto dos oito segundos.
      */
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     clicar("/pt");
     expect(visivel()).toBe(false);
     clicar("#contactos");
@@ -91,7 +93,7 @@ describe("o aviso de que uma página está a demorar", () => {
   });
 
   it("não se acende no que sai desta aplicação", () => {
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     for (const href of [
       "https://instagram.com/liquen.events",
       "mailto:a@b.pt",
@@ -103,7 +105,7 @@ describe("o aviso de que uma página está a demorar", () => {
   });
 
   it("não se acende num clique que abre noutro sítio", () => {
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     clicar("/pt/galeria", { target: "_blank" });
     expect(visivel(), "target=_blank abre outro separador").toBe(false);
     clicar("/pt/galeria", { metaKey: true });
@@ -116,7 +118,7 @@ describe("o aviso de que uma página está a demorar", () => {
     // Se a chegada nunca acontecer (uma navegação que morreu, uma rota que
     // rebentou), um indicador de espera que não sabe acabar é a própria avaria
     // que ele existe para evitar.
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     clicar("/pt/galeria");
     expect(visivel()).toBe(true);
     act(() => void vi.advanceTimersByTime(8_000));
@@ -126,14 +128,14 @@ describe("o aviso de que uma página está a demorar", () => {
   it("a espera tem NOME para quem ouve o ecrã", () => {
     // A regra dela: «nunca um estado de espera sem nome». Um logótipo a
     // respirar é bonito e não é um nome.
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     clicar("/pt/galeria");
     const aviso = screen.getByRole("status");
     expect(aviso.textContent).toMatch(/abrir/i);
   });
 
   it("em inglês, o nome vem em inglês", () => {
-    render(<AvisoDeCarregamento locale="en" />);
+    render(<AvisoDeCarregamento rotulo={en.common.aAbrir} />);
     clicar("/en/galeria");
     expect(screen.getByRole("status").textContent).toMatch(/opening/i);
   });
@@ -181,7 +183,7 @@ describe("e o que o CSS tem de prometer", () => {
      * efeito que o apaga nunca corre, e o logótipo ficava a respirar por cima
      * de uma página que já lá estava até ao tecto dos oito segundos.
      */
-    render(<AvisoDeCarregamento locale="pt" />);
+    render(<AvisoDeCarregamento rotulo={pt.common.aAbrir} />);
     clicar("/pt/galeria");
     expect(visivel()).toBe(true);
     act(() => void window.dispatchEvent(new Event("popstate")));

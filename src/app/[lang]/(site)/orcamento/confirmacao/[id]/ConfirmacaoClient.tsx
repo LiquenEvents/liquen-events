@@ -10,7 +10,7 @@ import { waHref } from "@/data";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
-import { fill, localizeHref } from "@/lib/i18n";
+import { fill, localizeHref } from "@/lib/i18n/config";
 import type { Dict } from "@/lib/i18n";
 import { daysUntil, isHighSeason, longDate } from "@/lib/workdays";
 import { track } from "@/lib/track";

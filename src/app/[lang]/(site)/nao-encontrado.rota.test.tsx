@@ -96,7 +96,7 @@ describe("endereço que não existe", () => {
     expect(titulo.split("Líquen Events")).toHaveLength(2);
   });
 
-  it("o 404 desenhado dá caminhos de volta, e na língua do visitante", () => {
+  it("o 404 desenhado dá caminhos de volta, e na língua do visitante", async () => {
     for (const locale of ["pt", "en"] as const) {
       const t = getDictionary(locale);
       const { unmount } = render(
@@ -104,7 +104,8 @@ describe("endereço que não existe", () => {
           <NotFoundView />
         </LocaleProvider>,
       );
-      const ligacoes = screen.getAllByRole("link");
+      // O corpo chega por `next/dynamic` (P1): espera-se por ele.
+      const ligacoes = await screen.findAllByRole("link");
       expect(ligacoes.length, "um 404 sem saídas é um beco").toBeGreaterThanOrEqual(5);
       // Em inglês as ligações levam o prefixo /en; em português são nuas.
       for (const a of ligacoes) {

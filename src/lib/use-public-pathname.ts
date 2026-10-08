@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { LOCALES } from "@/lib/i18n";
+import { LOCALES } from "@/lib/i18n/config";
 
 /**
  * Strips the internal locale segment (`/pt`, `/en`) from a pathname.

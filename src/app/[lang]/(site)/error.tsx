@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { log } from "@/lib/logger";
 import { useTranslations } from "@/components/LocaleProvider";
-import { localizeHref } from "@/lib/i18n";
+import { localizeHref } from "@/lib/i18n/config";
 
 export default function Error({
   error,

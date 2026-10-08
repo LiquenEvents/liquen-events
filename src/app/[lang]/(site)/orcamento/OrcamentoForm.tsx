@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { waHref } from "@/data";
 import { useTranslations } from "@/components/LocaleProvider";
-import { localizeHref } from "@/lib/i18n";
+import { localizeHref } from "@/lib/i18n/config";
 import type { Dict } from "@/lib/i18n";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
