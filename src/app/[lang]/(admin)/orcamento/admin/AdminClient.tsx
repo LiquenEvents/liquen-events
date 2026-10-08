@@ -7753,7 +7753,10 @@ export default function AdminClient({
                         {selected.notes && (
                           <div>
                             <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                            <p className="rounded-lg bg-[var(--bo-tinta-6)] p-3 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                            {/* `whitespace-pre-line`: o casal escreve em
+                                parágrafos, e «Linha 1 Linha 2» numa linha só
+                                era outra coisa (achado n.º 35). */}
+                            <p className="rounded-lg bg-[var(--bo-tinta-6)] p-3 text-xs leading-relaxed whitespace-pre-line text-[var(--bo-tinta-72)]">
                               {selected.notes}
                             </p>
                           </div>

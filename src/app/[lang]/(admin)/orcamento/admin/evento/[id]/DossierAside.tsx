@@ -125,7 +125,9 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
             <p className="text-foreground/25 text-[9px] tracking-wide uppercase mb-1">
               Notas do cliente
             </p>
-            <p className="text-foreground/45 text-xs leading-relaxed">{quote.notes}</p>
+            <p className="text-foreground/45 text-xs leading-relaxed whitespace-pre-line">
+              {quote.notes}
+            </p>
           </div>
         )}
       </div>

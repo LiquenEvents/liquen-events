@@ -43,8 +43,20 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
     [email, existingQuotes],
   );
 
+  /**
+   * Achado n.º 31 da auditoria: o «Criar pedido» ficava desligado até haver
+   * nome, sem dizer porquê, e o Enter não fazia nada. Agora o botão está
+   * sempre ligado, o Enter num campo cria, e sem nome a razão aparece no
+   * próprio campo.
+   */
+  const [faltaNome, setFaltaNome] = useState(false);
+
   async function submit() {
-    if (!f.name.trim() || saving) return;
+    if (saving) return;
+    if (!f.name.trim()) {
+      setFaltaNome(true);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/orcamento/manual", {
@@ -93,7 +105,6 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             variant="primary"
             onClick={submit}
             loading={saving}
-            disabled={!f.name.trim()}
             iconRight={<span aria-hidden="true">→</span>}
           >
             {saving ? "A criar…" : "Criar pedido"}
@@ -111,7 +122,22 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
           ficar com três números a dizer a mesma coisa.
           Os telemóveis todos ficam numa coluna: um iPhone Pro Max dá 388 px
           de caixa, abaixo dos 416 px do limiar. */}
-      <div className="@container">
+      <div
+        className="@container"
+        // O Enter num campo de uma linha cria o pedido, como num formulário.
+        // Numa caixa de várias linhas continua a ser uma linha nova.
+        onKeyDown={(e) => {
+          if (
+            e.key === "Enter" &&
+            !e.nativeEvent.isComposing &&
+            e.target instanceof HTMLInputElement &&
+            e.target.type !== "checkbox"
+          ) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
+      >
         <div className="grid grid-cols-1 gap-x-4 gap-y-5 @min-[26rem]:grid-cols-2">
           {duplicates.length > 0 && (
             <div className="@min-[26rem]:col-span-2 flex items-start gap-3 rounded-xl border border-[var(--bo-aviso-tom)]/25 bg-[var(--bo-aviso-tom)]/[0.06] p-3.5">
@@ -147,7 +173,13 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
             label="Nome"
             required
             value={f.name}
-            onChange={(e) => set("name", e.target.value)}
+            onChange={(e) => {
+              set("name", e.target.value);
+              if (e.target.value.trim()) setFaltaNome(false);
+            }}
+            error={
+              faltaNome ? "Escreve o nome do cliente — é o único campo obrigatório." : undefined
+            }
             placeholder="Nome do cliente"
             autoFocus
           />

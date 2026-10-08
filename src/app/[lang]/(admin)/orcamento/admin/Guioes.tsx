@@ -687,6 +687,19 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
               title="Ainda não há eventos com data"
               description="Uma timeline pertence a um evento marcado. Assim que um pedido tiver data, aparece aqui à espera de timeline."
             />
+          ) : noAmbito.length === 0 ? (
+            /* ── NINGUÉM MUDOU O FILTRO ─────────────────────────────────────
+               Achado n.º 21 da auditoria: a vista abre em «Fechados», e sem
+               nenhum evento fechado dizia «Nenhuma timeline por fazer — Mudou o
+               filtro, não os dados» a quem tinha acabado de chegar. A omissão
+               fica (é dela, ver `ambito`); a frase passa a dizer o que se passa
+               e o botão leva aos outros eventos, que estão lá. */
+            <EmptyState
+              icon={<IconeDeGuiao />}
+              title="Ainda nenhum evento fechado"
+              description={`Os eventos entram aqui quando a proposta é aceite. Há ${contagensDoAmbito.todos} ${contagensDoAmbito.todos === 1 ? "evento" : "eventos"} com data noutros estados.`}
+              action={{ label: "Ver todos os eventos", onClick: () => setAmbito("todos") }}
+            />
           ) : visiveis.length === 0 ? (
             <EmptyState
               icon={<IconeDeGuiao />}

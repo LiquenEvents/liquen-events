@@ -4,12 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Quote } from "@/lib/orcamento/types";
-import {
-  CATEGORIES,
-  EVENT_TYPES_BY_CATEGORY,
-  QUOTE_EVENT_OPTIONS,
-  isPluralRegister,
-} from "@/lib/orcamento/data";
+import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, QUOTE_EVENT_OPTIONS } from "@/lib/orcamento/data";
 import { SITE } from "@/lib/site";
 import { waHref } from "@/data";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
@@ -165,10 +160,13 @@ export default function ConfirmacaoClient({
   const typeLabel =
     (optIdx >= 0 ? eventTypeLabels[optIdx] : undefined) ?? et?.label ?? quote?.eventName ?? "";
 
-  // Plural ("o vosso pedido") for weddings and christenings, singular formal
-  // otherwise — the same rule the confirmation email applies, so the page and
-  // the inbox address the client the same way.
-  const plural = isPluralRegister(quote?.eventType);
+  // SINGULAR PARA TODA A GENTE, casais incluídos — é a decisão dela para o
+  // email «Pedido recebido» (ver `email-pedido-recebido.ts`), e a página tem
+  // de tratar a pessoa como o email a trata. Esta página ficou no plural para
+  // casamentos e batizados («Recebemos o vosso pedido», «podem
+  // contactar-nos») depois de o email mudar — achado n.º 27 da auditoria.
+  // Os textos no plural ficam no dicionário; deixaram de ser escolhidos.
+  const plural = false;
   const pick = (singular: string, pl: string) => (plural ? pl : singular);
 
   // One clock for the whole render, so the countdown and the reply-by promise

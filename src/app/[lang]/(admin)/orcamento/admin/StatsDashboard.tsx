@@ -70,9 +70,12 @@ function Kpi({
   label,
   accent,
   small,
+  nota,
 }: {
   value: string;
   label: string;
+  /** O que o número conta, quando o rótulo sozinho não chega. */
+  nota?: string;
   accent?: boolean;
   /** Secondary, less prominent tile (smaller number, tighter padding). */
   small?: boolean;
@@ -94,10 +97,15 @@ function Kpi({
         {value}
       </p>
       <p
-        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-[var(--bo-accent)]" : "text-foreground/30"}`}
+        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-muted)]"}`}
       >
         {label}
       </p>
+      {nota && (
+        <p className="relative mt-1.5 text-[11px] leading-snug text-[var(--bo-text-muted)]">
+          {nota}
+        </p>
+      )}
     </div>
   );
 }
@@ -599,6 +607,9 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       total,
       thisMonth,
       conversion,
+      accepted,
+      decided,
+      porDecidir: total - decided,
       avgDaysClose,
       forecastRevenue,
       avgRespLabel,
@@ -758,7 +769,18 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         {/* Headline numbers — the four that answer "how are we doing?" at a glance */}
         <div className="grid grid-cols-2 @[40rem]:grid-cols-4 gap-3">
           <Kpi value={String(stats.total)} label="Pedidos totais" accent />
-          <Kpi value={`${stats.conversion}%`} label="Conversão" />
+          {/* Achado n.º 13: «100%» ao lado de «0 € Ganho» lia-se como «tudo
+              converte». A conta é ganhos ÷ (ganhos + perdidos), sem os que
+              ainda não têm resposta — e passa a estar escrita por baixo. */}
+          <Kpi
+            value={stats.decided > 0 ? `${stats.conversion}%` : "—"}
+            label="Conversão"
+            nota={
+              stats.decided > 0
+                ? `${stats.accepted} ganho${stats.accepted === 1 ? "" : "s"} em ${stats.decided} decidido${stats.decided === 1 ? "" : "s"} · ${stats.porDecidir} por decidir`
+                : "Ainda nenhum pedido ganho ou perdido."
+            }
+          />
           <Kpi value={eur(stats.pipelineSum)} label="Em proposta (com IVA)" />
           <Kpi value={eur(stats.wonSum)} label="Ganho (aceite, com IVA)" accent />
         </div>
