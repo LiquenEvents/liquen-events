@@ -15,6 +15,11 @@ import { saudacaoDaCarta } from "./tratamento";
  * no desenho dela) e o assunto passa a ser «Pedido de Proposta – Casamento |
  * 10 de junho de 2028».
  *
+ * Depois de a mandar, pediu UMA mudança: o texto da carta «em formato
+ * quadrado» — justificado (`text-align:justify`) nos cinco parágrafos
+ * corridos. A saudação e a despedida ficam como estão: numa linha só,
+ * justificar não muda nada.
+ *
  * O que não muda: os textos, as cores, os tamanhos e os espaçamentos do HTML
  * são os dela, e o teste de fidelidade (`email-pedido-recebido.test.ts`) põe
  * este HTML lado a lado com o ficheiro dela e exige que sejam IGUAIS, byte a
@@ -389,8 +394,8 @@ export function emailPedidoRecebido(d: DadosDoPedidoRecebido): {
   <!-- Carta: primeira parte -->
   <tr><td class="pad" style="padding:28px 40px 0;">
     <p class="t1" style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;">${esc(saudacao)}</p>
-    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">${esc(agradecemos)}</p>
-    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">${t.confirmamos}</p>
+    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;text-align:justify;">${esc(agradecemos)}</p>
+    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;text-align:justify;">${t.confirmamos}</p>
   </td></tr>
 
   <!-- Resumo do pedido: tabela de linhas finas -->
@@ -401,9 +406,9 @@ ${linhas}    </table>
 
   <!-- Carta: segunda parte -->
   <tr><td class="pad" style="padding:26px 40px 0;">
-    <p class="t1" style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;">${t.aNossaEquipa}</p>
-    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">${t.entraremos}</p>
-    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">${t.casoNecessite}</p>
+    <p class="t1" style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;text-align:justify;">${t.aNossaEquipa}</p>
+    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;text-align:justify;">${t.entraremos}</p>
+    <p class="t1" style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;text-align:justify;">${t.casoNecessite}</p>
     <p class="t1" style="margin:30px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">${t.cumprimentos}</p>
   </td></tr>
 

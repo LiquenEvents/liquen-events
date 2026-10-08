@@ -66,8 +66,27 @@ const EXEMPLO: DadosDoPedidoRecebido = {
   },
 };
 
-/** O ficheiro dela com os marcadores trocados — e mais nada. */
-const ESPERADO = semComentarioDeAutoria(ORIGINAL)
+/**
+ * A ÚNICA mudança que ela pediu depois de mandar o ficheiro: o texto corrido
+ * da carta «em formato quadrado» — justificado. São os cinco parágrafos
+ * longos: quatro com a margem de 18 px e o primeiro da segunda parte («A nossa
+ * equipa…»), que abre com margem zero. O ficheiro dela fica como chegou.
+ */
+const JUSTIFICADO = "text-align:justify;";
+function comTextoJustificado(html: string): string {
+  return html
+    .replaceAll(
+      'style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">',
+      `style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;${JUSTIFICADO}">`,
+    )
+    .replace(
+      'style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;">A nossa equipa',
+      `style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;${JUSTIFICADO}">A nossa equipa`,
+    );
+}
+
+/** O ficheiro dela com os marcadores trocados e o texto justificado — e mais nada. */
+const ESPERADO = comTextoJustificado(semComentarioDeAutoria(ORIGINAL))
   .replace('src="LOGO_URL"', 'src="cid:liquen-logo"')
   .replace('src="BANNER_URL"', 'src="cid:liquen-banner"')
   // Os ícones antes das ligações: `ICON_FACEBOOK_URL` contém `FACEBOOK_URL`.
@@ -120,6 +139,12 @@ describe("o email «Pedido de proposta» é a carta dela", () => {
    * O CONTROLO NEGATIVO: a comparação apanha uma mudança de um píxel. Sem
    * isto, um `ESPERADO` montado a partir da própria saída passava sempre.
    */
+  it("o texto corrido sai justificado, e só ele", () => {
+    const { html } = emailPedidoRecebido(EXEMPLO);
+    expect(html.split(JUSTIFICADO)).toHaveLength(6);
+    expect(html).toContain(`color:#1d1d1f;">Estimada Diana,</p>`);
+  });
+
   it("e a comparação apanha um espaçamento mexido", () => {
     const { html } = emailPedidoRecebido(EXEMPLO);
     const mexido = html.replace("padding:26px 40px 0;", "padding:25px 40px 0;");
