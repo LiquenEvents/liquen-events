@@ -2342,9 +2342,15 @@ body:has([data-cream-page]) [data-public-nav] {
   }
 }
 
-/* ── Smooth scroll ── */
+/* ── Scroll ──
+   SEM `scroll-behavior: smooth` global (auditoria externa, A9). Estava aqui, e
+   fazia de TODO o scroll programático um deslize: o restauro da posição da
+   galeria, a inércia da roda, cada `scrollTo` sem `behavior` — vários sítios
+   tinham de escrever `behavior: "instant"` só para lhe fugir. O rolo suave
+   fica só nos saltos internos, pedido onde acontecem: a âncora `#pedido` das
+   páginas de anúncio (`BarraFixa`) e o «voltar ao topo» da galeria, os dois
+   pela porta de `lib/motion/rolar.ts`, que respeita o movimento reduzido. */
 html {
-  scroll-behavior: smooth;
   /* Anchored sections (e.g. /servicos#empresas) and keyboard-focused elements
      land clear of the fixed navbar (≈140px unscrolled) instead of being hidden
      under it — WCAG 2.4.11 Focus Not Obscured. */

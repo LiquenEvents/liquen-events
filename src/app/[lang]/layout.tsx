@@ -274,7 +274,6 @@ export default async function RootLayout({
   return (
     <html
       lang={htmlLang(locale)}
-      data-scroll-behavior="smooth"
       className={`${inter.variable} ${playfair.variable} ${playfairItalico.variable} ${archivo.variable}`}
       /**
        * O `className` desta etiqueta é escrito por NÓS no servidor e mexido por
