@@ -6352,12 +6352,35 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
+  /**
+   * ── A TABELA ABRE COM UMA LINHA PRONTA ─────────────────────────────────
+   *
+   * Palavras dela, com a captura dos cabeçalhos sem nada por baixo: «eu quero
+   * que isto aqui esteja aberto por definição». Sem adicionais, a secção
+   * mostrava «Descrição · Valor · IVA» e um «+ Adicionar» — um clique a mais
+   * para começar a escrever.
+   *
+   * A linha vazia é SÓ do ecrã: não entra na proposta até se escrever nela
+   * (`updateBudgetExtra` cria-a nesse momento), e mesmo que entrasse vazia o
+   * PDF já salta as linhas sem descrição nem valor (`proposal-doc-pdf`).
+   */
+  const extrasAVista: { label: string; valueText: string }[] =
+    (doc.budgetExtras ?? []).length > 0 ? (doc.budgetExtras ?? []) : [{ label: "", valueText: "" }];
+  const soLinhaPorEscrever = (doc.budgetExtras ?? []).length === 0;
+
   function addBudgetExtra() {
     // Uma linha nova nasce vazia: não há valor nenhum para somar ainda.
     definirExtras([...(doc.budgetExtras ?? []), { label: "", valueText: "" }]);
   }
   function updateBudgetExtra(i: number, p: Partial<{ label: string; valueText: string }>) {
-    definirExtras((doc.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)));
+    const extras = doc.budgetExtras ?? [];
+    // A linha que se mostra aberta sem existir (ver `extrasAVista`): a primeira
+    // coisa escrita nela é o que a cria.
+    if (extras.length === 0 && i === 0) {
+      definirExtras([{ label: "", valueText: "", ...p }]);
+      return;
+    }
+    definirExtras(extras.map((r, j) => (j === i ? { ...r, ...p } : r)));
   }
   /**
    * O valor escrito no campo numérico, já normalizado e com o IVA da linha.
@@ -6368,14 +6391,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * `textoDoAdicional`.
    */
   function definirValorDoAdicional(i: number, escrito: string) {
-    const linha = (doc.budgetExtras ?? [])[i];
+    const linha = extrasAVista[i];
     if (!linha) return;
     const modo = modoDoAdicional(linha.valueText ?? "", doc.vatRate ?? DEFAULT_VAT_RATE);
     updateBudgetExtra(i, { valueText: textoDoAdicional(escrito, modo) });
   }
   /** Troca o IVA que a linha declara, mantendo o número que lá está. */
   function definirIvaDoAdicional(i: number, modo: ModoDeIvaDoAdicional) {
-    const linha = (doc.budgetExtras ?? [])[i];
+    const linha = extrasAVista[i];
     if (!linha) return;
     updateBudgetExtra(i, { valueText: textoDoAdicional(linha.valueText ?? "", modo) });
   }
@@ -10011,7 +10034,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <span>IVA da linha</span>
                         <span className="w-5" />
                       </div>
-                      {(doc.budgetExtras ?? []).map((ex, i) => {
+                      {extrasAVista.map((ex, i) => {
                         const modo = modoDoAdicional(
                           ex.valueText ?? "",
                           doc.vatRate ?? DEFAULT_VAT_RATE,
@@ -10050,20 +10073,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                 placeholder="Deslocação da equipa Líquen"
                                 aria-label="Descrição da linha adicional"
                               />
-                              {caixaDeIngles(
-                                { tipo: "extraRotulo", i },
-                                "Descrição da linha adicional",
-                                {
-                                  className:
-                                    "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
-                                  placeholder: "Líquen team travel",
-                                  // EMPILHADA: esta já vive numa célula estreita
-                                  // de uma grelha de dois (o rótulo à esquerda, o
-                                  // valor à direita). Parti-la outra vez ao meio
-                                  // dava duas caixas onde não cabe «Deslocação».
-                                  empilhada: true,
-                                },
-                              )}
+                              {!soLinhaPorEscrever &&
+                                caixaDeIngles(
+                                  { tipo: "extraRotulo", i },
+                                  "Descrição da linha adicional",
+                                  {
+                                    className:
+                                      "bo-input px-2.5 py-2 text-xs text-[var(--bo-tinta-72)]",
+                                    placeholder: "Líquen team travel",
+                                    // EMPILHADA: esta já vive numa célula estreita
+                                    // de uma grelha de dois (o rótulo à esquerda, o
+                                    // valor à direita). Parti-la outra vez ao meio
+                                    // dava duas caixas onde não cabe «Deslocação».
+                                    empilhada: true,
+                                  },
+                                )}
                             </div>
                             {/* ── UM CAMPO DE DINHEIRO, NÃO UM CAMPO DE TEXTO ──
                               Chamava-se «Valor (texto)» e aceitava o que lhe
@@ -10105,14 +10129,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               <option value="acrescer">+ IVA</option>
                               <option value="incluido">IVA incluído</option>
                             </select>
-                            <button
-                              type="button"
-                              className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
-                              onClick={() => removeBudgetExtra(i)}
-                              aria-label="Remover linha adicional"
-                            >
-                              ×
-                            </button>
+                            {soLinhaPorEscrever ? (
+                              // A linha ainda não existe: não há o que remover.
+                              // A célula fica, para a grelha não mudar de forma.
+                              <span className="w-5" aria-hidden="true" />
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${REMOVE_BTN} ${ESTADO} ${PRESSAO}`}
+                                onClick={() => removeBudgetExtra(i)}
+                                aria-label="Remover linha adicional"
+                              >
+                                ×
+                              </button>
+                            )}
                             {/* O que fica escrito na proposta, à letra. É a única
                               forma de ela ver que «1500» e «+ IVA» viram
                               «1 500,00 € + IVA» no papel — e de um texto livre
