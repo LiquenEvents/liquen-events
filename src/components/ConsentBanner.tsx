@@ -246,7 +246,12 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
       }}
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <p className="text-[12.5px] leading-relaxed text-white/80">
+        {/* `text-white` e não `/80` (auditoria externa, C5): sobre a página
+            branca, o fundo a 95% deixa 4,48:1 com `/80` — abaixo dos 4,5 do
+            AA. Branco dá 5,92:1. Fica em 12,5 px de propósito: a 14 px o texto
+            ganhava uma linha e a barra passava a reserva medida em
+            `--reserva-consentimento`. */}
+        <p className="text-[12.5px] leading-relaxed text-white">
           {t.text}{" "}
           <Link
             href={localizeHref("/privacidade", locale)}
