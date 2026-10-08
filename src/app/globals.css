@@ -2472,6 +2472,18 @@ body {
   }
 }
 
+/* ── E COM JAVASCRIPT, O RODAPÉ ESPERA PELA PÁGINA (auditoria externa, C4) ──
+   O ecrã de espera passou a ficar FIXO por cima (`loading.tsx`) para não
+   empurrar a página quando ela chega. Mas era ele, a ocupar um ecrã inteiro,
+   que mantinha o rodapé lá em baixo: sem ele, o rodapé ficava logo abaixo do
+   menu — tapado, mas «no ecrã» para a medição — e saltava ao chegar o
+   conteúdo. MEDIDO: CLS 0,81 no rodapé. Escondido enquanto o ecrã de espera
+   lá está, ele aparece já no sítio dele, que não conta como salto.
+   Só com JavaScript: sem ele, as regras de cima mostram a página e o rodapé. */
+html.com-javascript body:has(.ecra-de-espera) > footer {
+  display: none;
+}
+
 /* ── Mobile base ── */
 html {
   -webkit-text-size-adjust: 100%;
