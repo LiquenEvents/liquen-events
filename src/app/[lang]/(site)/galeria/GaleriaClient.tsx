@@ -191,13 +191,6 @@ function collectionFromSlug(slug: string, names: string[]): string | null {
   return names.find((n) => collectionSlug(n) === slug) ?? null;
 }
 const STRIP = 7;
-const SLIDE_MS = 5000; // ritmo do slideshow cinematográfico
-// Com prefers-reduced-motion o indicador de progresso do slideshow deixa de ser
-// pintado (`.lb-progress { animation: none }` em globals.css), portanto a foto
-// mudava sozinha de 5 em 5 segundos sem qualquer pista visual de que ia mudar
-// — medido: aria-label passou de "foto 3 de 427" para "foto 4 de 427" em 6,2s.
-// 15s dá tempo de ler a foto antes de ela saltar. Continua pausável (WCAG 2.2.2).
-const SLIDE_MS_REDUCED = 15000;
 
 // Corre trabalho NÃO crítico quando a main thread está livre, para que a
 // hidratação e a primeira interação não fiquem bloqueadas por observers /
@@ -553,7 +546,6 @@ export default function GaleriaClient({
   const [shown, setShown] = useState(INITIAL_PAGE);
   const [fading, setFading] = useState(false);
   const [lb, setLb] = useState<number | null>(null);
-  const [playing, setPlaying] = useState(false);
   // A fechar? Enquanto true o lightbox corre o fade+scale de saída (lb-closing)
   // e só depois desmonta. Fecho fiável por CSS — ver comentário em close().
   const [closing, setClosing] = useState(false);
@@ -1219,7 +1211,6 @@ export default function GaleriaClient({
     // instável (o Escape disparava mas a transição não fazia commit). Aqui
     // marcamos `closing` → o lightbox faz um fade+scale de saída (classe
     // lb-closing) e só depois desmonta. O morph de ABERTURA (openAt) mantém-se.
-    setPlaying(false);
     setClosing(true);
     window.setTimeout(() => {
       setMorphSrc(null);
@@ -1232,7 +1223,6 @@ export default function GaleriaClient({
   const dismiss = useCallback(() => {
     setMorphSrc(null);
     setLb(null);
-    setPlaying(false);
   }, []);
   // Navegar (←/→): sem morph entre fotos, mas `morphSrc` acompanha a foto
   // atual para que o FECHO faça o morph de volta à miniatura certa.
@@ -1545,8 +1535,6 @@ export default function GaleriaClient({
         <Lightbox
           index={lb}
           pool={pool}
-          playing={playing}
-          setPlaying={setPlaying}
           closing={closing}
           justOpened={justOpened}
           setJustOpened={setJustOpened}
@@ -1616,8 +1604,6 @@ const estadoDaFotoDoZero = (idx: number): EstadoDaFoto => ({
 function Lightbox({
   index,
   pool,
-  playing,
-  setPlaying,
   closing,
   justOpened,
   setJustOpened,
@@ -1631,8 +1617,6 @@ function Lightbox({
 }: {
   index: number;
   pool: Photo[];
-  playing: boolean;
-  setPlaying: React.Dispatch<React.SetStateAction<boolean>>;
   closing: boolean;
   justOpened: boolean;
   setJustOpened: (v: boolean) => void;
@@ -1742,18 +1726,7 @@ function Lightbox({
       if (e.key === "Escape") close();
       else if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
-      else if (e.key === " " || e.code === "Space") {
-        // NÃO sequestrar a barra de espaço quando o foco está num controlo: ela
-        // é o gesto padrão para activar um botão. Medido, com o foco em
-        // "Fechar", Space deixava o diálogo aberto E arrancava o slideshow
-        // (dialogStillOpen: true, slideshowPlayingAfter: true) — o oposto do
-        // que o utilizador pediu. Falha WCAG 2.1.1.
-        const el = document.activeElement;
-        const tag = el?.tagName;
-        if (tag === "BUTTON" || tag === "A" || el?.getAttribute("role") === "button") return;
-        e.preventDefault();
-        setPlaying((p) => !p);
-      } else if (e.key === "Tab" && dialogRef.current) {
+      else if (e.key === "Tab" && dialogRef.current) {
         // Trap focus inside the lightbox dialog.
         const f = dialogRef.current.querySelectorAll<HTMLElement>(
           'button, a[href], [tabindex]:not([tabindex="-1"])',
@@ -1776,7 +1749,7 @@ function Lightbox({
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
-  }, [close, prev, next, setPlaying]);
+  }, [close, prev, next]);
 
   // Move focus into the dialog on open; restore it to the trigger on close
   // (mount = abrir, unmount = fechar, já que este componente só vive aberto).
@@ -1805,44 +1778,9 @@ function Lightbox({
     };
   }, []);
 
-  // Slideshow cinematográfico — auto-avança enquanto estiver a reproduzir e o
-  // separador estiver visível. Pausável (botão / barra de espaço) — WCAG 2.2.2.
-  // Lido uma vez na montagem do lightbox (que só existe no cliente, depois de
-  // uma interacção), por isso não há hidratação a acertar.
-  const [slideMs] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-      ? SLIDE_MS_REDUCED
-      : SLIDE_MS,
-  );
-  /**
-   * O separador está escondido? Tem de ser ESTADO, e não uma leitura solta de
-   * `document.hidden` dentro do efeito do avanço.
-   *
-   * Era uma leitura solta, e falhava dos dois lados. Esconder o separador não
-   * parava nada — o temporizador já armado disparava na mesma e a fotografia
-   * avançava com o visitante a olhar para outra coisa. E ao voltar não havia
-   * mudança de estado nenhuma que fizesse o efeito correr outra vez: a única
-   * coisa que o re-arma é a foto mudar, e ela tinha deixado de mudar. O
-   * slideshow ficava morto para o resto da visita, com o botão a dizer
-   * "Pausar" e `aria-pressed="true"` — ou seja, a afirmar que está a andar.
-   *
-   * É o caso normal de quem o põe a andar no telemóvel: muda de app, atende,
-   * volta. Voltava para um slideshow parado que se dizia a andar.
-   */
-  const [separadorEscondido, setSeparadorEscondido] = useState(
-    () => typeof document !== "undefined" && document.hidden,
-  );
-  useEffect(() => {
-    const aoMudar = () => setSeparadorEscondido(document.hidden);
-    aoMudar();
-    document.addEventListener("visibilitychange", aoMudar);
-    return () => document.removeEventListener("visibilitychange", aoMudar);
-  }, []);
-  useEffect(() => {
-    if (!playing || separadorEscondido) return;
-    const id = window.setTimeout(next, slideMs);
-    return () => window.clearTimeout(id);
-  }, [playing, separadorEscondido, next, slideMs]);
+  // O slideshow (o «▶» ao lado do «×», a barra de espaço e a barra de
+  // progresso) saiu a pedido dela, com a captura do botão: «retira isto do
+  // site da galeria». Navega-se com ←/→, com as miniaturas e com o gesto.
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -1993,23 +1931,6 @@ function Lightbox({
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setPlaying((p) => !p)}
-            aria-label={playing ? dict.lbPause : dict.lbPlay}
-            aria-pressed={playing}
-            className={`p-3 transition-colors rounded-full hover:bg-white/8 ${playing ? "text-moss-light" : "text-white/60 hover:text-white"}`}
-          >
-            {playing ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.8-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
-              </svg>
-            )}
-          </button>
-          <button
             onClick={close}
             aria-label={dict.lbClose}
             // /60 (era /40): icone em repouso media 3.66:1, no limite de WCAG 1.4.11.
@@ -2026,16 +1947,6 @@ function Lightbox({
           </button>
         </div>
       </div>
-
-      {/* Barra de progresso do slideshow — reinicia a cada foto */}
-      {playing && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/8 z-20 pointer-events-none">
-          <div
-            key={index}
-            className="lb-progress h-full bg-gradient-to-r from-moss to-moss-light origin-left"
-          />
-        </div>
-      )}
 
       {/* Área da foto + botões */}
       <div className="relative flex-1 flex items-center justify-center min-h-0">
@@ -2176,9 +2087,7 @@ function Lightbox({
               // fetchPriority="high", que e exactamente o efeito que se quer.
               fetchPriority="high"
               onLoad={() => anotar((a) => ({ ...a, carregada: true }))}
-              className={`object-contain ${
-                playing ? "lb-kenburns" : justOpened ? "lb-open-in" : "lb-photo-in"
-              }`}
+              className={`object-contain ${justOpened ? "lb-open-in" : "lb-photo-in"}`}
               {...blurProps(pool[index])}
             />
           </VTWrap>
