@@ -117,6 +117,25 @@ export function SeparadorDoMenu({ semantico }: { semantico: boolean }) {
   );
 }
 
+/**
+ * Junta grupos de acções numa lista, com o `separadorAntes` no primeiro item
+ * de cada grupo a seguir ao primeiro.
+ *
+ * Os grupos podem vir vazios ou com itens escondidos («oculta itens
+ * indisponíveis», Parte 9.8): o filete vai sempre no primeiro item QUE FICOU,
+ * e um grupo vazio não deixa dois filetes seguidos. Escrever o campo à mão em
+ * cada item obrigava cada lista a saber qual dos seus itens sobreviveu.
+ */
+export function emGrupos(...grupos: readonly (readonly AccaoDeItem[])[]): AccaoDeItem[] {
+  const lista: AccaoDeItem[] = [];
+  for (const grupo of grupos) {
+    grupo.forEach((a, i) =>
+      lista.push(i === 0 && lista.length > 0 ? { ...a, separadorAntes: true } : a),
+    );
+  }
+  return lista;
+}
+
 /** O filete que vai antes do item `i` de uma lista desenhada, se algum. */
 export function separadorAntesDe(
   itens: readonly AccaoDeItem[],
@@ -196,6 +215,15 @@ export interface MenuDeAccoesProps {
    * à mão. Sem `pequeno` não é usado.
    */
   pastilha?: string;
+  /**
+   * O «⋯» à vista sempre, também com rato.
+   *
+   * O esconder-no-hover é para o «⋯» de uma LINHA ou de um CARTÃO, que tem um
+   * `group` à volta para o fazer voltar. No cabeçalho de uma pasta não há
+   * linha nenhuma: o «⋯» é o sítio das acções do tema, e escondido seria um
+   * botão que só aparece a quem já sabe que lá está.
+   */
+  sempreVisivel?: boolean;
   className?: string;
 }
 
@@ -218,6 +246,7 @@ export function MenuDeAccoes({
   soltasNoEcraGrande = 0,
   tamanho = "normal",
   pastilha,
+  sempreVisivel = false,
   className,
 }: MenuDeAccoesProps) {
   const pequeno = tamanho === "pequeno";
@@ -330,7 +359,7 @@ export function MenuDeAccoes({
                 : "h-11 w-11 rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
               // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
               // menu deixava o menu a flutuar sem nada que o segurasse.
-              aberto ? "opacity-100" : ESCONDIDO_COM_RATO,
+              aberto || sempreVisivel ? "opacity-100" : ESCONDIDO_COM_RATO,
             )}
           >
             {pequeno ? (

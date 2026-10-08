@@ -50,7 +50,7 @@ async function abrirPasta() {
     (b) => b.getAttribute("aria-haspopup") !== "menu",
   );
   fireEvent.click(cartoes[0]);
-  await screen.findByRole("button", { name: "Eliminar tema" });
+  await screen.findByRole("button", { name: "Adicionar fotos" });
   for (let i = 0; i < 6; i++) await act(async () => {});
 }
 
