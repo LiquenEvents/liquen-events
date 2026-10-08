@@ -72,6 +72,11 @@ export type { FolhaOuDialogoProps } from "./FolhaOuDialogo";
 export { TabelaOuCartoes } from "./TabelaOuCartoes";
 export type { TabelaOuCartoesProps, Coluna } from "./TabelaOuCartoes";
 
+// A lista agrupada «como as Definições do macOS»: linhas de 44 px, rótulo e
+// valor, `›` quando levam a algum lado. Conteúdo — sem sombra, sem vidro.
+export { ListaAgrupada, LinhaAgrupada } from "./ListaAgrupada";
+export type { ListaAgrupadaProps, LinhaAgrupadaProps } from "./ListaAgrupada";
+
 export { MenuDeAccoes } from "./MenuDeAccoes";
 export type { MenuDeAccoesProps, AccaoDeItem } from "./MenuDeAccoes";
 
