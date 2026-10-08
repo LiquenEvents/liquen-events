@@ -103,6 +103,21 @@ export default function ThemeCopyDialog({
    * antes e o que os testes que a montam à mão continuam a querer.
    */
   aberto = true,
+  /**
+   * ── E ABRE NO GESTO QUE A TROUXE ───────────────────────────────────────
+   *
+   * Esta folha tem duas portas: «Copiar para…» na barra da selecção e «Mover
+   * para…» no menu da fotografia. Abria SEMPRE em «Copiar», e o menu prometia
+   * mover: quem escolhia «Mover para…», escolhia o destino e carregava no
+   * botão do fundo COPIAVA — a fotografia ficava nos dois temas, e o engano só
+   * se via ao voltar à pasta de origem. É o pai que sabe por que porta se
+   * entrou, portanto é ele que diz. Por omissão fica «copiar», que é o que a
+   * barra da selecção sempre quis.
+   *
+   * Só o modo INICIAL: os dois botões continuam lá para trocar, e quem chega
+   * por «Mover» lê a frase da consequência de «Mover» antes de carregar.
+   */
+  modoInicial = "copiar",
   sourceTheme,
   themes,
   paths,
@@ -111,6 +126,8 @@ export default function ThemeCopyDialog({
 }: {
   /** Ver a nota na desestruturação: é isto que dá a saída a esta folha. */
   aberto?: boolean;
+  /** Ver a nota na desestruturação: a porta por onde se entrou. */
+  modoInicial?: ThemeCopyMode;
   sourceTheme: ThemeSummary;
   /** Todos os temas conhecidos (o de origem é filtrado aqui). */
   themes: ThemeSummary[];
@@ -125,7 +142,7 @@ export default function ThemeCopyDialog({
   );
 
   const [destId, setDestId] = useState<string | null>(others[0]?.id ?? null);
-  const [mode, setMode] = useState<ThemeCopyMode>("copiar");
+  const [mode, setMode] = useState<ThemeCopyMode>(modoInicial);
   const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
+import type { ThemeCopyMode, ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import PhotoLightbox from "./PhotoLightbox";
 import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
 import FundirTemas, { type ThemeMergeOutcome } from "./FundirTemas";
@@ -2971,6 +2971,12 @@ function ThemeFolder({
   const [verifying, setVerifying] = useState<{ done: number; total: number } | null>(null);
   /** O diálogo "Copiar para…" está aberto. */
   const [copyOpen, setCopyOpen] = useState(false);
+  /** E em que modo abre: «Mover para…» do menu da fotografia abre em
+   *  «mover», a barra da selecção em «copiar». Sem isto a folha abria sempre
+   *  em «copiar» e o menu que dizia «Mover» copiava — ver `modoInicial` no
+   *  `ThemeCopyDialog`. Só muda no instante de abrir, por isso não salta a
+   *  meio da saída da folha. */
+  const [copyMode, setCopyMode] = useState<ThemeCopyMode>("copiar");
   /** O que aconteceu à última cópia/mudança — fica no ecrã enquanto houver
    *  fotos por levar (um número em que ela tem de agir não pode desaparecer). */
   const [copyReport, setCopyReport] = useState<ThemeCopyOutcome | null>(null);
@@ -4601,6 +4607,7 @@ function ThemeFolder({
               rotulo: "Mover para…",
               onAccao: () => {
                 setSelected((prev) => (prev.has(im.path) ? prev : new Set([im.path])));
+                setCopyMode("mover");
                 setCopyOpen(true);
               },
             },
@@ -4942,7 +4949,16 @@ function ThemeFolder({
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {selectedCount > 0 && (
-              <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  // Repetir é repetir O MESMO: um lote de «mover» parado a
+                  // meio não pode ser retomado como cópia.
+                  setCopyMode(copyReport.mode);
+                  setCopyOpen(true);
+                }}
+              >
                 Tentar novamente
               </Button>
             )}
@@ -5042,7 +5058,14 @@ function ThemeFolder({
                 proibida para ela, senão passam a existir dois significados no
                 mesmo sítio. Só aparece havendo outro tema para onde levar. */}
                 {otherThemes.length > 0 && (
-                  <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setCopyMode("copiar");
+                      setCopyOpen(true);
+                    }}
+                  >
                     Copiar para…
                   </Button>
                 )}
@@ -5106,6 +5129,7 @@ function ThemeFolder({
       {copiaNoEcra && (
         <ThemeCopyDialog
           aberto={copyOpen}
+          modoInicial={copyMode}
           sourceTheme={theme}
           themes={themes}
           // Congelada no instante do fecho, para a contagem não mudar a meio
