@@ -68,6 +68,11 @@ beforeEach(() => {
   st.lqips = new Map();
   st.falhaDaLeitura = false;
   vi.clearAllMocks();
+  // O `clearAllMocks` não repõe implementações: um teste que ensine o
+  // Storage a recusar um caminho não pode deixar isso para o seguinte.
+  st.sign.mockImplementation(
+    async (paths: string[]) => new Map(paths.map((p) => [p, `https://signed/${p}`] as const)),
+  );
   st.lerCores.mockImplementation(async (paths: readonly string[]) => {
     if (st.falhaDaLeitura) throw new Error("base de dados em baixo");
     const pick = (m: Map<string, string>) =>
@@ -130,5 +135,53 @@ describe("GET /api/temas — a cor da capa", () => {
     const [t] = await res.json();
     expect(t).toMatchObject({ id: "t-1", imageCount: 1 });
     expect(t).not.toHaveProperty("coverCor");
+  });
+});
+
+/**
+ * «Por defeito a primeira» (T1): sem capa escolhida, o cartão mostra a
+ * primeira da GRELHA — e num tema arrumado à mão essa é a primeira da ordem,
+ * não a mais recente. Sem isto o cartão trocava de capa ao abrir a pasta.
+ */
+describe("GET /api/temas — a capa por omissão segue a ordem manual", () => {
+  it("sem capa escolhida, é a primeira da ordem manual", async () => {
+    st.themes = [theme("t-1", { photoOrder: ["t-1/c.jpg", "t-1/a.jpg"] })];
+    st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg"]) };
+    st.cores = new Map([["t-1/c.jpg", "#112233"]]);
+    const [t] = await (await GET(req())).json();
+    expect(t.coverUrl).toBe("https://signed/t-1/c.jpg");
+    expect(t.coverCor).toBe("#112233");
+    // E custa ZERO idas a mais: a candidata vai na mesma assinatura.
+    expect(st.sign).toHaveBeenCalledTimes(1);
+  });
+
+  it("a capa escolhida continua a ganhar à ordem", async () => {
+    st.themes = [
+      theme("t-1", { coverPath: "t-1/b.jpg", photoOrder: ["t-1/c.jpg", "t-1/a.jpg"] }),
+    ];
+    st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg"]) };
+    const [t] = await (await GET(req())).json();
+    expect(t.coverUrl).toBe("https://signed/t-1/b.jpg");
+  });
+
+  it("uma arrumada que já não existe salta para a seguinte, como na pasta", async () => {
+    st.themes = [theme("t-1", { photoOrder: ["t-1/apagada.jpg", "t-1/b.jpg"] })];
+    st.files = { "t-1": folder(["a.jpg", "b.jpg"]) };
+    // O Storage não assina o que não está lá.
+    st.sign.mockImplementation(
+      async (paths: string[]) =>
+        new Map(
+          paths.filter((p) => !p.includes("apagada")).map((p) => [p, `https://signed/${p}`]),
+        ),
+    );
+    const [t] = await (await GET(req())).json();
+    expect(t.coverUrl).toBe("https://signed/t-1/b.jpg");
+  });
+
+  it("um caminho de OUTRA pasta na ordem não serve de capa", async () => {
+    st.themes = [theme("t-1", { photoOrder: ["t-2/intrusa.jpg"] })];
+    st.files = { "t-1": folder(["a.jpg"]) };
+    const [t] = await (await GET(req())).json();
+    expect(t.coverUrl).toBe("https://signed/t-1/a.jpg");
   });
 });

@@ -138,7 +138,8 @@ export interface ThemeSummary extends ProposalTheme {
   /** A contagem é um MÍNIMO: a listagem da pasta bateu no limite por página. */
   truncated?: boolean;
   /** URL assinado da foto do cartão: a escolhida (`coverPath`) ou, sem
-   *  escolha — ou se a escolhida já não existir —, a foto mais recente. */
+   *  escolha — ou se a escolhida já não existir —, a primeira da grelha (a
+   *  primeira da ordem manual, ou a mais recente sem ordem). */
   coverUrl?: string;
   /**
    * ═══════════════════════════════════════════════════════════════════════

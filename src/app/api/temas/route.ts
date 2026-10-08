@@ -231,6 +231,10 @@ function respostaDeAvaria(a: Avaria): NextResponse {
  */
 const ORCAMENTO_DO_STORAGE_MS = 8000;
 
+/** Quantas fotografias da ordem manual concorrem à capa por omissão — ver
+ *  «SEM CAPA ESCOLHIDA, A CAPA É A PRIMEIRA DA GRELHA», no GET. */
+const CANDIDATAS_DA_ORDEM = 3;
+
 async function comOrcamento<T>(
   trabalho: Promise<T>,
   ms: number,
@@ -285,7 +289,9 @@ function semAssinatura(url: string | undefined): string {
  * "500+"); o número exato vive no ecrã do tema, que pagina.
  *
  * A capa é a ESCOLHIDA (`coverPath`) e, se não houver — ou se a escolhida já
- * tiver sido apagada e não puder ser assinada —, a foto mais recente.
+ * tiver sido apagada e não puder ser assinada —, a primeira da grelha: a
+ * primeira da ordem manual, quando o tema foi arrumado à mão, e a foto mais
+ * recente quando não foi.
  *
  * Uma pasta ilegível não derruba a lista nem se disfarça de "0 fotos": esse
  * tema aparece com `imageCount: null` (o cartão mostra "Fotos indisponíveis")
@@ -342,6 +348,29 @@ export async function GET(request: NextRequest) {
     );
     /**
      * ════════════════════════════════════════════════════════════════════
+     * SEM CAPA ESCOLHIDA, A CAPA É A PRIMEIRA DA GRELHA
+     * ════════════════════════════════════════════════════════════════════
+     *
+     * «Por defeito a primeira» (T1). Era sempre a mais RECENTE — e num tema
+     * arrumado à mão (`photoOrder`) a primeira da grelha é outra: o cartão
+     * mostrava uma fotografia e, ao abrir a pasta, trocava para a primeira
+     * da ordem (é essa que a pasta dá ao cartão, ver `capa-do-cartao.ts`).
+     *
+     * A ordem já vem na linha do tema, que esta rota leu lá em cima — não
+     * custa ida nenhuma. As candidatas entram na MESMA assinatura em bloco, e
+     * a escolhida é a primeira cujo original se deixou assinar, que é a
+     * regra da pasta (`listThemeImagePage` deixa cair o que não assina).
+     * Só as primeiras `CANDIDATAS_DA_ORDEM`: uma ordem pode ter centenas de
+     * caminhos, e uma capa não precisa delas; se as três primeiras tiverem
+     * desaparecido todas, fica a mais recente, como antes.
+     */
+    const daOrdem = themes.map((t) =>
+      (t.photoOrder ?? [])
+        .filter((p) => isThemePath(p) && p.startsWith(`${themeFolder(t.id)}/`))
+        .slice(0, CANDIDATAS_DA_ORDEM),
+    );
+    /**
+     * ════════════════════════════════════════════════════════════════════
      * UMA FOTOGRAFIA POR CARTÃO — e o que isso poupa
      * ════════════════════════════════════════════════════════════════════
      *
@@ -382,7 +411,7 @@ export async function GET(request: NextRequest) {
      * as fotos anteriores às derivadas não têm miniatura nenhuma, e um cartão
      * vazio seria pior do que um cartão pesado. É plano B, não caminho.
      */
-    const todos = [...new Set([...chosen, ...newest].filter(Boolean))];
+    const todos = [...new Set([...chosen, ...daOrdem.flat(), ...newest].filter(Boolean))];
     const vazio = () => new Map<string, string>();
     /* ── E OS BORRÕES, NO MESMO FÔLEGO ────────────────────────────────────
        «Placeholder blur por foto — acaba o ecrã de cartões cinzentos.»
@@ -426,7 +455,9 @@ export async function GET(request: NextRequest) {
       const { names, ok, truncated } = listings[i];
       // O caminho da capa, antes de se escolher que TAMANHO servir: é preciso
       // para poder mandar também o original como plano B.
-      const capa = paraCapa(chosen[i]) ? chosen[i] : newest[i];
+      const capa = paraCapa(chosen[i])
+        ? chosen[i]
+        : (daOrdem[i].find((p) => urls.has(p)) ?? newest[i]);
       const coverUrl = paraCapa(capa);
       const coverFallbackUrl = capa ? urls.get(capa) : undefined;
       const coverLqip = capa ? lqips.get(capa) : undefined;
