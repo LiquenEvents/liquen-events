@@ -4393,12 +4393,11 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     expect(await screen.findByText(/perde \d+% da área/i)).toBeTruthy();
   });
 
-  // «Isto aqui também está enorme», e depois «coloca isto mais bonito»: com a
-  // forma da tira (quase 1:2), uma miniatura de meia coluna tinha ~630 px de
-  // altura. As duas tiras ficam lado a lado com 112 px de largura, cada uma
-  // com o seu nome e uma etiqueta curta com o número DELA; a explicação, que
-  // é igual para as duas, diz-se uma vez.
-  it("as capas são duas tiras pequenas, com o número numa etiqueta e a explicação uma vez", async () => {
+  // «Isto aqui também está enorme», «coloca isto mais bonito» e, por fim,
+  // «quero as fotos a preencher o retângulo»: as duas capas enchem a largura
+  // do cartão com uma altura fixa, e o número de cada uma vai numa etiqueta
+  // por cima DELA; a explicação, igual para as duas, diz-se uma vez.
+  it("as capas enchem o cartão, com o número por cima de cada uma e a explicação uma vez", async () => {
     comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
     await medirCapas([
       { w: 1500, h: 1000 },
@@ -4409,11 +4408,13 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     const img = [...seccao.querySelectorAll("img")].find((i) =>
       (i.getAttribute("src") ?? "").includes("capas/"),
     )!;
-    expect(img.closest(".w-28"), "a miniatura deixou de ter largura fixa").not.toBeNull();
-    // A etiqueta é curta e vive debaixo da SUA tira.
-    expect(etiquetas[0].textContent).toMatch(/^Perde \d+% da área$/);
-    expect(etiquetas[0].closest(".w-28")).toBe(img.closest(".w-28"));
-    // A explicação aparece uma vez, e não uma por fotografia.
+    const moldura = img.closest(".h-64");
+    expect(moldura, "a capa deixou de ter a altura fixa").not.toBeNull();
+    expect(moldura!.className).toMatch(/\bw-full\b/);
+    // Sem a forma da tira: a fotografia enche a moldura.
+    expect((moldura as HTMLElement).style.aspectRatio).toBe("");
+    // A etiqueta vive na célula da SUA fotografia.
+    expect(etiquetas[0].closest(".relative")).toBe(moldura!.parentElement);
     expect(within(seccao).getAllByText(/Uma fotografia ao alto perde menos/)).toHaveLength(1);
   });
 

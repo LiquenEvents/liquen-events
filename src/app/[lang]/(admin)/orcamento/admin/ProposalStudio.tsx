@@ -152,7 +152,6 @@ import { depositPercentOf } from "@/lib/proposal-doc";
 import {
   ASPETO_POR_OMISSAO,
   alturaDaLegenda,
-  aspetoDaCapa,
   caixasDoMoodboard,
   layoutSugerido,
   linhasDaLegendaAprox,
@@ -8106,17 +8105,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 A causa de fundo está corrigida acima; isto é a rede por baixo:
                 mesmo que a coluna volte a apertar, as capas empilham em vez de
                 se espremerem. */}
-              {/* ── AS DUAS TIRAS LADO A LADO, COMO NA CAPA ────────────────────
-                  Palavras dela, com a captura: «coloca isto mais bonito aqui».
-                  Eram duas miniaturas perdidas em meia coluna cada, com a
-                  mesma frase longa em vermelho ao lado de cada uma — o aviso
-                  pesava mais do que as fotografias. Agora as duas tiras ficam
-                  juntas, como ficam na capa (esquerda | direita), cada uma com
-                  o seu nome e, se perder muito, uma etiqueta curta com o
-                  número DELA; a explicação, que é a mesma para as duas, diz-se
-                  uma vez por baixo. Âmbar e não vermelho: perder área não é um
-                  erro, é uma coisa a saber antes de escolher. */}
-              <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+              {/* ── AS FOTOGRAFIAS ENCHEM O CARTÃO ──────────────────────────────
+                  Palavras dela, em três capturas seguidas: «isto aqui também
+                  está enorme» (cada tira com ~630 px de altura), depois
+                  «coloca isto mais bonito», e por fim, sobre duas tiras
+                  estreitas encostadas à esquerda: «não gosto. quero as fotos
+                  a preencher o retângulo».
+
+                  As duas capas ocupam a largura toda do cartão, meia cada, e
+                  uma altura fixa de 256 px — cabem as duas no ecrã com a
+                  secção à volta. Perde-se a pré-visualização do recorte exacto
+                  da tira (era o `aspeto` da capa), e o que a substitui é o
+                  NÚMERO: a etiqueta por cima de cada fotografia diz quanto
+                  dela fica de fora no PDF, medido pela mesma conta de antes.
+                  A explicação, igual para as duas, diz-se uma vez por baixo. */}
+              <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
                 {[0, 1].map((idx) => {
                   const path = doc.coverImages?.[idx];
                   /**
@@ -8154,7 +8157,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
                   const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
                   return (
-                    <div key={idx} className={path ? "w-28 shrink-0" : "min-w-48 flex-1"}>
+                    <div key={idx} className="relative">
                       {path ? (
                         <>
                           <Thumb
@@ -8170,9 +8173,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             // esperam pela fila das fotos que estão fora do ecrã.
                             priority
                             onRemove={() => removeCoverAt(idx)}
-                            // A forma REAL da tira de capa, e não um 4:3 que o
-                            // documento nunca desenha. Ver `aspeto` em `Thumb`.
-                            aspeto={aspetoDaCapa()}
+                            className="h-64 w-full"
                             // Medir aqui é o que dá o número do aviso de baixo —
                             // a mesma medida que os mood boards já faziam, na
                             // célula que já está no ecrã e sem pedir nada ao
@@ -8182,16 +8183,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
                             refDoc={path}
                           />
-                          <div className="mt-1.5 flex flex-col items-start gap-1">
-                            <span className="text-caption text-[var(--bo-text-muted)]">
-                              {idx === 0 ? "Esquerda" : "Direita"}
-                            </span>
+                          {/* O nome do lado e, se perder muito, o número — numa
+                              etiqueta escura por cima da fotografia, como o
+                              «×» de remover que já lá vive. */}
+                          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white">
+                            {idx === 0 ? "Esquerda" : "Direita"}
                             {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                              <span className="rounded-full bg-[var(--bo-aviso-tom)]/[0.12] px-2 py-0.5 text-caption font-medium tabular-nums text-[var(--bo-aviso)]">
-                                Perde {Math.round(perdaDaCapa * 100)}% da área
-                              </span>
+                              <>
+                                {" · "}
+                                <span className="tabular-nums">
+                                  perde {Math.round(perdaDaCapa * 100)}% da área
+                                </span>
+                              </>
                             )}
-                          </div>
+                          </span>
                         </>
                       ) : (
                         <>
