@@ -62,6 +62,17 @@ export function juntarRascunhos(
   base: Doc,
 ): { doc: Doc; conflitos: string[] } {
   const doc: Doc = { ...noServidor };
+  /**
+   * Um campo que FALTA do lado do servidor não é «a outra pessoa apagou-o».
+   * O estúdio grava sempre o documento inteiro; um campo ausente é um rascunho
+   * parcial ou de uma versão antiga. Partir só do que lá está fazia este
+   * campo desaparecer da junção — e foi assim que um estúdio ficou sem
+   * `serviceGroups` e o editor dos Serviços rebentou (visto no CI). Nesses,
+   * fica o que chega.
+   */
+  for (const k of Object.keys(meu)) {
+    if (noServidor[k] === undefined && meu[k] !== undefined) doc[k] = meu[k];
+  }
   const conflitos: string[] = [];
   for (const k of campos) {
     const mexeramLa = !mesmoValor(noServidor[k], base[k]);

@@ -50,6 +50,19 @@ describe("rascunho-juntar", () => {
     expect(juntarRascunhos(lido, meu, campos, base).doc.eventDate).toBe("2027-06-12");
   });
 
+  it("um campo que falta no servidor não desaparece da junção", () => {
+    // Um rascunho parcial (ou de uma versão antiga) gravado por outro lado:
+    // sem `serviceGroups`. Quem chega não mexeu nos Serviços, mas também não
+    // os pode perder — sem eles o editor dos Serviços rebenta.
+    const meu = { ...lido, serviceGroups: [{ title: "Flores", items: [] }], eventTime: "17h" };
+    const { campos, base } = camposMudados({ ...lido, serviceGroups: meu.serviceGroups }, meu);
+    expect(campos).toEqual(["eventTime"]);
+    const parcial = { clientNames: lido.clientNames };
+    const j = juntarRascunhos(parcial, meu, campos, base);
+    expect(j.doc.serviceGroups).toEqual(meu.serviceGroups);
+    expect(j.doc.eventTime).toBe("17h");
+  });
+
   it("ausente e null são o mesmo valor", () => {
     expect(mesmoValor(undefined, null)).toBe(true);
     expect(mesmoValor([{ a: 1 }], [{ a: 1 }])).toBe(true);

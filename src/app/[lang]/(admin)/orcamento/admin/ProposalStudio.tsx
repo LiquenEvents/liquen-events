@@ -2566,8 +2566,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               for (const k of new Set([...Object.keys(junto), ...Object.keys(enviado)])) {
                 if (mesmoValor(junto[k], enviado[k])) continue;
                 if (!mesmoValor(atual[k], enviado[k])) continue;
-                if (junto[k] === undefined) delete novo[k];
-                else novo[k] = junto[k];
+                // Nunca se APAGA um campo do ecrã por causa de uma junção: o
+                // documento do estúdio tem a forma inteira, e um campo que lhe
+                // falte (os Serviços, por exemplo) deita abaixo o editor que o
+                // desenha. Vindo vazio do servidor, fica o que está.
+                if (junto[k] === undefined) continue;
+                novo[k] = junto[k];
                 mudou = true;
               }
               return mudou ? (novo as unknown as StudioDoc) : d;
