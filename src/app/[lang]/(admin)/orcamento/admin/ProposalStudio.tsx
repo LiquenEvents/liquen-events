@@ -8106,7 +8106,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 A causa de fundo está corrigida acima; isto é a rede por baixo:
                 mesmo que a coluna volte a apertar, as capas empilham em vez de
                 se espremerem. */}
-              <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
+              {/* ── AS DUAS TIRAS LADO A LADO, COMO NA CAPA ────────────────────
+                  Palavras dela, com a captura: «coloca isto mais bonito aqui».
+                  Eram duas miniaturas perdidas em meia coluna cada, com a
+                  mesma frase longa em vermelho ao lado de cada uma — o aviso
+                  pesava mais do que as fotografias. Agora as duas tiras ficam
+                  juntas, como ficam na capa (esquerda | direita), cada uma com
+                  o seu nome e, se perder muito, uma etiqueta curta com o
+                  número DELA; a explicação, que é a mesma para as duas, diz-se
+                  uma vez por baixo. Âmbar e não vermelho: perder área não é um
+                  erro, é uma coisa a saber antes de escolher. */}
+              <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
                 {[0, 1].map((idx) => {
                   const path = doc.coverImages?.[idx];
                   /**
@@ -8144,55 +8154,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
                   const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
                   return (
-                    <div key={idx}>
+                    <div key={idx} className={path ? "w-28 shrink-0" : "min-w-48 flex-1"}>
                       {path ? (
-                        /* ── PEQUENA, COM O AVISO AO LADO ─────────────────────
-                           Palavras dela, com a captura: «isto aqui também está
-                           enorme». A miniatura enchia meia coluna e, com a
-                           forma da tira (quase 1:2), ficava com ~630 px de
-                           altura — duas capas tapavam o ecrã inteiro para se
-                           escolher uma fotografia. Fica com 96 px de largura
-                           (a forma continua a ser a da tira, que é o que ela
-                           precisa de ver) e o aviso do corte passa para o
-                           lado, onde há largura para ele. */
-                        <div className="flex items-start gap-3">
-                          <div className="w-24 shrink-0">
-                            <Thumb
-                              url={assetUrls[path]}
-                              // A cascata, do mais leve para o mais pesado. Ver
-                              // `assetMedias`: o degrau do meio poupa ~900 KB por
-                              // célula sempre que a miniatura falha.
-                              planoB={[assetMedias[path], assetOriginais[path]]}
-                              estadoDosUrls={estadoDosUrls}
-                              aoTentarDeNovo={() => void tentarBuscarFotos()}
-                              aoMorrer={marcarUrlMorto}
-                              // As capas são duas e estão no topo do passo: nunca
-                              // esperam pela fila das fotos que estão fora do ecrã.
-                              priority
-                              onRemove={() => removeCoverAt(idx)}
-                              // A forma REAL da tira de capa, e não um 4:3 que o
-                              // documento nunca desenha. Ver `aspeto` em `Thumb`.
-                              aspeto={aspetoDaCapa()}
-                              // Medir aqui é o que dá o número do aviso de baixo —
-                              // a mesma medida que os mood boards já faziam, na
-                              // célula que já está no ecrã e sem pedir nada ao
-                              // servidor.
-                              onMedida={(a) => registarAspeto(path, a)}
-                              pendente={isPendingImage(path)}
-                              onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
-                              refDoc={path}
-                            />
+                        <>
+                          <Thumb
+                            url={assetUrls[path]}
+                            // A cascata, do mais leve para o mais pesado. Ver
+                            // `assetMedias`: o degrau do meio poupa ~900 KB por
+                            // célula sempre que a miniatura falha.
+                            planoB={[assetMedias[path], assetOriginais[path]]}
+                            estadoDosUrls={estadoDosUrls}
+                            aoTentarDeNovo={() => void tentarBuscarFotos()}
+                            aoMorrer={marcarUrlMorto}
+                            // As capas são duas e estão no topo do passo: nunca
+                            // esperam pela fila das fotos que estão fora do ecrã.
+                            priority
+                            onRemove={() => removeCoverAt(idx)}
+                            // A forma REAL da tira de capa, e não um 4:3 que o
+                            // documento nunca desenha. Ver `aspeto` em `Thumb`.
+                            aspeto={aspetoDaCapa()}
+                            // Medir aqui é o que dá o número do aviso de baixo —
+                            // a mesma medida que os mood boards já faziam, na
+                            // célula que já está no ecrã e sem pedir nada ao
+                            // servidor.
+                            onMedida={(a) => registarAspeto(path, a)}
+                            pendente={isPendingImage(path)}
+                            onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
+                            refDoc={path}
+                          />
+                          <div className="mt-1.5 flex flex-col items-start gap-1">
+                            <span className="text-caption text-[var(--bo-text-muted)]">
+                              {idx === 0 ? "Esquerda" : "Direita"}
+                            </span>
+                            {perdaDaCapa > PERDA_QUE_SE_AVISA && (
+                              <span className="rounded-full bg-[var(--bo-aviso-tom)]/[0.12] px-2 py-0.5 text-caption font-medium tabular-nums text-[var(--bo-aviso)]">
+                                Perde {Math.round(perdaDaCapa * 100)}% da área
+                              </span>
+                            )}
                           </div>
-                          {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                            <p className="min-w-0 text-xs leading-relaxed text-[var(--bo-perigo)]">
-                              A tira da capa é quase duas vezes mais alta do que larga:{" "}
-                              <strong className="font-medium">
-                                esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
-                              </strong>
-                              . Uma fotografia ao alto perde menos.
-                            </p>
-                          )}
-                        </div>
+                        </>
                       ) : (
                         <>
                           <UploadArea
@@ -8229,6 +8229,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   );
                 })}
               </div>
+              {[0, 1].some((i) => {
+                const p = doc.coverImages?.[i];
+                const a = p ? aspetosDasFotos[p] : undefined;
+                return a ? perdaNaCapa(a) > PERDA_QUE_SE_AVISA : false;
+              }) && (
+                <p className="mt-3 max-w-prose text-caption text-[var(--bo-text-muted)]">
+                  A tira da capa é quase duas vezes mais alta do que larga, por isso a fotografia é
+                  cortada dos lados. Uma fotografia ao alto perde menos.
+                </p>
+              )}
             </Section>
 
             {/* Service groups */}

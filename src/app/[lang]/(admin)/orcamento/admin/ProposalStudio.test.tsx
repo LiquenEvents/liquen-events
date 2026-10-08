@@ -4393,21 +4393,28 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     expect(await screen.findByText(/perde \d+% da área/i)).toBeTruthy();
   });
 
-  // «Isto aqui também está enorme»: com a forma da tira (quase 1:2), uma
-  // miniatura de meia coluna tinha ~630 px de altura. Fica numa caixa de
-  // 96 px de largura, e o aviso do corte vai para o lado.
-  it("a miniatura da capa é pequena, e o aviso fica ao lado dela", async () => {
-    comCapas(["capas/uma.jpg", ""]);
-    await medirCapas([{ w: 1500, h: 1000 }]);
-    const aviso = await screen.findByText(/perde \d+% da área/i);
-    const img = [...document.getElementById("sec-capas")!.querySelectorAll("img")].find((i) =>
+  // «Isto aqui também está enorme», e depois «coloca isto mais bonito»: com a
+  // forma da tira (quase 1:2), uma miniatura de meia coluna tinha ~630 px de
+  // altura. As duas tiras ficam lado a lado com 112 px de largura, cada uma
+  // com o seu nome e uma etiqueta curta com o número DELA; a explicação, que
+  // é igual para as duas, diz-se uma vez.
+  it("as capas são duas tiras pequenas, com o número numa etiqueta e a explicação uma vez", async () => {
+    comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
+    await medirCapas([
+      { w: 1500, h: 1000 },
+      { w: 1500, h: 1000 },
+    ]);
+    const etiquetas = await screen.findAllByText(/perde \d+% da área/i);
+    const seccao = document.getElementById("sec-capas")!;
+    const img = [...seccao.querySelectorAll("img")].find((i) =>
       (i.getAttribute("src") ?? "").includes("capas/"),
     )!;
-    const caixa = img.closest(".w-24");
-    expect(caixa, "a miniatura deixou de ter largura fixa").not.toBeNull();
-    // Irmãos na mesma fila, não um por baixo do outro.
-    expect(caixa!.parentElement).toBe(aviso.closest("p")!.parentElement);
-    expect(caixa!.parentElement!.className).toMatch(/\bflex\b/);
+    expect(img.closest(".w-28"), "a miniatura deixou de ter largura fixa").not.toBeNull();
+    // A etiqueta é curta e vive debaixo da SUA tira.
+    expect(etiquetas[0].textContent).toMatch(/^Perde \d+% da área$/);
+    expect(etiquetas[0].closest(".w-28")).toBe(img.closest(".w-28"));
+    // A explicação aparece uma vez, e não uma por fotografia.
+    expect(within(seccao).getAllByText(/Uma fotografia ao alto perde menos/)).toHaveLength(1);
   });
 
   /**
