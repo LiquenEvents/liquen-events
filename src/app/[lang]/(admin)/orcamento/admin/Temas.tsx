@@ -1785,7 +1785,23 @@ export default function Temas() {
 
              `basis-72 grow-0` no campo: a largura decide-se pela fila onde ele
              está, não pela janela, e a `Toolbar` já é `flex flex-wrap`. A 375 px
-             a fila parte-se e o estado desce para baixo do campo sozinho. */
+             a fila parte-se e o estado desce para baixo do campo sozinho.
+
+             ── UMA ALTURA SÓ NA BARRA INTEIRA: 40 px ───────────────────────
+             Ponto 5 da auditoria: o campo «alinhado na mesma linha e na mesma
+             baseline dos outros controlos». CONTADO pelas classes, com rato
+             (não medido num browser): campo 42 px (`py-2.5` + `text-sm` +
+             fio), ordenação 34 a 38 (duas cadeias de `py` na mesma classe),
+             tamanho dos cartões 34, «⋯» 36, «Novo tema» 32 — cinco
+             controlos, quatro ou cinco alturas. Passam todos a `h-10`, que é
+             o degrau `md` do `ui/Button` (`h-10 pointer-coarse:h-11`) e o
+             tamanho por omissão da casa. Os 32 do `sm` seriam o outro degrau que existe,
+             e ficaram de fora por uma razão que ganha ao documento: «alvo
+             efetivo ≥ 40 px em desktop» (Parte 9.1 do sistema de design;
+             «Alvos ≥ 40 px» na Parte 7 do dos temas). No dedo continuam os 44
+             de sempre — o `input` pela regra do `globals.css`, a ordenação
+             pelo `pointer-coarse:min-h-11` do `Escolha`, os botões pelo
+             `.alvo-toque` e pelo `pointer-coarse:h-11` do `Button`. */
           <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
             {searchable && (
               // O campo só aparece quando há lista que chegue para justificar
@@ -1793,12 +1809,29 @@ export default function Temas() {
               // do que ler.
               <div className="relative w-full max-w-md basis-72 grow-0">
                 {SearchIcon}
+                {/* ── «PROCURAR TEMAS», E NÃO «… E FOTOGRAFIAS» ─────────────
+                    A Parte 6 do documento propõe «Procurar temas e
+                    fotografias». Esta procura só lê o NOME e as NOTAS do tema
+                    (ver o `visible`, mais acima); uma fotografia não tem texto
+                    por onde se ache. Prometer fotografias era um campo que
+                    mente na primeira vez que se usa — fica a metade
+                    verdadeira, no plural, que é o que a lista mostra.
+
+                    ── E O RAIO DOS CONTROLOS, 10 px ────────────────────────
+                    Ponto 5: «campo de pesquisa a 10 px, como tudo o resto» —
+                    mini a medium são rectângulos arredondados, cápsula só em
+                    large. O `.bo-input` desenha o raio com `var(--bo-radius)`
+                    (8 px, o do CONTEÚDO) numa regra fora de camadas, que
+                    ganharia a qualquer `rounded-*`. Em vez de a vencer com um
+                    `!important`, redefine-se a variável que ela lê, só neste
+                    elemento, para o token do controlo (`--radius-control`,
+                    `tema.css`). A ordenação ao lado recebe o mesmo. */}
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Procurar tema…"
+                  placeholder="Procurar temas"
                   aria-label="Procurar tema por nome ou nota"
-                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+                  className="bo-input h-10 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30 [--bo-radius:var(--radius-control)]"
                 />
               </div>
             )}
@@ -1873,7 +1906,11 @@ export default function Temas() {
                       guardarOrdem(o);
                     }}
                     containerClassName="w-auto"
-                    className="py-2 pl-3 text-xs text-[var(--bo-tinta-72)]"
+                    /* A altura e o raio da barra — ver a nota «UMA ALTURA SÓ»
+                       no campo de procura. `py-0` porque quem manda é o
+                       `h-10`, e o preenchimento da pele só tirava espaço ao
+                       texto. */
+                    className="h-10 py-0 pl-3 text-xs text-[var(--bo-tinta-72)] [--bo-radius:var(--radius-control)]"
                   >
                     {/* «Mais usados» e «Menos usados» só entram quando a
                         contagem de propostas chegou — ver `ORDENS`. Oferecer
@@ -1889,7 +1926,9 @@ export default function Temas() {
                 <div
                   role="group"
                   aria-label="Tamanho dos cartões"
-                  className="flex overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)]"
+                  /* `min-h-10`, e os botões esticam: a moldura de 1 px
+                     está DENTRO dos 40, como nos outros controlos da fila. */
+                  className="flex min-h-10 overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)]"
                 >
                   {(
                     [
@@ -1905,7 +1944,7 @@ export default function Temas() {
                         setDensidade(valor);
                         guardarDensidade(valor);
                       }}
-                      className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
+                      className={`alvo-toque px-3 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
                         densidade === valor
                           ? "bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
                           : "text-foreground/40 hover:text-[var(--bo-text-muted)]"
@@ -1958,7 +1997,7 @@ export default function Temas() {
                     accoes: accoesDaBiblioteca,
                   });
                 }}
-                className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque flex h-10 w-10 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <circle cx="5" cy="12" r="1.6" />
@@ -1968,7 +2007,8 @@ export default function Temas() {
               </button>
               <Button
                 variant={adding ? "secondary" : "primary"}
-                size="sm"
+                // `md` e não `sm`: os 40 px da fila — ver «UMA ALTURA SÓ».
+                size="md"
                 iconLeft={adding ? undefined : PlusIcon}
                 onClick={() => setAdding(!adding)}
               >

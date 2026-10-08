@@ -1440,6 +1440,69 @@ describe("Biblioteca de Temas — a barra de controlos", () => {
     expect(screen.getByRole("menuitem", { name: "Rever etiquetas…" })).toBeTruthy();
   });
 
+  /**
+   * ── FASE 01: O CAMPO DIZ O QUE PROCURA, A 10 px, E A FILA TEM UMA ALTURA ──
+   *
+   * «Procurar temas» e não «… e fotografias»: a procura só lê o nome e a nota
+   * (o teste de cima acha por nome; o dos âmbitos, por nota). Uma fotografia
+   * não tem texto por onde se ache.
+   */
+  it("o campo diz «Procurar temas» e não promete o que não procura", async () => {
+    cinco();
+    renderTemas();
+    const campo = await screen.findByLabelText(/Procurar tema/);
+    expect(campo.getAttribute("placeholder")).toBe("Procurar temas");
+  });
+
+  /**
+   * Ponto 5 da auditoria: «campo de pesquisa a 10 px, como tudo o resto. E
+   * alinhado na mesma linha e na mesma baseline dos outros controlos.» Pelas
+   * classes davam 42, 34–38, 34, 36 e 32 px. O jsdom não tem caixas, portanto
+   * prende-se o contrato das classes: o degrau `h-10` em todos (o `md` do
+   * `ui/Button`) e o raio do token do controlo nos dois que usam o `.bo-input`.
+   */
+  it("os controlos da barra partilham uma altura, e o campo o raio do controlo", async () => {
+    cinco();
+    renderTemas();
+    const campo = await screen.findByLabelText(/Procurar tema/);
+    const ordenar = screen.getByRole("combobox", { name: "Ordenar os temas" });
+    const reticencias = screen.getByRole("button", { name: /Acções de Biblioteca de Temas/ });
+    const novo = screen.getByRole("button", { name: /Novo tema/ });
+    const tamanhos = screen.getByRole("group", { name: /Tamanho dos cartões/ });
+
+    for (const [nome, no] of [
+      ["campo", campo],
+      ["ordenação", ordenar],
+      ["«⋯»", reticencias],
+      ["«Novo tema»", novo],
+    ] as const) {
+      expect(no.className.split(/\s+/), `${nome} fora dos 40 px da fila`).toContain("h-10");
+    }
+    expect(tamanhos.className.split(/\s+/)).toContain("min-h-10");
+    for (const no of [campo, ordenar]) {
+      expect(no.className.split(/\s+/)).toContain("[--bo-radius:var(--radius-control)]");
+    }
+    // E o token existe mesmo, com os 10 px que o documento pede.
+    const tema = readFileSync(join(process.cwd(), "src/app/tema.css"), "utf8");
+    expect(tema).toMatch(/--radius-control:\s*10px;/);
+  });
+
+  /**
+   * Parte 6: «Fotos de inspiração por tema, prontas para as propostas» →
+   * «(fora — a secção chama-se Temas)». O subtítulo vive no `AdminClient`,
+   * que este ficheiro não monta; lê-se o mapa onde ele está escrito.
+   */
+  it("a secção não tem subtítulo por cima do título", () => {
+    const fonte = readFileSync(
+      join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/AdminClient.tsx"),
+      "utf8",
+    );
+    const inicio = fonte.indexOf("const VIEW_SUB");
+    expect(inicio, "o mapa dos subtítulos mudou de nome").toBeGreaterThan(-1);
+    const mapa = fonte.slice(inicio, fonte.indexOf("};", inicio));
+    expect(mapa).toMatch(/^\s*temas: "",$/m);
+  });
+
   it("a ordenação e o tamanho dos cartões ficam no mesmo grupo", async () => {
     cinco();
     renderTemas();

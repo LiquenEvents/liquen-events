@@ -4361,7 +4361,13 @@ export default function AdminClient({
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
     material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
-    temas: "Fotos de inspiração por tema, prontas para as propostas",
+    /* ── A DESCRIÇÃO DOS TEMAS SAIU, COMO A DAS TAREFAS E A DAS TIMELINES ──
+       É a primeira linha da tabela da Parte 6 do `docs/APPLE-TEMAS.md`: «Fotos
+       de inspiração por tema, prontas para as propostas» → «(fora — a secção
+       chama-se Temas)». E o ponto 3 da auditoria diz porquê: a frase estava
+       ACIMA do título, em cinzento pequeno, e ocupava a posição de maior
+       destaque a explicar o que é um tema a quem já entrou nos temas. */
+    temas: "",
     estatisticas: "Métricas e desempenho",
     contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
