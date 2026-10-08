@@ -390,6 +390,17 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
+/**
+ * Carregar no «Confirmar» do envio como uma pessoa: depois de a pergunta estar
+ * à vista. O botão ignora cliques nos primeiros 400 ms — é o que impede o
+ * segundo clique de um duplo clique de enviar a proposta (achado n.º 3).
+ */
+async function confirmarEnvio(user: { click: (el: Element) => Promise<void> }) {
+  const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
+  await new Promise((r) => setTimeout(r, 450));
+  await user.click(botao);
+}
+
 /** Só o DOCUMENTO de cada gravação do rascunho. O corpo leva também a `base`
  *  dos campos que mudaram (achado n.º 6 — o valor de ANTES, para o servidor
  *  juntar duas pessoas campo a campo), e isso não é o que fica gravado. */
@@ -1609,6 +1620,26 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     expect(within(alerta).getByText(/Verifica antes de enviar/)).toBeTruthy();
   });
 
+  /**
+   * Achado n.º 3 da auditoria: o «Confirmar» aparece exactamente onde estava a
+   * ponta direita do «Gerar e enviar ao cliente». Um duplo clique ali enviava
+   * a proposta sem a pergunta chegar a ser vista.
+   */
+  it("o segundo clique de um duplo clique não confirma o envio", async () => {
+    seedDraft(2);
+    propostaDoc = reply({ json: { ok: true, emailed: true } });
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    // Logo a seguir — é o segundo clique do duplo clique.
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+    // Depois de a ler, confirma.
+    await confirmarEnvio(user);
+    await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
+  });
+
   it("o envio avisa das duas perdas ao mesmo tempo, sem as confundir", async () => {
     seedDraft(2);
     propostaDoc = reply({
@@ -1624,7 +1655,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     // Enviar exige duas carregadas: a acção e a confirmação.
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     const alerta = await screen.findByRole("alert");
     const texto = alerta.textContent ?? "";
@@ -1660,7 +1691,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     // A pergunta, com os dois cortes escritos por extenso.
     expect(await screen.findByText(/O documento sai com conteúdo cortado/)).toBeTruthy();
@@ -1695,7 +1726,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
     await user.click(await screen.findByRole("button", { name: /Voltar e corrigir/ }));
 
     // Um envio só — o que fez a pergunta.
@@ -1911,7 +1942,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     const enviar = screen.getByRole("button", { name: /Gerar e enviar ao cliente/ });
     expect(enviar).toBeEnabled();
     await user.click(enviar);
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
     expect(corpo).not.toContain("pending:");
@@ -2687,7 +2718,7 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     const alerta = await screen.findByRole("alert");
     expect(alerta.textContent ?? "").toMatch(/email de cliente válido/i);
@@ -5392,7 +5423,7 @@ describe("gerar a proposta em inglês", () => {
 
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5406,7 +5437,7 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5440,7 +5471,7 @@ describe("gerar a proposta em inglês", () => {
 
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5520,7 +5551,7 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
@@ -5617,7 +5648,7 @@ describe("o botão «Copiar resumo»", () => {
     renderStudio();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
     await screen.findByRole("button", { name: "Enviar de novo / nova revisão" });
 
     await user.click(screen.getByRole("button", { name: "Copiar resumo" }));
@@ -5689,7 +5720,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
   }
 
   it("o que ela escreve na caixa segue no pedido de envio", async () => {
@@ -7201,7 +7232,7 @@ describe("o email do passo 3 viaja com o envio", () => {
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await confirmarEnvio(user);
   }
 
   it("o texto que está na caixa é o que segue, com o assunto e o modelo", async () => {

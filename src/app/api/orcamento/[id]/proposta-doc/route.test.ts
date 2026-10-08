@@ -152,7 +152,14 @@ vi.mock("@/lib/mail", () => ({
  * o correio ter sido aceite.
  */
 const copia = vi.hoisted(() => ({
-  registar: vi.fn(async () => ({ gravado: true })),
+  /** Como o verdadeiro: o que se regista passa a estar na lista. A trava de
+   *  repetição distingue por aqui um email que saiu de uma proposta marcada
+   *  como enviada pelo WhatsApp (achado n.º 4), portanto o duplo tem de o
+   *  fazer também. */
+  registar: vi.fn(async (_quoteId: string, envio: { enviadoEm: string; propostaId?: string }) => {
+    copia.lista.push(envio);
+    return { gravado: true };
+  }),
   /** O REGISTO de envios do pedido — a trava de repetição passou a lê-lo, para
    *  reconhecer um envio que aconteceu mesmo quando o `status` não gravou. */
   lista: [] as Array<{ enviadoEm: string; propostaId?: string }>,
@@ -228,7 +235,10 @@ beforeEach(() => {
   store.attempts = 0;
   store.linhas.clear();
   copia.lista = [];
-  copia.registar.mockResolvedValue({ gravado: true });
+  copia.registar.mockImplementation(async (_q: string, envio: { enviadoEm: string }) => {
+    copia.lista.push(envio);
+    return { gravado: true };
+  });
   updated.falhar = false;
   vi.clearAllMocks();
   modelo.get.mockResolvedValue(null);
@@ -2358,5 +2368,48 @@ describe("POST proposta-doc — o link no corpo do email", () => {
       params,
     });
     expect(enviado().html).not.toContain("Ver a proposta online");
+  });
+});
+
+/**
+ * Achado n.º 4 da auditoria: com «Por onde segue: WhatsApp», a proposta ficava
+ * «rascunho», a resposta vinha sem link e o ecrã dizia que o email não tinha
+ * saído. O WhatsApp nunca abria.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — só pelo WhatsApp", () => {
+  beforeEach(() => {
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+      store.linhas.set(p.id, { ...p });
+    });
+    copia.lista = [];
+  });
+
+  it("marca-a como enviada, devolve o link, e não manda email nenhum", async () => {
+    updated.estado = "pendente";
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 }), { porEmail: false }), {
+      params,
+    });
+    const j = await res.json();
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(j).toMatchObject({ emailed: false, semEmailPorEscolha: true, estado: "enviada" });
+    expect(typeof j.acceptUrl).toBe("string");
+    expect(j.emailError).toBeUndefined();
+    expect(store.linhas.get(j.id)?.status).toBe("enviada");
+    // O pedido sobe a «Proposta enviada», como num envio por email.
+    expect(updated.last).toMatchObject({ status: "cotado" });
+    // Não houve email: não fica cópia de email nenhum.
+    expect(copia.registar).not.toHaveBeenCalled();
+  });
+
+  it("depois do WhatsApp, o email do mesmo documento SAI — não é uma repetição", async () => {
+    updated.estado = "pendente";
+    const doc = baseDoc({ totalAmount: 3000 });
+    await POST(sendReq(doc, { porEmail: false }), { params });
+    vi.mocked(sendMail).mockClear();
+    const j = await (await POST(sendReq(doc), { params })).json();
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(j.emailed).toBe(true);
+    expect(j.repetido).toBeUndefined();
   });
 });

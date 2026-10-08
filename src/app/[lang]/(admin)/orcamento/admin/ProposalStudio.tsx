@@ -182,6 +182,7 @@ import {
 } from "@/lib/proposal-budget";
 import { eur, eurDocumento, montanteNaLingua, round2 } from "@/lib/money";
 import { resumoDaPropostaParaCopiar } from "@/lib/email-proposta-textos";
+import { linkDoWhatsApp } from "@/lib/whatsapp";
 import { randomId } from "./util";
 import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -1081,6 +1082,13 @@ export function textoDoAdicional(escrito: string, modo: ModoDeIvaDoAdicional): s
  * tem a tabela, ou a chave não a pode escrever). Nesses, tentar outra vez dá
  * exactamente a mesma resposta e só atrasa o aviso.
  */
+/**
+ * Quanto tempo a pergunta do envio tem de estar à vista antes de o «Confirmar»
+ * aceitar um clique. Um duplo clique são ~120 ms entre os dois; 400 ms tira o
+ * segundo de lá com folga e é menos do que alguém demora a ler a frase.
+ */
+const CONFIRMAR_ENVIO_APOS_MS = 400;
+
 const GRAVACAO_TENTATIVAS = 3;
 const GRAVACAO_PAUSA_MS = 400;
 const GRAVACAO_TECTO_MS = 10000;
@@ -1144,7 +1152,13 @@ export type ResultadoDaGravacao =
     }
   /** Não ficou no servidor. O trabalho está no ecrã e na cópia local — e é isso
    *  mesmo que a pessoa tem de ouvir, com estas palavras. */
-  | { estado: "so-local"; porque?: string };
+  | {
+      estado: "so-local";
+      porque?: string;
+      /** O servidor recusou porque a sessão caiu (401) — não é avaria nenhuma:
+       *  basta entrar outra vez (achado n.º 34). */
+      sessaoExpirada?: boolean;
+    };
 
 function ehObjecto(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -1178,6 +1192,7 @@ export async function gravarRascunhoNoServidor(
   },
 ): Promise<ResultadoDaGravacao> {
   let porque: string | undefined;
+  let sessaoExpirada = false;
   for (let tentativa = 1; tentativa <= GRAVACAO_TENTATIVAS; tentativa++) {
     try {
       const res = await fetchComTecto(
@@ -1208,6 +1223,7 @@ export async function gravarRascunhoNoServidor(
         };
       }
       porque = typeof dados?.erro === "string" ? dados.erro : undefined;
+      sessaoExpirada = res.status === 401;
       // Um 4xx é o pedido que está errado, e repeti-lo dá o mesmo. Um 503
       // `permanente` é a instalação que está incompleta — também dá o mesmo.
       if (res.status < 500 || dados?.permanente === true) break;
@@ -1220,7 +1236,7 @@ export async function gravarRascunhoNoServidor(
       await new Promise((r) => setTimeout(r, GRAVACAO_PAUSA_MS * tentativa));
     }
   }
-  return { estado: "so-local", porque };
+  return { estado: "so-local", porque, ...(sessaoExpirada ? { sessaoExpirada } : {}) };
 }
 
 /**
@@ -1386,6 +1402,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     docRef.current = doc;
   }, [doc]);
   const [copiarAberto, setCopiarAberto] = useState(false);
+  /** Quando apareceu a pergunta «Enviar para…?» — ver `CONFIRMAR_ENVIO_APOS_MS`. */
+  const perguntaDoEnvioDesde = useRef(0);
   const [copiaSubstitui, setCopiaSubstitui] = useState<string | null>(null);
   /**
    * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
@@ -2446,14 +2464,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *     aviso que aparece sempre é um aviso que se aprende a ignorar.
    */
   const registarSoLocal = useCallback(
-    (porque?: string) => {
+    (porque?: string, sessaoExpirada = false) => {
       setSoNesteComputador({ porque });
       if (avisouSoLocal.current) return;
       avisouSoLocal.current = true;
+      // Achado n.º 34: com a sessão caída, «fala com quem gere a instalação»
+      // mandava procurar uma avaria que não existe. Basta entrar outra vez.
       toast(
-        `Este rascunho está guardado SÓ NESTE COMPUTADOR — não chegou ao servidor.${
-          porque ? ` ${porque}` : ""
-        } Não feche o separador sem falar com quem gere a instalação: noutro dispositivo esta proposta não existe.`,
+        sessaoExpirada
+          ? "A tua sessão expirou e este rascunho ficou guardado SÓ NESTE COMPUTADOR. Não feches o separador: entra outra vez e continua — a gravação seguinte já chega ao servidor."
+          : `Este rascunho está guardado SÓ NESTE COMPUTADOR — não chegou ao servidor.${
+              porque ? ` ${porque}` : ""
+            } Não feche o separador sem falar com quem gere a instalação: noutro dispositivo esta proposta não existe.`,
         "error",
       );
     },
@@ -2549,7 +2571,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           if (r.duradouro === false) registarNaoDura(r.aviso);
           else marcarQueDura();
         } else {
-          registarSoLocal(r.porque);
+          registarSoLocal(r.porque, r.sessaoExpirada);
         }
         return r;
       } finally {
@@ -3696,15 +3718,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * para escrever o dinheiro na língua do documento (ver `money.ts`) — para o
    * valor aqui não discordar do valor que o documento em anexo mostra.
    */
-  const resumoParaCopiar = resumoDaPropostaParaCopiar(
-    {
-      clientNames: doc.clientNames ?? "",
-      eventDate: camposDoEventoNaLingua(doc, idiomaDoPdf).eventDate ?? "",
-      aPagar: montanteNaLingua(eurDocumento(totais.aPagar), idiomaDoPdf),
-      link: linkDaProposta ?? undefined,
-    },
-    idiomaDoPdf,
-  );
+  const resumoComLink = (link: string | undefined) =>
+    resumoDaPropostaParaCopiar(
+      {
+        clientNames: doc.clientNames ?? "",
+        eventDate: camposDoEventoNaLingua(doc, idiomaDoPdf).eventDate ?? "",
+        aPagar: montanteNaLingua(eurDocumento(totais.aPagar), idiomaDoPdf),
+        link,
+      },
+      idiomaDoPdf,
+    );
+  const resumoParaCopiar = resumoComLink(linkDaProposta ?? undefined);
   // O desvio do total escrito à mão. Vive aqui em cima porque é lido em dois
   // sítios: na dica do campo e no aviso com o botão que o arruma.
   const desvio = desalinhamento(doc, money.base);
@@ -6532,6 +6556,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
     setBusy("send");
     setConfirmSend(false);
+    /**
+     * ── O WHATSAPP ABRE-SE AQUI, AINDA DENTRO DO CLIQUE ─────────────────────
+     *
+     * Achado n.º 4: com «Por onde segue: WhatsApp», o WhatsApp nunca abria. O
+     * link só existe quando o servidor responde, e um separador aberto DEPOIS
+     * de um `await` é bloqueado pelo browser (já não é o gesto dela). Abre-se
+     * vazio agora, e aponta-se para o WhatsApp quando o link chegar; se o envio
+     * não chegar lá, fecha-se.
+     */
+    let janelaDoWhatsApp: Window | null = null;
+    let whatsAppAberto = false;
+    if (canal === "whatsapp") {
+      try {
+        janelaDoWhatsApp = window.open("", "_blank") ?? null;
+        if (janelaDoWhatsApp) janelaDoWhatsApp.opener = null;
+      } catch {
+        janelaDoWhatsApp = null;
+      }
+    }
     try {
       const comecou = Date.now();
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
@@ -6641,7 +6684,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
        * (isso não se perde), mas o botão continua lá para ela poder corrigir o
        * contacto e enviar a sério.
        */
-      const saiu = Boolean(data?.emailed);
+      // E o WhatsApp que ela escolheu também conta como ter seguido (achado
+      // n.º 4): o servidor marca-a como «enviada» e devolve o link.
+      const saiu =
+        Boolean(data?.emailed) || (data?.semEmailPorEscolha === true && data?.estado === "enviada");
       /**
        * ══════════════════════════════════════════════════════════════════════
        * PRIMEIRO O QUE ACONTECEU, DEPOIS O QUE ESTAVA LÁ DENTRO
@@ -6706,7 +6752,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
              próxima pessoa não carregar no botão que falta. */
           toast(
             canal === "whatsapp"
-              ? "Proposta gerada — falta mandá-la"
+              ? janelaDoWhatsApp
+                ? "Proposta pronta — o WhatsApp abriu com o link. Escolhe o casal e carrega em enviar."
+                : "Proposta pronta — falta mandá-la: é o botão «Mandar por WhatsApp»."
               : "Proposta enviada ao cliente",
             "success",
           );
@@ -6719,10 +6767,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         setSent(true);
         onSent?.();
       }
+      if (saiu && janelaDoWhatsApp && typeof data?.acceptUrl === "string") {
+        janelaDoWhatsApp.location.href = linkDoWhatsApp(resumoComLink(data.acceptUrl));
+        whatsAppAberto = true;
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
     } finally {
       setBusy(null);
+      // Não seguiu (ou parou para perguntar pelos cortes): o separador vazio
+      // não fica aberto a fingir que alguma coisa vai acontecer.
+      if (janelaDoWhatsApp && !whatsAppAberto) {
+        try {
+          janelaDoWhatsApp.close();
+        } catch {
+          /* já fechado */
+        }
+      }
     }
   }
 
@@ -11841,7 +11902,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <Button variant="ghost" onClick={() => setConfirmSend(false)}>
                     Cancelar
                   </Button>
-                  <Button variant="primary" onClick={() => void send()} disabled={busy !== null}>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      // Achado n.º 3: o «Confirmar» aparece onde estava a ponta
+                      // direita do «Gerar e enviar», e o segundo clique de um
+                      // duplo clique enviava sem a pergunta chegar a ser vista.
+                      // Confirmar pede um gesto NOVO, depois de a ler.
+                      if (
+                        performance.now() - perguntaDoEnvioDesde.current <
+                        CONFIRMAR_ENVIO_APOS_MS
+                      ) {
+                        return;
+                      }
+                      void send();
+                    }}
+                    disabled={busy !== null}
+                  >
                     Confirmar
                   </Button>
                 </div>
@@ -11862,7 +11939,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
                 <Button
                   variant="primary"
-                  onClick={() => setConfirmSend(true)}
+                  onClick={() => {
+                    perguntaDoEnvioDesde.current = performance.now();
+                    setConfirmSend(true);
+                  }}
                   disabled={busy !== null || !canSend}
                   /**
                    * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────

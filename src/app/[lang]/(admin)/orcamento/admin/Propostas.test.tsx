@@ -374,6 +374,30 @@ describe("Propostas — a que ficou por enviar", () => {
     expect(document.body.textContent).not.toContain("aguarda resposta do cliente");
   });
 
+  /** Achado n.º 11: o aviso mandava abrir o pedido e não levava lá, e
+   *  clicar na linha não fazia nada. */
+  it("o aviso e a linha levam ao pedido", async () => {
+    const pedido = { id: "q9", name: "Maria & Zé" } as unknown as Quote;
+    const onOpenQuote = vi.fn();
+    render(
+      <ToastProvider>
+        <Propostas quotes={[pedido]} onOpenQuote={onOpenQuote} onQuoteUpdated={() => {}} />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
+    screen.getByRole("button", { name: "Abrir o pedido" }).click();
+    expect(onOpenQuote).toHaveBeenCalledWith(pedido);
+    onOpenQuote.mockClear();
+    (screen.getByText("Maria & Zé").closest("tr, button") as HTMLElement).click();
+    expect(onOpenQuote).toHaveBeenCalledWith(pedido);
+  });
+
+  it("o valor da proposta mostra os cêntimos", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
+    expect(document.body.textContent?.replace(/\s/g, "")).toContain("4920,00€");
+  });
+
   it("não entra no valor enviado aos clientes nem na taxa de aceitação", async () => {
     desenhar();
     await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
