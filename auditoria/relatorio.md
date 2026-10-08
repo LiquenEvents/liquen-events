@@ -164,3 +164,50 @@ Os críticos primeiro; depois agrupado por ficheiro, para cada grupo ser uma alt
 14. **Imagens do email em escuro** (precisa das tuas imagens): n.º 28.
 15. **Pedido duplicado em simultâneo** (`orcamento/route.ts`): n.º 18.
 16. **Testes e código morto**: n.º 38, 39.
+
+---
+
+## 8 · O que ficou corrigido (8 de outubro de 2026)
+
+Pela ordem do plano, no PR das correções. Cada linha diz onde, e como se
+provou. «Verificado a correr» = no browser, contra o servidor local com dados
+TESTE; os testes automáticos ficaram no repositório.
+
+| N.º | Estado | O que mudou | Prova |
+|---|---|---|---|
+| 1 | Corrigido | Carimbar ids nos Serviços deixou de contar como «ela escreveu» (`soMudaramOsIds`) | Passeio de dois dispositivos: vermelho antes, verde depois |
+| 2 | Corrigido | A linha só com rótulo é partida como é desenhada (`wrap`) | Teste do PDF: vermelho antes, verde depois |
+| 3 | Corrigido | O «Confirmar» ignora cliques nos primeiros 400 ms | Teste do duplo clique |
+| 4 | Corrigido | WhatsApp: «enviada», link na resposta, o WhatsApp abre com a mensagem | Verificado a correr + testes da rota |
+| 5, 16, 17 | Corrigido | Negativo, zero e sinal fora de 1–99 dizem porquê e não gravam | Verificado a correr + testes |
+| 6 | Corrigido | Duas pessoas juntam-se campo a campo (`rascunho-juntar.ts`) | Verificado a correr + testes |
+| 7 | Corrigido | «Criar a partir de…» pergunta antes de substituir | Verificado a correr + testes |
+| 8 | Corrigido | Saldo a um mês do evento; sinal no dia de Lisboa | Testes |
+| 9 | Corrigido | Modelos de email abrem em texto; o marcador volta a ser construído | Verificado a correr |
+| 10 | Corrigido | Pesquisas sem acentos e com telefone em qualquer formato (seis vistas) | Testes |
+| 11 | Corrigido | Linhas das Propostas e o aviso levam ao pedido; valor com cêntimos | Verificado a correr + testes |
+| 12 | Corrigido | O servidor recusa datas que não existem e datas passadas; anúncios com data mínima | Testes |
+| 13 | Corrigido | A «Conversão» diz o que conta | Teste |
+| 14, 25 | Corrigido | Escuro: 12 vistas sem uma falha de contraste no axe; claro: as que o relatório nomeava | axe antes e depois |
+| 15 | Corrigido | Tarefas cabem em 390 px; as outras vistas medidas cabem | Medido a 390 |
+| 18 | Corrigido | O gémeo simultâneo responde «ok» sem segundo email | Testes da rota |
+| 19 | Corrigido | «Ganho» sem proposta enviada avisa no seletor | Verificado a correr |
+| 20 | Corrigido | Horas de entrada no fuso de Lisboa nos dois lados | — |
+| 21 | Corrigido | Timelines sem eventos fechados dizem isso e levam aos outros | Teste |
+| 22 | Corrigido | A fórmula da deslocação diz quando arredondou | Teste |
+| 23 | Corrigido | A barra do Material é a das outras vistas | Medido a 390 |
+| 24 | Corrigido (Calendário e Pedidos) | Calendário em `grid`; Pedidos sem controlos dentro de controlos. **A fase 11 dos Temas fica por fazer** (sem erro no axe) | axe: 50 → 0 e 31 → 0 |
+| 26 | Já estava bem | Medido de novo a 390 com toque: os alvos têm 44 px | Medido |
+| 27 | Corrigido | A confirmação do pedido fala no singular, como o email | Teste |
+| 29 | Corrigido | «s/ IVA» nos Pedidos, «c/ IVA» nas Propostas | — |
+| 30 | Corrigido | «Jun ’27» | Teste |
+| 31 | Corrigido | «Criar pedido» diz o que falta; Enter cria | Testes |
+| 32 | Corrigido | O painel das gralhas avisa dos emojis que o PDF não tem, com «Tirar» | Testes |
+| 33 | Corrigido | Os campos deixam de passar a não controlados depois de um modelo | Consola limpa |
+| 34 | Corrigido | Sessão expirada: «entra outra vez», e não «fala com quem gere a instalação» | — |
+| 35 | Corrigido | As notas do cliente mantêm os parágrafos | — |
+| 36 | Corrigido | Nome dos ficheiros com o dia de Lisboa | — |
+| 37 | Corrigido | **O portal do cliente saiu** (página, PDFs, token, botões do dossier, glossário, textos) | Testes; `/portal/…` dá «Página não encontrada» |
+| 38 | Corrigido | Tecto dos testes a 20 s | Suite inteira verde |
+| 39 | Parcial | 134 → 62 avisos, zero de código morto. Ficam os do compilador do React e os dois ficheiros enormes por partir | `npm run lint` |
+| **28** | **À espera de ti** | O email «Pedido recebido» é o teu desenho, com a regra de não mudar o HTML — e um teste que o compara byte a byte. Trocar o logótipo e os ícones por versões que funcionem no escuro precisa das imagens e de tu dizeres que se pode mexer | — |
