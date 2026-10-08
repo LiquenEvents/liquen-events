@@ -511,6 +511,9 @@
   --transition-duration-foto-zoom: 400ms;
   /* O desfoque a dar lugar à fotografia nas grelhas dos serviços (A6). */
   --transition-duration-foto-chega: 300ms;
+  /* O botão a ceder ao toque no sítio público (A8). O back office tem o seu,
+     o `toque` de 20 ms aqui em cima, com a mola do `ui/movimento.ts`. */
+  --transition-duration-carregar: 100ms;
 
   /* E as dez do documento — o tempo real até assentar a 0,5% do valor final. */
   --transition-duration-smooth: 590ms;

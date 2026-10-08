@@ -88,7 +88,7 @@ export default function WhatsAppButton() {
       // medidas. O `bottom` estava escrito aqui à mão e não sabia da barra.
       // A classe soma a reserva do aviso ao mesmo 1,25rem de sempre, e quando
       // não há aviso a reserva vale 0px, ou seja fica tudo como estava.
-      className={`whatsapp-fixed piso-flutuante fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
+      className={`toque whatsapp-fixed piso-flutuante fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       style={{

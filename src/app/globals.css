@@ -2827,6 +2827,24 @@ body {
   }
 }
 
+/* ── O botão cede ao toque (auditoria externa, A8) ──────────────────────────
+   `scale(.97)` em 100 ms, com a curva da casa, nos botões do sítio público
+   (os que levam a classe `toque`). A transição está SÓ no `:active`: é a regra
+   do estado de chegada que manda na transição, portanto carregar anima e
+   largar volta de imediato — e as transições de cor que cada botão já tem
+   (hover) ficam intactas fora do toque. A opacidade de cima continua no ecrã
+   de toque; vai na mesma lista para esta regra não a cortar.
+   Fora de `@layer` de propósito: um `scale-*` do Tailwind não a desliga.
+   E nada para quem pediu movimento reduzido. */
+@media (prefers-reduced-motion: no-preference) {
+  .toque:active {
+    scale: 0.97;
+    transition:
+      scale var(--transition-duration-carregar) var(--ease-out),
+      opacity 0.06s ease;
+  }
+}
+
 /* ── Film grain overlay ── */
 body::before {
   content: "";

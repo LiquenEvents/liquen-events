@@ -63,7 +63,7 @@ export default function BarraFixa({
             meta.contacto({ contexto });
             track("WhatsAppClick", { source: "social", origem: contexto });
           }}
-          className="flex flex-[1.4] items-center justify-center gap-2.5 bg-moss px-4 py-3.5 text-white transition-colors hover:bg-moss-dark"
+          className="toque flex flex-[1.4] items-center justify-center gap-2.5 bg-moss px-4 py-3.5 text-white transition-colors hover:bg-moss-dark"
         >
           <WhatsAppIcon className="h-5 w-5 flex-shrink-0" />
           <span className="text-[12px] font-medium tracking-[0.08em]">{textoWhatsApp}</span>
@@ -83,7 +83,7 @@ export default function BarraFixa({
             rolarAteVer(alvo, { block: "start" });
             history.replaceState(null, "", "#pedido");
           }}
-          className="flex flex-1 items-center justify-center border border-white/60 px-4 py-3.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
+          className="toque flex flex-1 items-center justify-center border border-white/60 px-4 py-3.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
         >
           {textoFormulario}
         </a>

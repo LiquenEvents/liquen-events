@@ -44,7 +44,7 @@ const MENU_EASE = EASE_OUT;
  * da secundária, e essas continuam escritas em cada botão.
  */
 const BOTAO_DA_BARRA =
-  "alvo-toque inline-flex items-center justify-center gap-1.5 leading-none " +
+  "toque alvo-toque inline-flex items-center justify-center gap-1.5 leading-none " +
   "border px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase";
 
 const NAV_ORDER = ["/", "/sobre", "/servicos", "/galeria", "/clientes", "/contacto"];
@@ -355,7 +355,7 @@ const MobileMenu = memo(function MobileMenu({
           href={localizeHref("/orcamento", locale)}
           onClick={() => track("CTAClick", { source: "nav-mobile" })}
           // 311×37 px medidos com o menu aberto — a acção principal do menu.
-          className="alvo-toque group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
+          className="toque alvo-toque group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
         >
           <span>{t.nav.pedirOrcamento}</span>
           <span
