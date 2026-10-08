@@ -82,6 +82,12 @@ export type { TabelaOuCartoesProps, Coluna } from "./TabelaOuCartoes";
 export { ListaAgrupada, LinhaAgrupada } from "./ListaAgrupada";
 export type { ListaAgrupadaProps, LinhaAgrupadaProps } from "./ListaAgrupada";
 
+// O esqueleto da cor da fotografia vive com os outros esqueletos
+// (`../Skeleton.tsx`); sai também por aqui para os ecrãs o encontrarem ao pé
+// dos primitivos. Sem cor válida, é o `.bo-skeleton` de sempre.
+export { EsqueletoDeCor } from "../Skeleton";
+export type { EsqueletoDeCorProps } from "../Skeleton";
+
 export { MenuDeAccoes } from "./MenuDeAccoes";
 export type { MenuDeAccoesProps, AccaoDeItem } from "./MenuDeAccoes";
 
