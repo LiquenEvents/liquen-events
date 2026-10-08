@@ -358,3 +358,27 @@ describe("useFocusTrap — o fundo sai da árvore em qualquer nível", () => {
     }
   });
 });
+
+/**
+ * ── O QUE AINDA ESTÁ À ESPERA DE HIDRATAÇÃO ───────────────────────────────
+ * Um painel carregado à parte chega como HTML do servidor e só depois é
+ * hidratado. Marcá-lo antes disso faz o React acusar uma divergência de
+ * atributos (passeio dos temas, vermelho duas vezes no CI). O sinal: o pai já é
+ * do React, ele ainda não é.
+ */
+describe("useFocusTrap — não toca no que o React ainda não hidratou", () => {
+  function ComPai({ active }: { active: boolean }) {
+    return createElement("div", { "data-testid": "pai" }, createElement(Dialog, { active }));
+  }
+
+  it("salta o filho de um pai do React que ainda não é do React", () => {
+    const { rerender } = render(createElement(ComPai, { active: false }));
+    const porHidratar = document.createElement("div");
+    screen.getByTestId("pai").appendChild(porHidratar);
+    rerender(createElement(ComPai, { active: true }));
+    expect(porHidratar.getAttribute("aria-hidden")).toBeNull();
+    expect(porHidratar.inert).toBeFalsy();
+    // E os irmãos que já são do React continuam a ser marcados.
+    expect(screen.getByTestId("trigger").getAttribute("aria-hidden")).toBe("true");
+  });
+});
