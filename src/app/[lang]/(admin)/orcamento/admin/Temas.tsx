@@ -1802,6 +1802,14 @@ export default function Temas() {
              está, não pela janela, e a `Toolbar` já é `flex flex-wrap`. A 375 px
              a fila parte-se e o estado desce para baixo do campo sozinho.
 
+             E `w-72`, não `w-full`. MEDIDO num browser a 1440: com `w-full`, o
+             Chrome contava o campo pela largura natural do `input` (~245 px)
+             ao medir a fila, e depois desenhava-o com os 288 do `basis-72` —
+             a fila ficava 43 px mais curta do que o que lá cabia, e o estado
+             caía para baixo do campo com toda a largura da janela livre ao
+             lado. Com a largura dita, a fila mede 437 e o estado fica ao lado,
+             na mesma linha dos 40 px dos controlos da direita.
+
              ── UMA ALTURA SÓ NA BARRA INTEIRA: 40 px ───────────────────────
              Ponto 5 da auditoria: o campo «alinhado na mesma linha e na mesma
              baseline dos outros controlos». CONTADO pelas classes, com rato
@@ -1817,12 +1825,12 @@ export default function Temas() {
              de sempre — o `input` pela regra do `globals.css`, a ordenação
              pelo `pointer-coarse:min-h-11` do `Escolha`, os botões pelo
              `.alvo-toque` e pelo `pointer-coarse:h-11` do `Button`. */
-          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {searchable && (
               // O campo só aparece quando há lista que chegue para justificar
               // um controlo a mais — com três temas, procurar é mais trabalho
               // do que ler.
-              <div className="relative w-full max-w-md basis-72 grow-0">
+              <div className="relative w-72 max-w-full basis-72 grow-0">
                 {SearchIcon}
                 {/* ── «PROCURAR TEMAS», E NÃO «… E FOTOGRAFIAS» ─────────────
                     A Parte 6 do documento propõe «Procurar temas e
@@ -2370,8 +2378,16 @@ export default function Temas() {
                    O raio fica: `rounded-2xl` são os 20 px do degrau «painel»
                    da escada concêntrica. O documento pede 12, o token de
                    cartão da casa (`--radius-card`) diz 16, e nenhum dos dois
-                   é decisão a tomar aqui — fica dito no relatório. */
-                className={`block w-full overflow-hidden rounded-2xl bg-[var(--bo-surface)] text-left shadow-[var(--bo-sombra-repouso)] hover:shadow-[var(--bo-sombra-erguida)] ${ESTADO} ${PRESSAO}`}
+                   é decisão a tomar aqui — fica dito no relatório.
+
+                   `h-full`: a célula da grelha já estica à altura da fila
+                   (`align-items: stretch`), mas o cartão dentro dela não a
+                   seguia. Com o rasto de números a poder ocupar duas linhas,
+                   «todos os cartões da mesma fila têm a mesma altura»
+                   (critério 2 da Parte 8) só se cumpre se o cartão encher a
+                   célula — medido a 1440, a primeira fila tinha fundos a 508,
+                   523 e 525 px. */
+                className={`block h-full w-full overflow-hidden rounded-2xl bg-[var(--bo-surface)] text-left shadow-[var(--bo-sombra-repouso)] hover:shadow-[var(--bo-sombra-erguida)] ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -2479,15 +2495,24 @@ export default function Temas() {
                       Agora os números são um só rasto, pela ordem em que
                       respondem à pergunta «o que é este tema?»: quantas fotos
                       tem, quantas vezes saiu, e há quanto tempo não lhe tocam.
-                      Com `truncate`, o que cai primeiro é a data — que é a
-                      menos decisiva das três, e é por isso que está no fim. */}
+                      A data vai no fim por ser a menos decisiva das três.
+
+                      Era `truncate`, e com a data absoluta (a partir de 30
+                      dias, «15/08/2026») o rasto deixou de caber num cartão de
+                      seis colunas: lia-se «15/08/2…», que é uma data que não
+                      diz o ano. O desenho do cartão na Parte 3 do documento
+                      parte o rasto em DUAS linhas («14 fotos · / 1 proposta ·
+                      ⚑»), e é isso que fica: quebra entre palavras, nunca a
+                      meio de um número, e no máximo duas linhas. Os cartões
+                      da mesma fila continuam da mesma altura — a grelha estica
+                      cada célula à mais alta. */}
                   {/* «caption, --fg-tertiary, tabular-nums» (Parte 3). Os
                       algarismos com a mesma largura são o que deixa «9 fotos»
                       e «14 fotos» alinharem de cartão para cartão, e a cor é
                       o terceiro papel de texto da casa
                       (`--bo-texto-terciario`, 4,7:1 sobre o cartão branco e
                       5,7:1 sobre o escuro, os números da Parte 5.2). */}
-                  <p className="mt-0.5 truncate text-caption tabular-nums text-[var(--bo-texto-terciario)]">
+                  <p className="mt-0.5 line-clamp-2 text-caption tabular-nums text-[var(--bo-texto-terciario)]">
                     {photoCountLabel(t.imageCount, t.truncated)}
                     {/* «7 propostas» ou «Nunca usado» — a segunda é a metade
                         mais útil: é o que distingue um tema que a biblioteca

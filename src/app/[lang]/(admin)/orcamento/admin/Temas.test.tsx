@@ -1365,10 +1365,22 @@ describe("Biblioteca de Temas — o cartão", () => {
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
     await act(async () => {});
-    // Uma linha só: fotos, uso, e a data por último — que é a que cai primeiro
-    // quando não cabe, por ser a menos decisiva das três.
+    // Um rasto só: fotos, uso, e a data por último. Parte-se em duas linhas
+    // quando não cabe (o desenho da Parte 3), em vez de cortar a data a meio.
     const rasto = screen.getByText(/9 fotos · 4 propostas/);
-    expect(rasto.className).toMatch(/truncate/);
+    expect(rasto.className).toMatch(/\bline-clamp-2\b/);
+    expect(rasto.className, "`truncate` cortava a data absoluta a meio").not.toMatch(/\btruncate\b/);
+  });
+
+  it("o cartão enche a célula da grelha, para a fila ter uma altura só", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
+    );
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const rasto = screen.getByText(/9 fotos/);
+    const cartao = rasto.closest("button")!;
+    expect(cartao.className, "sem `h-full`, um rasto de duas linhas desalinha a fila").toMatch(/\bh-full\b/);
   });
 
   /**
