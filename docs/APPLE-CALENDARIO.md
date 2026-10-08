@@ -18,8 +18,8 @@ Auditado no código contra a tabela da **Parte 9** — `Calendario.tsx`,
 | 07 | Vista de ano | **feito** — doze mini-meses com o resumo em palavras |
 | 08 | Vista de semana | **feito** — sete colunas na mesma escala, faixa de dia inteiro, coluna de hoje |
 | 09 | Arrastar | **por fazer** — e é ela que destranca o `Mudar de dia…` do menu de contexto (ver abaixo) |
-| 10 | Menus e teclado | **parcial** — menu de contexto no dia, no pedido e na marcação; `⌘1–4`, `⌘T` (e `T`), `⌘N`, `←/→` e `⌥←/→`. Falta `Delete`, `Espaço`, `Home`/`End` e `PageUp`/`PageDown`, que são navegação DENTRO da grelha e vão com a fase 11 |
-| 11 | Acessibilidade | **por fazer** — a grelha do mês ainda é um `role="group"` de `role="button"`, não um `role="grid"` de `gridcell` |
+| 10 | Menus e teclado | **parcial** — menu de contexto no dia, no pedido e na marcação; `⌘1–4`, `⌘T` (e `T`), `⌘N`, `←/→` e `⌥←/→`. `Home`/`End` e `PageUp`/`PageDown` entraram com a fase 11; falta `Delete` |
+| 11 | Acessibilidade | **feito** — a grelha do mês é um `role="grid"` de `row` (com `display: contents`, para não mexer na disposição) e `gridcell`; um só dia no fio do Tab (foco itinerante), `aria-selected`, `aria-current="date"` em hoje, e o nome do dia com o dia da semana («Quinta-feira, 15 de Janeiro de 2026…»). Setas, `Home`/`End` e `PageUp`/`PageDown` (`diaPelaTecla`, com teste). Era o achado n.º 24 da auditoria: controlos dentro de controlos, 31 por mês no axe — agora zero |
 
 **Duas coisas que o código não deixou fazer como está escrito**, e ficam aqui
 para quem vier a seguir não as procurar:

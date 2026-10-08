@@ -69,13 +69,13 @@ describe("Calendário — o nome do dia", () => {
   it("diz o ano, não só o dia e o mês", async () => {
     await montar();
 
-    expect(screen.getByLabelText(/^9 de Janeiro de 2026 — 1 evento/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/, 9 de Janeiro de 2026 — 1 evento/)).toBeInTheDocument();
   });
 
   it("um dia vazio também diz o ano — não é só quem tem eventos", async () => {
     await montar();
 
-    expect(screen.getByLabelText(/^14 de Janeiro de 2026 — /)).toBeInTheDocument();
+    expect(screen.getByLabelText(/, 14 de Janeiro de 2026 — /)).toBeInTheDocument();
   });
 
   it("o ano acompanha o mês para onde se navega", async () => {
@@ -85,6 +85,6 @@ describe("Calendário — o nome do dia", () => {
     screen.getByLabelText("Mês anterior").click();
 
     await waitFor(() => expect(screen.getByText("Dezembro 2025")).toBeInTheDocument());
-    expect(screen.getByLabelText(/^9 de Dezembro de 2025 — /)).toBeInTheDocument();
+    expect(screen.getByLabelText(/, 9 de Dezembro de 2025 — /)).toBeInTheDocument();
   });
 });

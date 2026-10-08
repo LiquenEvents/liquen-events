@@ -86,7 +86,9 @@ describe("Calendário — o estado do pedido não é só cor", () => {
   it("a etiqueta da grelha diz o estado por palavras no nome acessível", async () => {
     await montar(DOIS_CINZENTOS);
 
-    expect(screen.getAllByLabelText(/Abrir pedido de Marta Nunes.*Novo$/).length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText(/Abrir pedido de Marta Nunes.*Novo$/).length).toBeGreaterThan(
+      0,
+    );
     expect(
       screen.getAllByLabelText(/Abrir pedido de Rui Cardoso.*Perdido$/).length,
     ).toBeGreaterThan(0);
@@ -113,7 +115,7 @@ describe("Calendário — o estado do pedido não é só cor", () => {
     await montar(DOIS_CINZENTOS);
 
     // Abrir o dia 9, que tem os dois pedidos.
-    fireEvent.click(screen.getByLabelText(/^9 de Janeiro de 2026 — 2 eventos/));
+    fireEvent.click(screen.getByLabelText(/, 9 de Janeiro de 2026 — 2 eventos/));
 
     await waitFor(() => expect(screen.getByText(/^Novo · /)).toBeInTheDocument());
     expect(screen.getByText(/^Perdido · /)).toBeInTheDocument();

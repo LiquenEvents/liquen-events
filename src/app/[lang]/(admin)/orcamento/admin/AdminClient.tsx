@@ -593,6 +593,7 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       chave: "sel",
       cabecalho: "",
       largura: "w-10",
+      interactiva: true,
       celula: (q) => (
         <label className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <input

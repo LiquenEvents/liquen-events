@@ -873,6 +873,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 },
                 {
                   chave: "accoes",
+                  interactiva: true,
                   cabecalho: "",
                   largura: "w-12",
                   alinharADireita: true,

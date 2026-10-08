@@ -70,13 +70,17 @@ Ela escolheu a ordem: **«prefiro as tarefas primeiro»**. Em resumo, hoje —
 e cada tabela é que manda, isto é só o mapa:
 
   · **Tarefas**: onze de onze. A 11 era percorrer a Parte 6 num browser, e está feita;
-  · **Calendário**: as quatro vistas existem (dia, semana, mês, ano). Faltam a
-    09 (arrastar) e a 11 (acessibilidade); a 01, a 05 e a 10 estão parciais;
+  · **Calendário**: as quatro vistas existem (dia, semana, mês, ano). Falta a
+    09 (arrastar); a 11 (acessibilidade) ficou feita com o achado n.º 24 da
+    auditoria; a 01, a 05 e a 10 estão parciais;
   · **Temas**: a 06, a 07, a 08 e a 09 ficaram feitas; a 01, a 02, a 03, a 05
     e a 10 estão parciais, e a 04 e a 11 por fazer.
 
 Repara que a 11 do Calendário e a dos Temas são a mesma peça: passar a grelha de
-`role="button"` a `role="grid"` com `gridcell`. Faz-se de uma vez, e não duas. (A das
+`role="button"` a `role="grid"` com `gridcell`. A do Calendário está feita
+(`Calendario.tsx`, com o `diaPelaTecla`); a dos Temas segue o mesmo desenho e
+ficou por fazer — a grelha de fotografias tem arrasto, selecção múltipla e um
+número de colunas que muda com a largura, e não tinha erro no axe. (A das
 Tarefas NÃO era essa: a lista é `<ul>/<li>`, e a 11 foi percorrer a Parte 6 inteira.
 Este mapa dizia o contrário e estava errado: a tabela de cada documento é que manda.)
 

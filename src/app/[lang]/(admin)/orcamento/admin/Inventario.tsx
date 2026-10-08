@@ -1032,6 +1032,7 @@ export default function Inventario() {
                 },
                 {
                   chave: "accoes",
+                  interactiva: true,
                   cabecalho: "Ações",
                   alinharADireita: true,
                   largura: "w-32",
