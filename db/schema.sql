@@ -485,9 +485,12 @@ create table if not exists public.invoice_counters (
 -- linha do Postgres serializa emissões concorrentes, cada uma recebe um `n`
 -- distinto e consecutivo, nunca o mesmo. A aplicação formata depois `FT AAAA/NNNN`.
 -- Idempotente (create or replace) — seguro correr o ficheiro as vezes que forem.
+-- `search_path = ''` (auditoria externa, B2): a função não resolve nomes pelo
+-- caminho de quem a chama; todos os nomes do corpo já vêm com `public.`.
 create or replace function public.next_invoice_seq(p_year int)
 returns int
 language sql
+set search_path = ''
 as $$
   insert into public.invoice_counters (year, n)
   values (p_year, 1)
