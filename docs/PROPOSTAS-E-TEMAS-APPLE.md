@@ -5,6 +5,50 @@
 
 ---
 
+## Parte −1 — o que ela decidiu em cima deste documento (8 de outubro de 2026)
+
+O documento chegou no mesmo dia. Antes da Fase 1, foi comparado com o código e com as decisões já escritas noutros documentos. Em quatro pontos chocava com uma escolha dela ou com uma regra que os testes guardam, e por isso perguntei-lhe. As respostas valem mais do que o texto acima.
+
+| Ponto do documento | Resposta dela | O que fica |
+|---|---|---|
+| E2 e §6 — `Sidebar` à esquerda no computador | **«Fica a barra de baixo»** (a mesma resposta que deu em setembro; ver `FAZER-PROPOSTA.md`, Parte −1) | Não há `Sidebar`. O estúdio e os Temas ganham colunas por dentro do ecrã; a navegação geral continua na barra de baixo. |
+| E1 — «o logótipo sai do back-office (fica só no login)» | **«Fica ao centro»** | O logótipo continua ao centro do cabeçalho. Por isso o cabeçalho mantém ~84 px e não desce aos 52 px da `Toolbar` do §6: o logótipo sozinho tem 56. |
+| §6 — `--font` com a letra do sistema | **«Fica o Geist»** | A letra do back office continua a Geist (guardada por `letra-da-casa.test.ts`). |
+| §6 — tokens base | **«Usar o que existe»** | Não se cria uma segunda família. Cada valor do §6 é aplicado através do token da casa que já faz esse papel (tabela abaixo), e o contraste fica sempre em ≥ 4,5:1. |
+
+E uma decisão do mesmo dia, sobre os Temas: **«sim à sombra, cantos a 12»** — o cartão de tema eleva-se por sombra (`--bo-sombra-repouso`/`--bo-sombra-erguida`) e tem os cantos a 12 px (`--radius-tile`).
+
+### O §6, traduzido para os tokens da casa
+
+| §6 | Token da casa | Porque não o valor do §6 |
+|---|---|---|
+| `--text` / `--text-2` / `--text-3` | `--bo-text` / `--bo-text-muted` / `--bo-text-faint` | No Tailwind v4 o prefixo `--text-*` é o do TAMANHO de letra: `--text-2` criaria uma classe `text-2` com uma cor como tamanho. E `#86868b` sobre branco dá 3,6:1, abaixo dos 4,5. |
+| `--bg` / `--bg-2` | `--bo-surface` / `--bo-chao` | No escuro, a casa evita o preto puro. |
+| `--line` | `--bo-hairline-strong` | — |
+| `--accent` `#5F7C66` | `--bo-accent` (sage-600, `#4C6752`); o `#5F7C66` é a `--bo-marca` | `#5F7C66` é a cor da marca, mas como texto ou como fundo de texto branco fica abaixo dos 4,5:1. |
+| `--danger` `#ff3b30` | `--bo-perigo` | `#ff3b30` sobre branco dá 3,5:1. |
+| `--r-field` 10 / `--r-card` 18 / `--r-pill` | `--radius-control` 10 / `--radius-card` 16 (12 no cartão de tema, `--radius-tile`) / `--bo-raio-pilula` | 18 px é o raio das folhas e janelas na casa (`--bo-raio-janela`), não dos cartões. |
+| `--shadow-1` | `--bo-sombra-repouso`, `-erguida`, `-suspensa`, `-modal` | — |
+| `--glass` .72 + `blur(20px) saturate(180%)` | `.bo-material` + `.bo-material-desfoque` (20 px e 180 %, já iguais) | A .72 o texto secundário fica abaixo de 4,5:1 sobre fundo escuro (medido: .74 dá 4,54; .70 dá 4,30). E vale a regra do `LIQUID-GLASS.md`: uma camada de vidro por ecrã. |
+| `--dur-fast` 150 / `--dur` 240 / `--dur-sheet` 500 | `--transition-duration-interactive` 150 / `--bo-mola-chegada` 240 / `--transition-duration-sheet` com a mola `--ease-sheet` | As durações vivem em `--transition-duration-*` (Parte −1 do `DESIGN-SYSTEM.md`). A `cubic-bezier(0.32, 0.72, 0, 1)` escrita à mão é proibida pela casa: a folha usa a mola. |
+| Molas 170/26 e 300/30 | `--ease-mola-100` e `--ease-mola-86` (as mesmas formas) | A 170/26 já foi medida e recusada: um arrasto de 200 px demorava 717 ms a assentar. |
+| `prefers-reduced-motion` → fades de 150 ms | O que já existe: cada regra tem a sua guarda (`motion-safe:`) | A casa desliga o movimento regra a regra, e há testes que o exigem. |
+
+### Componentes do §6
+
+| Componente | O que fica |
+|---|---|
+| `Button` | Já é cápsula. O secundário passa a cinzento (Fase 1). |
+| `Toolbar` 52 px | Não se faz: o logótipo fica (ver acima). |
+| `Sidebar` | Não se faz: fica a barra de baixo. |
+| `Inspector` 320 px, ⌘I | Novo, opaco (o vidro do ecrã já está no cabeçalho). Em ecrã estreito abre como folha. |
+| `GroupedList` / `GroupedRow` | Novo: `ListaAgrupada` / `LinhaAgrupada`. |
+| `Sheet` | Já existe: `FolhaOuDialogo` e `PerguntaDestrutiva`. |
+| `ContextMenu` | Já existe: `MenuDeContexto` e `MenuDeAccoes`. Separadores e teclado entram na Fase 2. |
+| `Skeleton` de cor dominante | Novo (`EsqueletoDeCor`), com a cor que o servidor já calcula para cada fotografia. |
+
+---
+
 ## 0. Como trabalhar (regras obrigatórias)
 
 1. **Entra em plan mode primeiro.** Para cada fase, mostra-me o plano (ficheiros e o que muda) antes de escrever código.
