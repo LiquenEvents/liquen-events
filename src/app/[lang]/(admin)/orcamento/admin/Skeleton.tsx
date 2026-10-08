@@ -1,5 +1,8 @@
 "use client";
 
+import { hex, lerHex } from "@/lib/cor-dominante";
+import { cn } from "./ui/cn";
+
 /**
  * Skeleton loaders for the back office. Instead of a bare spinner or "A
  * carregar…" text, these mirror the shape of the content that's about to
@@ -127,5 +130,81 @@ export function SkeletonList({ rows = 5 }: { rows?: number }) {
           conta para nada — quem lê, lê o conteúdo todo. */}
       <ADizerQueCarrega />
     </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ESQUELETO DA COR DA FOTOGRAFIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Enquanto uma fotografia não chega, o lugar dela pinta-se com a cor que ela
+ * VAI ter — a dominante, que o trabalhador das imagens já calcula ao carregar
+ * (`src/lib/cor-dominante.ts`) e que vem gravada em `ThemeImage.cor`. Uma
+ * grelha de temas a carregar passa a ser uma grelha de cores certas em vez de
+ * vinte rectângulos cinzentos iguais, e a foto que chega assenta numa mancha
+ * que já era dela. Fica pronto aqui; quem o usa são as grelhas dos Temas, na
+ * fase seguinte.
+ *
+ * Sem cor — fotos carregadas antes de a cor existir, ou um valor que não se
+ * reconhece — é o `.bo-skeleton` de sempre, com o brilho a passar.
+ *
+ * ── A COR NÃO ENTRA NO CSS SEM SER LIDA ──────────────────────────────────
+ *
+ * O valor vem da base de dados, e uma cor escrita num `style` é uma porta
+ * aberta para o CSS se não for verificada. Só passa o formato que o
+ * `cor-dominante.ts` produz — `#rrggbb`, verificado pelo `lerHex` dele — e o
+ * que chega ao `style` é REESCRITO pelo `hex` a partir dos três números, não
+ * o texto que entrou. Tudo o resto cai no cinzento.
+ *
+ * ── E SEM BRILHO ──────────────────────────────────────────────────────────
+ *
+ * Com cor, é um bloco liso e parado: o brilho a passar por cima de uma cor
+ * sólida fazia-a piscar, e o que se quer é que ela já pareça a fotografia. É
+ * também o que pede quem prefere menos movimento — e aqui nem é preciso
+ * perguntar, porque não há movimento nenhum para tirar.
+ *
+ * O raio é o do `.bo-skeleton` (`--bo-raio-conteudo`, 8 px), para as duas
+ * formas terem o mesmo canto. Quem quiser outro passa-o em `className` — com
+ * `!` no caso cinzento, porque a regra do `.bo-skeleton` está fora de camadas
+ * (é o que o `SkeletonCard` já faz com o `!rounded-full`).
+ */
+export interface EsqueletoDeCorProps {
+  /** A cor dominante da fotografia, em `#rrggbb` (`ThemeImage.cor`). */
+  cor?: string | null;
+  className?: string;
+  /** A proporção da fotografia, para o lugar já ter o tamanho certo: `"4 / 3"`, `"1.5"`. */
+  aspecto?: string;
+}
+
+/** `#rrggbb` reescrito a partir dos números, ou `null`. Nunca o texto que entrou. */
+export function corSegura(cor: string | null | undefined): string | null {
+  if (typeof cor !== "string") return null;
+  const rgb = lerHex(cor);
+  return rgb ? hex(rgb.r, rgb.g, rgb.b) : null;
+}
+
+/** Uma proporção do CSS (`4 / 3`, `1.5`) e nada mais. */
+const PROPORCAO = /^\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?$/;
+
+export function EsqueletoDeCor({ cor, className, aspecto }: EsqueletoDeCorProps) {
+  const fundo = corSegura(cor);
+  const proporcao = aspecto && PROPORCAO.test(aspecto.trim()) ? aspecto.trim() : undefined;
+  if (!fundo) {
+    return (
+      <div
+        className={cn("bo-skeleton", className)}
+        style={proporcao ? { aspectRatio: proporcao } : undefined}
+        aria-hidden
+      />
+    );
+  }
+  return (
+    <div
+      className={cn("rounded-[var(--bo-raio-conteudo)]", className)}
+      style={{ backgroundColor: fundo, ...(proporcao && { aspectRatio: proporcao }) }}
+      data-cor={fundo}
+      aria-hidden
+    />
   );
 }

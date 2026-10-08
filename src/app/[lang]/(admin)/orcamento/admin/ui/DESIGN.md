@@ -106,7 +106,7 @@ the global `:focus-visible` moss ring (so primitives don't hand-roll focus).
 
 | Component | Use it for |
 | --- | --- |
-| `Button` | Every clickable action. Variants: `primary` (moss, the affirmative action), `secondary` (outline), `ghost` (quiet/toolbar), `subtle` (soft moss tint), `danger` (destructive). Sizes `sm`/`md`/`lg`; `loading`, `disabled`, `iconLeft`/`iconRight`, `fullWidth`. |
+| `Button` | Every clickable action. Variants: `primary` (moss, the affirmative action), `secondary` (grey fill — one ink step, `--bo-tinta-8`), `ghost` (quiet/toolbar), `subtle` (soft moss tint), `danger` (destructive). Sizes `sm`/`md`/`lg`; `loading`, `disabled`, `iconLeft`/`iconRight`, `fullWidth`. |
 | `Card` | The bare rounded white surface. `padding` prop; `padding="none"` when content self-manages. |
 | `SectionCard` | A `Card` with a titled header: `eyebrow` + serif `title` + `description` + right-aligned `actions`. The default "titled panel". |
 | `Field` | Any labelled input. `as="input"\|"textarea"\|"select"`, `hint`, `error`, `required`. Wires `label/for`, `aria-describedby`, `aria-invalid` for you. |
