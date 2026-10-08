@@ -29,6 +29,7 @@ import {
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
+  soMudaramOsIds,
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -5039,10 +5040,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     (update: (prev: StudioDoc["serviceGroups"]) => StudioDoc["serviceGroups"]) => {
       // Ver `camposTocados`: o editor de serviços é o outro caminho por onde a
       // PESSOA escreve, e é onde o texto perdido foi medido primeiro.
-      camposTocados.current.add("serviceGroups");
+      //
+      // MAS SÓ QUANDO ELA ESCREVEU. O editor também passa por aqui ao montar,
+      // para dar ids às linhas que vêm sem eles — e contar isso como escrita
+      // fazia o merge do rascunho do servidor pôr de lado os Serviços que ele
+      // trazia; a gravação seguinte apagava-os do servidor. Medido: abrir a
+      // proposta noutro computador deixava os Serviços vazios (relatório da
+      // auditoria, n.º 1). `soMudaramOsIds` separa as duas coisas.
       setDoc((d) => {
         const next = update(d.serviceGroups);
-        return next === d.serviceGroups ? d : { ...d, serviceGroups: next };
+        if (next === d.serviceGroups) return d;
+        if (!soMudaramOsIds(d.serviceGroups, next)) camposTocados.current.add("serviceGroups");
+        return { ...d, serviceGroups: next };
       });
     },
     [],

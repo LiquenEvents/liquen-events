@@ -65,17 +65,24 @@ test.describe("Rascunho da proposta", () => {
         .getByLabel(/^Clientes$/i)
         .first()
         .fill(marca);
+      // E os Serviços — o achado n.º 1 da auditoria: o segundo dispositivo
+      // abria com os Clientes certos e os Serviços VAZIOS, e gravava o vazio
+      // por cima. Carimbar ids nas linhas ao abrir contava como «ela escreveu».
+      await abrirSeccao(page, "servicos");
+      await page.getByLabel("Título do grupo 1", { exact: true }).fill(`Título ${marca}`);
+      await page.getByLabel("Linha 1 do grupo 1", { exact: true }).fill(`Linha ${marca}`);
 
       // A gravação é adiada de propósito (não se grava a cada tecla).
       await expect
         .poll(
           async () => {
             const r = await page.request.get(`/api/orcamento/${quoteId}/proposta-rascunho`);
-            return (await r.json())?.draft?.doc?.clientNames ?? null;
+            const doc = (await r.json())?.draft?.doc;
+            return [doc?.clientNames ?? null, doc?.serviceGroups?.[0]?.items?.[0]?.label ?? null];
           },
           { timeout: 20_000 },
         )
-        .toBe(marca);
+        .toEqual([marca, `Linha ${marca}`]);
 
       // ── Dispositivo 2: contexto novo, sem localStorage nenhum ──
       const other: BrowserContext = await browser.newContext();
@@ -88,6 +95,18 @@ test.describe("Rascunho da proposta", () => {
         await expect(page2.getByLabel(/^Clientes$/i).first()).toHaveValue(marca, {
           timeout: 20_000,
         });
+        await abrirSeccao(page2, "servicos");
+        await expect(page2.getByLabel("Título do grupo 1", { exact: true })).toHaveValue(
+          `Título ${marca}`,
+        );
+        await expect(page2.getByLabel("Linha 1 do grupo 1", { exact: true })).toHaveValue(
+          `Linha ${marca}`,
+        );
+        // E abrir não pode ter gravado nada por cima: dá tempo à gravação
+        // adiada do segundo dispositivo e volta a perguntar ao servidor.
+        await page2.waitForTimeout(3000);
+        const r = await page2.request.get(`/api/orcamento/${quoteId}/proposta-rascunho`);
+        expect((await r.json())?.draft?.doc?.serviceGroups?.[0]?.title).toBe(`Título ${marca}`);
       } finally {
         await other.close();
       }
