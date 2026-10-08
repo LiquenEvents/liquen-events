@@ -76,8 +76,10 @@ Runs as a non-root user with a container `HEALTHCHECK` against `/api/health`.
 
 ## Operations
 
-- **Health probe:** `GET /api/health` → status, uptime, commit and which
-  integrations are configured (booleans only) — point an uptime monitor here.
+- **Health probe:** `GET /api/health` → publicly just `{"status":"ok"}`. With
+  `Authorization: Bearer <HEALTH_TOKEN>` it also probes the database (503 when
+  it is down) and reports uptime, commit and which integrations are configured
+  (booleans only) — give an uptime monitor the token.
 - **Cron:** `GET /api/cron/reminders` (daily) sends the team's summary; gated by
   `CRON_SECRET`.
 - **Node:** pinned to 22 (`.nvmrc`, `engines`).
