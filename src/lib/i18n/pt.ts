@@ -738,7 +738,7 @@ export const pt = {
     dateLocale: "pt-PT",
     greetingWarm: "Estamos felizes por fazer parte deste momento.",
     signOff: "Com carinho,",
-    signName: "Catarina & a equipa Líquen",
+    signName: "Equipa Líquen",
     saveDate: "Guardar a data no calendário",
     whileTitle: "Enquanto preparamos a sua proposta",
     whileTitlePlural: "Enquanto preparamos a vossa proposta",

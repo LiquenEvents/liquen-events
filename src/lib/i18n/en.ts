@@ -667,7 +667,7 @@ export const en: Dict = {
     dateLocale: "en-GB",
     greetingWarm: "We're so happy to be part of this moment.",
     signOff: "With love,",
-    signName: "Catarina & the Líquen team",
+    signName: "The Líquen team",
     saveDate: "Add the date to your calendar",
     whileTitle: "While we prepare your proposal",
     whileTitlePlural: "While we prepare your proposal",
