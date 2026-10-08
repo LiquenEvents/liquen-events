@@ -9,7 +9,8 @@ import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
  * da MESMA fotografia — a derivada que se pede (`coverUrl`), a oferta em AVIF
  * que o `<picture>` põe à frente dela (`coverAvif`), o original para quando a
  * derivada dá 404 (`coverFallbackUrl`) e o borrão que se pinta enquanto se
- * espera (`coverLqip`).
+ * espera (`coverLqip`) — mais a cor que pinta o lugar quando nem o borrão
+ * existe (`coverCor`).
  *
  * Trocar a capa mudava só o primeiro. O AVIF ficava da fotografia ANTIGA, e
  * como o `<source>` ganha ao `<img>` em qualquer navegador que leia AVIF, o
@@ -22,7 +23,7 @@ import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
  */
 export type CapaDoCartao = Pick<
   ThemeSummary,
-  "coverUrl" | "coverAvif" | "coverFallbackUrl" | "coverLqip"
+  "coverUrl" | "coverAvif" | "coverFallbackUrl" | "coverLqip" | "coverCor"
 >;
 
 /**
@@ -42,6 +43,7 @@ export function capaDaFoto(im: ThemeImage | null): CapaDoCartao {
     ...(url ? { coverUrl: url } : {}),
     ...(im.thumbUrl && im.url ? { coverFallbackUrl: im.url } : {}),
     ...(im.lqip ? { coverLqip: im.lqip } : {}),
+    ...(im.cor ? { coverCor: im.cor } : {}),
   };
 }
 
@@ -62,12 +64,13 @@ function semAssinatura(url: string | undefined): string {
  */
 export function comCapa<T extends ThemeSummary>(t: T, capa: CapaDoCartao): T {
   if (capa.coverUrl && semAssinatura(capa.coverUrl) === semAssinatura(t.coverUrl)) return t;
-  // Os quatro saem, e só depois entram os da fotografia nova.
+  // Os campos saem todos, e só depois entram os da fotografia nova.
   const {
     coverUrl: _url,
     coverAvif: _avif,
     coverFallbackUrl: _planoB,
     coverLqip: _lqip,
+    coverCor: _cor,
     ...resto
   } = t;
   return { ...resto, ...capa } as T;

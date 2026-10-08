@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { lqipsDeCaminhos } from "@/lib/biblioteca-fotos-store";
+import { lqipsECoresDeCaminhos } from "@/lib/biblioteca-fotos-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { listThemes, createTheme } from "@/lib/themes-store";
 import {
@@ -395,8 +395,17 @@ export async function GET(request: NextRequest) {
 
        Os `lqip` lêem-se por PASTA e a chave é o caminho REAL, sem o prefixo
        `tema:` que só existe dentro de um documento. Aqui os caminhos já são os
-       reais — vêm da listagem da pasta. */
-    const [urls, thumbs, avifs, lqips] = await comOrcamento(
+       reais — vêm da listagem da pasta.
+
+       ── E A COR, NA MESMA LEITURA ────────────────────────────────────────
+       «Nunca um cartão vazio» (T1 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`): o
+       cartão pinta o lugar da capa com a cor dominante dela enquanto a
+       fotografia não chega — e quando não chega de todo. A cor vive na mesma
+       linha do borrão, e por isso vem na mesma consulta
+       (`lqipsECoresDeCaminhos`), dentro do mesmo orçamento: estourado o
+       tempo, o cartão fica sem cor e cai no esqueleto cinzento, nunca num
+       erro. */
+    const [urls, thumbs, avifs, { lqips, cores }] = await comOrcamento(
       Promise.all([
         signThemePaths(todos),
         signThemeThumbs(todos),
@@ -404,10 +413,10 @@ export async function GET(request: NextRequest) {
         // e é isso que a torna segura: um `<source>` que dá 404 não faz o
         // navegador recuar para o `<img>`. Ver `signThemeAvif`.
         signThemeAvif(todos),
-        lqipsDeCaminhos(todos),
+        lqipsECoresDeCaminhos(todos),
       ]),
       limite - Date.now(),
-      [vazio(), vazio(), vazio(), vazio()],
+      [vazio(), vazio(), vazio(), { lqips: vazio(), cores: vazio() }],
       "assinatura das capas",
     );
     /** O melhor que existe para a capa do cartão (~128 px). */
@@ -421,6 +430,7 @@ export async function GET(request: NextRequest) {
       const coverUrl = paraCapa(capa);
       const coverFallbackUrl = capa ? urls.get(capa) : undefined;
       const coverLqip = capa ? lqips.get(capa) : undefined;
+      const coverCor = capa ? cores.get(capa) : undefined;
       // Só se oferece o AVIF do tamanho que se está a servir: um AVIF de 400 px
       // proposto ao lado de uma micro de 96 seria mandar buscar dezassete vezes
       // os pixéis, com um cabeçalho a dizer que era uma poupança.
@@ -432,6 +442,7 @@ export async function GET(request: NextRequest) {
         coverUrl,
         ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
         ...(coverLqip ? { coverLqip } : {}),
+        ...(coverCor ? { coverCor } : {}),
         ...(coverAvif ? { coverAvif } : {}),
       };
     });

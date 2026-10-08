@@ -202,6 +202,18 @@ export interface ThemeSummary extends ProposalTheme {
    *
    */
   coverAvif?: string;
+  /**
+   * A cor dominante da capa, em `#rrggbb` — a mesma `ThemeImage.cor`.
+   *
+   * É o que o cartão pinta no lugar da fotografia enquanto ela não chega, e o
+   * que fica se ela não chegar de todo (as duas fontes a dar erro): «nunca um
+   * cartão vazio» (T1). Viaja aqui pela mesma razão do borrão — está pintada
+   * no primeiro fotograma, sem ida nenhuma ao Storage.
+   *
+   * Ausente nas fotos anteriores à cor existir e quando a leitura estoura o
+   * tempo da lista; aí o lugar é o esqueleto cinzento de sempre.
+   */
+  coverCor?: string;
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */

@@ -37,7 +37,7 @@ import {
   themeIdOfPath,
 } from "./theme-ref";
 import { log } from "./logger";
-import { lqipsDeCaminhos } from "./biblioteca-fotos-store";
+import { lqipsECoresDeCaminhos } from "./biblioteca-fotos-store";
 import type { ThemeImage, ThemeImagePage } from "./theme-types";
 import { THEME_PAGE_SIZE, MAX_THEME_PAGE_SIZE } from "./theme-types";
 
@@ -1139,20 +1139,27 @@ export async function listThemeImagePage(
   // pô-la em série atrás das assinaturas somaria a latência da base de dados ao
   // caminho crítico da grelha — para servir precisamente aquilo que existe
   // para o caminho crítico ser mais curto.
-  const [urls, thumbs, lqips] = await Promise.all([
+  //
+  // A COR vem na mesma consulta do borrão (é a mesma linha): é ela que deixa
+  // a capa escolhida AQUI chegar ao cartão com a cor do lugar — ver
+  // `capa-do-cartao.ts` e `ThemeSummary.coverCor`. Não custa ida nenhuma.
+  const nenhum = { lqips: new Map<string, string>(), cores: new Map<string, string>() };
+  const [urls, thumbs, { lqips, cores }] = await Promise.all([
     signThemePaths(paths),
     paths.length > 0 ? signThemeThumbs(paths) : Promise.resolve(new Map<string, string>()),
-    paths.length > 0 ? lqipsDeCaminhos(paths) : Promise.resolve(new Map<string, string>()),
+    paths.length > 0 ? lqipsECoresDeCaminhos(paths) : Promise.resolve(nenhum),
   ]);
   const images: ThemeImage[] = paths
     .map((path) => {
       const thumbUrl = thumbs.get(path);
       const lqip = lqips.get(path);
+      const cor = cores.get(path);
       return {
         path,
         url: urls.get(path) ?? "",
         ...(thumbUrl ? { thumbUrl } : {}),
         ...(lqip ? { lqip } : {}),
+        ...(cor ? { cor } : {}),
       };
     })
     .filter((im) => im.url);
