@@ -4,7 +4,6 @@ import type { Proposal } from "@/lib/orcamento/types";
 import {
   type ProposalDoc,
   withProposalDefaults,
-  resolveProposalMoney,
   resolveValidUntil,
   MAX_PROPOSAL_DOC_BYTES,
 } from "@/lib/proposal-doc";

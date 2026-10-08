@@ -1,6 +1,6 @@
 "use client";
 
-import { corDeTexto, tintaDoRotulo } from "./status-meta";
+import { tintaDoRotulo } from "./status-meta";
 import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";

@@ -82,7 +82,6 @@ type Idioma = "pt" | "en";
 type Campo = "assunto" | "corpo";
 
 const inputCls = "bo-input px-3 py-2 text-sm text-[var(--bo-tinta-72)] placeholder-foreground/22";
-const VERDE = "#5F7C66";
 
 /** Um payload que não tem a forma certa ignora-se — nunca parte o ecrã. */
 function ehModelo(v: unknown): v is ModeloBilingue {

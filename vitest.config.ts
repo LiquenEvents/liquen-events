@@ -29,6 +29,20 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
     /**
+     * ── 20 s E NÃO OS 5 DE OMISSÃO ────────────────────────────────────────
+     *
+     * Achado n.º 38 da auditoria: com a máquina carregada, 5 de 10 911 testes
+     * falharam por TEMPO — sozinhos passavam todos. Eram dos mais pesados (o
+     * estúdio de propostas e as Timelines montam ecrãs inteiros em jsdom, com
+     * centenas de nós), e um ecrã destes demora 1–2 s numa máquina folgada e
+     * passa dos 5 quando o CI corre quatro ficheiros ao mesmo tempo.
+     *
+     * Um vermelho por tempo não mede defeito nenhum: ensina a carregar em
+     * «re-run». O tecto sobe para o que estes testes precisam com a máquina
+     * cheia; um teste que fique PENDURADO continua a falhar, só que aos 20 s.
+     */
+    testTimeout: 20_000,
+    /**
      * ── E OS AJUDANTES DO `e2e/` TAMBÉM ──────────────────────────────────
      *
      * Os PASSEIOS do Playwright são `*.spec.ts` e continuam de fora — correm

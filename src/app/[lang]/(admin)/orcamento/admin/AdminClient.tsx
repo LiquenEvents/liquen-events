@@ -97,15 +97,7 @@ import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
-import {
-  NAV,
-  CORE_NAV,
-  MORE_NAV,
-  BARRA_INFERIOR,
-  ROTULO_CURTO,
-  vistaValida,
-  type View,
-} from "./nav";
+import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, ROTULO_CURTO, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
 import { Escolha } from "./ui/Escolha";
 import {
@@ -1803,15 +1795,6 @@ export default function AdminClient({
    * que ele apanhou. Uma referência não tem nome para colidir.
    */
   const barraDeDestinosRef = useRef<HTMLElement | null>(null);
-  /**
-   * A barra lateral está fora do ecrã (gaveta), e não encostada como coluna?
-   *
-   * Abaixo de `lg` a barra é uma gaveta que vive em `-translate-x-full` quando
-   * fechada: continua no DOM, com tamanho, apenas empurrada para fora. A partir
-   * de `lg` é uma coluna sempre visível. Sem saber em qual dos dois estamos não
-   * há como marcá-la inerte só no caso certo.
-   */
-  const [navEhGaveta, setNavEhGaveta] = useState(false);
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
   /**
@@ -2755,19 +2738,6 @@ export default function AdminClient({
      que nunca chegava a correr. */
   useCamadaDeHistoria(navOpen, () => setNavOpen(false));
   useCamadaDeHistoria(!!selected, () => closeDetail());
-
-  // A barra lateral é gaveta abaixo de `lg` (1024px) — o mesmo ponto de corte
-  // do `lg:sticky` / `lg:translate-x-0` que a desenha. Mesmo guarda do efeito
-  // abaixo: sem `matchMedia` (SSR / jsdom) fica em `false`, que é o estado
-  // seguro — nunca marca inerte uma barra que possa estar visível.
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mq = window.matchMedia("(max-width: 1023px)");
-    const update = () => setNavEhGaveta(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
 
   // Track whether the detail panel is currently a modal overlay (below xl) so the
   // dialog/focus-trap behaviour is gated to that state. matchMedia may be absent

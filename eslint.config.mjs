@@ -18,6 +18,26 @@ const eslintConfig = defineConfig([
       "react-hooks/purity": "warn",
     },
   },
+  // ── O `_` À FRENTE QUER DIZER «DE PROPÓSITO» ─────────────────────────────
+  // Achado n.º 39 da auditoria: dos 66 avisos de «não usado», a maioria eram
+  // parâmetros de duplos de teste (`(_url, _init) => …`, que têm de ter a forma
+  // da função verdadeira) e campos tirados de um objecto por desestruturação
+  // (`{ id: _g, ...resto }`). O `_` à frente é a convenção para «não uso isto
+  // de propósito»; o aviso fica para o resto, que é código morto a sério.
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
   // Test files don't ship to the browser; allow pragmatic casts (e.g. fakes).
   {
     files: ["**/*.test.ts", "**/*.test.tsx"],

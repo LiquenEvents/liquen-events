@@ -889,12 +889,6 @@ export async function renderProposalDocPdfWithReport(
   const noteUndrawn: NoteUndrawn = (b64) => {
     undrawn.add(b64);
   };
-  /** Corta a `max` linhas E DIZ quantas ficaram de fora. Usar sempre isto em
-   *  vez de `.slice(0, max)`: o `.slice` é mudo, este não. */
-  const clampLines = (lines: string[], max: number, where: string): string[] => {
-    note(where, lines.length - max, "linhas");
-    return lines.slice(0, max);
-  };
 
   const pdf = await PDFDocument.create();
   // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes

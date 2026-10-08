@@ -821,3 +821,33 @@ describe("pedido sem email e sem telemóvel", () => {
     expect((await res.json()).error).toBe(getDictionary("pt").orcamento.errContacto);
   });
 });
+
+/**
+ * Achado n.º 18: dois envios simultâneos do mesmo pedido — o segundo levava
+ * «chave duplicada» ao gravar e seguia o caminho da gravação falhada, que
+ * manda o email à equipa ANTES de responder. A equipa recebia dois.
+ */
+describe("POST /api/orcamento — o gémeo que chega ao mesmo tempo", () => {
+  it("chave duplicada com o pedido já gravado é sucesso, sem email nenhum", async () => {
+    // A verificação de idempotência ainda não o vê (os dois passaram por ela
+    // ao mesmo tempo); a gravação recusa; e logo a seguir ele está lá.
+    store.get.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "LIQ-IDEM-abcdefgh12" });
+    store.create.mockRejectedValueOnce(
+      Object.assign(new Error('duplicate key value violates unique constraint "quotes_pkey"'), {
+        code: "23505",
+      }),
+    );
+    const res = await enviarTudo({ form: validForm, submissionId: "abcdefgh12" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: "LIQ-IDEM-abcdefgh12", status: "ok" });
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("uma gravação que falha a sério continua a avisar a equipa", async () => {
+    store.get.mockResolvedValue(null);
+    store.create.mockRejectedValueOnce(new Error("base em baixo"));
+    const res = await enviarTudo({ form: validForm, submissionId: "abcdefgh13" });
+    expect(res.status).toBe(200);
+    expect(sendMailMock).toHaveBeenCalled();
+  });
+});

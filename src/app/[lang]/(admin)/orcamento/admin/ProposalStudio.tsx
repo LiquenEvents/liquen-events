@@ -104,7 +104,6 @@ import {
   corrigirGralha,
   corrigirTudo,
   gralhasDoDocumento,
-  lerCampo,
   seccaoDoCampo,
   tirarSimbolos,
   type CampoDeTexto,
