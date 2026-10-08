@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SafeImage from "@/components/SafeImage";
+import SetaDeDescer from "@/components/motion/SetaDeDescer";
 import HeroImage from "@/components/HeroImage";
 import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
@@ -234,20 +235,8 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               sem captura de ponteiro. Omitida no último capítulo — nada de
               relevante fica logo abaixo antes do photo wall. */}
           {i < arr.length - 1 && (
-            <svg
-              aria-hidden
-              width="28"
-              height="18"
-              viewBox="0 0 28 22"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="scroll-chevron absolute bottom-6 left-1/2 -translate-x-1/2 z-10 text-white/70 pointer-events-none"
-            >
-              <path d="M2 5 L14 17 L26 5" />
-            </svg>
+            // Pára fora do ecrã (auditoria externa, A5) — ver SetaDeDescer.
+            <SetaDeDescer className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 text-white/70 pointer-events-none" />
           )}
         </section>
       ))}

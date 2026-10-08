@@ -3222,6 +3222,10 @@ body::before {
 .scroll-chevron {
   animation: scroll-chevron 5s ease-in-out infinite;
 }
+/* Fora do ecrã pára (auditoria externa, A5) — `SetaDeDescer`. */
+.scroll-chevron.seta-parada {
+  animation-play-state: paused;
+}
 @media (prefers-reduced-motion: reduce) {
   .scroll-chevron {
     animation: none;
