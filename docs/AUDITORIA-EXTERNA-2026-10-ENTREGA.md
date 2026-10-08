@@ -19,11 +19,11 @@ para `main`, nem migrações aplicadas.
 | C1 | feito | **A causa não era a que a auditoria supunha.** Não era 100vw nem o zoom do rato: era a entrada `zoom` do mosaico, que começa ampliado. Medido: 38 px a 1440, 34 a 1280, 27 a 1024. A grelha passa a `overflow-x-clip`. Há um passeio novo a 1440, 1280, 1024 e 390 nas quatro páginas. | `servicos/[slug]/page.tsx`, `e2e/sem-scroll-horizontal.spec.ts` |
 | A1 | feito | Em computador o flutuante sai. No telemóvel aparece depois do primeiro ecrã (já era assim) e esconde-se enquanto o aviso de cookies está no ecrã (regra CSS, sem JavaScript). | `StickyCTA.tsx`, `globals.css`, `e2e/cta-flutuante.spec.ts` |
 | C2 | feito | «Serviços de Decoração e Produção de Eventos \| Líquen Events» e «Event Decoration & Production Services \| Líquen Events». | `src/lib/i18n/pt.ts`, `en.ts` |
-| C4 | **parado — a causa é outra** | Ver «Perguntas para ti». | — |
+| C4 | feito (aprovado por ti) | A causa não era a barra de cookies nem a fonte: era o ecrã de espera, desenhado a partir do topo, quando as páginas sem fotografia de topo começam 96 px mais abaixo. Passa a ficar fixo por cima, e o rodapé espera por ele. Medido em 10 carregamentos: /casamentos/acores saltava em 8 e /casamentos/oeste em 6 (CLS 0,0667); depois, 0 saltos em 60. | `(site)/loading.tsx`, `globals.css` |
 | C5 | feito | O parágrafo é o do **aviso de cookies**, que está em todas as páginas e não só em /orcamento. Media 4,48:1 sobre a página branca; passa a `text-white`, com 5,92:1. Fica em 12,5 px porque a 14 a barra ganhava uma linha. | `ConsentBanner.tsx` |
 | C6 | feito | Com rato, os alvos passam a ≥ 24 px com padding e margem negativa igual (a técnica que a barra já usava). Capturas antes e depois **iguais ao píxel**. Ficam de fora as duas caixas de seleção de /orcamento: o rótulo à volta, que também se clica, já tem 24 px. | `Footer.tsx`, `ManageCookiesLink.tsx`, `page.tsx` (início), `OrcamentoForm.tsx`, `servicos/[slug]/page.tsx`, `e2e/alvos-de-24-com-rato.spec.ts` |
 | P2 | **parado — a causa é outra** | Ver «Perguntas para ti». | — |
-| P1 | **lista feita, à espera de ti** | Ver «Perguntas para ti». | — |
+| P1 | feito (aprovado por ti) | Os dicionários PT e EN deixam de ir para o browser, e o corpo do 404 vem a pedido. JavaScript inicial −50 KB por página (−15 KB comprimidos). O `inlineCss` foi medido outra vez e **fica** (ver abaixo). | `AvisoDeCarregamento`, `CromadoDoSitio`, `lib/i18n`, `NotFoundView`, 6 imports |
 | P3 | **parado — a causa é outra** | Ver «Perguntas para ti». | — |
 | P4 | sem mudança, medido | O próprio browser (Chromium) já pede as fotografias da grelha a **1 200 px** do ecrã, antes dos 600 pedidos. Um observador a 600 px pedia-as **mais tarde**. No Safari não verificado. | — |
 | A6 | feito | O desfoque dá lugar à fotografia em 300 ms. A fotografia nunca fica escondida à espera do JavaScript: o véu só existe depois de hidratar, e só se a foto ainda não chegou. | `SafeImage.tsx`, `tema.css` |
@@ -48,17 +48,6 @@ e `opacity`.
 
 ## Perguntas para ti (a tua regra: «se a causa for diferente, diz-me antes»)
 
-**C4 — o salto de layout.** Não é a barra de cookies nem a fonte. É o ecrã
-de «a carregar» (`(site)/loading.tsx`). Ele desenha-se a partir do topo da
-página (`-mt-24`), mas as páginas sem fotografia de topo começam 96 px mais
-abaixo: privacidade, termos, regiões e estilos. Quando a rede é lenta o
-suficiente para esse ecrã aparecer primeiro, a página salta 96 px ao chegar.
-Medido aqui em `/casamentos/acores`: CLS 0,0667 a 1440.
-
-Proposta: o ecrã de espera passa a ficar por cima da página, sem ocupar
-espaço, e assim já não a empurra. Mexe num ecrã que aparece em todas as
-navegações lentas, por isso preferi perguntar.
-
 **P2 — o Google carregado duas vezes.** O código carrega **um** `gtag/js`
 (`G-29CZZ76H6F`). O segundo pedido (`AW-…`) é a própria biblioteca da Google
 a buscar o contentor do Google Ads, quando se configura esse ID. Só se tira
@@ -73,35 +62,29 @@ que as conversões do Google Ads continuam a disparar, porque esta máquina não
 chega à Google. Ficaria por verificar no Tag Assistant depois do deploy.
 Avanço?
 
-**P1 — os componentes cliente.** Medido com o analisador do Next, na página
-inicial:
+**P1 — feito, e o `inlineCss` medido outra vez.** Pediste para avançar. Os
+pontos 1 e 2 estão feitos:
 
-| Bloco | Tamanho | O que é |
+| Página | JS inicial antes | depois |
 |---|---|---|
-| react-dom | 200 KB | o React — fixo |
-| runtime do Next | 152 KB | **é o «bloco de 156 KB» da auditoria** — fixo |
-| polyfills | 110 KB | `noModule`: os browsers modernos não o descarregam |
-| dicionários PT + EN inteiros | ~51 KB | **evitável** |
-| componentes do sítio (Navbar 10 KB, NotFoundView 4,8, SafeImage 4,4, ConsentBanner 2,5, StickyCTA 2,2, WhatsApp 1,8, …) | ~60 KB no total | os nossos |
-| galeria: GaleriaClient | 29 KB | só em /galeria |
-| orçamento: OrcamentoForm | 21 KB | só em /orcamento |
+| / | 593 KB (184 comprimido) | 543 KB (169) |
+| /galeria | 620 KB (193) | 570 KB (177) |
+| /orcamento | 610 KB (189) | 560 KB (173) |
+| /servicos/casamentos | 588 KB (182) | 538 KB (166) |
 
-Converter componentes a servidor poupa pouco: os nossos somam ~60 KB. O que
-pesa é o React e o Next. Proponho três coisas, por esta ordem:
+O ponto 3 era só voltar a medir, porque a escolha foi tua. Repeti a medição
+original («4G fraco», 1,2 Mbps e 300 ms; tempo até à primeira pintura,
+mediana de 5, a 390 px):
 
-1. O `AvisoDeCarregamento.tsx` (montado em todas as páginas) chama
-   `getDictionary`, e isso põe **os dois dicionários inteiros** no browser.
-   Ele só precisa da parte `common`, que já chega pelo `LocaleProvider`. Mais
-   sete ficheiros cliente importam de `@/lib/i18n` em vez de
-   `@/lib/i18n/config`. Poupa ~51 KB por página. Não muda nada à vista.
-2. O `NotFoundView` (4,8 KB) vai para todas as páginas e só é preciso no
-   404: passa a `next/dynamic`.
-3. O ecrã da página inicial é sobretudo o próprio HTML. Tem 474 KB, dos quais
-   ~165 KB são uma segunda cópia da folha de estilos, por causa do
-   `inlineCss: true`. Essa escolha foi tua, para tirar o ecrã em branco no
-   telemóvel, e está medida no `next.config.ts`. Desde então a folha cresceu
-   de 34 KB para ~165 KB. Vale a pena voltar a medir a troca, mas não lhe
-   mexi.
+| Página | CSS no HTML (como está) | CSS num ficheiro à parte |
+|---|---|---|
+| / | **768 ms** | 1 672 ms |
+| /galeria | **780 ms** | 1 712 ms |
+| /orcamento | **744 ms** | 1 588 ms |
+
+O HTML comprimido pesa mais 60 KB com o CSS lá dentro (85 KB contra 24 KB
+no início). Mesmo assim pinta o dobro mais depressa. A troca que fizeste
+continua certa, e não lhe mexi.
 
 **P3 — a primeira imagem da galeria.** No telemóvel, a «primeira imagem» que
 o Lighthouse mede (o LCP) é o **logótipo da barra**, e não uma fotografia.
@@ -138,15 +121,22 @@ optimistas do que os da auditoria e não incluem o custo da Google (P2).
 | | depois | 70 | 3,7 s | **608 ms** | 0 | **1 104 KB** |
 | /orcamento | antes | 83 | 3,0 s | 411 ms | 0 | 877 KB |
 | | depois | 82 | 3,1 s | **386 ms** | 0 | **849 KB** |
+| / | **depois, com C4 e P1** | **85** | 3,2 s | **274 ms** | 0 | 1 527 KB |
+| /galeria | **depois, com C4 e P1** | **82** | 3,4 s | **308 ms** | 0 | 1 124 KB |
+| /orcamento | **depois, com C4 e P1** | **87** | 3,0 s | **274 ms** | 0 | 835 KB |
 
 Lido com honestidade:
 - O TBT desce nas três páginas (−7 % a −21 %) e o peso também (−3 % a −10 %).
 - O desempenho e o LCP mexem dentro do ruído de uma corrida para a outra. As
   três corridas de cada página variaram até 6 pontos antes e depois. O LCP da
   galeria (3,4 → 3,7 s) está dentro dessa variação.
-- Os objetivos (TBT < 300 ms, LCP < 2,5 s, desempenho > 85) **não estão
-  atingidos**. O que mais pesava está nas quatro perguntas acima: P1 (os
-  dicionários e a folha de estilos duplicada), P2 (a Google) e P3/P5.
+- Com a C4 e a P1, o TBT fica **abaixo dos 300 ms** no início e no orçamento
+  (274 ms) e encosta na galeria (308 ms); o desempenho chega a 85, 82 e 87.
+  As três corridas de cada página: início 75, 85 e 86; galeria 79, 82 e 82;
+  orçamento 85, 87 e 88.
+- O **LCP continua acima dos 2,5 s** (3,0 a 3,4 s). O elemento é o logótipo
+  da barra (ver P3/P5), e a cortina, que é decisão tua (A3), atrasa-o.
+- Falta o P2 (a Google), que esta máquina não consegue medir.
 - As corridas estão guardadas (`antes_*` e `depois_*`), com o mesmo comando,
   o mesmo Chromium e o Lighthouse 13.5.0.
 
