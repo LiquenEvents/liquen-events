@@ -22,8 +22,22 @@ import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido
  */
 
 async function openStudio(page: Page, quoteId: string): Promise<void> {
+  // O estúdio vai buscar o rascunho do servidor DEPOIS de se desenhar, e o que
+  // chega por cima substitui o que está no ecrã. Escrever antes disso é
+  // escrever num documento que vai ser trocado — num servidor lento (o de
+  // desenvolvimento do CI, à primeira visita) o campo onde se ia escrever
+  // ainda nem existe. Espera-se pela leitura, não por um relógio.
+  const leuORascunho = page
+    .waitForResponse(
+      (r) =>
+        r.request().method() === "GET" &&
+        r.url().includes(`/api/orcamento/${quoteId}/proposta-rascunho`),
+      { timeout: 30_000 },
+    )
+    .catch(() => null);
   await page.goto(`/orcamento/admin/evento/${quoteId}`);
   await expect(page.getByText(/Estúdio de propostas/i).first()).toBeVisible({ timeout: 20000 });
+  await leuORascunho;
   // Esperar que o React assuma o formulário: escrever antes disso mexe no DOM
   // e não no estado, e a gravação nunca chegaria a acontecer.
   await page.waitForTimeout(1500);
@@ -48,6 +62,35 @@ async function abrirSeccao(page: Page, id: string) {
   await expect(dobra).toHaveAttribute("aria-expanded", "true");
 }
 
+/**
+ * O primeiro grupo de Serviços, com uma linha — criados se não existirem.
+ *
+ * O pedido semeado é o MESMO para todos os passeios desta suite, e os do
+ * editor (`caca/a02-editor-stress.spec.ts`) deixam lá o seu trabalho. O que se
+ * mede aqui é o rascunho a seguir para outro dispositivo, não o estado em que
+ * o passeio anterior deixou os Serviços — e foi exactamente isso que o CI
+ * mostrou: o «Título do grupo 1» não existia à primeira tentativa e existia à
+ * segunda, depois de a limpeza ter corrido. Cria-se o que faltar, com os
+ * botões que ela usaria.
+ */
+async function primeiraLinhaDosServicos(page: Page) {
+  const seccao = page.locator("#seccao-servicos");
+  const titulo = page.getByLabel("Título do grupo 1", { exact: true });
+  if ((await titulo.count()) === 0) {
+    await seccao.getByRole("button", { name: /Adicionar grupo de serviços/ }).click();
+  }
+  await expect(titulo).toBeVisible();
+  const linha = page.getByLabel("Linha 1 do grupo 1", { exact: true });
+  if ((await linha.count()) === 0) {
+    await seccao
+      .getByRole("button", { name: /Adicionar linha/ })
+      .first()
+      .click();
+  }
+  await expect(linha).toBeVisible();
+  return { titulo, linha };
+}
+
 test.describe("Rascunho da proposta", () => {
   test("segue o trabalho para outro dispositivo", async ({ page, browser }) => {
     test.setTimeout(90_000);
@@ -62,6 +105,10 @@ test.describe("Rascunho da proposta", () => {
     const quoteId = await garantirPedido(page);
     const marca = `Maria & Zé ${Date.now().toString(36)}`;
 
+    // Começar limpo: o rascunho que outro passeio tenha deixado neste pedido
+    // não é o trabalho que se está a seguir de um dispositivo para o outro.
+    await page.request.delete(`/api/orcamento/${quoteId}/proposta-rascunho`, { timeout: 10_000 });
+
     try {
       // ── Dispositivo 1: escrever ──
       await openStudio(page, quoteId);
@@ -74,8 +121,9 @@ test.describe("Rascunho da proposta", () => {
       // abria com os Clientes certos e os Serviços VAZIOS, e gravava o vazio
       // por cima. Carimbar ids nas linhas ao abrir contava como «ela escreveu».
       await abrirSeccao(page, "servicos");
-      await page.getByLabel("Título do grupo 1", { exact: true }).fill(`Título ${marca}`);
-      await page.getByLabel("Linha 1 do grupo 1", { exact: true }).fill(`Linha ${marca}`);
+      const { titulo, linha } = await primeiraLinhaDosServicos(page);
+      await titulo.fill(`Título ${marca}`);
+      await linha.fill(`Linha ${marca}`);
 
       // A gravação é adiada de propósito (não se grava a cada tecla).
       await expect
