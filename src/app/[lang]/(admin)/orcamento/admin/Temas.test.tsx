@@ -1154,6 +1154,29 @@ describe("Biblioteca de Temas — um botão sobre a fotografia", () => {
     expect(flutuantes[0].getAttribute("aria-haspopup")).toBe("menu");
   });
 
+  /**
+   * B3. «`⋯` só aparece no hover ou quando o cartão tem foco de teclado —
+   * senão é inacessível por teclado» (Parte 3). O Tab pousa primeiro no botão
+   * do CARTÃO, que é irmão do «⋯» e não pai; com `focus-within` na caixa do
+   * «⋯» e `focus-visible` no gatilho, nenhum dos dois acendia com o cartão
+   * focado. O jsdom não avalia media queries nem `:focus-within`, portanto o
+   * que se prende é o contrato das classes, inteiras (um `toContain` na cadeia
+   * apanhava «com-rato:focus-within» dentro de «group-focus-within»).
+   */
+  it("o «⋯» volta com o foco no CARTÃO, e não só com o foco nele", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    expect(grupo.className.split(/\s+/)).toContain("group");
+    const gatilho = within(grupo).getByRole("button", { name: "Acções de Terracotta" });
+    const caixa = gatilho.parentElement!;
+    for (const no of [caixa, gatilho]) {
+      const classes = no.className.split(/\s+/);
+      expect(classes).toContain("com-rato:opacity-0");
+      expect(classes).toContain("com-rato:group-focus-within:opacity-100");
+    }
+  });
+
   /** A estrela era um chip aceso sobre a fotografia; a informação não se
    *  perdeu, mudou de sítio — para o rasto de números, com nome escrito. */
   it("um tema fixado di-lo na linha dos números, e não por cima da capa", async () => {

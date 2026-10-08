@@ -2259,9 +2259,17 @@ export default function Temas() {
                      O véu acompanha o botão a aparecer e a desaparecer, com as
                      MESMAS variantes que ele usa por dentro: senão ficava um
                      círculo escuro em repouso com o glifo invisível lá dentro.
-                     `focus-within` e não `focus-visible` porque quem foca é o
-                     botão FILHO desta caixa. */
-                  className="bo-vidro-claro rounded-full opacity-100 [&>button]:text-white com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-within:opacity-100"
+
+                     `group-focus-within` e não só `focus-within`: o Tab pousa
+                     PRIMEIRO no botão do cartão, que é irmão desta caixa e não
+                     filho — e com `focus-within` o véu e o glifo ficavam a
+                     zero enquanto o cartão tinha o foco, e o «⋯» só se via
+                     quando o Tab seguinte já estava nele. «Só aparece no hover
+                     ou quando o cartão tem foco de teclado — senão é
+                     inacessível por teclado» (Parte 3). O `group` é o
+                     contentor do cartão, aqui em cima, e o foco dentro dele
+                     cobre os dois casos (cartão e o próprio «⋯»). */
+                  className="bo-vidro-claro rounded-full opacity-100 [&>button]:text-white com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
                 />
               </div>
               <button

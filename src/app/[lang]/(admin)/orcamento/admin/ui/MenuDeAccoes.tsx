@@ -33,6 +33,28 @@ import { SAIDA, useSaidaDeUmSo } from "./saida";
  * JavaScript, zero piscar, e o mesmo desenho do lado do servidor.
  */
 
+/**
+ * ── ESCONDIDO EM REPOUSO, SÓ COM RATO, E DE VOLTA COM O FOCO NA LINHA ─────
+ *
+ * Eram três maneiras de reaparecer: o rato sobre o `group` (a linha, o
+ * cartão), e o foco de teclado no PRÓPRIO botão. Faltava a do meio: o foco de
+ * teclado noutra coisa da mesma linha. Medido no cartão de tema: o Tab pousa
+ * primeiro no botão do cartão (que abre o tema) e o «⋯» continuava a zero de
+ * opacidade — quem anda de teclado não tinha como saber que havia um menu ali
+ * até o Tab seguinte cair num botão que não se via. O `docs/APPLE-TEMAS.md`
+ * (Parte 3) di-lo à letra: «`⋯` só aparece no hover OU QUANDO O CARTÃO TEM
+ * FOCO DE TECLADO — senão é inacessível por teclado».
+ *
+ * `group-focus-within` e não `group-has-[:focus-visible]`: um clique de rato
+ * num controlo da linha também revela o «⋯», e isso não é defeito — é o mesmo
+ * que o rato por cima já fazia. Todos os `group` que hoje embrulham um
+ * `MenuDeAccoes` são do tamanho de UMA linha ou de UM cartão (Tarefas,
+ * Fornecedores, TabelaOuCartoes, Temas), portanto o foco numa não acende as
+ * outras.
+ */
+const ESCONDIDO_COM_RATO =
+  "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100";
+
 export interface AccaoDeItem {
   id: string;
   rotulo: string;
@@ -150,7 +172,9 @@ export function MenuDeAccoes({
               ? "text-[var(--bo-perigo)] active:bg-[var(--bo-perigo)]/[0.12]"
               : "text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
             // O coração deste componente: só se esconde onde há mesmo rato.
-            "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
+            // E volta com o foco DENTRO da linha, não só sobre si — ver a nota
+            // `ESCONDIDO_COM_RATO`.
+            ESCONDIDO_COM_RATO,
           )}
         >
           {a.icone ?? a.rotulo.slice(0, 1)}
@@ -170,9 +194,7 @@ export function MenuDeAccoes({
               `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
               // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
               // menu deixava o menu a flutuar sem nada que o segurasse.
-              aberto
-                ? "opacity-100"
-                : "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
+              aberto ? "opacity-100" : ESCONDIDO_COM_RATO,
             )}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
