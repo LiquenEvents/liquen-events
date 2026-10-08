@@ -91,3 +91,29 @@ describe("Gralhas", () => {
     });
   });
 });
+
+/** Achado n.º 32: um emoji desaparecia do PDF sem aviso. */
+describe("Gralhas — o que não sai no PDF", () => {
+  const comEmoji = doc({
+    serviceGroups: [{ letter: "a)", title: "Decoração Floral 💐", items: [] }],
+  } as Partial<ProposalDoc>);
+
+  it("diz qual é o símbolo e onde está, mesmo sem gralhas de acentos", () => {
+    const onTirarSimbolos = vi.fn();
+    render(
+      <Gralhas
+        doc={comEmoji}
+        onCorrigir={vi.fn()}
+        onCorrigirTudo={vi.fn()}
+        onIr={vi.fn()}
+        onTirarSimbolos={onTirarSimbolos}
+        onIrAosSimbolos={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("region", { name: "Não sai no PDF" })).toBeTruthy();
+    expect(screen.queryByText("Ortografia")).toBeNull();
+    expect(screen.getByText("💐")).toBeTruthy();
+    screen.getByRole("button", { name: "Tirar" }).click();
+    expect(onTirarSimbolos).toHaveBeenCalledWith(expect.objectContaining({ simbolos: ["💐"] }));
+  });
+});

@@ -2,7 +2,12 @@
 
 import { useMemo } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
-import { gralhasDoDocumento, type Gralha } from "@/lib/proposal-ortografia";
+import {
+  gralhasDoDocumento,
+  simbolosQueNaoSaem,
+  type Gralha,
+  type SimbolosQueNaoSaem,
+} from "@/lib/proposal-ortografia";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
@@ -30,6 +35,8 @@ export default function Gralhas({
   onCorrigir,
   onCorrigirTudo,
   onIr,
+  onTirarSimbolos,
+  onIrAosSimbolos,
 }: {
   doc: ProposalDoc;
   /** Aplica UMA correcção ao documento do estúdio. */
@@ -45,75 +52,132 @@ export default function Gralhas({
    * este aviso acabar ignorado.
    */
   onIr: (g: Gralha) => void;
+  /** Tira os símbolos que não saem no PDF daquele campo (achado n.º 32). */
+  onTirarSimbolos?: (s: SimbolosQueNaoSaem) => void;
+  /** Leva ao campo onde estão os símbolos. */
+  onIrAosSimbolos?: (s: SimbolosQueNaoSaem) => void;
 }) {
   const gralhas = useMemo(() => gralhasDoDocumento(doc), [doc]);
-  if (gralhas.length === 0) return null;
+  const simbolos = useMemo(() => simbolosQueNaoSaem(doc), [doc]);
+  if (gralhas.length === 0 && simbolos.length === 0) return null;
 
   return (
     <section
-      aria-labelledby="gralhas-titulo"
+      aria-labelledby={gralhas.length > 0 ? "gralhas-titulo" : "gralhas-simbolos-titulo"}
       className="mt-5 rounded-2xl border border-[var(--bo-aviso-tom)]/40 bg-[var(--bo-aviso-tom)]/[0.05] p-4"
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3
-          id="gralhas-titulo"
-          className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
-        >
-          Ortografia
-        </h3>
-        {gralhas.length > 1 && (
-          <button
-            type="button"
-            onClick={onCorrigirTudo}
-            className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
-          >
-            Corrigir as {gralhas.length}
-          </button>
-        )}
-      </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
-        {gralhas.length === 1
-          ? "Uma palavra que sai impressa parece estar sem acento."
-          : `${gralhas.length} palavras que saem impressas parecem estar sem acento.`}{" "}
-        Nada te impede de enviar assim.
-      </p>
+      {gralhas.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h3
+              id="gralhas-titulo"
+              className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
+            >
+              Ortografia
+            </h3>
+            {gralhas.length > 1 && (
+              <button
+                type="button"
+                onClick={onCorrigirTudo}
+                className={`alvo-toque text-[11px] font-medium text-sage-600 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
+              >
+                Corrigir as {gralhas.length}
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+            {gralhas.length === 1
+              ? "Uma palavra que sai impressa parece estar sem acento."
+              : `${gralhas.length} palavras que saem impressas parecem estar sem acento.`}{" "}
+            Nada te impede de enviar assim.
+          </p>
 
-      <ul className="mt-3 flex flex-col gap-1.5">
-        {gralhas.map((g, i) => (
-          <li
-            key={`${i}-${g.escrita}`}
-            className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-relaxed"
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {gralhas.map((g, i) => (
+              <li
+                key={`${i}-${g.escrita}`}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-relaxed"
+              >
+                <span className="text-foreground/45">{g.rotulo}:</span>
+                {/* A palavra escrita e a proposta, uma ao lado da outra. Sem as
+                  duas à vista, «corrigir» é um botão que faz uma coisa que não
+                  se viu — e num campo que vai impresso isso não chega. */}
+                <span className="text-[var(--bo-tinta-72)]">
+                  <span className="line-through decoration-[var(--bo-perigo)]/60">{g.escrita}</span>
+                  <span aria-hidden="true" className="mx-1 text-foreground/30">
+                    →
+                  </span>
+                  <strong className="font-medium">{g.sugerida}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onCorrigir(g)}
+                  className={`alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                >
+                  Corrigir
+                </button>
+                {/* O caminho para quem não quer a correcção automática: ver a
+                  palavra onde ela está escrita, com a frase à volta. */}
+                <button
+                  type="button"
+                  onClick={() => onIr(g)}
+                  className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${ESTADO} ${PRESSAO}`}
+                >
+                  Ver no campo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {/* ── O QUE NÃO SAI NO PDF ───────────────────────────────────────────
+          Achado n.º 32: um emoji desaparecia do PDF sem aviso. Mesma regra
+          das gralhas: não trava o envio, diz o que vai acontecer. */}
+      {simbolos.length > 0 && (
+        <div className={gralhas.length > 0 ? "mt-4" : undefined}>
+          <h3
+            id="gralhas-simbolos-titulo"
+            className="text-[11px] font-medium tracking-[0.12em] uppercase text-[var(--bo-tinta-72)]"
           >
-            <span className="text-foreground/45">{g.rotulo}:</span>
-            {/* A palavra escrita e a proposta, uma ao lado da outra. Sem as
-                duas à vista, «corrigir» é um botão que faz uma coisa que não
-                se viu — e num campo que vai impresso isso não chega. */}
-            <span className="text-[var(--bo-tinta-72)]">
-              <span className="line-through decoration-[var(--bo-perigo)]/60">{g.escrita}</span>
-              <span aria-hidden="true" className="mx-1 text-foreground/30">
-                →
-              </span>
-              <strong className="font-medium">{g.sugerida}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => onCorrigir(g)}
-              className={`alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
-            >
-              Corrigir
-            </button>
-            {/* O caminho para quem não quer a correcção automática: ver a
-                palavra onde ela está escrita, com a frase à volta. */}
-            <button
-              type="button"
-              onClick={() => onIr(g)}
-              className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${ESTADO} ${PRESSAO}`}
-            >
-              Ver no campo
-            </button>
-          </li>
-        ))}
-      </ul>
+            Não sai no PDF
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+            {simbolos.length === 1
+              ? "Um campo tem emojis ou símbolos que a letra do PDF não tem — o cliente recebe o texto sem eles."
+              : `${simbolos.length} campos têm emojis ou símbolos que a letra do PDF não tem — o cliente recebe o texto sem eles.`}
+          </p>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {simbolos.map((s, i) => (
+              <li
+                key={`${i}-${s.rotulo}`}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-relaxed"
+              >
+                <span className="text-foreground/45">{s.rotulo}:</span>
+                <span className="text-[var(--bo-tinta-72)]">{s.simbolos.join(" ")}</span>
+                {onTirarSimbolos && (
+                  <button
+                    type="button"
+                    onClick={() => onTirarSimbolos(s)}
+                    className={`alvo-toque rounded-md border border-[var(--bo-hairline-strong)] px-2 py-0.5 text-[11px] font-medium text-[var(--bo-tinta-72)] hover:border-foreground/30 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+                  >
+                    Tirar
+                  </button>
+                )}
+                {onIrAosSimbolos && (
+                  <button
+                    type="button"
+                    onClick={() => onIrAosSimbolos(s)}
+                    className={`alvo-toque text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${ESTADO} ${PRESSAO}`}
+                  >
+                    Ver no campo
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

@@ -106,6 +106,7 @@ import {
   gralhasDoDocumento,
   lerCampo,
   seccaoDoCampo,
+  tirarSimbolos,
   type CampoDeTexto,
   type CampoPublicado,
 } from "@/lib/proposal-ortografia";
@@ -11067,6 +11068,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   toast(`«${g.escrita}» passou a «${g.sugerida}» — ${g.rotulo}.`, "info");
                 }}
                 onIr={(g) => irParaCampo(g.campo)}
+                onTirarSimbolos={(s) => {
+                  setDoc((d) => tirarSimbolos(d, s));
+                  toast(`Tirei ${s.simbolos.join(" ")} — ${s.rotulo}.`, "info");
+                }}
+                onIrAosSimbolos={(s) => irParaCampo(s.campo)}
                 onCorrigirTudo={() => {
                   const quantas = gralhasDoDocumento(doc as ProposalDoc).length;
                   setDoc((d) => corrigirTudo(d));
