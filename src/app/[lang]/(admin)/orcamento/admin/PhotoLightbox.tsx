@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeImage } from "@/lib/theme-types";
-import { Button, cn } from "./ui";
+import { cn } from "./ui";
 import { SAIDA } from "./ui/saida";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
@@ -262,14 +262,28 @@ export default function PhotoLightbox({
           {index + 1} / {images.length}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            loading={downloading}
+          {/* ── PORQUE É QUE ISTO DEIXOU DE SER O `<Button variant="secondary">` ──
+              O secundário passou a cinzento cheio, e o cinzento é um degrau de
+              tinta TRANSLÚCIDO — um degrau mais escuro do que o que está por
+              baixo. Aqui por baixo está o preto do visualizador, em claro e em
+              escuro: no claro ficava tinta preta sobre preto, e a etiqueta
+              desaparecia. O visualizador é sempre escuro, portanto o botão fala
+              a língua dele — a mesma cápsula do «×» ao lado, branca a 10%. Sem
+              o rodopio do primitivo: enquanto transfere, a etiqueta diz-o.
+
+              E é `white` e não `--bo-surface`, nos dois: o `--bo-surface` é
+              quase preto no modo escuro, e a cápsula do «×» (que o usava)
+              desaparecia lá. O preto daqui não muda com o modo; o branco que
+              assenta nele também não. */}
+          <button
+            type="button"
+            disabled={downloading}
+            aria-busy={downloading || undefined}
             onClick={() => onDownload(image, index)}
+            className={`alvo-toque inline-flex h-9 items-center justify-center rounded-full bg-white/10 px-3 text-caption font-medium text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:opacity-60 ${ESTADO} ${PRESSAO}`}
           >
-            Transferir
-          </Button>
+            {downloading ? "A transferir…" : "Transferir"}
+          </button>
           <button
             ref={closeRef}
             type="button"
@@ -278,7 +292,7 @@ export default function PhotoLightbox({
             // 36×36 medidos a 375 px. As setas ao lado já têm 44 (`h-11 w-11`)
             // e esta — a única forma de sair de um ecrã preto inteiro — tinha
             // menos. `.alvo-toque` iguala-a a elas, só ao dedo.
-            className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bo-surface)]/10 text-lg leading-none text-white hover:bg-[var(--bo-surface)]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
+            className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${ESTADO} ${PRESSAO}`}
           >
             ×
           </button>

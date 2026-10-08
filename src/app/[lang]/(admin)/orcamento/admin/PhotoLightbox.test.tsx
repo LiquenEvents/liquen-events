@@ -122,3 +122,30 @@ describe("quando o original não chega", () => {
     expect(dialogo.contains(screen.getByRole("button", { name: /tentar de novo/i }))).toBe(true);
   });
 });
+
+/**
+ * ── O «TRANSFERIR» NÃO É O SECUNDÁRIO DA CASA, E TEM DE CONTINUAR A NÃO SER ─
+ *
+ * O secundário passou a cinzento de tinta translúcida, um degrau mais escuro
+ * do que o que está por baixo. Por baixo daqui está o preto do visualizador:
+ * no modo claro a etiqueta ficava tinta preta sobre preto. O botão usa a
+ * cápsula do próprio visualizador — branca e translúcida, com texto branco.
+ */
+describe("o botão de transferir, sobre o preto", () => {
+  it("é branco sobre o preto, e não a tinta do secundário", () => {
+    montar([COM_MINIATURA]);
+    const botao = screen.getByRole("button", { name: "Transferir" });
+    expect(botao).toHaveClass("text-white", "bg-white/10");
+    expect(botao.className).not.toContain("--bo-tinta-8");
+  });
+
+  it("enquanto transfere, diz que está a transferir e não aceita outro toque", () => {
+    const onDownload = vi.fn();
+    montar([COM_MINIATURA], 0, { downloading: true, onDownload });
+    const botao = screen.getByRole("button", { name: "A transferir…" });
+    expect(botao).toBeDisabled();
+    expect(botao).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(botao);
+    expect(onDownload).not.toHaveBeenCalled();
+  });
+});

@@ -321,3 +321,45 @@ describe("o texto do back office cumpre o contraste mínimo AA", () => {
     expect(excessivos, excessivos.join("\n")).toEqual([]);
   });
 });
+
+/**
+ * ── O TEXTO DO BOTÃO SECUNDÁRIO, SOBRE O CINZENTO DELE ──────────────────────
+ *
+ * O secundário passou de contorno branco a cinzento cheio — a tinta-8, que é
+ * translúcida e se achata sobre o que estiver por baixo. Os dois sítios onde
+ * um botão assenta são o cartão (branco) e o chão do painel; a tinta achatada
+ * sobre o chão é o fundo mais escuro dos dois, e por isso o que tem de passar.
+ *
+ * Só o `--bo-text`, porque é a única tinta que o secundário escreve. (Os
+ * valores escuros vivem no `light-dark()` e ficam medidos no comentário do
+ * `ui/Button.tsx`: 9,12:1 sobre o cartão, 7,44:1 no pior caso.)
+ */
+describe("o texto do botão secundário", () => {
+  it("passa os 4,5:1 sobre o cinzento, no cartão e no chão", () => {
+    const tinta8 = token("--bo-tinta-8");
+    const chao = token("--bo-chao");
+    const texto = token("--bo-text");
+    for (const [nome, base] of [
+      ["cartão", BRANCO],
+      ["chão", achatar(chao.cor, chao.alpha, BRANCO)],
+    ] as const) {
+      const fundo = achatar(tinta8.cor, tinta8.alpha, base);
+      const racio = racioDeContraste(achatar(texto.cor, texto.alpha, fundo), fundo);
+      expect(racio, `--bo-text sobre o secundário, no ${nome}: ${racio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+        AA_TEXTO_NORMAL,
+      );
+    }
+  });
+
+  it("e o cinzento vê-se no chão — não é o `--bo-surface-sunken`, que lá mede 1,01:1", () => {
+    const tinta8 = token("--bo-tinta-8");
+    const chao = token("--bo-chao");
+    const base = achatar(chao.cor, chao.alpha, BRANCO);
+    const fundo = achatar(tinta8.cor, tinta8.alpha, base);
+    // Não é contraste de texto: é a distância entre o botão e o que está por
+    // baixo. O piso de 1,15 é escolhido aqui, não vem de norma nenhuma: o
+    // cartão branco sobre o chão mede 1,07 e é o degrau que esta casa já dá
+    // por visível; o botão tem de ficar claramente acima dele.
+    expect(racioDeContraste(fundo, base)).toBeGreaterThanOrEqual(1.15);
+  });
+});

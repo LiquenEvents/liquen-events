@@ -12,8 +12,8 @@ import { ESTADO, PRESSAO } from "./movimento";
  *
  * Design notes
  * - Colours come from the existing tokens only — no new palette. `primary` fills
- *   with moss-dark `#4c6752` (≈6:1 on white → WCAG AA); `secondary` is a hairline
- *   outline; `ghost` is quiet until hover; `subtle` is the soft moss tint used for
+ *   with moss-dark `#4c6752` (≈6:1 on white → WCAG AA); `secondary` is a grey
+ *   fill (one ink step, `--bo-tinta-8`); `ghost` is quiet until hover; `subtle` is the soft moss tint used for
  *   in-context actions; `danger` is a dark red that also passes AA on white.
  * - Focus ring is inherited from the global `:focus-visible` rule in globals.css
  *   (a 2px surface gap + moss halo); we only round the corners so it hugs them.
@@ -107,22 +107,43 @@ const BASE =
 const VARIANTS: Record<ButtonVariant, string> = {
   // Moss-dark solid — the affirmative primary action.
   primary: "bg-sage-600 text-white hover:bg-[var(--bo-accent-hover)]",
-  // Outline on white — secondary emphasis.
+  // ── O SECUNDÁRIO É CINZENTO CHEIO, E NÃO CONTORNO ────────────────────────
   //
-  // Era `border-[var(--bo-hairline-strong)]` com `text-[var(--bo-text)]`, e lia-se como
-  // DESACTIVADO: o estado desactivado é este mesmo desenho com `opacity-45`
-  // por cima, e a diferença entre os dois era pequena de mais para se notar.
-  // Na entrada isso é grave — «Entrar com palavra-passe» é o caminho de quem
-  // ainda não tem passkey, e parecia fora de serviço.
+  // Pedido do `docs/PROPOSTAS-E-TEMAS-APPLE.md` §6: «primário verde,
+  // secundário cinza». Era um contorno branco (`bg-[var(--bo-surface)]` com
+  // `border-foreground/28`); passa a preenchimento, sem borda.
   //
-  // O contorno passa a 28% e o texto a 90% (que dá 12,6:1 sobre branco, contra
-  // os 10,2:1 de antes). Continua a ser claramente secundário ao lado do verde
-  // cheio do passkey — o que muda é ler-se como disponível.
+  // ── PORQUE É QUE O CINZENTO É UM DEGRAU DA TINTA E NÃO O `--bo-surface-sunken` ─
+  //
+  // O plano pedia o `--bo-surface-sunken`, e no claro ele é #f7f7f8 — contra o
+  // chão do painel (#f7f8f7) mede 1,01:1. Um botão da cor do chão onde assenta
+  // não se vê. No escuro é o MESMO valor do `--bo-elevado` (#1e241e), e
+  // desaparecia dentro de qualquer diálogo.
+  //
+  // A tinta-8 é translúcida: é sempre um degrau mais escura do que o que está
+  // por baixo, seja o cartão, o chão, o diálogo ou o vidro (o `systemFill` da
+  // Apple faz o mesmo). Medido, com as contas do `contraste-do-texto.test.ts`:
+  //
+  //                         fundo do botão    texto (--bo-text) sobre ele
+  //   claro, sobre cartão       1,19:1             10,34:1
+  //   claro, sobre o chão       1,18:1              9,90:1
+  //   escuro, sobre cartão      1,24:1              9,12:1
+  //   escuro, sobre o chão      1,21:1              9,88:1
+  //   escuro, sobre elevado-2   1,26:1              7,44:1
+  //
+  // ── E CONTINUA A NÃO PARECER DESACTIVADO ─────────────────────────────────
+  //
+  // Foi o defeito do contorno a 13%: o desactivado é o mesmo desenho com
+  // `opacity-45` por cima. Aqui o texto do desactivado desce para 2,3:1 no
+  // claro e 2,8–3,1:1 no escuro, contra ≥ 7,4:1 do activo — a etiqueta é que
+  // diz «posso» ou «não posso», e a diferença é de mais de duas vezes e meia.
+  //
+  // O passar do rato e o carregar descem um degrau de tinta cada (8 → 10 → 13);
+  // a tinta-6 fica para o `ghost`, que é o hover dele — assim um fantasma
+  // debaixo do rato nunca se confunde com um secundário em repouso.
   secondary:
-    "bg-[var(--bo-surface)] text-[var(--bo-text)] border border-foreground/28 hover:border-foreground/45 hover:bg-[var(--bo-tinta-3)] hover:text-foreground " +
-    // A pressão aprofunda a MESMA tinta do hover (0,03 → 0,07). Sem cor nova:
-    // é o passo de opacidade que o `DESIGN.md` já usa para hierarquia.
-    "active:bg-[var(--bo-tinta-6)]",
+    "bg-[var(--bo-tinta-8)] text-[var(--bo-text)] hover:bg-[var(--bo-tinta-10)] hover:text-foreground " +
+    "active:bg-[var(--bo-tinta-13)]",
   // Quiet until hovered — for toolbars and low-emphasis rows.
   ghost:
     "bg-transparent text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] " +
