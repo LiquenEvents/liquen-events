@@ -323,7 +323,7 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
           pool={mosaicPool}
           alt={t.common.imageAlt.clientesCorporate}
           className="grid grid-cols-2 md:grid-cols-12 gap-0 auto-rows-[150px] md:auto-rows-auto md:grid-rows-[210px_210px_230px]"
-          imgClassName="transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]"
+          imgClassName="transition-transform duration-foto-zoom group-hover:scale-[1.03]"
         />
       </section>
 

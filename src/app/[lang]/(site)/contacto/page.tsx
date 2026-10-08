@@ -344,7 +344,7 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   fill
                   sizes="33vw"
                   quality={75}
-                  className="object-cover transition-transform duration-[1.1s] ease-out group-hover:scale-105"
+                  className="object-cover transition-transform duration-foto-zoom group-hover:scale-[1.03]"
                 />
                 <div className="absolute inset-0 bg-black/25 group-hover:bg-black/10 transition-colors duration-500" />
               </div>

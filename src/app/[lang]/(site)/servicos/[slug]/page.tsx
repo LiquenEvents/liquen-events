@@ -388,7 +388,7 @@ export default async function ServiceDetailPage({
                   fill
                   sizes={`(max-width: 1024px) 50vw, ${dvw}`}
                   quality={75}
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="object-cover transition-transform duration-foto-zoom group-hover:scale-[1.03]"
                 />
               </div>
             );
@@ -467,7 +467,7 @@ export default async function ServiceDetailPage({
                     fill
                     sizes="(max-width: 639px) 100vw, (max-width: 1280px) 50vw, 576px"
                     quality={75}
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="object-cover transition-transform duration-foto-zoom group-hover:scale-[1.03]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/90 via-[#080808]/20 to-transparent" />
                   <div className="absolute bottom-0 p-6">

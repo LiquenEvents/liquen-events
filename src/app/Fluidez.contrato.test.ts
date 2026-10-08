@@ -428,7 +428,9 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
       ".link-line::after",
       ".lift",
       ".field-line",
-      ".group-hover\\:scale-\\[1\\.06\\]",
+      // Era o 1.06; desde a auditoria externa (A4) o zoom das fotografias do
+      // sítio é um só, 1.03.
+      ".group-hover\\:scale-\\[1\\.03\\]",
       ":focus-visible",
     ]) {
       expect(dentroDeReduce, `${seletor} sem guarda de movimento reduzido`).toContain(seletor);
@@ -456,7 +458,9 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
       for (const m of fonte.matchAll(/group-hover:scale-(\[[^\]]+\]|\d+)/g)) usados.add(m[0]);
     }
     // Não passa por vacuidade: se o extractor deixar de ver nada, isto avisa.
-    expect(usados.size, "o varredor deixou de encontrar zooms de hover").toBeGreaterThan(2);
+    // (Eram mais de dois números; desde a auditoria externa, A4, as fotografias
+    // do sítio usam todas o 1.03, e sobra o 1.02 da proposta.)
+    expect(usados.size, "o varredor deixou de encontrar zooms de hover").toBeGreaterThan(0);
 
     const dentroDeReduce = blocosDe(
       css,

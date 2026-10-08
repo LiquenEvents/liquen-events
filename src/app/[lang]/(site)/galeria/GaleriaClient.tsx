@@ -260,8 +260,10 @@ function FocusRing() {
 // ocorrências (masonry, herói 2x2, satélites) escapavam ao bloco reduced-motion
 // do globals.css e continuavam a animar 900ms (medido: transitionDuration 0.9s
 // com reducedMotion "reduce").
-const ZOOM_CLASS =
-  "transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]";
+//
+// 400 ms e 1.03 (auditoria externa, A4) — o mesmo zoom de todas as fotografias
+// do sítio; a curva é a omissão da casa (cubic-bezier(0.16, 1, 0.3, 1)).
+const ZOOM_CLASS = "transition-transform duration-foto-zoom group-hover:scale-[1.03]";
 
 // Hover overlay — reused in hero cells and masonry cells.
 // `aria-hidden`: é decoração visual que repete o que o botão já diz. Sem isto o

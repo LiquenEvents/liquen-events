@@ -5339,10 +5339,10 @@ body:has(.barra-consentimento) footer {
      existia. Ninguém reparou porque, com movimento normal, todos parecem bem.
      Há teste a enumerar os que estão mesmo no código e a exigi-los aqui: um
      zoom novo com um número novo põe o `Fluidez.contrato` vermelho. */
-  .group-hover\:scale-\[1\.06\],
-  .group-hover\:scale-\[1\.04\],
-  .group-hover\:scale-\[1\.02\],
-  .group-hover\:scale-105 {
+  /* Desde a auditoria externa (A4) as fotografias do sítio usam todas o mesmo
+     zoom, 1.03 em 400 ms; o 1.02 é o da inspiração da proposta. */
+  .group-hover\:scale-\[1\.03\],
+  .group-hover\:scale-\[1\.02\] {
     scale: none;
     transition: none;
   }

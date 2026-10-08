@@ -728,7 +728,7 @@ export default function ConfirmacaoClient({
                       quality={70}
                       placeholder="blur"
                       blurDataURL={c.blur}
-                      className="object-cover transition-transform duration-700 ease-expo group-hover:scale-[1.04]"
+                      className="object-cover transition-transform duration-foto-zoom group-hover:scale-[1.03]"
                     />
                     <span
                       aria-hidden
