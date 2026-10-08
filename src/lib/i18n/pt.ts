@@ -132,7 +132,7 @@ export const pt = {
     sobreTitle: "Empresa de Decoração e Coordenação de Eventos",
     sobreDescription:
       "Líquen Events, empresa de decoração e coordenação de eventos. Mais de 100 casamentos e celebrações decorados desde 2018.",
-    servicosTitle: "Decoração de Casamentos e Eventos",
+    servicosTitle: "Serviços de Decoração e Produção de Eventos",
     servicosDescription:
       "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas.",
     galeriaTitle: "Galeria de Casamentos e Eventos",

@@ -132,7 +132,7 @@ export const en: Dict = {
     sobreTitle: "Event Decoration & Coordination Company",
     sobreDescription:
       "Líquen Events, an event decoration and coordination company. Over 100 weddings and celebrations decorated since 2018.",
-    servicosTitle: "Wedding & Event Decoration",
+    servicosTitle: "Event Decoration & Production Services",
     servicosDescription:
       "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties.",
     galeriaTitle: "Wedding & Event Gallery",
