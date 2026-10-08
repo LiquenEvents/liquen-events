@@ -69,6 +69,11 @@ export type { Largura, Capacidade, Adaptativo } from "./adaptativo";
 export { FolhaOuDialogo } from "./FolhaOuDialogo";
 export type { FolhaOuDialogoProps } from "./FolhaOuDialogo";
 
+// O inspector: coluna de 320 px à direita a partir de `lg`, folha abaixo
+// disso, ⌘I para abrir e fechar. Opaco — o vidro do ecrã é do cabeçalho.
+export { Inspector } from "./Inspector";
+export type { InspectorProps } from "./Inspector";
+
 export { TabelaOuCartoes } from "./TabelaOuCartoes";
 export type { TabelaOuCartoesProps, Coluna } from "./TabelaOuCartoes";
 
