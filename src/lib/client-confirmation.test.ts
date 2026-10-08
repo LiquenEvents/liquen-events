@@ -3,25 +3,24 @@ import { buildClientConfirmation } from "./client-confirmation";
 
 describe("buildClientConfirmation", () => {
   /**
-   * ── A REFERÊNCIA DEIXOU DE IR NO EMAIL ────────────────────────────────
+   * ── A REFERÊNCIA VOLTOU AO EMAIL ──────────────────────────────────────
    *
-   * Este caso guardava o contrário («with the reference in the body»). A regra
-   * mudou por decisão dela, com o desenho novo: a referência do pedido NÃO
-   * aparece ao cliente — nem no corpo, nem no texto, nem no pré-cabeçalho, nem
-   * na mensagem do WhatsApp. É interna; o cliente não precisa dela.
+   * O desenho anterior escondia-a, por decisão dela. A carta que ela mandou
+   * depois («é assim que quero que o cliente receba a mensagem») mostra-a na
+   * última linha do resumo — é essa a regra agora. Vai no corpo e no texto;
+   * no assunto e no pré-cabeçalho continua a não ir.
    */
-  it("builds a Portuguese quote confirmation WITHOUT the reference anywhere", () => {
+  it("builds a Portuguese quote confirmation as her letter, with the reference in the summary", () => {
     const { subject, html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
       referenceId: "LIQ-ABC-1234",
     });
-    expect(subject).toBe("Recebemos o seu pedido.");
-    expect(html).toContain("Olá Ana.");
-    for (const parte of [subject, html, text]) {
-      expect(parte).not.toContain("LIQ-ABC-1234");
-      expect(parte).not.toMatch(/ref\./i);
-    }
+    expect(subject).toBe("Pedido de Proposta");
+    expect(html).toContain(">Estimada Ana,</p>");
+    expect(html).toContain('word-break:break-all;">LIQ-ABC-1234</td>');
+    expect(text).toContain("Referência: LIQ-ABC-1234");
+    expect(subject).not.toContain("LIQ-");
   });
 
   it("states no turnaround at all — not a date, not a window", () => {
@@ -39,7 +38,7 @@ describe("buildClientConfirmation", () => {
     expect(text).not.toMatch(timing);
   });
 
-  it("mirrors the event back in the «O seu pedido.» card", () => {
+  it("mirrors the event back in the summary table", () => {
     const { html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
@@ -50,32 +49,40 @@ describe("buildClientConfirmation", () => {
         guests: 120,
         location: "Évora",
         space: "Exterior",
+        ceremony: "Civil",
         plural: true,
       },
     });
-    expect(html).toContain(">Casamento</td>");
+    expect(html).toContain(">Casamento, 23 de fevereiro de 2027</p>");
     expect(html).toContain(">23 de fevereiro de 2027</td>");
-    expect(html).toContain(">Cerca de 120</td>");
+    expect(html).toContain(">120 (previsão)</td>");
     expect(html).toContain(">Évora</td>");
     expect(html).toContain(">Exterior</td>");
-    expect(text).toContain("Evento: Casamento");
+    expect(html).toContain(">Civil</td>");
+    expect(text).toContain("Data: 23 de fevereiro de 2027");
   });
 
   /**
-   * O registo plural («o vosso pedido») para casais saiu, por decisão dela:
-   * o desenho novo fala com toda a gente no singular. Fica guardado para não
-   * voltar por um caminho antigo.
+   * O registo é o da carta dela, à letra — «o seu contacto», «o vosso dia» —
+   * e o tipo entra na frase pelo TIPO, não pela etiqueta.
    */
-  it("speaks in the singular to everyone, couples included", () => {
+  it("puts the event type in the sentence by its noun", () => {
     const { html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
       referenceId: "LIQ-ABC-1234",
-      event: { typeLabel: "Casamento", date: "2027-02-23", plural: true },
+      event: {
+        typeLabel: "Casamento",
+        eventType: "casamentos",
+        date: "2027-02-23",
+        location: "Quinta do Vale",
+        plural: true,
+      },
     });
-    expect(html).toContain("o seu pedido");
-    expect(html).not.toContain("vosso");
-    expect(text).not.toContain("vosso");
+    expect(html).toContain(
+      "organização do vosso casamento, previsto para o dia 23 de fevereiro de 2027, na Quinta do Vale.",
+    );
+    expect(text).toContain("Agradecemos o seu contacto");
   });
 
   it("an open date says «Ainda a definir», as the form does", () => {
@@ -95,7 +102,7 @@ describe("buildClientConfirmation", () => {
       referenceId: "LIQ-ABC-1234",
       event: { typeLabel: "Casamento", guestsRange: "100 a 150" },
     });
-    expect(html).toContain(">100 a 150</td>");
+    expect(html).toContain(">100 a 150 (previsão)</td>");
   });
 
   it("every image in the email travels with it as an attachment", () => {
@@ -204,18 +211,15 @@ describe("buildClientConfirmation — assinatura da casa", () => {
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * O TIPO DE EVENTO SÓ APARECE COMO ETIQUETA
+ * A ETIQUETA NO TÍTULO, O SUBSTANTIVO NA FRASE
  * ══════════════════════════════════════════════════════════════════════════
  *
- * Aqui estavam seis casos sobre a FRASE de abertura do email anterior («É um
- * gosto receber o vosso pedido para…»), que colava o tipo, a data e o local
- * numa frase e errou de três maneiras em correio verdadeiro («para o
- * casamentos», «para o outro», a vírgula pendurada sem data).
- *
- * O desenho novo não tem essa frase: o tipo, a data e o local vivem cada um na
- * sua linha do cartão «O seu pedido.», que é uma construção que nunca precisa
- * de artigo nem de vírgula. Os casos que sobram guardam o que continua a poder
- * correr mal.
+ * Uma frase de abertura antiga colava o RÓTULO do tipo numa frase e errou de
+ * três maneiras em correio verdadeiro («para o casamentos», «para o outro», a
+ * vírgula pendurada sem data). A carta dela volta a ter o tipo numa frase
+ * («a organização do vosso casamento»), e por isso a frase usa o TIPO (que tem
+ * substantivo e género próprios) e nunca a etiqueta — que fica no assunto e no
+ * título, onde é etiqueta.
  */
 describe("buildClientConfirmation — o tipo de evento é uma etiqueta", () => {
   const base = { locale: "pt", name: "Ana", referenceId: "LIQ-ABC-1234" } as const;
@@ -223,11 +227,24 @@ describe("buildClientConfirmation — o tipo de evento é uma etiqueta", () => {
   it("um rótulo de lista entra tal como é, e nunca a meio de uma frase", () => {
     const { html, text } = buildClientConfirmation({
       ...base,
-      event: { typeLabel: "Batizado / Comunhão", date: "2027-05-03", plural: true },
+      event: {
+        typeLabel: "Batizado / Comunhão",
+        eventType: "batizados",
+        date: "2027-05-03",
+        plural: true,
+      },
     });
-    expect(html).toContain(">Batizado / Comunhão</td>");
-    expect(text).toContain("Evento: Batizado / Comunhão");
-    expect(text.toLowerCase()).not.toContain("para o batizado");
+    expect(html).toContain(">Batizado / Comunhão, 3 de maio de 2027</p>");
+    expect(html).toContain("do vosso batizado, previsto para o dia 3 de maio de 2027.");
+    expect(text.toLowerCase()).not.toContain("vosso batizado / comunhão");
+
+    // Sem tipo (o «Outro» do formulário): «evento», nunca a etiqueta.
+    const outro = buildClientConfirmation({
+      ...base,
+      event: { typeLabel: "Outro", date: "2027-05-03" },
+    });
+    expect(outro.html).toContain("do vosso evento, previsto para o dia 3 de maio de 2027.");
+    expect(outro.html.toLowerCase()).not.toContain("vosso outro");
   });
 
   it("o email inglês diz tudo em inglês, incluindo o tipo na etiqueta", () => {
@@ -238,8 +255,8 @@ describe("buildClientConfirmation — o tipo de evento é uma etiqueta", () => {
       // A etiqueta chega já na língua de quem lê — é a rota que a resolve.
       event: { typeLabel: "Wedding", date: "2027-06-12", location: "Évora", plural: true },
     });
-    expect(subject).toBe("We've received your request.");
-    expect(text).toContain("Event: Wedding");
+    expect(subject).toBe("Proposal Request – Wedding | 12 June 2027");
+    expect(text).toContain("Date: 12 June 2027");
     expect(html).toContain(">12 June 2027</td>");
     expect(text.toLowerCase()).not.toContain("casamento");
     expect(html.toLowerCase()).not.toContain("casamento");

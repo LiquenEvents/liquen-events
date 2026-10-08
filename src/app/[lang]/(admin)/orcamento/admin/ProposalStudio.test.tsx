@@ -1632,12 +1632,19 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
     const gerar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
-    // Os dois cliques no MESMO instante, como um duplo clique — com `fireEvent`,
-    // que é síncrono. Com `await user.click` + `findByRole` pelo meio, o CI
-    // lento deixava passar mais de 400 ms entre os dois, e aí o «Confirmar»
-    // aceitava, e bem: já não era um duplo clique.
-    fireEvent.click(gerar);
-    fireEvent.click(screen.getByRole("button", { name: /^Confirmar$/ }));
+    // Os dois cliques no MESMO instante, como um duplo clique. O relógio fica
+    // parado entre os dois: o estúdio redesenha-se por inteiro depois do
+    // primeiro, e numa máquina carregada isso chegou a passar dos 400 ms — e aí
+    // o «Confirmar» aceitava, e bem, porque já não era um duplo clique. Falhava
+    // de vez em quando também no `main`; o que se mede é a regra, não a
+    // velocidade da máquina.
+    const relogio = vi.spyOn(performance, "now").mockReturnValue(1_000);
+    try {
+      fireEvent.click(gerar);
+      fireEvent.click(screen.getByRole("button", { name: /^Confirmar$/ }));
+    } finally {
+      relogio.mockRestore();
+    }
     expect(corpos("proposta-doc", "POST")).toHaveLength(0);
     // Depois de a ler, confirma.
     await confirmarEnvio(user);
