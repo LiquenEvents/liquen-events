@@ -332,7 +332,7 @@ export default async function ServicosPage({ params }: { params: Promise<{ lang:
               >
                 {ts.seoTitle}
               </h2>
-              <p className="text-cream/75 text-sm lg:text-base leading-[1.8] max-w-xl">
+              <p className="text-cream/75 text-sm lg:text-base leading-[1.8] max-w-xl text-justify">
                 {ts.seoText}
               </p>
             </AnimateIn>
