@@ -51,6 +51,11 @@ async function abrirSeccao(page: Page, id: string) {
 test.describe("Rascunho da proposta", () => {
   test("segue o trabalho para outro dispositivo", async ({ page, browser }) => {
     test.setTimeout(90_000);
+    // Cada gesto com tecto próprio. Sem isto, um campo que não aparece espera
+    // até ao fim dos 90 s e quem leva a culpa é a limpeza do `finally` — foi o
+    // que o CI mostrou: «apiRequestContext.delete: Test timeout», e nem uma
+    // palavra sobre o passo que de facto ficou parado.
+    page.setDefaultTimeout(20_000);
 
     exigirLogin(await entrarNoBackOffice(page));
 
@@ -88,6 +93,7 @@ test.describe("Rascunho da proposta", () => {
       const other: BrowserContext = await browser.newContext();
       try {
         const page2 = await other.newPage();
+        page2.setDefaultTimeout(20_000);
         const loggedIn2 = await entrarNoBackOffice(page2);
         expect(loggedIn2, "o segundo dispositivo também entra").toBe(true);
         await openStudio(page2, quoteId);
@@ -111,8 +117,13 @@ test.describe("Rascunho da proposta", () => {
         await other.close();
       }
     } finally {
-      // Não deixar o rascunho de teste em cima do trabalho de ninguém.
-      await page.request.delete(`/api/orcamento/${quoteId}/proposta-rascunho`);
+      // Não deixar o rascunho de teste em cima do trabalho de ninguém. Com
+      // tecto e sem lançar: uma limpeza que falha não pode tapar o erro do
+      // passo que falhou antes dela — em JavaScript, o que o `finally` lança
+      // substitui o que vinha de trás.
+      await page.request
+        .delete(`/api/orcamento/${quoteId}/proposta-rascunho`, { timeout: 10_000 })
+        .catch((e) => console.warn("limpeza do rascunho de teste falhou:", String(e)));
     }
   });
 });
