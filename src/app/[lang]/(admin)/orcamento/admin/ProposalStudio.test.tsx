@@ -5250,10 +5250,11 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await irParaPrever(user);
 
-    // A versão de uma linha, que é a única que o telemóvel mostra.
+    // A versão de uma linha, que é a única à vista — em qualquer ecrã desde
+    // que ela pediu as barras «muito mais finas».
     expect(screen.getByText("Em inglês muda a moldura do documento.")).toBeTruthy();
-    // E a longa continua lá para o ecrã largo, mas atrás do corte de largura.
-    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("hidden");
+    // A longa continua lá para quem ouve o ecrã, mas não ocupa a barra.
+    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("sr-only");
   });
 
   it("escolhido o inglês, a explicação abre inteira em qualquer ecrã", async () => {

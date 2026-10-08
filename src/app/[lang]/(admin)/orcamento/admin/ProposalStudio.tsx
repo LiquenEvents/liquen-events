@@ -11383,7 +11383,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            do bordo do ecrã. Não é um número afinado a olho — é o token do ar
            desta casa, aplicado ao vão entre duas peças em vez de ao vão entre
            uma peça e a moldura. Ficam 14 px, e lêem-se como duas. */
-        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-2 px-3 py-2.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit sm:py-3"
+        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-1.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit"
       >
         {step === "conteudo" && (
           <>
@@ -11645,6 +11645,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 certeza sem esperar pelos 800 ms. */}
               {soNesteComputador && (
                 <Button
+                  size="sm"
                   variant="secondary"
                   onClick={guardarAgora}
                   loading={aGuardarAgora}
@@ -11654,6 +11655,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </Button>
               )}
               <Button
+                size="sm"
                 variant="primary"
                 onClick={() => setStep("prever")}
                 iconRight={<span aria-hidden="true">→</span>}
@@ -11666,7 +11668,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
         {step === "prever" && (
           <>
-            <Button variant="ghost" onClick={() => setStep("conteudo")}>
+            <Button size="sm" variant="ghost" onClick={() => setStep("conteudo")}>
               ← Conteúdo
             </Button>
             {/* ══════════════════════════════════════════════════════════════
@@ -11743,7 +11745,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
                 />
               ) : (
-                <Button variant="secondary" onClick={preview} disabled={busy !== null}>
+                <Button size="sm" variant="secondary" onClick={preview} disabled={busy !== null}>
                   Descarregar PDF
                 </Button>
               )}
@@ -11786,7 +11788,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                   Em ecrã largo abre sempre: lá a barra tem espaço, e a única
                   razão para o encurtar era a que não existe. */}
-              <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
+              {/* ── E AGORA UMA LINHA SÓ, EM QUALQUER ECRÃ ─────────────────
+                  Palavras dela, com a captura desta barra e da do passo 3:
+                  «coloca estas barras muito mais finas de modo a não estarem
+                  a atrapalhar o trabalho de por trás». No ecrã largo o texto
+                  inteiro ocupava uma linha só para ele, e a barra tinha três
+                  andares (voltar · idioma e PDF · ressalva · «Rever e
+                  enviar»).
+
+                  Com «Português» fica a frase curta, À VISTA e na mesma fila
+                  dos controlos — continua dito, antes do clique, que o inglês
+                  muda o documento. O texto inteiro fica para o leitor de ecrã
+                  (`sr-only`) e abre à vista quando se escolhe «Inglês», que é
+                  quando passa a ser a consequência do que ela fez. */}
+              <p
+                className={
+                  idiomaDoPdf === "en"
+                    ? "w-full text-right text-[11px] leading-snug text-foreground/50"
+                    : "order-first text-[11px] leading-snug text-foreground/50"
+                }
+              >
                 {idiomaDoPdf === "en" ? (
                   <>
                     Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
@@ -11796,8 +11817,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   </>
                 ) : (
                   <>
-                    <span className="sm:hidden">Em inglês muda a moldura do documento.</span>
-                    <span className="hidden sm:inline">
+                    <span aria-hidden="true">Em inglês muda a moldura do documento.</span>
+                    <span className="sr-only">
                       Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
                       data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
                       «EN»; o que ficar em branco sai em português. Os valores continuam à
@@ -11853,6 +11874,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 })()}
             </div>
             <Button
+              size="sm"
               variant="primary"
               onClick={() => setStep("enviar")}
               iconRight={<span aria-hidden="true">→</span>}
@@ -11865,6 +11887,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         {step === "enviar" && !sent && (
           <>
             <Button
+              size="sm"
               variant="ghost"
               onClick={() => setStep("prever")}
               // A meio de um envio, voltar atrás não cancela nada — o pedido já
@@ -11910,6 +11933,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button
+                    size="sm"
                     variant="primary"
                     onClick={() => void send(true)}
                     disabled={busy !== null}
@@ -11917,6 +11941,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     Enviar assim mesmo
                   </Button>
                   <Button
+                    size="sm"
                     variant="ghost"
                     onClick={() => {
                       setCortesPorConfirmar(null);
@@ -11965,10 +11990,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   a pagar.
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setConfirmSend(false)}>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmSend(false)}>
                     Cancelar
                   </Button>
                   <Button
+                    size="sm"
                     variant="primary"
                     onClick={() => {
                       // Achado n.º 3: o «Confirmar» aparece onde estava a ponta
@@ -11996,7 +12022,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  coisa.» A razão já existia — vivia no `title`, que num iPhone
                  não aparece. Passa a estar escrita ao lado do botão, com cada
                  falta a saltar para onde se resolve. */
-              <div className="ml-auto flex flex-col items-end gap-2">
+              /* «Vai para …» AO LADO do botão e não por cima: eram dois
+                 andares para uma frase de uma linha («barras muito mais
+                 finas»). Quando há faltas, a caixa que as explica quebra para
+                 cima sozinha (`flex-wrap`) — aí a altura é a mensagem. */
+              <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
                 <PorqueNaoDaParaEnviar
                   faltas={faltas}
                   fotosPorConfirmar={fotosPorConfirmar}
@@ -12004,6 +12034,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   onIr={(f) => irParaAFalta(f.seccao, f.campo)}
                 />
                 <Button
+                  size="sm"
                   variant="primary"
                   onClick={() => {
                     perguntaDoEnvioDesde.current = performance.now();
@@ -12041,7 +12072,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         )}
 
         {step === "enviar" && sent && (
-          <Button variant="ghost" onClick={() => setStep("conteudo")}>
+          <Button size="sm" variant="ghost" onClick={() => setStep("conteudo")}>
             ← Voltar ao conteúdo
           </Button>
         )}
