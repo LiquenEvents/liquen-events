@@ -113,13 +113,17 @@ export default function StickyCTA() {
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
-      {/* Squared ghost chip in the site's SpaceX idiom: dark backing with a
-          white hairline that fills solid white on hover, text inverting to
-          near-black. Backdrop-blur dropped on purpose — this chip is fixed and
-          visible while you scroll, and a backdrop-filter re-samples + re-blurs
-          the moving pixels behind it EVERY scroll frame (the textbook scroll
-          jank). At /90 opacity the backing is effectively solid over both photos
-          and paper, so the blur was imperceptible anyway. */}
+      {/* ── VERDE, TRANSLÚCIDO, EM CÁPSULA ──────────────────────────────
+          Palavras dela, com a captura do chip quadrado e preto: «coloca isto
+          também transparente e verde com as bordas curvas». Passa ao mesmo
+          material do aviso de cookies: o verde da casa (`sage-700`) a 85 %,
+          em cápsula, com um fio claro. Branco a 90 % por cima dá perto de 5:1
+          mesmo sobre uma página branca.
+
+          O desfoque tinha saído daqui por custo — um `backdrop-filter` num
+          elemento fixo volta a desfocar o que passa por trás a cada frame de
+          scroll. Volta, mas `md` e não `xl`, e sobre uma pílula de ~170 × 44:
+          é o tamanho que o torna barato, não a ausência. */}
       {/* MEDIDO a 375 px com toque emulado: 163×38 px — e só se vê ao rolar,
           o que é precisamente a razão por que passou despercebido tanto tempo.
           Uma medição feita no topo da página não o encontra, e este chip é, no
@@ -129,16 +133,16 @@ export default function StickyCTA() {
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="toque alvo-toque group flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-6 sm:py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
+        className="toque alvo-toque group flex items-center gap-2 sm:gap-3 rounded-full px-4 py-2.5 sm:px-6 sm:py-3 bg-sage-700/85 backdrop-blur-md backdrop-saturate-150 border border-white/20 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)] hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
-        <span className="text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
+        <span className="text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.28em] uppercase text-white/90 group-hover:text-sage-800 transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}
         </span>
         <span
           // `motion-reduce`: a seta desliza meio píxel para a direita ao passar
           // o rato — é um transform, e é o mesmo remendo que a seta do PhotoWall
           // já leva. A cor continua a mudar (isso é informação, não movimento).
-          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo motion-reduce:transition-none motion-reduce:group-hover:translate-x-0 text-xs sm:text-sm"
+          className="text-white/70 group-hover:text-sage-800 group-hover:translate-x-0.5 transition-all duration-300 ease-expo motion-reduce:transition-none motion-reduce:group-hover:translate-x-0 text-xs sm:text-sm"
           aria-hidden
         >
           →
