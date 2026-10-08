@@ -3,6 +3,7 @@
 import {
   Fragment,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as TeclaDoReact,
@@ -39,6 +40,9 @@ import { SAIDA, useSaidaDeUmSo } from "./saida";
  * mas a media query já é verdadeira quando o primeiro píxel é pintado. Zero
  * JavaScript, zero piscar, e o mesmo desenho do lado do servidor.
  */
+
+/** Quanto o painel se afasta da borda da janela — o mesmo 8 do `MenuDeContexto`. */
+const MARGEM_DA_JANELA = 8;
 
 /** O glifo do «⋯», o mesmo nos dois tamanhos. */
 const RETICENCIAS = (
@@ -253,6 +257,38 @@ export function MenuDeAccoes({
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
   const abridorRef = useRef<HTMLButtonElement>(null);
+  const painelRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * ── E SE NÃO COUBER POR BAIXO, ABRE PARA CIMA ────────────────────────────
+   *
+   * O painel pende do «⋯» (`top-full`). Num cartão da segunda fila de uma
+   * grelha a 1440 × 900, o menu do tema (nove itens, ~430 px) passava o fundo
+   * da janela e ficava por baixo da barra de navegação — visto na captura da
+   * Fase 2. Mede-se ao abrir, antes de pintar, e só se vira quando por baixo
+   * não cabe E por cima cabe; escreve-se no nó (é posicionar um elemento
+   * medido, como no `MenuDeContexto`) e a origem da entrada vira com ele.
+   */
+  useLayoutEffect(() => {
+    const el = painelRef.current;
+    if (!aberto || !el) return;
+    // Reaberto a meio da saída é o mesmo nó: mede-se sempre a partir de baixo.
+    for (const p of ["top", "bottom", "marginTop", "marginBottom", "transformOrigin"] as const) {
+      el.style[p] = "";
+    }
+    const r = el.getBoundingClientRect();
+    const abridor = abridorRef.current?.getBoundingClientRect();
+    if (!abridor || r.height === 0) return;
+    const naoCabeEmBaixo = r.bottom > window.innerHeight - MARGEM_DA_JANELA;
+    const cabeEmCima = abridor.top - r.height - MARGEM_DA_JANELA > 0;
+    if (naoCabeEmBaixo && cabeEmCima) {
+      el.style.top = "auto";
+      el.style.bottom = "100%";
+      el.style.marginTop = "0";
+      el.style.marginBottom = "0.25rem";
+      el.style.transformOrigin = "bottom right";
+    }
+  }, [aberto]);
   /* O foco NÃO entra sozinho no menu ao abrir, e as setas no próprio «⋯»
      não o abrem: há ecrãs (as Tarefas) em que ↓/↑ num botão de uma linha
      anda de linha em linha, e o Tab a seguir ao «⋯» já cai no primeiro item.
@@ -376,6 +412,7 @@ export function MenuDeAccoes({
 
           {(aberto || aSairAgora) && (
             <div
+              ref={painelRef}
               onKeyDown={teclasDoMenu}
               /* A SAIR, ISTO JÁ NÃO É UM MENU. O nó fica montado 200 ms para
                  ter o que animar, mas para quem ouve o ecrã e para quem anda de
@@ -442,7 +479,12 @@ export function MenuDeAccoes({
                         a.onAccao();
                       }}
                       className={cn(
-                        `alvo-toque flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
+                        // `whitespace-nowrap`: um rótulo de menu não se parte
+                        // («Adicionar fotografias…» partia-se nos 192 px do
+                        // `min-w-48`) — é o menu que alarga. `justify-start`:
+                        // no dedo, o `.alvo-toque` centra o conteúdo, e os
+                        // itens apareciam centrados (visto a 390 na Fase 2).
+                        `alvo-toque flex w-full items-center justify-start gap-2.5 whitespace-nowrap px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
                         "rounded-[var(--bo-material-raio-pastilha)]",
                         /* ── A LINHA SOB O RATO É UMA PASTILHA CHEIA ────────
                            Era uma lavagem de 6% de preto (e de 7% de vermelho).

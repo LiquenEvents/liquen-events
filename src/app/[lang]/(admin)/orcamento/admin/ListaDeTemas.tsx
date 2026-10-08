@@ -94,9 +94,7 @@ export interface ListaDeTemasProps {
 function Capa({ tema }: { tema: ThemeSummary }) {
   // `!` porque a `.bo-skeleton` (o caso sem cor) está fora de camadas e traz
   // o seu próprio `position` e raio.
-  const lugar = (
-    <EsqueletoDeCor cor={tema.coverCor} className="!absolute inset-0 !rounded-none" />
-  );
+  const lugar = <EsqueletoDeCor cor={tema.coverCor} className="!absolute inset-0 !rounded-none" />;
   if (!tema.coverUrl) {
     return (
       <span

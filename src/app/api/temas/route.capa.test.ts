@@ -75,8 +75,7 @@ beforeEach(() => {
   );
   st.lerCores.mockImplementation(async (paths: readonly string[]) => {
     if (st.falhaDaLeitura) throw new Error("base de dados em baixo");
-    const pick = (m: Map<string, string>) =>
-      new Map([...m].filter(([p]) => paths.includes(p)));
+    const pick = (m: Map<string, string>) => new Map([...m].filter(([p]) => paths.includes(p)));
     return { lqips: pick(st.lqips), cores: pick(st.cores) };
   });
 });
@@ -156,9 +155,7 @@ describe("GET /api/temas — a capa por omissão segue a ordem manual", () => {
   });
 
   it("a capa escolhida continua a ganhar à ordem", async () => {
-    st.themes = [
-      theme("t-1", { coverPath: "t-1/b.jpg", photoOrder: ["t-1/c.jpg", "t-1/a.jpg"] }),
-    ];
+    st.themes = [theme("t-1", { coverPath: "t-1/b.jpg", photoOrder: ["t-1/c.jpg", "t-1/a.jpg"] })];
     st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg"]) };
     const [t] = await (await GET(req())).json();
     expect(t.coverUrl).toBe("https://signed/t-1/b.jpg");
@@ -170,9 +167,7 @@ describe("GET /api/temas — a capa por omissão segue a ordem manual", () => {
     // O Storage não assina o que não está lá.
     st.sign.mockImplementation(
       async (paths: string[]) =>
-        new Map(
-          paths.filter((p) => !p.includes("apagada")).map((p) => [p, `https://signed/${p}`]),
-        ),
+        new Map(paths.filter((p) => !p.includes("apagada")).map((p) => [p, `https://signed/${p}`])),
     );
     const [t] = await (await GET(req())).json();
     expect(t.coverUrl).toBe("https://signed/t-1/b.jpg");

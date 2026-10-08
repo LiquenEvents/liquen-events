@@ -164,6 +164,69 @@ describe("o menu do botão direito", () => {
   });
 });
 
+/**
+ * ── O QUE A CAPTURA DA FASE 2 MOSTROU ──────────────────────────────────────
+ *
+ * Três defeitos que as classes não mostravam e o browser mostrou: no dedo os
+ * itens apareciam CENTRADOS (o `.alvo-toque` centra o conteúdo e os itens não
+ * diziam o contrário); «Adicionar fotografias…» partia-se em duas linhas; e o
+ * menu do tema, com nove itens, aberto de um cartão da segunda fila, passava
+ * o fundo da janela.
+ */
+describe("o que a captura mostrou", () => {
+  it("os itens dos dois menus alinham à esquerda e não partem o rótulo", () => {
+    abrirMenu(accoes(true));
+    for (const item of screen.getAllByRole("menuitem")) {
+      expect(item.className).toContain("justify-start");
+      expect(item.className).toContain("whitespace-nowrap");
+    }
+    cleanup();
+    abrirContexto(accoes(true));
+    for (const item of screen.getAllByRole("menuitem")) {
+      expect(item.className).toContain("justify-start");
+      expect(item.className).toContain("whitespace-nowrap");
+    }
+  });
+
+  it("sem lugar por baixo e com lugar por cima, o «⋯» abre para cima", () => {
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    const alturaOriginal = window.innerHeight;
+    // Uma janela de 900 px: o «⋯» a 560 e um painel de 430 px, que por baixo
+    // acabaria nos 1000.
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      const menu = this.getAttribute("role") === "menu";
+      const top = menu ? 600 : 560;
+      const h = menu ? 430 : 40;
+      return {
+        top,
+        bottom: top + h,
+        height: h,
+        left: 0,
+        right: 40,
+        width: 40,
+        x: 0,
+        y: top,
+        toJSON() {},
+      } as DOMRect;
+    };
+    try {
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 });
+      const menu = abrirMenu(accoes(true));
+      expect(menu.style.bottom).toBe("100%");
+      expect(menu.style.top).toBe("auto");
+      expect(menu.style.transformOrigin).toBe("bottom right");
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = original;
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: alturaOriginal });
+    }
+  });
+
+  it("com lugar por baixo, fica como sempre esteve", () => {
+    const menu = abrirMenu(accoes(true));
+    expect(menu.style.bottom).toBe("");
+  });
+});
+
 describe("a entrada dos menus no CSS", () => {
   const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
   it("é a `.bo-entrada` com a duração, a curva e a escala dos tokens — nenhum número novo", () => {

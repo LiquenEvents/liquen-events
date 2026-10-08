@@ -199,7 +199,9 @@ export function MenuDeContexto({
   // percorre com o teclado é um menu que metade das acções não tem.
   useEffect(() => {
     if (!pedido) return;
-    painelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
+    painelRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+      ?.focus();
   }, [pedido]);
 
   if (!desenhado) return null;
@@ -248,8 +250,10 @@ export function MenuDeContexto({
                 a.onAccao();
               }}
               className={
-                `alvo-toque flex w-full items-center gap-2.5 rounded-[var(--bo-material-raio-pastilha)] ` +
-                `px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO} ` +
+                `alvo-toque flex w-full items-center justify-start gap-2.5 rounded-[var(--bo-material-raio-pastilha)] ` +
+                // Um rótulo de menu não se parte, e não se centra no dedo —
+                // ver o do «⋯».
+                `whitespace-nowrap px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO} ` +
                 (a.destrutiva
                   ? "text-[var(--bo-perigo)] hover:bg-[var(--bo-perigo)] hover:text-white active:bg-[var(--bo-perigo)] active:text-white"
                   : "text-[var(--bo-tinta-72)] hover:bg-[var(--bo-accent)] hover:text-white active:bg-[var(--bo-accent)] active:text-white")
