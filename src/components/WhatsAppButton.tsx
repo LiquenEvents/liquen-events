@@ -88,15 +88,21 @@ export default function WhatsAppButton() {
       // medidas. O `bottom` estava escrito aqui à mão e não sabia da barra.
       // A classe soma a reserva do aviso ao mesmo 1,25rem de sempre, e quando
       // não há aviso a reserva vale 0px, ou seja fica tudo como estava.
-      className={`toque whatsapp-fixed piso-flutuante fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
+      //
+      // «coloca o wats mais baixo e mais fino»: passa a `piso-flutuante-direita`
+      // (1 rem do fundo, e a partir de 640 px sem a reserva do aviso, que lá
+      // é um cartão no canto ESQUERDO e não tapa este lado), e a pílula fica
+      // com 36 px de altura no computador (era 46). No telemóvel continua um
+      // círculo de 44 px, que é o alvo mínimo de um dedo.
+      className={`toque whatsapp-fixed piso-flutuante-direita alvo-toque fixed z-50 flex items-center justify-center gap-2 p-3 sm:px-4 sm:py-2 bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       style={{
         right: "calc(1.25rem + env(safe-area-inset-right))",
       }}
     >
-      <WhatsAppIcon className="w-5 h-5 flex-shrink-0" />
-      <span className="hidden sm:inline text-sm font-medium tracking-wide">WhatsApp</span>
+      <WhatsAppIcon className="w-5 h-5 flex-shrink-0 sm:w-4 sm:h-4" />
+      <span className="hidden sm:inline text-[13px] font-medium tracking-wide">WhatsApp</span>
     </a>
   );
 }

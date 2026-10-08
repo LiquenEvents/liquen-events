@@ -4393,6 +4393,31 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     expect(await screen.findByText(/perde \d+% da área/i)).toBeTruthy();
   });
 
+  // «Isto aqui também está enorme», «coloca isto mais bonito» e, por fim,
+  // «quero as fotos a preencher o retângulo»: as duas capas enchem a largura
+  // do cartão com uma altura fixa, e o número de cada uma vai numa etiqueta
+  // por cima DELA; a explicação, igual para as duas, diz-se uma vez.
+  it("as capas enchem o cartão, com o número por cima de cada uma e a explicação uma vez", async () => {
+    comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
+    await medirCapas([
+      { w: 1500, h: 1000 },
+      { w: 1500, h: 1000 },
+    ]);
+    const etiquetas = await screen.findAllByText(/perde \d+% da área/i);
+    const seccao = document.getElementById("sec-capas")!;
+    const img = [...seccao.querySelectorAll("img")].find((i) =>
+      (i.getAttribute("src") ?? "").includes("capas/"),
+    )!;
+    const moldura = img.closest(".h-64");
+    expect(moldura, "a capa deixou de ter a altura fixa").not.toBeNull();
+    expect(moldura!.className).toMatch(/\bw-full\b/);
+    // Sem a forma da tira: a fotografia enche a moldura.
+    expect((moldura as HTMLElement).style.aspectRatio).toBe("");
+    // A etiqueta vive na célula da SUA fotografia.
+    expect(etiquetas[0].closest(".relative")).toBe(moldura!.parentElement);
+    expect(within(seccao).getAllByText(/Uma fotografia ao alto perde menos/)).toHaveLength(1);
+  });
+
   /**
    * ── O AVISO ERA O MESMO PARA AS DUAS, E NÃO PODIA SER ──────────────────
    *
@@ -5250,10 +5275,11 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await irParaPrever(user);
 
-    // A versão de uma linha, que é a única que o telemóvel mostra.
+    // A versão de uma linha, que é a única à vista — em qualquer ecrã desde
+    // que ela pediu as barras «muito mais finas».
     expect(screen.getByText("Em inglês muda a moldura do documento.")).toBeTruthy();
-    // E a longa continua lá para o ecrã largo, mas atrás do corte de largura.
-    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("hidden");
+    // A longa continua lá para quem ouve o ecrã, mas não ocupa a barra.
+    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("sr-only");
   });
 
   it("escolhido o inglês, a explicação abre inteira em qualquer ecrã", async () => {

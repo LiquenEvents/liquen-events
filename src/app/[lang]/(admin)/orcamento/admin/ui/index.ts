@@ -69,8 +69,24 @@ export type { Largura, Capacidade, Adaptativo } from "./adaptativo";
 export { FolhaOuDialogo } from "./FolhaOuDialogo";
 export type { FolhaOuDialogoProps } from "./FolhaOuDialogo";
 
+// O inspector: coluna de 320 px à direita a partir de `lg`, folha abaixo
+// disso, ⌘I para abrir e fechar. Opaco — o vidro do ecrã é do cabeçalho.
+export { Inspector } from "./Inspector";
+export type { InspectorProps } from "./Inspector";
+
 export { TabelaOuCartoes } from "./TabelaOuCartoes";
 export type { TabelaOuCartoesProps, Coluna } from "./TabelaOuCartoes";
+
+// A lista agrupada «como as Definições do macOS»: linhas de 44 px, rótulo e
+// valor, `›` quando levam a algum lado. Conteúdo — sem sombra, sem vidro.
+export { ListaAgrupada, LinhaAgrupada } from "./ListaAgrupada";
+export type { ListaAgrupadaProps, LinhaAgrupadaProps } from "./ListaAgrupada";
+
+// O esqueleto da cor da fotografia vive com os outros esqueletos
+// (`../Skeleton.tsx`); sai também por aqui para os ecrãs o encontrarem ao pé
+// dos primitivos. Sem cor válida, é o `.bo-skeleton` de sempre.
+export { EsqueletoDeCor } from "../Skeleton";
+export type { EsqueletoDeCorProps } from "../Skeleton";
 
 export { MenuDeAccoes } from "./MenuDeAccoes";
 export type { MenuDeAccoesProps, AccaoDeItem } from "./MenuDeAccoes";

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeSummary } from "@/lib/theme-types";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import ImagemComPlanoB from "./ImagemComPlanoB";
 import {
   SPRING_LOADING_MS,
   destinoValido,
@@ -69,20 +70,36 @@ export interface ListaDeTemasProps {
   aArrastar?: boolean;
 }
 
-/** A capa em miniatura, ou o quadrado vazio de um tema sem fotos. */
+/**
+ * A capa em miniatura, ou o quadrado vazio de um tema sem fotos.
+ *
+ * ── COM O PLANO B, COMO OS CARTÕES ───────────────────────────────────────
+ * Era um `<img src={coverUrl}>` simples, e MEDIDO no ecrã dela: a coluna
+ * inteira de imagens partidas. O `coverUrl` é a miniatura de 400 px, e essa
+ * derivada pode não existir (fotos anteriores a ela, ou migradas em massa) —
+ * o Storage assina o caminho na mesma e o 404 só aparece no browser. Os
+ * cartões da grelha sempre recuaram para o original (`coverFallbackUrl`)
+ * através do `ImagemComPlanoB`; esta coluna, que veio depois, não. Passa a
+ * usar a mesma peça: AVIF quando há, o original quando a derivada falha, e o
+ * borrão por baixo enquanto nenhuma chega. A moldura dá a forma e o fundo.
+ */
 function Capa({ tema }: { tema: ThemeSummary }) {
   if (!tema.coverUrl) {
     return <span aria-hidden className="h-10 w-10 shrink-0 rounded-md bg-[var(--bo-tinta-6)]" />;
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={tema.coverUrl}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      className="h-10 w-10 shrink-0 rounded-md object-cover"
-    />
+    <span
+      aria-hidden
+      className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--bo-tinta-6)]"
+    >
+      <ImagemComPlanoB
+        src={tema.coverUrl}
+        avif={tema.coverAvif}
+        planoB={tema.coverFallbackUrl}
+        lqip={tema.coverLqip}
+        className="h-full w-full object-cover"
+      />
+    </span>
   );
 }
 

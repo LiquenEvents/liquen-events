@@ -329,6 +329,29 @@ describe("Button (extended)", () => {
     expect(btn).toHaveClass("h-8");
   });
 
+  /**
+   * ── «PRIMÁRIO VERDE, SECUNDÁRIO CINZA» ─────────────────────────────────
+   * O secundário era um contorno branco; passou a cinzento CHEIO, que é um
+   * degrau da tinta (translúcido, um degrau mais escuro do que o que está por
+   * baixo). As razões e os números estão no `Button.tsx`. O que se prende aqui
+   * é a forma: sem contorno, com a tinta-8 em repouso, e um degrau a cada
+   * passo (rato → 10, carregar → 13).
+   */
+  it("secondary is a grey fill — one ink step — and no outline", () => {
+    render(<Button variant="secondary">Limpar seleção</Button>);
+    const btn = screen.getByRole("button", { name: "Limpar seleção" });
+    expect(btn).toHaveClass(
+      "bg-[var(--bo-tinta-8)]",
+      "text-[var(--bo-text)]",
+      "hover:bg-[var(--bo-tinta-10)]",
+      "active:bg-[var(--bo-tinta-13)]",
+    );
+    expect(btn.className, "o secundário voltou a ter contorno").not.toMatch(/(^|\s)border(\s|-)/);
+    expect(btn, "o secundário voltou a ser branco").not.toHaveClass("bg-[var(--bo-surface)]");
+    // A pílula da acção não se perde na troca.
+    expect(btn).toHaveClass("rounded-full");
+  });
+
   it("danger variant uses the audited dark-red token", () => {
     render(<Button variant="danger">Eliminar</Button>);
     expect(screen.getByRole("button", { name: "Eliminar" })).toHaveClass("bg-[var(--bo-perigo)]");
