@@ -4801,6 +4801,14 @@ body:has(.barra-consentimento) {
   }
 }
 
+/* O «Pedir orçamento» flutuante sai enquanto o aviso de cookies estiver no
+   ecrã (auditoria externa, A1): eram duas coisas a pedir uma decisão no mesmo
+   canto. O `:not(.consentimento-decidido)` é para quem já escolheu — a barra
+   ainda fica uns segundos no DOM, escondida, até o React a tirar. */
+html:not(.consentimento-decidido) body:has(.barra-consentimento) .cta-flutuante {
+  display: none;
+}
+
 /* Secções ancoradas ao fundo do primeiro ecrã (o herói da home é `min-h-[100svh]
    flex flex-col justify-end`): o recuo empurra a legenda PARA CIMA dentro da
    mesma caixa, em vez de encolher a fotografia. */

@@ -84,9 +84,9 @@ export default function StickyCTA() {
       // um anel de foco a 0% de opacidade. inert remove-o da ordem de Tab e da
       // árvore de acessibilidade até ficar visível.
       inert={!show}
-      // Shown on every breakpoint: on mobile it's the only persistent path to
-      // the quote form (the navbar auto-hides on scroll-down). It sits bottom-
-      // LEFT, so it never collides with the bottom-right WhatsApp pill.
+      // On mobile it's the only persistent path to the quote form (the navbar
+      // auto-hides on scroll-down). It sits bottom-LEFT, so it never collides
+      // with the bottom-right WhatsApp pill.
       //
       // `motion-reduce`: a entrada é um transform (16 px a subir em 500 ms) e
       // não uma mudança de cor. Este é um dos dois elementos que estão em
@@ -101,7 +101,15 @@ export default function StickyCTA() {
       // só, que lhe soma a reserva e vale o mesmo de sempre quando não há
       // aviso. Nada de `bottom-*` ao lado destas classes: a regra à mão vive
       // fora de `@layer` e ganharia em silêncio (CamadasCss.contrato.test.ts).
-      className={`piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
+      //
+      // `lg:hidden` e `cta-flutuante` (auditoria externa, A1): havia quatro
+      // chamadas à acção ao mesmo tempo — o «Pedir orçamento» da barra, este,
+      // o WhatsApp e o aviso de cookies. Em computador a barra de navegação
+      // está sempre lá com o mesmo botão, e este sai. No telemóvel fica (a
+      // barra esconde-se ao descer), aparece depois do primeiro ecrã, e
+      // esconde-se enquanto o aviso de cookies estiver no ecrã — a regra está
+      // em globals.css, junto de `.piso-flutuante`.
+      className={`cta-flutuante lg:hidden piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
