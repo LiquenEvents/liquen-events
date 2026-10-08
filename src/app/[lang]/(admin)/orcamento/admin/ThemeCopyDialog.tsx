@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ImagemComPlanoB from "./ImagemComPlanoB";
 import {
   MAX_THEME_COPY_BATCH,
   THEME_COPY_CHUNK,
@@ -411,13 +412,14 @@ export default function ThemeCopyDialog({
                 }`}
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--bo-tinta-6)]">
+                  {/* Com o plano B, como os cartões: a miniatura da capa pode
+                      não existir, e sem recurso ficava uma imagem partida. */}
                   {t.coverUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <ImagemComPlanoB
                       src={t.coverUrl}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
+                      avif={t.coverAvif}
+                      planoB={t.coverFallbackUrl}
+                      lqip={t.coverLqip}
                       className="h-full w-full object-cover"
                     />
                   )}
