@@ -10,6 +10,35 @@ import { z } from "zod";
 
 const trimmed = (max: number) => z.string().trim().max(max);
 
+/**
+ * ── A DATA DO EVENTO TEM DE SER UM DIA QUE EXISTE ──────────────────────────
+ *
+ * Achado n.º 12 da auditoria: o servidor aceitava «2027-02-30», anos de cinco
+ * algarismos, «amanhã!» e datas passadas. O Calendário mostrava o 30 de
+ * Fevereiro como 2 de Março, e a lista «30 fev 2027 · faltam 5 meses». O
+ * formulário do site trava isto no browser; os dois dos anúncios não tinham
+ * data mínima — e um pedido forjado não passa por browser nenhum.
+ *
+ * Vazio continua a valer: é o «Ainda a definir».
+ */
+export function ehDiaDeCalendario(v: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const [a, mes, dia] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const d = new Date(Date.UTC(a, mes - 1, dia));
+  return d.getUTCFullYear() === a && d.getUTCMonth() === mes - 1 && d.getUTCDate() === dia;
+}
+
+/** Ontem, em UTC. A folga de um dia cobre quem preenche de um fuso em que já
+ *  (ou ainda) é outro dia — o que se recusa é o que já passou de certeza. */
+function ontem(): string {
+  return new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+}
+
+const dataDoEvento = trimmed(20)
+  .refine((v) => v === "" || ehDiaDeCalendario(v), "Data inválida — escolha um dia do calendário.")
+  .refine((v) => v === "" || !ehDiaDeCalendario(v) || v >= ontem(), "A data do evento já passou.");
+
 // Quote request — the part of QuoteFormData we rely on; rest passes through.
 const selectedAddonSchema = z.object({
   id: trimmed(100),
@@ -46,7 +75,7 @@ export const quoteFormSchema = z
     company: trimmed(160).optional().default(""),
     nif: trimmed(20).optional().default(""),
     guests: z.coerce.number().int().min(0).max(100000).optional().default(0),
-    date: trimmed(20).optional().default(""),
+    date: dataDoEvento.optional().default(""),
     // ── ESTE 4000 TEM UM PAR DO OUTRO LADO ────────────────────────────────
     // `notes` é o campo «Como imagina o seu evento?» do formulário público,
     // com as marcas de «ainda a definir» agarradas à frente. O formulário

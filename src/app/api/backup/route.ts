@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
+import { hojeNoEstudio } from "@/lib/proposal-doc";
 import { listQuotes } from "@/lib/quotes-store";
 import { listAllProposals } from "@/lib/proposals-store";
 import { listSuppliers } from "@/lib/suppliers-store";
@@ -355,7 +356,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(corpo, {
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="liquen-backup-${new Date().toISOString().slice(0, 10)}.json"`,
+        "Content-Disposition": `attachment; filename="liquen-backup-${hojeNoEstudio()}.json"`,
       },
     });
   } catch (err) {

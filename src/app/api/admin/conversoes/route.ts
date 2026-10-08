@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hojeNoEstudio } from "@/lib/proposal-doc";
 import { isAuthed } from "@/lib/admin-auth";
 import { listQuotes } from "@/lib/quotes-store";
 import { listAllProposals } from "@/lib/proposals-store";
@@ -67,7 +68,9 @@ export async function GET(req: NextRequest) {
     (id) => aceiteEmPorQuote.get(id),
   );
 
-  const dia = new Date().toISOString().slice(0, 10);
+  // O dia de Lisboa, não o de Greenwich: entre a meia-noite e a uma, no Verão,
+  // o ficheiro levava a data de ontem (achado n.º 36).
+  const dia = hojeNoEstudio();
   const pedido = req.nextUrl.searchParams.get("ficheiro") ?? "relatorio";
 
   log.info("conversoes-offline: exportadas", {

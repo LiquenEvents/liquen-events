@@ -16,7 +16,7 @@ import { listRules } from "./material-rules-store";
 import { gerarChecklist, type ContextoEvento } from "./material-rules";
 import { getForQuote, obterOuCriarParaPedido, updateEventMaterial } from "./event-material-store";
 import { listItemsOfEvent, addEventItem, removeItemsOfEvent } from "./event-material-items-store";
-import { depositPercentOf } from "./proposal-doc";
+import { depositPercentOf, hojeNoEstudio } from "./proposal-doc";
 import { totaisDaProposta } from "./proposal-budget";
 import type { ChecklistItem, CalendarEventKind, Payment, Quote } from "./orcamento/types";
 
@@ -328,6 +328,35 @@ async function gerarMaterial(quote: Quote): Promise<{ linhas: number; preservada
  * partir daí. Nunca se marca nada como pago: `paid: false` sempre, porque
  * "entrou dinheiro" é um facto que só ela conhece.
  */
+/**
+ * O último dia para liquidar o saldo: um mês de calendário antes do evento.
+ *
+ * Achado n.º 8 da auditoria: o saldo nascia com a data do PRÓPRIO dia do
+ * casamento. A proposta diz «70% 1 mês antes» e o contrato «é liquidado até 1
+ * mês antes da data do evento» — e o lembrete diário, que avisa a 7 dias,
+ * chegava na semana do casamento.
+ *
+ * O dia do mês é o mesmo, e encosta ao fim do mês quando esse dia não existe
+ * (31 de Março → 28 ou 29 de Fevereiro). Nunca antes do dia do sinal: um
+ * casamento marcado a três semanas não tem um saldo «vencido» à nascença.
+ * Sem data de evento (ou com uma ilegível), fica a que lá estava.
+ */
+export function prazoDoSaldo(dataDoEvento: string, diaDoSinal: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dataDoEvento ?? "");
+  if (!m) return dataDoEvento;
+  let [ano, mes] = [Number(m[1]), Number(m[2]) - 1];
+  const dia = Number(m[3]);
+  if (mes === 0) {
+    ano -= 1;
+    mes = 11;
+  } else {
+    mes -= 1;
+  }
+  const ultimoDoMes = new Date(Date.UTC(ano, mes + 1, 0)).getUTCDate();
+  const prazo = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(Math.min(dia, ultimoDoMes)).padStart(2, "0")}`;
+  return prazo < diaDoSinal ? diaDoSinal : prazo;
+}
+
 async function pagamentosEmFalta(
   quote: Quote,
   quando: string,
@@ -343,13 +372,22 @@ async function pagamentosEmFalta(
   const existentes = new Set((quote.payments ?? []).map((p) => p.kind));
   const emFalta: { kind: "sinal" | "saldo"; amount: number; date: string }[] = [];
   // O sinal leva a data em que a proposta foi aceite — o momento em que se
-  // gera, que é a mesma data que `quando` traz. O saldo leva a data do
-  // evento: é nesse dia que tem de estar liquidado.
+  // gera, que é a mesma data que `quando` traz —, lida no dia de LISBOA (era o
+  // dia de Greenwich: entre a meia-noite e a uma, no Verão, saía ontem). O
+  // saldo leva o prazo do contrato: um mês antes do evento (`prazoDoSaldo`).
+  const instante = new Date(quando);
+  const diaDoSinal = Number.isNaN(instante.getTime())
+    ? quando.slice(0, 10)
+    : hojeNoEstudio(instante);
   if (!existentes.has("sinal")) {
-    emFalta.push({ kind: "sinal", amount: totais.sinal, date: quando.slice(0, 10) });
+    emFalta.push({ kind: "sinal", amount: totais.sinal, date: diaDoSinal });
   }
   if (!existentes.has("saldo")) {
-    emFalta.push({ kind: "saldo", amount: totais.saldo, date: quote.date });
+    emFalta.push({
+      kind: "saldo",
+      amount: totais.saldo,
+      date: prazoDoSaldo(quote.date, diaDoSinal),
+    });
   }
   return emFalta;
 }

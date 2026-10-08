@@ -339,9 +339,10 @@ describe("gerarEventoAoGanhar — o dinheiro é o da proposta", () => {
     const saldo = payments.find((p) => p.kind === "saldo")!;
     expect(sinal.amount).toBe(esperado.sinal);
     expect(saldo.amount).toBe(esperado.saldo);
-    // Sinal na data em que se gerou (aceite); saldo na data do evento.
+    // Sinal na data em que se gerou (aceite); saldo um mês antes do evento —
+    // é o prazo do contrato (achado n.º 8; era a data do próprio evento).
     expect(sinal.date).toBe("2026-08-14");
-    expect(saldo.date).toBe("2026-09-19");
+    expect(saldo.date).toBe("2026-08-19");
     // Nunca marcado como pago automaticamente.
     expect(sinal.paid).toBe(false);
     expect(saldo.paid).toBe(false);
@@ -510,5 +511,34 @@ describe("gerarEventoAoGanhar — o dinheiro é o da proposta", () => {
     const log = quotesDb.rows.get("Q1")!.activityLog as { summary: string; actor: string }[];
     expect(log.at(-1)!.actor).toBe("Sistema");
     expect(log.at(-1)!.summary).toContain("pagamentos (2 linhas)");
+  });
+});
+
+/** Achado n.º 8: o saldo nascia com a data do próprio dia do casamento. */
+describe("prazoDoSaldo — um mês antes do evento", () => {
+  it("o mesmo dia, no mês anterior", async () => {
+    const { prazoDoSaldo } = await import("./semear-producao");
+    expect(prazoDoSaldo("2027-06-12", "2026-10-08")).toBe("2027-05-12");
+  });
+
+  it("encosta ao fim do mês quando o dia não existe", async () => {
+    const { prazoDoSaldo } = await import("./semear-producao");
+    expect(prazoDoSaldo("2027-03-31", "2026-10-08")).toBe("2027-02-28");
+    expect(prazoDoSaldo("2028-03-31", "2026-10-08")).toBe("2028-02-29");
+  });
+
+  it("Janeiro volta a Dezembro do ano anterior", async () => {
+    const { prazoDoSaldo } = await import("./semear-producao");
+    expect(prazoDoSaldo("2027-01-15", "2026-10-08")).toBe("2026-12-15");
+  });
+
+  it("nunca antes do dia do sinal", async () => {
+    const { prazoDoSaldo } = await import("./semear-producao");
+    expect(prazoDoSaldo("2026-10-29", "2026-10-08")).toBe("2026-10-08");
+  });
+
+  it("sem data de evento, fica a que lá estava", async () => {
+    const { prazoDoSaldo } = await import("./semear-producao");
+    expect(prazoDoSaldo("", "2026-10-08")).toBe("");
   });
 });

@@ -2176,8 +2176,10 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                         {MONTHS[new Date(q.date + "T12:00:00").getMonth()].slice(0, 3)}
                         {new Date(q.date + "T12:00:00").getFullYear() !==
                           new Date().getFullYear() && (
+                          // Era «Jun 27», que se lê «27 de Junho» (achado n.º 30).
+                          // O apóstrofo diz que é o ano.
                           <span className="ml-0.5">
-                            {String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
+                            ’{String(new Date(q.date + "T12:00:00").getFullYear()).slice(2)}
                           </span>
                         )}
                       </p>

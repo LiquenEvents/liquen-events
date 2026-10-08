@@ -142,6 +142,9 @@ export default function ClientMessenger({ quote, onSent }: Props) {
               </p>
               <p className="text-foreground/40 text-[10px] mt-1.5">
                 {new Date(m.at).toLocaleString("pt-PT", {
+                  // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
+                  // diferentes entre a meia-noite e a uma — erro de hidratação.
+                  timeZone: "Europe/Lisbon",
                   day: "numeric",
                   month: "short",
                   hour: "2-digit",

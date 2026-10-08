@@ -94,12 +94,13 @@ describe("os próximos eventos", () => {
       pedido({ id: "LIQ-4", name: "Casamento deste ano", date: "2026-10-24" }),
       pedido({ id: "LIQ-5", name: "Casamento do ano seguinte", date: "2027-05-22" }),
     ]);
-    // «Mai» sozinho lia-se antes de «Out» e parecia fora de ordem.
-    expect(within(painel).getByText("27")).toBeTruthy();
+    // «Mai» sozinho lia-se antes de «Out» e parecia fora de ordem. E «Mai 27»
+    // lia-se «27 de Maio»: o apóstrofo diz que é o ano (achado n.º 30).
+    expect(within(painel).getByText("’27")).toBeTruthy();
   });
 
   it("e não aparece no ano corrente — escrevê-lo em todas as linhas é ruído", async () => {
     const painel = await montar([pedido({ id: "LIQ-6", date: "2026-10-24" })]);
-    expect(within(painel).queryByText("26")).toBeNull();
+    expect(within(painel).queryByText("’26")).toBeNull();
   });
 });

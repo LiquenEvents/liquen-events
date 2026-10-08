@@ -1058,6 +1058,9 @@ const QuoteCard = memo(function QuoteCard({
             ) : null}
             <span className="bo-text-faint text-[12px]">
               {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
+                // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
+                // diferentes entre a meia-noite e a uma — erro de hidratação.
+                timeZone: "Europe/Lisbon",
                 day: "numeric",
                 month: "short",
               })}
@@ -1284,6 +1287,28 @@ export default function AdminClient({
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState<QuoteStatus>("pendente");
+  /**
+   * Achado n.º 19 da auditoria: pôr um pedido em «Ganho» à mão criava um
+   * contrato ligado a uma proposta que nunca tinha chegado ao cliente — sem
+   * nada no ecrã a dizê-lo. Ao escolher «Ganho», pergunta-se ao servidor se
+   * alguma proposta deste pedido seguiu (`acceptUrl` do GET do envio); se não,
+   * fica o aviso por baixo do seletor. Não trava: pode ter sido aceite de boca.
+   */
+  const [ganhoSemProposta, setGanhoSemProposta] = useState<string | null>(null);
+  const escolherEstado = (novo: QuoteStatus) => {
+    setEditStatus(novo);
+    setGanhoSemProposta(null);
+    if (novo !== "aceite" || !selected || selected.status === "aceite") return;
+    const id = selected.id;
+    void fetch(`/api/orcamento/${id}/proposta-doc`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j && j.acceptUrl == null) setGanhoSemProposta(id);
+      })
+      .catch(() => {
+        /* sem resposta não se inventa um aviso */
+      });
+  };
   const [editAssigned, setEditAssigned] = useState("");
   const [editLostReason, setEditLostReason] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -7280,7 +7305,12 @@ export default function AdminClient({
                                   <select
                                     id="pedido-estado"
                                     value={editStatus}
-                                    onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
+                                    onChange={(e) => escolherEstado(e.target.value as QuoteStatus)}
+                                    aria-describedby={
+                                      ganhoSemProposta === selected.id && editStatus === "aceite"
+                                        ? "pedido-estado-aviso"
+                                        : undefined
+                                    }
                                     className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
                                   >
                                     {STATUS_OPTIONS.map((s) => (
@@ -7289,6 +7319,17 @@ export default function AdminClient({
                                       </option>
                                     ))}
                                   </select>
+                                  {ganhoSemProposta === selected.id && editStatus === "aceite" && (
+                                    <p
+                                      id="pedido-estado-aviso"
+                                      role="status"
+                                      className="mt-1.5 text-xs leading-relaxed text-[var(--bo-aviso)]"
+                                    >
+                                      Nenhuma proposta deste pedido chegou ao cliente. Marcar como
+                                      Ganho cria o contrato na mesma — se foi aceite de boca, está
+                                      certo; senão, envia primeiro a proposta.
+                                    </p>
+                                  )}
                                 </div>
                                 <div>
                                   <label htmlFor="pedido-preco" className="bo-eyebrow block mb-1.5">
@@ -7714,6 +7755,9 @@ export default function AdminClient({
                         <p className="text-[10px] text-foreground/50">
                           Submetido em{" "}
                           {new Date(selected.submittedAt).toLocaleString("pt-PT", {
+                            // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
+                            // diferentes entre a meia-noite e a uma — erro de hidratação.
+                            timeZone: "Europe/Lisbon",
                             day: "numeric",
                             month: "long",
                             year: "numeric",
