@@ -5,6 +5,7 @@ import type { Proposal, ProposalStatus, Quote } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { MenuDeAccoes, TabelaOuCartoes, type AccaoDeItem } from "./ui";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 import { Button, Card, EmptyState, PerguntaDestrutiva, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { useCachedList } from "./useCachedList";
@@ -689,7 +690,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
               <button
                 type="button"
                 onClick={() => handleOpenQuote(soUmPorEnviar)}
-                className="alvo-toque font-semibold underline underline-offset-2"
+                className={`alvo-toque font-semibold underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
               >
                 Abrir o pedido
               </button>
@@ -697,7 +698,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
               <button
                 type="button"
                 onClick={() => setFilter("rascunho")}
-                className="alvo-toque font-semibold underline underline-offset-2"
+                className={`alvo-toque font-semibold underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
               >
                 Ver as {porEnviar}
               </button>
@@ -912,7 +913,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                       <button
                         type="button"
                         onClick={() => handleOpenQuote(pedido)}
-                        className="alvo-toque min-w-0 flex-1 text-left"
+                        className={`alvo-toque min-w-0 flex-1 text-left ${ESTADO} ${PRESSAO}`}
                       >
                         {resumo}
                       </button>

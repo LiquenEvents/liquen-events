@@ -7,7 +7,6 @@ import {
   verifyCredentials,
   ADMIN_COOKIE,
 } from "./admin-auth";
-import { createPortalToken } from "./portal-token";
 
 // Adversarial coverage for the admin session token verifier. The happy path and
 // the tamper/expiry/version/proposal-confusion cases live in admin-auth.test.ts;
@@ -89,15 +88,6 @@ describe("readSession — hostile inputs never throw, always deny", () => {
       JSON.stringify({ typ: "session", sub: "Hacker", exp: Date.now() + 1e9, v: "1" }),
     ).toString("base64url");
     expect(readSession(`${forged}.${"A".repeat(43)}`)).toBeNull();
-  });
-});
-
-describe("readSession — cross-domain token confusion", () => {
-  it("never accepts a portal-link token as an admin session", () => {
-    // Same SESSION_SECRET, same wire format, but signed with the raw secret and
-    // carrying typ:"portal" — must be cryptographically and semantically refused.
-    const portal = createPortalToken("quote-123");
-    expect(readSession(portal)).toBeNull();
   });
 });
 

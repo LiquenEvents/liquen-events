@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import {
@@ -16,53 +16,6 @@ import { downloadEventIcs, printEventDossier, printRunSheet } from "../../export
 import { Button } from "../../ui";
 import { useDesceu } from "../../ui/adaptativo";
 import { ESTADO, PRESSAO } from "../../ui/movimento";
-
-/** Ghost-style toolbar control shared by the header's link + button actions.
- *
- * `alvo-toque` porque o rótulo é `hidden sm:inline`: num telemóvel isto fica
- * uma seta de 14 px com `px-3` à volta, e media 38×32 — a caixa mais pequena
- * desta barra. Os `h-8` continuam a mandar no rato; a classe só põe o chão de
- * 44×44 onde se toca com o dedo, sem mexer no desenho. */
-const TOOL_LINK =
-  "alvo-toque inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-[var(--bo-text-muted)] " +
-  // Sem lista nem duração próprias: o único sítio que usa isto junta-lhe o
-  // `ESTADO`, e duas `transition-property` no mesmo elemento é uma corrida que
-  // a ordem do CSS gerado decide — não a ordem do atributo. Os `150 ms` que
-  // aqui estavam eram, mais uma vez, o valor de omissão do Tailwind à mão.
-  "hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)]";
-
-/**
- * Copia texto para a área de transferência com degradação graciosa. O caminho
- * moderno (`navigator.clipboard`) pode estar indefinido em http não seguro ou
- * ser recusado sem gesto do utilizador — aqui está atrás de um clique, mas
- * guardamos na mesma; o fallback usa um textarea oculto + `execCommand('copy')`
- * para browsers antigos. Devolve `true` se a cópia foi confirmada.
- */
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    /* cai para o fallback legado abaixo */
-  }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.top = "-9999px";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
-    return ok;
-  } catch {
-    return false;
-  }
-}
 
 /** yyyy-mm-dd (ou ISO) → "12 set 2026"; null se ausente/inválida. */
 function fmtDate(v?: string | null): string | null {
@@ -95,12 +48,11 @@ interface Props {
   stage: EventStage;
   metrics: EventMetrics;
   next: NextAction;
-  portalUrl: string;
   lang: Locale;
   onScrollTo: (id: string) => void;
 }
 
-export default function DossierHeader({ data, stage, next, portalUrl, lang, onScrollTo }: Props) {
+export default function DossierHeader({ data, stage, next, lang, onScrollTo }: Props) {
   const { quote } = data;
   const stepRef = useRef<HTMLDivElement>(null);
 
@@ -142,26 +94,6 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
   // Confirmação inline da cópia — a árvore do Dossier não está dentro do
   // ToastProvider (só a raiz de administração está), por isso mostramos um
   // "Copiado ✓" transitório no próprio botão em vez de um toast.
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (copyTimer.current) clearTimeout(copyTimer.current);
-    },
-    [],
-  );
-
-  // Link partilhável do portal do cliente. O `portalUrl` chega relativo
-  // (ex.: /pt/portal/<token>); prefixamos a origem atual para obter o URL
-  // absoluto que a estúdio envia ao cliente.
-  const copyPortalLink = useCallback(async () => {
-    const absolute = typeof window !== "undefined" ? window.location.origin + portalUrl : portalUrl;
-    const ok = await copyToClipboard(absolute);
-    if (!ok) return;
-    setCopied(true);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(false), 2000);
-  }, [portalUrl]);
 
   const dates = stageDates(data);
   const reachedIdx = stage === "perdido" ? -1 : STAGE_ORDER.indexOf(stage);
@@ -175,8 +107,9 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
     quote.location?.trim() || null,
   ].filter(Boolean);
 
-  // Onde a próxima ação aponta. Portal abre link; as restantes navegam para a
-  // zona respetiva; arquivar fica como marcador (fase de quick-actions).
+  // Onde a próxima ação aponta: cada uma navega para a zona respetiva; arquivar
+  // fica como marcador (fase de quick-actions). O portal do cliente, que abria
+  // um link, saiu — achado n.º 37, decisão dela.
   function zoneFor(kind: NextAction["kind"]): string | null {
     switch (kind) {
       case "proposta":
@@ -284,81 +217,6 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 portanto continua tudo numa linha só — o `flex-wrap` não chega
                 a ser preciso. Com rato fica exactamente como estava. */}
             <div className="flex flex-wrap items-center gap-1.5 pointer-coarse:gap-2 mt-4">
-              {/* Copiar link do portal — ação principal da estúdio para
-                  partilhar o portal privado com o cliente, por isso destacada. */}
-              <Button
-                variant={copied ? "primary" : "subtle"}
-                size="sm"
-                className="alvo-toque"
-                onClick={copyPortalLink}
-                aria-live="polite"
-                title="Copiar o link privado do portal do cliente para a área de transferência"
-                iconLeft={
-                  copied ? (
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5" />
-                      <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5" />
-                    </svg>
-                  )
-                }
-              >
-                <span className="hidden sm:inline">
-                  {copied ? "Copiado ✓" : "Copiar link do portal"}
-                </span>
-              </Button>
-
-              {/* Abrir portal — mesma janela nova que o cartão de próxima ação. */}
-              <a
-                href={portalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${TOOL_LINK} ${ESTADO} ${PRESSAO}`}
-                title="Abrir o portal do cliente num separador novo"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <path d="M15 3h6v6M10 14 21 3" />
-                </svg>
-                <span className="hidden sm:inline">Abrir portal</span>
-              </a>
-
-              {/* Separador subtil entre partilha e impressão/calendário. */}
-              <span aria-hidden className="w-px h-4 bg-[var(--bo-tinta-10)] mx-1" />
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -470,42 +328,10 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                   mínimo, e é o alvo que este cartão inteiro existe para oferecer.
                   `pointer-coarse:h-11` é o mesmo degrau que o `ui/Button.tsx` já
                   dá aos tamanhos `sm` e `md`; estes três estão escritos à mão e
-                  por isso ficaram de fora. Os três estados (portal, zona,
+                  por isso ficaram de fora. Os estados (zona e
                   desactivado) sobem juntos: um cartão onde a altura do botão
                   muda com o estado lê-se como um salto. */}
-              {next.kind === "portal" ? (
-                <a
-                  href={portalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  /* ── O AFUNDAR ESTAVA ESCRITO E NÃO ACONTECIA ──────────────
-                     Tinha `motion-safe:active:scale-[0.98]` — e a lista ao lado
-                     era `transition-colors`, que no Tailwind v4 sai como
-                     `color, background-color, border-color, outline-color,
-                     text-decoration-color, fill, stroke`. `scale` não está lá.
-                     O botão encolhia na mesma, mas a CORTE SECO, 0 ms — e os
-                     `duration-150` do lado (o valor de omissão do Tailwind
-                     copiado à mão, que ninguém escolheu) não lhe tocavam. É a
-                     mesma avaria que o `ui/movimento.ts` conta ter apanhado no
-                     `Button`, viva neste ficheiro.
-                     O `ESTADO` traz a lista certa (com `scale`) e o degrau da
-                     casa; o `PRESSAO` traz os 20 ms do toque. */
-                  className={`inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-sage-600 hover:bg-[var(--bo-marca)] text-white/95 text-sm font-medium rounded-full ${ESTADO} ${PRESSAO}`}
-                >
-                  {next.label}
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    aria-hidden="true"
-                  >
-                    <path d="M7 17 17 7M8 7h9v9" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </a>
-              ) : zone ? (
+              {zone ? (
                 <button
                   type="button"
                   onClick={() => onScrollTo(zone)}

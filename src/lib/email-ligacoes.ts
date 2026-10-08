@@ -41,9 +41,6 @@ import { esc } from "./mail";
 /** O que o cliente lê no lugar do endereço, no email da proposta. */
 export const ROTULO_DA_PROPOSTA = "Ver a proposta online";
 
-/** O mesmo, para os emails que apontam ao portal do cliente. */
-export const ROTULO_DO_PORTAL = "Abrir a minha página";
-
 /** Uma ligação de texto: sublinhada, no verde da casa, sem cor herdada.
  *  Estilo EM LINHA porque uma folha de estilo no cabeçalho não sobrevive ao
  *  Gmail (a razão inteira está no `email-assinatura.ts`). */

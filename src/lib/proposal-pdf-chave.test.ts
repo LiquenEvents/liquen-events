@@ -11,9 +11,9 @@ import { chaveDoPdf } from "./proposal-pdf-chave";
  * Palavras dela: «quero que isto se torne ultra rápido».
  *
  * Abrir a proposta em PDF já não desenha nada no caso normal: o ficheiro fica
- * guardado no envio, e as duas rotas que o servem — a do link do casal e a do
- * portal — mandam o browser directamente ao armazenamento com um endereço
- * assinado. Três passos, e nenhum deles precisa de desenhar.
+ * guardado no envio, e a rota que o serve — a do link do casal (a do portal
+ * saiu com ele, achado n.º 37) — manda o browser directamente ao armazenamento
+ * com um endereço assinado. Três passos, e nenhum deles precisa de desenhar.
  *
  * Só que a `chaveDoPdf` vivia no `proposal-pdf-cache`, que importa o
  * `proposal-doc-render`, que importa o `pdf-lib` e o `sharp`. Um `import` no
@@ -27,10 +27,7 @@ import { chaveDoPdf } from "./proposal-pdf-chave";
  * começar. Nenhum teste de comportamento o apanharia.
  */
 
-const ROTAS = [
-  "src/app/api/proposta/[token]/pdf/route.ts",
-  "src/app/api/portal/[token]/proposta-pdf/route.ts",
-];
+const ROTAS = ["src/app/api/proposta/[token]/pdf/route.ts"];
 
 const ler = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 

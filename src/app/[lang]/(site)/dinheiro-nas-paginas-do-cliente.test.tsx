@@ -49,7 +49,6 @@ vi.mock("@/lib/proposals-store", () => ({
 vi.mock("next/image", () => ({ default: () => null }));
 
 import ProposalPage from "../(privado)/proposta/[token]/page";
-import PortalView from "./portal/[token]/PortalView";
 
 /** A proposta de 24 600 €: base 20 000, IVA 4 600 — os três da mesma coluna. */
 const proposta = (over: Record<string, unknown> = {}) => ({
@@ -120,57 +119,6 @@ describe("a página onde o casal responde à proposta", () => {
   });
 });
 
-// ── O portal do cliente ─────────────────────────────────────────────────────
-
-/** O portal em inglês, com o dicionário a sério — é ele que traz o `en-GB`. */
-function portal(over: Record<string, unknown> = {}) {
-  const t = getDictionary("en" as Parameters<typeof getDictionary>[0]).portal;
-  return (
-    <PortalView
-      {...({
-        t,
-        clientName: "Ana Dias",
-        eventLabel: "Wedding",
-        eventName: "Ana & John",
-        eventDate: "2027-05-29",
-        location: "Évora",
-        proposal: { total: 24600, currency: "EUR", status: "aceite" },
-        pdfHref: null,
-        contract: null,
-        contratoPdfHref: null,
-        schedule: { sinal: 7380, saldo: 17220 },
-        depositPercent: 30,
-        currency: "EUR",
-        ...over,
-      } as unknown as Parameters<typeof PortalView>[0])}
-    />
-  );
-}
-
-describe("o portal do cliente", () => {
-  it("em INGLÊS escreve o dinheiro à portuguesa", () => {
-    render(portal());
-    const texto = naPagina();
-
-    expect(texto).toContain(`24.600,00${EURO}`);
-    // O total, o sinal e o saldo — todos na mesma folha e todos com a mesma
-    // pontuação, mesmo com a página em inglês.
-    expect(texto).toContain(`7.380,00${EURO}`);
-    expect(texto).toContain(`17.220,00${EURO}`);
-
-    expect(texto).not.toContain("€24,600.00");
-    expect(texto).not.toContain("24,600.00");
-    expect(texto).not.toContain(`7380,00${EURO}`);
-  });
-
-  it("999 € continua sem separador", () => {
-    render(portal({ proposal: { total: 999, currency: "EUR", status: "aceite" } }));
-    const texto = naPagina();
-    expect(texto).toContain(`999,00${EURO}`);
-    expect(texto).not.toContain(`.999,00${EURO}`);
-  });
-});
-
 /**
  * A prova de que o dicionário inglês REALMENTE pede `en-GB` — sem isto, os
  * testes acima podiam estar a passar por o duplo do idioma nunca ter mudado, e
@@ -180,6 +128,5 @@ describe("o dicionário inglês continua a pedir en-GB para as DATAS", () => {
   it("o `dateLocale` do inglês é `en-GB`", () => {
     const en = getDictionary("en" as Parameters<typeof getDictionary>[0]);
     expect(en.proposta.dateLocale).toBe("en-GB");
-    expect(en.portal.dateLocale).toBe("en-GB");
   });
 });

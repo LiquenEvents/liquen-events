@@ -47,7 +47,15 @@ vi.mock("@/lib/mail", () => ({
       .replace(/'/g, "&#39;"),
   MAIL_TO: "team@example.com",
 }));
-vi.mock("@/lib/portal-token", () => ({ createPortalToken: vi.fn((id: string) => `ptok:${id}`) }));
+// O `{link}` deixou de ser o portal (que deixou de existir — achado n.º 37):
+// é a página da proposta mais recente do pedido.
+const propostas = vi.hoisted(() => ({ lista: [] as Array<{ id: string }> }));
+vi.mock("@/lib/proposals-store", () => ({
+  listProposalsForQuote: vi.fn(async () => propostas.lista),
+}));
+vi.mock("@/lib/proposta-link-curto", () => ({
+  enderecoDaProposta: vi.fn(async (id: string) => `https://liquen.test/proposta/${id}`),
+}));
 vi.mock("@/lib/email-templates-store", async (original) => {
   const real = await original<typeof import("@/lib/email-templates-store")>();
   return { ...real, getTemplate: modelo.get };
@@ -338,5 +346,27 @@ describe("POST /api/orcamento/[id]/modelo — o servidor de correio a recusar", 
     const body = await res.json();
     expect(body.emailed).toBe(false);
     expect(String(body.emailError)).toMatch(/não está configurado/i);
+  });
+});
+
+describe("POST /api/orcamento/[id]/modelo — o {link} sem portal", () => {
+  beforeEach(() => {
+    authed.ok = true;
+    quotes.actual = { ...PEDIDO };
+    mail.send.mockClear();
+  });
+
+  it("um modelo dela com {link} leva a página da proposta mais recente, com etiqueta", async () => {
+    propostas.lista = [{ id: "p-nova" }, { id: "p-velha" }];
+    modelo.get.mockResolvedValueOnce({
+      key: "agradecimento",
+      subject: "Obrigado",
+      body: `<p>Olá {nome}, a proposta está em <a href="{link}">{link}</a>.</p>`,
+    });
+    const res = await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    const html = String((mail.send.mock.calls.at(-1)?.[0] as { html?: string })?.html ?? "");
+    expect(html).toContain("https://liquen.test/proposta/p-nova");
+    expect(html).not.toContain("/portal/");
   });
 });

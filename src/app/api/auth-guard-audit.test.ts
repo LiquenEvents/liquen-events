@@ -22,7 +22,7 @@ import { NextRequest } from "next/server";
  *                      confirmation GET, admin login/logout. Asserted REACHABLE
  *                      without a session (never 401 for lack of one).
  *
- *  3. TOKEN / SECRET — portal PDFs + the proposal accept POST (signed token,
+ *  3. TOKEN / SECRET — the proposal PDF + the proposal accept POST (signed token,
  *                      404/401 on a bad token), cron (CRON_SECRET, fails closed
  *                      in prod), devproposalpreview (dev-only, 404 in prod).
  *
@@ -743,8 +743,6 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       // sair para um endereço já configurado no ADMIN_USERS.
       "./admin/recuperar/route",
       "./admin/recuperar/definir/route",
-      "./portal/[token]/proposta-pdf/route",
-      "./portal/[token]/contrato-pdf/route",
       "./proposta/[token]/pdf/route",
       // As fotografias da proposta, assinadas para quem tem o token. Mesmo
       // modelo de confiança do PDF ao lado — e ver menos do que ele, que já
@@ -886,20 +884,6 @@ describe("PUBLIC routes stay reachable without a session", () => {
 // 3. TOKEN-guarded routes: a bad token must NOT resolve (404/401), never a leak.
 // ─────────────────────────────────────────────────────────────────────────────
 describe("TOKEN-guarded routes deny a bad token", () => {
-  it("GET /api/portal/[token]/proposta-pdf → 404 on a bad token", async () => {
-    const fn = await handler("./portal/[token]/proposta-pdf/route", "GET");
-    const res = await fn(req("GET"), ctx());
-    expect(res.status).toBe(404);
-    expect(calls).toEqual([]); // never reached the quote / proposal store
-  });
-
-  it("GET /api/portal/[token]/contrato-pdf → 404 on a bad token", async () => {
-    const fn = await handler("./portal/[token]/contrato-pdf/route", "GET");
-    const res = await fn(req("GET"), ctx());
-    expect(res.status).toBe(404);
-    expect(calls).toEqual([]);
-  });
-
   it("GET /api/proposta/[token]/pdf → 404 on a bad token", async () => {
     // Mesmo modelo de confiança do aceite: o token assinado É a autorização, e
     // um token que não seja o da proposta não abre o documento de ninguém.

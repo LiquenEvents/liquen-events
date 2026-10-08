@@ -74,6 +74,15 @@ const RAIZ = join(process.cwd(), "src/app/[lang]/(admin)");
  * qualquer coisa.
  */
 const SEM_AFUNDAR: { ficheiro: string; marca: string; porque: string }[] = [
+  // ── O EMBRULHO QUE SÓ TRAVA O CLIQUE ────────────────────────────────────
+  // A linha das Propostas abre o pedido (achado n.º 11); o menu das acções
+  // vive dentro dela, e este `<span>` só impede que «Apagar» também abra o
+  // pedido por baixo. Não é um comando: quem afunda é o botão do menu.
+  {
+    ficheiro: "orcamento/admin/Propostas.tsx",
+    marca: "<span onClick={(e) => e.stopPropagation()}>",
+    porque: "trava a propagação do menu dentro da linha clicável",
+  },
   // ── O ESCURO À VOLTA DE UM DIÁLOGO ──────────────────────────────────────
   // Tem `onClick` para fechar, mas não é uma coisa em que se carregue: é o
   // vazio à volta. Encolher o véu 2% descola-o das margens e deixa ver a

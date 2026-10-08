@@ -27,17 +27,15 @@ import { ESTADO, PRESSAO } from "../../ui/movimento";
  * métricas e o stepper recalcularem ao vivo.
  *
  * Nenhuma importação de store server-only atravessa esta fronteira: proposta e
- * contrato chegam já reduzidos a dados serializáveis em `data`; o link do
- * portal chega cunhado em `portalUrl`.
+ * contrato chegam já reduzidos a dados serializáveis em `data`.
  */
 interface Props {
   data: DossierData;
-  portalUrl: string;
   lang: Locale;
   userName: string;
 }
 
-export default function DossierClient({ data, portalUrl, lang, userName }: Props) {
+export default function DossierClient({ data, lang, userName }: Props) {
   const [quote, setQuote] = useState<Quote>(data.quote);
 
   // Superfície de ferramenta de página inteira: esconder nav pública + grão,
@@ -165,7 +163,6 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
         stage={stage}
         metrics={metrics}
         next={next}
-        portalUrl={portalUrl}
         lang={lang}
         onScrollTo={scrollTo}
       />
