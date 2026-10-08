@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
-import CromadoDoSitio from "@/components/CromadoDoSitio";
-import { LocaleProvider } from "@/components/LocaleProvider";
-import { getDictionary, pickChromeDict, htmlLang, type Locale } from "@/lib/i18n";
+import { getDictionary, htmlLang, localizeHref, type Locale } from "@/lib/i18n";
 import { CABECALHO_DA_LINGUA } from "@/lib/lingua-do-pedido";
-import NotFoundView from "./[lang]/(site)/NotFoundView";
+import { waHref } from "@/data";
+import NotFoundConteudo from "./[lang]/(site)/NotFoundConteudo";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -33,10 +32,19 @@ import NotFoundView from "./[lang]/(site)/NotFoundView";
  *   · e qualquer caminho sem página — `/pagina-que-nao-existe`, `/en/x/y`.
  *
  * Como não passa pelo layout, traz o que precisa: a folha global, as duas
- * fontes do primeiro ecrã, e o cromado do sítio (menu e rodapé) à volta do
- * `NotFoundView` de sempre. A língua não vem de parâmetros (não há): vem do
- * cabeçalho que o `proxy` escreve em cada pedido de página
+ * fontes do primeiro ecrã, o logótipo a levar ao início, o corpo de sempre do
+ * 404 (`NotFoundConteudo`) e o WhatsApp. A língua não vem de parâmetros (não
+ * há): vem do cabeçalho que o `proxy` escreve em cada pedido de página
  * (`CABECALHO_DA_LINGUA`) — `/en/…` responde em inglês, o resto em português.
+ *
+ * ── SEM COMPONENTES CLIENTE, E É DE PROPÓSITO ─────────────────────────────
+ * A primeira versão punha à volta o cromado inteiro do sítio (menu, rodapé,
+ * flutuantes). O Next junta os componentes cliente do 404 global ao pacote de
+ * TODAS as rotas: a proposta do casal passou de 160 KB para 185 KB e o painel
+ * de 520 para 548 — o `scripts/peso-das-rotas.mjs` parou o CI. Aqui só há
+ * servidor: o `next/link` do corpo já vai em todas as páginas de qualquer
+ * maneira. O preço é este 404 não ter o menu: tem o logótipo, os sete
+ * caminhos do corpo e o WhatsApp.
  */
 
 const inter = Inter({
@@ -86,12 +94,26 @@ export default async function GlobalNotFound() {
   const t = getDictionary(locale);
   return (
     <html lang={htmlLang(locale)} className={`${inter.variable} ${playfair.variable}`}>
-      <body className="flex flex-col min-h-screen antialiased">
-        <LocaleProvider locale={locale} dict={pickChromeDict(t)}>
-          <CromadoDoSitio locale={locale} skipLabel={t.skipLink}>
-            <NotFoundView />
-          </CromadoDoSitio>
-        </LocaleProvider>
+      <body className="flex flex-col min-h-screen antialiased bg-surface">
+        <header className="flex justify-center px-6 pt-8">
+          <a href={localizeHref("/", locale)} aria-label={t.common.voltarInicio}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/_img/l/logo-liquen-256.webp" alt="Líquen Events" width={148} height={88} />
+          </a>
+        </header>
+        <main id="conteudo" className="flex-1">
+          <NotFoundConteudo locale={locale} t={t} />
+        </main>
+        <footer className="pb-10 text-center">
+          <a
+            href={waHref(t.common.whatsappPrefill)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground/68 hover:text-moss text-xs tracking-[0.2em] uppercase transition-colors"
+          >
+            {t.common.contactWhatsApp}
+          </a>
+        </footer>
       </body>
     </html>
   );
