@@ -43,4 +43,35 @@ describe("coluna dos temas — a capa recua para o original", () => {
     fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")?.getAttribute("src")).toBe(tema.coverFallbackUrl);
   });
+
+  it("por baixo da capa fica a cor dela, e com as duas fontes partidas fica só a cor", () => {
+    const { container } = render(
+      <ListaDeTemas
+        temas={[{ ...tema, coverCor: "#a07850" } as ThemeSummary]}
+        activoId="t1"
+        aoEscolher={() => {}}
+        aoVoltar={() => {}}
+        aoLargarFotos={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    fireEvent.error(container.querySelector("img")!);
+    fireEvent.error(container.querySelector("img")!);
+    // Nenhum `<img>` partido; a cor continua lá.
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+  });
+
+  it("um tema com fotos e sem capa assinada mostra a cor", () => {
+    const { container } = render(
+      <ListaDeTemas
+        temas={[{ ...tema, coverUrl: undefined, coverCor: "#203040" } as ThemeSummary]}
+        activoId="t1"
+        aoEscolher={() => {}}
+        aoVoltar={() => {}}
+        aoLargarFotos={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-cor="#203040"]')).not.toBeNull();
+  });
 });

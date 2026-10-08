@@ -33,6 +33,7 @@ import {
   Toolbar,
   type AccaoDeItem,
   Escolha,
+  EsqueletoDeCor,
   Glass,
 } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
@@ -2411,8 +2412,42 @@ export default function Temas() {
 
                     A moldura é 4:3 SEMPRE: é ela que mantém a primeira linha
                     alinhada quando as fotos têm proporções diferentes. */}
-                <div className="aspect-[4/3] w-full overflow-hidden bg-[var(--bo-tinta-6)]">
-                  {t.coverUrl ? (
+                {/* ══════════════════════════════════════════════════════
+                    NUNCA UM CARTÃO VAZIO
+                    ══════════════════════════════════════════════════════
+
+                    T1 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`: «muitos cartões
+                    sem capa ao fim de 5 s — a página parece partida».
+
+                    Por baixo da fotografia fica SEMPRE o lugar pintado com a
+                    cor dela (`EsqueletoDeCor`, com a `coverCor` que vem no
+                    resumo): enquanto a capa viaja, vê-se a cor certa; e se as
+                    duas fontes falharem, a imagem sai (`ImagemComPlanoB`) e a
+                    cor fica. Sem cor gravada é o esqueleto cinzento.
+
+                    Um tema COM fotos e SEM `coverUrl` — o Storage estourou os
+                    8 s da lista, ou a capa não se deixou assinar — já não
+                    mostra o ícone de pasta: mostra o lugar, com a cor quando
+                    a há e o fundo neutro da moldura quando não (sem o brilho
+                    a passar: aí não há nada a caminho, e o brilho diria que
+                    há). O ícone fica para o que ele diz, uma pasta vazia
+                    (`imageCount` 0).
+
+                    A fotografia leva `relative` para ficar POR CIMA do lugar,
+                    que é `absolute`; o `!` vence a `.bo-skeleton`, que está
+                    fora de camadas e traz o seu próprio `position` e raio. */}
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--bo-tinta-6)]">
+                  {t.imageCount === 0 ? (
+                    <div
+                      data-pasta-vazia
+                      className="flex h-full w-full items-center justify-center text-foreground/40"
+                    >
+                      {FolderIcon}
+                    </div>
+                  ) : t.coverUrl || t.coverCor ? (
+                    <EsqueletoDeCor cor={t.coverCor} className="!absolute inset-0 !rounded-none" />
+                  ) : null}
+                  {t.coverUrl && t.imageCount !== 0 && (
                     <ImagemComPlanoB
                       src={t.coverUrl}
                       avif={t.coverAvif}
@@ -2430,12 +2465,8 @@ export default function Temas() {
 
                          O que sinaliza o hover continua a ser a moldura a
                          ganhar o acento, no botão aqui em baixo. */
-                      className="h-full w-full object-cover"
+                      className="relative h-full w-full object-cover"
                     />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-foreground/40">
-                      {FolderIcon}
-                    </div>
                   )}
                 </div>
                 <div className="px-3 py-2.5">

@@ -1205,6 +1205,51 @@ describe("Biblioteca de Temas — um botão sobre a fotografia", () => {
     expect(within(grupo).getByText("Fixado no topo")).toBeTruthy();
   });
 
+  /**
+   * ── NUNCA UM CARTÃO VAZIO (T1) ──────────────────────────────────────────
+   *
+   * Um tema com fotos e sem capa assinada (o Storage estourou o tempo da
+   * lista) mostrava o ícone de pasta, que diz «vazio». Passa a mostrar o lugar
+   * com a cor da capa; o ícone fica só para a pasta vazia de verdade.
+   */
+  it("um tema com fotos e sem capa mostra a cor dela, não o ícone de pasta", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Terracotta", imageCount: 9, coverCor: "#a07850" },
+        { ...THEME, id: "t2", name: "Itália", imageCount: 0 },
+      ]),
+    );
+    renderTemas();
+    const cheio = await acharCartaoDoTema(/Terracotta/);
+    expect(cheio.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    expect(cheio.querySelector("[data-pasta-vazia]")).toBeNull();
+    // A pasta vazia continua a dizer que está vazia.
+    expect(cartaoDoTema(/Itália/).querySelector("[data-pasta-vazia]")).not.toBeNull();
+  });
+
+  it("a cor fica por baixo da capa e, com as duas fontes partidas, fica só ela", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        {
+          ...THEME,
+          imageCount: 9,
+          coverUrl: "https://cdn.test/thumb-404.webp",
+          coverFallbackUrl: "https://cdn.test/original-404.jpg",
+          coverCor: "#a07850",
+        },
+      ]),
+    );
+    renderTemas();
+    const cartao = await acharCartaoDoTema(/Terracotta/);
+    expect(cartao.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    fireEvent.error(cartao.querySelector("img")!);
+    fireEvent.error(cartao.querySelector("img")!);
+    // Nenhum `<img>` partido no cartão — e o lugar pintado continua lá.
+    expect(cartao.querySelector("img")).toBeNull();
+    expect(cartao.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    expect(cartao.querySelector("[data-pasta-vazia]")).toBeNull();
+  });
+
   /** «Datas relativas sem data absoluta em tooltip» é proibido pela Parte 9. */
   it("a data relativa leva a data inteira no `title`", async () => {
     const ontem = new Date(Date.now() - 86_400_000).toISOString();

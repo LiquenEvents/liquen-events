@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeSummary } from "@/lib/theme-types";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { EsqueletoDeCor } from "./Skeleton";
 import {
   SPRING_LOADING_MS,
   destinoValido,
@@ -82,22 +83,42 @@ export interface ListaDeTemasProps {
  * através do `ImagemComPlanoB`; esta coluna, que veio depois, não. Passa a
  * usar a mesma peça: AVIF quando há, o original quando a derivada falha, e o
  * borrão por baixo enquanto nenhuma chega. A moldura dá a forma e o fundo.
+ *
+ * ── E O MESMO LUGAR PINTADO DOS CARTÕES ──────────────────────────────────
+ * T2 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`. Por baixo da capa fica a cor dela
+ * (`EsqueletoDeCor` com a `coverCor` do resumo): é o que se vê enquanto a
+ * miniatura viaja e o que fica se as duas fontes falharem — a imagem que
+ * falhou sai, e nunca fica o ícone partido. Um tema com fotos e sem capa
+ * assinada mostra só a cor; o quadrado neutro é para quem não tem nem uma.
  */
 function Capa({ tema }: { tema: ThemeSummary }) {
+  // `!` porque a `.bo-skeleton` (o caso sem cor) está fora de camadas e traz
+  // o seu próprio `position` e raio.
+  const lugar = (
+    <EsqueletoDeCor cor={tema.coverCor} className="!absolute inset-0 !rounded-none" />
+  );
   if (!tema.coverUrl) {
-    return <span aria-hidden className="h-10 w-10 shrink-0 rounded-md bg-[var(--bo-tinta-6)]" />;
+    return (
+      <span
+        aria-hidden
+        className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--bo-tinta-6)]"
+      >
+        {tema.coverCor && tema.imageCount !== 0 && lugar}
+      </span>
+    );
   }
   return (
     <span
       aria-hidden
-      className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--bo-tinta-6)]"
+      className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--bo-tinta-6)]"
     >
+      {lugar}
       <ImagemComPlanoB
         src={tema.coverUrl}
         avif={tema.coverAvif}
         planoB={tema.coverFallbackUrl}
         lqip={tema.coverLqip}
-        className="h-full w-full object-cover"
+        className="relative h-full w-full object-cover"
       />
     </span>
   );
