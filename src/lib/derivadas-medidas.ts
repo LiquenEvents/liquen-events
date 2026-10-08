@@ -34,3 +34,20 @@ export const MEDIA_LADO = 1200;
 
 /** A qualidade, de 0 a 100. No browser lê-se como 0,80 — ver `MID_QUALITY`. */
 export const MEDIA_QUALIDADE = 80;
+
+/**
+ * ── E A MINIATURA DE 400 px ──────────────────────────────────────────────
+ *
+ * O lado e a qualidade da MINIATURA, lidos pelo lote das derivadas e pela
+ * geração a pedido (`lib/derivadas.ts`) e pela rota que gera as miniaturas
+ * em falta de UM tema (`/api/temas/[id]/miniaturas`). Essa rota tinha os
+ * seus próprios números (400 e q72) e o lote q78: a mesma fotografia saía
+ * com duas qualidades conforme o botão por onde a miniatura foi feita. Vive
+ * aqui, e não no `derivadas.ts`, pela razão do topo deste ficheiro: só
+ * números, sem `sharp` nem Storage atrás — a rota importa a constante e não
+ * o módulo inteiro do lote.
+ *
+ * O `scripts/derivadas-em-falta.mjs` não consegue importar TypeScript e
+ * repete o 400/78 à mão, com a origem escrita ao lado.
+ */
+export const MINIATURA = { lado: 400, qualidade: 78 } as const;

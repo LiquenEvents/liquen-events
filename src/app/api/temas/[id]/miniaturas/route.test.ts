@@ -27,7 +27,14 @@ const st = vi.hoisted(() => ({
   /** Fotos cujos bytes não se conseguem ler. */
   unreadable: new Set<string>(),
   /** Tudo o que foi escrito: `bucket → [{path, upsert}]`. */
-  writes: [] as { bucket: string; path: string; upsert?: boolean; bytes: number }[],
+  writes: [] as {
+    bucket: string;
+    path: string;
+    upsert?: boolean;
+    bytes: number;
+    /** O ficheiro escrito, para se poder comparar com o que devia ter saído. */
+    buf: Buffer;
+  }[],
   /** Buckets que existiam antes do pedido. */
   buckets: new Set<string>(),
   created: [] as string[],
@@ -77,7 +84,7 @@ vi.mock("@/lib/supabase", () => ({
           return { data: [], error: null };
         },
         upload: async (path: string, bytes: Buffer, o?: { upsert?: boolean }) => {
-          st.writes.push({ bucket, path, upsert: o?.upsert, bytes: bytes.byteLength });
+          st.writes.push({ bucket, path, upsert: o?.upsert, bytes: bytes.byteLength, buf: bytes });
           return { error: null };
         },
       }),
@@ -174,6 +181,30 @@ describe("gerar miniaturas em falta", () => {
     expect(st.writes.map((w) => w.path).sort()).toEqual(["t-1/foto-0000.jpg", "t-1/foto-0002.jpg"]);
     // A miniatura é MESMO pequena (o original de 1200 px pesa muito mais).
     expect(st.writes.every((w) => w.bytes > 0 && w.bytes < 60_000)).toBe(true);
+  });
+
+  /**
+   * A MESMA miniatura do lote das derivadas: a `MINIATURA` partilhada
+   * (`derivadas-medidas.ts`). Esta rota tinha os seus 400/q72 e o lote q78 —
+   * a mesma fotografia saía com duas qualidades conforme o botão por onde a
+   * miniatura foi feita. O `sharp` é o verdadeiro e é determinista: o ficheiro
+   * escrito tem de ser, byte a byte, o que a constante manda fazer.
+   */
+  it("gera com a qualidade da `MINIATURA` partilhada, e não com números seus", async () => {
+    const { MINIATURA } = await import("@/lib/derivadas-medidas");
+    const sharp = (await import("sharp")).default;
+    const feita = (qualidade: number) =>
+      sharp(jpegBytes, { failOn: "none" })
+        .rotate()
+        .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: qualidade, progressive: false, chromaSubsampling: "4:2:0" })
+        .toBuffer();
+    st.photos = names(1);
+    await POST(...post({}));
+    expect(st.writes).toHaveLength(1);
+    expect(st.writes[0].buf.equals(await feita(MINIATURA.qualidade))).toBe(true);
+    // E não é a de antes.
+    expect(st.writes[0].buf.equals(await feita(72))).toBe(false);
   });
 
   it("a miniatura tem a mesma chave do original e escreve por cima (repetível)", async () => {

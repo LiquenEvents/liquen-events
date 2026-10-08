@@ -24,7 +24,7 @@ import {
 } from "@/lib/theme-ref";
 import { garantirBucketDeDerivadas } from "@/lib/theme-storage";
 import { log } from "@/lib/logger";
-import { MEDIA_LADO, MEDIA_QUALIDADE } from "@/lib/derivadas-medidas";
+import { MEDIA_LADO, MEDIA_QUALIDADE, MINIATURA } from "@/lib/derivadas-medidas";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -80,15 +80,12 @@ export const LOTE = 25;
  * trocado aqui produziria derivadas num sítio onde ninguém as vai procurar, e
  * a grelha continuaria lenta com o painel a dizer que estava tudo bem.
  */
-/**
- * O lado e a qualidade da MINIATURA, num sítio só.
- *
- * Estavam escritos duas vezes (uma por família) e agora são lidos também pela
- * geração a pedido (`miniaturaAPedido`). Três cópias do mesmo 400/78 seriam
- * três oportunidades de a mesma fotografia sair diferente conforme o caminho
- * por onde foi fabricada.
+/*
+ * O lado e a qualidade da MINIATURA vivem no `derivadas-medidas.ts`, num
+ * sítio só. Estavam escritos duas vezes (uma por família), depois eram lidos
+ * também pela geração a pedido (`miniaturaAPedido`), e agora também pela rota
+ * das miniaturas de um tema — que tinha os seus próprios 400/q72.
  */
-const MINIATURA = { lado: 400, qualidade: 78 } as const;
 
 /**
  * A DERIVADA INTERMÉDIA, e a conta que a justifica.
