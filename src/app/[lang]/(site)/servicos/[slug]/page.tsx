@@ -352,7 +352,13 @@ export default async function ServiceDetailPage({
           // uma fotografia deitada perdia 53% da altura. A 340 são 2,8:1 e a
           // perda cai para 44%. Mais do que isto e as filas passam a empurrar
           // a secção seguinte para fora do ecrã sem se ganhar enquadramento.
-          className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[340px]"
+          //
+          // `overflow-x-clip` (auditoria externa, C1): o `zoom` de entrada
+          // começa cada mosaico ampliado, e os da borda passavam o ecrã — a
+          // página ganhava scroll horizontal (MEDIDO: 38 px a 1440, 34 a 1280,
+          // 27 a 1024). `clip` e não `hidden`: corta só na horizontal e não faz
+          // da grelha um contentor de scroll.
+          className="grid grid-cols-2 lg:grid-cols-6 gap-px auto-rows-[160px] sm:auto-rows-[220px] lg:auto-rows-[340px] overflow-x-clip"
         >
           {gallery.map((src, i) => {
             // Match the real column span (grid is 6-col at lg) so the wide
