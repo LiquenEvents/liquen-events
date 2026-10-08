@@ -18,6 +18,7 @@ import { SITE, SITE_KEYWORDS } from "@/lib/site";
 export function generateStaticParams() {
   return LOCALES.map((lang) => ({ lang }));
 }
+export const dynamicParams = false;
 
 // Both faces stay VARIABLE (no `weight`): a single woff2 per family that
 // already covers every weight the design uses — Inter 300–700 (font-light

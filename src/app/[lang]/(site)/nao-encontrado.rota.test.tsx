@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import ApanhaTudo, { generateMetadata as gerarMetadados } from "./[...caminho]/page";
+import { metadata as metadadosDo404 } from "../../global-not-found";
+import nextConfig from "../../../../next.config";
 import NotFoundView from "./NotFoundView";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { getDictionary, pickChromeDict } from "@/lib/i18n";
@@ -47,82 +48,52 @@ import { getDictionary, pickChromeDict } from "@/lib/i18n";
  * root layout". A documentação nomeia este caso e manda usar
  * `global-not-found.js`, que é uma bandeira experimental em next.config.ts.
  *
- * A SAÍDA, sem tocar na configuração: uma rota apanha-tudo dentro de `(site)`
- * que chama `notFound()`. Passa a HAVER rota, portanto o 404 volta a ser
- * tratado dentro do ramo — com o layout do sítio (menu e rodapé), com a língua
- * do segmento e com o `NotFoundView` desenhado. Segmento estático e dinâmico
- * ganham sempre ao apanha-tudo, logo nenhuma página real muda de destino.
+ * A PRIMEIRA SAÍDA foi uma rota apanha-tudo em `(site)/[...caminho]` que
+ * desenhava o `NotFoundView`. Deu o 404 desenhado — mas com estado 200: debaixo
+ * do `loading.tsx` do `(site)` a resposta vai em streaming e o estado já seguiu
+ * quando a rota corre. E `/.env` ou `/backup.zip` nem lá chegavam: o `[lang]`
+ * aceitava qualquer valor e servia a página inicial.
+ *
+ * A SAÍDA DE AGORA (auditoria externa, S5/C3) é a que a documentação nomeia
+ * para este caso: `app/global-not-found.tsx`, ligado em next.config.ts. O Next
+ * não renderiza rota nenhuma e devolve essa página pronta, com 404 e legível
+ * sem JavaScript. E o `[lang]` passa a aceitar só `pt` e `en`.
  */
 
 afterEach(cleanup);
 
 describe("endereço que não existe", () => {
-  it("há uma rota apanha-tudo no ramo do sítio", () => {
-    // Se alguém a apagar, o 404 volta em silêncio à página nua do Next — não
-    // há erro de compilação nenhum a denunciá-lo.
-    const segmentos = readdirSync(join(process.cwd(), "src/app/[lang]/(site)"), {
-      withFileTypes: true,
-    })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name);
-    expect(segmentos.filter((s) => s.startsWith("[..."))).toHaveLength(1);
+  const APP = join(process.cwd(), "src/app");
+
+  it("o 404 é o global-not-found, ligado na configuração", () => {
+    expect(existsSync(join(APP, "global-not-found.tsx"))).toBe(true);
+    expect(nextConfig.experimental?.globalNotFound).toBe(true);
   });
 
-  /**
-   * ── ISTO EXIGIA `notFound()`, E O `notFound()` ERA O DEFEITO ──────────────
-   *
-   * O que aqui estava exigia que a rota apanha-tudo ATIRASSE
-   * `NEXT_HTTP_ERROR_FALLBACK;404`, na convicção — escrita no comentário do
-   * `page.tsx` — de que era assim que o sítio devolvia um 404. MEDIDO com o
-   * sítio a correr, não devolvia: a resposta vai em streaming (o `loading.tsx`
-   * do grupo (site) é uma fronteira `<Suspense>`) e o estado era 200 na
-   * mesma — a documentação do Next di-lo por extenso em loading.md, «Status
-   * Codes». O `notFound()` não estava a comprar o 404 que este teste julgava
-   * estar a guardar; estava só a pagar três preços, todos medidos e todos
-   * agora em `e2e/endereco-que-nao-existe.spec.ts`:
-   *
-   *   • sem JavaScript a página ficava BRANCA (o `notFound()` atirado dentro
-   *     da fronteira não deixa HTML atrás de si — a gaveta do React vinha
-   *     vazia, sem sequer o `id="S:0"` que a regra do globals.css revela);
-   *   • o `<title>` era o da PÁGINA INICIAL, porque o cabeçalho já tinha
-   *     seguido quando o `notFound()` rebentou;
-   *   • saíam DOIS `<meta name="robots">` a dizer o contrário um do outro,
-   *     `index, follow` à frente e `noindex` atrás.
-   *
-   * O contrato passa a ser o que se pode mesmo cumprir: a rota DESENHA o 404,
-   * com o cabeçalho a sair dos seus próprios metadados. E o que este teste
-   * guarda agora é isso — que ela devolve conteúdo e não uma excepção.
-   */
-  it("desenha o 404 em vez de o atirar (e por isso ele existe sem JavaScript)", async () => {
-    let erro: unknown;
-    let saida: unknown;
-    try {
-      saida = await ApanhaTudo();
-    } catch (e) {
-      erro = e;
-    }
-    expect(
-      erro,
-      "a rota apanha-tudo voltou a atirar em vez de desenhar — sem JavaScript isso é um ecrã em branco",
-    ).toBeUndefined();
-    expect(saida, "a rota apanha-tudo não devolveu nó nenhum").toBeTruthy();
-    // E o que ela devolve é o 404 desenhado, não outra coisa qualquer.
-    expect((saida as { type?: unknown }).type).toBe(NotFoundView);
+  it("não há rota apanha-tudo — é ela que tirava o 404 ao 404", () => {
+    // Debaixo do `loading.tsx` do `(site)`, uma rota apanha-tudo responde 200
+    // a tudo o que não existe, e o global-not-found deixa de ser chamado.
+    const procurar = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
+        d.isDirectory()
+          ? d.name.startsWith("[...") || d.name.startsWith("[[...")
+            ? [join(dir, d.name)]
+            : procurar(join(dir, d.name))
+          : [],
+      );
+    expect(procurar(join(APP, "[lang]"))).toEqual([]);
   });
 
-  it("o apanha-tudo pede para não ser indexado, e só uma vez", async () => {
-    // O `robots` tem de vir DESTA rota: era a ausência dele aqui que deixava o
-    // `index, follow` do sítio à frente do `noindex` que o Next injecta.
-    const meta = await gerarMetadados({ params: Promise.resolve({ lang: "pt" }) });
-    expect(meta.robots, "o apanha-tudo deixou de declarar robots").toEqual({
-      index: false,
-      follow: false,
-    });
-    // E o título é o do 404, SEM a marca à mão: quem a acrescenta é o molde
-    // `template: "%s | Líquen Events"` do layout de raiz, e escrevê-la aqui
-    // punha-a duas vezes no separador.
-    expect(String(meta.title)).toBe(getDictionary("pt").errors.notFoundEyebrow);
-    expect(String(meta.title)).not.toContain("Líquen Events");
+  it("o [lang] só aceita pt e en", async () => {
+    const layout = await import("../layout");
+    expect((layout as { dynamicParams?: boolean }).dynamicParams).toBe(false);
+  });
+
+  it("o 404 pede para não ser indexado, e o título leva a marca uma vez só", () => {
+    expect(metadadosDo404.robots).toEqual({ index: false, follow: false });
+    const titulo = String(metadadosDo404.title);
+    expect(titulo).toBe("404 | Líquen Events");
+    expect(titulo.split("Líquen Events")).toHaveLength(2);
   });
 
   it("o 404 desenhado dá caminhos de volta, e na língua do visitante", () => {

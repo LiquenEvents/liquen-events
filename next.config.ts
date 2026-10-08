@@ -372,6 +372,13 @@ const nextConfig: NextConfig = {
 
   experimental: {
     /**
+     * O 404 DO SÍTIO, COM ESTADO 404 (auditoria externa, S5/C3). Ver
+     * src/app/global-not-found.tsx: o layout de raiz vive num segmento
+     * dinâmico (`app/[lang]/layout.tsx`), que é exactamente o caso para o qual
+     * a documentação do Next aponta este ficheiro.
+     */
+    globalNotFound: true,
+    /**
      * ════════════════════════════════════════════════════════════════════
      * O CSS VIAJA COM O HTML — E É ISTO QUE TIRA O ECRÃ EM BRANCO
      * ════════════════════════════════════════════════════════════════════

@@ -43,13 +43,18 @@ import { test, expect } from "@playwright/test";
  *     `robots: { index: false, follow: false }` e esse pedido nunca ganhava o
  *     primeiro lugar.
  *
- * O estado HTTP 200 NÃO é tratado aqui, e é de propósito: a documentação do
- * Next diz que em streaming o 200 é o comportamento próprio («a 200 status code
- * will be returned to signal that the request was successful … the status code
- * of the response cannot be updated»), e o remédio que ela aponta é uma
- * verificação de rota no `proxy` — coisa de outra dimensão. O que este teste
- * exige é o que se vê e o que os motores de busca lêem.
+ * O ESTADO HTTP passou a ser exigido (auditoria externa, S5/C3). Enquanto o
+ * 404 era desenhado por uma rota apanha-tudo debaixo do `loading.tsx` do
+ * `(site)`, a resposta ia em streaming e saía 200 — o comportamento que a
+ * documentação descreve («the status code of the response cannot be
+ * updated»). Agora quem responde é o `app/global-not-found.tsx`, que o Next
+ * devolve pronto, sem renderizar rota nenhuma: 404, e legível sem JavaScript.
  */
+
+/** Os três endereços da auditoria — um ficheiro de configuração, um arquivo, e
+ *  uma página que não existe. Os dois primeiros eram a PÁGINA INICIAL com 200,
+ *  porque o `[lang]` aceitava qualquer valor. */
+const DA_AUDITORIA = ["/.env", "/backup.zip", "/pagina-que-nao-existe"];
 
 const ENDERECOS = [
   { rota: "/nao-existe-esta-pagina", lingua: "pt" },
@@ -75,6 +80,17 @@ const RAMOS = [
 ];
 
 test.describe("um endereço que não existe", () => {
+  for (const rota of DA_AUDITORIA) {
+    test(`${rota} — responde 404, e não a página inicial`, async ({ request }) => {
+      const r = await request.get(rota, { maxRedirects: 0 });
+      expect(r.status(), `"${rota}" respondeu ${r.status()}`).toBe(404);
+      const html = await r.text();
+      expect(html, `"${rota}" está a servir a página inicial`).not.toContain(
+        "Decoração de Casamentos e Eventos | Líquen Events",
+      );
+    });
+  }
+
   for (const { rota, lingua } of ENDERECOS) {
     test(`${rota} — diz que não existe mesmo sem JavaScript`, async ({ browser }) => {
       // Um telemóvel, sem JavaScript: é o caso em que a página ficava branca.
@@ -83,7 +99,8 @@ test.describe("um endereço que não existe", () => {
         javaScriptEnabled: false,
       });
       const page = await ctx.newPage();
-      await page.goto(rota);
+      const resposta = await page.goto(rota);
+      expect(resposta?.status(), `"${rota}" respondeu ${resposta?.status()}`).toBe(404);
 
       const medida = await page.evaluate(() => {
         const texto = (document.body.innerText || "").replace(/\s+/g, " ").trim();
@@ -192,6 +209,11 @@ test.describe("um endereço que não existe", () => {
       // anúncio tem de ser visível nos registos, e não passar por página boa.
       expect(resposta?.status(), `"${rota}" respondeu ${resposta?.status()}`).toBe(404);
 
+      // Este 404 desenha-se com o JavaScript (está escrito por cima): medir
+      // logo a seguir ao `goto` era uma corrida — às vezes o <h1> ainda não lá
+      // estava, e o teste falhava sem defeito nenhum. Espera-se por ele.
+      await expect(page.locator("h1")).toHaveCount(1);
+
       const medida = await page.evaluate(() => ({
         titulo: document.title,
         lang: document.documentElement.lang,
@@ -212,10 +234,16 @@ test.describe("um endereço que não existe", () => {
 
       // Três saídas, e a que interessa: uma página sem cromado que não ofereça
       // caminho nenhum é um beco sem saída pago a peso de ouro.
+      //
+      // «Pelo menos um», e não «exactamente um»: desde que estes endereços caem
+      // no 404 global (com o cromado do sítio), o rodapé traz um WhatsApp e a
+      // pílula flutuante traz outro — e a pílula só nasce 1,5 s depois. Contar
+      // exactamente um passava ou falhava conforme a pílula já lá estivesse.
       const wa = medida.saidas.filter((h) => h.includes("wa.me"));
-      expect(wa.length, `"${rota}" não oferece o WhatsApp: ${JSON.stringify(medida.saidas)}`).toBe(
-        1,
-      );
+      expect(
+        wa.length,
+        `"${rota}" não oferece o WhatsApp: ${JSON.stringify(medida.saidas)}`,
+      ).toBeGreaterThanOrEqual(1);
       expect(
         medida.saidas.some((h) => /\/orcamento$/.test(h)),
         `"${rota}" não oferece o formulário: ${JSON.stringify(medida.saidas)}`,

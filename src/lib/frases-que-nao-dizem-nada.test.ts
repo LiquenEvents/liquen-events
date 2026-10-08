@@ -64,6 +64,8 @@ const FICHEIROS = [
   "src/app/[lang]/(site)/error.tsx",
   "src/app/[lang]/(site)/not-found.tsx",
   "src/app/[lang]/s/not-found.tsx",
+  "src/app/[lang]/s/NaoEncontradoSocial.tsx",
+  "src/app/global-not-found.tsx",
 ];
 
 /** E a árvore inteira do back office, que é onde vivem as frases de falha. */
