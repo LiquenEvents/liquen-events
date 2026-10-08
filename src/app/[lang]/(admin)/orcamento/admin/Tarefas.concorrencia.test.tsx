@@ -87,7 +87,7 @@ function caixaDe(titulo: string): HTMLElement {
  * muda o caminho até ao gesto, e é por isso que ele fica escrito uma vez aqui.
  */
 async function abrirMenuDe(user: ReturnType<typeof userEvent.setup>, titulo: string) {
-  const linha = screen.getByText(titulo).closest("div.group")!;
+  const linha = screen.getByText(titulo).closest("[data-tarefa]")!;
   await user.click(linha.querySelector('[aria-haspopup="menu"]') as HTMLElement);
 }
 

@@ -9,11 +9,12 @@ import {
   URGENCY_OPTIONS,
   eventTagLabel,
 } from "@/lib/orcamento/data";
-import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { sendMail, MAIL_TO } from "@/lib/mail";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
+import { htmlDoPedidoParaAEquipa, type LinhaDoCartao } from "@/lib/email-pedido-equipa";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n";
@@ -396,18 +397,6 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     .filter(Boolean)
     .join(" · ");
 
-  // Detail row — hairline-separated; empty value → no row. `valueHtml` is
-  // already-safe HTML (esc'd text or a link). Classes drive dark-mode overrides.
-  const row = (label: string, valueHtml: string) =>
-    valueHtml
-      ? `<tr>
-           <td class="em-hair em-muted" style="padding:11px 0;border-top:1px solid #eee8dc;color:#6b6f5a;font-size:13px;width:120px;vertical-align:top">${esc(label)}</td>
-           <td class="em-hair em-strong" style="padding:11px 0;border-top:1px solid #eee8dc;color:#2a2620;font-size:14px;font-weight:500">${valueHtml}</td>
-         </tr>`
-      : "";
-  const link = (href: string, text: string) =>
-    `<a href="${href}" style="color:#4c6150;text-decoration:none">${esc(text)}</a>`;
-
   // Decision block first (can we do it?), contact block second (how to reply).
   // Os pontos de decoração que o casal escolheu no pedido. Vão no bloco de
   // DECISÃO e não nas notas porque é isto que diz, antes da primeira chamada,
@@ -429,25 +418,32 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   // montagens são e se é preciso um plano para o caso de chover.
   const cerimonia = ceremonyTypeLabel(form.ceremonyType);
   const espaco = spaceTypeLabel(form.spaceType);
-  const eventRows =
-    row("Convidados", esc(convidados)) +
-    row("Local", esc(local)) +
-    (espaco ? row("Espaço", esc(espaco)) : "") +
-    (cerimonia ? row("Cerimónia", esc(cerimonia)) : "") +
+  // As linhas que ficam: uma linha sem valor não se desenha (era o que o
+  // `row()` fazia, e é o que este `filter` faz).
+  const linhasDoPedido: LinhaDoCartao[] = [
+    { rotulo: "Convidados", valor: convidados },
+    { rotulo: "Local", valor: local },
+    { rotulo: "Espaço", valor: espaco },
+    { rotulo: "Cerimónia", valor: cerimonia },
     // "Casal" e não "Noivos": o formulário deixou de presumir que são um homem
     // e uma mulher, e o email que ela lê a seguir não pode voltar a presumi-lo.
-    (noivos ? row("Casal", esc(noivos)) : "") +
-    (decor ? row("Decoração", esc(decor)) : "") +
-    (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
-    (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");
+    { rotulo: "Casal", valor: noivos },
+    { rotulo: "Decoração", valor: decor },
+    { rotulo: "Orçamento", valor: budgetLabel },
+    { rotulo: "Antecedência", valor: urgencyLabel },
+    { rotulo: "Orçamento estimado", valor: estimate },
+  ].filter((l) => l.valor);
   // O email pode agora vir VAZIO (a regra é "email ou telefone" — ver
-  // quoteFormSchema). `row()` já omite a linha quando o valor é vazio, mas o
-  // `link()` construiria um `mailto:` para lado nenhum, por isso a guarda.
-  const contactRows =
-    (form.email ? row("Email", link(`mailto:${esc(form.email)}`, form.email)) : "") +
-    (form.phone ? row("Telefone", link(`tel:${telHref(form.phone)}`, form.phone)) : "") +
-    (form.company ? row("Empresa", esc(form.company)) : "") +
-    (form.nif ? row("NIF", esc(form.nif)) : "");
+  // quoteFormSchema): sem ele não há linha, e portanto não há um `mailto:`
+  // para lado nenhum.
+  const linhasDeContacto: LinhaDoCartao[] = [
+    form.email ? { rotulo: "Email", valor: form.email, href: `mailto:${form.email}` } : null,
+    form.phone
+      ? { rotulo: "Telefone", valor: form.phone, href: `tel:${telHref(form.phone)}` }
+      : null,
+    form.company ? { rotulo: "Empresa", valor: form.company } : null,
+    form.nif ? { rotulo: "NIF", valor: form.nif } : null,
+  ].filter((l): l is LinhaDoCartao => l !== null);
 
   // Email-specific logo: the site PNG carries ~23% transparent padding, so at a
   // 38px box the wordmark rendered only ~18px tall (illegible), and width/height
@@ -469,7 +465,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const mailtoHref = form.email
     ? // O evento entra como ETIQUETA, depois de um «·» — o separador que a casa
       // já usa em todo o lado. Assim identifica o assunto sem nunca discordar.
-      `mailto:${esc(form.email)}?subject=${encodeURIComponent(
+      `mailto:${form.email}?subject=${encodeURIComponent(
         `Líquen Events — o seu pedido${evento ? ` · ${evento}` : ""}`,
       )}` +
       `&body=${encodeURIComponent(
@@ -481,122 +477,25 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const nudge = urgencyLabel
     ? "O cliente pediu resposta com urgência — um olá nas próximas horas faz toda a diferença."
     : "Pedidos respondidos no próprio dia convertem muito mais.";
-  const btnPrimary =
-    "display:inline-block;background:#4c6150;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;padding:12px 24px;border-radius:10px";
-  const btnOutline =
-    "display:inline-block;background:#ffffff;border:1px solid #ece7dc;color:#3a3d30;text-decoration:none;font-size:14px;font-weight:500;padding:11px 22px;border-radius:10px";
-  // Três casos, agora que um pedido pode chegar só com telefone OU só com
-  // email: os dois botões, só o WhatsApp, ou só o email. O que NÃO pode
-  // acontecer é desenhar um botão com um `href` vazio — parecia um botão e
-  // não fazia nada, que é a pior das três avarias possíveis num email que a
-  // equipa lê com pressa.
-  const actionsCell =
-    waHref && mailtoHref
-      ? `<td style="padding-right:10px"><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>
-       <td><a href="${mailtoHref}" style="${btnOutline}">Responder por email</a></td>`
-      : waHref
-        ? `<td><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>`
-        : mailtoHref
-          ? `<td><a href="${mailtoHref}" style="${btnPrimary}">Responder ao cliente</a></td>`
-          : // Inalcançável pelo esquema (exige email ou telefone), mas se
-            // alguém afrouxar essa regra é melhor um aviso do que um botão morto.
-            `<td style="color:#8f8a7a;font-size:13px">Sem contacto registado.</td>`;
-
-  const html = `<!doctype html>
-<html lang="pt">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
-<title>Novo pedido de orçamento</title>
-<style>
-  :root{color-scheme:light dark;supported-color-schemes:light dark}
-  @media (prefers-color-scheme: dark){
-    .em-bg{background:#161911 !important}
-    .em-card{background:#24271c !important;border-color:#3a3d30 !important}
-    .em-strong{color:#f4f3ef !important}
-    .em-muted{color:#c7c9ba !important}
-    .em-hair{border-color:#3a3d30 !important}
-    .em-note{background:#1e2118 !important;border-color:#3a3d30 !important}
-    .em-foot{color:#9a9c8e !important}
-  }
-</style>
-</head>
-<body class="em-bg" style="margin:0;padding:0;background:#f7f4ee">
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f7f4ee">${esc(preheader)}&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#f7f4ee;padding:32px 12px">
-    <tr><td align="center">
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" class="em-card" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #ece7dc;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-        <!-- Logo colorido -->
-        <tr><td align="center" class="em-hair" style="padding:36px 40px 28px;border-bottom:1px solid #ece7dc">
-          <img src="${logoUrl}" alt="Líquen Events" width="130" height="65" style="width:130px;height:65px;display:block;border:0;margin:0 auto;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#4c6150;text-decoration:none" />
-        </td></tr>
-
-        <!-- Título -->
-        <tr><td style="padding:32px 40px 0">
-          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600">Novo pedido de orçamento</div>
-          <div class="em-strong" style="font-family:Georgia,'Times New Roman',serif;font-size:27px;color:#2a2620;margin-top:14px;line-height:1.15;letter-spacing:-0.01em">${esc(name)}</div>
-          ${subtitle ? `<div class="em-muted" style="color:#8f8a7a;font-size:14px;margin-top:7px">${esc(subtitle)}</div>` : ""}
-        </td></tr>
-
-        <!-- Data em destaque -->
-        <tr><td style="padding:20px 40px 0">
-          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600">Data do evento</div>
-          <div class="em-strong" style="font-family:Georgia,serif;font-size:20px;color:#2a2620;margin-top:6px">${esc(dateHero)}${isWeekend ? ` <span style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:12px;color:#63755a;font-weight:600">· fim de semana</span>` : ""}</div>
-        </td></tr>
-
-        <!-- O evento -->
-        <tr><td style="padding:24px 40px 0">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${eventRows}</table>
-        </td></tr>
-
-        <!-- Estimativa -->
-        ${
-          estimate
-            ? `<tr><td style="padding:16px 40px 0">
-                 <div class="em-note" style="background:#f7f4ee;border:1px solid #ece7dc;border-radius:10px;padding:14px 16px">
-                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-                     <td class="em-muted" style="color:#8f8a7a;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;vertical-align:middle">Orçamento estimado</td>
-                     <td class="em-strong" style="text-align:right;font-family:Georgia,serif;color:#2a2620;font-size:17px;vertical-align:middle">${esc(estimate)}</td>
-                   </tr></table>
-                 </div>
-               </td></tr>`
-            : ""
-        }
-
-        <!-- Contacto -->
-        <tr><td style="padding:24px 40px 0">
-          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;margin-bottom:2px">Contacto</div>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${contactRows}</table>
-        </td></tr>
-
-        <!-- Notas -->
-        ${
-          form.notes
-            ? `<tr><td style="padding:24px 40px 0">
-                 <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;font-weight:600">Notas do cliente</div>
-                 <div class="em-note em-strong" style="color:#45483c;font-size:14px;line-height:1.65;white-space:pre-wrap;background:#f7f4ee;border:1px solid #ece7dc;border-radius:10px;padding:14px 16px">${esc(form.notes)}</div>
-               </td></tr>`
-            : ""
-        }
-
-        <!-- Ações -->
-        <tr><td style="padding:32px 40px 0">
-          <table role="presentation" cellpadding="0" cellspacing="0"><tr>${actionsCell}</tr></table>
-          <div class="em-muted" style="color:#6b6f5a;font-size:12px;line-height:1.5;margin-top:14px">${esc(nudge)}</div>
-          <div class="em-muted" style="color:#8f8a7a;font-size:12px;line-height:1.5;margin-top:6px">Também pode responder a este email — a resposta vai direta para ${esc(firstName)}.</div>
-        </td></tr>
-
-        <!-- Rodapé -->
-        <tr><td style="padding:26px 40px 32px">
-          <div class="em-hair em-foot" style="border-top:1px solid #ece7dc;padding-top:16px;color:#a8a294;font-size:11px;letter-spacing:0.3px">Ref. ${esc(id)} · ${esc(new Date().toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" }))}</div>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  // O desenho é o do email ao cliente (ver `email-pedido-equipa.ts`); os
+  // valores são os que estas linhas de cima já decidiam.
+  const html = htmlDoPedidoParaAEquipa({
+    logo: logoUrl,
+    nome: name,
+    data: dateHero,
+    fimDeSemana: isWeekend,
+    subtitulo: subtitle,
+    preheader,
+    whatsapp: waHref,
+    mailto: mailtoHref,
+    lembrete: nudge,
+    primeiroNome: firstName,
+    pedido: linhasDoPedido,
+    contacto: linhasDeContacto,
+    notas: form.notes ?? "",
+    referencia: id,
+    quando: new Date().toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" }),
+  });
 
   // ── A PRIMEIRA LINHA DESTE TEXTO É A PRÉ-VISUALIZAÇÃO DA CAIXA DE CORREIO ──
   // Ela fotografou a lista de mensagens e por baixo do assunto lia-se "NOVO

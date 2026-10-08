@@ -20,10 +20,41 @@ módulos de `src/lib/tarefas/` contra a tabela da **Parte 7**, e não de memóri
 | 08 | Painel de detalhe | **feito** — `TarefaDetalhe.tsx`: notas, subtarefas, ligações e a porta para o evento. Os quatro campos (prazo, quem, área, prioridade) continuam a EDITAR-SE na linha e o painel só os mostra — um segundo editor dos mesmos campos era a família duplicada que a Parte −1 do sistema de design proíbe |
 | 09 | Arrastar e menus | **feito** — arrasto com linha de inserção e Anular, ordem GUARDADA (`Task.posicao`, ver `lib/tarefas/posicoes.ts`), menu no `⋯` e no botão direito, `↓`/`↑`, `⇧F10`, `⌘⌫`, `Esc`. **Três coisas do ponto 21 ficaram fora, com razão:** `⌘1`–`⌘5` (é como o browser troca de separador), `⌘F` (é a pesquisa global da casa e a do browser) e o `Espaço` a marcar a linha focada (o foco está num botão, e roubar-lhe o `Espaço` parte-o). E do ponto 20 ficaram fora os três submenus — «Escolher data…», «Atribuir a…» e «Prioridade» —, que o `ui/MenuDeAccoes` não sabe desenhar e que o «Editar tarefa» já dá |
 | 10 | Estado vazio | **feito** — com botão, como a Parte 8 exige |
-| 11 | Acessibilidade | **por fazer** — a lista da Parte 6 não foi percorrida de fio a pavio |
+| 11 | Acessibilidade | **feito** — a lista da Parte 6 percorrida ponto a ponto num browser (ver abaixo). Guardado por `Tarefas.acessibilidade.test.tsx` (o que o código decide) e por `e2e/tarefas-acessibilidade.spec.ts` (o que só um browser diz) |
 
-Dez das onze. A que falta é a única que não muda o ecrã: percorrer a lista da
-Parte 6 inteira e medir o Lighthouse.
+Onze de onze.
+
+### A fase 11, ponto a ponto (Parte 6)
+
+Medido num Chromium, antes de mexer. **O que estava errado** e foi corrigido:
+
+| Ponto | Antes | Depois |
+|---|---|---|
+| `<ul role="list">` e `<li>` | `<div>` solta, sem papel | `<ul role="list">` com `<li>`, nos grupos e nas concluídas |
+| Responsável pelo nome inteiro | inicial lida solta («C»), sem contexto | inicial muda, «Responsável: Catarina Almeida» |
+| Prioridade lida | «Alta» | «Prioridade: Alta» |
+| Alvos ≥ 40 px (rato) | caixa 36×36, título 278×20 | 40×40 e 40 de altura, com a linha na mesma altura |
+| ⌘N | abria o campo e deixava o foco em `BODY` (corrida: o `rAF` chegava antes do campo) | foco no campo, à primeira |
+| Esc / ⇧Enter fecham o campo | foco caía para `BODY` | foco no botão «Nova tarefa» |
+| Campo a gravar | `disabled` largava o foco para `BODY` | `readOnly`: o foco fica |
+| Contagem da lista escolhida | 4,45:1 (axe) | passa (axe: zero violações; o degrau acima, `--bo-text-muted`) |
+
+**O que já estava certo** e fica guardado: checkbox real, `<h2>` com `aria-labelledby`,
+«⚠ Atrasada» com sinal e palavra, anúncio em `role="status"` ao marcar
+(«Tarefa concluída — «X»»), «Mover para cima/baixo» com anúncio, zoom a 200% e a 400%
+sem rolagem horizontal, contraste do texto da linha (o pior, 4,53:1), axe com zero
+violações em computador e telemóvel.
+
+**O que fica de fora, com razão:**
+
+- **O anel de foco tem 2 px, não 3.** É o anel global da casa, e a Parte 12.2 do
+  sistema de design aceita 2–3 px. Um anel de 3 só aqui era uma segunda família.
+- **O responsável não se desenha abaixo de `sm`.** Está `hidden sm:flex` desde
+  antes desta fase, sem decisão escrita. Mostrá-lo no telemóvel muda o desenho da
+  linha; é uma decisão dela, não uma correcção de acessibilidade.
+- **O Lighthouse não foi medido** neste ecrã: o back office está atrás de uma
+  sessão e o `lighthouserc` só visita páginas públicas. O axe, com o contraste,
+  está no passeio.
 
 ---
 

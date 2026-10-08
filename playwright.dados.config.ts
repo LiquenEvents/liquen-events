@@ -103,6 +103,7 @@ export default defineConfig({
         "**/nav-estudio-marca.spec.ts",
         "**/painel-estudio-marca.spec.ts",
         "**/geometria-dos-alvos.spec.ts",
+        "**/tarefas-acessibilidade.spec.ts",
         "**/proposta-rascunho.spec.ts",
         "**/temas.spec.ts",
         "**/guiao-do-dia.spec.ts",

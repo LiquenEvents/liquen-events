@@ -2,19 +2,26 @@ import { describe, it, expect } from "vitest";
 import { buildClientConfirmation } from "./client-confirmation";
 
 describe("buildClientConfirmation", () => {
-  it("builds a Portuguese quote confirmation with the reference in the body", () => {
+  /**
+   * ── A REFERÊNCIA DEIXOU DE IR NO EMAIL ────────────────────────────────
+   *
+   * Este caso guardava o contrário («with the reference in the body»). A regra
+   * mudou por decisão dela, com o desenho novo: a referência do pedido NÃO
+   * aparece ao cliente — nem no corpo, nem no texto, nem no pré-cabeçalho, nem
+   * na mensagem do WhatsApp. É interna; o cliente não precisa dela.
+   */
+  it("builds a Portuguese quote confirmation WITHOUT the reference anywhere", () => {
     const { subject, html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
       referenceId: "LIQ-ABC-1234",
     });
-    // The reference is deliberately NOT in the subject: it's ~28 chars and ate
-    // the whole line on a phone. It lives in the preheader and the body.
-    expect(subject).not.toContain("LIQ-ABC-1234");
-    expect(subject).toMatch(/Recebemos/);
-    expect(html).toContain("Olá Ana");
-    expect(html).toContain("LIQ-ABC-1234");
-    expect(text).toContain("LIQ-ABC-1234");
+    expect(subject).toBe("Recebemos o seu pedido.");
+    expect(html).toContain("Olá Ana.");
+    for (const parte of [subject, html, text]) {
+      expect(parte).not.toContain("LIQ-ABC-1234");
+      expect(parte).not.toMatch(/ref\./i);
+    }
   });
 
   it("states no turnaround at all — not a date, not a window", () => {
@@ -24,16 +31,15 @@ describe("buildClientConfirmation", () => {
       referenceId: "LIQ-ABC-1234",
     });
     // In high season a number the team can't always hit does more damage than
-    // the reassurance it buys, so the email promises care instead of speed.
+    // the reassurance it buys. «Em breve» promises no number.
     const timing =
       /\d+\s*(horas?|dias?)\s*úteis|segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira/i;
     expect(subject).not.toMatch(timing);
     expect(html).not.toMatch(timing);
     expect(text).not.toMatch(timing);
-    expect(html).toContain("atenção que merece");
   });
 
-  it("mirrors the event back in prose and in the recap", () => {
+  it("mirrors the event back in the «O seu pedido.» card", () => {
     const { html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
@@ -43,40 +49,67 @@ describe("buildClientConfirmation", () => {
         date: "2027-02-23",
         guests: 120,
         location: "Évora",
+        space: "Exterior",
         plural: true,
       },
     });
-    // A frase leva a DATA e o LOCAL, não o tipo: ver o bloco «o tipo de evento
-    // não entra na frase» mais abaixo para o porquê.
-    expect(html).toContain("para 23 de fevereiro de 2027, em Évora");
-    expect(html).toContain("23 de fevereiro de 2027");
-    expect(html).toContain("cerca de 120");
-    expect(html).toContain("Évora");
-    // Plural register for a couple.
-    expect(html).toContain("vosso pedido");
-    expect(text).toContain("Casamento");
+    expect(html).toContain(">Casamento</td>");
+    expect(html).toContain(">23 de fevereiro de 2027</td>");
+    expect(html).toContain(">Cerca de 120</td>");
+    expect(html).toContain(">Évora</td>");
+    expect(html).toContain(">Exterior</td>");
+    expect(text).toContain("Evento: Casamento");
   });
 
-  it("uses the singular register for non-couple events", () => {
-    const { html } = buildClientConfirmation({
+  /**
+   * O registo plural («o vosso pedido») para casais saiu, por decisão dela:
+   * o desenho novo fala com toda a gente no singular. Fica guardado para não
+   * voltar por um caminho antigo.
+   */
+  it("speaks in the singular to everyone, couples included", () => {
+    const { html, text } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
       referenceId: "LIQ-ABC-1234",
-      event: { typeLabel: "Jantar de Gala", plural: false },
+      event: { typeLabel: "Casamento", date: "2027-02-23", plural: true },
     });
     expect(html).toContain("o seu pedido");
-    expect(html).not.toContain("vosso pedido");
+    expect(html).not.toContain("vosso");
+    expect(text).not.toContain("vosso");
   });
 
-  it("handles an open date with the seasons note", () => {
+  it("an open date says «Ainda a definir», as the form does", () => {
     const { html } = buildClientConfirmation({
       locale: "pt",
       name: "Ana",
       referenceId: "LIQ-ABC-1234",
       event: { typeLabel: "Casamento", date: "", plural: true },
     });
-    expect(html).toContain("ainda a definir");
-    expect(html).toContain("fins de semana");
+    expect(html).toContain(">Ainda a definir</td>");
+  });
+
+  it("the guest estimate she picked is what the email shows", () => {
+    const { html } = buildClientConfirmation({
+      locale: "pt",
+      name: "Ana",
+      referenceId: "LIQ-ABC-1234",
+      event: { typeLabel: "Casamento", guestsRange: "100 a 150" },
+    });
+    expect(html).toContain(">100 a 150</td>");
+  });
+
+  it("every image in the email travels with it as an attachment", () => {
+    const { html, attachments } = buildClientConfirmation({
+      locale: "pt",
+      name: "Ana",
+      referenceId: "LIQ-ABC-1234",
+    });
+    const noHtml = new Set([...html.matchAll(/src="cid:([^"]+)"/g)].map((m) => m[1]));
+    const anexados = new Set(attachments.map((a) => a.cid));
+    expect(noHtml.size).toBeGreaterThan(0);
+    for (const cid of noHtml) expect(anexados, `«cid:${cid}» sem anexo`).toContain(cid);
+    // E nenhuma imagem por endereço remoto.
+    expect(html).not.toMatch(/<img[^>]+src="https?:/);
   });
 
   it("builds an English contact confirmation (no reference, no steps)", () => {
@@ -118,7 +151,8 @@ describe("buildClientConfirmation", () => {
       referenceId: "LIQ-ABC-1234",
     });
     expect(html).toMatch(/^<!doctype html>/i);
-    expect(html).toContain('lang="pt-PT"');
+    // O desenho dela declara `lang="pt"` (era `pt-PT` no anterior).
+    expect(html).toContain('lang="pt"');
     expect(html).toContain('<meta charset="utf-8">');
     expect(html).toContain("prefers-color-scheme: dark");
     expect(html).toContain("mso-hide:all"); // hidden preheader
@@ -170,111 +204,45 @@ describe("buildClientConfirmation — assinatura da casa", () => {
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * O TIPO DE EVENTO NÃO ENTRA NA FRASE — SÓ NA ETIQUETA
+ * O TIPO DE EVENTO SÓ APARECE COMO ETIQUETA
  * ══════════════════════════════════════════════════════════════════════════
  *
- * Uma auditoria a 92 dias de correio verdadeiro apanhou as três formas do
- * mesmo erro, todas na mesma frase de abertura:
+ * Aqui estavam seis casos sobre a FRASE de abertura do email anterior («É um
+ * gosto receber o vosso pedido para…»), que colava o tipo, a data e o local
+ * numa frase e errou de três maneiras em correio verdadeiro («para o
+ * casamentos», «para o outro», a vírgula pendurada sem data).
  *
- *   «É um gosto receber o vosso pedido PARA O CASAMENTOS de 25 de janeiro»
- *   «It's a joy to receive your request FOR YOUR CASAMENTO on 12 June»
- *   «É um gosto receber o vosso pedido PARA O OUTRO de 15 de maio»
- *
- * O que lá caía era um rótulo de LISTA: plural, com barras, e um deles é
- * literalmente «Outro». Nenhum artigo serve para todos, e uma tabela de
- * géneros era uma máquina inteira para uma frase que se reescreve.
- *
- * A frase passa a falar da DATA e do LOCAL — as duas coisas que o cliente
- * quer ver confirmadas — e o tipo aparece onde nunca há concordância para
- * discordar: a linha «Evento:» do resumo e o pré-cabeçalho.
+ * O desenho novo não tem essa frase: o tipo, a data e o local vivem cada um na
+ * sua linha do cartão «O seu pedido.», que é uma construção que nunca precisa
+ * de artigo nem de vírgula. Os casos que sobram guardam o que continua a poder
+ * correr mal.
  */
-describe("buildClientConfirmation — a frase de abertura não depende do tipo", () => {
+describe("buildClientConfirmation — o tipo de evento é uma etiqueta", () => {
   const base = { locale: "pt", name: "Ana", referenceId: "LIQ-ABC-1234" } as const;
 
-  it("um rótulo no plural não é colado a um artigo no singular", () => {
-    // Exactamente o que os anúncios enviam: sem `eventName`, o balde da
-    // taxonomia («Casamentos») era o que sobrava para a frase.
+  it("um rótulo de lista entra tal como é, e nunca a meio de uma frase", () => {
     const { html, text } = buildClientConfirmation({
-      ...base,
-      event: { typeLabel: "Casamentos", date: "2027-01-25", location: "Évora", plural: true },
-    });
-    expect(text).toContain(
-      "É um gosto receber o vosso pedido para 25 de janeiro de 2027, em Évora.",
-    );
-    expect(html).not.toContain("para o casamentos");
-    expect(text).not.toContain("para o casamentos");
-  });
-
-  it("«Outro» deixa de ter de fazer sentido como substantivo", () => {
-    // Sem tipo nenhum (é o que o «Outro» do formulário grava) a frase não
-    // perde nada: continua a confirmar a data.
-    const { text } = buildClientConfirmation({
-      ...base,
-      event: { date: "2027-05-15", plural: false },
-    });
-    expect(text).toContain("É um gosto receber o seu pedido para 15 de maio de 2027.");
-    expect(text.toLowerCase()).not.toContain("para o outro");
-    expect(text.toLowerCase()).not.toContain("for your other");
-  });
-
-  it("uma barra de lista («Batizado / Comunhão») não vai parar a meio da frase", () => {
-    // Mesmo que a etiqueta chegue com a barra da lista pendente, a frase não
-    // a pode ir buscar: «para o batizado / comunhão de 3 de maio» saiu assim.
-    const { text } = buildClientConfirmation({
       ...base,
       event: { typeLabel: "Batizado / Comunhão", date: "2027-05-03", plural: true },
     });
-    const abertura = text.split("\n").find((l) => l.startsWith("É um gosto"))!;
-    expect(abertura).toBe(
-      "É um gosto receber o vosso pedido para 3 de maio de 2027. Está agora nas mãos da nossa equipa.",
-    );
-    expect(abertura).not.toContain("/");
+    expect(html).toContain(">Batizado / Comunhão</td>");
+    expect(text).toContain("Evento: Batizado / Comunhão");
+    expect(text.toLowerCase()).not.toContain("para o batizado");
   });
 
   it("o email inglês diz tudo em inglês, incluindo o tipo na etiqueta", () => {
-    const { text, html } = buildClientConfirmation({
+    const { subject, text, html } = buildClientConfirmation({
       locale: "en",
       name: "Sarah",
       referenceId: "LIQ-ABC-1234",
       // A etiqueta chega já na língua de quem lê — é a rota que a resolve.
       event: { typeLabel: "Wedding", date: "2027-06-12", location: "Évora", plural: true },
     });
-    expect(text).toContain("It's a joy to receive your request for 12 June 2027, in Évora.");
+    expect(subject).toBe("We've received your request.");
     expect(text).toContain("Event: Wedding");
+    expect(html).toContain(">12 June 2027</td>");
     expect(text.toLowerCase()).not.toContain("casamento");
     expect(html.toLowerCase()).not.toContain("casamento");
-  });
-
-  /**
-   * «É um gosto receber o vosso pedido para o casamento, em Evora.» — saiu
-   * quatro vezes entre 5 e 10 de agosto. A vírgula separava a data do local,
-   * e sem data ficou a separar coisa nenhuma.
-   */
-  it("sem data, não fica uma vírgula pendurada", () => {
-    const { text } = buildClientConfirmation({
-      ...base,
-      event: { typeLabel: "Casamento", date: "", location: "Évora", plural: true },
-    });
-    expect(text).toContain("É um gosto receber o vosso pedido para um evento em Évora.");
-    expect(text).not.toMatch(/pedido[^.\n]*,\s*em Évora/);
-
-    const en = buildClientConfirmation({
-      locale: "en",
-      name: "Sarah",
-      referenceId: "LIQ-ABC-1234",
-      event: { typeLabel: "Wedding", date: "", location: "Portugal", plural: true },
-    });
-    expect(en.text).toContain("It's a joy to receive your request for an event in Portugal.");
-    expect(en.text).not.toMatch(/request[^.\n]*,\s*in Portugal/);
-  });
-
-  it("sem data e sem local, a frase acaba onde acaba", () => {
-    const { text } = buildClientConfirmation({
-      ...base,
-      event: { typeLabel: "Casamento", plural: true },
-    });
-    expect(text).toContain("É um gosto receber o vosso pedido. Está agora nas mãos");
-    expect(text).not.toMatch(/pedido\s*,/);
   });
 });
 
@@ -300,9 +268,8 @@ describe("buildClientConfirmation — a geografia do evento é a do cliente", ()
       referenceId: "LIQ-ABC-1234",
       event: { typeLabel: "Casamento", date: "", location: "Vermil, Guimarães", plural: true },
     });
-    // A nota das épocas está lá (é a data em aberto)…
-    expect(text).toContain("fins de semana");
-    // …mas não afirma uma região que pode não ser a do evento.
+    // A nota das épocas saiu com o desenho novo; o que fica guardado é que o
+    // email não afirma uma região que pode não ser a do evento.
     expect(text).not.toMatch(/n[oa] Alentejo/i);
     expect(html).not.toMatch(/n[oa] Alentejo/i);
   });
@@ -314,7 +281,6 @@ describe("buildClientConfirmation — a geografia do evento é a do cliente", ()
       referenceId: "LIQ-ABC-1234",
       event: { typeLabel: "Wedding", date: "", location: "Guimarães", plural: true },
     });
-    expect(text).toContain("weekends");
     expect(text).not.toMatch(/in the Alentejo/i);
   });
 });

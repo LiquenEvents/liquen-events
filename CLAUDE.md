@@ -69,15 +69,16 @@ refazer seja o que for.
 Ela escolheu a ordem: **«prefiro as tarefas primeiro»**. Em resumo, hoje —
 e cada tabela é que manda, isto é só o mapa:
 
-  · **Tarefas**: dez de onze. Falta a 11, acessibilidade;
+  · **Tarefas**: onze de onze. A 11 era percorrer a Parte 6 num browser, e está feita;
   · **Calendário**: as quatro vistas existem (dia, semana, mês, ano). Faltam a
     09 (arrastar) e a 11 (acessibilidade); a 01, a 05 e a 10 estão parciais;
   · **Temas**: a 06, a 07, a 08 e a 09 ficaram feitas; a 01, a 02, a 03, a 05
     e a 10 estão parciais, e a 04 e a 11 por fazer.
 
-Repara que a 11 é a mesma nos três — é a acessibilidade, e nos três é a mesma
-troca: passar as grelhas de `role="button"` a `role="grid"` com `gridcell`.
-Três ecrãs a pedir a mesma peça é sinal de que se faz de uma vez, e não três.
+Repara que a 11 do Calendário e a dos Temas são a mesma peça: passar a grelha de
+`role="button"` a `role="grid"` com `gridcell`. Faz-se de uma vez, e não duas. (A das
+Tarefas NÃO era essa: a lista é `<ul>/<li>`, e a 11 foi percorrer a Parte 6 inteira.
+Este mapa dizia o contrário e estava errado: a tabela de cada documento é que manda.)
 
 Estes três andaram perdidos: chegaram pelo chat e nunca ficaram guardados. O do
 Liquid Glass fez o mesmo caminho e só se recuperou por sorte. **Um documento que

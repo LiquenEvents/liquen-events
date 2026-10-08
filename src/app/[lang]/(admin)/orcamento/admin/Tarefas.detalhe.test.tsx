@@ -137,7 +137,7 @@ const abrirDetalhe = async (user: ReturnType<typeof userEvent.setup>, titulo: st
   user.click(screen.getByRole("button", { name: `Abrir «${titulo}»` }));
 
 const abrirMenu = async (user: ReturnType<typeof userEvent.setup>, titulo: string) => {
-  const linha = screen.getByText(titulo).closest("div.group")!;
+  const linha = screen.getByText(titulo).closest("[data-tarefa]")!;
   await user.click(linha.querySelector('[aria-haspopup="menu"]') as HTMLElement);
 };
 
@@ -247,7 +247,7 @@ describe("fase 09 — o menu da linha, o mover e o teclado", () => {
   it("as acções da linha vivem num botão só, e o menu abre-se com o botão direito", async () => {
     await montar();
 
-    const linha = screen.getByText("Confirmar florista").closest("div.group")!;
+    const linha = screen.getByText("Confirmar florista").closest("[data-tarefa]")!;
     // Um botão, não três: o lápis e o caixote soltos saíram da linha.
     expect(linha.querySelector('[aria-label="Editar tarefa"]')).toBeNull();
 
