@@ -97,7 +97,7 @@ export default function NotasInternas({
       >
         <span aria-hidden="true">✎</span>
         <span className="min-w-0">{titulo}</span>
-        <span className="font-normal normal-case tracking-normal text-[var(--bo-aviso)]/70">
+        <span className="font-normal normal-case tracking-normal text-[var(--bo-aviso)]">
           — só para ti, nunca sai na proposta
         </span>
       </label>

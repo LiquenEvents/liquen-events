@@ -56,7 +56,7 @@ export default function NotaDaProposta({ quoteId }: { quoteId: string }) {
       <p className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[var(--bo-aviso)]">
         <span aria-hidden="true">✎</span>
         Nota da proposta
-        <span className="font-normal normal-case tracking-normal text-[var(--bo-aviso)]/70">
+        <span className="font-normal normal-case tracking-normal text-[var(--bo-aviso)]">
           — escreve-se no estúdio, nunca sai na proposta
         </span>
       </p>

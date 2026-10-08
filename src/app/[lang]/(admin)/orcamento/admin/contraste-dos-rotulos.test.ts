@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { corDeTexto, UNKNOWN_STATUS_COLOR } from "./status-meta";
+import { corDeTexto, tintaDoRotulo, UNKNOWN_STATUS_COLOR } from "./status-meta";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -181,10 +181,14 @@ describe("a paleta de estados varrida da fonte", () => {
    * deixarem silenciosamente de ser medidas.
    */
   it("a varredura encontrou mesmo alguma coisa", () => {
-    expect(cores.size, "nenhuma cor de mapa de estados encontrada — a varredura cegou").
-      toBeGreaterThanOrEqual(8);
-    expect(alfas.length, "nenhum alfa de crachá encontrado — a varredura cegou").
-      toBeGreaterThanOrEqual(2);
+    expect(
+      cores.size,
+      "nenhuma cor de mapa de estados encontrada — a varredura cegou",
+    ).toBeGreaterThanOrEqual(8);
+    expect(
+      alfas.length,
+      "nenhum alfa de crachá encontrado — a varredura cegou",
+    ).toBeGreaterThanOrEqual(2);
   });
 
   for (const [cor, ficheiros] of [...cores].sort()) {
@@ -272,11 +276,55 @@ describe("os crachás escrevem com o degrau de texto", () => {
           valor: m[1].trim(),
         })),
       )
-      .filter(({ valor }) => /\.color\b/.test(valor) && !valor.includes("corDeTexto("));
+      .filter(
+        ({ valor }) =>
+          /\.color\b/.test(valor) &&
+          !valor.includes("corDeTexto(") &&
+          // O `tintaDoRotulo` é o `corDeTexto` em claro, e o mesmo tom
+          // misturado com branco em escuro (achado n.º 14).
+          !valor.includes("tintaDoRotulo("),
+      );
 
     expect(
       crus.map((c) => `${c.ficheiro}:${c.linha} → ${c.valor}`),
       "um crachá escreve a cor de preencher em vez da cor de escrever",
     ).toEqual([]);
+  });
+});
+
+/**
+ * Achado n.º 14: no modo Escuro, os crachás escreviam com a cor afinada para o
+ * claro — «Alta» a 1,91:1. O `tintaDoRotulo` escreve, no escuro, o mesmo tom a
+ * 45% com branco. A conta é feita aqui contra o pior fundo escuro da casa: o
+ * cartão mais claro (`--bo-elevado-2`) com a própria cor por cima, ao alfa
+ * mais carregado que o código usa (`0x22`).
+ */
+describe("os rótulos no modo Escuro", () => {
+  const PALETA = [
+    "#9aa36a",
+    "#8a8a82",
+    "#8a6d2f",
+    "#7c854b",
+    "#b5894a",
+    "#a9781f",
+    "#7d8a55",
+    "#7a8caa",
+    "#8a2a22",
+    "#4c6752",
+    "#3a5c39",
+    "#b23b2e",
+  ];
+  const CARTAO_ESCURO = ler("#262d26");
+
+  it.each(PALETA)("%s escreve-se a 4,5:1 ou mais", (cor) => {
+    const tinta = ler(cor).map((c) => c * 0.45 + 255 * 0.55);
+    const fundo = achatar(ler(cor), 0x22 / 255, CARTAO_ESCURO);
+    expect(racio(tinta, fundo)).toBeGreaterThanOrEqual(MINIMO);
+  });
+
+  it("o claro continua a ser o `corDeTexto`, e o escuro é a mistura com branco", () => {
+    expect(tintaDoRotulo("#9aa36a")).toBe(
+      `light-dark(${corDeTexto("#9aa36a")}, color-mix(in srgb, #9aa36a 45%, white))`,
+    );
   });
 });

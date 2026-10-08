@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { useMemo, useState, useDeferredValue } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
@@ -366,12 +367,7 @@ export default function Fornecedores() {
           if (cat === "Preferidos" && !s.preferred) return false;
           if (cat !== "Todos" && cat !== "Preferidos" && s.category !== cat) return false;
           const q = dSearch.trim().toLowerCase();
-          if (
-            q &&
-            ![s.name, s.email, s.phone, s.location, s.notes]
-              .filter(Boolean)
-              .some((v) => v!.toLowerCase().includes(q))
-          )
+          if (q && !casaComAProcura(q, [s.name, s.email, s.phone, s.location, s.notes]))
             return false;
           return true;
         })

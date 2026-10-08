@@ -9,7 +9,7 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
 import { Button, Card, EmptyState, PerguntaDestrutiva, Segmented } from "./ui";
 import type { SegmentedOption } from "./ui";
 import { useCachedList } from "./useCachedList";
-import { corDeTexto, metaFor } from "./status-meta";
+import { metaFor, tintaDoRotulo } from "./status-meta";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import {
   lugaresNoCliente,
@@ -150,7 +150,7 @@ function EstadoChip({ p }: { p: Proposal }) {
   return (
     <span
       className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]"
-      style={{ background: `${meta.color}1f`, color: corDeTexto(meta.color) }}
+      style={{ background: `${meta.color}1f`, color: tintaDoRotulo(meta.color) }}
     >
       {meta.label}
     </span>
@@ -860,7 +860,9 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 },
                 {
                   chave: "valor",
-                  cabecalho: "Valor",
+                  // Com IVA — é o que o casal paga. Os Pedidos mostram o mesmo
+                  // pedido sem IVA, e diz-se dos dois lados (achado n.º 29).
+                  cabecalho: "Valor c/ IVA",
                   alinharADireita: true,
                   ordenar: (a, b) => a.total - b.total,
                   celula: (p) => (
@@ -923,6 +925,9 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                     <div className="flex shrink-0 items-center gap-1">
                       <span className="text-sm font-semibold tabular-nums text-[var(--bo-text)]">
                         {eurCentimos(p.total)}
+                        <span className="ml-1 text-[11px] font-normal text-[var(--bo-text-muted)]">
+                          c/ IVA
+                        </span>
                       </span>
                       <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />
                     </div>

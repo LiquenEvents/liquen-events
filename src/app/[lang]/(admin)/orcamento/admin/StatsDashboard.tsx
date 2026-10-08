@@ -1,6 +1,6 @@
 "use client";
 
-import { corDeTexto } from "./status-meta";
+import { corDeTexto, tintaDoRotulo } from "./status-meta";
 import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
@@ -80,7 +80,9 @@ function Kpi({
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${small ? "p-4" : "p-5"} ${
-        accent ? "bg-sage-600/[0.05] border-sage-600/20" : "bg-[var(--bo-surface)] border-[var(--bo-hairline)] "
+        accent
+          ? "bg-sage-600/[0.05] border-sage-600/20"
+          : "bg-[var(--bo-surface)] border-[var(--bo-hairline)] "
       }`}
     >
       <p
@@ -92,7 +94,7 @@ function Kpi({
         {value}
       </p>
       <p
-        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-sage-600/60" : "text-foreground/30"}`}
+        className={`text-[9px] tracking-[0.25em] uppercase relative ${accent ? "text-[var(--bo-accent)]" : "text-foreground/30"}`}
       >
         {label}
       </p>
@@ -327,9 +329,7 @@ const QUADRADOS_DE_NUMERO = "grid grid-cols-1 min-[22rem]:grid-cols-2 gap-3";
 function Sub({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-5 text-title3 font-semibold text-[var(--bo-text-muted)]">
-        {title}
-      </h3>
+      <h3 className="mb-5 text-title3 font-semibold text-[var(--bo-text-muted)]">{title}</h3>
       {children}
     </div>
   );
@@ -839,7 +839,8 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         <span className="w-2 h-2 rounded-full bg-moss" /> Recebido
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--bo-aviso-tom)]/70" /> A receber
+                        <span className="w-2 h-2 rounded-full bg-[var(--bo-aviso-tom)]/70" /> A
+                        receber
                       </span>
                     </div>
                   </div>
@@ -927,7 +928,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                     return stats.profitability.byType.map((row) => {
                       const pct = Math.round(row.marginPct);
                       // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
-                      const color = corDeTexto(
+                      const color = tintaDoRotulo(
                         pct >= 50 ? "#4c6752" : pct >= 20 ? "#7c854b" : "#8a8a82",
                       );
                       return (
@@ -1064,7 +1065,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         className="text-[11px] font-semibold tabular-nums min-w-[34px] text-right"
                         style={{
                           // `corDeTexto`: o `#8a8a82` media 3,48:1 como número.
-                          color: corDeTexto(
+                          color: tintaDoRotulo(
                             row.taxa >= 50 ? "#4c6752" : row.taxa >= 20 ? "#7c854b" : "#8a8a82",
                           ),
                         }}

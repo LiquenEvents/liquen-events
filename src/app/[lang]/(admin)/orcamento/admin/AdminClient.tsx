@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { resumoDoEnvio } from "./envio-da-mensagem";
 import { rolarAteVer } from "@/lib/motion/rolar";
 
@@ -1050,6 +1051,12 @@ const QuoteCard = memo(function QuoteCard({
             {q.quotedPrice ? (
               <span className="text-sage-600 text-[13px] font-semibold">
                 {formatPrice(q.quotedPrice)}
+                {/* Achado n.º 29: este é SEM IVA, e as Propostas mostram o
+                    mesmo pedido COM IVA — sem o rótulo, eram dois números
+                    diferentes para a mesma coisa. */}
+                <span className="ml-1 text-[11px] font-normal text-[var(--bo-text-muted)]">
+                  s/ IVA
+                </span>
               </span>
             ) : q.priceBreakdown?.total ? (
               <span className="bo-text-muted text-[13px]">
@@ -4010,8 +4017,10 @@ export default function AdminClient({
       list = list.filter((x) => (x.tags ?? []).includes(tagFilter));
     }
     if (q) {
+      // Sem acentos e com o telefone em qualquer formato — ver `procura.ts`
+      // (achado n.º 10: «evora» dava zero resultados).
       list = list.filter((x) =>
-        [
+        casaComAProcura(q, [
           x.name,
           x.email,
           x.phone,
@@ -4021,9 +4030,7 @@ export default function AdminClient({
           x.assignedTo,
           x.contractRef,
           ...(x.tags ?? []),
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q)),
+        ]),
       );
     }
     const sorted = [...list];
@@ -5702,7 +5709,7 @@ export default function AdminClient({
                   <button
                     onClick={pedirNovaTarefa}
                     aria-label="Nova tarefa"
-                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
                     title="Escrever uma tarefa (⌘N)"
                   >
                     <svg
@@ -5722,7 +5729,7 @@ export default function AdminClient({
                   <button
                     onClick={() => setNewQuoteOpen(true)}
                     aria-label="Novo pedido"
-                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
+                    className={`alvo-toque flex items-center gap-2 px-4 py-2 bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} `}
                     title="Criar pedido manualmente"
                   >
                     <svg
@@ -6371,7 +6378,7 @@ export default function AdminClient({
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === "all" ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -6381,7 +6388,7 @@ export default function AdminClient({
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${filterStatus === s.id ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] " : "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -6395,7 +6402,7 @@ export default function AdminClient({
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[var(--bo-seleccao)] text-white " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-[10px] tracking-[0.1em] uppercase font-medium ${ESTADO} ${PRESSAO} ${showArchived ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] " : "bg-[var(--bo-tinta-6)] text-foreground/30 hover:bg-[var(--bo-tinta-10)]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>

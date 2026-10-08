@@ -1,5 +1,6 @@
 "use client";
 
+import { casaComAProcura } from "@/lib/procura";
 import { useMemo, useState, useDeferredValue } from "react";
 // `import type` é totalmente apagado no build, por isso puxar a forma do store
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
@@ -27,8 +28,10 @@ import { referenciaCurta } from "@/lib/referencia-curta";
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
 // das chips do Inventário.
 const STATUS_META: Record<ContractStatus, { label: string; bg: string; text: string }> = {
-  aceite: { label: "Aceite", bg: "#e7efe4", text: "#3a5c39" },
-  pendente: { label: "Pendente", bg: "#00000008", text: "#8a8378" },
+  // Tokens, e não hex: o «Pendente» em #8a8378 media 3,5:1 no claro, e no
+  // escuro os dois ficavam pretos sobre preto (achados n.º 14 e 25).
+  aceite: { label: "Aceite", bg: "var(--bo-accent-lavagem)", text: "var(--bo-accent)" },
+  pendente: { label: "Pendente", bg: "var(--bo-tinta-3)", text: "var(--bo-text-muted)" },
 };
 
 const STATUSES = Object.keys(STATUS_META) as ContractStatus[];
@@ -65,8 +68,8 @@ function statusMeta(status: string): { label: string; bg: string; text: string }
   return (
     STATUS_META[status as ContractStatus] ?? {
       label: status || "—",
-      bg: "#00000008",
-      text: "#8a8378",
+      bg: "var(--bo-tinta-3)",
+      text: "var(--bo-text-muted)",
     }
   );
 }
@@ -199,9 +202,7 @@ export default function Contratos() {
       if (status !== "all" && c.status !== status) return false;
       if (
         q &&
-        ![c.clientName, c.clientEmail, c.acceptedName, c.quoteId, c.proposalId]
-          .filter(Boolean)
-          .some((v) => v!.toLowerCase().includes(q))
+        !casaComAProcura(q, [c.clientName, c.clientEmail, c.acceptedName, c.quoteId, c.proposalId])
       )
         return false;
       return true;

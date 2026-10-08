@@ -7,7 +7,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
-import { corDeTexto, metaFor } from "./status-meta";
+import { metaFor, tintaDoRotulo } from "./status-meta";
 import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
 import { useEntradaAoChegar } from "./ui/useEntradaAoChegar";
@@ -433,7 +433,7 @@ function AvisoConflito({
       <div className="flex flex-wrap gap-2 mt-2.5">
         <button
           onClick={() => onEscolher("meu")}
-          className={`px-3 py-1.5 rounded-full bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
+          className={`px-3 py-1.5 rounded-full bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.12em] uppercase ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
         >
           {doBrowser ? "Guardar as deste browser" : "Guardar a minha por cima"}
         </button>
@@ -513,7 +513,10 @@ function AvisoLeitura({ onRecarregar }: { onRecarregar: () => void }) {
   return (
     <p role="alert" className="text-[var(--bo-perigo)] text-xs leading-relaxed">
       Não foi possível ler o que está guardado no servidor.{" "}
-      <button onClick={onRecarregar} className={`underline font-semibold rounded ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}>
+      <button
+        onClick={onRecarregar}
+        className={`underline font-semibold rounded ${FOCUS_RING} ${ESTADO} ${PRESSAO}`}
+      >
         Tentar de novo
       </button>
     </p>
@@ -613,7 +616,7 @@ const MetaReceita = memo(function MetaReceita({
             <button
               onClick={() => void saveGoal()}
               disabled={estado.tipo === "a-guardar"}
-              className={`px-4 py-2 bg-[var(--bo-seleccao)] text-white/90 text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] whitespace-nowrap disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
+              className={`px-4 py-2 bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] text-[10px] tracking-[0.15em] uppercase rounded-full hover:bg-[var(--bo-seleccao-hover)] whitespace-nowrap disabled:opacity-50 ${ESTADO} ${PRESSAO}`}
             >
               {estado.tipo === "a-guardar" ? "A guardar…" : "Guardar"}
             </button>
@@ -643,7 +646,7 @@ const MetaReceita = memo(function MetaReceita({
                 className="font-light"
                 style={{
                   fontSize: "clamp(18px, 2vw, 24px)",
-                  color: wonThisMonth >= goal ? "#3a5c39" : "#4c6752",
+                  color: tintaDoRotulo(wonThisMonth >= goal ? "#3a5c39" : "#4c6752"),
                 }}
               >
                 {eur(wonThisMonth)}
@@ -652,7 +655,7 @@ const MetaReceita = memo(function MetaReceita({
             </div>
             <span
               className="text-sm font-semibold tabular-nums"
-              style={{ color: wonThisMonth >= goal ? "#3a5c39" : "#4c6752" }}
+              style={{ color: tintaDoRotulo(wonThisMonth >= goal ? "#3a5c39" : "#4c6752") }}
             >
               {Math.min(100, Math.round((wonThisMonth / goal) * 100))}%
             </span>
@@ -1593,7 +1596,7 @@ export default function Overview({
                    de 44 px do dedo: media 37 px de altura, e é o único caminho
                    para sair de um ecrã que não tem mais nada. Só cresce com
                    dedo — com rato fica exactamente como está desenhado. */
-                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[var(--bo-seleccao)] text-white/90 hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} mb-3 ${FOCUS_RING}`}
+                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] hover:bg-[var(--bo-seleccao-hover)] ${ESTADO} ${PRESSAO} mb-3 ${FOCUS_RING}`}
               >
                 <svg
                   width="13"
@@ -1615,7 +1618,7 @@ export default function Overview({
               className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium ${ESTADO} ${PRESSAO} ${
                 tudoArquivado && onVerArquivados
                   ? "bg-[var(--bo-surface)] border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)]"
-                  : "bg-[var(--bo-seleccao)] text-white/90 hover:bg-[var(--bo-seleccao-hover)]"
+                  : "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] hover:bg-[var(--bo-seleccao-hover)]"
               } ${FOCUS_RING}`}
             >
               <svg
@@ -1702,7 +1705,7 @@ export default function Overview({
               onClick={a.onClick}
               className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium ${ESTADO} ${PRESSAO} ${FOCUS_RING} ${
                 i === 0
-                  ? "bg-[var(--bo-seleccao)] text-white/90 hover:bg-[var(--bo-seleccao-hover)] "
+                  ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] hover:bg-[var(--bo-seleccao-hover)] "
                   : "bg-[var(--bo-surface)] border border-[var(--bo-hairline)] text-[var(--bo-text-muted)] hover:text-[var(--bo-text)] hover:border-[var(--bo-hairline-strong)] "
               }`}
             >
@@ -1740,12 +1743,13 @@ export default function Overview({
               <p
                 className="text-[10px] tracking-[0.25em] uppercase font-medium mb-1.5"
                 style={{
-                  color:
+                  color: tintaDoRotulo(
                     data.nextEventDays <= 3
                       ? "#8a2a22"
                       : data.nextEventDays <= 7
                         ? "#b5894a"
                         : "#4c6752",
+                  ),
                 }}
               >
                 {data.nextEventDays === 0
@@ -1774,12 +1778,13 @@ export default function Overview({
               <p
                 className="text-2xl sm:text-3xl font-light tabular-nums"
                 style={{
-                  color:
+                  color: tintaDoRotulo(
                     data.nextEventDays <= 3
                       ? "#8a2a22"
                       : data.nextEventDays <= 7
                         ? "#b5894a"
                         : "#4c6752",
+                  ),
                 }}
               >
                 {data.nextEventDays === 0 ? "hoje" : `${data.nextEventDays}d`}
@@ -1932,7 +1937,8 @@ export default function Overview({
                 className="font-light leading-none"
                 style={{
                   fontSize: k.tamanho,
-                  color: k.cor,
+                  // No escuro, o mesmo tom mais claro — achado n.º 14.
+                  color: tintaDoRotulo(k.cor),
                 }}
               >
                 {k.v}
@@ -2146,7 +2152,8 @@ export default function Overview({
                     <span className="w-2 h-2 rounded-full bg-sage-600" /> Recebido
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[var(--bo-aviso-tom)]/70" /> Por receber
+                    <span className="w-2 h-2 rounded-full bg-[var(--bo-aviso-tom)]/70" /> Por
+                    receber
                   </span>
                 </div>
               </>
@@ -2223,7 +2230,7 @@ export default function Overview({
                         style={{
                           background: `${metaFor(STATUS_META, q.status).color}18`,
                           // A cor de ESCREVER, não a de preencher: medido 3,16:1 antes.
-                          color: corDeTexto(metaFor(STATUS_META, q.status).color),
+                          color: tintaDoRotulo(metaFor(STATUS_META, q.status).color),
                         }}
                       >
                         {metaFor(STATUS_META, q.status).label}

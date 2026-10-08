@@ -1669,6 +1669,28 @@ body:has([data-admin-mode][data-aparencia="claro"]) {
   --bo-tinta-rgb: 13 13 13;
 }
 
+/* ── O VERDE DO TEXTO NO ESCURO ───────────────────────────────────────────
+   Achado n.º 14 da auditoria: `text-sage-600` é a cor de marca a escrever
+   texto — 126 sítios só no estúdio (as pastilhas de estado, os números dos
+   cartões, as ligações). No escuro dava 2,0–2,8:1. O `--bo-accent` é o mesmo
+   verde em claro e o sage-300 em escuro (9,34:1, medido no bloco de cima).
+
+   Troca-se a TINTA do texto e não o `--color-sage-600`: esse também pinta os
+   fundos dos botões cheios, que levam texto branco por cima e ficavam
+   ilegíveis se o verde clareasse. Os mesmos três estados do canal da tinta. */
+@media (prefers-color-scheme: dark) {
+  body:has([data-admin-mode]):not(:has([data-admin-mode][data-aparencia="claro"]))
+    :is(.text-sage-600, .text-sage-700, .text-moss, [class*="text-sage-600/"]) {
+    color: var(--bo-accent);
+  }
+}
+/* As variantes com opacidade (`text-sage-600/60`) e o `text-moss` também: no
+   escuro, um verde-escuro a 60% sobre o chão escuro mediu 1,76:1. */
+body:has([data-admin-mode][data-aparencia="escuro"])
+  :is(.text-sage-600, .text-sage-700, .text-moss, [class*="text-sage-600/"]) {
+  color: var(--bo-accent);
+}
+
 /* ── O GEIST, E PORQUE É QUE ESTA REGRA NÃO ESTÁ NO `body` ────────────────
    A letra é carregada pelo `layout.tsx` do grupo `(admin)`, e o `next/font`
    põe a variável no elemento que leva a classe — o `<main data-admin-mode>`.
@@ -4482,8 +4504,14 @@ body[data-menu-open] .whatsapp-fixed {
 
    O contraste MELHORA com a troca (#0d0d0d a 64% é mais escuro do que
    #2a2620 a 66% sobre branco), por isso a garantia de AA mantém-se. */
+/* ── E A COR VEM DO TOKEN, E NÃO DE UM rgba ESCRITO À MÃO ──────────────────
+   Achado n.º 14 da auditoria: o `rgba(13, 13, 13, .64)` daqui não trocava no
+   modo Escuro — os títulos de secção ficavam a 1,02:1, quase pretos sobre o
+   chão escuro, em dez vistas. O `--bo-text-muted` É este mesmo cinzento em
+   claro (a tinta a 64%), e troca com a tinta. Só há `.bo-eyebrow` no back
+   office, que é onde o token existe. */
 .bo-eyebrow {
-  color: rgba(13, 13, 13, 0.64);
+  color: var(--bo-text-muted);
   font-size: 0.6875rem; /* 11px — a touch more legible than 10px */
   letter-spacing: 0.14em;
   text-transform: uppercase;

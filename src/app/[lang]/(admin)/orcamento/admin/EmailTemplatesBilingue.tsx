@@ -7,7 +7,11 @@ import { Escolha, Button } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
-import { insertToken } from "@/lib/email-template-format";
+import {
+  construirCorpoDeModelo,
+  extractSimpleText,
+  insertToken,
+} from "@/lib/email-template-format";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { renderizarAssunto, renderizarCorpo, validarModelo } from "@/lib/email-template-engine";
 import {
@@ -201,14 +205,37 @@ export default function EmailTemplatesBilingue() {
     `${chave ?? ""}:${idioma}`,
   );
 
+  /**
+   * ── A CAIXA MOSTRA O TEXTO, NÃO O FORMATO GUARDADO ──────────────────────
+   *
+   * Achado n.º 9 da auditoria: a «Mensagem» dos sete modelos abria com
+   * `<!-- liquen:simple:v1:T2zDoSB7…` seguido do HTML com estilos — mudar uma
+   * palavra era editar HTML, e o marcador escondido (que o editor clássico
+   * lê) deixava de acompanhar o que se mudava aqui.
+   *
+   * Um corpo com marcador abre como o TEXTO que lá está guardado, e volta a
+   * ser construído inteiro (marcador incluído) ao publicar, ao pré-visualizar
+   * e ao enviar o teste. Um corpo escrito à mão em HTML, sem marcador, abre
+   * como está — não há texto de origem para lhe tirar.
+   */
+  const [corpoEmTexto, setCorpoEmTexto] = useState(false);
+  const paraGravar = (texto: string) => (corpoEmTexto ? construirCorpoDeModelo(texto) : texto);
+  const paraEditar = (body: string) => {
+    const texto = extractSimpleText(body);
+    setCorpoEmTexto(texto != null);
+    return texto ?? body;
+  };
+
   const abrir = useCallback((m: ModeloBilingue, lingua: Idioma) => {
     const lado = m[lingua];
+    const texto = extractSimpleText(lado.body);
+    setCorpoEmTexto(texto != null);
     setChave(m.chave);
     setIdioma(lingua);
     setAssunto(lado.subject);
-    setCorpo(lado.body);
+    setCorpo(texto ?? lado.body);
     setBaseAssunto(lado.subject);
-    setBaseCorpo(lado.body);
+    setBaseCorpo(texto ?? lado.body);
     setHistoricoAberto(false);
   }, []);
 
@@ -306,9 +333,10 @@ export default function EmailTemplatesBilingue() {
   const valores = valoresReais ?? VALORES_DE_EXEMPLO;
 
   const previsualizacao = useMemo(() => {
-    const html = renderizarCorpo(corpo, valores);
+    const html = renderizarCorpo(paraGravar(corpo), valores);
     return `<!doctype html><html lang="${idioma}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0}body{padding:20px;background:#f7f4ee;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}</style></head><body>${html}</body></html>`;
-  }, [corpo, valores, idioma]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [corpo, valores, idioma, corpoEmTexto]);
 
   function inserir(texto: string, deslocaCursor = 0) {
     const alvo =
@@ -413,7 +441,7 @@ export default function EmailTemplatesBilingue() {
             nome: modelo.nome,
             idioma,
             subject: assunto.trim(),
-            body: corpo,
+            body: paraGravar(corpo),
           }),
         },
       );
@@ -426,7 +454,7 @@ export default function EmailTemplatesBilingue() {
                 ...m,
                 [idioma]: {
                   subject: assunto.trim(),
-                  body: corpo,
+                  body: paraGravar(corpo),
                   updatedAt: guardado?.updatedAt ?? new Date().toISOString(),
                 },
               }
@@ -507,10 +535,11 @@ export default function EmailTemplatesBilingue() {
     setModelos((prev) =>
       prev.map((m) => (m.chave === modelo.chave ? { ...m, [idioma]: reposto } : m)),
     );
+    const repostoEmTexto = paraEditar(reposto.body);
     setAssunto(reposto.subject);
-    setCorpo(reposto.body);
+    setCorpo(repostoEmTexto);
     setBaseAssunto(reposto.subject);
-    setBaseCorpo(reposto.body);
+    setBaseCorpo(repostoEmTexto);
     await carregarVersoes();
     toast("Versão reposta.", "success");
   }
@@ -528,7 +557,7 @@ export default function EmailTemplatesBilingue() {
           body: JSON.stringify({
             nome: modelo.nome,
             subject: assunto,
-            body: corpo,
+            body: paraGravar(corpo),
             idioma,
             pedido: pedidoId,
             para: destinoDoTeste.trim(),
