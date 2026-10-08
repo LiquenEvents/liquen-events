@@ -585,6 +585,7 @@ async function confirmarAoCliente(id: string, form: QuoteFormData, locale: Local
          * estar um nome.
          */
         typeLabel: eventTagLabel(form, locale) || undefined,
+        eventType: form.eventType,
         date: form.date,
         guests: form.guests || undefined,
         // Sem número, devolve-se a ordem de grandeza que ELA escolheu — em

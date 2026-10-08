@@ -210,4 +210,4 @@ TESTE; os testes automáticos ficaram no repositório.
 | 37 | Corrigido | **O portal do cliente saiu** (página, PDFs, token, botões do dossier, glossário, textos) | Testes; `/portal/…` dá «Página não encontrada» |
 | 38 | Corrigido | Tecto dos testes a 20 s | Suite inteira verde |
 | 39 | Parcial | 134 → 62 avisos, zero de código morto. Ficam os do compilador do React e os dois ficheiros enormes por partir | `npm run lint` |
-| **28** | **À espera de ti** | O email «Pedido recebido» é o teu desenho, com a regra de não mudar o HTML — e um teste que o compara byte a byte. Trocar o logótipo e os ícones por versões que funcionem no escuro precisa das imagens e de tu dizeres que se pode mexer | — |
+| **28** | **Corrigido** | Com a tua autorização. O logótipo perdeu a placa branca (igual ao de sempre sobre branco; sem placa no escuro) e os ícones das redes passaram de preto ao cinzento #6e6e73 da tua carta, que se vê nos dois fundos. Feito sobre as imagens que já existiam (`scripts/gen-imagens-email-escuro.mjs`), e no mesmo passo o email passou à versão carta que mandaste | `public/email/*.png`, `email-logo.ts` |

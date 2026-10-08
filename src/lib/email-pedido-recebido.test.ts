@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { emailPedidoRecebido, type DadosDoPedidoRecebido } from "./email-pedido-recebido";
+import { emailPedidoRecebido, noSitio, type DadosDoPedidoRecebido } from "./email-pedido-recebido";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O EMAIL QUE SAI É O DESENHO DELA — BYTE A BYTE
+ * O EMAIL QUE SAI É A CARTA DELA — BYTE A BYTE
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Regra dela: «não alterar textos, cores, tamanhos nem espaçamentos do HTML
- * novo». A única prova disso que não depende de olhar é esta: com os valores
- * de exemplo do próprio ficheiro, o HTML que o código monta tem de ser IGUAL
- * ao `docs/email-pedido-recebido-apple.html`, trocados só os marcadores que o
+ * «É assim que quero que o cliente receba a mensagem.» A única prova disso que
+ * não depende de olhar é esta: com os valores de exemplo do próprio ficheiro,
+ * o HTML que o código monta tem de ser IGUAL ao
+ * `docs/email-pedido-recebido-carta.html`, trocados só os marcadores que o
  * ficheiro manda trocar (`LOGO_URL`, `BANNER_URL`, `ICON_*_URL`, `*_URL`).
  *
  * Se alguém mexer num espaçamento, numa cor ou numa palavra — no ficheiro ou
  * no código —, isto deixa de ser igual e diz onde.
  */
 
-const ORIGINAL = readFileSync(join(process.cwd(), "docs/email-pedido-recebido-apple.html"), "utf8");
+const ORIGINAL = readFileSync(join(process.cwd(), "docs/email-pedido-recebido-carta.html"), "utf8");
 
 /** O comentário «A TROCAR antes de usar…» é para quem integra: não segue no email. */
 function semComentarioDeAutoria(html: string): string {
@@ -36,13 +36,16 @@ const REDES = {
 /** Os valores de exemplo DO FICHEIRO, ligados às variáveis reais. */
 const EXEMPLO: DadosDoPedidoRecebido = {
   locale: "pt",
-  nome: "Ana",
+  nome: "Diana",
+  referencia: "LIQ-45A65D-0E787B2273E29B21",
   pedido: {
-    evento: "Conferência",
-    data: "2026-11-06",
-    convidados: 50,
-    local: "Évora",
-    espaco: "Interior",
+    evento: "Casamento",
+    tipo: "casamentos",
+    data: "2028-06-10",
+    convidados: 200,
+    local: "Quinta da Melhorada",
+    espaco: "Misto (interior e exterior)",
+    cerimonia: "Religiosa",
   },
   casa: {
     nome: "Catarina Gaspar",
@@ -63,8 +66,27 @@ const EXEMPLO: DadosDoPedidoRecebido = {
   },
 };
 
-/** O ficheiro dela com os marcadores trocados — e mais nada. */
-const ESPERADO = semComentarioDeAutoria(ORIGINAL)
+/**
+ * A ÚNICA mudança que ela pediu depois de mandar o ficheiro: o texto corrido
+ * da carta «em formato quadrado» — justificado. São os cinco parágrafos
+ * longos: quatro com a margem de 18 px e o primeiro da segunda parte («A nossa
+ * equipa…»), que abre com margem zero. O ficheiro dela fica como chegou.
+ */
+const JUSTIFICADO = "text-align:justify;";
+function comTextoJustificado(html: string): string {
+  return html
+    .replaceAll(
+      'style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;">',
+      `style="margin:18px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;${JUSTIFICADO}">`,
+    )
+    .replace(
+      'style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;">A nossa equipa',
+      `style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;${JUSTIFICADO}">A nossa equipa`,
+    );
+}
+
+/** O ficheiro dela com os marcadores trocados e o texto justificado — e mais nada. */
+const ESPERADO = comTextoJustificado(semComentarioDeAutoria(ORIGINAL))
   .replace('src="LOGO_URL"', 'src="cid:liquen-logo"')
   .replace('src="BANNER_URL"', 'src="cid:liquen-banner"')
   // Os ícones antes das ligações: `ICON_FACEBOOK_URL` contém `FACEBOOK_URL`.
@@ -84,10 +106,19 @@ function primeiraDiferenca(a: string, b: string): string {
   return `linha ${linha}:\n  esperado: ${JSON.stringify(a.slice(i - 40, i + 60))}\n  saiu:     ${JSON.stringify(b.slice(i - 40, i + 60))}`;
 }
 
-describe("o email «Pedido recebido» é o desenho dela", () => {
+const comPedido = (p: Partial<DadosDoPedidoRecebido["pedido"]>) =>
+  emailPedidoRecebido({ ...EXEMPLO, pedido: { ...EXEMPLO.pedido, ...p } });
+
+describe("o email «Pedido de proposta» é a carta dela", () => {
   it("com os valores de exemplo, o HTML é igual ao ficheiro dela", () => {
     const { html } = emailPedidoRecebido(EXEMPLO);
     expect(html === ESPERADO, primeiraDiferenca(ESPERADO, html)).toBe(true);
+  });
+
+  it("e o assunto é o do ficheiro", () => {
+    expect(emailPedidoRecebido(EXEMPLO).subject).toBe(
+      "Pedido de Proposta – Casamento | 10 de junho de 2028",
+    );
   });
 
   it("e nenhum marcador do ficheiro fica por trocar", () => {
@@ -108,54 +139,68 @@ describe("o email «Pedido recebido» é o desenho dela", () => {
    * O CONTROLO NEGATIVO: a comparação apanha uma mudança de um píxel. Sem
    * isto, um `ESPERADO` montado a partir da própria saída passava sempre.
    */
+  it("o texto corrido sai justificado, e só ele", () => {
+    const { html } = emailPedidoRecebido(EXEMPLO);
+    expect(html.split(JUSTIFICADO)).toHaveLength(6);
+    expect(html).toContain(`color:#1d1d1f;">Estimada Diana,</p>`);
+  });
+
   it("e a comparação apanha um espaçamento mexido", () => {
     const { html } = emailPedidoRecebido(EXEMPLO);
-    const mexido = html.replace("padding:56px 56px 0;", "padding:55px 56px 0;");
+    const mexido = html.replace("padding:26px 40px 0;", "padding:25px 40px 0;");
     expect(mexido).not.toBe(ESPERADO);
-    expect(ESPERADO).toContain("padding:56px 56px 0;");
+    expect(ESPERADO).toContain("padding:26px 40px 0;");
   });
 });
 
-describe("as regras dela", () => {
-  it("o assunto é «Recebemos o seu pedido.», com o ponto", () => {
-    expect(emailPedidoRecebido(EXEMPLO).subject).toBe("Recebemos o seu pedido.");
+describe("o que muda de pedido para pedido", () => {
+  it("homem com nome claro: «Estimado»; nome ambíguo: «Olá»", () => {
+    expect(emailPedidoRecebido({ ...EXEMPLO, nome: "João" }).html).toContain(">Estimado João,</p>");
+    expect(emailPedidoRecebido({ ...EXEMPLO, nome: "Alex" }).html).toContain(">Olá Alex,</p>");
+    expect(emailPedidoRecebido({ ...EXEMPLO, nome: "" }).html).toContain(">Olá,</p>");
   });
 
-  it("a data por definir diz «Ainda a definir»", () => {
-    const { html, text } = emailPedidoRecebido({
-      ...EXEMPLO,
-      pedido: { ...EXEMPLO.pedido, data: "" },
-    });
+  it("o tipo entra na frase com o género certo", () => {
+    const { html } = comPedido({ evento: "Conferência", tipo: "conferencias", local: "Évora" });
+    expect(html).toContain(
+      "para a organização da vossa conferência, prevista para o dia 10 de junho de 2028, em Évora.",
+    );
+  });
+
+  it("sem tipo, «evento» — nunca o rótulo plural da lista", () => {
+    const { html } = comPedido({ evento: "", tipo: null });
+    expect(html).toContain("organização do vosso evento, previsto para o dia");
+  });
+
+  it("sem data: a frase encurta, o resumo diz «Ainda a definir», e o assunto perde o «|»", () => {
+    const { html, subject, text } = comPedido({ data: "" });
+    expect(html).toContain("do vosso casamento, na Quinta da Melhorada.</p>");
     expect(html).toContain(">Ainda a definir</td>");
+    expect(html).toContain(">Casamento</p>");
+    expect(subject).toBe("Pedido de Proposta – Casamento");
     expect(text).toContain("Data: Ainda a definir");
+    expect(html).toContain("Confirmamos a receção do vosso pedido, na Quinta da Melhorada.");
   });
 
-  it("sem número, os convidados dizem a estimativa que ela escolheu", () => {
-    const { html, text } = emailPedidoRecebido({
-      ...EXEMPLO,
-      pedido: { ...EXEMPLO.pedido, convidados: undefined, convidadosEstimativa: "50 a 100" },
-    });
-    expect(html).toContain(">50 a 100</td>");
-    expect(html).not.toContain("Cerca de");
-    expect(text).toContain("Convidados: 50 a 100");
+  it("sem local: não fica vírgula pendurada", () => {
+    const { html } = comPedido({ local: "" });
+    expect(html).toContain("previsto para o dia 10 de junho de 2028.</p>");
+    expect(html).not.toContain(">Local</td>");
+    expect(html).toContain("Confirmamos a receção do vosso pedido para 10 de junho de 2028.");
   });
 
-  it("com número, «Cerca de 50»", () => {
-    expect(emailPedidoRecebido(EXEMPLO).html).toContain(">Cerca de 50</td>");
+  it("os convidados dizem a estimativa que ele escolheu, como previsão", () => {
+    const { html } = comPedido({ convidados: undefined, convidadosEstimativa: "100 a 150" });
+    expect(html).toContain(">100 a 150 (previsão)</td>");
   });
 
-  it("sem nome, começa em «O seu pedido já está connosco.»", () => {
-    const { html, text } = emailPedidoRecebido({ ...EXEMPLO, nome: "" });
-    expect(html).toContain('color:#1d1d1f;">O seu pedido já está connosco.</p>');
-    expect(html).not.toContain("Olá");
-    expect(text).not.toContain("Olá");
-  });
-
-  it("o WhatsApp abre sem mensagem escrita", () => {
-    const { html } = emailPedidoRecebido(EXEMPLO);
-    const ligacoes = [...html.matchAll(/href="(https:\/\/wa\.me\/[^"]*)"/g)].map((m) => m[1]);
-    expect(ligacoes.length).toBe(3);
-    for (const l of ligacoes) expect(l).toBe("https://wa.me/351919259820");
+  it("uma linha que chegue vazia sai, e a referência continua a ser a última, com o filete de baixo", () => {
+    const { html } = comPedido({ cerimonia: "", espaco: "" });
+    expect(html).not.toContain(">Cerimónia</td>");
+    expect(html).not.toContain(">Espaço</td>");
+    expect(html).toContain(
+      'border-bottom:1px solid #d2d2d7;color:#1d1d1f;word-break:break-all;">LIQ-45A65D-0E787B2273E29B21</td>',
+    );
   });
 
   it("escreve o que o cliente escreveu, sem o deixar entrar no HTML", () => {
@@ -170,18 +215,6 @@ describe("as regras dela", () => {
     expect(html).toContain("&lt;b&gt;Évora&lt;/b&gt;");
   });
 
-  it("uma linha que chegue vazia sai, e o filete de baixo passa para a última que fica", () => {
-    const { html } = emailPedidoRecebido({
-      ...EXEMPLO,
-      pedido: { ...EXEMPLO.pedido, espaco: "" },
-    });
-    expect(html).not.toContain(">Espaço</td>");
-    // «Local» passa a ser a última: sem filete por baixo.
-    expect(html).toContain(
-      '<td class="t2" style="padding:14px 12px 14px 0;color:#6e6e73;">Local</td>',
-    );
-  });
-
   it("sem banner nem redes, os blocos saem inteiros — não fica uma imagem partida", () => {
     const { html } = emailPedidoRecebido({
       ...EXEMPLO,
@@ -189,7 +222,27 @@ describe("as regras dela", () => {
     });
     expect(html).not.toContain("liquen-banner");
     expect(html).not.toContain("liquen-social-");
-    expect(html).not.toContain("<!-- 10. MANTIDO: banner Líquen -->");
+    expect(html).not.toContain("<!-- Banner Líquen -->");
+  });
+});
+
+describe("a preposição antes do sítio", () => {
+  it.each([
+    ["Quinta da Melhorada", "na Quinta da Melhorada"],
+    ["Herdade do Esporão", "na Herdade do Esporão"],
+    ["Convento do Espinheiro", "no Convento do Espinheiro"],
+    ["Palácio de Estoi", "no Palácio de Estoi"],
+    ["O Convento", "no Convento"],
+    ["Porto", "no Porto"],
+    ["Évora", "em Évora"],
+    ["Lisboa", "em Lisboa"],
+  ])("%s → %s", (local, esperado) => {
+    expect(noSitio(local, "pt")).toBe(esperado);
+  });
+
+  it("em inglês: «at» um sítio de eventos, «in» uma cidade", () => {
+    expect(noSitio("Quinta da Melhorada", "en")).toBe("at Quinta da Melhorada");
+    expect(noSitio("Évora", "en")).toBe("in Évora");
   });
 });
 
@@ -197,23 +250,30 @@ describe("e em inglês, com o mesmo desenho", () => {
   const EN: DadosDoPedidoRecebido = {
     ...EXEMPLO,
     locale: "en",
-    pedido: { ...EXEMPLO.pedido, evento: "Conference", espaco: "Indoors" },
+    pedido: {
+      ...EXEMPLO.pedido,
+      evento: "Wedding",
+      espaco: "Indoors and outdoors",
+      cerimonia: "Religious",
+    },
   };
 
   it("diz tudo em inglês", () => {
     const { subject, html, text } = emailPedidoRecebido(EN);
-    expect(subject).toBe("We've received your request.");
+    expect(subject).toBe("Proposal Request – Wedding | 10 June 2028");
     expect(html).toContain('<html lang="en"');
-    expect(html).toContain("Hello Ana. Your request is already with us.");
-    expect(html).toContain(">6 November 2026</td>");
-    expect(html).toContain(">Around 50</td>");
+    expect(html).toContain(">Dear Diana,</p>");
+    expect(html).toContain(
+      "for the organisation of your wedding, planned for 10 June 2028, at Quinta da Melhorada.",
+    );
+    expect(html).toContain(">200 (estimate)</td>");
     for (const pt of [
-      "Recebemos",
-      "Olá",
+      "Pedido de",
+      "Estimada",
       "Convidados",
-      "A seguir",
-      "Com carinho",
-      "Recebeu este email",
+      "Referência",
+      "cumprimentos",
+      "Recebeu este",
     ]) {
       expect(html, `ficou «${pt}» no email inglês`).not.toContain(pt);
       expect(text, `ficou «${pt}» no texto inglês`).not.toContain(pt);

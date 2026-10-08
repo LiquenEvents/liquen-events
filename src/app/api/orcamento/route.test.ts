@@ -288,11 +288,11 @@ describe("POST /api/orcamento", () => {
      *
      * Este caso garantia o contrário: a preocupação do João era o automático
      * soar impessoal, e repetir de volta o que a pessoa escolheu fazia parecer
-     * que alguém leu. O email «Pedido recebido» passou a ser o desenho dela
-     * (`docs/email-pedido-recebido-apple.html`), cujo cartão «O seu pedido.» tem
-     * cinco linhas — Evento, Data, Convidados, Local, Espaço — e a regra dela é
-     * não lhe alterar textos. A decoração continua a ir no email à EQUIPA (o
-     * caso de cima), que é onde decide o trabalho.
+     * que alguém leu. O email «Pedido de proposta» passou a ser a carta dela
+     * (`docs/email-pedido-recebido-carta.html`), cujo resumo tem as linhas que
+     * ela escolheu — Data, Local, Convidados, Espaço, Cerimónia, Referência — e
+     * a regra dela é não lhe alterar textos. A decoração continua a ir no email
+     * à EQUIPA (o caso de cima), que é onde decide o trabalho.
      */
     it("ficam no email à equipa, e o do cliente segue o desenho dela", async () => {
       await enviarTudo({ form: comDecor });
@@ -398,15 +398,14 @@ describe("POST /api/orcamento", () => {
     });
 
     /**
-     * O ESPAÇO é devolvido ao cliente — é uma das cinco linhas do desenho dela.
-     * O tipo de CERIMÓNIA não: o cartão «O seu pedido.» não o tem, e fica no
-     * email à equipa (o caso de cima). Ver a nota no caso da decoração.
+     * O ESPAÇO e a CERIMÓNIA são devolvidos ao cliente — são duas linhas do
+     * resumo da carta dela (o desenho anterior não tinha a cerimónia).
      */
-    it("o espaço é devolvido ao cliente; a cerimónia fica para a equipa", async () => {
+    it("o espaço e a cerimónia são devolvidos ao cliente", async () => {
       await enviarTudo({ form: comAmbos });
       const cliente = sendMailMock.mock.calls[1][0];
       expect(cliente.text ?? "").toContain("Espaço: Exterior");
-      expect(cliente.text ?? "").not.toContain("Civil e religiosa");
+      expect(cliente.text ?? "").toContain("Cerimónia: Civil e religiosa");
     });
 
     it("um identificador inventado não passa para os emails", async () => {
@@ -685,13 +684,15 @@ describe("a etiqueta do evento no email de confirmação", () => {
     const cliente = await confirmacaoAoCliente(casamentoDeAnuncio);
     expect(cliente.text ?? "").not.toContain("para o casamentos");
     expect(cliente.html).not.toContain("para o casamentos");
-    // O tipo continua a aparecer — como etiqueta, no singular.
-    expect(cliente.text ?? "").toContain("Evento: Casamento");
+    // O tipo continua a aparecer — como etiqueta, no singular, por baixo do
+    // título; e na frase pelo substantivo.
+    expect(cliente.text ?? "").toContain("Casamento, 25 de janeiro de 2027");
+    expect(cliente.text ?? "").toContain("do vosso casamento");
   });
 
   it("quem escreveu em inglês lê o tipo em inglês", async () => {
     const cliente = await confirmacaoAoCliente(casamentoDeAnuncio, "en");
-    expect(cliente.text ?? "").toContain("Event: Wedding");
+    expect(cliente.text ?? "").toContain("Wedding, 25 January 2027");
     expect((cliente.text ?? "").toLowerCase()).not.toContain("casamento");
     expect(cliente.html.toLowerCase()).not.toContain("casamento");
   });
@@ -709,7 +710,7 @@ describe("a etiqueta do evento no email de confirmação", () => {
       },
       "en",
     );
-    expect(cliente.text ?? "").toContain("Event: Christening");
+    expect(cliente.text ?? "").toContain("Christening, 3 May 2027");
     expect(cliente.text ?? "").not.toContain("Batizado / Comunhão");
   });
 
@@ -730,7 +731,9 @@ describe("a etiqueta do evento no email de confirmação", () => {
       ...casamentoDeAnuncio,
       eventName: "Casamento da Ana e do João",
     });
-    expect(cliente.text ?? "").toContain("Evento: Casamento da Ana e do João");
+    expect(cliente.text ?? "").toContain("Casamento da Ana e do João, 25 de janeiro de 2027");
+    // Na frase continua o substantivo do tipo — um título não leva artigo.
+    expect(cliente.text ?? "").toContain("do vosso casamento");
   });
 });
 
