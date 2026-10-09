@@ -11,6 +11,7 @@ import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { SkeletonRow } from "./Skeleton";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { diaPorExtenso } from "@/lib/data-curta";
 
 const DAYS_AHEAD = 14;
 
@@ -230,12 +231,11 @@ export default function Agenda({ quotes, onOpen }: Props) {
 
   const todayStr = todayKey();
   function dayLabel(key: string): string {
-    const d = new Date(key + "T12:00:00");
     const diff = Math.round(
       (+new Date(key + "T12:00:00") - +new Date(todayStr + "T12:00:00")) / 864e5,
     );
     const rel = diff === 0 ? "Hoje" : diff === 1 ? "Amanhã" : "";
-    const full = d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+    const full = diaPorExtenso(key);
     return rel ? `${rel} · ${full}` : full;
   }
 

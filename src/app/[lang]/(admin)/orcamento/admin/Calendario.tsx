@@ -41,6 +41,7 @@ import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { comMaiuscula, diaPorExtenso } from "@/lib/data-curta";
 
 /**
  * Os três caracteres de cada dia, no cabeçalho da grelha do mês.
@@ -426,7 +427,7 @@ function AddEventModal({
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <p className="bo-eyebrow mb-1.5">Novo no calendário</p>
-            <p className="text-[var(--bo-tinta-72)] text-sm capitalize">{dateLabel}</p>
+            <p className="text-[var(--bo-tinta-72)] text-sm">{dateLabel}</p>
           </div>
           <button
             onClick={onClose}
@@ -1129,12 +1130,10 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     [vista, year, quotes, marcacoesVisiveis],
   );
 
-  const dayLabelLong = (key: string) =>
-    new Date(key + "T12:00:00").toLocaleDateString("pt-PT", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    });
+  // Escrito por extenso numa só fonte (`diaPorExtenso`): era o
+  // `toLocaleDateString` com um `capitalize` por cima, que levantava todas as
+  // palavras. A primeira letra sobe à mão, e só ela.
+  const dayLabelLong = (key: string) => comMaiuscula(diaPorExtenso(key));
 
   /* ══════════════════════════════════════════════════════════════════════════
      O BOTÃO DIREITO — FASE 10, PONTO 17
@@ -1299,7 +1298,9 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
       ? String(year)
       : vista === "semana"
         ? tituloDaSemana(diasDaVista)
-        : `${Number(diaAncora.slice(8, 10))} de ${MONTHS[Number(diaAncora.slice(5, 7)) - 1]} ${diaAncora.slice(0, 4)}`;
+        : // «9 de outubro de 2026»: era montado com os meses dos CABEÇALHOS
+          // (em maiúscula) e sem o «de» antes do ano.
+          diaPorExtenso(diaAncora, { ano: true, semana: false });
 
   /** O nome do dia da semana de uma data — a linha de estado da vista de dia. */
   const nomeDoDiaDaSemana = (iso: string) =>
@@ -1353,14 +1354,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   if (modalDate !== null && modalDate !== ultimaDataDoModal) setUltimaDataDoModal(modalDate);
   const dataDoModal = modalDate ?? (aSairDoModal ? ultimaDataDoModal : null);
 
-  const modalDateLabel = dataDoModal
-    ? new Date(dataDoModal + "T12:00:00").toLocaleDateString("pt-PT", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : "";
+  const modalDateLabel = dataDoModal ? comMaiuscula(diaPorExtenso(dataDoModal, { ano: true })) : "";
 
   /* ══════════════════════════════════════════════════════════════════════════
      O TECLADO — FASE 10
@@ -2162,7 +2156,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
                voltar a correr. */
                 <div className="bo-entrada mt-5 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] overflow-hidden">
                   <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--bo-hairline)]">
-                    <p className="bo-eyebrow capitalize">{dayLabelLong(selectedDay)}</p>
+                    <p className="bo-eyebrow">{dayLabelLong(selectedDay)}</p>
                     <div className="flex items-center gap-1">
                       <Button variant="subtle" size="sm" onClick={() => openAdd(selectedDay)}>
                         Adicionar

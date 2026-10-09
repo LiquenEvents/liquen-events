@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dataCurta } from "./data-curta";
+import { comMaiuscula, dataCurta, diaPorExtenso } from "./data-curta";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -41,5 +41,32 @@ describe("a data curta em português", () => {
     // Esconder o que lá está impede quem olha de perceber porque é que está
     // estranha — e é a diferença entre um dado mau visível e um dado mau mudo.
     expect(dataCurta("nem-uma-data")).toBe("nem-uma-data");
+  });
+});
+
+describe("diaPorExtenso", () => {
+  it("escreve o dia da semana e o mês em minúsculas", () => {
+    expect(diaPorExtenso("2026-10-09")).toBe("sexta-feira, 9 de outubro");
+  });
+  it("com ano, põe o «de» antes do ano", () => {
+    expect(diaPorExtenso("2026-10-01", { ano: true })).toBe("quinta-feira, 1 de outubro de 2026");
+  });
+  it("sem dia da semana", () => {
+    expect(diaPorExtenso("2026-10-09", { ano: true, semana: false })).toBe("9 de outubro de 2026");
+  });
+  it("não se deixa mexer pelo fuso: o último dia do ano é o último dia do ano", () => {
+    expect(diaPorExtenso("2026-12-31")).toBe("quinta-feira, 31 de dezembro");
+  });
+  it("devolve tal e qual o que não consegue ler", () => {
+    expect(diaPorExtenso("amanhã")).toBe("amanhã");
+    expect(diaPorExtenso("")).toBe("");
+  });
+});
+
+describe("comMaiuscula", () => {
+  it("só levanta a primeira letra, ao contrário do `capitalize` do CSS", () => {
+    expect(comMaiuscula("quinta-feira, 1 de outubro de 2026")).toBe(
+      "Quinta-feira, 1 de outubro de 2026",
+    );
   });
 });

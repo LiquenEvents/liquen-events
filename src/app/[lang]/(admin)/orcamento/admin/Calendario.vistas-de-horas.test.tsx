@@ -100,7 +100,7 @@ describe("a vista de dia", () => {
     const user = await montar();
     await user.click(screen.getByRole("radio", { name: "Dia" }));
 
-    expect(screen.getByRole("heading", { name: "10 de Setembro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "10 de setembro de 2026" })).toBeInTheDocument();
     // O estado da vista diz de que dia da semana se trata — a informação que o
     // número sozinho não dá, e que ela precisa para saber se é um sábado.
     expect(screen.getByText(/^Quinta-feira · 3 eventos$/)).toBeInTheDocument();
@@ -146,9 +146,9 @@ describe("a vista de dia", () => {
     await user.click(screen.getByRole("radio", { name: "Dia" }));
 
     await user.click(screen.getByRole("button", { name: "Dia seguinte" }));
-    expect(screen.getByRole("heading", { name: "11 de Setembro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "11 de setembro de 2026" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Dia anterior" }));
-    expect(screen.getByRole("heading", { name: "10 de Setembro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "10 de setembro de 2026" })).toBeInTheDocument();
   });
 
   it("voltar ao mês cai no mês do dia em que se estava, e não onde o cursor ficou", async () => {
@@ -158,7 +158,7 @@ describe("a vista de dia", () => {
     for (let i = 0; i < 25; i += 1) {
       await user.click(screen.getByRole("button", { name: "Dia seguinte" }));
     }
-    expect(screen.getByRole("heading", { name: "5 de Outubro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "5 de outubro de 2026" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "Mês" }));
     expect(screen.getByRole("heading", { name: "Outubro 2026" })).toBeInTheDocument();
@@ -194,7 +194,7 @@ describe("a vista de semana", () => {
     await user.click(screen.getByRole("radio", { name: "Semana" }));
     await user.click(screen.getByRole("button", { name: /^Sábado, 12/ }));
 
-    expect(screen.getByRole("heading", { name: "12 de Setembro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "12 de setembro de 2026" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Dia" })).toBeChecked();
   });
 

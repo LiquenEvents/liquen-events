@@ -143,7 +143,11 @@ export function CampoDeHora({
         vazio="--"
         disabled={disabled}
         className={cn("text-sm tabular-nums", className)}
-        containerClassName="w-[68px]"
+        // No dedo a letra sobe para 16 px (o Safari faz zoom abaixo disso) e o
+        // gatilho guarda 36 px para a seta e 14 para a margem: em 68 sobravam
+        // 18 px para «00», e lia-se «0C» — MEDIDO a 390. No dedo é o degrau de
+        // 80 da escala de larguras (DESIGN-SYSTEM §9.9, «quantidade»).
+        containerClassName="w-[68px] pointer-coarse:w-20"
       />
       {/* Os dois pontos são do RELÓGIO e não de nenhum dos dois controlos, por
           isso vivem entre eles e não dentro de um. `aria-hidden` porque quem
@@ -160,7 +164,7 @@ export function CampoDeHora({
         vazio="--"
         disabled={disabled || !h}
         className={cn("text-sm tabular-nums", className)}
-        containerClassName="w-[68px]"
+        containerClassName="w-[68px] pointer-coarse:w-20"
       />
     </span>
   );
