@@ -794,6 +794,10 @@ export const pt = {
     emitidaEm: "Emitida a",
     versaoNumero: "Versão",
     atualizadaEm: "Atualizada a",
+    // A6-005: o casal aceitou, e depois houve uma revisão. O link continua a
+    // mostrar a versão ACEITE (congelada) — e isso dizia-se a ninguém.
+    revistaDepoisDeAceite:
+      "Esta é a versão que aceitou. Entretanto preparámos uma versão mais recente, e nada muda sem falarmos consigo primeiro.",
     verPdf: "Ver a proposta completa (PDF)",
     footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos:",
     respostaComo:

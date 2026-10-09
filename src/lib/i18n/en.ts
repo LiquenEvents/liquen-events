@@ -714,6 +714,8 @@ export const en: Dict = {
     emitidaEm: "Issued on",
     versaoNumero: "Version",
     atualizadaEm: "Updated on",
+    revistaDepoisDeAceite:
+      "This is the version you accepted. We have since prepared a newer version, and nothing changes until we have spoken with you.",
     verPdf: "View the full proposal (PDF)",
     footerNote: "Any questions or changes? Reply to this email or contact us:",
     respostaComo:

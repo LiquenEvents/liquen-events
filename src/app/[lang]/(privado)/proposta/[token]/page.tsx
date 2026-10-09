@@ -685,6 +685,21 @@ export default async function ProposalPage({
           </p>
         )}
 
+        {/* ── A VERSÃO MUDOU DEPOIS DO «SIM» (A6-005) ────────────────────────
+            O estado era calculado (`proposta-do-link.ts`) e ninguém o desenhava.
+            Depois de um aceite o link mostra a versão ACEITE, congelada; se
+            entretanto houve uma revisão, o casal não tinha maneira de o saber.
+            Diz-se uma vez, sem alarme: o que ele vê é o que aceitou, e nada
+            muda sem uma conversa. */}
+        {doLink?.estado === "revista" && (
+          <p
+            role="note"
+            className="mx-auto mt-4 max-w-md rounded-md border border-moss/30 bg-moss/5 px-4 py-3 text-center text-xs leading-relaxed text-foreground/80"
+          >
+            {t.revistaDepoisDeAceite}
+          </p>
+        )}
+
         {/**
          * ═══════════════════════════════════════════════════════════════════
          * A RESPOSTA É POR EMAIL OU POR TELEFONE — NÃO POR BOTÃO
