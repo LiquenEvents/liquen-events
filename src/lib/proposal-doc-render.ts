@@ -35,6 +35,7 @@ import {
 import { TECTO_DA_ROTA_MS } from "@/lib/custo-do-pdf";
 import { log } from "@/lib/logger";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
+import { renderEditorialPdf } from "@/lib/pdf-editorial/montar";
 
 /**
  * Lado maior das miniaturas que o navegador fabrica no carregamento
@@ -207,7 +208,17 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
  * miniatura que ia ser ampliada é apanhada. A 1.ª é só uma aposta a poupar
  * bytes — errá-la custa uma ida ao armazenamento de 20 KB, nunca uma foto mole.
  */
-async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; missing: number }> {
+async function resolveImages(
+  doc: ProposalDoc,
+  /**
+   * `originais`: cada foto vem do ORIGINAL, reduzida a {@link LADO_EDITORIAL}.
+   * É o caminho do desenho editorial, onde uma foto pode ocupar a página
+   * inteira e as caixas não são as do desenho antigo — a escolha entre
+   * miniatura e original, aqui em baixo, mede-se contra caixas que lá não
+   * existem.
+   */
+  opcoes: { originais?: boolean } = {},
+): Promise<{ doc: ProposalDoc; missing: number }> {
   let remaining = MAX_IMAGES_PER_DOC;
   // Quantas fotos foram PEDIDAS e não entraram. Uma proposta com fotos a menos
   // seguia para o cliente sem ninguém dar por isso; agora quem chama fica a
@@ -267,6 +278,10 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
    * chega. Ver {@link buscarCapa}.
    */
   const buscar = async (ref: string, caixa: CaixaPdf | null): Promise<Resolvida | null> => {
+    if (opcoes.originais) {
+      const bytes = await bytesDoOriginal(ref);
+      return bytes ? { ref, bytes: await reduzirParaEditorial(bytes), original: true } : null;
+    }
     if (!caixa) return buscarCapa(ref);
     const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
     // Só se vai buscar a miniatura quando ela PODE servir. Acima do lado dela
@@ -599,4 +614,48 @@ export async function renderStoredProposalDocPdfWithReport(
     });
   }
   return { pdf: Buffer.from(pdfBytes), missingImages: emFalta, truncations };
+}
+
+/**
+ * O lado maior a que uma foto chega ao desenho editorial.
+ *
+ * O desenho pede no máximo 1 800 px (uma foto que ocupa a página inteira —
+ * `pdf-editorial/imagens.ts`). Reduzir logo à chegada é o que deixa oitenta
+ * originais de 2,6 MB caberem na memória de uma função: cada um passa a umas
+ * centenas de KB antes de o próximo chegar.
+ */
+const LADO_EDITORIAL = 1800;
+
+async function reduzirParaEditorial(bytes: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(bytes, { failOn: "none" })
+      .rotate()
+      .resize(LADO_EDITORIAL, LADO_EDITORIAL, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 86 })
+      .toBuffer();
+  } catch {
+    // O desenho volta a tentar ler estes bytes e, se falharem lá, conta a foto
+    // como não desenhada — o aviso chega na mesma.
+    return bytes;
+  }
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * O DESENHO EDITORIAL — SÓ PARA VER, ATÉ ELA APROVAR
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O mesmo caminho do de cima (os textos fixos, as fotografias do armazenamento,
+ * o relatório do que falta e do que ficou cortado), com o desenho novo de
+ * `pdf-editorial/`. Só a pré-visualização o chama, com `desenho: "editorial"`;
+ * o envio e o link do casal continuam no desenho antigo até ela o aprovar.
+ */
+export async function renderStoredEditorialPdfWithReport(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number; truncations: DocTruncation[] }> {
+  const withDefaults = withProposalDefaults(doc);
+  const { doc: resolved, missing } = await resolveImages(withDefaults, { originais: true });
+  const { bytes, truncations, undrawnImages } = await renderEditorialPdf(resolved, idioma);
+  return { pdf: Buffer.from(bytes), missingImages: missing + undrawnImages, truncations };
 }

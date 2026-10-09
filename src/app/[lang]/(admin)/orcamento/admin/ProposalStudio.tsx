@@ -6498,7 +6498,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   //    o que lhe chegou. A cópia demora segundos; um PDF sem a foto que ela
   //    escolheu dura para sempre. O botão fica desligado enquanto houver fotos
   //    a caminho, com a razão escrita ao lado, e volta sozinho quando assentam.
-  async function preview() {
+  /**
+   * `desenho: "editorial"` pede o desenho NOVO do PDF (o do exemplo «Mafalda &
+   * João»), que ainda está a ser aprovado por partes. Só se vê: o envio
+   * continua a sair no desenho de hoje até ela dizer que o novo está bom.
+   */
+  async function preview(desenho?: "editorial") {
     if (busy) return;
     setBusy("preview");
     // De ponta a ponta, que é o que ela espera — e não o que o servidor demora
@@ -6517,6 +6522,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           mode: "preview",
           idioma: idiomaDoPdf,
           doc: stripPendingImages(doc),
+          ...(desenho ? { desenho } : {}),
         }),
       });
       if (!res.ok) {
@@ -6553,7 +6559,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
        * Passa a sair da mesma função que o servidor usa — incluindo o nome que
        * ela escreveu, quando escreveu.
        */
-      a.download = nomeDoFicheiroDaProposta(
+      const nome = nomeDoFicheiroDaProposta(
         {
           escolhido: doc.nomeDoFicheiro,
           clientNames: doc.clientNames,
@@ -6562,6 +6568,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         },
         idiomaDoPdf,
       );
+      // O desenho novo não pode ter o nome do que segue para o casal: na pasta
+      // de transferências os dois ficavam lado a lado sem se saber qual é qual.
+      a.download = desenho ? nome.replace(/(\.pdf)?$/i, " (desenho novo).pdf") : nome;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -6581,6 +6590,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gera outra vez daqui a pouco."
             : `PDF gerado sem ${fotosPorConfirmar} fotos que ainda estão a entrar na proposta. Gera outra vez daqui a pouco.`,
           "info",
+        );
+      } else if (desenho) {
+        toast(
+          "Desenho novo gerado (PDF descarregado). Ainda está a ser feito por partes.",
+          "success",
         );
       } else {
         toast("Pré-visualização gerada (PDF descarregado)", "success");
@@ -11813,9 +11827,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
                 />
               ) : (
-                <Button size="sm" variant="secondary" onClick={preview} disabled={busy !== null}>
-                  Descarregar PDF
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => preview()}
+                    disabled={busy !== null}
+                  >
+                    Descarregar PDF
+                  </Button>
+                  {/* O desenho novo, por partes, só para ver. Sai daqui quando
+                      ela o aprovar e o envio passar a usá-lo. */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => preview("editorial")}
+                    disabled={busy !== null}
+                  >
+                    Ver desenho novo
+                  </Button>
+                </>
               )}
               {/* ══════════════════════════════════════════════════════════
                   A RESSALVA TEM DE SER VERIFICÁVEL NO PAPEL

@@ -131,3 +131,6 @@ e2e/.auth/
 # `.lighthouseci/` e do `e2e/.auth/` aqui em cima: existe para uma medição
 # local acontecer, e não diz nada a quem clona o repositório noutro sítio.
 *.local.config.ts
+
+# Referências do redesenho do PDF (fotografias de clientes; não vão para o git)
+/referencia/

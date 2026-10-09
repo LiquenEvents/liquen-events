@@ -18,7 +18,10 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
  *  pode citar. O porquê da separação está no `money.ts`. */
 import { eur, eurDocumento } from "@/lib/money";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
-import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import {
+  renderStoredEditorialPdfWithReport,
+  renderStoredProposalDocPdfWithReport,
+} from "@/lib/proposal-doc-render";
 import { chaveDoPdf } from "@/lib/proposal-pdf-cache";
 import { guardarPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { enderecoDoPdfDaProposta } from "@/lib/proposta-link-curto";
@@ -198,6 +201,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * A escolha nova tem de ser explícita para tirar alguma coisa.
        */
       porEmail?: unknown;
+      /**
+       * «editorial» desenha a PRÉ-VISUALIZAÇÃO no desenho novo (o do exemplo
+       * «Mafalda & João»), que ainda está a ser aprovado. No envio é ignorado:
+       * o que segue para o casal continua a ser o desenho de hoje até ela dizer
+       * que o novo está bom.
+       */
+      desenho?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
@@ -357,7 +367,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
-    let relatorio = await renderStoredProposalDocPdfWithReport(doc, idioma);
+    let relatorio =
+      mode === "preview" && body?.desenho === "editorial"
+        ? await renderStoredEditorialPdfWithReport(doc, idioma)
+        : await renderStoredProposalDocPdfWithReport(doc, idioma);
 
     /**
      * ════════════════════════════════════════════════════════════════════════
