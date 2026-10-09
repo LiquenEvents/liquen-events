@@ -135,3 +135,33 @@ describe("PedidoRelampago — o campo-armadilha e a repetição", () => {
     expect(localStorage.getItem("liquen-orcamento-sid")).toBeNull();
   });
 });
+
+describe("PedidoRelampago — o Lead só segue para a Meta com consentimento", () => {
+  /**
+   * MEDIDO na passagem do site de 9 de outubro: em /s/comporta?fbclid=…, com
+   * «Recusar» carregado, o pedido levava `leadEventId` e `metaClick`, e o
+   * servidor reenviava o Lead à Conversions API com email, telefone e nome.
+   */
+  it("com os cookies recusados, não leva o identificador do Lead", async () => {
+    localStorage.setItem("liquen-consent", "denied");
+    const { container } = montar();
+    preencherESubmeter(container);
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect((pedidos[0].form as Record<string, unknown>).leadEventId).toBe("");
+  });
+
+  it("sem escolha nenhuma feita, também não", async () => {
+    const { container } = montar();
+    preencherESubmeter(container);
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect((pedidos[0].form as Record<string, unknown>).leadEventId).toBe("");
+  });
+
+  it("com os cookies aceites, leva-o — e a deduplicação com o pixel continua a funcionar", async () => {
+    localStorage.setItem("liquen-consent", "granted");
+    const { container } = montar();
+    preencherESubmeter(container);
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect((pedidos[0].form as Record<string, unknown>).leadEventId).toBe("evt-1");
+  });
+});

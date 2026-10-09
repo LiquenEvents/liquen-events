@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { track } from "@/lib/track";
 import { meta } from "@/lib/meta/enviar";
+import { temConsentimento } from "@/lib/meta/consentimento";
 import { lerClique, serializar } from "@/lib/ads/click-id";
 import { lerIdentificadores, serializar as serializarMeta } from "@/lib/meta/click-id";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
@@ -246,7 +247,18 @@ export default function PedidoRelampago({
       referralSource: origem,
       adClick: cliqueGoogle,
       metaClick: cliqueMeta,
-      leadEventId,
+      /**
+       * ── SÓ COM CONSENTIMENTO ─────────────────────────────────────────────
+       * O servidor reenvia o `Lead` à Conversions API (com email, telefone,
+       * nome, IP) quando recebe este identificador — e a regra escrita lá é
+       * «só quando o pixel correu, que só corre com consentimento». Mas o
+       * `meta.lead` devolve o identificador SEMPRE, e o `metaClick` existe sem
+       * pixel (o `fbclid` fica guardado do URL). MEDIDO a 9 de outubro: com
+       * «Recusar» carregado, o pedido levava os dois e o servidor enviava.
+       * Sem consentimento, o identificador não sai daqui, e o reenvio não
+       * acontece.
+       */
+      leadEventId: temConsentimento() ? leadEventId : "",
       name: s("nome"),
       email: contacto.email,
       phone: contacto.telefone,

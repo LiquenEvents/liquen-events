@@ -187,9 +187,10 @@ class NadaParaConfirmar extends Error {}
  *  1. sem `leadEventId` não se envia. É o que garante a deduplicação: um
  *     identificador gerado aqui nunca encontraria o par do browser, e a
  *     conversão contaria duas vezes;
- *  2. sem `metaClick` não se envia. Esse campo só existe quando o pixel
- *     correu, e o pixel só corre com consentimento — portanto a presença dele
- *     É a prova de consentimento que o servidor tem. Não se inventa outra;
+ *  2. sem `metaClick` não se envia — sem ele não há com que ligar o evento ao
+ *     anúncio. ATENÇÃO: isto NÃO é prova de consentimento (o `fbclid` do URL
+ *     fica guardado mesmo sem ele). A prova é a guarda 1: o formulário só manda
+ *     o `leadEventId` quando o visitante aceitou (`PedidoRelampago.tsx`);
  *  3. sem configuração (`META_DATASET_ID` / `META_CAPI_ACCESS_TOKEN`) o
  *     `enviarEventos` devolve `sem-configuracao` sem abrir socket nenhum.
  *
