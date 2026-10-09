@@ -461,6 +461,14 @@ export default function PaginaEditorial({
       // A folha do cliente mantém a letra do cliente: o marcador devolve o
       // `--font-display` à serifa nesta árvore (ver `globals.css`).
       data-folha-do-cliente
+      // ── UMA IMAGEM DA PÁGINA, E NÃO TEXTO PARA LER ──────────────────────
+      // As letras aqui dentro são o desenho da folha à escala — 5 a 9 px
+      // num telemóvel. Lidas por um leitor de ecrã eram dezenas de frases
+      // soltas por miniatura; medidas como parágrafos, a auditoria táctil
+      // acusava-as de «texto esmagado» (92 px para 45 letras). A miniatura
+      // é uma IMAGEM com o nome da página, e o desenho por dentro é decorativo.
+      role="img"
+      aria-label={`Página «${pagina.nome}», como vai sair no PDF`}
       className="relative w-full overflow-hidden rounded-md border border-[var(--bo-hairline-strong)]"
       style={{
         aspectRatio: `${W} / ${H}`,
@@ -468,7 +476,9 @@ export default function PaginaEditorial({
         background: "var(--bo-papel-pdf)",
       }}
     >
-      {conteudo}
+      <div aria-hidden="true" className="absolute inset-0">
+        {conteudo}
+      </div>
     </div>
   );
 }
