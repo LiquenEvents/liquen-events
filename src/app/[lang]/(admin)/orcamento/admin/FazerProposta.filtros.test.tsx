@@ -116,42 +116,46 @@ describe("lista de pedidos — as etiquetas", () => {
   });
 });
 
-describe("lista de pedidos — a fila de estados", () => {
+/**
+ * SÓ OS QUE AINDA NÃO TÊM PROPOSTA.
+ *
+ * Palavras dela, com a lista à frente: «quero que aqui o sistema retire as
+ * propostas que já foram feitas e fique apenas as que ainda não se fizeram».
+ */
+describe("a lista mostra só o que está por fazer", () => {
   const quotes = () => [
     pedido({ name: "Ana e Pedro", status: "pendente", date: "2027-03-01" }),
+    pedido({ name: "Marta e Rui", status: "em_revisao", date: "2027-03-15" }),
     pedido({ name: "Rita e João", status: "cotado", date: "2027-04-01" }),
+    pedido({ name: "Inês e Tiago", status: "aceite", date: "2027-04-15" }),
     pedido({ name: "Sofia e Luís", status: "rejeitado", date: "2027-05-01" }),
   ];
 
-  it("esconde os perdidos por omissão", () => {
+  it("os novos e os que aguardam resposta estão; enviados, ganhos e perdidos não", () => {
     desenhar(quotes());
     expect(screen.getByRole("button", { name: /Ana e Pedro/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Rita e João/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Marta e Rui/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Rita e João/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Inês e Tiago/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Sofia e Luís/ })).toBeNull();
   });
 
-  it("mostra-os quando se toca na pastilha «Perdido»", async () => {
+  it("a fila tem só «Por fazer», «Novo» e «Aguardar resposta», com as contagens", () => {
+    desenhar([...quotes(), pedido({ name: "Beatriz e Nuno", status: "pendente" })]);
+    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
+    const nomes = within(fila)
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+    expect(nomes).toEqual(["Por fazer · 3", "Novo · 2", "Aguardar resposta · 1"]);
+  });
+
+  it("«Aguardar resposta» mostra só esses", async () => {
     const u = userEvent.setup();
     desenhar(quotes());
     const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    await u.click(within(fila).getByRole("button", { name: /Perdido/ }));
-
-    expect(screen.getByRole("button", { name: /Sofia e Luís/ })).toBeTruthy();
+    await u.click(within(fila).getByRole("button", { name: /Aguardar resposta/ }));
+    expect(screen.getByRole("button", { name: /Marta e Rui/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Ana e Pedro/ })).toBeNull();
-  });
-
-  it("conta quantos há em cada estado", () => {
-    desenhar([...quotes(), pedido({ name: "Beatriz e Nuno", status: "pendente" })]);
-    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    expect(within(fila).getByRole("button", { name: "Activos · 3" })).toBeTruthy();
-    expect(within(fila).getByRole("button", { name: "Novo · 2" })).toBeTruthy();
-    expect(within(fila).getByRole("button", { name: "Perdido · 1" })).toBeTruthy();
-  });
-
-  it("não mostra a pastilha «Perdido» quando não há nenhum", () => {
-    desenhar([pedido({ name: "Ana e Pedro", status: "pendente" })]);
-    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    expect(within(fila).queryByRole("button", { name: /Perdido/ })).toBeNull();
   });
 
   it("as contagens são do que a procura deixou passar, não da lista toda", async () => {
@@ -170,11 +174,38 @@ describe("lista de pedidos — a fila de estados", () => {
     const u = userEvent.setup();
     desenhar([pedido({ name: "Ana e Pedro", status: "pendente" })]);
     const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    await u.click(within(fila).getByRole("button", { name: /^Ganho/ }));
+    await u.click(within(fila).getByRole("button", { name: /^Aguardar resposta/ }));
 
     expect(screen.getByText("Nada neste estado")).toBeTruthy();
     expect(screen.queryByText("Ainda não há pedidos")).toBeNull();
-    await u.click(screen.getByRole("button", { name: "Ver os activos" }));
+    await u.click(screen.getByRole("button", { name: "Ver os por fazer" }));
     expect(screen.getByRole("button", { name: /Ana e Pedro/ })).toBeTruthy();
+  });
+
+  /**
+   * Procurar um casal que já tem proposta dava «Ninguém com esse nome» — e o
+   * casal existe. Diz-se onde está, e leva-se lá.
+   */
+  it("procurar quem já tem proposta diz onde está, e leva a Propostas", async () => {
+    const u = userEvent.setup();
+    const irParaPropostas = vi.fn();
+    render(
+      <FazerProposta
+        quotes={quotes()}
+        selectedId={null}
+        onSelect={() => {}}
+        onNovoPedido={() => {}}
+        onSent={() => {}}
+        onQuoteUpdated={() => {}}
+        onAbrirPedido={() => {}}
+        onIrParaPropostas={irParaPropostas}
+      />,
+    );
+    await u.type(screen.getByRole("searchbox", { name: "Procurar cliente" }), "Rita");
+    expect(await screen.findByText("Rita e João já tem proposta")).toBeTruthy();
+    expect(screen.getByText(/Está em «Proposta enviada»/)).toBeTruthy();
+    expect(screen.queryByText("Ninguém com esse nome")).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Ver em Propostas" }));
+    expect(irParaPropostas).toHaveBeenCalledTimes(1);
   });
 });

@@ -5934,6 +5934,8 @@ export default function AdminClient({
                 // Financeiro e as mensagens. O `openQuote` já muda a vista para
                 // Pedidos e trata da espera com nome.
                 onAbrirPedido={openQuote}
+                // As propostas já feitas não estão nesta lista — estão lá.
+                onIrParaPropostas={() => setView("propostas")}
                 onNovoPedido={() => setNewQuoteOpen(true)}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
