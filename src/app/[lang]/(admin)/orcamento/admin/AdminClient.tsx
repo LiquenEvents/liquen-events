@@ -1399,6 +1399,11 @@ export default function AdminClient({
   const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>(vistaInicial ?? "overview");
   const [navOpen, setNavOpen] = useState(false);
+  // A gaveta é modal: com ela aberta, o Tab passeava pelo fundo desfocado
+  // (Ajuda → Tudo guardado → Pesquisar → Novo) e o foco ficava no botão que a
+  // abriu. A armadilha da casa leva o foco para dentro, prende o Tab, tira o
+  // fundo da árvore e devolve o foco a quem a abriu quando fecha.
+  const gavetaRef = useFocusTrap<HTMLDivElement>(navOpen);
   /**
    * ════════════════════════════════════════════════════════════════════════
    * O MENU ENCOLHIDO NO COMPUTADOR — E SOZINHO AO FAZER PROPOSTA
@@ -4486,11 +4491,33 @@ export default function AdminClient({
             o `lg:contents` do invólucro — sem ele, o invólucro volta a ser o
             bloco contentor que impede a página de se arrastar para o lado, e
             agora também no computador. */}
-        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)]">
+        <div
+          ref={gavetaRef}
+          className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)]"
+        >
+          {/* O véu vive DENTRO do invólucro da gaveta. Fora dele, a armadilha
+              de foco (que tira os irmãos da árvore) deixava-o inerte, e tocar
+              fora da gaveta deixava de a fechar. Cá dentro, também passa a
+              cobrir a barra de baixo — que, com a gaveta aberta, já não
+              responde. */}
+          {navOpen && (
+            <div
+              className="bo-entrada bo-entrada-fundo pointer-events-auto absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+              onClick={() => setNavOpen(false)}
+            />
+          )}
+          {/* A sombra só existe aberta: fechada, a gaveta está em x = −256 com
+              o bordo direito em x = 0, e a sombra pintava ~40 px de cinzento
+              no canto esquerdo de todos os ecrãs. */}
           <aside
             inert={!navOpen}
-            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] motion-safe:transition-transform motion-safe:duration-300 ${
-              navOpen ? "translate-x-0" : "-translate-x-full"
+            role={navOpen ? "dialog" : undefined}
+            aria-modal={navOpen || undefined}
+            aria-label={navOpen ? "Menu" : undefined}
+            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 ${
+              navOpen
+                ? "translate-x-0 shadow-[var(--bo-sombra-modal)]"
+                : "-translate-x-full shadow-none"
             }`}
           >
             {/* A cruz que fecha a gaveta. Deixou de ser «do telemóvel»: a
@@ -4829,14 +4856,6 @@ export default function AdminClient({
             </div>
           </aside>
         </div>
-
-        {/* Backdrop (mobile nav drawer) */}
-        {navOpen && (
-          <div
-            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px]"
-            onClick={() => setNavOpen(false)}
-          />
-        )}
 
         {/* ══════════════════════════════════════════════════════════════════
             A BARRA DE DESTINOS DO TELEMÓVEL — UMA CÁPSULA QUE FLUTUA

@@ -176,7 +176,7 @@ const SEM_AFUNDAR: { ficheiro: string; marca: string; porque: string }[] = [
   // `<summary>` e os dois `<a>` são comandos a sério e DEVEM levar `PRESSAO`.
   {
     ficheiro: "orcamento/admin/AdminClient.tsx",
-    marca: "fixed inset-0 z-30 bg-black/60",
+    marca: "pointer-events-auto absolute inset-0 bg-black/60",
     porque: "véu da gaveta — dono noutra ronda",
   },
   {
