@@ -127,9 +127,6 @@ export default async function SobrePage({ params }: { params: Promise<{ lang: st
               <br />
               <span className="text-moss">{t.sobre.manifestoTitleLine2}</span>
             </h2>
-            <p className="text-white/80 text-base lg:text-lg leading-[1.8] mt-8 max-w-md">
-              {t.sobre.manifestoText}
-            </p>
           </AnimateIn>
         </div>
         {/* Right — full-height photo, covering the centre of the backdrop (the
