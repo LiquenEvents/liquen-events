@@ -66,7 +66,7 @@ vi.mock("@/lib/proposal-doc-render", () => ({
    * uma proposta com fotos a menos deixa de sair calada para o cliente. O
    * `emFalta` é regulável por caso para se poder exercitar a recusa.
    */
-  renderStoredProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
+  renderStoredEditorialPdfWithReport: vi.fn(async (doc: unknown) => {
     db.rendered.push(doc);
     return {
       pdf: new Uint8Array([37, 80, 68, 70]),
@@ -80,7 +80,7 @@ vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.
 import { GET } from "./route";
 import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
 import { getProposal } from "@/lib/proposals-store";
-import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { renderStoredEditorialPdfWithReport } from "@/lib/proposal-doc-render";
 
 // Um IP diferente por chamada: o limitador é real (12/minuto por IP) e é
 // partilhado por todo o processo de testes — sem isto, um teste gastava a
@@ -122,7 +122,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
     // seria uma degradação de cinco ou seis vezes em vez de uma melhoria.
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
     await call();
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
 
     const req = new Request("http://x", {
       headers: { "x-real-ip": `10.0.1.${++n % 250}`, range: "bytes=0-1" },
@@ -130,7 +130,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
     const res = await GET(req, { params: Promise.resolve({ token: "bom-p1" }) });
     expect(res.status).toBe(206);
     expect(res.headers.get("Content-Range")).toBe("bytes 0-1/4");
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
   });
 
   it("serve o documento guardado NA proposta do token", async () => {
@@ -156,7 +156,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1" });
     const res = await call();
     expect(res.status).toBe(404);
-    expect(renderStoredProposalDocPdfWithReport).not.toHaveBeenCalled();
+    expect(renderStoredEditorialPdfWithReport).not.toHaveBeenCalled();
   });
 
   it("404 a uma proposta que já não existe", async () => {
@@ -187,7 +187,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
 
   it("500 sem detalhes quando o desenho rebenta (nada do erro chega ao cliente)", async () => {
     db.proposals.set("p1", { id: "p1", doc: { ref: "PO" } });
-    vi.mocked(renderStoredProposalDocPdfWithReport).mockRejectedValueOnce(
+    vi.mocked(renderStoredEditorialPdfWithReport).mockRejectedValueOnce(
       new Error("sharp em baixo"),
     );
     const res = await call();
@@ -229,7 +229,7 @@ describe("GET /api/proposta/[token]/pdf — a língua da proposta", () => {
     });
     const res = await call();
     expect(res.status).toBe(200);
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "en");
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "en");
   });
 
   it("e o ficheiro chama-se como o que seguiu no email", async () => {
@@ -243,7 +243,7 @@ describe("GET /api/proposta/[token]/pdf — a língua da proposta", () => {
   it("uma proposta PORTUGUESA continua exactamente como estava", async () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", idioma: "pt", doc: { ref: "PO" } });
     const res = await call();
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
     expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-LIQ-AAA-1.pdf");
   });
 
@@ -252,14 +252,14 @@ describe("GET /api/proposta/[token]/pdf — a língua da proposta", () => {
     // desta coluna existir foi enviado em português.
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
     const res = await call();
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
     expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-LIQ-AAA-1.pdf");
   });
 
   it("uma língua estranha na base não inventa nada: português", async () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", idioma: "fr", doc: { ref: "PO" } });
     await call();
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
   });
 });
 

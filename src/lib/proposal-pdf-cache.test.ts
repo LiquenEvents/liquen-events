@@ -19,7 +19,7 @@ const desenhar = vi.fn();
 /** Fotos em falta em cada passagem, por ordem. Vazia = zero, sempre. */
 let filaDeFaltas: number[] = [];
 vi.mock("./proposal-doc-render", () => ({
-  renderStoredProposalDocPdfWithReport: async (...args: unknown[]) => {
+  renderStoredEditorialPdfWithReport: async (...args: unknown[]) => {
     const pdf = await desenhar(...args);
     return { pdf, missingImages: filaDeFaltas.shift() ?? 0, truncations: [] };
   },

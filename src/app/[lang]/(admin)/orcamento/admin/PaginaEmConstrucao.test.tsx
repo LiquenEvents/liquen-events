@@ -12,8 +12,8 @@ import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
  * página a ganhar forma, e percebe-se imediatamente quando há fotos a mais».
  *
  * O que se prende aqui é o que esse canto tem de responder sem falhar: quantas
- * já lá estão, quantas vão entrar, e — a razão nº 1 de isto existir — quantas
- * é que a página do PDF não vai imprimir.
+ * já lá estão, quantas vão entrar, e quando é que o tema passa a ocupar mais
+ * do que uma página do PDF (no desenho novo nenhuma fica de fora).
  */
 
 /** O ecrã dela. Por omissão o jsdom é largo, que é o caso do computador. */
@@ -35,40 +35,36 @@ afterEach(cleanup);
 
 describe("a página em construção", () => {
   it("não aparece quando não há nada para mostrar", () => {
-    const { container } = render(<PaginaEmConstrucao jaLa={[]} aEntrar={[]} maximo={10} />);
+    const { container } = render(<PaginaEmConstrucao jaLa={[]} aEntrar={[]} maximo={12} />);
     expect(container.innerHTML).toBe("");
   });
 
   it("conta o que a página JÁ tem mais o que vai entrar", () => {
-    render(<PaginaEmConstrucao jaLa={fotos(3, "a")} aEntrar={fotos(2, "b")} maximo={10} />);
+    render(<PaginaEmConstrucao jaLa={fotos(3, "a")} aEntrar={fotos(2, "b")} maximo={12} />);
     expect(screen.getByText("5")).toBeTruthy();
-    expect(screen.getByText(/de 10/)).toBeTruthy();
+    expect(screen.getByText(/de 12/)).toBeTruthy();
   });
 
   /**
-   * O AVISO É O PONTO TODO.
+   * NENHUMA FICA DE FORA.
    *
-   * Descobrir aqui que duas fotos não entram é uma escolha a menos; descobri-lo
-   * no PDF é uma proposta a refazer.
+   * No PDF antigo as que passavam de dez não saíam. No novo o tema passa a
+   * ocupar mais uma página — diz-se, para ela decidir se a quer.
    */
-  it("avisa quando passa do que a página imprime", () => {
-    render(<PaginaEmConstrucao jaLa={fotos(8, "a")} aEntrar={fotos(4, "b")} maximo={10} />);
-    expect(screen.getByText("2 não entram na página")).toBeTruthy();
-  });
-
-  it("e no singular fala no singular", () => {
-    render(<PaginaEmConstrucao jaLa={fotos(10, "a")} aEntrar={fotos(1, "b")} maximo={10} />);
-    expect(screen.getByText("1 não entra na página")).toBeTruthy();
-  });
-
-  it("dentro do que cabe, não inventa avisos", () => {
-    render(<PaginaEmConstrucao jaLa={fotos(4, "a")} aEntrar={fotos(2, "b")} maximo={10} />);
+  it("acima de uma página diz quantas o tema ocupa", () => {
+    render(<PaginaEmConstrucao jaLa={fotos(10, "a")} aEntrar={fotos(4, "b")} maximo={12} />);
+    expect(screen.getByText("Ocupa 2 páginas no PDF")).toBeTruthy();
     expect(screen.queryByText(/não entra/)).toBeNull();
+  });
+
+  it("dentro de uma página, não inventa avisos", () => {
+    render(<PaginaEmConstrucao jaLa={fotos(8, "a")} aEntrar={fotos(4, "b")} maximo={12} />);
+    expect(screen.queryByText(/Ocupa/)).toBeNull();
   });
 
   it("as que vão entrar distinguem-se das que já lá estão", () => {
     const { container } = render(
-      <PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={fotos(1, "b")} maximo={10} />,
+      <PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={fotos(1, "b")} maximo={12} />,
     );
     const celulas = container.querySelectorAll("span.aspect-square");
     expect(celulas).toHaveLength(3);
@@ -76,13 +72,12 @@ describe("a página em construção", () => {
     expect(celulas[2].className, "a que vai entrar leva moldura").toContain("ring-sage-600");
   });
 
-  it("as que passam do teto aparecem apagadas", () => {
+  it("nenhuma aparece apagada — no PDF novo todas saem", () => {
     const { container } = render(
       <PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={fotos(2, "b")} maximo={3} />,
     );
     const celulas = container.querySelectorAll("span.aspect-square");
-    expect(celulas[2].className).not.toContain("opacity-40");
-    expect(celulas[3].className).toContain("opacity-40");
+    expect([...celulas].some((c) => c.className.includes("opacity-40"))).toBe(false);
   });
 
   /**
@@ -91,7 +86,7 @@ describe("a página em construção", () => {
    */
   it("com muitas fotos mostra nove e di-lo", () => {
     const { container } = render(
-      <PaginaEmConstrucao jaLa={fotos(14, "a")} aEntrar={[]} maximo={10} />,
+      <PaginaEmConstrucao jaLa={fotos(14, "a")} aEntrar={[]} maximo={12} />,
     );
     expect(container.querySelectorAll("span.aspect-square")).toHaveLength(9);
     expect(screen.getByText("14")).toBeTruthy();
@@ -104,11 +99,11 @@ describe("a página em construção", () => {
         titulo="Jardim ao entardecer"
         jaLa={fotos(1, "a")}
         aEntrar={[]}
-        maximo={10}
+        maximo={12}
       />,
     );
     expect(screen.getByText("Jardim ao entardecer")).toBeTruthy();
-    rerender(<PaginaEmConstrucao titulo="   " jaLa={fotos(1, "a")} aEntrar={[]} maximo={10} />);
+    rerender(<PaginaEmConstrucao titulo="   " jaLa={fotos(1, "a")} aEntrar={[]} maximo={12} />);
     expect(screen.getByText("Esta página")).toBeTruthy();
   });
 
@@ -119,21 +114,23 @@ describe("a página em construção", () => {
    * precisar de saber quantas leva — e de poder voltar a abri-lo.
    */
   it("fecha-se, e fechada continua a dizer quantas são", () => {
-    render(<PaginaEmConstrucao jaLa={fotos(8, "a")} aEntrar={fotos(4, "b")} maximo={10} />);
+    render(<PaginaEmConstrucao jaLa={fotos(10, "a")} aEntrar={fotos(4, "b")} maximo={12} />);
     fireEvent.click(screen.getByRole("button", { name: "Esconder a página em construção" }));
     const pastilha = screen.getByRole("button");
-    expect(pastilha.textContent).toContain("12 fotos");
-    expect(pastilha.textContent, "e o aviso não se perde ao fechar").toContain("2 a mais");
+    expect(pastilha.textContent).toContain("14 fotos");
+    expect(pastilha.textContent, "e a conta das páginas não se perde ao fechar").toContain(
+      "2 páginas",
+    );
     fireEvent.click(pastilha);
-    expect(screen.getByText(/de 10/)).toBeTruthy();
+    expect(screen.getByText("Ocupa 2 páginas no PDF")).toBeTruthy();
   });
 
   it("e lembra-se de que foi fechada da próxima vez", () => {
-    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
+    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={12} />);
     fireEvent.click(screen.getByRole("button", { name: "Esconder a página em construção" }));
     cleanup();
-    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
-    expect(screen.queryByText(/de 10/)).toBeNull();
+    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={12} />);
+    expect(screen.queryByText(/de 12/)).toBeNull();
     expect(screen.getByRole("button").textContent).toContain("2 fotos");
   });
 
@@ -148,23 +145,23 @@ describe("a página em construção", () => {
    */
   it("num ecrã estreito começa fechada, e continua a dizer a conta", () => {
     estreitar(390);
-    render(<PaginaEmConstrucao jaLa={fotos(7, "a")} aEntrar={fotos(4, "b")} maximo={10} />);
+    render(<PaginaEmConstrucao jaLa={fotos(9, "a")} aEntrar={fotos(4, "b")} maximo={12} />);
     expect(screen.queryByLabelText("A página em construção")).toBeNull();
     const pastilha = screen.getByRole("button");
-    expect(pastilha.textContent).toContain("11 fotos");
-    expect(pastilha.textContent).toContain("1 a mais");
+    expect(pastilha.textContent).toContain("13 fotos");
+    expect(pastilha.textContent).toContain("2 páginas");
   });
 
   it("e no computador, onde não tapa nada, começa aberta", () => {
     estreitar(1024);
-    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
+    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={12} />);
     expect(screen.getByLabelText("A página em construção")).toBeTruthy();
   });
 
   it("mas uma escolha dela manda em qualquer largura", () => {
     estreitar(390);
     localStorage.setItem("liquen-pagina-em-construcao", "1");
-    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
+    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={12} />);
     expect(screen.getByLabelText("A página em construção")).toBeTruthy();
   });
 
@@ -186,7 +183,7 @@ describe("a página em construção", () => {
           },
         ]}
         aEntrar={[]}
-        maximo={10}
+        maximo={12}
       />,
     );
     const img = container.querySelector("img")!;

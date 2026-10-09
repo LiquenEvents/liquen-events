@@ -20,11 +20,14 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
  * ── O QUE ESTA MINIATURA MOSTRA, E O QUE NÃO MOSTRA ───────────────────────
  *
  * Mostra QUANTAS e QUAIS, na ordem em que vão ficar — e não a composição
- * exacta. A página do PDF dá às caixas a forma das fotografias (ver
- * `ordemDasFotos` no estúdio), e reproduzir isso aqui num quadrado de 100 px
- * seria uma promessa que este canto não pode cumprir. O que este canto responde
- * é a pergunta que se faz a meio de escolher: «quantas é que já tenho, e ainda
- * cabem?».
+ * exacta, que o PDF decide pelo número de fotografias (`pdf-editorial/
+ * mosaico.ts`). O que este canto responde é a pergunta que se faz a meio de
+ * escolher: «quantas é que já tenho, e ainda cabem numa página?».
+ *
+ * No PDF antigo uma página imprimia dez e as outras ficavam de fora. No novo
+ * não fica nenhuma de fora: acima de doze o tema passa a DUAS páginas (a
+ * segunda diz «Mais ideias…»). É isso que se diz agora — não é um erro, é uma
+ * página a mais, e ela decide se a quer.
  *
  * ── E PORQUE É QUE SE PODE ESCONDER ───────────────────────────────────────
  *
@@ -85,7 +88,8 @@ export function PaginaEmConstrucao({
   jaLa: readonly FotoDaPagina[];
   /** As que estão escolhidas e ainda não entraram. */
   aEntrar: readonly FotoDaPagina[];
-  /** Quantas a página do PDF imprime. */
+  /** Quantas cabem numa página do PDF (`MAXIMO_POR_PAGINA`, 12). Acima
+   *  disso o tema ocupa mais do que uma página. */
   maximo: number;
   /**
    * ── ANCORADA, E NÃO POR CIMA DAS FOTOS ────────────────────────────────
@@ -123,8 +127,8 @@ export function PaginaEmConstrucao({
     });
   };
 
-  /** Passou do que a página imprime. É a razão nº 1 de isto existir. */
-  const aMais = Math.max(0, total - maximo);
+  /** Quantas páginas o tema vai ocupar no PDF. */
+  const paginas = Math.max(1, Math.ceil(total / Math.max(1, maximo)));
 
   if (!aberta) {
     return (
@@ -137,7 +141,7 @@ export function PaginaEmConstrucao({
         <span className="tabular-nums text-[var(--bo-tinta-72)]">
           {total} {total === 1 ? "foto" : "fotos"}
         </span>
-        {aMais > 0 && <span className="text-[var(--bo-aviso)]">· {aMais} a mais</span>}
+        {paginas > 1 && <span className="text-[var(--bo-text-muted)]">· {paginas} páginas</span>}
       </button>
     );
   }
@@ -184,13 +188,12 @@ export function PaginaEmConstrucao({
       <div className="mt-1.5 grid grid-cols-3 gap-1">
         {[...jaLa, ...aEntrar].slice(0, 9).map((f, i) => {
           const entrando = i >= jaLa.length;
-          const excedente = i >= maximo;
           return (
             <span
               key={`${f.path}:${i}`}
               className={`relative block aspect-square overflow-hidden rounded bg-[var(--bo-tinta-6)] ${
                 entrando ? "ring-1 ring-sage-600" : ""
-              } ${excedente ? "opacity-40" : ""}`}
+              }`}
             >
               {f.url && (
                 /* `ImagemComPlanoB` e não um `img`: uma miniatura que não
@@ -209,15 +212,16 @@ export function PaginaEmConstrucao({
       </div>
 
       <p className="mt-1.5 text-[10px] leading-snug text-[var(--bo-text-muted)]">
-        <span className="tabular-nums">{total}</span> de {maximo}
+        <span className="tabular-nums">{total}</span>
+        {paginas > 1 ? (total === 1 ? " foto" : " fotos") : ` de ${maximo}`}
         {total > 9 && <span className="text-foreground/40"> · mostra 9</span>}
       </p>
-      {aMais > 0 && (
-        /* O aviso que faz esta miniatura valer a pena: a página do PDF imprime
-           `maximo`, e o que passa disso não sai. Descobrir isto aqui é uma
-           escolha a menos; descobri-lo no PDF é uma proposta a refazer. */
-        <p className="mt-0.5 text-[10px] leading-snug text-[var(--bo-aviso)]">
-          {aMais === 1 ? "1 não entra na página" : `${aMais} não entram na página`}
+      {paginas > 1 && (
+        /* Não é um erro: no PDF novo nenhuma fica de fora, o tema passa a
+           ocupar mais uma página («Mais ideias…»). Diz-se para ela decidir
+           se a quer. */
+        <p className="mt-0.5 text-[10px] leading-snug text-[var(--bo-text-muted)]">
+          Ocupa {paginas} páginas no PDF
         </p>
       )}
     </div>

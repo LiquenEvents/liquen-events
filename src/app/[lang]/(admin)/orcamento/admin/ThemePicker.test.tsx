@@ -1935,14 +1935,16 @@ describe("o painel a 390 px", () => {
     expect(screen.getByText("3"), "a escolhida conta antes de entrar").toBeInTheDocument();
   });
 
-  it("e avisa quando a escolha passa do que a página imprime", async () => {
+  it("e diz quando a escolha passa a ocupar duas páginas do PDF", async () => {
+    // No PDF novo nenhuma fica de fora: acima do que cabe numa página, o tema
+    // passa a duas («Mais ideias…»).
     await openPicker(true, undefined, undefined, {
       fotos: [{ path: "b/uma.jpg" }, { path: "b/outra.jpg" }],
       maximo: 2,
     });
-    expect(screen.queryByText(/não entra/)).toBeNull();
+    expect(screen.queryByText(/Ocupa 2 páginas/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: `Foto 1 de ${visible()}` }));
-    expect(screen.getByText("1 não entra na página")).toBeInTheDocument();
+    expect(screen.getByText("Ocupa 2 páginas no PDF")).toBeInTheDocument();
   });
 
   it("sem página nenhuma para compor, o canto não existe", async () => {

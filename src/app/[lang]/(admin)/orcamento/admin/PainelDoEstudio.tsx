@@ -1,11 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { MoodBoard } from "@/lib/proposal-doc";
-import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
-import { ASPETO_POR_OMISSAO, type LayoutDeMoodboard } from "@/lib/proposal-geometria";
-import { layoutDoBoard as layoutEfectivo, ordemDasFotos } from "@/lib/proposal-moodboard";
-import PreviaDaPagina from "./PreviaDaPagina";
+import { useMemo, useRef, useState } from "react";
+import type { MoodBoard, ProposalDoc } from "@/lib/proposal-doc";
+import {
+  capituloDoTema,
+  ordemDoDesenho,
+  planoDaProposta,
+  type EntradaDoPlano,
+} from "@/lib/pdf-editorial/plano";
+import { MAXIMO_POR_PAGINA } from "@/lib/pdf-editorial/mosaico";
+import { grupoDoTema } from "@/lib/pdf-editorial/grupos";
+import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
 
@@ -109,8 +114,7 @@ export default function PainelDoEstudio({
   urls,
   originais,
   aspetos,
-  layoutPorOmissao,
-  enquadramentoPorOmissao,
+  doc,
   onSaltar,
   onEscolherFotos,
 }: {
@@ -121,8 +125,13 @@ export default function PainelDoEstudio({
   urls: Record<string, string>;
   originais: Record<string, string>;
   aspetos: Record<string, number>;
-  layoutPorOmissao?: LayoutDeMoodboard;
-  enquadramentoPorOmissao?: "forma-da-foto";
+  /**
+   * O documento, para as páginas saírem do PLANO do PDF novo (`plano.ts`) —
+   * a vez de cada tema, que decide o lado do mosaico, e as páginas a mais de
+   * um tema com mais de doze fotografias. Sem ele, cada tema desenha-se só com
+   * as suas fotografias, como se fosse o único.
+   */
+  doc?: ProposalDoc;
   onSaltar: (bi: number) => void;
   /**
    * Abrir a biblioteca de temas já apontada a esta página.
@@ -170,35 +179,44 @@ export default function PainelDoEstudio({
   const separadoresRef = useRef<HTMLDivElement>(null);
   const { marca, podeAndar } = useMarcaQueAnda(separadoresRef, '[aria-selected="true"]', vista);
 
-  const daPagina = (p: PaginaParaOPainel) => {
-    const caminhos = (p.board.images ?? []).slice(0, MOOD_BOARD_MAX_IMAGES);
-    const formas = caminhos.map((c) => aspetos[c] ?? ASPETO_POR_OMISSAO);
-    /*
-     * A preferência da proposta entra AQUI, e não dentro do `layoutDoBoard`.
-     *
-     * Aquela função responde «o que este board diz, ou o que o número de fotos
-     * sugere» — é a mesma que o gerador usa, e ela não conhece o documento. Dar
-     * -lhe o board já com o layout da proposta preenchido é o que faz o painel
-     * desenhar o que o PDF vai desenhar, sem duas regras a decidir o mesmo.
-     */
-    const comOLayoutDaProposta = { ...p.board, layout: p.board.layout ?? layoutPorOmissao };
-    const ordem = ordemDasFotos(comOLayoutDaProposta);
-    return {
-      layout: layoutEfectivo(comOLayoutDaProposta),
-      semRecorte: (p.board.enquadramento ?? enquadramentoPorOmissao) === "forma-da-foto",
-      aspectos: ordem.map((i) => formas[i] ?? ASPETO_POR_OMISSAO),
-      urls: ordem.map((i) => urls[caminhos[i]]),
-      originais: ordem.map((i) => originais[caminhos[i]]),
-    };
-  };
-
   /**
-   * A página a mostrar em «Página».
-   *
-   * A que está a ser editada quando se sabe qual é, e a primeira quando não se
-   * sabe — abrir o estúdio e ver o painel vazio até tocar num board era um
-   * painel que parece avariado.
+   * A primeira página de cada tema, tal como o plano do PDF a desenha. Sem
+   * documento (ou um tema que o plano não tem — vazio), uma página feita só
+   * com as fotografias do tema.
    */
+  const plano = useMemo(() => (doc ? planoDaProposta(doc) : []), [doc]);
+  const docDosTemas = useMemo<ProposalDoc>(() => {
+    if (doc) return doc;
+    const moodBoards: MoodBoard[] = [];
+    for (const p of paginas) moodBoards[p.bi] = p.board;
+    return { moodBoards } as ProposalDoc;
+  }, [doc, paginas]);
+  const entradaDe = (p: PaginaParaOPainel, vez: number): EntradaDoPlano =>
+    plano.find((e) => e.tipo === "tema" && e.bi === p.bi && e.parte === 0) ?? {
+      tipo: "tema",
+      bi: p.bi,
+      vez,
+      grupo: grupoDoTema(p.board.title ?? "", p.board.subtitulo ?? ""),
+      titulo: (p.board.title ?? "").trim(),
+      parte: 0,
+      partes: 1,
+      fotos: ordemDoDesenho(p.board).slice(0, MAXIMO_POR_PAGINA),
+      nome: (p.board.title ?? "").trim() || capituloDoTema(p.board),
+      seccao: "moodboards",
+    };
+  const entradas = paginas.map((p, i) => entradaDe(p, i + 1));
+  const fontes = fontesDasFolhas(docDosTemas, plano.length ? plano : entradas, urls, originais);
+  const folha = (p: PaginaParaOPainel, i: number) => (
+    <PaginaEditorial
+      pagina={entradas[i]}
+      doc={docDosTemas}
+      aspetos={aspetos}
+      capa={fontes.capa}
+      fotosDoTema={fontes.fotosDoTema}
+      outras={fontes.outrasDa(Math.max(0, plano.indexOf(entradas[i])))}
+    />
+  );
+
   const aVer = paginas.find((p) => p.bi === activa) ?? paginas[0];
 
   // Não cabe: não há painel nenhum, nem o custo de o desenhar. Ver
@@ -316,12 +334,7 @@ export default function PainelDoEstudio({
               <div key={vista} className="view-in">
                 {vista === "pagina" && aVer ? (
                   <>
-                    <PreviaDaPagina
-                      {...daPagina(aVer)}
-                      titulo={aVer.board.title}
-                      subtitulo={aVer.board.subtitulo}
-                      legenda={aVer.board.annotation}
-                    />
+                    {folha(aVer, paginas.indexOf(aVer))}
                     <p className="mt-2 text-center text-[11px] text-foreground/45">
                       Inspiração {paginas.findIndex((p) => p.bi === aVer.bi) + 1} de{" "}
                       {paginas.length}
@@ -356,12 +369,7 @@ export default function PainelDoEstudio({
                         }`}
                         aria-label={`Ir para a página ${i + 1}${p.board.title ? `: ${p.board.title}` : ""}`}
                       >
-                        <PreviaDaPagina
-                          {...daPagina(p)}
-                          titulo={p.board.title}
-                          subtitulo={p.board.subtitulo}
-                          legenda={p.board.annotation}
-                        />
+                        {folha(p, i)}
                         <span className="mt-1 block truncate text-[10px] text-foreground/45 tabular-nums">
                           {i + 1}. {p.board.title || "sem título"}
                         </span>

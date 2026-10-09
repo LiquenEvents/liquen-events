@@ -44,7 +44,8 @@ const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
  *
  * 3. QUE A FOLHA DO CLIENTE NÃO MUDOU DE LETRA. A proposta que chega ao casal
  *    é em Playfair — está escrito no `Documento.tsx`, que vive em `(privado)`.
- *    A `FolhaDaProposta` é a PRÉ-VISUALIZAÇÃO dessa folha. Se a prévia
+ *    A `PaginaEditorial` é a PRÉ-VISUALIZAÇÃO dessa folha (era a
+ *    `FolhaDaProposta`, do PDF antigo). Se a prévia
  *    seguisse o back office, ela passava a conferir uma folha diferente da que
  *    sai — que é exactamente o defeito do `letra-da-previa.test.ts`, com as
  *    palavras dela por trás: «uma pré-visualização parcial dá falsa
@@ -63,7 +64,7 @@ const SELECTOR_ADMIN = "body:is(.admin-mode, :has([data-admin-mode]))";
 
 const CSS = readFileSync("src/app/globals.css", "utf8");
 const RAIZ = "src/app/[lang]/(admin)/orcamento/admin/";
-const FOLHA = `${RAIZ}FolhaDaProposta.tsx`;
+const FOLHA = `${RAIZ}PaginaEditorial.tsx`;
 
 /** A regra que pinta a letra do painel, do selector até à chaveta que o fecha. */
 function regraDaLetra(css: string): string {
@@ -190,7 +191,7 @@ describe("a letra da casa no back office", () => {
     );
     expect(
       semComentarios(readFileSync(FOLHA, "utf8")),
-      "a `FolhaDaProposta` deixou de se marcar como folha do cliente",
+      "a `PaginaEditorial` deixou de se marcar como folha do cliente",
     ).toContain("data-folha-do-cliente");
   });
 

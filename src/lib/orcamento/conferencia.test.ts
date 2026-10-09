@@ -562,21 +562,20 @@ describe("a lista toda", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * AS FOLHAS QUE SAEM EM BRANCO
+ * AS SECÇÕES QUE NÃO SAEM
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Achado F-13 de uma auditoria em produção: a vista de conjunto anunciava as
- * páginas 4 e 5 com «Esta folha sai em branco» — e o documento seguiu para o
- * cliente com duas folhas vazias no meio. «A aplicação sabe e avisa — mas deixa
- * enviar.» Sabia num sítio: dois passos e um scroll antes do botão.
+ * Achado F-13 de uma auditoria em produção: o documento seguiu para o cliente
+ * com duas folhas vazias no meio. O desenho novo já não imprime uma folha sem
+ * conteúdo — o que pode faltar é o texto, e é isso que se diz.
  */
-describe("as folhas que saem em branco", () => {
-  it("nomeia as duas folhas do fecho quando estão vazias", () => {
+describe("as secções que não saem", () => {
+  it("nomeia as duas listas do fecho quando estão vazias", () => {
     const vs = conferir({ doc: documento(), quote: pedido(), ...base });
     const f = achar(vs, "folhas-em-branco");
     expect(f.severidade).toBe("aviso");
-    expect(f.detalhe).toContain("Condições gerais");
-    expect(f.detalhe).toContain("Observações e contactos");
+    expect(f.detalhe).toContain("Condições");
+    expect(f.detalhe).toContain("Observações");
   });
 
   it("cala-se quando elas têm conteúdo", () => {
@@ -591,17 +590,12 @@ describe("as folhas que saem em branco", () => {
       ...base,
     });
     const f = achar(vs, "folhas-em-branco");
-    expect(f.titulo).toMatch(/Uma folha/);
-    expect(f.detalhe).toContain("vai sair");
-    expect(f.detalhe).not.toContain("vão sair");
+    expect(f.titulo).toMatch(/Uma secção/);
+    expect(f.detalhe).toContain("não sai");
+    expect(f.detalhe).not.toContain("não saem");
   });
 
-  /**
-   * A armadilha que isto quase pisou. Uma página de inspiração não tem uma
-   * linha de texto e está CHEIA de fotografias — contá-la como vazia era
-   * anunciar como em branco a página mais cheia da proposta.
-   */
-  it("não confunde uma página de inspiração com uma folha vazia", () => {
+  it("uma página de inspiração sem texto não conta como secção vazia", () => {
     const vs = conferir({
       doc: documentoCompleto({
         moodBoards: [{ images: ["b/1.jpg", "b/2.jpg"] }],

@@ -99,3 +99,17 @@ existem** — nenhuma segunda família, contraste ≥ 4,5:1. Lê-a antes de segu
 o §6 à letra: quase todos os valores de lá já existem cá com outro nome, e
 alguns dos nomes de lá (`--text-*`, `--accent`, `--ease-sheet`) já querem dizer
 outra coisa nesta casa.
+
+# E o PDF da proposta tem o seu
+
+`docs/PDF-EDITORIAL.md` é o documento dela para o redesenho do PDF (o desenho
+escuro do exemplo «Mafalda & João»). O código novo está em
+`src/lib/pdf-editorial/`, e **ela aprovou-o**: é o do envio, do link do casal e
+do estúdio. O gerador antigo (`proposal-doc-pdf.ts`) fica sem uso nas rotas até
+um PR à parte o apagar. O estúdio conta e mostra as páginas pelo `plano.ts`
+(um teste prende-o ao PDF) — não voltes a contar páginas noutro sítio. Lê a
+**Parte −1** antes de seguir o texto à letra: lá está a tabela do que já está
+feito, e os sítios onde a execução se afastou do texto (uma só cor de
+destaque, nenhum fundo desfocado, capa só com a fotografia de fundo, logótipo no
+rodapé). A
+referência que conta é o exemplo NOVO, de 26 páginas.

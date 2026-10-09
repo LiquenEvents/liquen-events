@@ -4,7 +4,7 @@ import { foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
 import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
-import { paginasEmBranco } from "@/lib/proposal-paginas";
+import { listasQueNaoSaem } from "@/lib/pdf-editorial/plano";
 import { camposDeEscolhaPorTraduzir } from "@/lib/proposta-escolhas";
 
 /**
@@ -577,40 +577,40 @@ export function conferir({
   // é só a marca de trava; a frase é a que já cá estava. Os outros (o título
   // interno, os grupos, as capas, os boards, a soma) não tinham voz nenhuma
   // aqui e entram tal como estão escritos.
-  // ── As folhas que saem em branco ────────────────────────────────────────
+  // ── As listas que não saem ────────────────────────────────────────────
   //
   // Achado F-13 de uma auditoria em produção: na proposta da Maria João, a
   // vista de conjunto anunciava as páginas 4 e 5 com «Esta folha sai em
   // branco» — e o documento seguiu para o cliente com duas folhas vazias no
   // meio. «A aplicação sabe e avisa — mas deixa enviar.»
   //
-  // Sabia num sítio: dois passos e um scroll antes do botão. Passa a saber
-  // aqui, que é onde ela decide.
+  // O desenho novo do PDF já não imprime uma secção sem conteúdo: a folha
+  // vazia deixou de existir. O que continua a poder faltar é o TEXTO — umas
+  // condições gerais apagadas por engano saem como «não há condições», e isso
+  // é tão grave como a folha em branco era. O `id` fica o mesmo, porque a
+  // pergunta é a mesma: o documento vai sair com um buraco?
   //
   // ── PORQUE É QUE ISTO NÃO TRAVA ─────────────────────────────────────────
   //
   // Pela regra desta casa, escrita no cabeçalho: o que trava nasce em
-  // `proposal-progress.ts` e é copiado, nunca decidido aqui. Uma folha em
-  // branco é grave — mas é dela a decisão de a mandar na mesma (pode estar a
-  // enviar uma versão para ela própria ver). O que não podia continuar é ir
-  // sem ela ter tido a hipótese de reparar, e é isso que muda.
+  // `proposal-progress.ts` e é copiado, nunca decidido aqui. É dela a decisão
+  // de a mandar na mesma (pode estar a enviar uma versão para ela própria
+  // ver); o que não pode é ir sem ela ter tido a hipótese de reparar.
   //
   // `aviso` e não `erro` pela mesma razão que a data diferente da do pedido é
   // `aviso`: é sempre para olhar, e nem sempre é um defeito.
-  const emBranco = paginasEmBranco(doc, idioma);
+  const faltam = listasQueNaoSaem(doc);
   v.push(
-    emBranco.length === 0
-      ? { id: "folhas-em-branco", titulo: "Folhas do documento", severidade: "ok", detalhe: "" }
+    faltam.length === 0
+      ? { id: "folhas-em-branco", titulo: "Secções do documento", severidade: "ok", detalhe: "" }
       : {
           id: "folhas-em-branco",
-          titulo: emBranco.length === 1 ? "Uma folha sai em branco" : "Folhas que saem em branco",
+          titulo: faltam.length === 1 ? "Uma secção não sai no PDF" : "Secções que não saem no PDF",
           severidade: "aviso",
-          // Pelo NOME e não pelo número: o número da folha muda com uma página
-          // de inspiração a mais, e o nome é o que ela lê na vista de conjunto.
-          detalhe: `${emBranco.map((p) => `«${p.titulo}»`).join(" e ")} ${
-            emBranco.length === 1 ? "vai sair" : "vão sair"
-          } com o cabeçalho e nada por baixo.`,
-          seccao: emBranco[0].seccao,
+          detalhe: `${faltam.map((p) => `«${p.nome}»`).join(" e ")} ${
+            faltam.length === 1 ? "está vazia e não sai" : "estão vazias e não saem"
+          } no PDF.`,
+          seccao: faltam[0].seccao,
         },
   );
 

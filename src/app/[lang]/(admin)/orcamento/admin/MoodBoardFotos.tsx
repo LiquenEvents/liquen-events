@@ -428,7 +428,8 @@ export function CelulaDeFoto({
   ii: number;
   children: ReactNode;
   accoes?: ReactNode;
-  /** É a foto que manda na página — ver `proposal-moodboard.ts`. */
+  /** É a fotografia do cartão: a de «O que propomos» e a primeira do mosaico
+   *  no PDF (`ordemDoDesenho`, em `pdf-editorial/plano.ts`). */
   principal?: boolean;
   seleccionada?: boolean;
   /** O board está fechado: a foto vê-se, não se mexe. */
@@ -484,7 +485,7 @@ export function CelulaDeFoto({
         )}
         {principal && (
           <span className="pointer-events-none absolute top-1 left-1 z-10 rounded-full bg-sage-600 px-1.5 py-0.5 text-[8px] font-medium tracking-[0.1em] uppercase text-white">
-            principal
+            cartão
           </span>
         )}
       </div>

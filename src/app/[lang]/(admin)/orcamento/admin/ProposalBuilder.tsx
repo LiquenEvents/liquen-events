@@ -8,7 +8,6 @@ import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
 import { Card, Field, Button, EmptyState, EmCurso } from "@/app/[lang]/(admin)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import { useTravaoDeSaida } from "./useGravacaoAutomatica";
-import { tempoEstimado } from "@/lib/custo-do-pdf";
 import { eur, round2 } from "@/lib/money";
 import { Escolha } from "./ui";
 import { ESTADO, PRESSAO } from "./ui/movimento";
@@ -29,9 +28,10 @@ const LS_KEY = "liquen-last-proposal-items";
  * anteriores. Este construtor não tem NENHUM desses dois dados:
  *
  *  · fotografias não tem nenhumas — o PDF que esta rota manda desenhar é o de
- *    linhas (`proposal-pdf.ts`), texto e tabela, sem uma única imagem. Por isso
- *    `tempoEstimado(0)` e não um número inventado: é o custo fixo do modelo,
- *    que é exactamente a parte do desenho que este documento paga;
+ *    linhas (`proposal-pdf.ts`), texto e tabela, sem uma única imagem. Usava o
+ *    custo fixo do modelo do Estúdio (`tempoEstimado(0)`), que era ~0,9 s; esse
+ *    modelo passou a ser o do desenho novo, de 26 páginas com fotografias, e
+ *    deixou de servir aqui. Fica o 0,9 s que ele valia, escrito à mão;
  *  · amostras não tem nenhumas — as gerações medidas vivem numa chave de
  *    `localStorage` privada do Estúdio, que este ficheiro não pode ler sem
  *    duplicar a chave à mão. Fica-se pelo modelo de arranque.
@@ -46,7 +46,8 @@ const LS_KEY = "liquen-last-proposal-items";
  * recado. Errar por cima é que era mau — uma barra parada no princípio.
  */
 const MS_DO_CORREIO = 7_000;
-const MS_DO_ENVIO = tempoEstimado(0) + MS_DO_CORREIO;
+const MS_DO_DESENHO_DE_LINHAS = 900;
+const MS_DO_ENVIO = MS_DO_DESENHO_DE_LINHAS + MS_DO_CORREIO;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

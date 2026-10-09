@@ -38,7 +38,16 @@ Portanto, neste repositório:
   é a parte do desenho que resolve o scroll — e essa não depende da sidebar;
 * a proibição «barra de separadores no fundo» (Parte 11) **não vale aqui**.
 
-Tudo o resto do documento vale como está escrito.
+Tudo o resto do documento vale como está escrito, com uma segunda ressalva, que
+veio depois:
+
+**O PDF mudou de desenho, e o estúdio com ele** (9 de outubro; ver
+`docs/PDF-EDITORIAL.md`, «O estúdio, adaptado ao PDF novo»). Onde este
+documento fala do inspector «O que vai sair» ou das miniaturas das páginas,
+são agora as páginas do PDF novo (`PaginaEditorial.tsx`, pelo `plano.ts`). A
+disposição de cada tema e o «Manter a forma» saíram da toolbar dos temas: o PDF
+decide a composição pelo número de fotografias, e o cartão di-lo só de leitura.
+A capa passou a ter um lugar só.
 
 ---
 
