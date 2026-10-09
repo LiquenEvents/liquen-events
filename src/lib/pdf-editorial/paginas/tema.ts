@@ -6,6 +6,7 @@ import {
   FOLHA,
   FUNDO_DO_CONTEUDO,
   fotoNaCaixa,
+  logotipoNaLinha,
   novaPagina,
   rectangulo,
   rodape,
@@ -14,7 +15,7 @@ import {
   type Contexto,
 } from "../moldura";
 import { composicao } from "../mosaico";
-import { COR, FOLHA_PX_W, LETRA, MARGEM, fio, px } from "../paleta";
+import { COR, FOLHA_PX_H, FOLHA_PX_W, LETRA, MARGEM, fio, px } from "../paleta";
 import {
   baseDaLinha,
   bloco,
@@ -37,7 +38,7 @@ import { DE_BAIXO } from "./fotografia";
  * pelo número de fotografias — ver `mosaico.ts`.
  *
  * As páginas de mosaico não têm o rodapé normal: o mosaico de texto leva em
- * baixo «LÍQUEN EVENTS» e o número da página, como no exemplo.
+ * baixo o logótipo da Líquen e o número da página.
  */
 
 export interface DadosDoTema {
@@ -52,6 +53,11 @@ export interface DadosDoTema {
   fotos: readonly Foto[];
   /** O número desta página no documento. */
   pagina: number;
+  /**
+   * Só para um tema SEM fotografias: uma fotografia de outro tema do capítulo
+   * para o painel da esquerda — «nenhuma página é só texto sobre fundo liso».
+   */
+  painel?: Foto | null;
 }
 
 const doisAlgarismos = (n: number) => String(n).padStart(2, "0");
@@ -68,8 +74,10 @@ export async function tema(ctx: Contexto, d: DadosDoTema): Promise<PDFPage> {
   const sobre = `${ctx.te.inspiracao} · ${d.grupo}`;
 
   if (c.tipo === "texto") {
-    paginaDeTexto(ctx, p, d, sobre);
-    rodape(ctx, p, d.pagina);
+    const x0 = d.painel ? PAINEL_DO_TEXTO.w + 56 : MARGEM;
+    if (d.painel) await fotoNaCaixa(ctx, p, d.painel, PAINEL_DO_TEXTO, {}, LADO_PAGINA);
+    paginaDeTexto(ctx, p, d, sobre, x0);
+    rodape(ctx, p, d.pagina, x0);
     return p;
   }
 
@@ -156,8 +164,12 @@ function mosaicoDeTexto(ctx: Contexto, p: PDFPage, cx: CaixaPx, d: DadosDoTema, 
     cor: COR.textoBaixo,
     espaco: LETRA.mosaicoPe.espaco,
   };
-  const yPe = yDoTopo(cx.y + cx.h - DENTRO.baixo - pe.tam * 1.21) - baseDaLinha(pe, 1.21);
-  escrever(p, pe, "LÍQUEN EVENTS", px(x), yPe);
+  const topoPe = cx.y + cx.h - DENTRO.baixo - pe.tam * 1.21;
+  const yPe = yDoTopo(topoPe) - baseDaLinha(pe, 1.21);
+  // O logótipo, como no rodapé das outras páginas (o pedido dela).
+  if (!logotipoNaLinha(ctx, p, x, yPe, 26)) {
+    escrever(p, pe, "LÍQUEN EVENTS", px(x), yPe);
+  }
   escreverADireita(p, pe, doisAlgarismos(d.pagina), px(x + largo), yPe);
 }
 
@@ -267,9 +279,16 @@ function alturaDoTexto(ctx: Contexto, d: DadosDoTema, largo: number, escala: num
   return h;
 }
 
-/** Um tema sem fotografias: só o texto, numa coluna, centrado — sem caixas vazias. */
-function paginaDeTexto(ctx: Contexto, p: PDFPage, d: DadosDoTema, sobre: string) {
-  const largo = 640;
+/**
+ * Um tema sem fotografias: o texto, sem caixas vazias — e, à esquerda, um
+ * painel de fotografia nítida de outro tema do capítulo, como o índice. A
+ * regra dela: nenhuma página é só texto sobre fundo liso. Sem fotografia
+ * nenhuma na proposta, o texto fica sozinho na página.
+ */
+const PAINEL_DO_TEXTO = { x: 0, y: 0, w: 440, h: FOLHA_PX_H };
+
+function paginaDeTexto(ctx: Contexto, p: PDFPage, d: DadosDoTema, sobre: string, x0: number) {
+  const largo = Math.min(640, FOLHA_PX_W - MARGEM - x0);
   const num: Estilo = {
     letra: ctx.letras.titulo,
     tam: LETRA.mosaicoNumero.tam * 2,
@@ -284,6 +303,6 @@ function paginaDeTexto(ctx: Contexto, p: PDFPage, d: DadosDoTema, sobre: string)
   );
   const altura = alturaDoTexto(ctx, d, largo, 1.4);
   const topo = Math.max(60, (FUNDO_DO_CONTEUDO - altura) / 2);
-  const t = sobretitulo(ctx, p, sobre, MARGEM, topo) + 10;
-  textoDoTema(ctx, p, d, MARGEM, t, largo, FUNDO_DO_CONTEUDO - 20, 1.4);
+  const t = sobretitulo(ctx, p, sobre, x0, topo) + 10;
+  textoDoTema(ctx, p, d, x0, t, largo, FUNDO_DO_CONTEUDO - 20, 1.4);
 }

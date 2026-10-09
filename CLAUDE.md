@@ -108,5 +108,6 @@ escuro do exemplo «Mafalda & João»). O código novo está em
 ser o do envio até ela aprovar o novo — não o troques antes disso. Lê a
 **Parte −1** antes de seguir o texto à letra: lá está a tabela do que já está
 feito, e os sítios onde a execução se afastou do texto (uma só cor de
-destaque, nenhum fundo desfocado, os algarismos cozidos na letra). A
+destaque, nenhum fundo desfocado, capa só com a fotografia de fundo, logótipo no
+rodapé). A
 referência que conta é o exemplo NOVO, de 26 páginas.

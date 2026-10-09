@@ -3,9 +3,9 @@ import type { PDFPage } from "pdf-lib";
 import { SITE } from "@/lib/site";
 import { PAGINA_H } from "@/lib/proposal-geometria";
 import type { Foto } from "../fotos";
-import { LADO_PAGINA, type Sombra, type Tratamento } from "../imagens";
+import { LADO_PAGINA, type Tratamento } from "../imagens";
 import { FOLHA, fotoNaCaixa, linha, novaPagina, sobretitulo, type Contexto } from "../moldura";
-import { COR, FOLHA_PX_W, LETRA, MARGEM, px } from "../paleta";
+import { COR, LETRA, MARGEM, px } from "../paleta";
 import {
   baseDaLinha,
   bloco,
@@ -23,29 +23,24 @@ import {
  * CAPA E CONTRACAPA — a mesma composição, abrir e fechar
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Como no exemplo: uma fotografia a cobrir a folha, escurecida SÓ DO LADO
- * ESQUERDO, onde está o texto; outra num painel alto à direita, com sombra.
+ * Uma fotografia a cobrir a folha, escurecida SÓ DO LADO ESQUERDO, onde está
+ * o texto, e limpa à direita.
+ *
+ * Tinha, como o exemplo, uma segunda fotografia num painel alto à direita.
+ * Ela viu a capa com as fotografias dela e pediu: «retira esta foto da
+ * página capa… deixa apenas a de fundo». A contracapa repete a capa, e
+ * perdeu o painel com ela.
  *
  * O fundo é NÍTIDO. Esteve desfocado, e ela viu-o assim: «uma fotografia
  * pequena, ampliada e desfocada». A fotografia de fundo é a de MAIOR
- * resolução que serve para a página — ver `montar.ts`, que a escolhe —, e o
- * painel é a segunda fotografia de capa que ela já escolhe hoje.
- *
- * A contracapa repete a composição: o documento fecha com a imagem com que
- * abriu (e, por isso, com as mesmas duas imagens no ficheiro, não quatro).
+ * resolução que serve para a página — ver `montar.ts`, que a escolhe.
  */
-
-/** O painel do exemplo: 300 px de largura, de 70 px do topo a 70 px do fundo. */
-const PAINEL = { x: FOLHA_PX_W - MARGEM - 300, y: 70, w: 300, h: 794 - 140 } as const;
-
-const SOMBRA: Sombra = { ...PAINEL, desfoque: 60, desce: 30, opacidade: 0.45 };
 
 /** A caixa do logótipo (`150 × 88`, `contain`). */
 const LOGO = { w: 150, h: 88 } as const;
 
-/** O fundo: a foto nítida, escura à esquerda, limpa à direita, com a sombra do painel. */
+/** O fundo: a foto nítida, escura à esquerda, limpa à direita. */
 const FUNDO: Tratamento = {
-  sombra: SOMBRA,
   degrades: [
     {
       de: [0, 0],
@@ -60,15 +55,8 @@ const FUNDO: Tratamento = {
   ],
 };
 
-async function fundoEPainel(
-  ctx: Contexto,
-  pagina: PDFPage,
-  fundo: Foto | null,
-  painel: Foto | null,
-) {
-  await fotoNaCaixa(ctx, pagina, fundo, FOLHA, FUNDO, LADO_PAGINA);
-  await fotoNaCaixa(ctx, pagina, painel, PAINEL, { qualidade: 78 }, LADO_PAGINA, 2.2);
-}
+const fundo = (ctx: Contexto, pagina: PDFPage, foto: Foto | null) =>
+  fotoNaCaixa(ctx, pagina, foto, FOLHA, FUNDO, LADO_PAGINA);
 
 /** O logótipo dentro da caixa do exemplo, centrado como o `contain`. */
 function logotipo(ctx: Contexto, pagina: PDFPage, xPx: number, topoPx: number): void {
@@ -94,7 +82,6 @@ export interface DadosDaCapa {
   /** Rótulo e valor de cada campo da faixa de baixo; vazios não aparecem. */
   faixa: readonly { rotulo: string; valor: string }[];
   fundo: Foto | null;
-  painel: Foto | null;
 }
 
 /** O texto da capa ocupa 560 px, como no exemplo. */
@@ -102,7 +89,7 @@ const LARGURA_TEXTO = 560;
 
 export async function capa(ctx: Contexto, d: DadosDaCapa): Promise<PDFPage> {
   const p = novaPagina(ctx);
-  await fundoEPainel(ctx, p, d.fundo, d.painel);
+  await fundo(ctx, p, d.fundo);
   logotipo(ctx, p, MARGEM, 78);
 
   const topoSobre = 78 + LOGO.h + 120;
@@ -255,12 +242,11 @@ export interface DadosDaContracapa {
   /** «Esta proposta é válida até 27 de novembro de 2026.» */
   validade: string;
   fundo: Foto | null;
-  painel: Foto | null;
 }
 
 export async function contracapa(ctx: Contexto, d: DadosDaContracapa): Promise<PDFPage> {
   const p = novaPagina(ctx);
-  await fundoEPainel(ctx, p, d.fundo, d.painel);
+  await fundo(ctx, p, d.fundo);
   const largura = 520;
   let topo = sobretitulo(ctx, p, d.sobretitulo, MARGEM, 150) + 16;
 

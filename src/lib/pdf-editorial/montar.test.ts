@@ -132,7 +132,9 @@ async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
     return drawText.call(this, texto, o);
   };
   PDFPage.prototype.drawImage = function (...a: Parameters<typeof drawImage>) {
-    imagens[paginas.indexOf(this)]++;
+    // Só as FOTOGRAFIAS contam: o logótipo do rodapé (32 px ≈ 24 pt de
+    // altura) e o do mosaico (26 px) não são fotografias do tema.
+    if ((a[1]?.height ?? 0) > 30) imagens[paginas.indexOf(this)]++;
     return drawImage.apply(this, a);
   };
   try {
@@ -219,6 +221,19 @@ describe("os temas: todas as fotografias, o título e a nota", () => {
     expect(naPagina(escritas, pagina)).toContain("TESTE nota");
   });
 
+  it("um tema SEM fotografias leva um painel nítido de outro tema do capítulo", async () => {
+    const doc = docDeTeste({
+      moodBoards: [
+        { title: "Corredor", images: fotos(4) },
+        { title: "Altar", images: [], annotation: "TESTE só texto" },
+      ],
+    });
+    const { escritas, imagens } = await desenhar(doc);
+    const pagina = escritas.find((e) => e.texto === "Altar")!.pagina;
+    expect(imagens[pagina - 1]).toBe(1);
+    expect(naPagina(escritas, pagina)).toContain("TESTE só texto");
+  });
+
   it("acima de doze, reparte por duas páginas — a segunda diz «Mais ideias…»", async () => {
     const doc = docDeTeste({ moodBoards: [{ title: "Corredor", images: fotos(13) }] });
     const { escritas, imagens } = await desenhar(doc);
@@ -295,7 +310,7 @@ describe("os números do orçamento são os do gerador antigo", () => {
 });
 
 describe("o rodapé", () => {
-  it("«LÍQUEN EVENTS», o nome da proposta e o número, nas páginas de texto", async () => {
+  it("o logótipo, o nome da proposta e o número, nas páginas de texto", async () => {
     const { escritas } = await desenhar(docDeTeste());
     // Nas páginas com painel de fotografia o rodapé é mais estreito e o nome
     // da proposta acaba em «…», como no exemplo — conta o princípio.
@@ -304,10 +319,8 @@ describe("o rodapé", () => {
       .map((e) => e.pagina);
     // Índice, proposta, serviços, paleta, orçamento, total, três de condições.
     expect(comRodape).toEqual(expect.arrayContaining([2, 3, 4, 5, 14, 15, 16, 17, 18]));
-    for (const n of comRodape) {
-      const marca = escritas.find((e) => e.pagina === n && e.texto === "LÍQUEN EVENTS" && e.y < 45);
-      expect(marca, `marca na página ${n}`).toBeDefined();
-    }
+    // A marca é o logótipo (uma imagem), já não o texto «LÍQUEN EVENTS».
+    expect(escritas.some((e) => e.texto === "LÍQUEN EVENTS" && e.y < 45)).toBe(false);
   });
 });
 

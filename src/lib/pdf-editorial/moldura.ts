@@ -189,19 +189,49 @@ export function cabecalho(
 }
 
 /**
+ * O logótipo da casa, com `altura` px do exemplo, ASSENTE na linha de base
+ * `yBase` (pontos do PDF): o nome «LÍQUEN EVENTS», que é a parte de baixo do
+ * logótipo, fica na mesma linha da frase ao lado — foi o que ela pediu ao vê-lo
+ * centrado, um pouco abaixo do texto: «coloca mais para cima para ficar ao
+ * nível da frase». Devolve a largura que ocupou, em px do exemplo.
+ */
+export function logotipoNaLinha(
+  ctx: Contexto,
+  pagina: PDFPage,
+  xPx: number,
+  yBase: number,
+  altura: number,
+): number {
+  if (!ctx.logo) return 0;
+  const w = (ctx.logo.width / ctx.logo.height) * altura;
+  pagina.drawImage(ctx.logo, {
+    x: px(xPx),
+    y: yBase,
+    width: px(w),
+    height: px(altura),
+  });
+  return w;
+}
+
+/** A altura do logótipo no rodapé: legível, e sem passar da faixa do rodapé. */
+export const LOGO_NO_RODAPE = 32;
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
- * O RODAPÉ — «LÍQUEN EVENTS  Proposta de decoração · nomes · data      07»
+ * O RODAPÉ — [logótipo]  Proposta de decoração · nomes · data          07
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Como no exemplo: a marca em maiúsculas espaçadas, o nome da proposta, e o
- * número da página à direita com dois algarismos. A 38 px do fundo, em 12 px.
+ * O logótipo da Líquen à esquerda, o nome da proposta, e o número da página à
+ * direita com dois algarismos. A 38 px do fundo, em 12 px.
  *
- * Esteve com o símbolo do logótipo no lugar da marca, como o primeiro texto
- * dela pedia; ela viu-o no papel — «demasiado pequeno e quase não se lê» — e
- * pediu a marca em texto, como no exemplo.
+ * O caminho até aqui, pela mão dela: primeiro o símbolo sozinho (o texto do
+ * prompt) — «demasiado pequeno e quase não se lê»; depois «LÍQUEN EVENTS» em
+ * letra, como o exemplo; e por fim, ao ver o PDF: «troca pelo logo da Líquen
+ * nas páginas». É o logótipo inteiro (símbolo e nome), o mesmo ficheiro da
+ * capa, a 32 px de altura — o nome lê-se e a faixa do rodapé não cresce.
  *
  * `x0`/`x1` são as margens do texto da página: numa página com painel de
- * fotografia o rodapé fica do lado do texto, como no exemplo.
+ * fotografia o rodapé fica do lado do texto e acaba onde o painel começa.
  *
  * O texto do meio encolhe com «…» se não couber — nomes compridos não podem
  * empurrar o número da página para fora da folha.
@@ -213,25 +243,19 @@ export function rodape(
   x0 = MARGEM,
   x1 = FOLHA_PX_W - MARGEM,
 ): void {
-  const marca: Estilo = {
-    letra: ctx.letras.corpoForte,
-    tam: RODAPE.tamanho,
-    cor: COR.textoSuave,
-    espaco: LETRA.rodape.marcaEspaco,
-  };
   const corpo: Estilo = {
     letra: ctx.letras.corpo,
     tam: RODAPE.tamanho,
     cor: COR.textoBaixo,
     espaco: LETRA.rodape.espaco,
   };
-  const topoTexto = FOLHA_PX_H - RODAPE.fundo - RODAPE.tamanho * 1.21;
+  const altLinha = RODAPE.tamanho * 1.21;
+  const topoTexto = FOLHA_PX_H - RODAPE.fundo - altLinha;
   const yBase = yDoTopo(topoTexto) - baseDaLinha(corpo, 1.21);
-  const textoMarca = "LÍQUEN EVENTS";
-  escrever(pagina, marca, textoMarca, px(x0), yBase);
+  const larguraDoLogo = logotipoNaLinha(ctx, pagina, x0, yBase, LOGO_NO_RODAPE);
   const n = String(numero).padStart(2, "0");
   escreverADireita(pagina, corpo, n, px(x1), yBase);
-  const xMeio = px(x0) + largura(marca, textoMarca) + px(14);
+  const xMeio = px(x0 + larguraDoLogo + (larguraDoLogo ? 16 : 0));
   const livre = px(x1) - largura(corpo, n) - px(24) - xMeio;
   let meio = ctx.rodape;
   if (largura(corpo, meio) > livre) {
@@ -241,8 +265,12 @@ export function rodape(
   if (livre > px(40)) escrever(pagina, corpo, meio, xMeio, yBase);
 }
 
-/** O fundo da área de conteúdo: acima do rodapé (`.mid { height: 724px }`). */
-export const FUNDO_DO_CONTEUDO = 724;
+/**
+ * O fundo da área de conteúdo, acima do rodapé. No exemplo é 724 (`.mid`);
+ * aqui 716, porque o logótipo do rodapé (32 px, assente na linha da frase)
+ * sobe até aos 721 — uma coluna de condições cheia até ao fim tocava-lhe.
+ */
+export const FUNDO_DO_CONTEUDO = 716;
 
 /** Um fio horizontal, com a opacidade do exemplo já misturada no fundo. */
 export function linha(

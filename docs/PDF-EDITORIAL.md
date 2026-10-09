@@ -1,7 +1,8 @@
 # PDF editorial — o redesenho da proposta
 
 Este é o documento dela, tal como o mandou no chat a 9 de outubro de 2026, com
-o exemplo «Mafalda & João» e o `referencia-liquen.zip`. Fica aqui para não se
+o exemplo «Mafalda & João» e o `referencia-liquen.zip` — na versão ATUALIZADA
+(o `PROMPT-Claude-Code-Proposta-Liquen.md` novo), que substitui a primeira. Fica aqui para não se
 perder, como os outros: **um documento que ela manda guarda-se em `docs/` no
 mesmo dia.**
 
@@ -20,20 +21,21 @@ por um com o exemplo NOVO (5,5 MB, 26 páginas): o índice com um painel de
 fotografia nítida à esquerda, «A proposta» com fotografia nítida a página
 inteira, separadores com DUAS fotografias grandes e título a 72 px, e páginas
 com faixa de fotografia à direita no orçamento e nas condições. O CSS não
-mudou; mudou a composição de cada página. É esta versão que conta. O texto do
-prompt aqui em baixo é o da primeira versão: o `PROMPT-…md` atualizado ainda
-não chegou cá.
+mudou; mudou a composição de cada página. É esta versão que conta, e o texto
+do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
 
 **O que já está feito, e o que falta** (auditado no código):
 
 | O quê | Estado |
 |---|---|
-| Capa, índice, «A proposta», «O que propomos», paleta e ambiente | feito |
+| Capa (só a fotografia de fundo), índice, «A proposta», «O que propomos», paleta e ambiente | feito |
 | Separadores dos capítulos e as páginas dos temas (0, 1, 2–3, 4, 5, 6–12, > 12 fotografias) | feito |
 | Citação a meio da inspiração | feito |
 | Investimento: separador, quadro, total com sinal e saldo | feito (só quando há orçamento) |
 | Condições: notas, condições gerais, pagamento e cancelamento, contactos | feito (SEMPRE) |
-| Contracapa | feito |
+| Contracapa (só a fotografia de fundo) | feito |
+| Regra geral: nenhuma página só texto sobre fundo liso, nenhum fundo desfocado | feito |
+| Rodapé com o logótipo da Líquen | feito |
 | Modelo Organização: cronograma e linhas com preço | feito, sem exemplo visual para comparar |
 | Botão «Ver desenho novo» no estúdio (só pré-visualização) | feito |
 | Trocar o envio para o desenho novo | só depois de ela aprovar |
@@ -43,12 +45,22 @@ não chegou cá.
 - **Grupos de inspiração: «Pelo nome do tema».** O sistema não guarda o grupo
   de cada tema; lê-se das palavras do título (`grupos.ts`). Nenhum campo novo.
   O que não encaixa vai para «Ambiente».
-- **Nenhuma página com fundo desfocado.** Palavras dela, com o exemplo novo à
-  frente: «Nenhuma página tem fundo desfocado a encher a página.» Vale também
-  para as duas páginas onde o próprio exemplo o tem — «O que propomos» e o
-  tema de cinco fotografias desalinhadas —, que ficam com o fundo escuro liso.
-- **O rodapé leva «LÍQUEN EVENTS» em texto**, como o exemplo. Esteve com o
-  símbolo do logótipo (o primeiro texto pedia-o); ela viu-o pequeno demais.
+- **Nenhuma página com fundo desfocado, e nenhuma só texto sobre fundo liso.**
+  Palavras dela, com o exemplo novo à frente: «Nenhuma página tem fundo
+  desfocado a encher a página.» Vale também para as duas páginas onde o
+  próprio exemplo o tem — «O que propomos» (cartões com fotografia) e o tema
+  de cinco fotografias desalinhadas —, que ficam com o fundo escuro liso e as
+  fotografias à vista. Um tema SEM fotografias leva um painel nítido à
+  esquerda, de outro tema do capítulo.
+- **A capa e a contracapa só com a fotografia de fundo.** O exemplo tem uma
+  segunda fotografia num painel alto à direita; ela viu a capa com as fotos
+  dela e pediu: «retira esta foto da página capa… deixa apenas a de fundo».
+- **O rodapé leva o logótipo da Líquen.** Foi primeiro o símbolo sozinho (o
+  texto do prompt pede «símbolo pequeno») — «demasiado pequeno e quase não se
+  lê»; depois «LÍQUEN EVENTS» em letra, como o exemplo; e ela, ao ver o PDF:
+  «troca pelo logo da Líquen nas páginas». É o logótipo inteiro, a 32 px de
+  altura (26 px no mosaico de texto dos temas), ASSENTE na linha da frase —
+  «coloca mais para cima para ficar ao nível da frase».
 - **«A proposta» não tem o bloco «Serviços».** Contava os GRUPOS de serviços
   («Serviços: 1»); o exemplo novo já não o tem, e saiu.
 
@@ -59,29 +71,35 @@ não chegou cá.
    (`#e6d28a`); o texto diz «uma cor de destaque, não duas».
 2. **Os tamanhos dos títulos são os do exemplo**, não os «cerca de 39 px» do
    texto: o exemplo é «o alvo».
-3. **O logótipo é a única imagem com transparência.** Todos os degradés e a
-   sombra do painel estão fundidos nas JPEG; o teste `montar.test.ts` conta as
-   máscaras e as opacidades.
-4. **A Cormorant tem os algarismos direitos cozidos no ficheiro** (o pdf-lib
+3. **Os tipos 6 e 8 do kit** pedem «fotografia desfocada» por trás da tabela e
+   das condições; a estrutura (§ 9, 11–13) e a regra geral pedem painel
+   nítido, que é o que o exemplo novo tem. Fica o painel nítido.
+4. **A página de valor** tem os DOIS marcos que existem (sinal e saldo), como
+   a estrutura (§ 10) diz — o kit fala em três blocos.
+5. **O logótipo é a única imagem com transparência.** Todos os degradés estão
+   fundidos nas JPEG; o teste `montar.test.ts` conta as máscaras e as
+   opacidades.
+6. **A Cormorant tem os algarismos direitos cozidos no ficheiro** (o pdf-lib
    não aplica `lnum`) — ver o cabeçalho de `letras.ts`.
-5. **Peso:** página inteira até 1 800 px, células até 1 250 px, JPEG mozjpeg
+7. **Peso:** página inteira até 1 800 px, células até 1 250 px, JPEG mozjpeg
    70–78; uma foto que aparece duas vezes na mesma forma entra uma vez no
    ficheiro. Medido com 72 fotografias de 1 800 px fabricadas: 5,5 MB e
    ~11 s de desenho. O limite é o do anexo de email (8 MB).
-6. **A fotografia de fundo da capa** é a primeira de capa se tiver pelo menos
-   1 600 px no lado maior; senão, a deitada de maior resolução da inspiração
-   (era uma foto pequena ampliada e desfocada). O painel é a segunda de capa.
-7. **As fotografias dos painéis, fundos e separadores** saem das de
-   inspiração (`fotos.ts`): da forma que o lugar pede, as de maior resolução
-   primeiro, nunca a mesma em duas páginas seguidas.
-8. **As células do mosaico têm a forma da sua fotografia** (a largura é
-   proporcional ao aspecto, como o `flex` do exemplo), por isso não há «célula
-   maior» para onde mandar a foto de mais resolução, nem troca a fazer: cada
-   foto fica na sua ordem, recortada o mínimo.
-9. **O subtítulo do orçamento diz só «Seis serviços».** O exemplo acrescenta
-   «com montagem e desmontagem incluídas»; isso não está nos dados da
-   proposta, e não se escreve o que os dados não dizem.
-10. **O tijolo de quatro fotografias tem o texto sempre em cima à esquerda**
+8. **A fotografia de fundo da capa** é a primeira de capa se tiver pelo menos
+   1 600 px no lado maior; senão, a deitada de maior resolução da inspiração.
+9. **As fotografias dos painéis e fundos** saem das de inspiração (`fotos.ts`):
+   da forma que o lugar pede, as de maior resolução primeiro, nunca a mesma em
+   duas páginas seguidas. **Os separadores** levam as duas de MAIOR resolução
+   do capítulo, sem olhar à forma, como o texto pede.
+10. **As células do mosaico têm a forma da sua fotografia** (a largura é
+    proporcional ao aspecto, como o `flex` do exemplo), e todas as de uma fila
+    têm a mesma altura (395 px). Por isso a «troca por falta de resolução» que
+    o texto pede não daria mais pixéis a foto nenhuma, e não se faz: cada foto
+    fica na sua ordem, recortada o mínimo.
+11. **O subtítulo do orçamento diz só «Seis serviços».** O exemplo acrescenta
+    «com montagem e desmontagem incluídas»; isso não está nos dados da
+    proposta, e não se escreve o que os dados não dizem.
+12. **O tijolo de quatro fotografias tem o texto sempre em cima à esquerda**
     (como as duas páginas de quatro do exemplo); só o mosaico de seis ou mais
     alterna de lado.
 
@@ -103,7 +121,7 @@ Pus três PDF na pasta `referencia/` na raiz do projeto. Lê os três antes de e
 
 - `referencia/Proposta-Bouquet-de-Liz.pdf`: **a referência de design**. É uma proposta que fiz para outro cliente, de outro tipo (um website). Copia dela a linguagem visual e os tipos de página. Não copies o conteúdo nem a estrutura de secções, que não têm nada a ver com a Líquen.
 - `referencia/Maquetes-Bouquet-de-Liz.pdf`: mais exemplos da mesma linguagem visual, sobretudo páginas com fotografia a página inteira e separadores.
-- `referencia/Exemplo-Proposta-Liquen-Events.pdf`: **o alvo**. É a proposta da Mafalda e do João já no novo design, montada à mão como exemplo. É assim que quero que o sistema passe a gerar. As fotografias deste exemplo têm pouca resolução porque foram tiradas de dentro do PDF antigo; com os originais do back office, as imagens grandes e de página inteira têm de ficar nítidas.
+- `referencia/Exemplo-Proposta-Liquen-Events.pdf`: **o alvo**. É a proposta da Mafalda e do João já no novo design, montada à mão como exemplo. É assim que quero que o sistema passe a gerar. As fotografias deste exemplo foram tiradas de dentro do PDF antigo, onde são muito pequenas, e as maiores foram ampliadas artificialmente; por isso algumas parecem suaves. Com os originais do back office têm de ficar nítidas.
 - `referencia/modelo-html/`: o HTML e o CSS com que esse exemplo foi feito (`proposta-exemplo.html`), os dados usados (`dados-exemplo.json`), as imagens e os tipos de letra. Usa-o como implementação de referência dos tipos de página: podes aproveitar o CSS e a estrutura, adaptando-os à tecnologia do projeto. Os fundos escurecidos já vêm fundidos nas imagens (ficheiros `bg3_*` e `bk_*`), pela razão explicada mais abaixo.
 - `referencia/Proposta-Liquen-atual.pdf`: **o que o sistema gera hoje**. É a fonte do conteúdo, da ordem das secções e de todos os textos legais.
 
@@ -190,22 +208,24 @@ Regras do mosaico de ponta a ponta:
 
 Segue a estrutura do exemplo `Exemplo-Proposta-Liquen-Events.pdf`, página a página. O conteúdo é o da proposta atual; as páginas novas são todas geradas a partir de dados que o sistema já tem.
 
+**Regra geral: nenhuma página é só texto sobre fundo liso.** Todas as páginas de texto têm fotografia nítida à vista, de uma de duas formas: um **painel de fotografia a toda a altura** encostado a um lado da página, ou uma **fotografia a página inteira** escurecida apenas do lado onde está o texto. Nada de fundos desfocados e acinzentados a encher a página.
+
 1. **Capa.** Fotografia de fundo a página inteira, escurecida do lado do texto, e uma segunda fotografia ao alto num painel à direita, com sombra. Logótipo, etiqueta «PROPOSTA · DECORAÇÃO», nomes dos noivos em serifada grande com o «&» na cor de destaque, e a faixa com evento, data e local.
-2. **Índice.** Gerado automaticamente: «A proposta», uma linha por grupo de inspiração, «Investimento» e «Condições», com os números de página reais.
-3. **A proposta.** Título em serifada e os dados do evento em oito blocos de etiqueta e valor (evento, data, local, convidados, noivos, cerimónia, número de serviços, validade).
+2. **Índice.** Painel de fotografia à esquerda (cerca de 440 px, a toda a altura) e a lista à direita, gerada automaticamente: «A proposta», uma linha por grupo de inspiração, «Investimento» e «Condições», com os números de página reais.
+3. **A proposta.** Fotografia a página inteira, escurecida à esquerda. Título em serifada («Uma decoração pensada para o dia de <primeiro nome> e <primeiro nome>») e os dados do evento em seis blocos de etiqueta e valor.
 4. **O que propomos.** Um cartão por serviço, com fotografia, número e nome. A fotografia de cada cartão é a primeira do tema de inspiração correspondente.
-5. **Paleta e ambiente.** Cinco cores **extraídas automaticamente** das fotografias de inspiração dessa proposta (quantização das imagens, descartando os tons quase pretos e quase brancos e as cores demasiado parecidas entre si), mostradas como amostras com o código hexadecimal, e uma fila de seis fotografias. Se eu vier a ter um campo para escolher as cores à mão, esse campo tem prioridade.
-6. **Inspiração, por grupos.** Cada grupo (Cerimónia, Cocktail, Jantar, Complementos) abre com um **separador** de quatro fotografias lado a lado a página inteira, com o número e o nome do grupo. Seguem-se os temas desse grupo, cada um com a composição automática descrita acima, numerados em sequência (01, 02, 03…). Se o sistema não guardar o grupo de cada tema, propõe-me como o obter (um campo opcional, ou uma regra pelo nome do tema) em vez de inventar.
+5. **Paleta e ambiente.** Painel de fotografia à direita. Cinco cores **extraídas automaticamente** das fotografias de inspiração dessa proposta (quantização das imagens, descartando os tons quase pretos e quase brancos e as cores demasiado parecidas entre si), em amostras altas com o código hexadecimal, e uma fila de miniaturas. Se eu vier a ter um campo para escolher as cores à mão, esse campo tem prioridade.
+6. **Inspiração, por grupos.** Cada grupo (Cerimónia, Cocktail, Jantar, Complementos) abre com um **separador de duas fotografias grandes lado a lado**, a página inteira, com o número e o nome do grupo em serifada muito grande (cerca de 72 px) sobre a base escurecida. O sistema escolhe para o separador as duas fotografias de maior resolução do grupo. Seguem-se os temas desse grupo, cada um com a composição automática descrita acima, numerados em sequência (01, 02, 03…). Se o sistema não guardar o grupo de cada tema, propõe-me como o obter (um campo opcional, ou uma regra pelo nome do tema) em vez de inventar.
 7. **Página de citação**, a meio da inspiração: **uma fotografia a página inteira**, escurecida só na base, com a frase «Decoramos eventos, eternizamos memórias.» em serifada itálica grande. O sistema escolhe para ela a fotografia horizontal de maior resolução da proposta. Sem rodapé.
-8. **Separador «Investimento».**
-9. **Orçamento proposto.** Tabela numerada com os itens.
-10. **Total.** O total a pagar em serifada muito grande, com subtotal, deslocação, total sem IVA e IVA ao lado, e os dois blocos de sinal e saldo, com os valores que o sistema já calcula.
-11. **Notas, condições de reserva e próximos passos**, em três colunas.
-12. **Condições gerais**, em duas colunas.
-13. **Pagamento e cancelamento**, com os contactos.
+8. **Separador «Investimento»**, igual aos dos grupos.
+9. **Orçamento proposto.** Lista numerada dos itens à esquerda, painel de fotografia à direita.
+10. **Total.** Fotografia a página inteira, escurecida à esquerda. O total a pagar em serifada muito grande (cerca de 110 px), com subtotal, deslocação, total sem IVA e IVA por baixo, e os dois blocos de sinal e saldo, com os valores que o sistema já calcula.
+11. **Notas, condições de reserva e próximos passos**, em três colunas, com um painel de fotografia estreito (cerca de 230 px) à direita.
+12. **Condições gerais**, em duas colunas, com painel de fotografia estreito.
+13. **Pagamento e cancelamento**, com os contactos, e painel de fotografia estreito.
 14. **Contracapa.** Mesmo tratamento da capa: agradecimento, frase da marca, logótipo, contactos e validade.
 
-Os textos das páginas 11 a 13 são os de hoje, palavra por palavra.
+Os textos das páginas 11 a 13 são os de hoje, palavra por palavra. Nas páginas com painel de fotografia, o rodapé termina onde o painel começa.
 
 **De onde vêm as fotografias de fundo, capa e separadores.** Não quero ter de carregar fotografias a mais. Por omissão, o sistema escolhe-as de entre as fotografias de inspiração já carregadas nessa proposta, dando preferência às de maior resolução e de orientação horizontal, e sem repetir a mesma imagem em duas páginas seguidas. Se o projeto já tiver um conjunto de fotografias da própria Líquen (as da capa e da contracapa atuais, por exemplo), usa essas para a capa e a contracapa.
 

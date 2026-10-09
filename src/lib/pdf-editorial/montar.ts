@@ -162,8 +162,8 @@ export async function renderEditorialPdf(
   // ── Capa ──
   // O fundo é a fotografia de maior resolução que serve para a página: a
   // primeira de capa se tiver pixéis para isso; senão, a melhor deitada da
-  // inspiração. O painel é a segunda de capa (ou a primeira, se for a única
-  // e não tiver ido para o fundo).
+  // inspiração; senão, a segunda de capa. Não há painel: ela pediu a capa só
+  // com a fotografia de fundo.
   const RESOLUCAO_DE_FUNDO = 1600;
   const [capa1, capa2] = capaFotos;
   const capa1Serve =
@@ -171,10 +171,6 @@ export async function renderEditorialPdf(
   const fundoDaCapa = capa1Serve
     ? capa1
     : (album.escolher(1, "deitada")[0] ?? capa1 ?? capa2 ?? null);
-  const painelDaCapa =
-    [capa2, capa1].find((f) => f && f !== fundoDaCapa) ??
-    album.escolher(1, "alta").find((f) => f !== fundoDaCapa) ??
-    null;
   plano.push({
     desenhar: () =>
       capa(ctx, {
@@ -186,13 +182,12 @@ export async function renderEditorialPdf(
           { rotulo: te.factos.local, valor: doc.location ?? "" },
         ],
         fundo: fundoDaCapa,
-        painel: painelDaCapa,
       }),
   });
 
   // ── Índice ──
   {
-    const foto = album.escolher(proxima(), "alta")[0] ?? painelDaCapa;
+    const foto = album.escolher(proxima(), "alta")[0] ?? fundoDaCapa;
     plano.push({
       desenhar: (numero, entradas) =>
         indice(ctx, { sobretitulo: te.indice, titulo: te.tituloIndice, entradas, foto, numero }),
@@ -301,12 +296,12 @@ export async function renderEditorialPdf(
   capitulos.forEach((c, ci) => {
     const nome = te.grupos[c.grupo];
     const doCapitulo = c.itens.flatMap((x) => x.fotos);
-    // O separador: as DUAS fotografias de maior resolução do capítulo, ao alto
-    // de preferência (cada uma ocupa meia folha, que é mais alta do que larga);
-    // de preferência fora do primeiro tema, que vem logo a seguir.
+    // O separador: as DUAS fotografias de maior resolução do capítulo — é a
+    // regra do documento dela, e a forma não entra na escolha —, de
+    // preferência fora do primeiro tema, que vem logo a seguir.
     const paginaDoSeparador = proxima();
     const evitar = new Set(c.itens.length > 1 ? c.itens[0].fotos.map((f) => f.id) : []);
-    const fotosDoSeparador = album.escolher(paginaDoSeparador, "alta", 2, doCapitulo, evitar);
+    const fotosDoSeparador = album.escolher(paginaDoSeparador, "qualquer", 2, doCapitulo, evitar);
     plano.push({
       entrada: `${te.inspiracao} · ${nome}`,
       desenhar: (numero, entradas) =>
@@ -327,6 +322,12 @@ export async function renderEditorialPdf(
         feitas += quantas;
         const pagina = proxima();
         for (const f of fotos) album.usar(f, pagina);
+        // Um tema sem fotografias leva um painel de outro tema do capítulo
+        // (ou, não havendo, de qualquer tema) — nenhuma página é só texto.
+        const painel = fotos.length
+          ? null
+          : (album.escolher(pagina, "alta", 1, doCapitulo.length ? doCapitulo : inspiracao)[0] ??
+            null);
         plano.push({
           desenhar: (n) =>
             tema(ctx, {
@@ -337,6 +338,7 @@ export async function renderEditorialPdf(
               nota: k ? "" : x.nota,
               fotos,
               pagina: n,
+              painel,
             }),
         });
       });
@@ -383,7 +385,7 @@ export async function renderEditorialPdf(
     const temOrcamento = linhas.length > 0 || totais.aPagar > 0 || Boolean(totalStr.trim());
     if (temOrcamento) {
       const paginaDoSeparador = proxima();
-      const fotosDoSeparador = album.escolher(paginaDoSeparador, "alta", 2);
+      const fotosDoSeparador = album.escolher(paginaDoSeparador, "qualquer", 2);
       plano.push({
         entrada: te.investimento,
         desenhar: (numero, entradas) =>
@@ -558,7 +560,6 @@ export async function renderEditorialPdf(
         lema: t.slogan ?? SITE.slogan,
         validade: t.passoValidade(t.data(resolveValidUntil(doc))),
         fundo: fundoDaCapa,
-        painel: painelDaCapa,
       }),
   });
 
