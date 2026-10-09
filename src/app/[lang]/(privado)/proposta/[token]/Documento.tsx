@@ -23,6 +23,7 @@ import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import {
   descricaoNaLingua,
   escolhasParaOCasal,
+  escolhasParaOEcra,
   notaNaLingua,
   rotuloNaLingua,
   tituloNaLingua,
@@ -1065,7 +1066,7 @@ export default function Documento({
             {p.escolhasIntro}
           </p>
           <Escolhas
-            escolhas={escolhas}
+            escolhas={escolhasParaOEcra(escolhas)}
             escolhido={escolhido}
             fotos={fotosDasEscolhas}
             token={token}
