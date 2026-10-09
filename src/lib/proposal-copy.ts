@@ -157,6 +157,10 @@ export function fotosDoDocumento(doc: ProposalDoc): string[] {
   const todas = [
     ...(doc.coverImages ?? []),
     ...(doc.moodBoards ?? []).flatMap((b) => b.images ?? []),
+    // As fotografias das ALTERNATIVAS também (A6-008): ficavam fora desta
+    // lista, não eram recopiadas e a proposta nova continuava a apontar para a
+    // pasta do pedido de origem — apagá-lo apagava-lhe as fotos.
+    ...(doc.escolhas ?? []).flatMap((e) => (e.opcoes ?? []).map((o) => o.imagem ?? "")),
   ];
   // Só interessam os caminhos do Storage. Uma imagem em `data:` (coladas à mão
   // nos documentos mais antigos) viaja no próprio documento e não precisa de
@@ -288,5 +292,13 @@ export function trocarFotos(doc: ProposalDoc, mapa: Map<string, string>): Propos
     // onde a foto é impressa, por isso o array nunca se compacta.
     coverImages: (doc.coverImages ?? []).map((p) => (p ? troca(p) : p)),
     moodBoards: (doc.moodBoards ?? []).map((b) => ({ ...b, images: (b.images ?? []).map(troca) })),
+    ...(doc.escolhas
+      ? {
+          escolhas: doc.escolhas.map((e) => ({
+            ...e,
+            opcoes: (e.opcoes ?? []).map((o) => (o.imagem ? { ...o, imagem: troca(o.imagem) } : o)),
+          })),
+        }
+      : {}),
   };
 }

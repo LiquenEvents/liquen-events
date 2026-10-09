@@ -460,3 +460,33 @@ describe("as traduções viajam na cópia", () => {
     expect(JSON.stringify(doc)).not.toContain('En":');
   });
 });
+
+describe("as fotografias das alternativas também se copiam (A6-008)", () => {
+  const comAlternativas = {
+    ...ORIGEM,
+    escolhas: [
+      {
+        id: "e1",
+        titulo: "Arco",
+        opcoes: [
+          { id: "o1", titulo: "Flores", imagem: "pedidos/LIQ-A/arco-flores.jpg" },
+          { id: "o2", titulo: "Madeira" },
+        ],
+      },
+    ],
+  } as unknown as typeof ORIGEM;
+
+  it("entram na lista das que se recopiam", () => {
+    expect(fotosDoDocumento(comAlternativas)).toContain("pedidos/LIQ-A/arco-flores.jpg");
+  });
+
+  it("e trocam de caminho depois da cópia", () => {
+    const novo = trocarFotos(
+      comAlternativas,
+      new Map([["pedidos/LIQ-A/arco-flores.jpg", "pedidos/LIQ-B/arco-flores.jpg"]]),
+    );
+    expect(novo.escolhas?.[0].opcoes[0].imagem).toBe("pedidos/LIQ-B/arco-flores.jpg");
+    // Uma opção sem fotografia continua sem fotografia.
+    expect(novo.escolhas?.[0].opcoes[1].imagem).toBeUndefined();
+  });
+});
