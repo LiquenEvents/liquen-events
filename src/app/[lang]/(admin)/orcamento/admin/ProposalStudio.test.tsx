@@ -401,19 +401,6 @@ async function confirmarEnvio(user: { click: (el: Element) => Promise<void> }) {
   await user.click(botao);
 }
 
-/** Só o DOCUMENTO de cada gravação do rascunho. O corpo leva também a `base`
- *  dos campos que mudaram (achado n.º 6 — o valor de ANTES, para o servidor
- *  juntar duas pessoas campo a campo), e isso não é o que fica gravado. */
-function docsGravados(parte: string): string[] {
-  return corpos(parte).map((c) => {
-    try {
-      return JSON.stringify(JSON.parse(c).doc ?? null);
-    } catch {
-      return c;
-    }
-  });
-}
-
 beforeEach(() => {
   localStorage.clear();
   seletor.marcadores.length = 0;
@@ -542,7 +529,7 @@ const renderStudio = () =>
  */
 describe("notas presas a cada secção", () => {
   const seccoes = [
-    "Nota sobre as capas",
+    "Nota sobre a capa",
     "Nota sobre os serviços",
     "Nota sobre os mood boards",
     "Nota sobre o orçamento",
@@ -596,7 +583,7 @@ describe("notas presas a cada secção", () => {
      */
     renderStudio();
     const user = userEvent.setup();
-    const caixa = await screen.findByLabelText(/Nota sobre as capas/i);
+    const caixa = await screen.findByLabelText(/Nota sobre a capa/i);
     await user.type(caixa, "trocar a segunda");
     await waitFor(
       () => expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("trocar a segunda"),
@@ -1320,20 +1307,21 @@ describe("as linhas de Organização que não somam o total", () => {
  * O TECTO DE TEMPO, DITO ANTES DE SE BATER NELE
  * ════════════════════════════════════════════════════════════════════════════
  *
- * As rotas que redesenham o documento para o CASAL morrem aos 20 segundos, e
- * uma proposta no tecto do gerador (80 fotografias) gasta 7,6 s a desenhar
- * mais 6 a 12 s a ir buscar as fotos ao armazenamento. A conta é do
- * `custo-do-pdf.ts`, com os números medidos; o que se prende aqui é que ela
- * chega ao ecrã onde as fotografias se escolhem — e não ao registo do servidor
- * no dia em que a página do casal falhar.
+ * A rota que redesenha o documento para o CASAL tem 60 segundos, e uma
+ * proposta no tecto do gerador (80 fotografias) gasta 23 a 29 s no desenho
+ * novo, com a rede do mau dia. A conta é do `custo-do-pdf.ts`, com os números
+ * medidos; o que se prende aqui é que o ecrã onde as fotografias se escolhem
+ * não grita por uma conta que cabe — e que, se deixar de caber, o aviso diz o
+ * tecto verdadeiro e não um número escrito à mão.
  */
 describe("o aviso de tempo antes de gerar", () => {
-  it("uma proposta no tecto do gerador avisa que a página do casal pode desistir", async () => {
+  it("uma proposta no tecto do gerador cabe no tecto da rota: não há aviso", async () => {
     seedDraft(78);
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
-    expect(await screen.findByText(/desiste aos 20 segundos/)).toBeTruthy();
+    expect(await screen.findByText(/Gerar este PDF demora/)).toBeTruthy();
+    expect(screen.queryByText(/a página onde o casal o abre desiste/)).toBeNull();
   });
 
   it("uma proposta normal não diz nada sobre tempo nenhum", async () => {
@@ -1343,7 +1331,7 @@ describe("o aviso de tempo antes de gerar", () => {
     await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
     // A frase da estimativa continua lá — é o aviso do tecto que não aparece.
     expect(await screen.findByText(/Gerar este PDF demora/)).toBeTruthy();
-    expect(screen.queryByText(/desiste aos 20 segundos/)).toBeNull();
+    expect(screen.queryByText(/a página onde o casal o abre desiste/)).toBeNull();
   });
 });
 
@@ -1439,126 +1427,79 @@ describe("títulos de páginas quase iguais", () => {
   });
 });
 
-describe("mood board com mais fotos do que a página desenha", () => {
-  it("marca AO MONTAR as fotos que não vão ser impressas", async () => {
-    // A lotação subiu de 6 para 10 quando os layouts passaram a ser cinco (a
-    // proposta feita à mão chega às dez numa página). O aviso é o mesmo; o
-    // número é que mudou.
-    seedDraft(12);
+describe("um tema com mais fotografias do que uma página leva", () => {
+  /**
+   * No PDF antigo uma página imprimia dez e as outras ficavam de fora, com o
+   * aviso «fora do PDF». No novo nenhuma fica de fora: acima de doze o tema
+   * passa a duas páginas (a segunda diz «Mais ideias…»). Diz-se, em voz baixa.
+   */
+  it("acima de doze diz que o tema ocupa duas páginas, e não marca nenhuma de fora", async () => {
+    seedDraft(14);
     renderStudio();
-    // A décima primeira e a décima segunda ficam marcadas — as dez primeiras não.
-    expect(await screen.findAllByText("fora do PDF")).toHaveLength(2);
-    expect(screen.getByText(/A página deste mood board mostra 10 fotos/i).textContent).toMatch(
-      /as 2 últimas.*não são impressas/i,
-    );
+    expect(await screen.findByText(/14 fotos: no PDF este tema ocupa 2 páginas/)).toBeTruthy();
+    expect(screen.queryByText("fora do PDF")).toBeNull();
   });
 
   /**
    * ── UM AVISO CORTADO NÃO É UM AVISO ─────────────────────────────────────
    *
-   * Palavras dela: «"9 fotos numa página: cada uma fica peque…" — cortado à
-   * direita».
-   *
    * `white-space` e `text-overflow` HERDAM-SE: um `truncate` em qualquer
-   * antepassado deste parágrafo desce até ele, e o `overflow: hidden` desse
-   * antepassado faz o resto. Não é preciso o parágrafo ter classe nenhuma para
-   * sair com «…» — basta estar debaixo de alguém que a tenha.
-   *
-   * Por isso a defesa é declarada no próprio parágrafo, e é isso que se prende
-   * aqui: seja o que for que lhe esteja por cima, este aviso quebra.
+   * antepassado deste parágrafo desce até ele. A defesa é declarada no próprio
+   * parágrafo.
    */
   it("o aviso quebra a linha, aconteça o que acontecer por cima dele", async () => {
-    seedDraft(12);
+    seedDraft(14);
     renderStudio();
-    for (const aviso of [
-      screen.getByText(/A página deste mood board mostra 10 fotos/i),
-      ...screen.queryAllByText(/fotos numa página: cada uma fica pequena/i),
-    ]) {
-      expect(aviso.className, aviso.textContent ?? "").toContain("whitespace-normal");
-    }
+    const aviso = await screen.findByText(/no PDF este tema ocupa 2 páginas/);
+    expect(aviso.className).toContain("whitespace-normal");
   });
 
-  it("avisa NO INSTANTE em que a foto a mais entra no mood board", async () => {
-    // Não depois de gerar o PDF, não depois de enviar: agora, com a mão ainda
-    // na foto que acabou de escolher.
-    seedDraft(10);
+  it("diz NO INSTANTE em que o tema passa a duas páginas", async () => {
+    seedDraft(12);
     renderStudio();
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
     );
     await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
-    const alerta = await screen.findByRole("alert");
-    expect(alerta.textContent).toMatch(/fica com 11 fotos e a página do PDF mostra 10/);
-    expect(alerta.textContent).toMatch(/a última não entra/);
-    // …e a foto a mais fica marcada, para o aviso não morrer com o toast.
-    expect(await screen.findAllByText("fora do PDF")).toHaveLength(1);
+    expect(
+      await screen.findByText(/fica com 13 fotos e passa a ocupar 2 páginas no PDF/),
+    ).toBeTruthy();
   });
 
-  it("não marca nada quando as fotos todas cabem", async () => {
-    seedDraft(10);
+  it("até doze não diz nada", async () => {
+    seedDraft(12);
     renderStudio();
-    // O título da SECÇÃO. A coluna lateral também diz "Mood boards", e sem
-    // esta distinção o teste apanhava os dois e falhava por ambiguidade.
     await screen.findByRole("heading", { name: "Mood boards" });
+    expect(screen.queryByText(/ocupa 2 páginas/)).toBeNull();
     expect(screen.queryByText("fora do PDF")).toBeNull();
-    expect(screen.queryByText(/A página deste mood board mostra/i)).toBeNull();
   });
 });
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * A DISPOSIÇÃO DAS FOTOS NA PÁGINA
+ * O QUE O PDF FAZ COM CADA TEMA — DITO, E NÃO ESCOLHIDO
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Os cinco arranjos e o desenho já existiam; o que faltava era ela poder
- * ESCOLHER. E escolher por uma lista de nomes não é escolher: «mosaico» e
- * «filas» só querem dizer alguma coisa depois de se ver o que dão com ESTAS
- * fotos — por isso cada opção traz o diagrama das caixas, tirado da mesma
- * geometria que o PDF usa.
- *
- * O que estes testes prendem:
- *  · escolher grava (uma proposta reaberta volta a sair como saiu);
- *  · «Automático» APAGA o campo em vez de gravar o layout sugerido — é a
- *    diferença entre acompanhar o número de fotos e ficar preso a um arranjo;
- *  · o subtítulo chega ao documento;
- *  · e os diagramas seguem as fotos que o board tem naquele momento.
+ * O selector das disposições e o «Manter a forma de cada fotografia» saíram:
+ * o PDF novo decide a composição pelo número de fotografias, e cada célula tem
+ * quase a forma da sua foto. O cartão diz o capítulo e a composição, só de
+ * leitura.
  */
-describe("a disposição das fotos do mood board", () => {
-  /** As caixas desenhadas no diagrama de uma opção — uma por foto. */
-  const caixasDe = (opcao: HTMLElement) => opcao.querySelectorAll("rect");
-
-  it("escolher uma disposição grava-a no documento", async () => {
+describe("a composição de cada tema", () => {
+  it("diz o capítulo e a composição, e acompanha o número de fotos", async () => {
     seedDraft(5);
     renderStudio();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("radio", { name: "Mosaico" }));
-    await waitFor(() => {
-      expect(corpos("proposta-rascunho").at(-1) ?? "").toContain('"layout":"mosaico"');
-    });
-    expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain('"layout":"mosaico"');
-    // E fica assinalada, para o ecrã dizer o que o documento diz.
-    expect(screen.getByRole("radio", { name: "Mosaico" }).getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    const linha = (await screen.findAllByText(/^Capítulo:/))[0].closest("p")!;
+    expect(linha.textContent).toMatch(/Cinco ao alto/);
   });
 
-  it("«Automático» APAGA a escolha — não grava o layout sugerido", async () => {
-    seedDraft(5, { layout: "mosaico" });
+  it("já não há selector de disposição nem interruptor de recorte", async () => {
+    seedDraft(5);
     renderStudio();
-    const user = userEvent.setup();
-    // Semeado com uma escolha à mão: é essa que está assinalada, não o automático.
-    expect(
-      (await screen.findByRole("radio", { name: "Mosaico" })).getAttribute("aria-checked"),
-    ).toBe("true");
-    pedidos = [];
-    await user.click(screen.getByRole("radio", { name: /^Automático/ }));
-    await waitFor(() => {
-      const gravado = docsGravados("proposta-rascunho").at(-1) ?? "";
-      expect(gravado).toContain("Cerimónia");
-      expect(gravado).not.toContain('"layout"');
-    });
-    expect(localStorage.getItem(DRAFT_KEY) ?? "").not.toContain('"layout"');
+    await screen.findAllByText(/^Capítulo:/);
+    expect(screen.queryByRole("radio", { name: "Mosaico" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /manter a forma/i })).toBeNull();
   });
 
   it("o subtítulo do mood board é gravado", async () => {
@@ -1574,27 +1515,6 @@ describe("a disposição das fotos do mood board", () => {
         "Ramo de Noiva (a definir com a Noiva)",
       );
     });
-  });
-
-  it("os diagramas seguem o número de fotos do mood board", async () => {
-    seedDraft(5);
-    renderStudio();
-    const user = userEvent.setup();
-    // Cinco fotos: o sugerido é a fila única, e o diagrama do mosaico tem cinco
-    // caixas — a geometria verdadeira, não um desenho aproximado.
-    const automatico = await screen.findByRole("radio", { name: /^Automático/ });
-    expect(automatico.textContent).toMatch(/fila única/i);
-    expect(caixasDe(screen.getByRole("radio", { name: "Mosaico" }))).toHaveLength(5);
-
-    // Mais uma foto e tudo acompanha: outro sugerido, outro diagrama.
-    await user.click(
-      await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
-    );
-    await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
-    await waitFor(() => {
-      expect(screen.getByRole("radio", { name: /^Automático/ }).textContent).toMatch(/mosaico/i);
-    });
-    expect(caixasDe(screen.getByRole("radio", { name: "Mosaico" }))).toHaveLength(6);
   });
 });
 
@@ -4250,26 +4170,12 @@ describe("forçar a gravação do rascunho", () => {
  * link, e ligá-la calada mudava propostas que já foram enviadas, discutidas ao
  * telefone e talvez impressas.
  *
- * Estes testes prendem o que falta — ligá-la onde é dela ligar-se:
- *   · um mood board NOVO nasce sem recorte;
- *   · o interruptor dos que já existem liga e desliga, e isso chega ao
- *     documento gravado;
- *   · o diagrama que ela vê muda com o interruptor. Este é o que não pode
- *     falhar: escolher por um desenho e receber outro é o defeito que já custou
- *     caro neste projecto.
+ * O interruptor e o diagrama saíram com o PDF novo, que não recorta (cada
+ * célula do mosaico tem quase a forma da sua fotografia). Fica o que ainda vale:
+ * um mood board NOVO nasce marcado sem recorte (o gerador antigo lê-o), e a
+ * capa, que é UMA fotografia a cobrir a folha.
  */
 describe("as fotografias do mood board deixam de ser cortadas", () => {
-  const interruptor = () =>
-    screen.getByRole("checkbox", { name: /manter a forma de cada fotografia/i });
-
-  /** A geometria dos diagramas do selector, tal como está desenhada agora. É
-   *  isto que tem de mudar quando o interruptor muda — senão ela escolhe por um
-   *  desenho e recebe outro. */
-  const diagramas = (container: HTMLElement) =>
-    Array.from(container.querySelectorAll("svg rect"))
-      .map((r) => `${r.getAttribute("width")}×${r.getAttribute("height")}`)
-      .join("|");
-
   it("um mood board novo nasce a manter a forma das fotografias", async () => {
     seedDraft(0);
     renderStudio();
@@ -4281,48 +4187,8 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     );
   });
 
-  it("o interruptor liga e desliga, e a escolha vai no documento gravado", async () => {
-    // Um board como os que ela já tem a meio: sem o campo, portanto a sair
-    // exactamente como saía antes.
-    seedDraft(3, { layout: "mosaico" });
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("checkbox", { name: /manter a forma/i }));
-    await waitFor(
-      () => expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("forma-da-foto"),
-      { timeout: 3000 },
-    );
-
-    // E desligar volta a tirá-lo do documento — não fica lá um `false` que os
-    // documentos antigos não conhecem.
-    await user.click(interruptor());
-    await waitFor(
-      () => expect(docsGravados("proposta-rascunho").at(-1) ?? "").not.toContain("forma-da-foto"),
-      { timeout: 3000 },
-    );
-  });
-
-  it("o diagrama muda com o interruptor — ela escolhe pelo que vê", async () => {
-    seedDraft(3, { layout: "mosaico" });
-    const { container } = renderStudio();
-    const user = userEvent.setup();
-    await screen.findByRole("checkbox", { name: /manter a forma/i });
-    const antes = diagramas(container);
-    await user.click(interruptor());
-    await waitFor(() => expect(diagramas(container)).not.toEqual(antes), { timeout: 3000 });
-  });
-
   /** Por fotografia e não por disposição: na mesma página uma panorâmica perde
    *  5% e uma vertical 69%. Um aviso por página obrigava-a a adivinhar qual. */
-  it("com corte, diz quantas fotografias são cortadas e quanto perdem", async () => {
-    seedDraft(3, { layout: "mosaico" });
-    renderStudio();
-    expect(await screen.findByText(/são cortadas/i, undefined, { timeout: 3000 })).toBeTruthy();
-    // Com o interruptor ligado não há nada para avisar: a perda é zero.
-    await userEvent.setup().click(screen.getByRole("checkbox", { name: /manter a forma/i }));
-    await waitFor(() => expect(screen.queryByText(/são cortadas/i)).toBeNull(), { timeout: 3000 });
-  });
-
   /**
    * A capa do desenho novo é UMA fotografia a cobrir a folha deitada. Ela
    * escolheu «Usa a minha, com aviso»: se a dela não servir, o estúdio diz
@@ -4659,7 +4525,7 @@ describe("o custo de gerar o PDF", () => {
     // Duas medições anteriores: ~1,5 MB por fotografia. Com 20 fotos a
     // estimativa passa dos 8 MB — e é isso que o aviso tem de apanhar.
     localStorage.setItem(
-      "liquen-proposal-studio:geracoes",
+      "liquen-proposal-studio:geracoes-editorial",
       JSON.stringify([
         { fotos: 4, ms: 4000, bytes: 6_500_000 },
         { fotos: 8, ms: 6000, bytes: 12_500_000 },
@@ -5010,32 +4876,6 @@ describe("a grelha das fotos conta com a legenda", () => {
    * 4% e não é caso para aviso nenhum. O aviso existe para ela ir trocar UMA
    * fotografia — apontar-lhe a errada é pior do que estar calado.
    */
-  it("as percentagens de perda são as da página, não as de uma folha sem legenda", async () => {
-    seedBoardComLegenda();
-    renderStudio();
-    const aviso = await screen.findByText(/fotografias são cortadas/);
-    expect(aviso.textContent).toMatch(/3 fotografias são cortadas/);
-    /**
-     * ── PORQUE É QUE OS 63% MUDARAM DE FOTOGRAFIA ─────────────────────────
-     *
-     * Era «a 1.ª perde 63%». Passou a ser a 2.ª, e a 1.ª passou a perder 50%.
-     * Não é este aviso que mudou: é o mosaico, que passou a dar mesmo a maior
-     * célula à primeira posição — o comentário dele dizia-o desde sempre e o
-     * código fazia o contrário, pelo que a foto marcada como principal saía
-     * até 41% MAIS PEQUENA do que as outras.
-     *
-     * Uma caixa maior recorta menos, portanto a fotografia da frente passou a
-     * perder 50% em vez de 63%, e a que lhe cedeu o lugar herdou a perda. As
-     * três continuam a ser as mesmas fotografias, e a soma do que se perde na
-     * página é a mesma: o que mudou foi quem fica com a caixa boa — que é o
-     * ponto todo da correcção.
-     */
-    expect(aviso.textContent).toMatch(/a 1\.ª perde 50%/);
-    expect(aviso.textContent).toMatch(/a 2\.ª perde 63%/);
-    expect(aviso.textContent).toMatch(/a 4\.ª perde 50%/);
-    // A 3.ª deixa de ser acusada: 4% não é um corte que se note.
-    expect(aviso.textContent).not.toMatch(/a 3\.ª/);
-  });
 });
 
 /**
@@ -7870,79 +7710,6 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * A CONFIGURAÇÃO DAS PÁGINAS, DECIDIDA UMA VEZ PARA A PROPOSTA
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Palavras dela: «"Manter a forma de cada fotografia" hoje está desligada no
- * primeiro board e ligada no terceiro, sem razão». É o que acontece quando a
- * escolha só existe por página: sete páginas, sete decisões, tomadas em sete
- * momentos diferentes de uma tarde.
- *
- * A afirmação que vale por todas é a última: a página que discordar continua a
- * ganhar. Há páginas que pedem mesmo outro tratamento, e uma preferência de
- * proposta que passasse por cima delas era trocar sete decisões dispersas por
- * uma decisão errada.
- */
-describe("a configuração ao nível da proposta", () => {
-  const comBoards = (doc: Record<string, unknown>) => {
-    assetsServidor = [{ path: "b/1.jpg", url: "https://exemplo.pt/b/1.jpg" }];
-    localStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({
-        template: "decoracao",
-        ref: "PO Decoração",
-        clientNames: "Maria & Zé",
-        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
-        budgetItems: [],
-        coverImages: ["", ""],
-        totalAmount: 3000,
-        totalVatMode: "acrescer",
-        ...doc,
-      }),
-    );
-    renderStudio();
-  };
-
-  const dobraDaDisposicao = async () =>
-    (await screen.findAllByText(/^Disposição:/)).map((s) => s.textContent ?? "");
-
-  it("a preferência da proposta vale nas páginas que não escolheram", async () => {
-    comBoards({
-      enquadramentoPorOmissao: "forma-da-foto",
-      moodBoards: [{ id: "b1", title: "Cerimónia", images: ["b/1.jpg"] }],
-    });
-    expect((await dobraDaDisposicao())[0]).toContain("sem recorte");
-  });
-
-  /**
-   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
-   */
-  it("uma página que escolheu continua a ganhar à proposta", async () => {
-    comBoards({
-      enquadramentoPorOmissao: "forma-da-foto",
-      moodBoards: [
-        { id: "b1", title: "Cerimónia", images: ["b/1.jpg"], enquadramento: undefined },
-        { id: "b2", title: "Jantar", images: ["b/1.jpg"], enquadramento: "forma-da-foto" },
-      ],
-    });
-    const dobras = await dobraDaDisposicao();
-    // As duas leem «sem recorte» — a primeira pela proposta, a segunda por si.
-    expect(dobras).toHaveLength(2);
-    expect(dobras.every((d) => d.includes("sem recorte"))).toBe(true);
-  });
-
-  it("o bloco dos seis diagramas está DOBRADO, com a escolha à vista", async () => {
-    // «O bloco de seis layouts repete-se sete vezes, a ocupar altura.» O que se
-    // precisa de saber sem lá mexer é qual está escolhida, e é isso que fica.
-    comBoards({ moodBoards: [{ id: "b1", title: "Cerimónia", images: ["b/1.jpg"] }] });
-    const resumo = (await screen.findAllByText(/^Disposição:/))[0].closest("summary");
-    expect(resumo).toBeTruthy();
-    expect(resumo!.closest("details")!.open).toBe(false);
-  });
-});
-
-/**
- * ═══════════════════════════════════════════════════════════════════════════
  * UMA SECÇÃO NUNCA APARECE FECHADA
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -9658,92 +9425,6 @@ describe("as dobras do estúdio apresentam o que abrem", () => {
     expect(seta.className, "a lista entre rectos não cobre o `rotate` autónomo").not.toMatch(
       /transition-\[[^\]]*\]/,
     );
-  });
-
-  /**
-   * ── E A DOBRA DA DISPOSIÇÃO, QUE SÃO SETE ─────────────────────────────
-   */
-  describe("a dobra da disposição de cada mood board", () => {
-    const comDoisBoards = () => {
-      assetsServidor = [{ path: "board/foto-0.jpg", url: "https://sb/0.jpg" }];
-      localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          template: "decoracao",
-          ref: "PO Decoração",
-          clientNames: "Maria & Zé",
-          serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
-          moodBoards: [
-            { id: "b1", title: "Cerimónia", images: ["board/foto-0.jpg"] },
-            { id: "b2", title: "Jantar", images: ["board/foto-0.jpg"] },
-          ],
-          budgetItems: [],
-          coverImages: ["", ""],
-          totalAmount: 3000,
-          totalVatMode: "acrescer",
-        }),
-      );
-      renderStudio();
-    };
-
-    /** As `<details>` da disposição, pela ordem das páginas. */
-    const dobras = async () =>
-      (await screen.findAllByText(/^Disposição:/)).map(
-        (t) => t.closest("details") as HTMLDetailsElement,
-      );
-    /** O corpo de uma dobra: o último filho, a seguir ao `<summary>`. */
-    const corpo = (d: HTMLDetailsElement) => d.lastElementChild as HTMLElement;
-
-    it("ao carregar a proposta, nenhuma das dobras anima", async () => {
-      // Com sete páginas de inspiração eram sete blocos a animar de uma vez no
-      // primeiro fotograma do estúdio. É o caso que a entrada em CSS puro
-      // (`details[open] > …`) não sabe distinguir.
-      comDoisBoards();
-      const todas = await dobras();
-      expect(todas.length, "não há dobras nenhumas para medir").toBe(2);
-      expect(todas.map((d) => corpo(d).className).filter((c) => c.includes("bo-entrada"))).toEqual(
-        [],
-      );
-    });
-
-    it("e quando ela abre UMA, entra só essa", async () => {
-      comDoisBoards();
-      const [primeira, segunda] = await dobras();
-      fireEvent.click(primeira.querySelector("summary")!);
-      await waitFor(() => expect(primeira.open).toBe(true));
-      await waitFor(() =>
-        expect(
-          corpo(primeira).className,
-          "a dobra abriu a corte seco — o `onToggle` não chegou ao corpo",
-        ).toContain("bo-entrada"),
-      );
-      // A vizinha não se mexe: sete dobras não são um acordeão.
-      expect(corpo(segunda).className).not.toContain("bo-entrada");
-    });
-
-    it("e fechá-la tira a classe — para a entrada voltar a correr da próxima vez", async () => {
-      // Sem isto a classe ficava colada e a animação corria uma vez só, na
-      // primeira. É o defeito que não se vê em captura nenhuma.
-      comDoisBoards();
-      const [primeira] = await dobras();
-      const summary = primeira.querySelector("summary")!;
-      fireEvent.click(summary);
-      await waitFor(() => expect(corpo(primeira).className).toContain("bo-entrada"));
-      fireEvent.click(summary);
-      await waitFor(() => expect(primeira.open).toBe(false));
-      await waitFor(() => expect(corpo(primeira).className).not.toContain("bo-entrada"));
-    });
-
-    it("a seta da dobra demora o mesmo que a das secções", async () => {
-      comDoisBoards();
-      const [primeira] = await dobras();
-      const classes = primeira
-        .querySelector<HTMLElement>("summary span[aria-hidden]")!
-        .className.split(/\s+/);
-      expect(classes).toContain("motion-safe:duration-200");
-      expect(classes).toContain("motion-safe:ease-[cubic-bezier(0,0,0.2,1)]");
-      expect(classes).toContain("motion-safe:transition-transform");
-    });
   });
 });
 

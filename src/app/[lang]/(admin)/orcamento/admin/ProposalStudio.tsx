@@ -28,7 +28,6 @@ import {
   stripPendingImages,
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
-  MOOD_BOARD_MAX_IMAGES,
   soMudaramOsIds,
   type MoodBoard,
   type VatMode,
@@ -69,7 +68,6 @@ import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import EmailDoEnvio from "./EmailDoEnvio";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
-import PreviaDaPagina from "./PreviaDaPagina";
 import PainelDoEstudio from "./PainelDoEstudio";
 import { useLarguraDaZona } from "./useMedida";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
@@ -82,6 +80,7 @@ type CanalDeEnvio = "email" | "whatsapp" | "ambos";
 const CANAL_GUARDADO = "liquen-canal-de-envio";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import VistaDeConjunto from "./VistaDeConjunto";
+import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import LupaDeFotos from "./LupaDeFotos";
 import {
   ArrastoDosMoodBoards,
@@ -91,14 +90,7 @@ import {
   ListaDeBoards,
   type LargadaDeFoto,
 } from "./MoodBoardFotos";
-import {
-  filaDesequilibrada,
-  fotoPrincipalDe,
-  marcaDepoisDeMexer,
-  ordemDasFotos,
-  porqueEsteAutomatico,
-  temLugarDeDestaque,
-} from "@/lib/proposal-moodboard";
+import { fotoPrincipalDe, marcaDepoisDeMexer } from "@/lib/proposal-moodboard";
 import {
   chaveDoCampo,
   corrigirGralha,
@@ -141,26 +133,17 @@ import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
-import { planoDaProposta, temasComPagina } from "@/lib/pdf-editorial/plano";
+import {
+  capituloDoTema,
+  composicaoEmPalavras,
+  MAXIMO_POR_PAGINA,
+  paginasDoTema,
+  planoDaProposta,
+  temasComPagina,
+} from "@/lib/pdf-editorial/plano";
 import { avisoDeTituloParecido, titulosParecidos } from "@/lib/proposal-titulos-parecidos";
 import { depositPercentOf } from "@/lib/proposal-doc";
-// A geometria do documento, para a pré-visualização mostrar a forma que cada
-// foto vai MESMO ter. Módulo próprio, sem `server-only`, exactamente para poder
-// ser lido aqui — ver `proposal-geometria`. Os diagramas do selector de
-// disposição saem das MESMAS caixas que o PDF desenha (`caixasDoMoodboard`):
-// um segundo desenho, aproximado, mentia no dia em que divergisse.
-import {
-  ASPETO_POR_OMISSAO,
-  alturaDaLegenda,
-  caixasDoMoodboard,
-  layoutSugerido,
-  linhasDaLegendaAprox,
-  PAGINA_H,
-  PAGINA_W,
-  perdasDoMoodboard,
-  PERDA_QUE_SE_AVISA,
-  type LayoutDeMoodboard,
-} from "@/lib/proposal-geometria";
+import { PERDA_QUE_SE_AVISA } from "@/lib/proposal-geometria";
 import {
   LADO_MINIMO_DA_CAPA,
   perdaNaFolha,
@@ -3846,6 +3829,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const fotosPorBoard = doc.moodBoards.map((b) => b.images.length);
   const totalDeFotos = fotosPorBoard.reduce((a, b) => a + b, 0);
   const planoDoPdf = useMemo(() => planoDaProposta(doc as ProposalDoc), [doc]);
+  /** De onde vêm as fotografias das miniaturas do PDF novo (`PaginaEditorial`). */
+  const fontesDasMiniaturas = useMemo(
+    () => fontesDasFolhas(doc as ProposalDoc, planoDoPdf, assetUrls, assetOriginais),
+    [doc, planoDoPdf, assetUrls, assetOriginais],
+  );
   const paginasDeInspiracao = planoDoPdf.filter((p) => p.tipo === "tema").length;
   const tempoDaProposta = tempoMostrado > 0 ? ` · ${emPalavras(tempoMostrado)} de trabalho` : "";
   const contagemDosBoards =
@@ -5416,19 +5404,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         i === bi ? { ...b, images: [...b.images, ...paths] } : b,
       ),
     }));
-    // AVISAR AQUI, e não só depois de gerar o PDF. Quem põe a sétima foto num
-    // mood board fica a saber nesse instante — e não quando o documento já
-    // seguiu (ou nem isso, que era o que acontecia). O cartão do mood board
-    // fica também com a marca permanente, para o aviso não se perder com o
-    // toast: ver `MOOD_BOARD_MAX_IMAGES` mais abaixo, na grelha de fotos.
-    const total = (doc.moodBoards[bi]?.images.length ?? 0) + paths.length;
-    if (total > MOOD_BOARD_MAX_IMAGES) {
-      const sobra = total - MOOD_BOARD_MAX_IMAGES;
+    // Quem passa das doze fotografias fica a saber nesse instante que o tema
+    // vai ocupar duas páginas no PDF — não é um erro (nenhuma fica de fora),
+    // mas é uma página a mais, e decide-se melhor a escolher do que no PDF.
+    const antes = doc.moodBoards[bi]?.images.length ?? 0;
+    const total = antes + paths.length;
+    if (paginasDoTema(total) > paginasDoTema(antes) && antes > 0) {
       toast(
-        `Este mood board fica com ${total} fotos e a página do PDF mostra ${MOOD_BOARD_MAX_IMAGES}: ` +
-          `${sobra === 1 ? "a última não entra" : `as últimas ${sobra} não entram`}. ` +
-          "Remove fotos ou cria outro mood board.",
-        "error",
+        `Este tema fica com ${total} fotos e passa a ocupar ${paginasDoTema(total)} páginas no PDF.`,
+        "info",
       );
     }
   }
@@ -6116,7 +6100,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
     // A MESMA regra do gerador: uma fase sem tarefas não imprime nada, e um
     // cronograma sem nenhuma fase com tarefas não tem página nenhuma no PDF
-    // (ver `fasesComTarefas`, em `proposal-paginas.ts`). Se esta é a última que
+    // (o PDF salta-a — ver o cronograma em `pdf-editorial/plano.ts`). Se esta é a última que
     // ainda tem tarefas, o documento perde uma folha inteira — e isso é a
     // consequência que decide a resposta.
     const comTarefas = (doc.cronograma ?? []).filter((f) =>
@@ -8235,7 +8219,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           O PDF usa a melhor fotografia deitada dos temas.{" "}
                           <button
                             type="button"
-                            className="font-medium underline underline-offset-2"
+                            className={`alvo-toque font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                             onClick={() => setPicker({ kind: "cover", idx })}
                             onPointerEnter={aquecerBiblioteca}
                             onFocus={aquecerBiblioteca}
@@ -8365,103 +8349,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         {ordemDosBoards.map((bi, pos) => {
                           const b = doc.moodBoards[bi];
                           /**
-                           * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
-                           *
-                           * As medidas vêm das miniaturas que já estão no ecrã (ver
-                           * `aspetosDasFotos`); o que ainda não se mediu entra com a
-                           * omissão, que é a mesma do gerador. Daqui saem as duas
-                           * coisas que têm de concordar: os diagramas do selector e a
-                           * forma de cada célula da grelha. Antes a célula usava o
-                           * arranjo único e antigo, e mostrava um recorte que a página
-                           * já não fazia — a mesma fotografia, cortada noutro sítio.
-                           */
-                          /**
                            * A ORDEM POR QUE A PÁGINA DESENHA — a mesma função do
-                           * gerador (`ordemDasFotos`). Com uma foto marcada como
-                           * principal, ela troca para a caixa grande.
-                           *
-                           * Vem ANTES dos aspectos porque são os aspectos POR ESTA
-                           * ORDEM que dão as caixas: medir numa ordem e desenhar
-                           * noutra daria à foto marcada a forma da caixa da vizinha.
+                           * gerador (`ordemDoDesenho`): a fotografia do cartão à
+                           * frente, sempre.
                            */
-                          const ordemDeDesenho = ordemDasFotos(b);
-                          const aspectos = ordemDeDesenho
-                            .slice(0, MOOD_BOARD_MAX_IMAGES)
-                            .map((i) => aspetosDasFotos[b.images[i]] ?? ASPETO_POR_OMISSAO);
+                          const principalDoTema = fotoPrincipalDe(b);
                           /**
-                           * A escolha desta página: as caixas tomam a FORMA das
-                           * fotografias em vez de as recortarem. Viaja daqui para as
-                           * três coisas que têm de concordar — a forma de cada célula
-                           * da grelha, os diagramas do selector, e a página do PDF.
-                           * Se uma delas ficasse para trás, ela escolhia por um
-                           * desenho e recebia outro.
+                           * O que o PDF faz com este tema. No desenho novo a
+                           * disposição não se escolhe: sai do número de
+                           * fotografias (`pdf-editorial/mosaico.ts`), e o capítulo
+                           * sai do título (`grupos.ts`). Diz-se aqui, só de
+                           * leitura, no lugar do selector que existia.
                            */
-                          /*
-                           * ── O QUE ESTA PÁGINA FAZ, OU O QUE A PROPOSTA FAZ ──
-                           *
-                           * A página primeiro, a proposta a seguir, e a sugestão
-                           * do número de fotografias em último. É esta ordem que
-                           * permite decidir uma vez para as sete páginas e ainda
-                           * assim uma delas discordar — ver `layoutPorOmissao`,
-                           * em `proposal-doc.ts`.
-                           */
-                          const semRecorte =
-                            (b.enquadramento ?? doc.enquadramentoPorOmissao) === "forma-da-foto";
-                          const layoutDoBoard =
-                            b.layout ?? doc.layoutPorOmissao ?? layoutSugerido(aspectos.length);
-                          /**
-                           * A ALTURA QUE A LEGENDA ROUBA ÀS FOTOS.
-                           *
-                           * A página reserva altura para a descrição, e reserva
-                           * MAIS quanto mais linhas ela tiver: com cinco linhas
-                           * são 87 pontos, 15% da folha. Aqui deixava-se a omissão
-                           * de 8 pt — a de quem não tem legenda nenhuma —, e as
-                           * caixas saíam mais altas do que a página as desenha.
-                           * A grelha mostrava um recorte que a folha não faz e o
-                           * aviso «esta foto perde X%» disparava (ou calava-se)
-                           * pelas razões erradas, com dez pontos percentuais de
-                           * diferença. A `PreviaDaPagina`, desenhada no MESMO
-                           * cartão, já contava a legenda: as duas metades do
-                           * cartão discordavam uma da outra.
-                           */
-                          const alturaLegenda = alturaDaLegenda(linhasDaLegendaAprox(b.annotation));
-                          /**
-                           * As caixas que a página vai MESMO desenhar.
-                           *
-                           * Já não decidem a forma das células da grelha — ver o
-                           * `aspeto` mais abaixo, e a razão por extenso. Ficam
-                           * porque o aviso da última fila (`filaDesequilibrada`)
-                           * as lê, e esse tem de contar as filas da PÁGINA e não
-                           * as do ecrã.
-                           */
-                          const caixas = caixasDoMoodboard(
-                            layoutDoBoard,
-                            aspectos,
-                            alturaLegenda,
-                            semRecorte,
-                          );
-                          const comDestaque = temLugarDeDestaque(layoutDoBoard);
+                          const fotosDoTema = b.images.length;
+                          const paginasDesteTema = paginasDoTema(fotosDoTema);
                           /** Esta página está fechada a alterações? */
                           const fechado = !!b.bloqueado;
                           /** E dobrada, que é só uma questão de espaço no ecrã? */
                           const dobrado = !!(b.id && dobrados[b.id]);
-                          /**
-                           * Quanto é que cada fotografia perde, uma a uma.
-                           *
-                           * Por fotografia e não por disposição: na mesma página, uma
-                           * panorâmica perde 5% e uma vertical 69%. Um aviso por página
-                           * obrigava-a a adivinhar qual é que era o problema — e a
-                           * resposta a «qual delas?» é a única coisa que torna o aviso
-                           * accionável (trocar aquela foto, ou ligar o interruptor).
-                           */
-                          const cortadas = semRecorte
-                            ? []
-                            : // Com a MESMA altura de legenda das caixas aqui em
-                              // cima: uma perda medida noutra geometria é uma
-                              // percentagem sobre uma página que não existe.
-                              perdasDoMoodboard(layoutDoBoard, aspectos, alturaLegenda)
-                                .map((perda, i) => ({ perda, i }))
-                                .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
                           return (
                             <CartaoDeBoard
                               key={bi}
@@ -8723,32 +8628,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           {avisosDeTitulo[bi]}
                                         </p>
                                       )}
-                                      {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
-                                        Discreto, e antes do limite: às oito
-                                        fotos a página ainda sai inteira, mas
-                                        cada uma já é pequena. O aviso vermelho
-                                        fica para quando alguma deixa mesmo de
-                                        ser impressa. */}
-                                      {b.images.length >= FOTOS_QUE_ENCHEM_A_PAGINA &&
-                                        b.images.length <= MOOD_BOARD_MAX_IMAGES && (
-                                          <p className={`${AVISO_DO_BOARD} text-foreground/45`}>
-                                            {b.images.length} fotos numa página: cada uma fica
-                                            pequena. Duas páginas com metade lêem-se melhor do que
-                                            uma cheia.
-                                          </p>
-                                        )}
-                                      {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
-                          fotos. As que passam disso ficam marcadas — e ditas por
-                          extenso a seguir — em vez de desaparecerem caladas no
-                          PDF. */}
-                                      {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                                        <p className={`${AVISO_DO_BOARD} text-[var(--bo-perigo)]`}>
-                                          A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES}{" "}
-                                          fotos:{" "}
-                                          {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
-                                            ? "a última, marcada «fora do PDF», não é impressa"
-                                            : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                                          . Remove fotos ou cria outro mood board.
+                                      {/* ── DUAS PÁGINAS, E NÃO FOTOS DE FORA ───────
+                                        No PDF antigo uma página imprimia dez e
+                                        as outras ficavam de fora. No novo
+                                        nenhuma fica: acima de doze o tema passa
+                                        a duas páginas, e a segunda diz «Mais
+                                        ideias…». Não é um erro — diz-se em voz
+                                        baixa, para ela decidir se a quer. */}
+                                      {paginasDesteTema > 1 && (
+                                        <p
+                                          className={`${AVISO_DO_BOARD} text-[var(--bo-text-muted)]`}
+                                        >
+                                          {fotosDoTema} fotos: no PDF este tema ocupa{" "}
+                                          {paginasDesteTema} páginas (a segunda diz «Mais ideias…»).
                                         </p>
                                       )}
                                       {/* ── A FOTO QUE DESTOA DA PALETA ────────────
@@ -8817,7 +8709,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             key={ii}
                                             bi={bi}
                                             ii={ii}
-                                            principal={comDestaque && fotoPrincipalDe(b) === ii}
+                                            principal={principalDoTema === ii}
                                             seleccionada={seleccionadas.has(`${bi}:${ii}`)}
                                             // Fechado, a foto vê-se mas não se mexe: é
                                             // isso que «terminado» quer dizer.
@@ -8835,11 +8727,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                                   podeRecuar={ii > 0}
                                                   podeAvancar={ii < b.images.length - 1}
                                                   seleccionada={seleccionadas.has(`${bi}:${ii}`)}
-                                                  principal={
-                                                    comDestaque
-                                                      ? fotoPrincipalDe(b) === ii
-                                                      : undefined
-                                                  }
+                                                  principal={principalDoTema === ii}
                                                   onRecuar={() => reordenarFotos(bi, ii, ii - 1)}
                                                   onAvancar={() => reordenarFotos(bi, ii, ii + 1)}
                                                   onAmpliar={() => setLupa({ bi, ii })}
@@ -8905,9 +8793,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               // no recorte. Perdeu-se ver a forma; não se perdeu
                                               // ser avisada.
                                               aspeto={1}
-                                              foraDoPdf={
-                                                ordemDeDesenho.indexOf(ii) >= MOOD_BOARD_MAX_IMAGES
-                                              }
                                               pendente={isPendingImage(path)}
                                             />
                                           </CelulaDeFoto>
@@ -8947,260 +8832,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           />
                                         </div>
                                       )}
-                                      {/* Sem fotos não há disposição nenhuma para escolher — o
-                        selector aparece com a primeira foto, que é quando a
-                        pergunta passa a ter resposta. */}
-                                      {/* ── VER ANTES DE GERAR ───────────────────
-                                        A página com as fotos no sítio, ao lado
-                                        das opções. Os diagramas dizem a FORMA
-                                        das caixas; isto diz que fotografia
-                                        fica em qual. */}
-                                      {aspectos.length > 0 && (
-                                        /*
-                                         * ── SEIS DIAGRAMAS VEZES SETE PÁGINAS ──
-                                         *
-                                         * Palavras dela: «o bloco de seis layouts
-                                         * repete-se sete vezes, a ocupar altura».
-                                         *
-                                         * Passa a estar dobrado, com a escolha
-                                         * ACTUAL escrita no fecho — que é a única
-                                         * coisa que se precisa de saber quando não
-                                         * se está a mexer nela. Abre-se com um
-                                         * clique e fica aberto enquanto ela lá
-                                         * estiver.
-                                         *
-                                         * `details` e não um estado nosso: sete
-                                         * dobras guardadas num objecto era mais
-                                         * uma coisa a manter, para o navegador
-                                         * fazer melhor de graça.
-                                         *
-                                         * Continua a ser o `details` a mandar —
-                                         * quem abre e fecha é ele, e nenhuma
-                                         * dobra é guardada de fora. O que o
-                                         * `DobraDaDisposicao` acrescenta é uma
-                                         * coisa só: saber que ela abriu ESTA
-                                         * dobra AGORA, para o corpo poder
-                                         * entrar sem que as sete animem ao
-                                         * carregar a proposta. Ver a ficha dele.
-                                         */
-                                        <DobraDaDisposicao
-                                          resumo={
-                                            <>
-                                              Disposição:{" "}
-                                              <strong className="font-medium text-[var(--bo-tinta-72)]">
-                                                {NOME_DO_LAYOUT[layoutDoBoard]}
-                                              </strong>
-                                              <span className="text-foreground/35">
-                                                · {semRecorte ? "sem recorte" : "recorta"}
-                                              </span>
-                                            </>
-                                          }
-                                          corpo={`mt-2 grid gap-4 ${
-                                            painelLateralCabe
-                                              ? ""
-                                              : "@min-[30rem]:grid-cols-[minmax(0,1fr)_15rem]"
-                                          }`}
-                                        >
-                                          {/* A segunda coluna abre-se quando há
-                                            mesmo uma segunda coluna. Era
-                                            `2xl:grid-cols-1` a desfazê-la com
-                                            CSS por cima de uma miniatura que
-                                            continuava desenhada; agora a
-                                            miniatura ou está montada ou não
-                                            está, e a grelha diz o mesmo que ela.
-                                            Sem isto, uma coluna de 15 rem ficava
-                                            aberta e vazia. */}
-                                          {/* ── E A SEGUNDA COLUNA PERGUNTA AO
-                                              CARTÃO, NÃO À JANELA ──────────
-                                              Era `lg:grid-cols-…`: 1024 DE
-                                              JANELA, para decidir se cabem duas
-                                              colunas DENTRO deste cartão. É o
-                                              mesmo defeito da fila, um nível
-                                              abaixo, e errava para os dois
-                                              lados.
-
-                                              MEDIDO num Chromium, a largura
-                                              interior deste cartão (a mesma que
-                                              o `ProposalStudio.test.tsx` usa,
-                                              refeita a partir do DOM):
-
-                                                  janela 1023   cartão 747 px
-                                                  janela 1024   cartão 472 px
-                                                  janela 1440   cartão 528 px
-
-                                              A 1023 havia 747 px e o `lg:` dizia
-                                              UMA coluna; a 1024 havia 472 e
-                                              dizia duas. A janela cresceu 1 px e
-                                              o cartão perdeu 275 — porque é aí
-                                              que o índice das páginas passa a
-                                              coluna.
-
-                                              O número: a segunda coluna é um
-                                              `15rem` fixo (240 px) mais o
-                                              `gap-4` (16). `@min-[30rem]` (480)
-                                              é o degrau logo acima dos 472 a que
-                                              o `lg:` já dividia — a mesma
-                                              decisão, feita onde ela se resolve.
-                                              Sobram 224 px para o selector, que
-                                              é `flex-wrap` com peças de 5,75rem:
-                                              duas por linha, como já era. */}
-                                          <div className="min-w-0">
-                                            <SelectorDeLayout
-                                              valor={b.layout}
-                                              aspectos={aspectos}
-                                              semRecorte={semRecorte}
-                                              // `undefined` APAGA o campo: um mood board sem
-                                              // layout gravado continua sem ele, e uma proposta
-                                              // já enviada não muda de aspecto por causa disto.
-                                              onEscolher={(layout) => updateBoard(bi, { layout })}
-                                            />
-                                          </div>
-                                          {/*
-                                           * ── A MINIATURA REPETIDA SETE VEZES
-                                           *
-                                           * «Minúscula e repetida sete vezes.»
-                                           * Onde o painel da direita cabe, ele
-                                           * mostra a MESMA página, grande, e
-                                           * duas cópias da mesma coisa no mesmo
-                                           * ecrã são uma a mais. Abaixo disso
-                                           * fica, porque abaixo disso o painel
-                                           * não cabe — e tirá-la aí era tirar a
-                                           * pré-visualização a quem trabalha
-                                           * num portátil.
-                                           *
-                                           * MONTAGEM CONDICIONAL, e não
-                                           * `2xl:hidden`: escondida por CSS ela
-                                           * continuava a ser DESENHADA, sete
-                                           * vezes, com as URLs de todas as
-                                           * fotografias. Ver `painelLateralCabe`
-                                           * lá em cima, e o
-                                           * `PainelDoEstudio.tsx:52-57`, que
-                                           * conta o que isso custou quando era
-                                           * ele a fazê-lo.
-                                           */}
-                                          {/* A folga alinha a miniatura com o
-                                                selector ao lado — e por isso segue
-                                                o MESMO degrau que decide se estão
-                                                lado a lado. Era `lg:`, a mesma
-                                                janela do grid aqui em cima. */}
-                                          {!painelLateralCabe && (
-                                            <div className="@min-[30rem]:pt-6">
-                                              <PreviaDaPagina
-                                                layout={layoutDoBoard}
-                                                aspectos={aspectos}
-                                                // Pela ordem de DESENHO, com a principal à frente
-                                                // — a mesma que a página vai usar.
-                                                urls={ordemDeDesenho
-                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                  .map((i) => assetUrls[b.images[i]])}
-                                                // O plano B, o mesmo da grelha aqui
-                                                // ao lado: uma miniatura que não
-                                                // existe cai para o original em vez
-                                                // de dar o ícone de imagem partida.
-                                                originais={ordemDeDesenho
-                                                  .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                                  .map((i) => assetOriginais[b.images[i]])}
-                                                semRecorte={semRecorte}
-                                                titulo={b.title}
-                                                subtitulo={b.subtitulo}
-                                                legenda={b.annotation}
-                                                // Aqui o rótulo ainda diz alguma
-                                                // coisa: é a única miniatura do
-                                                // cartão, e sem ele lê-se como
-                                                // mais uma fotografia. Ver
-                                                // `comRotulo`.
-                                                comRotulo
+                                      {/* ── O QUE O PDF FAZ COM ESTE TEMA ─────────
+                                        Era aqui o selector das seis disposições,
+                                        o «Manter a forma de cada fotografia» e os
+                                        avisos de recorte e da última fila. O PDF
+                                        novo não usa nenhum deles: a composição
+                                        sai do número de fotografias e cada
+                                        célula tem quase a forma da sua foto. O
+                                        que fica é dizer o que vai sair — o
+                                        capítulo e a composição —, só de
+                                        leitura. */}
+                                      <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                                        Capítulo:{" "}
+                                        <strong className="font-medium text-[var(--bo-tinta-72)]">
+                                          {capituloDoTema(b)}
+                                        </strong>
+                                        <span className="text-foreground/35"> · </span>
+                                        {composicaoEmPalavras(fotosDoTema)}
+                                      </p>
+                                      {/* ── A PÁGINA, COMO VAI SAIR ───────────────
+                                        Onde o painel da direita não cabe, a
+                                        miniatura vive aqui, no cartão. Onde
+                                        cabe, NÃO se monta — o painel mostra a
+                                        mesma página, grande, e desenhá-la duas
+                                        vezes (sete vezes, numa proposta de sete
+                                        temas) foi o que já custou ao estúdio
+                                        deixar de responder. */}
+                                      {!painelLateralCabe &&
+                                        (() => {
+                                          const i = planoDoPdf.findIndex(
+                                            (e) =>
+                                              e.tipo === "tema" && e.bi === bi && e.parte === 0,
+                                          );
+                                          if (i < 0) return null;
+                                          return (
+                                            <figure className="m-0 mt-2 max-w-[15rem]">
+                                              <PaginaEditorial
+                                                pagina={planoDoPdf[i]}
+                                                doc={doc as ProposalDoc}
+                                                aspetos={aspetosDasFotos}
+                                                capa={fontesDasMiniaturas.capa}
+                                                fotosDoTema={fontesDasMiniaturas.fotosDoTema}
+                                                outras={fontesDasMiniaturas.outrasDa(i)}
                                               />
-                                            </div>
-                                          )}
-                                        </DobraDaDisposicao>
-                                      )}
-                                      {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
-                          Está aqui, por baixo dos diagramas, porque é com eles
-                          que se percebe o que ele faz: liga-se e as caixas
-                          mudam de forma à frente dela.
-
-                          Desligar APAGA o campo (não guarda um `false`): um
-                          mood board que nunca teve a escolha tem de continuar
-                          sem ela, para uma proposta já enviada sair como
-                          sempre saiu. */}
-                                      <div className="mt-2 flex items-center gap-1.5">
-                                        <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
-                                          <input
-                                            type="checkbox"
-                                            className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
-                                            checked={semRecorte}
-                                            onChange={(e) =>
-                                              updateBoard(bi, {
-                                                enquadramento: e.target.checked
-                                                  ? "forma-da-foto"
-                                                  : undefined,
-                                              })
-                                            }
-                                          />
-                                          <span>Manter a forma de cada fotografia (não corta)</span>
-                                        </label>
-                                        {/* FORA do `<label>`, e é por uma razão: um
-                                          botão lá dentro ligava e desligava a
-                                          opção ao ser carregado.
-
-                                          O que ele explica é a consequência de
-                                          DESLIGAR — a parte que ninguém precisa
-                                          de reler à quinquagésima página. */}
-                                        <Ajuda sobre="o que muda ao manter a forma das fotografias">
-                                          Desligado, as fotografias são recortadas para encher as
-                                          caixas da disposição — como saía antes. Ligado, cada uma
-                                          entra inteira e as caixas é que se ajustam à forma dela.
-                                        </Ajuda>
-                                      </div>
-                                      {/* ── A ÚLTIMA FILA ────────────────────────
-                                        Uma última fila com uma foto, quando as
-                                        de cima têm três ou quatro, lê-se como
-                                        um esquecimento. Medido nas caixas que a
-                                        página vai mesmo desenhar. */}
-                                      {(() => {
-                                        const fila = filaDesequilibrada(caixas);
-                                        if (!fila) return null;
-                                        const fotos = (n: number) =>
-                                          n === 1 ? "uma foto" : `${n} fotos`;
-                                        // Os dois remédios, com o mais barato à
-                                        // frente: quatro em cima e uma em baixo
-                                        // pede que se tire uma, não que se
-                                        // acrescentem três.
-                                        const acrescentar = `com mais ${fotos(fila.aAcrescentar)}`;
-                                        const remover = `tirando ${fila.aRemover === 1 ? "a que lá está" : `as ${fila.aRemover} que lá estão`}`;
-                                        return (
-                                          <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
-                                            A última fila desta página fica com{" "}
-                                            {fila.naUltima === 1
-                                              ? "uma foto só"
-                                              : `${fila.naUltima} fotos`}
-                                            , contra {fila.nasOutras} nas de cima. A página fecha
-                                            certa{" "}
-                                            {fila.sugestao === "remover"
-                                              ? `${remover} — ou ${acrescentar}`
-                                              : `${acrescentar} — ou ${remover}`}
-                                            .
-                                          </p>
-                                        );
-                                      })()}
-                                      {cortadas.length > 0 && (
-                                        <p className="mt-1.5 text-xs leading-relaxed text-[var(--bo-perigo)]">
-                                          Nesta disposição{" "}
-                                          {cortadas.length === 1
-                                            ? "1 fotografia é cortada"
-                                            : `${cortadas.length} fotografias são cortadas`}
-                                          :{" "}
-                                          {cortadas
-                                            .map(
-                                              ({ perda, i }) =>
-                                                `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`,
-                                            )
-                                            .join(", ")}
-                                          . Liga «Manter a forma de cada fotografia» para não perder
-                                          nada.
-                                        </p>
-                                      )}
+                                              <figcaption className="mt-1 text-[10px] text-foreground/40">
+                                                A página, como vai sair
+                                              </figcaption>
+                                            </figure>
+                                          );
+                                        })()}
                                       <div className="mt-2 flex flex-wrap items-center gap-4">
                                         <button
                                           type="button"
@@ -9270,66 +8950,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             Abrir todos
                           </button>
                         </>
-                      )}
-                      {/*
-                       * ── O QUE ESTA PROPOSTA FAZ, DECIDIDO UMA VEZ ──────────
-                       *
-                       * Palavras dela: «"Manter a forma de cada fotografia" hoje
-                       * está desligada no primeiro board e ligada no terceiro,
-                       * sem razão». É o que acontece quando a escolha só existe
-                       * por página: sete páginas, sete decisões, tomadas em sete
-                       * momentos diferentes de uma tarde. O resultado não é
-                       * variedade — é uma proposta que parece montada por duas
-                       * pessoas.
-                       *
-                       * Isto vale para as páginas que não disserem outra coisa. A
-                       * que discordar continua a ganhar, e é por isso que o botão
-                       * de aplicar a todas existe ao lado: é o gesto de quem quer
-                       * mesmo pôr as sete de acordo, e escreve a escolha em cada
-                       * uma em vez de a adivinhar.
-                       */}
-                      {doc.moodBoards.length > 1 && (
-                        <label className="flex items-center gap-2 text-xs text-[var(--bo-text-muted)]">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 shrink-0 accent-sage-600"
-                            checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
-                            onChange={(e) =>
-                              patch({
-                                // Ausente e não `false`: ausente quer dizer
-                                // «ninguém escolheu», e uma proposta já enviada
-                                // tem de continuar a sair como sempre saiu.
-                                enquadramentoPorOmissao: e.target.checked
-                                  ? "forma-da-foto"
-                                  : undefined,
-                              })
-                            }
-                          />
-                          <span>Manter a forma das fotografias em toda a proposta</span>
-                        </label>
-                      )}
-                      {doc.moodBoards.length > 1 && (
-                        <button
-                          type="button"
-                          className={`${ADD_BTN} ${ESTADO} ${PRESSAO}`}
-                          onClick={() => {
-                            const enq = doc.enquadramentoPorOmissao;
-                            patch({
-                              moodBoards: doc.moodBoards.map((b) => ({
-                                ...b,
-                                ...(enq ? { enquadramento: enq } : { enquadramento: undefined }),
-                              })),
-                            });
-                            toast(
-                              enq
-                                ? "As páginas passam todas a manter a forma das fotografias."
-                                : "As páginas passam todas a recortar as fotografias.",
-                              "info",
-                            );
-                          }}
-                        >
-                          Aplicar a todas as páginas
-                        </button>
                       )}
                       <ModelosParciais
                         tipo="moodboard"
@@ -10790,8 +10410,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             urls={assetUrls}
             originais={assetOriginais}
             aspetos={aspetosDasFotos}
-            layoutPorOmissao={doc.layoutPorOmissao}
-            enquadramentoPorOmissao={doc.enquadramentoPorOmissao}
+            doc={doc as ProposalDoc}
             onSaltar={(bi) => irParaAFalta("moodboards", `boardTitulo:${bi}`)}
             onEscolherFotos={(bi) => setPicker({ kind: "board", bi })}
           />
@@ -12157,7 +11776,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           onDropped={onDroppedFromLibrary}
           /* ── A PÁGINA QUE SE ESTÁ A COMPOR ─────────────────────────────
              Só para os mood boards: um mood board É uma página do PDF, com
-             `MOOD_BOARD_MAX_IMAGES` fotos impressas e as restantes de fora. As
+             `MAXIMO_POR_PAGINA` fotos por página (acima disso, duas). As
              capas são uma foto por espaço — não há conjunto nenhum a compor, e
              o canto não teria o que dizer.
 
@@ -12175,7 +11794,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     // imagem partida.
                     planoB: assetOriginais[path],
                   })),
-                  maximo: MOOD_BOARD_MAX_IMAGES,
+                  maximo: MAXIMO_POR_PAGINA,
                 }
               : undefined
           }
@@ -12211,16 +11830,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
  * custa quase tudo à cabeça. As antigas ficam esquecidas no navegador.
  */
 const AMOSTRAS_KEY = "liquen-proposal-studio:geracoes-editorial";
-
-/**
- * A partir de quantas fotos a página começa a ficar apertada.
- *
- * O tecto duro são as `MOOD_BOARD_MAX_IMAGES` (10), acima do qual as fotos
- * deixam de ser impressas e o aviso é vermelho. Este é o degrau ANTES: às oito,
- * a página sai inteira e cada fotografia já é pequena — que é uma decisão de
- * composição e não um erro, e por isso diz-se em voz baixa.
- */
-const FOTOS_QUE_ENCHEM_A_PAGINA = 8;
 
 /**
  * Uma linha do bloco de totais: o nome à esquerda, o número à direita.
@@ -12595,8 +12204,8 @@ function AccoesDaFoto({
           {
             id: "principal",
             rotulo: principal
-              ? "Deixar de ser a fotografia principal"
-              : "Fotografia principal desta página",
+              ? "Deixar de ser a fotografia do cartão"
+              : "Fotografia do cartão (a primeira do tema no PDF)",
             glifo: "★",
             onAccao: onPrincipal,
             activa: principal,
@@ -12777,98 +12386,6 @@ function AvisoDeOrdem({
         Arrumar eu
       </button>
     </div>
-  );
-}
-
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * A DOBRA DA DISPOSIÇÃO — E PORQUE É QUE A ENTRADA SÓ PODE VIR DO `onToggle`
- * ══════════════════════════════════════════════════════════════════════════
- *
- * O bloco dos seis diagramas de cada mood board vive dentro de um `<details>`
- * nativo — a decisão está contada no sítio onde ele se usa, e não muda: quem
- * abre e fecha continua a ser o browser, de graça, com teclado e com o
- * «localizar na página» a funcionar mesmo fechado.
- *
- * O que faltava era o corpo APARECER. Um `<details>` a abrir troca o `display`
- * do conteúdo, que é o corte mais seco que há — e numa proposta com sete
- * páginas de inspiração são sete dobras a fazer o mesmo salto.
- *
- * ── E PORQUE É QUE ISTO PRECISA DE ESTADO, SE O `<details>` JÁ TEM O SEU ───
- *
- * Porque a pergunta não é «está aberto?», é «acabou de ser aberto POR ELA?».
- * São coisas diferentes, e confundi-las é exactamente o defeito que isto
- * evita: uma entrada escrita em CSS (`details[open] > …`) corre sempre que o
- * corpo estiver visível, portanto correria também ao carregar a proposta — e
- * com sete páginas eram sete secções a animar de uma vez no primeiro
- * fotograma do estúdio. Isso não é uma entrada, é ruído.
- *
- * Hoje nenhuma destas dobras nasce aberta, e por isso a distinção parece
- * gratuita. Não é: é a rede para o dia em que alguém escrever `open` (ou
- * restaurar a dobra de uma visita anterior) e não ligar as duas coisas.
- *
- * ── O QUE ESTE COMPONENTE NÃO FAZ ─────────────────────────────────────────
- *
- * Não guarda a dobra. `aberta` é a repetição do que o `<details>` já sabe,
- * escrita só para o corpo saber se leva a classe; fechar a dobra apaga-a, e é
- * isso que faz a entrada correr outra vez quando ela reabre.
- *
- * E não re-desenha o que está lá dentro. Os `children` chegam prontos de quem
- * chama, portanto o React salta-os quando isto volta a desenhar-se ao abrir —
- * o único nó que muda é o corpo, e só na `className`. Uma dobra a abrir não
- * pode custar o desenho de um selector de layout e de uma miniatura.
- */
-function DobraDaDisposicao({
-  resumo,
-  corpo,
-  children,
-}: {
-  /** O que se lê no fecho: a disposição escolhida e o enquadramento. */
-  resumo: React.ReactNode;
-  /** As classes do corpo. A entrada junta-se a estas, não as substitui. */
-  corpo: string;
-  children: React.ReactNode;
-}) {
-  const [aberta, setAberta] = useState(false);
-  return (
-    <details
-      className="group mt-1"
-      onToggle={(e) => setAberta(e.currentTarget.open)}
-      /* `name` de propósito NÃO: um `name` partilhado fecharia a dobra de um
-         board ao abrir a do seguinte, e o que se quer é poder comparar duas
-         páginas lado a lado. */
-    >
-      <summary
-        className={`marker:content-none inline-flex list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-[var(--bo-tinta-72)] [&::-webkit-details-marker]:hidden ${ESTADO} ${PRESSAO}`}
-      >
-        {/* A MESMA seta, e o mesmo tempo, do cabeçalho das secções e das duas
-            setas irmãs da casa (`Overview.tsx`, `Tarefas.tsx:810`): 200 ms na
-            `cubic-bezier(0, 0, 0.2, 1)`. Estava sem duração, ou seja nos 150 ms
-            de omissão do Tailwind, que ninguém escolheu.
-
-            `transition-transform` NOMEADA e não `transition-[transform]`: no
-            Tailwind v4 o `rotate-90` emite a propriedade autónoma `rotate`, e
-            só a forma nomeada a inclui (compilado com o 4.3.0 deste
-            repositório: `transform, translate, scale, rotate`). */}
-        <span
-          aria-hidden
-          className="text-[10px] text-foreground/35 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0,0,0.2,1)] group-open:rotate-90"
-        >
-          ▸
-        </span>
-        {resumo}
-      </summary>
-      {/* `bo-entrada-folha` — oito píxeis e não quatro: isto não é um menu que
-          nasce encostado ao botão, é um bloco de conteúdo a descer para dentro
-          da página, e oito é a distância que a casa reserva para isso.
-
-          A `.bo-entrada` não tem `fill-mode`: acabada a animação larga o
-          elemento e não fica `transform` nenhum pendurado — que é o que
-          quebraria a barra de acção `sticky` do estúdio se ela estivesse cá
-          dentro. Não está, mas a regra vale à mesma para o dia em que algum
-          descendente daqui precise de se colar. */}
-      <div className={aberta ? `${corpo} bo-entrada bo-entrada-folha` : corpo}>{children}</div>
-    </details>
   );
 }
 
@@ -13676,234 +13193,7 @@ function useSrcSemPiscar(url?: string): string | undefined {
   return pronta && url ? pronta : url;
 }
 
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * ESCOLHER A DISPOSIÇÃO A VER, E NÃO A LER
- * ══════════════════════════════════════════════════════════════════════════
- *
- * Os cinco arranjos existiam no documento e o estúdio não os deixava escolher.
- * Uma lista de nomes resolvia metade do problema e criava outro: «mosaico» e
- * «filas» não querem dizer nada até se ver o que dão — e o que dão depende das
- * fotos DESTE mood board, porque a geometria respeita a forma de cada uma (uma
- * fila de verticais fica alta, a mesma fila de panorâmicas fica baixa).
- *
- * Por isso cada opção é um diagrama, desenhado com `caixasDoMoodboard` e com os
- * aspectos verdadeiros das fotos que o board tem NESTE momento. É a mesma
- * função que o PDF chama: não há aqui geometria nenhuma, só a conversão do
- * sistema de coordenadas do PDF (que conta de baixo) para o do SVG (que conta
- * de cima).
- */
-const NOME_DO_LAYOUT: Record<LayoutDeMoodboard, string> = {
-  filas: "Filas",
-  "fila-unica": "Fila única",
-  mosaico: "Mosaico",
-  destaque: "Destaque",
-  "texto-e-imagem": "Texto e imagem",
-};
-
 /** Pela ordem em que aparecem no selector — do mais usado ao mais especial. */
-const LAYOUTS: LayoutDeMoodboard[] = [
-  "filas",
-  "fila-unica",
-  "mosaico",
-  "destaque",
-  "texto-e-imagem",
-];
-
-/**
- * As caixas de um layout, desenhadas à escala da página.
- *
- * `caixasDoMoodboard` fica com a altura de anotação por omissão — a mesma que o
- * resolvedor usa quando ainda não tem fontes para medir o texto. A diferença
- * são uns pontos na base da mancha: invisível num diagrama de 90 px, e é o lado
- * certo para onde errar (as caixas saem por excesso, nunca por defeito).
- */
-function DiagramaDeLayout({
-  layout,
-  aspectos,
-  semRecorte = false,
-}: {
-  layout: LayoutDeMoodboard;
-  aspectos: number[];
-  /**
-   * A mesma escolha que a página tem («Manter a forma de cada fotografia»).
-   *
-   * Vem por prop e não por omissão: o diagrama e a página TÊM de ser desenhados
-   * com os mesmos argumentos. Se divergirem, ela escolhe uma disposição por um
-   * desenho e recebe outra — que é o defeito que este selector existe para não
-   * haver, e que já custou caro nesta casa.
-   */
-  semRecorte?: boolean;
-}) {
-  const caixas = caixasDoMoodboard(layout, aspectos, undefined, semRecorte);
-  return (
-    <svg
-      viewBox={`0 0 ${PAGINA_W} ${PAGINA_H}`}
-      className="block h-auto w-full"
-      // O diagrama é o mesmo que o rótulo diz por palavras; para quem ouve o
-      // ecrã, repeti-lo em caixinhas não acrescenta nada.
-      aria-hidden="true"
-      focusable="false"
-    >
-      {/* O «texto e imagem» é o único arranjo que não é só fotos: a nota ocupa
-          a esquerda e a página fica meia vazia sem ela. Estes traços são
-          indicativos e nascem da PRÓPRIA caixa da foto (vão da margem até onde
-          ela começa), portanto não têm como divergir da geometria. */}
-      {layout === "texto-e-imagem" &&
-        caixas[0] &&
-        [0, 1, 2].map((i) => (
-          <line
-            key={i}
-            x1={caixas[0].x * 0.18}
-            x2={caixas[0].x * 0.82}
-            y1={PAGINA_H * 0.3 + i * 34}
-            y2={PAGINA_H * 0.3 + i * 34}
-            stroke="#2a2620"
-            strokeOpacity={0.18}
-            strokeWidth={9}
-            strokeLinecap="round"
-          />
-        ))}
-      {caixas.map((c, i) => (
-        <rect
-          key={i}
-          x={c.x}
-          // O PDF conta o `y` a partir da BASE da página; o SVG a partir do
-          // topo. É a única conta que este diagrama faz.
-          y={PAGINA_H - c.y - c.h}
-          width={c.w}
-          height={c.h}
-          rx={6}
-          fill="#4c6752"
-          fillOpacity={0.22}
-          stroke="#4c6752"
-          strokeOpacity={0.45}
-          strokeWidth={3}
-        />
-      ))}
-    </svg>
-  );
-}
-
-/**
- * O selector de disposição de UM mood board.
- *
- * `valor` a `undefined` é a opção «Automático», e é uma opção a sério — não é o
- * mesmo que escolher à mão o layout que hoje calha ser sugerido. Sem escolha, a
- * página acompanha o número de fotos (tirar uma de cinco muda o arranjo); com
- * escolha, fica como está para sempre, que é o que faz uma proposta reaberta
- * meses depois voltar a sair como saiu. O rótulo diz as duas coisas ao mesmo
- * tempo: «Automático (fila única)».
- */
-function SelectorDeLayout({
-  valor,
-  aspectos,
-  semRecorte = false,
-  onEscolher,
-}: {
-  valor: LayoutDeMoodboard | undefined;
-  /** A forma de cada foto que a página vai desenhar, pela ordem delas. */
-  aspectos: number[];
-  /** O enquadramento deste mood board — os diagramas desenham-se com ele. */
-  semRecorte?: boolean;
-  onEscolher: (layout: LayoutDeMoodboard | undefined) => void;
-}) {
-  const sugerido = layoutSugerido(aspectos.length);
-  const opcoes: (LayoutDeMoodboard | undefined)[] = [undefined, ...LAYOUTS];
-  const escolhido = opcoes.findIndex((o) => o === valor);
-
-  // Um só ponto de paragem no tabulador e as setas a andar de opção em opção —
-  // a mesma navegação do `Segmented`, que é o outro grupo de opções do estúdio.
-  function aoTeclar(e: React.KeyboardEvent<HTMLDivElement>) {
-    const passo =
-      e.key === "ArrowRight" || e.key === "ArrowDown"
-        ? 1
-        : e.key === "ArrowLeft" || e.key === "ArrowUp"
-          ? -1
-          : 0;
-    if (!passo || escolhido === -1) return;
-    e.preventDefault();
-    onEscolher(opcoes[(escolhido + passo + opcoes.length) % opcoes.length]);
-  }
-
-  return (
-    <div className="mt-3">
-      <p className="mb-1.5 text-[10px] tracking-[0.14em] uppercase text-foreground/35">
-        Disposição na página
-      </p>
-      {/* ── PORQUE É QUE O AUTOMÁTICO ESCOLHEU AQUILO ────────────────────
-          Palavras dela: «sem explicar porquê». A regra é curta — depende só
-          de quantas fotos há — e dizê-la torna óbvio o remédio quando a
-          escolha não serve: tirar uma foto, acrescentar outra, ou escolher à
-          mão nas opções que estão logo ao lado. */}
-      <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">
-        {valor
-          ? `Escolhida à mão: ${NOME_DO_LAYOUT[valor].toLowerCase()}. O «Automático» acompanharia o número de fotos.`
-          : `Automático — ${porqueEsteAutomatico(aspectos.length)}`}
-      </p>
-      <div
-        role="radiogroup"
-        aria-label="Disposição das fotos na página"
-        onKeyDown={aoTeclar}
-        className="flex flex-wrap gap-2"
-      >
-        {opcoes.map((op, i) => {
-          const activo = op === valor;
-          const rotulo = op ? NOME_DO_LAYOUT[op] : "Automático";
-          return (
-            <button
-              key={op ?? "auto"}
-              type="button"
-              role="radio"
-              aria-checked={activo}
-              tabIndex={i === (escolhido === -1 ? 0 : escolhido) ? 0 : -1}
-              onClick={() => onEscolher(op)}
-              className={`w-[5.75rem] rounded-lg border p-1.5 text-left  ${
-                activo
-                  ? "border-sage-600/70 bg-sage-600/[0.07] "
-                  : "border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] hover:border-sage-600/40"
-              } ${ESTADO} ${PRESSAO}`}
-            >
-              <span className="block overflow-hidden rounded-[3px] border border-[var(--bo-hairline)] bg-[var(--bo-surface)]">
-                <DiagramaDeLayout
-                  layout={op ?? sugerido}
-                  aspectos={aspectos}
-                  semRecorte={semRecorte}
-                />
-              </span>
-              {/* A escolha nunca é só cor: a opção assinalada muda de peso e de
-                  elevação, e o `aria-checked` diz o mesmo a quem ouve. */}
-              <span
-                className={`mt-1 block text-[10px] leading-tight ${
-                  activo ? "font-semibold text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"
-                }`}
-              >
-                {rotulo}
-                {!op && (
-                  <span className="block text-[9px] text-foreground/40">
-                    ({NOME_DO_LAYOUT[sugerido].toLowerCase()})
-                  </span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      {/* «Texto e imagem» desenha UMA foto — as outras ficam de fora, e isso
-          tem de ser dito aqui, no instante da escolha, e não descoberto no PDF
-          já enviado. É o mesmo princípio do aviso das fotos a mais. */}
-      {(valor ?? sugerido) === "texto-e-imagem" && aspectos.length > 1 && (
-        <p className="mt-2 text-xs leading-relaxed text-[var(--bo-perigo)]">
-          «Texto e imagem» desenha só a primeira foto ao lado da descrição:{" "}
-          {aspectos.length - 1 === 1
-            ? "a outra não é impressa"
-            : `as outras ${aspectos.length - 1} não são impressas`}
-          .
-        </p>
-      )}
-    </div>
-  );
-}
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

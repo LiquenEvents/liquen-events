@@ -71,7 +71,7 @@ describe("a letra da pré-visualização", () => {
   });
 
   it("e a folha da proposta desenha-se mesmo na letra do documento", () => {
-    for (const f of ["FolhaDaProposta.tsx", "PreviaDaPagina.tsx"]) {
+    for (const f of ["PaginaEditorial.tsx"]) {
       const texto = fs.readFileSync(path.join(RAIZ, f), "utf8");
       expect(texto, `${f} deixou de desenhar na letra da casa`).toMatch(
         /font-display(-italico)?\b/,

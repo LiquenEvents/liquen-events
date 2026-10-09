@@ -3,8 +3,10 @@ import { blocosFixosNaLingua, textosDaProposta } from "@/lib/proposal-doc-textos
 import { totaisDaProposta } from "@/lib/proposal-budget";
 import { chaveDeRubrica, ordemDeSaida } from "@/lib/proposal-ordem";
 import { agrupar, grupoDoTema, type Grupo } from "./grupos";
-import { repartir as repartirFotos } from "./mosaico";
+import { MAXIMO_POR_PAGINA, repartir as repartirFotos } from "./mosaico";
 import { textosEditoriais } from "./textos";
+
+export { MAXIMO_POR_PAGINA };
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -463,3 +465,28 @@ export function listasQueNaoSaem(doc: ProposalDoc): { nome: string; seccao: stri
 
 /** Quantas páginas, pelo plano. */
 export const paginasDoPlano = (doc: ProposalDoc) => planoDaProposta(doc).length;
+
+/**
+ * A composição que o PDF dá a um tema com `n` fotografias, por palavras — o
+ * quadro de `mosaico.ts`. No desenho novo a disposição não se escolhe: sai do
+ * número de fotografias, e o estúdio di-lo em vez de oferecer um selector.
+ */
+export function composicaoEmPalavras(n: number): string {
+  if (n <= 0) return "Só texto, com uma fotografia de outro tema ao lado";
+  if (n === 1) return "Uma fotografia a página inteira";
+  if (n <= 3) return "Uma fila a toda a altura, com o texto ao lado";
+  if (n === 4) return "Duas filas em tijolo";
+  if (n === 5) return "Cinco ao alto, desalinhadas";
+  const paginas = repartirFotos(n).length;
+  return paginas > 1
+    ? `Mosaico de ponta a ponta, em ${paginas} páginas`
+    : "Mosaico de ponta a ponta";
+}
+
+/** O capítulo de inspiração de um tema («Jantar»), pelo nome — `grupos.ts`. */
+export function capituloDoTema(b: Pick<MoodBoard, "title" | "subtitulo">): string {
+  return textosEditoriais("pt").grupos[grupoDoTema(b.title ?? "", b.subtitulo ?? "")];
+}
+
+/** Quantas páginas um tema ocupa no PDF (0 fotos é uma página de texto). */
+export const paginasDoTema = (n: number) => (n > 0 ? repartirFotos(n).length : 1);

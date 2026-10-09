@@ -1298,6 +1298,16 @@ body:is(.admin-mode, :has([data-admin-mode])) {
      Inverte, e a tinta por cima com ela. */
   --bo-seleccao: #1b2119;
   --bo-seleccao-hover: #2a3227;
+
+  /* ── O PAPEL DO PDF — a folha escura do desenho novo ───────────────────
+     As miniaturas do estúdio (`PaginaEditorial.tsx`) desenham a folha que o
+     casal recebe, e a folha é escura nos dois temas do back office: estes
+     valores NÃO invertem. São os do PDF (`HEX`, em `pdf-editorial/paleta.ts`),
+     e um teste prende uns aos outros. */
+  --bo-papel-pdf: #1f2022;
+  --bo-papel-pdf-texto: #f3f0ea;
+  --bo-papel-pdf-baixo: #d2cdc3;
+  --bo-papel-pdf-acento: #d8bd5a;
   --bo-sobre-seleccao: #ffffff;
 
   /* O verde da marca (`sage-500`). Nunca como texto sobre branco — dá 4,6:1 e
@@ -1752,7 +1762,7 @@ body:has([data-admin-mode][data-aparencia="escuro"])
 /* ── A FOLHA DO CLIENTE MANTÉM A LETRA DO CLIENTE ──────────────────────────
    A prévia da proposta tem de ser a folha que sai, e a folha que sai é em
    Playfair. Este marcador põe-se na raiz do que é folha do casal — hoje a
-   `FolhaDaProposta` — e devolve o token à serifa dentro dessa árvore, sem
+   `PaginaEditorial` — e devolve o token à serifa dentro dessa árvore, sem
    tocar em mais nada do back office.
 
    É uma linha e não uma lista de ficheiros de propósito: uma prévia nova

@@ -19,8 +19,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { MoodBoard } from "@/lib/proposal-doc";
-import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import { contagemDosEstados, diagnosticoDoBoard } from "@/lib/proposal-moodboard";
+
+/**
+ * No PDF novo nenhuma fotografia fica de fora: acima de doze o tema passa a
+ * duas páginas. Não há tecto a partir do qual uma foto «não é impressa».
+ */
+const SEM_TECTO = Number.POSITIVE_INFINITY;
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
@@ -92,7 +97,7 @@ export default function MoodBoardIndice({
   );
   const ids = useMemo(() => ordem.map((bi) => `indice:${bi}`), [ordem]);
 
-  const contagem = useMemo(() => contagemDosEstados(boards, MOOD_BOARD_MAX_IMAGES), [boards]);
+  const contagem = useMemo(() => contagemDosEstados(boards, SEM_TECTO), [boards]);
 
   if (boards.length === 0) return null;
 
@@ -195,7 +200,7 @@ function EntradaDoIndice({
     id: `indice:${bi}`,
     disabled: !arrastavel,
   });
-  const diagnostico = diagnosticoDoBoard(board ?? { images: [] }, MOOD_BOARD_MAX_IMAGES);
+  const diagnostico = diagnosticoDoBoard(board ?? { images: [] }, SEM_TECTO);
   const vazio = diagnostico.estado === "vazio";
   const porAcabar = diagnostico.estado === "por-acabar";
   // O que falta, numa frase — no `title` e para quem lê por voz. A marca

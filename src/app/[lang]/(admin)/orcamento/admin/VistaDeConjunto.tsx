@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
-import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
-import { ASPETO_POR_OMISSAO } from "@/lib/proposal-geometria";
-import { layoutDoBoard, ordemDasFotos } from "@/lib/proposal-moodboard";
-import { folhasAproximadas, paginasDaProposta } from "@/lib/proposal-paginas";
-import FolhaDaProposta from "./FolhaDaProposta";
-import PreviaDaPagina from "./PreviaDaPagina";
+import { planoDaProposta, type EntradaDoPlano } from "@/lib/pdf-editorial/plano";
+import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
@@ -20,38 +16,25 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
  * de paleta» — e, depois de isto existir, «"Todas" mostra 7 páginas quando o
  * PDF tem cerca de 14. Uma pré-visualização parcial dá falsa confiança.»
  *
- * As duas frases são a mesma peça em dois momentos. Esta vista nasceu para os
- * mood boards e chamava-se «Todas»: mostrava sete folhas de catorze, e as sete
- * que mostrava eram justamente aquelas onde os erros NÃO estavam. Os erros que
- * chegaram a clientes estavam na apresentação, no orçamento e nas condições —
- * as folhas que nunca se viam.
- *
- * Passa a mostrar o documento: a capa, a apresentação, o cronograma quando o
- * há, as páginas de inspiração pela `ordemDeSaida`, o orçamento, as condições,
- * as observações e a contracapa. A lista é a de `paginasDaProposta`, que é a
- * espinha do gerador — e não uma segunda opinião que um dia divergia.
- *
- * ── DUAS MANEIRAS DE DESENHAR UMA FOLHA, E PORQUÊ ─────────────────────────
- *
- * As páginas de inspiração são fotografias, e desenham-se à escala com a
- * geometria do gerador (`PreviaDaPagina`). As outras são texto, e uma folha de
- * texto não se pode paginar sem a desenhar: a `FolhaDaProposta` mostra as
- * PALAVRAS — as mesmas que vão sair — sem prometer onde a folha parte. É a
- * diferença entre uma pré-visualização e uma fotocópia, e está dita lá.
+ * Mostra o documento do desenho NOVO, página a página: a lista é a de
+ * `planoDaProposta` (`pdf-editorial/plano.ts`), a mesma sequência que o
+ * gerador desenha, presa a ele por um teste — e não uma segunda opinião que um
+ * dia divergia. Cada miniatura é uma `PaginaEditorial`: os temas com as caixas
+ * exactas do mosaico, as outras páginas com a sua estrutura.
  *
  * ── CLICAR SALTA PARA ONDE O PROBLEMA NASCE ───────────────────────────────
  *
  * Palavras dela: «hoje vê-se um problema na página 5 e tem de se procurar onde
  * ele nasce». Cada página sabe que secção do formulário a produz (`seccao`), e
- * é essa que o clique abre. Uma página de inspiração salta mais fundo ainda —
- * para o cartão daquele board.
+ * é essa que o clique abre. Uma página de tema salta mais fundo ainda — para
+ * o cartão daquele tema.
  *
  * ── AS SETAS SÓ EXISTEM ONDE HÁ ORDEM PARA MUDAR ──────────────────────────
  *
- * A capa não troca de sítio com o orçamento. Só as páginas de inspiração se
- * reordenam, e movem-se contra a inspiração VIZINHA — o que salta por cima da
- * apresentação e das folhas fixas, e deixa a lista trocada como a seta
- * prometeu. Nas pontas ficam desligadas, em vez de mexerem no que não se vê.
+ * Só os temas se reordenam, e só dentro do seu capítulo: o PDF arruma os
+ * capítulos pela ordem do dia (cerimónia, cocktail, jantar…), e uma seta que
+ * passasse um tema do jantar para antes da cerimónia prometia uma troca que o
+ * PDF desfazia. Nas pontas do capítulo ficam desligadas.
  */
 
 /** Quanto tempo o rato tem de ficar quieto para a folha crescer. */
@@ -87,13 +70,18 @@ export default function VistaDeConjunto({
    *  passo 1), não há nada para fechar e o botão não se desenha. */
   onFechar?: () => void;
 }) {
-  const paginas = paginasDaProposta(doc);
-  const folhas = folhasAproximadas(doc);
+  const paginas = useMemo(() => planoDaProposta(doc), [doc]);
+  const fontes = useMemo(
+    () => fontesDasFolhas(doc, paginas, urls, originais),
+    [doc, paginas, urls, originais],
+  );
   const aumentada = useIntencaoDeAmpliar();
+  void idioma;
 
-  // As posições das páginas de inspiração DENTRO desta lista — é contra elas
-  // que as setas se movem.
-  const deInspiracao = paginas.flatMap((p, i) => (p.especie === "moodboard" ? [i] : []));
+  // As páginas de tema que abrem um tema (a 1.ª parte), e o capítulo de cada
+  // uma — é contra a vizinha do MESMO capítulo que as setas se movem.
+  const aberturas = paginas.flatMap((p, i) => (p.tipo === "tema" && p.parte === 0 ? [i] : []));
+  const capituloDe = (p: EntradaDoPlano | undefined) => (p?.tipo === "tema" ? p.grupo : null);
 
   return (
     <div className="mb-4 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">
@@ -102,10 +90,10 @@ export default function VistaDeConjunto({
           <p className="bo-eyebrow">Vista de conjunto</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/50">
             {/* O número que ela vê aqui é o MESMO que o botão de gerar mostra —
-                sai os dois de `paginasDaProposta`. Duas contagens sobre o mesmo
+                sai os dois de `planoDaProposta`. Duas contagens sobre o mesmo
                 documento foi o defeito que isto veio fechar. */}
-            {paginas.length} páginas, pela ordem em que saem — o PDF sai com cerca de {folhas}{" "}
-            folhas. Clica numa para ir onde ela se escreve.
+            Cerca de {paginas.length} páginas, pela ordem em que saem. Clica numa para ir onde ela
+            se escreve. As fotografias dos separadores e painéis são escolhidas pelo PDF.
           </p>
         </div>
         {onFechar && (
@@ -127,27 +115,30 @@ export default function VistaDeConjunto({
           fila são agora os mesmos três de todo o back office. */}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {paginas.map((pagina, i) => {
-          const bi = pagina.bi;
-          const b = bi === undefined ? undefined : doc.moodBoards[bi];
-          const vi = deInspiracao.indexOf(i);
-          // Para onde a página vai: o lugar da inspiração VIZINHA, na ordem
-          // real dos boards. `-1` = não há vizinha desse lado.
-          const anterior = vi > 0 ? paginas[deInspiracao[vi - 1]]?.bi : undefined;
-          const seguinte =
-            vi >= 0 && vi < deInspiracao.length - 1 ? paginas[deInspiracao[vi + 1]]?.bi : undefined;
+          const bi = pagina.tipo === "tema" ? pagina.bi : undefined;
+          const vi = aberturas.indexOf(i);
+          // Para onde o tema vai: o lugar do tema VIZINHO do mesmo capítulo,
+          // na ordem real dos boards. `-1` = não há vizinho desse lado.
+          const vizinho = (d: -1 | 1) => {
+            const j = aberturas[vi + d];
+            const p = j === undefined ? undefined : paginas[j];
+            return p?.tipo === "tema" && capituloDe(p) === capituloDe(pagina) ? p.bi : undefined;
+          };
+          const anterior = vi >= 0 ? vizinho(-1) : undefined;
+          const seguinte = vi >= 0 ? vizinho(1) : undefined;
           const pos = bi === undefined ? -1 : ordem.indexOf(bi);
           const paraTras = anterior === undefined ? -1 : ordem.indexOf(anterior);
           const paraAFrente = seguinte === undefined ? -1 : ordem.indexOf(seguinte);
 
           return (
-            <li key={`${pagina.especie}-${bi ?? i}`} className="min-w-0">
+            <li key={`${pagina.tipo}-${i}`} className="min-w-0">
               <button
                 type="button"
                 {...aumentada.pega(i, () =>
                   bi === undefined ? onIrParaSeccao(pagina.seccao) : onSaltar(bi),
                 )}
                 className={`block w-full text-left ${ESTADO} ${PRESSAO}`}
-                aria-label={`Ir para onde se escreve a página ${i + 1}, ${pagina.titulo}`}
+                aria-label={`Ir para onde se escreve a página ${i + 1}, ${pagina.nome}`}
               >
                 {/* A folha cresce COM `transform`: não empurra nada, não abre
                     barra de deslocamento nenhuma, e é a única propriedade que o
@@ -167,17 +158,14 @@ export default function VistaDeConjunto({
                       : undefined
                   }
                 >
-                  {b ? (
-                    <Inspiracao b={b} urls={urls} originais={originais} aspetos={aspetos} />
-                  ) : (
-                    <FolhaDaProposta
-                      doc={doc}
-                      pagina={pagina}
-                      idioma={idioma}
-                      capas={(doc.coverImages ?? []).map((c) => urls[c])}
-                      originaisDasCapas={(doc.coverImages ?? []).map((c) => originais[c])}
-                    />
-                  )}
+                  <PaginaEditorial
+                    pagina={pagina}
+                    doc={doc}
+                    aspetos={aspetos}
+                    capa={fontes.capa}
+                    fotosDoTema={fontes.fotosDoTema}
+                    outras={fontes.outrasDa(i)}
+                  />
                 </div>
               </button>
               <div className="mt-1 flex items-center justify-between gap-2">
@@ -188,7 +176,7 @@ export default function VistaDeConjunto({
                   <span className="block tabular-nums text-foreground/45">
                     Página {i + 1} de {paginas.length}
                   </span>
-                  <span className="block truncate">{pagina.titulo}</span>
+                  <span className="block truncate">{pagina.nome}</span>
                 </p>
                 {vi >= 0 && (
                   <span className="flex shrink-0 gap-0.5">
@@ -218,33 +206,6 @@ export default function VistaDeConjunto({
         })}
       </ul>
     </div>
-  );
-}
-
-/** Uma página de inspiração, desenhada à escala com a geometria do gerador. */
-function Inspiracao({
-  b,
-  urls,
-  originais,
-  aspetos,
-}: {
-  b: ProposalDoc["moodBoards"][number];
-  urls: Record<string, string>;
-  originais: Record<string, string>;
-  aspetos: Record<string, number>;
-}) {
-  const desenho = ordemDasFotos(b).slice(0, MOOD_BOARD_MAX_IMAGES);
-  return (
-    <PreviaDaPagina
-      layout={layoutDoBoard(b)}
-      aspectos={desenho.map((i) => aspetos[b.images[i]] ?? ASPETO_POR_OMISSAO)}
-      urls={desenho.map((i) => urls[b.images[i]])}
-      originais={desenho.map((i) => originais[b.images[i]])}
-      semRecorte={b.enquadramento === "forma-da-foto"}
-      titulo={b.title}
-      subtitulo={b.subtitulo}
-      legenda={b.annotation}
-    />
   );
 }
 
