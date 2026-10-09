@@ -1,77 +1,20 @@
 "use client";
 
-import Link from "next/link";
-import { localizeHref } from "@/lib/i18n";
+import dynamic from "next/dynamic";
 import { useTranslations } from "@/components/LocaleProvider";
 
+/**
+ * O corpo vem a pedido (auditoria externa, P1): o `not-found.tsx` do sítio é
+ * nomeado por TODAS as rotas do grupo, e com ele o corpo do 404 seguia no
+ * JavaScript de cada página — ~5 KB que só são precisos no dia em que alguém
+ * erra um endereço. Com `next/dynamic` o servidor desenha-o na mesma (o HTML
+ * do 404 sai completo), e o browser só o descarrega quando o 404 acontece.
+ */
+const NotFoundConteudo = dynamic(() => import("./NotFoundConteudo"));
+
+/** O 404 desenhado dentro do sítio (com o cromado à volta): lê a língua do
+ *  contexto e desenha o corpo partilhado com o `global-not-found.tsx`. */
 export default function NotFoundView() {
   const { locale, t } = useTranslations();
-  return (
-    <section className="relative min-h-[80vh] flex items-center justify-center px-6 bg-surface overflow-hidden">
-      {/* Soft moss wash so the 404 holds the site's cinematic tier instead of
-          reading as a bare framework default. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(70% 60% at 50% 34%, rgba(99, 122, 95, 0.1), transparent 70%)",
-        }}
-      />
-      <div className="relative max-w-xl text-center">
-        <p
-          className="text-moss/30 font-bold leading-none mb-6 select-none"
-          style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(80px, 16vw, 200px)" }}
-        >
-          404
-        </p>
-        <p className="text-foreground/66 text-[10px] tracking-[0.5em] uppercase mb-5 flex items-center justify-center gap-3">
-          <span className="w-5 h-px bg-moss/50" />
-          {t.errors.notFoundEyebrow}
-        </p>
-        <h1
-          className="text-foreground font-bold leading-tight mb-6"
-          style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(28px, 4vw, 48px)" }}
-        >
-          {t.errors.notFoundTitle}
-        </h1>
-        <p className="text-foreground/68 text-sm leading-[1.8] max-w-md mx-auto mb-12">
-          {t.errors.notFoundText}
-        </p>
-        <div className="flex flex-wrap gap-4 justify-center">
-          <Link
-            href={localizeHref("/", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-all duration-300 text-sm tracking-widest uppercase"
-          >
-            {t.common.voltarInicio} →
-          </Link>
-          <Link
-            href={localizeHref("/contacto", locale)}
-            className="inline-flex items-center gap-3 px-8 py-4 border border-foreground/20 text-foreground/72 font-medium hover:border-foreground/40 hover:text-foreground transition-all duration-300 text-sm tracking-widest uppercase"
-          >
-            {t.common.falarConnosco}
-          </Link>
-        </div>
-
-        {/* Quick links — keep the crawler & visitor moving */}
-        <nav className="mt-14 pt-8 border-t border-foreground/8 flex flex-wrap gap-x-7 gap-y-2 justify-center">
-          {[
-            [t.common.pedirOrcamento, "/orcamento"],
-            [t.nav.servicos, "/servicos"],
-            [t.nav.galeria, "/galeria"],
-            [t.nav.sobre, "/sobre"],
-            [t.nav.clientes, "/clientes"],
-          ].map(([label, href]) => (
-            <Link
-              key={href}
-              href={localizeHref(href, locale)}
-              className="text-foreground/68 hover:text-moss text-xs tracking-[0.2em] uppercase transition-colors"
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-    </section>
-  );
+  return <NotFoundConteudo locale={locale} t={t} />;
 }

@@ -115,6 +115,23 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
            quem lá vive, e não uma lista mantida aqui: um sítio novo acima dos
            modais passa a atributo, não a alteração deste ficheiro. */
         if (sibling.hasAttribute("data-acima-dos-modais")) continue;
+        /* ── O QUE O REACT AINDA NÃO HIDRATOU NÃO SE TOCA ────────────────────
+           Um painel carregado à parte (`next/dynamic`, `lazy`) chega do
+           servidor como HTML e só é hidratado quando o seu código chega. Se o
+           diálogo abre antes disso, marcar esse HTML com `aria-hidden`/`inert`
+           é escrever atributos que o React não pôs — e quando ele hidrata
+           acusa a divergência («A tree hydrated but some attributes… didn't
+           match») e não a corrige. Foi assim que o passeio dos temas ficou
+           vermelho duas vezes no CI: o seletor de mood boards abria no
+           dossier antes de o painel das mensagens estar hidratado.
+
+           O sinal é o dono: um elemento cujo PAI já é do React mas ele ainda
+           não é, está à espera de hidratação. Fica de fora desta vez — o
+           pior que acontece é o leitor de ecrã poder lá chegar durante os
+           instantes em que o painel ainda não existe para o React. Nós que
+           não são do React debaixo de um pai que também não é (o `body`, um
+           script de terceiros) continuam a ser marcados como sempre. */
+        if (ehDoReact(parent) && !ehDoReact(sibling)) continue;
         siblings.push({
           el: sibling,
           ariaHidden: sibling.getAttribute("aria-hidden"),
@@ -164,4 +181,19 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
   }, [active]);
 
   return ref;
+}
+
+/**
+ * O React pendura num nó do DOM, quando o cria ou o hidrata, uma propriedade
+ * `__reactFiber$<sufixo>`. É um pormenor interno, mas estável há várias
+ * versões, e é a única forma de saber de fora se um nó já foi hidratado. Se um
+ * dia deixar de existir, `ehDoReact` passa a dar sempre `false` e a guarda
+ * acima deixa de saltar fosse o que fosse — volta-se ao comportamento antigo,
+ * não a um pior.
+ */
+function ehDoReact(el: Element): boolean {
+  for (const k in el) {
+    if (k.startsWith("__reactFiber$")) return true;
+  }
+  return false;
 }

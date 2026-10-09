@@ -167,15 +167,16 @@ for (const medida of MEDIDAS) {
       expect(r.meu, `no centro da pílula de WhatsApp está ${r.existe ? r.quem : "?"}`).toBe(true);
     });
 
-    test("no centro do CTA fixo está o CTA fixo", async ({ page }) => {
-      // Este só se mostra depois de 75% de um ecrã de scroll — medi-lo no topo
-      // seria medir um elemento que está `opacity-0 pointer-events-none` de
-      // propósito, e passaria (ou falharia) por razões que não são esta.
+    test("o CTA fixo não aparece enquanto o aviso estiver no ecrã", async ({ page }) => {
+      // Antes, o CTA fixo subia para cima da barra e este teste media que nada
+      // o tapava. Desde a auditoria externa (A1) a resposta é outra: enquanto
+      // o aviso pede uma decisão, o «Pedir orçamento» flutuante não aparece —
+      // em computador nunca, no telemóvel só depois de a pessoa escolher
+      // (`e2e/cta-flutuante.spec.ts` mede esse lado). Mede-se depois do scroll
+      // que o faria aparecer.
       await page.evaluate(() => window.scrollTo(0, window.innerHeight * 1.2));
-      await esperarQueApareca(page, CTA_FIXO);
-      const r = await quemEstaNoCentro(page, CTA_FIXO);
-      expect(r.existe, "o CTA fixo não apareceu depois do scroll").toBe(true);
-      expect(r.meu, `no centro do CTA fixo está ${r.existe ? r.quem : "?"}`).toBe(true);
+      await page.waitForTimeout(800);
+      await expect(page.locator(CTA_FIXO)).toBeHidden();
     });
 
     test("e o aviso continua a ver-se, com os dois botões alcançáveis", async ({ page }) => {

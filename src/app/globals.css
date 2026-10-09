@@ -2372,9 +2372,15 @@ body:has([data-cream-page]) [data-public-nav] {
   }
 }
 
-/* ── Smooth scroll ── */
+/* ── Scroll ──
+   SEM `scroll-behavior: smooth` global (auditoria externa, A9). Estava aqui, e
+   fazia de TODO o scroll programático um deslize: o restauro da posição da
+   galeria, a inércia da roda, cada `scrollTo` sem `behavior` — vários sítios
+   tinham de escrever `behavior: "instant"` só para lhe fugir. O rolo suave
+   fica só nos saltos internos, pedido onde acontecem: a âncora `#pedido` das
+   páginas de anúncio (`BarraFixa`) e o «voltar ao topo» da galeria, os dois
+   pela porta de `lib/motion/rolar.ts`, que respeita o movimento reduzido. */
 html {
-  scroll-behavior: smooth;
   /* Anchored sections (e.g. /servicos#empresas) and keyboard-focused elements
      land clear of the fixed navbar (≈140px unscrolled) instead of being hidden
      under it — WCAG 2.4.11 Focus Not Obscured. */
@@ -2494,6 +2500,18 @@ body {
   html:not(.com-javascript) body > footer {
     order: 1;
   }
+}
+
+/* ── E COM JAVASCRIPT, O RODAPÉ ESPERA PELA PÁGINA (auditoria externa, C4) ──
+   O ecrã de espera passou a ficar FIXO por cima (`loading.tsx`) para não
+   empurrar a página quando ela chega. Mas era ele, a ocupar um ecrã inteiro,
+   que mantinha o rodapé lá em baixo: sem ele, o rodapé ficava logo abaixo do
+   menu — tapado, mas «no ecrã» para a medição — e saltava ao chegar o
+   conteúdo. MEDIDO: CLS 0,81 no rodapé. Escondido enquanto o ecrã de espera
+   lá está, ele aparece já no sítio dele, que não conta como salto.
+   Só com JavaScript: sem ele, as regras de cima mostram a página e o rodapé. */
+html.com-javascript body:has(.ecra-de-espera) > footer {
+  display: none;
 }
 
 /* ── Mobile base ── */
@@ -2851,6 +2869,24 @@ body {
   }
 }
 
+/* ── O botão cede ao toque (auditoria externa, A8) ──────────────────────────
+   `scale(.97)` em 100 ms, com a curva da casa, nos botões do sítio público
+   (os que levam a classe `toque`). A transição está SÓ no `:active`: é a regra
+   do estado de chegada que manda na transição, portanto carregar anima e
+   largar volta de imediato — e as transições de cor que cada botão já tem
+   (hover) ficam intactas fora do toque. A opacidade de cima continua no ecrã
+   de toque; vai na mesma lista para esta regra não a cortar.
+   Fora de `@layer` de propósito: um `scale-*` do Tailwind não a desliga.
+   E nada para quem pediu movimento reduzido. */
+@media (prefers-reduced-motion: no-preference) {
+  .toque:active {
+    scale: 0.97;
+    transition:
+      scale var(--transition-duration-carregar) var(--ease-out),
+      opacity 0.06s ease;
+  }
+}
+
 /* ── Film grain overlay ── */
 body::before {
   content: "";
@@ -3195,6 +3231,10 @@ body::before {
 }
 .scroll-chevron {
   animation: scroll-chevron 5s ease-in-out infinite;
+}
+/* Fora do ecrã pára (auditoria externa, A5) — `SetaDeDescer`. */
+.scroll-chevron.seta-parada {
+  animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
   .scroll-chevron {
@@ -4856,6 +4896,14 @@ body:has(.barra-consentimento) {
   }
 }
 
+/* O «Pedir orçamento» flutuante sai enquanto o aviso de cookies estiver no
+   ecrã (auditoria externa, A1): eram duas coisas a pedir uma decisão no mesmo
+   canto. O `:not(.consentimento-decidido)` é para quem já escolheu — a barra
+   ainda fica uns segundos no DOM, escondida, até o React a tirar. */
+html:not(.consentimento-decidido) body:has(.barra-consentimento) .cta-flutuante {
+  display: none;
+}
+
 /* Secções ancoradas ao fundo do primeiro ecrã (o herói da home é `min-h-[100svh]
    flex flex-col justify-end`): o recuo empurra a legenda PARA CIMA dentro da
    mesma caixa, em vez de encolher a fotografia. */
@@ -5386,10 +5434,10 @@ body:has(.barra-consentimento) footer {
      existia. Ninguém reparou porque, com movimento normal, todos parecem bem.
      Há teste a enumerar os que estão mesmo no código e a exigi-los aqui: um
      zoom novo com um número novo põe o `Fluidez.contrato` vermelho. */
-  .group-hover\:scale-\[1\.06\],
-  .group-hover\:scale-\[1\.04\],
-  .group-hover\:scale-\[1\.02\],
-  .group-hover\:scale-105 {
+  /* Desde a auditoria externa (A4) as fotografias do sítio usam todas o mesmo
+     zoom, 1.03 em 400 ms; o 1.02 é o da inspiração da proposta. */
+  .group-hover\:scale-\[1\.03\],
+  .group-hover\:scale-\[1\.02\] {
     scale: none;
     transition: none;
   }

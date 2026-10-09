@@ -44,7 +44,7 @@ const MENU_EASE = EASE_OUT;
  * da secundária, e essas continuam escritas em cada botão.
  */
 const BOTAO_DA_BARRA =
-  "alvo-toque inline-flex items-center justify-center gap-1.5 leading-none " +
+  "toque alvo-toque inline-flex items-center justify-center gap-1.5 leading-none " +
   "border px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase";
 
 const NAV_ORDER = ["/", "/sobre", "/servicos", "/galeria", "/clientes", "/contacto"];
@@ -355,7 +355,7 @@ const MobileMenu = memo(function MobileMenu({
           href={localizeHref("/orcamento", locale)}
           onClick={() => track("CTAClick", { source: "nav-mobile" })}
           // 311×37 px medidos com o menu aberto — a acção principal do menu.
-          className="alvo-toque group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
+          className="toque alvo-toque group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
         >
           <span>{t.nav.pedirOrcamento}</span>
           <span
@@ -416,6 +416,8 @@ export default function Navbar() {
   // passa a CLARA (surface), por isso os links voltam ao tratamento escuro (moss)
   // para ficarem legíveis sobre esse fundo claro.
   const light = (!scrolled && overDarkHero) || isOpen;
+  /** A barra no estado descido: o logótipo compacto (A2). O menu aberto manda. */
+  const compacto = scrolled && !isOpen;
 
   const navTypes = (href: string) => [
     orderIdx(href) >= orderIdx(pathname) ? "nav-forward" : "nav-back",
@@ -533,26 +535,50 @@ export default function Navbar() {
           className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 via-black/15 to-transparent"
         />
       )}
+      {/* O fundo moss da barra com o menu aberto tinha 150 px de altura; a fila
+          passou a ter 76 (ver a nota da fila, abaixo). Esta camada repõe os
+          150 por trás do logótipo, para o conteúdo do menu continuar a passar
+          por baixo sem se ver. */}
+      <div
+        aria-hidden
+        className={`fundo-do-menu pointer-events-none absolute inset-x-0 top-0 h-[calc(150px+env(safe-area-inset-top))] bg-moss-dark transition-opacity duration-500 lg:hidden ${
+          isOpen ? "opacity-100" : "opacity-0"
+        }`}
+      />
       {/* px-12 (not px-16) in the lg→xl band: at exactly 1024px the nav links and
           the right-side actions sat only ~4px apart (nearly touching). The extra
           32px of inner width opens that gap; alignment with page content
           (also lg:px-16) is restored at xl, where there's room. */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 xl:px-16">
+        {/*
+          ── A ALTURA NÃO SE ANIMA (auditoria externa, A2) ─────────────────────
+          Eram três alturas — 164 px em repouso, 76 ao descer, 150 com o menu
+          aberto — e a barra e o logótipo animavam `height`: layout em cada
+          fotograma da transição, numa peça que está em todas as páginas.
+
+          Agora a fila tem SEMPRE 76 px e o desenho é o mesmo de antes, feito só
+          com `translate`, `scale` e `opacity`:
+            · repouso: a fila desce 44 px (o centro fica nos 82 de uma barra de
+              164);
+            · menu aberto: desce 37 px (o centro nos 75 de uma barra de 150); o
+              fundo moss dos 150 px é a camada `fundo-do-menu` aqui em cima;
+            · ao descer: 0.
+          O logótipo troca entre dois (ver a nota junto deles). No computador o
+          de repouso fica no fluxo com a largura de sempre, e ao descer os links
+          fazem por `translate` o caminho que antes faziam por layout quando o
+          logótipo encolhia — metade da diferença de largura, por causa do
+          `justify-between`.
+        */}
         <div
-          className={`relative flex items-center justify-between transition-[height] duration-500 ${
-            // Three bar heights: a taller bar while the mobile menu is OPEN so it
-            // can carry a prominent centred logo (the menu's pt clears it); the
-            // compact 72px bar once the page is scrolled; the full 140px at rest.
-            // The open bar is kept trim (150px) so the menu below has room for
-            // the links + both service cards + the CTA without overflowing.
-            isOpen ? "h-[150px]" : scrolled ? "h-[76px]" : "h-[164px]"
+          className={`relative flex h-[76px] items-center justify-between transition-[translate] duration-500 motion-reduce:transition-none ${
+            isOpen ? "translate-y-[37px]" : scrolled ? "translate-y-0" : "translate-y-[44px]"
           }`}
         >
           {/* Logo: horizontally centred on mobile (absolute, out of flow), and
               in-flow on the left from lg up. */}
           <Link
             href={localizeHref("/", locale)}
-            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0"
+            className="flex items-center shrink-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:relative lg:left-0 lg:top-0 lg:translate-x-0 lg:translate-y-0"
           >
             {/* O logótipo está em `public/` e portanto existe sempre; o que
                 pode faltar é a DERIVADA que o carregador do sítio pede (hoje
@@ -560,13 +586,39 @@ export default function Navbar() {
                 dessa derivada deixa de significar uma marca partida no topo de
                 TODAS as páginas — passa a significar um segundo pedido ao PNG
                 original. */}
+            {/* DOIS logótipos, e não um a crescer (auditoria externa, A2).
+                O de repouso tem as alturas de sempre (128/148, ou 104/120 com
+                o menu aberto) e por isso desenha-se exactamente como antes —
+                incluindo o tecto que o `max-width: 100%` lhe põe num telemóvel
+                estreito, onde ele fica a ~171 px de largura e não a 214. Um
+                `scale` não consegue imitar esse tecto, que depende da largura
+                do ecrã. O compacto tem as alturas da barra descida (52/58).
+                Ao descer, um esbate-se e encolhe e o outro aparece — só
+                `opacity` e `scale`; os estados de chegada são os de sempre.
+                O de abrir o menu continua a ser uma troca de altura, mas sem
+                transição: acontece uma vez, num toque, e não a cada fotograma
+                de scroll. */}
             <SafeImage
               src="/logo-liquen.png"
               alt="Líquen Events"
               width={300}
               height={179}
               priority
-              className={`object-contain w-auto transition-[height] duration-500 ${isOpen ? "h-[104px] sm:h-[120px]" : scrolled ? "h-[52px] sm:h-[58px]" : "h-[128px] sm:h-[148px]"}`}
+              className={`object-contain w-auto lg:origin-left transition-[opacity,scale] duration-500 motion-reduce:transition-none ${
+                isOpen ? "h-[104px] sm:h-[120px]" : "h-[128px] sm:h-[148px]"
+              } ${compacto ? "opacity-0 scale-[calc(52/128)] sm:scale-[calc(58/148)]" : "opacity-100 scale-100"}`}
+            />
+            <SafeImage
+              src="/logo-liquen.png"
+              alt=""
+              aria-hidden
+              width={300}
+              height={179}
+              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-0 lg:translate-x-0 lg:origin-left object-contain w-auto max-w-none h-[52px] sm:h-[58px] transition-[opacity,scale] duration-500 motion-reduce:transition-none ${
+                compacto
+                  ? "opacity-100 scale-100"
+                  : "opacity-0 scale-[calc(128/52)] sm:scale-[calc(148/58)]"
+              }`}
             />
           </Link>
 
@@ -576,7 +628,11 @@ export default function Navbar() {
             {!isOpen && <LanguageToggle light={light} />}
           </div>
 
-          <div className="hidden lg:flex items-center gap-5 xl:gap-9">
+          <div
+            className={`hidden lg:flex items-center gap-5 xl:gap-9 transition-[translate] duration-500 motion-reduce:transition-none ${
+              scrolled ? "-translate-x-[calc((148px-58px)*3747/2238/2)]" : "translate-x-0"
+            }`}
+          >
             {links.map((link) => (
               <Link
                 key={link.href}

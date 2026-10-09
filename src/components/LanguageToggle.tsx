@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LANG_COOKIE, type Locale } from "@/lib/i18n";
+import { LANG_COOKIE, type Locale } from "@/lib/i18n/config";
 import { useTranslations } from "./LocaleProvider";
 
 /**

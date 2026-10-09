@@ -173,7 +173,10 @@ export function Inspector({
       )}
     >
       <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--bo-hairline)] pl-4 pr-1">
-        <h2 id={idTitulo} className="min-w-0 flex-1 truncate font-display text-lg text-[var(--bo-text)]">
+        <h2
+          id={idTitulo}
+          className="min-w-0 flex-1 truncate font-display text-lg text-[var(--bo-text)]"
+        >
           {titulo}
         </h2>
         <button
@@ -183,7 +186,15 @@ export function Inspector({
           aria-label="Fechar"
           className={`alvo-toque flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
+          >
             <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
           </svg>
         </button>

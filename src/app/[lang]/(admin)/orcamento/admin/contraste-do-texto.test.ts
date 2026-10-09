@@ -173,7 +173,9 @@ function lerCor(valor: string, css: string = CSS): { cor: RGB; alpha: number } {
       `o canal ${comCanal[1]}, de onde ${valor} tira a cor, não existe no globals.css`,
     ).not.toBeNull();
     const nums = canal![1].match(/\d+/g);
-    expect(nums?.length, `o canal ${comCanal[1]} não tem três componentes`).toBeGreaterThanOrEqual(3);
+    expect(nums?.length, `o canal ${comCanal[1]} não tem três componentes`).toBeGreaterThanOrEqual(
+      3,
+    );
     const [r, g, b] = nums!.slice(0, 3).map(Number);
     return { cor: [r, g, b], alpha: parseFloat(comCanal[2]) };
   }
@@ -345,9 +347,10 @@ describe("o texto do botão secundário", () => {
     ] as const) {
       const fundo = achatar(tinta8.cor, tinta8.alpha, base);
       const racio = racioDeContraste(achatar(texto.cor, texto.alpha, fundo), fundo);
-      expect(racio, `--bo-text sobre o secundário, no ${nome}: ${racio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
-        AA_TEXTO_NORMAL,
-      );
+      expect(
+        racio,
+        `--bo-text sobre o secundário, no ${nome}: ${racio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(AA_TEXTO_NORMAL);
     }
   });
 

@@ -64,9 +64,7 @@ const COM_MOTIVO: Record<string, string> = {
  * calar seria apagar a história, que é o contrário do que se quer.
  */
 function semComentarios(fonte: string): string {
-  return fonte
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  return fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 const PREFIXO = /(?:^|[\s"`'{])((?:sm|md|lg|xl|2xl):[a-zA-Z0-9._/%[\]()-]+)/g;

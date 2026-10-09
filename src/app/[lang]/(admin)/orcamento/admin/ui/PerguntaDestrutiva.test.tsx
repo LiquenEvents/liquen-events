@@ -104,7 +104,9 @@ describe("a pergunta destrutiva", () => {
     expect(apagar).toHaveClass("bg-[var(--bo-perigo)]");
     expect(cancelar).not.toHaveClass("bg-[var(--bo-perigo)]");
     // «Cancelar» à esquerda: vem primeiro na ordem do documento.
-    expect(cancelar.compareDocumentPosition(apagar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      cancelar.compareDocumentPosition(apagar) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("e só apaga quando se chega ao botão dele", async () => {

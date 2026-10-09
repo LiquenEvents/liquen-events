@@ -3,6 +3,7 @@
 import { waHref } from "@/data";
 import { meta } from "@/lib/meta/enviar";
 import { track } from "@/lib/track";
+import { rolarAteVer } from "@/lib/motion/rolar";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 /**
@@ -62,17 +63,27 @@ export default function BarraFixa({
             meta.contacto({ contexto });
             track("WhatsAppClick", { source: "social", origem: contexto });
           }}
-          className="flex flex-[1.4] items-center justify-center gap-2.5 bg-moss px-4 py-3.5 text-white transition-colors hover:bg-moss-dark"
+          className="toque flex flex-[1.4] items-center justify-center gap-2.5 bg-moss px-4 py-3.5 text-white transition-colors hover:bg-moss-dark"
         >
           <WhatsAppIcon className="h-5 w-5 flex-shrink-0" />
           <span className="text-[12px] font-medium tracking-[0.08em]">{textoWhatsApp}</span>
         </a>
         {/* Uma âncora, não um botão com `scrollIntoView`: funciona antes de
-            qualquer JavaScript correr, e no browser interno isso conta. */}
+            qualquer JavaScript correr, e no browser interno isso conta.
+            Depois de hidratar, o salto é suave (auditoria externa, A9: o
+            `scroll-behavior: smooth` saiu do `html` e fica só nos saltos
+            internos) — e seco para quem pediu movimento reduzido. */}
         <a
           href="#pedido"
-          onClick={() => track("CTAClick", { source: "social-barra", origem: contexto })}
-          className="flex flex-1 items-center justify-center border border-white/60 px-4 py-3.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
+          onClick={(e) => {
+            track("CTAClick", { source: "social-barra", origem: contexto });
+            const alvo = document.getElementById("pedido");
+            if (!alvo) return;
+            e.preventDefault();
+            rolarAteVer(alvo, { block: "start" });
+            history.replaceState(null, "", "#pedido");
+          }}
+          className="toque flex flex-1 items-center justify-center border border-white/60 px-4 py-3.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
         >
           {textoFormulario}
         </a>

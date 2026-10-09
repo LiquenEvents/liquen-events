@@ -92,9 +92,9 @@ export default function WhatsAppButton() {
       // «coloca o wats mais baixo e mais fino»: passa a `piso-flutuante-direita`
       // (1 rem do fundo, e a partir de 640 px sem a reserva do aviso, que lá
       // é um cartão no canto ESQUERDO e não tapa este lado), e a pílula fica
-      // com 32 px de altura no computador (era 46). No telemóvel continua um
+      // com 36 px de altura no computador (era 46). No telemóvel continua um
       // círculo de 44 px, que é o alvo mínimo de um dedo.
-      className={`whatsapp-fixed piso-flutuante-direita alvo-toque fixed z-50 flex items-center justify-center gap-2 p-3 sm:px-4 sm:py-2 bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
+      className={`toque whatsapp-fixed piso-flutuante-direita alvo-toque fixed z-50 flex items-center justify-center gap-2 p-3 sm:px-4 sm:py-2 bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       style={{

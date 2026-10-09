@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { CABECALHO_DA_LINGUA } from "@/lib/lingua-do-pedido";
 
 /**
  * Edge security & i18n proxy (Next.js 16 — formerly middleware).
@@ -123,7 +124,7 @@ export function proxy(req: NextRequest) {
 
   // ── English mirror: already the [lang=en] segment; stick the choice ──
   if (pathname === "/en" || pathname.startsWith("/en/")) {
-    const res = NextResponse.next();
+    const res = NextResponse.next({ request: { headers: comLingua(req, "en") } });
     // Only on real document navigations that don't already carry the cookie —
     // prefetches and background RSC fetches must stay side-effect free so they
     // can't clobber a fresh "pt" the toggle just wrote.
@@ -143,7 +144,21 @@ export function proxy(req: NextRequest) {
   const lang = req.cookies.get(LANG_COOKIE)?.value === "en" ? "en" : "pt";
   const url = req.nextUrl.clone();
   url.pathname = `/${lang}${pathname === "/" ? "" : pathname}`;
-  return NextResponse.rewrite(url);
+  return NextResponse.rewrite(url, { request: { headers: comLingua(req, lang) } });
+}
+
+/**
+ * A língua deste pedido, num cabeçalho, para o `app/global-not-found.tsx`.
+ *
+ * Esse ficheiro serve os endereços que não existem (auditoria externa, S5/C3)
+ * e não recebe parâmetros nenhuns — não vê o `[lang]` do caminho. Sem isto, um
+ * `/en/qualquer-coisa` partido respondia em português. Escreve-se SEMPRE por
+ * cima do que o cliente tenha mandado: o valor é nosso.
+ */
+function comLingua(req: NextRequest, lang: "pt" | "en"): Headers {
+  const h = new Headers(req.headers);
+  h.set(CABECALHO_DA_LINGUA, lang);
+  return h;
 }
 
 export const config = {

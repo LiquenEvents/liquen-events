@@ -10,7 +10,7 @@ import { waHref } from "@/data";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { useTranslations } from "@/components/LocaleProvider";
 import AnimateIn from "@/components/AnimateIn";
-import { fill, localizeHref } from "@/lib/i18n";
+import { fill, localizeHref } from "@/lib/i18n/config";
 import type { Dict } from "@/lib/i18n";
 import { daysUntil, isHighSeason, longDate } from "@/lib/workdays";
 import { track } from "@/lib/track";
@@ -728,7 +728,7 @@ export default function ConfirmacaoClient({
                       quality={70}
                       placeholder="blur"
                       blurDataURL={c.blur}
-                      className="object-cover transition-transform duration-700 ease-expo group-hover:scale-[1.04]"
+                      className="object-cover transition-transform duration-foto-zoom group-hover:scale-[1.03]"
                     />
                     <span
                       aria-hidden

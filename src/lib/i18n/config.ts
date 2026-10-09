@@ -64,3 +64,11 @@ export function localizeHref(href: string, locale: Locale): string {
   if (href === "/en" || href.startsWith("/en/")) return href;
   return href === "/" ? "/en" : `/en${href}`;
 }
+
+/**
+ * Fill `{token}` placeholders in a dictionary string.
+ * Unknown tokens collapse to "" rather than leaking `{foo}` into the UI.
+ */
+export function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => values[k] ?? "");
+}

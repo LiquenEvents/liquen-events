@@ -268,7 +268,10 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
       }}
     >
       <div className="flex flex-col gap-3">
-        <p className="text-[12.5px] leading-relaxed text-white/85">
+        {/* `text-white` e não `/85` (auditoria externa, C5): o aviso tem de
+            ficar acima dos 4,5:1 sobre qualquer página por trás, e o branco
+            inteiro dá folga sobre o verde translúcido do cartão. */}
+        <p className="text-[12.5px] leading-relaxed text-white">
           {t.text}{" "}
           <Link
             href={localizeHref("/privacidade", locale)}
@@ -289,14 +292,14 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
           <button
             type="button"
             onClick={() => choose(false)}
-            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-sage-800"
+            className="toque alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-sage-800"
           >
             {t.decline}
           </button>
           <button
             type="button"
             onClick={() => choose(true)}
-            className="alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-sage-800"
+            className="toque alvo-toque rounded-full border border-white/55 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-sage-800"
           >
             {t.accept}
           </button>

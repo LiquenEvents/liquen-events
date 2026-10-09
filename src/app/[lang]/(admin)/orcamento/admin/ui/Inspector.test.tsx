@@ -18,7 +18,11 @@ import { SAIDA_MS } from "./saida";
 function simularAparelho(largura: number, menosMovimento = false) {
   vi.stubGlobal("matchMedia", (mq: string): MediaQueryList => {
     const min = /min-width:\s*(\d+)px/.exec(mq);
-    const matches = min ? largura >= Number(min[1]) : mq.includes("reduce") ? menosMovimento : false;
+    const matches = min
+      ? largura >= Number(min[1])
+      : mq.includes("reduce")
+        ? menosMovimento
+        : false;
     return {
       matches,
       media: mq,
@@ -39,7 +43,13 @@ afterEach(() => {
 });
 
 /** Quem tem o estado. O botão de fora é o que tinha o foco antes de abrir. */
-function Anfitriao({ inicial = false, comCampo = false }: { inicial?: boolean; comCampo?: boolean }) {
+function Anfitriao({
+  inicial = false,
+  comCampo = false,
+}: {
+  inicial?: boolean;
+  comCampo?: boolean;
+}) {
   const [aberto, setAberto] = useState(inicial);
   return (
     <>
@@ -64,7 +74,11 @@ describe("a partir de lg, é uma coluna", () => {
     simularAparelho(1440);
     render(<Anfitriao inicial />);
     const painel = screen.getByRole("complementary", { name: "Só para ti" });
-    expect(painel).toHaveClass("w-80", "bg-[var(--bo-elevado)]", "shadow-[var(--bo-sombra-suspensa)]");
+    expect(painel).toHaveClass(
+      "w-80",
+      "bg-[var(--bo-elevado)]",
+      "shadow-[var(--bo-sombra-suspensa)]",
+    );
     expect(painel.className).not.toMatch(/backdrop|bo-material|bo-vidro/);
     expect(screen.queryByRole("dialog")).toBeNull();
     // Antes de montar a largura não se sabe; quem esconde a coluna no

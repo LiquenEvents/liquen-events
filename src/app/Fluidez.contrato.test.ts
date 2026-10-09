@@ -104,6 +104,12 @@ const eLayout = (prop: string) => {
  * As excepções. Cada uma tem de trazer a razão — e as duas primeiras têm os
  * números do cabeçalho por trás. Acrescentar uma linha aqui é uma decisão
  * consciente, que é exactamente o que se pretende.
+ *
+ * ACTUALIZAÇÃO — SAIU (auditoria externa, A2). A auditoria pediu-o por nome:
+ * «manter a altura fixa e animar só transform e opacity». A barra passou a
+ * uma fila de 76 px que desce por `translate`, com dois logótipos que trocam
+ * por `opacity` e `scale` (ver a nota no Navbar.tsx). A excepção deixou de
+ * existir e saiu da lista abaixo — a rede passa a apanhar quem a puser de volta.
  */
 const PERDOADAS_NO_CSS = new Set<string>([
   // `.field-line` desenha o filete de foco do formulário de orçamento com
@@ -129,9 +135,6 @@ const PERDOADAS_NA_CROMAGEM = new Map<string, string[]>([
   [
     "src/components/Navbar.tsx",
     [
-      // Medida: 58 das 76 passagens de layout por travessia. Ver o cabeçalho —
-      // fica por decisão, não por distracção.
-      "transition-[height]",
       // Só correm ao abrir/fechar o menu mobile (o hambúrguer a virar cruz, o
       // filete do item activo a crescer). Nunca durante o scroll.
       "transition-all",
@@ -428,7 +431,9 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
       ".link-line::after",
       ".lift",
       ".field-line",
-      ".group-hover\\:scale-\\[1\\.06\\]",
+      // Era o 1.06; desde a auditoria externa (A4) o zoom das fotografias do
+      // sítio é um só, 1.03.
+      ".group-hover\\:scale-\\[1\\.03\\]",
       ":focus-visible",
     ]) {
       expect(dentroDeReduce, `${seletor} sem guarda de movimento reduzido`).toContain(seletor);
@@ -456,7 +461,9 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
       for (const m of fonte.matchAll(/group-hover:scale-(\[[^\]]+\]|\d+)/g)) usados.add(m[0]);
     }
     // Não passa por vacuidade: se o extractor deixar de ver nada, isto avisa.
-    expect(usados.size, "o varredor deixou de encontrar zooms de hover").toBeGreaterThan(2);
+    // (Eram mais de dois números; desde a auditoria externa, A4, as fotografias
+    // do sítio usam todas o 1.03, e sobra o 1.02 da proposta.)
+    expect(usados.size, "o varredor deixou de encontrar zooms de hover").toBeGreaterThan(0);
 
     const dentroDeReduce = blocosDe(
       css,
@@ -585,13 +592,14 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
     // o que for e os três testes acima passarem sobre listas vazias.
     expect(propriedadesDeTransicao(css).length).toBeGreaterThan(15);
     expect(propriedadesDeKeyframes(css).length).toBeGreaterThan(15);
-    // E o classificador tem de reconhecer o que já lá está: a excepção medida da
-    // barra de navegação continua a ser detectada como animação de layout.
+    // E o classificador tem de reconhecer uma animação de layout quando a vê.
+    // (A excepção que aqui se usava como prova — o `transition-[height]` da
+    // barra de navegação — saiu com a auditoria externa, A2.)
     expect(eLayout("height")).toBe(true);
     expect(eLayout("all")).toBe(true);
     expect(eLayout("transform")).toBe(false);
     expect(eLayout("opacity")).toBe(false);
     const navbar = readFileSync(join(RAIZ, "src/components/Navbar.tsx"), "utf8");
-    expect(navbar).toContain("transition-[height]");
+    expect(navbar).not.toContain("transition-[height]");
   });
 });

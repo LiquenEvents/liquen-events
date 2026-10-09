@@ -84,9 +84,9 @@ export default function StickyCTA() {
       // um anel de foco a 0% de opacidade. inert remove-o da ordem de Tab e da
       // árvore de acessibilidade até ficar visível.
       inert={!show}
-      // Shown on every breakpoint: on mobile it's the only persistent path to
-      // the quote form (the navbar auto-hides on scroll-down). It sits bottom-
-      // LEFT, so it never collides with the bottom-right WhatsApp pill.
+      // On mobile it's the only persistent path to the quote form (the navbar
+      // auto-hides on scroll-down). It sits bottom-LEFT, so it never collides
+      // with the bottom-right WhatsApp pill.
       //
       // `motion-reduce`: a entrada é um transform (16 px a subir em 500 ms) e
       // não uma mudança de cor. Este é um dos dois elementos que estão em
@@ -101,7 +101,15 @@ export default function StickyCTA() {
       // só, que lhe soma a reserva e vale o mesmo de sempre quando não há
       // aviso. Nada de `bottom-*` ao lado destas classes: a regra à mão vive
       // fora de `@layer` e ganharia em silêncio (CamadasCss.contrato.test.ts).
-      className={`piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
+      //
+      // `lg:hidden` e `cta-flutuante` (auditoria externa, A1): havia quatro
+      // chamadas à acção ao mesmo tempo — o «Pedir orçamento» da barra, este,
+      // o WhatsApp e o aviso de cookies. Em computador a barra de navegação
+      // está sempre lá com o mesmo botão, e este sai. No telemóvel fica (a
+      // barra esconde-se ao descer), aparece depois do primeiro ecrã, e
+      // esconde-se enquanto o aviso de cookies estiver no ecrã — a regra está
+      // em globals.css, junto de `.piso-flutuante`.
+      className={`cta-flutuante lg:hidden piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
@@ -125,7 +133,7 @@ export default function StickyCTA() {
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="alvo-toque group flex items-center gap-2 sm:gap-3 rounded-full px-4 py-2.5 sm:px-6 sm:py-3 bg-sage-700/85 backdrop-blur-md backdrop-saturate-150 border border-white/20 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)] hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
+        className="toque alvo-toque group flex items-center gap-2 sm:gap-3 rounded-full px-4 py-2.5 sm:px-6 sm:py-3 bg-sage-700/85 backdrop-blur-md backdrop-saturate-150 border border-white/20 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)] hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
         <span className="text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.28em] uppercase text-white/90 group-hover:text-sage-800 transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}

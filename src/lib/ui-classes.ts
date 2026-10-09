@@ -12,8 +12,9 @@
 // that change on hover here are the gap (gap-3→gap-5, the icon drift) and the
 // background (bg-moss→bg-moss-dark). Naming them keeps the identical animation
 // while sparing the browser from evaluating every animatable property each hover.
+// `toque`: o botão cede ao carregar (globals.css, auditoria externa A8).
 const PRIMARY_BUTTON_BASE =
-  "inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-[gap,background-color] duration-300 text-[11px] tracking-[0.3em] uppercase disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3";
+  "toque inline-flex items-center gap-3 px-9 py-4 btn-shine bg-moss text-white font-medium hover:bg-moss-dark hover:gap-5 transition-[gap,background-color] duration-300 text-[11px] tracking-[0.3em] uppercase disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:gap-3";
 
 // On light / cream sections (form submits, service-intro CTA): soft moss lift.
 export const PRIMARY_BUTTON_CLASS = `${PRIMARY_BUTTON_BASE} shadow-lg shadow-moss/15`;
@@ -32,4 +33,4 @@ export const PRIMARY_BUTTON_DARK_CLASS = `${PRIMARY_BUTTON_BASE} shadow-xl shado
 // and border colours — identical look, no whole-property-set evaluation.
 // `ease-expo` (globals.css) is SpaceX's signature cubic-bezier(0.19,1,0.22,1).
 export const OUTLINE_LIGHT_BUTTON_CLASS =
-  "inline-flex items-center gap-3 px-8 py-3.5 border border-white/70 text-white text-[11px] tracking-[0.3em] uppercase hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 ease-expo focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80";
+  "toque inline-flex items-center gap-3 px-8 py-3.5 border border-white/70 text-white text-[11px] tracking-[0.3em] uppercase hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 ease-expo focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80";

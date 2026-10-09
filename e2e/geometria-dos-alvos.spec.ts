@@ -406,9 +406,11 @@ test.describe("D3 · alvos de 13 px", () => {
          `getBoundingClientRect` lê o rectângulo TRANSFORMADO, e medido a meio
          dava 44 × 0,97 ≈ 43 — um alvo que, parado, tem os seus 44. Espera-se
          que as animações do menu acabem, e só depois se mede o que fica. */
-      await page.getByRole("menu").evaluate((menu) =>
-        Promise.all(menu.getAnimations({ subtree: true }).map((a) => a.finished)),
-      );
+      await page
+        .getByRole("menu")
+        .evaluate((menu) =>
+          Promise.all(menu.getAnimations({ subtree: true }).map((a) => a.finished)),
+        );
 
       const alvos = await page.evaluate(() =>
         [

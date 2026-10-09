@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getDictionary, type Locale } from "@/lib/i18n";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -91,7 +90,13 @@ function naoNavega(e: MouseEvent): boolean {
   return false;
 }
 
-export function AvisoDeCarregamento({ locale }: { locale: Locale }) {
+/**
+ * `rotulo` chega já traduzido do `CromadoDoSitio` (servidor), em vez de esta
+ * peça chamar `getDictionary` — auditoria externa, P1: essa chamada punha os
+ * DOIS dicionários inteiros (PT e EN, ~51 KB) no JavaScript de todas as
+ * páginas do sítio, para ler uma frase.
+ */
+export function AvisoDeCarregamento({ rotulo }: { rotulo: string }) {
   const caminho = usePathname();
   const [aCaminho, setACaminho] = useState(false);
 
@@ -140,8 +145,6 @@ export function AvisoDeCarregamento({ locale }: { locale: Locale }) {
 
   if (!aCaminho) return null;
 
-  const t = getDictionary(locale).common;
-
   return (
     <div
       className="a-caminho"
@@ -164,7 +167,7 @@ export function AvisoDeCarregamento({ locale }: { locale: Locale }) {
         className="a-caminho__logo"
         priority
       />
-      <span className="sr-only">{t.aAbrir}</span>
+      <span className="sr-only">{rotulo}</span>
     </div>
   );
 }
