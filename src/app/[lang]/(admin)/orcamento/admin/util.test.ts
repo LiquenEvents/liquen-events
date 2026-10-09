@@ -318,3 +318,20 @@ describe("module boundary (client-safe)", () => {
     expect(src).toMatch(/from\s+["']@\/lib\/money["']/);
   });
 });
+
+describe("diasDesde / diasEntreDias", () => {
+  it("contam entre DIAS: o mesmo dia dá zero, seja a que hora for", async () => {
+    const { diasDesde, diasEntreDias } = await import("./util");
+    expect(diasDesde("2026-10-09T00:05:00", "2026-10-09")).toBe(0);
+    expect(diasDesde("2026-10-09T23:55:00", "2026-10-09")).toBe(0);
+    expect(diasDesde("2026-10-07T23:55:00", "2026-10-09")).toBe(2);
+    expect(diasEntreDias("2026-10-09", "2026-10-23")).toBe(14);
+    expect(diasEntreDias("2026-10-09", "2026-10-08")).toBe(-1);
+  });
+
+  it("atravessam a mudança da hora sem perder um dia", async () => {
+    const { diasEntreDias } = await import("./util");
+    expect(diasEntreDias("2026-10-24", "2026-10-26")).toBe(2);
+    expect(diasEntreDias("2026-03-28", "2026-03-30")).toBe(2);
+  });
+});

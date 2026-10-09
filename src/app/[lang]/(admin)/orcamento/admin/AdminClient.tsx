@@ -91,7 +91,7 @@ import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravac
 import BotaoGuardarTudo from "./GuardarTudo";
 import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
-import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
+import { diasDesde, eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -792,7 +792,7 @@ const QuoteCard = memo(function QuoteCard({
       : null;
   // Lead parado: status ativo sem atividade há 14+ dias
   const lastActivity = q.lastUpdated ?? q.submittedAt;
-  const daysSince = Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86400000);
+  const daysSince = diasDesde(lastActivity, todayStr);
   const isStale =
     (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
     daysSince >= 14;

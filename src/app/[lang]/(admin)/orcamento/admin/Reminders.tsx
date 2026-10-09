@@ -5,7 +5,7 @@ import type { Quote, Task } from "@/lib/orcamento/types";
 import { eur0 } from "@/lib/money";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { Card } from "./ui";
-import { todayKey } from "./util";
+import { diasDesde, diasEntreDias, todayKey } from "./util";
 import { useCachedList } from "./useCachedList";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
@@ -16,8 +16,6 @@ interface Reminder {
   sub: string;
   quote?: Quote;
 }
-
-const DAY = 86400000;
 
 interface Props {
   quotes: Quote[];
@@ -33,7 +31,9 @@ export default function Reminders({ quotes, onOpen }: Props) {
   const { data: tasks = [] } = useCachedList<Task[]>("tarefas", "/api/tarefas");
 
   const reminders = useMemo(() => {
-    const now = Date.now();
+    // Tudo se conta entre DIAS a partir do `today`, e não do relógio: o
+    // `Date.now()` lido aqui mudava de valor à hora de cada pedido, não à
+    // meia-noite (`util.ts`, `diasDesde`).
     // O dia LOCAL, nunca o de `toISOString()` (que é UTC): à meia-noite e meia
     // de Verão em Portugal a data UTC ainda é a de ONTEM, e daí saía um evento
     // de hoje dado como passado e um seguimento de hoje anunciado «em atraso».
@@ -44,7 +44,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
     for (const q of quotes) {
       // Upcoming events (next 14 days)
       if (q.date && q.date >= today) {
-        const days = Math.round((new Date(q.date + "T12:00:00").getTime() - now) / DAY);
+        const days = diasEntreDias(today, q.date);
         if (days <= 14) {
           list.push({
             kind: "evento",
@@ -82,7 +82,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
         const total = contractedAmounts(q).gross;
         const paid = (q.payments ?? []).filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
         if (total > 0 && paid < total - 1) {
-          const eventSoon = q.date && (new Date(q.date + "T12:00:00").getTime() - now) / DAY < 14;
+          const eventSoon = q.date && diasEntreDias(today, q.date) < 14;
           list.push({
             kind: "pagamento",
             urgent: !!eventSoon,
@@ -94,7 +94,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
       }
       // Stale pending requests (>2 days, no reply)
       if (q.status === "pendente") {
-        const age = (now - new Date(q.submittedAt).getTime()) / DAY;
+        const age = diasDesde(q.submittedAt, today);
         if (age >= 2 && !(q.messages && q.messages.length)) {
           list.push({
             kind: "pedido",
@@ -124,7 +124,7 @@ export default function Reminders({ quotes, onOpen }: Props) {
       // Sent proposals going cold: quoted 4+ days ago, no follow-up date set,
       // still undecided → nudge to chase before the lead loses interest.
       if (q.status === "cotado" && !q.followUpAt) {
-        const since = (now - new Date(q.lastUpdated ?? q.submittedAt).getTime()) / DAY;
+        const since = diasDesde(q.lastUpdated ?? q.submittedAt, today);
         if (since >= 4) {
           list.push({
             kind: "seguimento",

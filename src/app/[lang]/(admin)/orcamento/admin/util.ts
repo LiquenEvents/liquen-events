@@ -17,6 +17,32 @@ export function todayKey(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+/** A chave do dia LOCAL de um instante («aaaa-mm-dd»), como o `todayKey`. */
+export function chaveDoDia(instante: string | number | Date): string {
+  const d = new Date(instante);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Quantos dias passaram desde um instante até ao dia `hoje` — contados entre
+ * DIAS e não entre instantes.
+ *
+ * `floor((Date.now() − instante) / dia)` mudava de valor à hora a que cada
+ * pedido tinha entrado, e não à meia-noite; e lido no desenho (o
+ * `react-hooks/purity` apanhava-o em cinco sítios) dava um valor diferente a
+ * cada desenho e desfazia os `memo()`. Com o `hoje` vindo de fora, o mesmo dia
+ * dá sempre o mesmo número.
+ */
+export function diasDesde(instante: string, hoje: string = todayKey()): number {
+  return diasEntreDias(chaveDoDia(instante), hoje);
+}
+
+/** Dias de um dia «aaaa-mm-dd» a outro (negativo se `ate` vem antes). */
+export function diasEntreDias(de: string, ate: string): number {
+  return Math.round((Date.parse(`${ate}T12:00:00`) - Date.parse(`${de}T12:00:00`)) / 86400000);
+}
+
 /**
  * Parse money typed by a pt-PT hand into a number of euros.
  *
