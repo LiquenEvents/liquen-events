@@ -150,6 +150,10 @@ export default function Escolhas({ escolhas, escolhido, fotos, token, textos, em
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ escolhaId: escolha.id, opcaoId: opcao.id }),
+        // A9-007: sem prazo, uma rede que pendura deixava o botão em «a
+        // enviar» para sempre. Ao fim de 15 s dá-se por falhado, e o casal
+        // tem o «Tentar outra vez».
+        signal: AbortSignal.timeout?.(15_000),
       });
       if (!res.ok) throw new Error(String(res.status));
       setEstados((e) => ({ ...e, [escolha.id]: "seguiu" }));

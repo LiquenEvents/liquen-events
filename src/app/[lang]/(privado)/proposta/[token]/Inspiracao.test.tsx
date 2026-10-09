@@ -454,6 +454,22 @@ describe("quando as assinaturas morrem", () => {
       ).toBe("mini/a-nova"),
     );
   });
+
+  it("quando o servidor não serve, di-lo — em vez de não acontecer nada (A9-008)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })),
+    );
+    desenhar();
+    const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    fireEvent.error(cel());
+    fireEvent.error(cel());
+    fireEvent.error(cel());
+    fireEvent.click(screen.getByRole("button", { name: T.recarregarFotos }));
+    await waitFor(() => expect(screen.getByText(T.recarregarFalhou)).toBeTruthy());
+    // E o botão continua lá, para tentar outra vez.
+    expect(screen.getByRole("button", { name: T.recarregarFotos })).toBeTruthy();
+  });
 });
 
 /**
@@ -861,7 +877,10 @@ describe("a fotografia move-se enquanto passa", () => {
    * cada uma medida num Chromium verdadeiro. Nenhuma é de gosto.
    */
   const CSS = readFileSync("src/app/globals.css", "utf8");
-  const BLOCO = CSS.slice(CSS.indexOf("A FOTOGRAFIA MOVE-SE ENQUANTO PASSA"), CSS.indexOf("[data-sobe=\"respiro\"]"));
+  const BLOCO = CSS.slice(
+    CSS.indexOf("A FOTOGRAFIA MOVE-SE ENQUANTO PASSA"),
+    CSS.indexOf('[data-sobe="respiro"]'),
+  );
 
   it("a linha de tempo nasce na MOLDURA, e não na fotografia", () => {
     /**
@@ -941,12 +960,17 @@ describe("a capa mede-se pela página, e não pela sua travessia", () => {
    *     deriva ........... 5,48 px
    */
   const CSS = readFileSync("src/app/globals.css", "utf8");
-  const BLOCO = CSS.slice(CSS.indexOf("A FOTOGRAFIA MOVE-SE ENQUANTO PASSA"), CSS.indexOf("[data-sobe=\"respiro\"]"));
+  const BLOCO = CSS.slice(
+    CSS.indexOf("A FOTOGRAFIA MOVE-SE ENQUANTO PASSA"),
+    CSS.indexOf('[data-sobe="respiro"]'),
+  );
 
   it("a capa tem a linha de tempo da página; as do meio do documento a sua", () => {
     const capa = /\.foto-deriva--topo \{([^}]*)\}/.exec(BLOCO)?.[1] ?? "";
     expect(capa, "a capa ficou sem linha de tempo própria").toContain("scroll(root block)");
-    expect(capa, "a capa deixou de arrancar no princípio da página").toMatch(/animation-range:\s*0 100vh/);
+    expect(capa, "a capa deixou de arrancar no princípio da página").toMatch(
+      /animation-range:\s*0 100vh/,
+    );
     expect(BLOCO, "as fotografias do meio deixaram de se medir pela sua travessia").toMatch(
       /\.foto-deriva \{[^}]*animation-timeline:\s*--foto-passa/,
     );

@@ -517,18 +517,26 @@ export default function Inspiracao({
    * recarregar a página inteira e voltar a pagar tudo. Pede-se a rota, que
    * reassina o que está NAQUELE documento — nunca se lhe manda um caminho.
    */
+  // A9-008: uma resposta que não servia (`!r.ok`, sem fotos) saía calada — o
+  // casal carregava, nada mudava, e não sabia se tinha resultado. Agora diz.
+  const [recarregarFalhou, setRecarregarFalhou] = useState(false);
   const recarregar = useCallback(async () => {
     setARecarregar(true);
+    setRecarregarFalhou(false);
     try {
       const r = await fetch(`/api/proposta/${encodeURIComponent(token)}/fotos`, {
         cache: "no-store",
+        signal: AbortSignal.timeout?.(20_000),
       });
-      if (!r.ok) return;
-      const corpo = (await r.json()) as { fotos?: FotoDaProposta[] };
-      if (!corpo.fotos) return;
+      const corpo = r.ok ? ((await r.json()) as { fotos?: FotoDaProposta[] }) : null;
+      if (!corpo?.fotos) {
+        setRecarregarFalhou(true);
+        return;
+      }
       setFotos(Object.fromEntries(corpo.fotos.map((f) => [f.id, f])));
     } catch {
-      /* sem rede — fica o que está, e o botão continua lá */
+      // Sem rede: fica o que está, o botão continua lá, e diz-se.
+      setRecarregarFalhou(true);
     } finally {
       setARecarregar(false);
     }
@@ -819,6 +827,11 @@ export default function Inspiracao({
           >
             {textos.recarregarFotos}
           </button>
+          {recarregarFalhou && (
+            <span role="status" className="mt-2 block text-[11px] text-foreground/70">
+              {textos.recarregarFalhou}
+            </span>
+          )}
         </p>
       )}
 

@@ -360,4 +360,12 @@ describe("as fotografias das opções têm degrau do meio", () => {
     fireEvent.error(img);
     expect(img.getAttribute("src")).toBe("https://cdn/o1-1200");
   });
+
+  describe("o envio de uma escolha tem prazo (A9-007)", () => {
+    it("o pedido leva um sinal de tempo limite, para não ficar «a enviar» para sempre", async () => {
+      const { readFileSync } = await import("node:fs");
+      const fonte = readFileSync("src/app/[lang]/(privado)/proposta/[token]/Escolhas.tsx", "utf8");
+      expect(fonte).toContain("signal: AbortSignal.timeout?.(15_000)");
+    });
+  });
 });
