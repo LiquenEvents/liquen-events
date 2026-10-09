@@ -801,11 +801,12 @@ export default function Fornecedores() {
                         // O MESMO 309×16 do telefone aqui em cima, e a mesma
                         // correcção: o irmão foi tratado e este ficou para
                         // trás, na mesma coluna e à distância de um dedo.
-                        // `truncate` fica — os emails destes fornecedores
-                        // passam da largura da coluna.
-                        className={`alvo-toque !justify-start text-foreground/45 hover:text-sage-600 truncate ${ESTADO} ${PRESSAO}`}
+                        // O corte passou para um filho: os emails destes
+                        // fornecedores passam da largura da coluna, e num
+                        // `inline-flex` o `truncate` no próprio link é inerte.
+                        className={`alvo-toque !justify-start min-w-0 text-foreground/45 hover:text-sage-600 ${ESTADO} ${PRESSAO}`}
                       >
-                        {s.email}
+                        <span className="min-w-0 truncate">{s.email}</span>
                       </a>
                     )}
                     {s.location && <span className="text-foreground/30">{s.location}</span>}

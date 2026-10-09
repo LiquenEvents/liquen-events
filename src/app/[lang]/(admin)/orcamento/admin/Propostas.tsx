@@ -916,7 +916,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                       <button
                         type="button"
                         onClick={() => handleOpenQuote(pedido)}
-                        className={`alvo-toque min-w-0 flex-1 text-left ${ESTADO} ${PRESSAO}`}
+                        className={`alvo-toque block min-w-0 flex-1 text-left ${ESTADO} ${PRESSAO}`}
                       >
                         {resumo}
                       </button>

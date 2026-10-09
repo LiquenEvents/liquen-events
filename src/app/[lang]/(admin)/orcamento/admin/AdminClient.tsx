@@ -7660,9 +7660,12 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`mailto:${selected.email}`}
-                                className={`alvo-toque !justify-start truncate text-xs text-sage-600 hover:underline ${ESTADO} ${PRESSAO}`}
+                                className={`alvo-toque !justify-start min-w-0 text-xs text-sage-600 hover:underline ${ESTADO} ${PRESSAO}`}
                               >
-                                {selected.email}
+                                {/* O corte vive num filho: num `inline-flex` (o
+                                    que o `alvo-toque` faz do link no dedo) o
+                                    `truncate` no próprio link é inerte. */}
+                                <span className="min-w-0 truncate">{selected.email}</span>
                               </a>
                               <button
                                 onClick={() => {

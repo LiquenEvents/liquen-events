@@ -1062,7 +1062,7 @@ function LinhaDeGuiao({
       onClick={aoAbrir}
       aria-label={nome}
       aria-current={activo ? "true" : undefined}
-      className={`alvo-toque w-full rounded-[var(--bo-raio-conteudo)] border p-3 text-left ${ESTADO} ${PRESSAO} ${
+      className={`alvo-toque block w-full rounded-[var(--bo-raio-conteudo)] border p-3 text-left ${ESTADO} ${PRESSAO} ${
         activo
           ? "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)]"
           : "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:bg-[var(--bo-tinta-3)]"
