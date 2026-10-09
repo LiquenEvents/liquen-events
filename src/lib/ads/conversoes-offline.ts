@@ -1,6 +1,7 @@
 import type { Quote, Proposal } from "@/lib/orcamento/types";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { desserializar, JANELA_MS, type ParametroClique } from "./click-id";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -46,7 +47,7 @@ import { desserializar, JANELA_MS, type ParametroClique } from "./click-id";
 export const NOME_CONVERSAO = "Casamento fechado";
 
 /** Fuso horário declarado no cabeçalho do ficheiro. */
-export const FUSO = "Europe/Lisbon";
+export const FUSO = FUSO_DO_ESTUDIO;
 
 export interface LinhaConversao {
   /** O identificador em cru. */

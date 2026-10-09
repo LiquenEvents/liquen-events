@@ -8,6 +8,7 @@ import {
   FOTOGRAFIAS_DA_ENTRADA,
   type FotografiaDaEntrada,
 } from "@/data/fotografias-da-entrada";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -162,7 +163,7 @@ const CHAO_DO_FORMULARIO = "linear-gradient(180deg, #ffffff 0%, #f4f5f3 100%)";
  * texto a trocar debaixo dos olhos. Com o fuso escrito à mão, os dois lados
  * fazem a MESMA conta a partir do mesmo instante.
  */
-const FUSO = "Europe/Lisbon";
+const FUSO = FUSO_DO_ESTUDIO;
 
 const HORA_EM_LISBOA = new Intl.DateTimeFormat("en-GB", {
   timeZone: FUSO,

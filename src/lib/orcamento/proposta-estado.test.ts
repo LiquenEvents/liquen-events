@@ -53,9 +53,16 @@ describe("dias até uma data", () => {
   it("a hora do dia não muda a contagem", () => {
     // Meia-noite e onze da noite do mesmo dia têm de dar o mesmo número, senão
     // o painel muda de ordem ao longo do dia sem nada ter mudado.
+    // O MESMO dia em Portugal: 01:05 e 23:30 de 1 de junho (hora de Verão).
     const cedo = new Date("2026-06-01T00:05:00Z");
-    const tarde = new Date("2026-06-01T23:55:00Z");
+    const tarde = new Date("2026-06-01T22:30:00Z");
     expect(diasAte("2026-06-10", cedo)).toBe(diasAte("2026-06-10", tarde));
+  });
+
+  it("conta a partir do dia de PORTUGAL, e não do de Greenwich (A8-013)", () => {
+    // 23:30 UTC de 1 de junho já é 00:30 de 2 de junho em Lisboa.
+    expect(diasAte("2026-06-10", new Date("2026-06-01T23:30:00Z"))).toBe(8);
+    expect(diasAte("2026-06-10", new Date("2026-06-01T12:00:00Z"))).toBe(9);
   });
 });
 

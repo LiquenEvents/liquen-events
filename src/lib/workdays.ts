@@ -1,4 +1,5 @@
 import type { Locale } from "./i18n/config";
+import { hojeNoEstudio } from "@/lib/fuso";
 
 /**
  * Date helpers shared by the confirmation page and the confirmation email.
@@ -31,7 +32,9 @@ export function daysUntil(iso: string, from: Date): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
   const [y, m, d] = iso.split("-").map(Number);
   const target = Date.UTC(y, m - 1, d);
-  const today = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  // O dia de Portugal, e não o da máquina que corre isto (A8-017).
+  const [hy, hm, hd] = hojeNoEstudio(from).split("-").map(Number);
+  const today = Date.UTC(hy, hm - 1, hd);
   const diff = Math.round((target - today) / 86_400_000);
   return diff > 0 ? diff : null;
 }

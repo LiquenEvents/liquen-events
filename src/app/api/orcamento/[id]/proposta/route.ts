@@ -30,6 +30,7 @@ import { log } from "@/lib/logger";
  * escrevem para o mesmo pedido.
  */
 import { eur, eurDocumento, round2 } from "@/lib/money";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 export const runtime = "nodejs";
 /** O POST desenha o PDF da proposta e ainda fala com o SMTP com o anexo
@@ -343,7 +344,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         day: "numeric",
         month: "long",
         year: "numeric",
-        timeZone: "Europe/Lisbon",
+        timeZone: FUSO_DO_ESTUDIO,
       });
 
     const email = escrito

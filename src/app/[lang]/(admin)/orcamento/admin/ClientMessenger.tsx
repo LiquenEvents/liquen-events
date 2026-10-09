@@ -14,6 +14,7 @@ import { Button, Field } from "./ui";
  * mesma distinção — senão regista «enviada» sobre uma que ninguém recebeu.
  */
 import type { EnvioDaMensagem } from "./envio-da-mensagem";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 export type { EnvioDaMensagem } from "./envio-da-mensagem";
 
 interface Props {
@@ -144,7 +145,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
                 {new Date(m.at).toLocaleString("pt-PT", {
                   // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
                   // diferentes entre a meia-noite e a uma — erro de hidratação.
-                  timeZone: "Europe/Lisbon",
+                  timeZone: FUSO_DO_ESTUDIO,
                   day: "numeric",
                   month: "short",
                   hour: "2-digit",

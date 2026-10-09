@@ -8,6 +8,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 import { gerarLoteDeDerivadas } from "@/lib/derivadas";
 import { eur0 as eur } from "@/lib/money";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export const maxDuration = 60;
  * Nem local (`setHours`) nem UTC, portanto: o fuso do negócio, pelo nome, como
  * já se faz no `EntradaComFotografia` e nas conversões do Ads.
  */
-const FUSO = "Europe/Lisbon";
+const FUSO = FUSO_DO_ESTUDIO;
 const DIA_EM_LISBOA = new Intl.DateTimeFormat("en-CA", {
   timeZone: FUSO,
   year: "numeric",
