@@ -82,9 +82,14 @@ describe("a pergunta de eliminar um tema", () => {
     );
   });
 
-  it("o que se perde é uma lista, e cobre os três casos da contagem", () => {
+  /* Era «o que se perde é uma lista». Na Fase 2 (T3) a pergunta passou a
+     dizer os NÚMEROS em frases — «Desaparecem N fotografias.», «Está em M
+     propostas…» — e a lista com uma linha só deixou de fazer falta; o
+     comportamento está medido no `Temas.test.tsx` (`fraseDeEliminar`). O que
+     esta guarda continua a prender são os três casos da contagem. */
+  it("o que se perde diz o número, e cobre os três casos da contagem", () => {
     const codigo = semComentarios(FONTE);
-    expect(codigo, "a lista do que se perde desapareceu").toContain("oQueSePerde=");
+    expect(codigo, "as frases do que se perde desapareceram").toContain("fraseDeEliminar(");
     // Pasta ilegível, contagem truncada, pasta vazia: as três leituras que a
     // frase antiga já tinha de aguentar.
     expect(codigo, "o caso da pasta ilegível perdeu-se").toContain("imageCount === null");

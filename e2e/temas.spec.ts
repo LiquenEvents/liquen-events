@@ -225,7 +225,9 @@ test.describe("Biblioteca de Temas", () => {
 
       // ── 3. Abri-lo, e ler o estado das fotos sem mentir ───────────────
       await card.click();
-      await expect(page.getByRole("button", { name: /Eliminar tema/i })).toBeVisible();
+      // O sinal de que a pasta abriu: o botão de carregar fotos do cabeçalho.
+      // (Era o «Eliminar tema», que saiu do cabeçalho para o «⋯» — T3.)
+      await expect(page.getByRole("button", { name: "Adicionar fotos" })).toBeVisible();
 
       // Which of the two truths applies is decided by the route itself, not by
       // guessing at the environment: `ok: false` means "a pasta não pôde ser

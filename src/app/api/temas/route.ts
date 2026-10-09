@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { lqipsDeCaminhos } from "@/lib/biblioteca-fotos-store";
+import { lqipsECoresDeCaminhos } from "@/lib/biblioteca-fotos-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { listThemes, createTheme } from "@/lib/themes-store";
 import {
@@ -231,6 +231,10 @@ function respostaDeAvaria(a: Avaria): NextResponse {
  */
 const ORCAMENTO_DO_STORAGE_MS = 8000;
 
+/** Quantas fotografias da ordem manual concorrem à capa por omissão — ver
+ *  «SEM CAPA ESCOLHIDA, A CAPA É A PRIMEIRA DA GRELHA», no GET. */
+const CANDIDATAS_DA_ORDEM = 3;
+
 async function comOrcamento<T>(
   trabalho: Promise<T>,
   ms: number,
@@ -285,7 +289,9 @@ function semAssinatura(url: string | undefined): string {
  * "500+"); o número exato vive no ecrã do tema, que pagina.
  *
  * A capa é a ESCOLHIDA (`coverPath`) e, se não houver — ou se a escolhida já
- * tiver sido apagada e não puder ser assinada —, a foto mais recente.
+ * tiver sido apagada e não puder ser assinada —, a primeira da grelha: a
+ * primeira da ordem manual, quando o tema foi arrumado à mão, e a foto mais
+ * recente quando não foi.
  *
  * Uma pasta ilegível não derruba a lista nem se disfarça de "0 fotos": esse
  * tema aparece com `imageCount: null` (o cartão mostra "Fotos indisponíveis")
@@ -342,6 +348,29 @@ export async function GET(request: NextRequest) {
     );
     /**
      * ════════════════════════════════════════════════════════════════════
+     * SEM CAPA ESCOLHIDA, A CAPA É A PRIMEIRA DA GRELHA
+     * ════════════════════════════════════════════════════════════════════
+     *
+     * «Por defeito a primeira» (T1). Era sempre a mais RECENTE — e num tema
+     * arrumado à mão (`photoOrder`) a primeira da grelha é outra: o cartão
+     * mostrava uma fotografia e, ao abrir a pasta, trocava para a primeira
+     * da ordem (é essa que a pasta dá ao cartão, ver `capa-do-cartao.ts`).
+     *
+     * A ordem já vem na linha do tema, que esta rota leu lá em cima — não
+     * custa ida nenhuma. As candidatas entram na MESMA assinatura em bloco, e
+     * a escolhida é a primeira cujo original se deixou assinar, que é a
+     * regra da pasta (`listThemeImagePage` deixa cair o que não assina).
+     * Só as primeiras `CANDIDATAS_DA_ORDEM`: uma ordem pode ter centenas de
+     * caminhos, e uma capa não precisa delas; se as três primeiras tiverem
+     * desaparecido todas, fica a mais recente, como antes.
+     */
+    const daOrdem = themes.map((t) =>
+      (t.photoOrder ?? [])
+        .filter((p) => isThemePath(p) && p.startsWith(`${themeFolder(t.id)}/`))
+        .slice(0, CANDIDATAS_DA_ORDEM),
+    );
+    /**
+     * ════════════════════════════════════════════════════════════════════
      * UMA FOTOGRAFIA POR CARTÃO — e o que isso poupa
      * ════════════════════════════════════════════════════════════════════
      *
@@ -382,7 +411,7 @@ export async function GET(request: NextRequest) {
      * as fotos anteriores às derivadas não têm miniatura nenhuma, e um cartão
      * vazio seria pior do que um cartão pesado. É plano B, não caminho.
      */
-    const todos = [...new Set([...chosen, ...newest].filter(Boolean))];
+    const todos = [...new Set([...chosen, ...daOrdem.flat(), ...newest].filter(Boolean))];
     const vazio = () => new Map<string, string>();
     /* ── E OS BORRÕES, NO MESMO FÔLEGO ────────────────────────────────────
        «Placeholder blur por foto — acaba o ecrã de cartões cinzentos.»
@@ -395,8 +424,17 @@ export async function GET(request: NextRequest) {
 
        Os `lqip` lêem-se por PASTA e a chave é o caminho REAL, sem o prefixo
        `tema:` que só existe dentro de um documento. Aqui os caminhos já são os
-       reais — vêm da listagem da pasta. */
-    const [urls, thumbs, avifs, lqips] = await comOrcamento(
+       reais — vêm da listagem da pasta.
+
+       ── E A COR, NA MESMA LEITURA ────────────────────────────────────────
+       «Nunca um cartão vazio» (T1 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`): o
+       cartão pinta o lugar da capa com a cor dominante dela enquanto a
+       fotografia não chega — e quando não chega de todo. A cor vive na mesma
+       linha do borrão, e por isso vem na mesma consulta
+       (`lqipsECoresDeCaminhos`), dentro do mesmo orçamento: estourado o
+       tempo, o cartão fica sem cor e cai no esqueleto cinzento, nunca num
+       erro. */
+    const [urls, thumbs, avifs, { lqips, cores }] = await comOrcamento(
       Promise.all([
         signThemePaths(todos),
         signThemeThumbs(todos),
@@ -404,10 +442,10 @@ export async function GET(request: NextRequest) {
         // e é isso que a torna segura: um `<source>` que dá 404 não faz o
         // navegador recuar para o `<img>`. Ver `signThemeAvif`.
         signThemeAvif(todos),
-        lqipsDeCaminhos(todos),
+        lqipsECoresDeCaminhos(todos),
       ]),
       limite - Date.now(),
-      [vazio(), vazio(), vazio(), vazio()],
+      [vazio(), vazio(), vazio(), { lqips: vazio(), cores: vazio() }],
       "assinatura das capas",
     );
     /** O melhor que existe para a capa do cartão (~128 px). */
@@ -417,10 +455,13 @@ export async function GET(request: NextRequest) {
       const { names, ok, truncated } = listings[i];
       // O caminho da capa, antes de se escolher que TAMANHO servir: é preciso
       // para poder mandar também o original como plano B.
-      const capa = paraCapa(chosen[i]) ? chosen[i] : newest[i];
+      const capa = paraCapa(chosen[i])
+        ? chosen[i]
+        : (daOrdem[i].find((p) => urls.has(p)) ?? newest[i]);
       const coverUrl = paraCapa(capa);
       const coverFallbackUrl = capa ? urls.get(capa) : undefined;
       const coverLqip = capa ? lqips.get(capa) : undefined;
+      const coverCor = capa ? cores.get(capa) : undefined;
       // Só se oferece o AVIF do tamanho que se está a servir: um AVIF de 400 px
       // proposto ao lado de uma micro de 96 seria mandar buscar dezassete vezes
       // os pixéis, com um cabeçalho a dizer que era uma poupança.
@@ -432,6 +473,7 @@ export async function GET(request: NextRequest) {
         coverUrl,
         ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
         ...(coverLqip ? { coverLqip } : {}),
+        ...(coverCor ? { coverCor } : {}),
         ...(coverAvif ? { coverAvif } : {}),
       };
     });

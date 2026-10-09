@@ -400,6 +400,15 @@ test.describe("D3 · alvos de 13 px", () => {
         .first()
         .click();
       await expect(page.getByRole("menuitem", { name: "Editar tarefa" })).toBeVisible();
+      /* ── MEDE-SE O MENU PARADO, NÃO A MEIO DA ENTRADA ──────────────────────
+         O «⋯» passou a entrar com a mola da casa (`.bo-entrada-menu`, Fase 2):
+         cresce de `--bo-escala-chegada` (0,97) até 1 em 325 ms. O
+         `getBoundingClientRect` lê o rectângulo TRANSFORMADO, e medido a meio
+         dava 44 × 0,97 ≈ 43 — um alvo que, parado, tem os seus 44. Espera-se
+         que as animações do menu acabem, e só depois se mede o que fica. */
+      await page.getByRole("menu").evaluate((menu) =>
+        Promise.all(menu.getAnimations({ subtree: true }).map((a) => a.finished)),
+      );
 
       const alvos = await page.evaluate(() =>
         [

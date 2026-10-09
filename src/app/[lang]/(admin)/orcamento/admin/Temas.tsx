@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
+import type { ThemeCopyMode, ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import PhotoLightbox from "./PhotoLightbox";
 import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
 import FundirTemas, { type ThemeMergeOutcome } from "./FundirTemas";
@@ -29,15 +29,18 @@ import {
   EmptyState,
   Field,
   MenuDeAccoes,
+  emGrupos,
   PerguntaDestrutiva,
   Toolbar,
   type AccaoDeItem,
   Escolha,
+  EsqueletoDeCor,
   Glass,
 } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { capaDaFoto, comCapa, type CapaDoCartao } from "./capa-do-cartao";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { useSaidaDeUmSo } from "./ui/saida";
 import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
@@ -199,6 +202,103 @@ const FolderIcon = (
     <path d="m6 17 3.5-3 3 2.5L16 13l3 4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+/* ── OS ÍCONES DO MENU DO TEMA ───────────────────────────────────────────
+   «Dentro de um grupo, ou todos têm ícone ou nenhum tem» (Parte 9.7). O menu
+   já os tinha todos; os quatro itens novos da Fase 2 vêm no mesmo traço
+   (15 px, 1,7) para os grupos não ficarem mistos. */
+const svgDoMenu = (filhos: React.ReactNode) => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {filhos}
+  </svg>
+);
+const ICONE_ABRIR = svgDoMenu(
+  <>
+    <path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
+    <path d="M13 19h7m0 0-3-3m3 3-3 3" />
+    <path d="M20 14v-1M4 6v10a2 2 0 0 0 2 2h4" />
+  </>,
+);
+/** Uma fotografia com um «+». */
+const ICONE_ADICIONAR = svgDoMenu(
+  <>
+    <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" />
+    <path d="m4 16 4.5-4 3.5 3 2.5-2 5.5 4.5" />
+    <path d="M19 2v6M16 5h6" />
+  </>,
+);
+/** Um lápis. */
+const ICONE_RENOMEAR = svgDoMenu(
+  <>
+    <path d="M14.5 5.5 18.5 9.5" />
+    <path d="M4 20l1-4.5L16 4.5a2.1 2.1 0 0 1 3 0l.5.5a2.1 2.1 0 0 1 0 3L8.5 19 4 20Z" />
+  </>,
+);
+/** Uma fotografia com a estrela da capa. */
+const ICONE_CAPA = svgDoMenu(
+  <>
+    <rect x="3.5" y="5" width="17" height="14" rx="2" />
+    <path d="m12 8.6 1.1 2.2 2.4.3-1.8 1.7.5 2.4-2.2-1.2-2.2 1.2.5-2.4-1.8-1.7 2.4-.3Z" />
+  </>,
+);
+
+/**
+ * O que a pergunta de eliminar um tema diz, com os números.
+ *
+ * As FOTOGRAFIAS: a contagem pode ser desconhecida (pasta ilegível —
+ * `imageCount === null`), um mínimo (`truncated`, «500+») ou zero (a pasta
+ * está vazia), e as três versões têm de fazer sentido.
+ *
+ * As PROPOSTAS: `propostas` é o número que o cartão mostra (`usos`, sem os
+ * rascunhos). Com zero não há nada a dizer; sem número (a contagem ainda não
+ * chegou, ou falhou) fica a frase de antes, que continua verdadeira: ao
+ * eliminar, o servidor copia para cada proposta as fotos que ela usa
+ * (`theme-materializar.ts`), e é por isso que elas não mudam.
+ */
+export function fraseDeEliminar(
+  t: Pick<ThemeSummary, "imageCount" | "truncated">,
+  propostas: number | null,
+): { fotos: string; propostas: string | null } {
+  const n = t.imageCount;
+  const fotos =
+    t.imageCount === null
+      ? "Desaparecem as fotografias que estiverem lá dentro."
+      : n === 0
+        ? "A pasta está vazia: não desaparece nenhuma fotografia."
+        : n === 1 && !t.truncated
+          ? "Desaparece 1 fotografia."
+          : `Desaparecem ${n}${t.truncated ? "+" : ""} fotografias.`;
+  const frasePropostas =
+    propostas === null
+      ? "As propostas já feitas com estas fotos não são afectadas."
+      : propostas === 0
+        ? null
+        : propostas === 1
+          ? "Está em 1 proposta — essa guarda as fotos que usa e não muda."
+          : `Está em ${propostas} propostas — essas guardam as fotos que usam e não mudam.`;
+  return { fotos, propostas: frasePropostas };
+}
+
+/** A tecla que pede o menu de contexto: a tecla de menu, ou Shift+F10. */
+function teclaDeMenu(e: React.KeyboardEvent): boolean {
+  return e.key === "ContextMenu" || (e.shiftKey && e.key === "F10");
+}
+
+/** Um pedido do menu do tema que só a PASTA sabe servir — ver `pedirAPasta`. */
+interface PedidoAPasta {
+  temaId: string;
+  accao: "adicionar" | "renomear" | "capa";
+}
 
 const SearchIcon = (
   <svg
@@ -552,6 +652,20 @@ export const GRELHA_DE_FOTOS =
  * completo. Datas futuras (relógios trocados) contam como hoje, em vez de
  * dizerem "há -2 dias".
  */
+/**
+ * Quando foi mexido, como se diz — até um mês. Depois disso, a data.
+ *
+ * Ponto 13 da auditoria do `docs/APPLE-TEMAS.md`: «mantém o relativo e
+ * acrescenta `title` com a data completa; a partir de 30 dias mostra a data».
+ * «Há 2 meses» já não responde à pergunta de trabalho («foi antes ou depois do
+ * casamento dos Ferreira?»), e dois temas com «há 1 ano» podem estar onze
+ * meses afastados. Abaixo dos 30 dias o relativo é mais preciso do que a data
+ * de relance; a partir daí é ao contrário.
+ *
+ * A data vai no formato da casa, `DD/MM/AAAA` (Parte 9.6 do sistema de
+ * design), e não por extenso: está no fim de uma linha que trunca, e a
+ * versão longa continua no `title` (`dataPorExtenso`).
+ */
 export function desdeQuando(iso: string | undefined, agora = Date.now()): string {
   if (!iso) return "";
   const t = Date.parse(iso);
@@ -560,10 +674,11 @@ export function desdeQuando(iso: string | undefined, agora = Date.now()): string
   if (dias <= 0) return "hoje";
   if (dias === 1) return "ontem";
   if (dias < 30) return `há ${dias} dias`;
-  const meses = Math.floor(dias / 30);
-  if (meses < 12) return `há ${meses} ${meses === 1 ? "mês" : "meses"}`;
-  const anos = Math.floor(meses / 12);
-  return `há ${anos} ${anos === 1 ? "ano" : "anos"}`;
+  return new Date(t).toLocaleDateString("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -1064,145 +1179,215 @@ export default function Temas() {
   );
 
   /**
-   * As acções de um cartão de tema, como DADOS — a forma é de quem as desenha.
+   * ── OS PEDIDOS QUE SÓ A PASTA SABE SERVIR ──────────────────────────────
    *
-   * Estão aqui para que os dois ícones do computador e os dois itens do menu
-   * «⋯» do dedo não possam divergir: é a MESMA lista, e nenhum dos dois
-   * desenhos pode ganhar uma acção que o outro não tenha.
+   * «Adicionar fotografias…», «Renomear…» e «Definir capa…» estão no menu do
+   * tema (no cartão e no cabeçalho da pasta), mas quem os sabe fazer é a
+   * PASTA: é lá que estão o seletor de ficheiros, o campo do nome e a grelha
+   * onde se escolhe a capa. O menu abre a pasta (perguntando, como as outras
+   * portas, se houver um lote a subir noutra) e deixa um pedido — um objecto
+   * novo a cada vez, que é o que distingue dois pedidos iguais seguidos. A
+   * pasta serve-o e avisa (`pedidoServido`), e o pedido sai daqui, para não
+   * ser servido outra vez quando a pasta voltar a montar.
+   */
+  const [pedidoAPasta, setPedidoAPasta] = useState<PedidoAPasta | null>(null);
+  const pedirAPasta = useCallback(
+    (t: ThemeSummary, accao: PedidoAPasta["accao"]) => {
+      if (t.id !== openId && !podeTrocarDeTema()) return;
+      setOpenId(t.id);
+      setPedidoAPasta({ temaId: t.id, accao });
+    },
+    [openId, podeTrocarDeTema],
+  );
+  const pedidoServido = useCallback(
+    (servido: PedidoAPasta) => setPedidoAPasta((p) => (p === servido ? null : p)),
+    [],
+  );
+
+  /**
+   * As acções de um tema, como DADOS — a forma é de quem as desenha.
+   *
+   * A MESMA lista no «⋯» do cartão, no botão direito e no «⋯» do cabeçalho da
+   * pasta: nenhum dos três pode ganhar uma acção que os outros não tenham.
+   *
+   * ── PELA ORDEM DO DOCUMENTO ─────────────────────────────────────────────
+   * Parte 3 do `docs/APPLE-TEMAS.md`: «Abrir · Pré-visualizar — separador —
+   * Adicionar fotografias… · Renomear… · Definir capa… — separador —
+   * Favorito · Arquivar — separador — Eliminar tema… (vermelho)».
+   *
+   * «Juntar a outro tema…» não está no documento e fica, no grupo de
+   * arrumação, antes do destrutivo: é o ÚNICO caminho geral para fundir dois
+   * temas (o aviso de nomes parecidos só cobre pares parecidos).
+   *
+   * ── OITO ITENS EM TRÊS GRUPOS, DECISÃO DELA ──────────────────────────────
+   * Com «Juntar…» o menu chegava a nove itens em quatro grupos, acima do que a
+   * Apple aconselha (cinco a oito, no máximo três grupos), e no telemóvel,
+   * aberto para cima, escondia o «Abrir» debaixo do cabeçalho. Perguntado, ela
+   * respondeu «podes» a encurtar: sai «Pré-visualizar» (dentro da pasta a
+   * barra de espaço continua a abrir a fotografia em grande) e o «Abrir» junta-
+   * se ao grupo do que se faz ao tema. Ficam: Abrir · Adicionar fotografias… ·
+   * Renomear… · Definir capa… | Favorito · Arquivar · Juntar a outro tema… |
+   * Eliminar tema…
+   *
+   * Itens que não servem escondem-se em vez de se esbaterem (Parte 9.8):
+   * «Definir capa…» numa pasta vazia, e «Abrir» dentro da própria pasta
+   * (`naPasta`). Os filetes vão no primeiro item que ficou de cada grupo
+   * (`emGrupos`).
    */
   const accoesDoTema = useCallback(
-    (t: ThemeSummary): AccaoDeItem[] => [
-      /* ── «ABRIR» É O PRIMEIRO ITEM, E EXISTE MESMO SENDO ÓBVIO ──────────
-         «Incluir só os comandos mais prováveis» e «tudo o que está no menu de
-         contexto existe também na interface principal». [APPLE] O caminho
-         normal para abrir um tema é carregar no cartão; num menu aberto com o
-         botão direito EM CIMA do cartão, não haver «Abrir» obriga a fechar o
-         menu para fazer o gesto mais provável de todos. */
-      {
-        id: "abrir",
-        rotulo: "Abrir",
-        icone: (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
-            <path d="M13 19h7m0 0-3-3m3 3-3 3" />
-            <path d="M20 14v-1M4 6v10a2 2 0 0 0 2 2h4" />
-          </svg>
-        ),
-        onAccao: () => setOpenId(t.id),
-      },
-      {
-        id: "favorito",
-        rotulo: t.favorito ? "Desafixar" : "Fixar no topo",
-        icone: (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill={t.favorito ? "currentColor" : "none"}
-            stroke="currentColor"
-            strokeWidth="1.7"
-            aria-hidden="true"
-          >
-            <path
-              d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ),
-        onAccao: () => alternarMarca(t, "favorito"),
-      },
-      {
-        id: "arquivar",
-        rotulo: t.arquivado ? "Repor na lista" : "Arquivar",
-        icone: (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            aria-hidden="true"
-          >
-            {t.arquivado ? (
-              <path d="M12 19V7m0 0-4 4m4-4 4 4M4 4h16" strokeLinecap="round" />
-            ) : (
-              <>
-                <path d="M4 8h16v11H4z" strokeLinejoin="round" />
-                <path d="M3 4h18v4H3zM10 12h4" strokeLinecap="round" />
-              </>
-            )}
-          </svg>
-        ),
-        onAccao: () => alternarMarca(t, "arquivado"),
-      },
-      {
-        id: "fundir",
-        rotulo: "Juntar a outro tema…",
-        icone: (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            {/* Dois caminhos que se encontram num só — o desenho do que a acção
-                faz, e não uma pasta com uma seta (que é o que já significa
-                arquivar, aqui mesmo por cima). */}
-            <path d="M4 4c0 6 4 8 8 8s8 2 8 8" />
-            <path d="M20 4c0 6-4 8-8 8" />
-            <path d="m17 17 3 3-3 3" />
-          </svg>
-        ),
-        onAccao: () => setAFundir(t),
-      },
-      /* ── A DESTRUTIVA FICA NO FIM, A VERMELHO E COM O NOME DO QUE SE PERDE
-         Ponto 20 da auditoria: «"Eliminar tema" é um link de texto ao lado do
-         botão primário» — uma acção destrutiva com o peso de um link comum e
-         encostada à acção principal. Passa para aqui, marcada como destrutiva:
-         o `MenuDeAccoes` (e o menu do botão direito) põem-na a vermelho,
-         depois de um filete, e a pergunta que se segue diz o nome do tema e
-         quantas fotografias se perdem — a `perguntaDeEliminar`, que já existia
-         e já dizia as duas coisas. */
-      {
-        id: "eliminar",
-        rotulo: "Eliminar tema…",
-        destrutiva: true,
-        icone: (
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 7h16M10 11v6M14 11v6" />
-            <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-          </svg>
-        ),
-        onAccao: () => setAEliminar(t),
-      },
-    ],
-    [alternarMarca],
+    (t: ThemeSummary, { naPasta = false }: { naPasta?: boolean } = {}): AccaoDeItem[] => {
+      const temFotos = t.imageCount !== 0;
+      return emGrupos(
+        [
+          /* ── «ABRIR» É O PRIMEIRO ITEM, E EXISTE MESMO SENDO ÓBVIO ──────
+             «Incluir só os comandos mais prováveis» e «tudo o que está no
+             menu de contexto existe também na interface principal». [APPLE]
+             Num menu aberto com o botão direito EM CIMA do cartão, não haver
+             «Abrir» obrigava a fechar o menu para fazer o gesto mais
+             provável de todos. Dentro da pasta não faz sentido. */
+          ...(naPasta
+            ? []
+            : [
+                {
+                  id: "abrir",
+                  rotulo: "Abrir",
+                  icone: ICONE_ABRIR,
+                  onAccao: () => {
+                    if (podeTrocarDeTema()) setOpenId(t.id);
+                  },
+                },
+              ]),
+          {
+            id: "adicionar",
+            rotulo: "Adicionar fotografias…",
+            icone: ICONE_ADICIONAR,
+            onAccao: () => pedirAPasta(t, "adicionar"),
+          },
+          {
+            id: "renomear",
+            rotulo: "Renomear…",
+            icone: ICONE_RENOMEAR,
+            onAccao: () => pedirAPasta(t, "renomear"),
+          },
+          ...(temFotos
+            ? [
+                {
+                  id: "capa",
+                  rotulo: "Definir capa…",
+                  icone: ICONE_CAPA,
+                  onAccao: () => pedirAPasta(t, "capa"),
+                },
+              ]
+            : []),
+        ],
+        [
+          /* Um item comutável, com rótulo que diz o que FAZ (Parte 9.7). A
+             palavra é a do âmbito «Favoritos» da barra de filtros. */
+          {
+            id: "favorito",
+            rotulo: t.favorito ? "Tirar dos favoritos" : "Favorito",
+            icone: (
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill={t.favorito ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="1.7"
+                aria-hidden="true"
+              >
+                <path
+                  d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ),
+            onAccao: () => alternarMarca(t, "favorito"),
+          },
+          {
+            id: "arquivar",
+            rotulo: t.arquivado ? "Repor na lista" : "Arquivar",
+            icone: (
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                aria-hidden="true"
+              >
+                {t.arquivado ? (
+                  <path d="M12 19V7m0 0-4 4m4-4 4 4M4 4h16" strokeLinecap="round" />
+                ) : (
+                  <>
+                    <path d="M4 8h16v11H4z" strokeLinejoin="round" />
+                    <path d="M3 4h18v4H3zM10 12h4" strokeLinecap="round" />
+                  </>
+                )}
+              </svg>
+            ),
+            onAccao: () => alternarMarca(t, "arquivado"),
+          },
+          {
+            id: "fundir",
+            rotulo: "Juntar a outro tema…",
+            icone: (
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {/* Dois caminhos que se encontram num só — o desenho do que a
+                    acção faz, e não uma pasta com uma seta (que é o que já
+                    significa arquivar, aqui mesmo por cima). */}
+                <path d="M4 4c0 6 4 8 8 8s8 2 8 8" />
+                <path d="M20 4c0 6-4 8-8 8" />
+                <path d="m17 17 3 3-3 3" />
+              </svg>
+            ),
+            onAccao: () => setAFundir(t),
+          },
+        ],
+        [
+          /* ── A DESTRUTIVA FICA NO FIM, A VERMELHO E COM O CUSTO ───────────
+             Ponto 20 da auditoria e T3 do `PROPOSTAS-E-TEMAS-APPLE.md`:
+             «Eliminar tema» só no menu «…». O `MenuDeAccoes` (e o menu do
+             botão direito) põem-na a vermelho, depois de um filete, e a
+             pergunta que se segue diz o nome do tema e o que se perde — a
+             `perguntaDeEliminar`. */
+          {
+            id: "eliminar",
+            rotulo: "Eliminar tema…",
+            destrutiva: true,
+            icone: (
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 7h16M10 11v6M14 11v6" />
+                <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+              </svg>
+            ),
+            onAccao: () => setAEliminar(t),
+          },
+        ],
+      );
+    },
+    [alternarMarca, pedirAPasta, podeTrocarDeTema],
   );
   // Filtrar fora da tecla: com poucos temas é imperceptível, e mantém o campo
   // instantâneo quando a lista cresce (é o mesmo padrão do Inventário).
@@ -1363,20 +1548,16 @@ export default function Temas() {
   /** Mantém o cartão do tema a par do que a pasta diz. A pasta é a fonte de
    *  verdade: a contagem passa a ser a que o servidor devolveu (e `truncated`
    *  com ela), e um `imageCount` que estava a `null` fica finalmente conhecido.
-   *  `coverUrl` a `undefined` quer dizer "não se sabe" — o cartão fica como
-   *  está; a `null` quer dizer "a pasta está vazia". */
+   *  `capa` a `undefined` quer dizer "não se sabe" — o cartão fica como está;
+   *  a `null` quer dizer "a pasta está vazia". Os campos da capa mudam todos
+   *  juntos — ver `comCapa`. */
   const syncCard = useCallback((id: string, s: FolderState) => {
     setThemes((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              imageCount: s.total,
-              truncated: s.truncated,
-              coverUrl: s.coverUrl === undefined ? t.coverUrl : (s.coverUrl ?? undefined),
-            }
-          : t,
-      ),
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const contado = { ...t, imageCount: s.total, truncated: s.truncated };
+        return s.capa === undefined ? contado : comCapa(contado, capaDaFoto(s.capa));
+      }),
     );
   }, []);
 
@@ -1581,30 +1762,35 @@ export default function Temas() {
    * da lista como de dentro da pasta aberta, e esse ramo devolve outro
    * componente. Sem isto, a pergunta pedida lá dentro não tinha onde aparecer.
    *
-   * O que se perde vai numa LISTA e não espremido no meio de uma frase — é
-   * para isso que a `oQueSePerde` existe. A contagem de fotos pode ser
-   * desconhecida (pasta ilegível) ou um mínimo (contagem truncada), e as três
-   * versões têm de fazer sentido.
+   * ── COM OS NÚMEROS, E NÃO COM UMA PROMESSA GERAL ──────────────────────
+   * T3 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`: «uma confirmação que diz
+   * quantas fotos e propostas são afectadas». Dizia «as propostas já feitas
+   * com estas fotos não são afectadas» — verdade, mas sem número nenhum. Passa
+   * a dizer quantas fotografias desaparecem e em quantas propostas o tema
+   * está, e porque é que essas não mudam. As frases vêm do `fraseDeEliminar`;
+   * só a última, a irreversível, vai a vermelho.
    */
+  const frasesDeEliminar = aEliminar
+    ? fraseDeEliminar(aEliminar, usos ? (usos[aEliminar.id] ?? 0) : null)
+    : null;
   const perguntaDeEliminar = (
     <PerguntaDestrutiva
       aberto={!!aEliminar}
       onFechar={() => setAEliminar(null)}
       titulo={`Eliminar o tema «${aEliminar?.name ?? ""}»?`}
-      oQueSePerde={
-        aEliminar
-          ? [
-              aEliminar.imageCount === null
-                ? "As fotografias que estiverem lá dentro"
-                : aEliminar.imageCount > 0
-                  ? `${aEliminar.imageCount}${aEliminar.truncated ? "+" : ""} ${
-                      aEliminar.imageCount === 1 ? "fotografia" : "fotografias"
-                    }`
-                  : "A pasta, que está vazia",
-            ]
-          : []
+      aviso={
+        frasesDeEliminar && (
+          <>
+            <span className="block text-[var(--bo-text)]">{frasesDeEliminar.fotos}</span>
+            {frasesDeEliminar.propostas && (
+              <span className="mt-1 block text-[var(--bo-tinta-72)]">
+                {frasesDeEliminar.propostas}
+              </span>
+            )}
+            <span className="mt-3 block">Esta acção não pode ser anulada.</span>
+          </>
+        )
       }
-      aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
       rotuloConfirmar="Eliminar o tema"
       onConfirmar={() => {
         const t = aEliminar;
@@ -1700,15 +1886,17 @@ export default function Temas() {
                   .sort((a, b) => a.name.localeCompare(b.name, "pt")),
               )
             }
-            onCover={(coverPath, coverUrl) =>
+            onCover={(coverPath, capa) =>
               setThemes((prev) =>
-                prev.map((t) => (t.id === open.id ? { ...t, coverPath, coverUrl } : t)),
+                prev.map((t) => (t.id === open.id ? { ...comCapa(t, capa), coverPath } : t)),
               )
             }
-            onDelete={() => setAEliminar(open)}
+            accoes={accoesDoTema(open, { naPasta: true })}
             aoArrastar={setAArrastar}
             aoSubir={setASubirFotos}
             pedidoDeMover={pedidoDeMover}
+            pedidoAPasta={pedidoAPasta}
+            aoServirPedido={pedidoServido}
           />
         </div>
         {perguntaDeEliminar}
@@ -1785,20 +1973,61 @@ export default function Temas() {
 
              `basis-72 grow-0` no campo: a largura decide-se pela fila onde ele
              está, não pela janela, e a `Toolbar` já é `flex flex-wrap`. A 375 px
-             a fila parte-se e o estado desce para baixo do campo sozinho. */
-          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
+             a fila parte-se e o estado desce para baixo do campo sozinho.
+
+             E `w-72`, não `w-full`. MEDIDO num browser a 1440: com `w-full`, o
+             Chrome contava o campo pela largura natural do `input` (~245 px)
+             ao medir a fila, e depois desenhava-o com os 288 do `basis-72` —
+             a fila ficava 43 px mais curta do que o que lá cabia, e o estado
+             caía para baixo do campo com toda a largura da janela livre ao
+             lado. Com a largura dita, a fila mede 437 e o estado fica ao lado,
+             na mesma linha dos 40 px dos controlos da direita.
+
+             ── UMA ALTURA SÓ NA BARRA INTEIRA: 40 px ───────────────────────
+             Ponto 5 da auditoria: o campo «alinhado na mesma linha e na mesma
+             baseline dos outros controlos». CONTADO pelas classes, com rato
+             (não medido num browser): campo 42 px (`py-2.5` + `text-sm` +
+             fio), ordenação 34 a 38 (duas cadeias de `py` na mesma classe),
+             tamanho dos cartões 34, «⋯» 36, «Novo tema» 32 — cinco
+             controlos, quatro ou cinco alturas. Passam todos a `h-10`, que é
+             o degrau `md` do `ui/Button` (`h-10 pointer-coarse:h-11`) e o
+             tamanho por omissão da casa. Os 32 do `sm` seriam o outro degrau que existe,
+             e ficaram de fora por uma razão que ganha ao documento: «alvo
+             efetivo ≥ 40 px em desktop» (Parte 9.1 do sistema de design;
+             «Alvos ≥ 40 px» na Parte 7 do dos temas). No dedo continuam os 44
+             de sempre — o `input` pela regra do `globals.css`, a ordenação
+             pelo `pointer-coarse:min-h-11` do `Escolha`, os botões pelo
+             `.alvo-toque` e pelo `pointer-coarse:h-11` do `Button`. */
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {searchable && (
               // O campo só aparece quando há lista que chegue para justificar
               // um controlo a mais — com três temas, procurar é mais trabalho
               // do que ler.
-              <div className="relative w-full max-w-md basis-72 grow-0">
+              <div className="relative w-72 max-w-full basis-72 grow-0">
                 {SearchIcon}
+                {/* ── «PROCURAR TEMAS», E NÃO «… E FOTOGRAFIAS» ─────────────
+                    A Parte 6 do documento propõe «Procurar temas e
+                    fotografias». Esta procura só lê o NOME e as NOTAS do tema
+                    (ver o `visible`, mais acima); uma fotografia não tem texto
+                    por onde se ache. Prometer fotografias era um campo que
+                    mente na primeira vez que se usa — fica a metade
+                    verdadeira, no plural, que é o que a lista mostra.
+
+                    ── E O RAIO DOS CONTROLOS, 10 px ────────────────────────
+                    Ponto 5: «campo de pesquisa a 10 px, como tudo o resto» —
+                    mini a medium são rectângulos arredondados, cápsula só em
+                    large. O `.bo-input` desenha o raio com `var(--bo-radius)`
+                    (8 px, o do CONTEÚDO) numa regra fora de camadas, que
+                    ganharia a qualquer `rounded-*`. Em vez de a vencer com um
+                    `!important`, redefine-se a variável que ela lê, só neste
+                    elemento, para o token do controlo (`--radius-control`,
+                    `tema.css`). A ordenação ao lado recebe o mesmo. */}
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Procurar tema…"
+                  placeholder="Procurar temas"
                   aria-label="Procurar tema por nome ou nota"
-                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+                  className="bo-input h-10 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30 [--bo-radius:var(--radius-control)]"
                 />
               </div>
             )}
@@ -1873,7 +2102,11 @@ export default function Temas() {
                       guardarOrdem(o);
                     }}
                     containerClassName="w-auto"
-                    className="py-2 pl-3 text-xs text-[var(--bo-tinta-72)]"
+                    /* A altura e o raio da barra — ver a nota «UMA ALTURA SÓ»
+                       no campo de procura. `py-0` porque quem manda é o
+                       `h-10`, e o preenchimento da pele só tirava espaço ao
+                       texto. */
+                    className="h-10 py-0 pl-3 text-xs text-[var(--bo-tinta-72)] [--bo-radius:var(--radius-control)]"
                   >
                     {/* «Mais usados» e «Menos usados» só entram quando a
                         contagem de propostas chegou — ver `ORDENS`. Oferecer
@@ -1889,7 +2122,9 @@ export default function Temas() {
                 <div
                   role="group"
                   aria-label="Tamanho dos cartões"
-                  className="flex overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)]"
+                  /* `min-h-10`, e os botões esticam: a moldura de 1 px
+                     está DENTRO dos 40, como nos outros controlos da fila. */
+                  className="flex min-h-10 overflow-hidden rounded-lg border border-[var(--bo-hairline-strong)]"
                 >
                   {(
                     [
@@ -1905,7 +2140,7 @@ export default function Temas() {
                         setDensidade(valor);
                         guardarDensidade(valor);
                       }}
-                      className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
+                      className={`alvo-toque px-3 text-[10px] uppercase tracking-[0.12em] ${ESTADO} ${PRESSAO} ${
                         densidade === valor
                           ? "bg-[var(--bo-tinta-6)] text-[var(--bo-tinta-72)]"
                           : "text-foreground/40 hover:text-[var(--bo-text-muted)]"
@@ -1958,7 +2193,7 @@ export default function Temas() {
                     accoes: accoesDaBiblioteca,
                   });
                 }}
-                className={`alvo-toque flex h-9 w-9 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
+                className={`alvo-toque flex h-10 w-10 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <circle cx="5" cy="12" r="1.6" />
@@ -1968,7 +2203,8 @@ export default function Temas() {
               </button>
               <Button
                 variant={adding ? "secondary" : "primary"}
-                size="sm"
+                // `md` e não `sm`: os 40 px da fila — ver «UMA ALTURA SÓ».
+                size="md"
                 iconLeft={adding ? undefined : PlusIcon}
                 onClick={() => setAdding(!adding)}
               >
@@ -2098,7 +2334,7 @@ export default function Temas() {
         // não a apresentação do que chegou.
         <div className={`grid ${COLUNAS[densidade]}`}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bo-skeleton aspect-[4/3] rounded-2xl" aria-hidden />
+            <div key={i} className="bo-skeleton aspect-[4/3] rounded-tile" aria-hidden />
           ))}
           <p className="sr-only">A carregar temas…</p>
         </div>
@@ -2242,11 +2478,24 @@ export default function Temas() {
                   ganha é a ordem do Tailwind e não a ordem em que estão
                   escritos. MEDIDO antes de os separar: o menu esticava-se aos
                   165,5 px do cartão inteiro. */}
-              <div className="absolute right-2 top-2 z-10">
+              {/* `right-1 top-1` e não `right-2 top-2`: o que se põe no
+                  canto é o ALVO de 40 px, e a pastilha de 28 fica 6 px para
+                  dentro dele — o círculo que se vê assenta a 10 px das
+                  arestas, dentro do arco do canto do cartão. */}
+              <div className="absolute right-1 top-1 z-10">
                 <MenuDeAccoes
                   sobre={t.name}
                   accoes={accoesDoTema(t)}
-                  /* ── O VIDRO CLARO VIAJA COM O BOTÃO ────────────────────
+                  /* ── 28 px À VISTA, 40 px DE ALVO ───────────────────────
+                     «Botão glass, 28px» (Parte 3) e «o `⋯` sobre a imagem tem
+                     28 px visuais e 40 px de alvo» (Parte 7). Era o «⋯» de
+                     linha, 44 × 44, com o vidro na caixa de fora — um círculo
+                     escuro de 44 px por cima da capa, um quarto da largura de
+                     um cartão compacto. O tamanho é uma opção do próprio
+                     `MenuDeAccoes` (`tamanho="pequeno"`), e não classes por
+                     cima das dele. No dedo o `.alvo-toque` leva o alvo aos 44.
+
+                     ── O VIDRO CLARO VIAJA DENTRO DO BOTÃO ────────────────
                      O «⋯» pousa EM CIMA de uma fotografia, e o `MenuDeAccoes`
                      traz tinta de texto normal (`--bo-text-muted`) — que sobre
                      uma capa clara desaparece. A conta já estava feita para os
@@ -2256,12 +2505,16 @@ export default function Temas() {
                      `globals.css`). Sem desfoque de propósito — um por cartão
                      eram noventa numa biblioteca de trinta.
 
-                     O véu acompanha o botão a aparecer e a desaparecer, com as
-                     MESMAS variantes que ele usa por dentro: senão ficava um
-                     círculo escuro em repouso com o glifo invisível lá dentro.
-                     `focus-within` e não `focus-visible` porque quem foca é o
-                     botão FILHO desta caixa. */
-                  className="bo-vidro-claro rounded-full opacity-100 [&>button]:text-white com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-within:opacity-100"
+                     Vivia na caixa de fora, que tinha de repetir à mão as
+                     variantes de esconder do botão (senão ficava um círculo
+                     escuro em repouso com o glifo invisível lá dentro). Agora
+                     é a `pastilha`, DENTRO do botão: esconde-se e mostra-se
+                     com o mesmo `opacity` do glifo, incluindo com o foco de
+                     teclado no cartão (o `group-focus-within` do
+                     `MenuDeAccoes`), e não há duas listas para manter
+                     iguais. */
+                  tamanho="pequeno"
+                  pastilha="bo-vidro-claro text-white"
                 />
               </div>
               <button
@@ -2281,7 +2534,44 @@ export default function Temas() {
                   if (e.pointerType === "mouse") adiantarTema(t.id);
                 }}
                 onFocus={() => adiantarTema(t.id)}
-                className={`block w-full overflow-hidden rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] text-left hover:border-sage-600/40 ${ESTADO} ${PRESSAO}`}
+                /* ── O MENU SEM RATO: Shift+F10 E A TECLA DE MENU ─────────
+                   O botão direito tem o seu equivalente de teclado, e é este
+                   (o mesmo de qualquer sistema). Abre o MESMO menu, ancorado
+                   ao canto de baixo do cartão; ao fechar, o foco volta ao
+                   cartão (`MenuDeContexto`). */
+                onKeyDown={(e) => {
+                  if (!teclaDeMenu(e)) return;
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setMenu({ x: r.left, y: r.bottom, sobre: t.name, accoes: accoesDoTema(t) });
+                }}
+                /* ── SOMBRA, E NÃO BORDA ──────────────────────────────────
+                   Ponto 11 da auditoria: «cartões delimitados por borda em vez
+                   de sombra. Em modo claro a elevação faz-se por sombra.» E a
+                   Parte 9 proíbe «borda a marcar elevação». Era um fio de 10 %
+                   em repouso que ganhava o acento sob o rato; passa a sombra de
+                   repouso que se ergue sob o rato — o único efeito de hover de
+                   um cartão (Parte 12.1 do sistema de design), sem `scale`. O
+                   `ESTADO` já anima `box-shadow` nos 150 ms do degrau
+                   interactivo, com a `--ease-interactive`: é a linha «Hover do
+                   cartão» da tabela da Parte 5, sem tempo novo nenhum. Os dois
+                   tokens e a razão de existirem estão no `globals.css`. Em
+                   escuro a sombra quase não se vê, e é a regra: lá quem separa
+                   é a luminosidade (`--bo-surface` sobre `--bo-chao`).
+
+                   O raio é o `--radius-tile`, 12 px: era `rounded-2xl` (os 20
+                   do degrau «painel»), o documento pedia 12 e o cartão da casa
+                   diz 16. A escolha não era deste ficheiro — foi dela: «sim à
+                   sombra, cantos a 12». O token e a razão estão no `tema.css`.
+
+                   `h-full`: a célula da grelha já estica à altura da fila
+                   (`align-items: stretch`), mas o cartão dentro dela não a
+                   seguia. Com o rasto de números a poder ocupar duas linhas,
+                   «todos os cartões da mesma fila têm a mesma altura»
+                   (critério 2 da Parte 8) só se cumpre se o cartão encher a
+                   célula — medido a 1440, a primeira fila tinha fundos a 508,
+                   523 e 525 px. */
+                className={`block h-full w-full overflow-hidden rounded-tile bg-[var(--bo-surface)] text-left shadow-[var(--bo-sombra-repouso)] hover:shadow-[var(--bo-sombra-erguida)] ${ESTADO} ${PRESSAO}`}
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
@@ -2308,8 +2598,45 @@ export default function Temas() {
 
                     A moldura é 4:3 SEMPRE: é ela que mantém a primeira linha
                     alinhada quando as fotos têm proporções diferentes. */}
-                <div className="aspect-[4/3] w-full overflow-hidden bg-[var(--bo-tinta-6)]">
-                  {t.coverUrl ? (
+                {/* ══════════════════════════════════════════════════════
+                    NUNCA UM CARTÃO VAZIO
+                    ══════════════════════════════════════════════════════
+
+                    T1 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`: «muitos cartões
+                    sem capa ao fim de 5 s — a página parece partida».
+
+                    Por baixo da fotografia fica SEMPRE o lugar pintado com a
+                    cor dela (`EsqueletoDeCor`, com a `coverCor` que vem no
+                    resumo): enquanto a capa viaja, vê-se a cor certa; e se as
+                    duas fontes falharem, a imagem sai (`ImagemComPlanoB`) e a
+                    cor fica. Sem cor gravada é o esqueleto cinzento.
+
+                    Um tema COM fotos e SEM `coverUrl` — o Storage estourou os
+                    8 s da lista, ou a capa não se deixou assinar — já não
+                    mostra o ícone de pasta: mostra o lugar, com a cor quando
+                    a há e o fundo neutro da moldura quando não (sem o brilho
+                    a passar: aí não há nada a caminho, e o brilho diria que
+                    há). O ícone fica para o que ele diz, uma pasta vazia
+                    (`imageCount` 0).
+
+                    A fotografia leva `relative` para ficar POR CIMA do lugar,
+                    que é `absolute`; o `!` vence a `.bo-skeleton`, que está
+                    fora de camadas e traz o seu próprio `position` e raio. */}
+                <div
+                  data-capa-do-tema={t.id}
+                  className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--bo-tinta-6)]"
+                >
+                  {t.imageCount === 0 ? (
+                    <div
+                      data-pasta-vazia
+                      className="flex h-full w-full items-center justify-center text-foreground/40"
+                    >
+                      {FolderIcon}
+                    </div>
+                  ) : t.coverUrl || t.coverCor ? (
+                    <EsqueletoDeCor cor={t.coverCor} className="!absolute inset-0 !rounded-none" />
+                  ) : null}
+                  {t.coverUrl && t.imageCount !== 0 && (
                     <ImagemComPlanoB
                       src={t.coverUrl}
                       avif={t.coverAvif}
@@ -2327,12 +2654,8 @@ export default function Temas() {
 
                          O que sinaliza o hover continua a ser a moldura a
                          ganhar o acento, no botão aqui em baixo. */
-                      className="h-full w-full object-cover"
+                      className="relative h-full w-full object-cover"
                     />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-foreground/40">
-                      {FolderIcon}
-                    </div>
                   )}
                 </div>
                 <div className="px-3 py-2.5">
@@ -2359,9 +2682,19 @@ export default function Temas() {
                       Vai sempre, e não só quando corta — saber SE corta exige
                       medir o nó depois de desenhado, e uma dica que repete o
                       nome que está à vista não incomoda ninguém. */}
+                  {/* ── O TIPO DA CASA, E NÃO UM NÚMERO ESCRITO À MÃO ──────
+                      Era `text-[14px] leading-snug`. O `ThemeCard` da Parte 3
+                      pede «headline/600», e o mapeamento da Parte 6.3 do
+                      sistema de design diz o mesmo de qualquer «nome em
+                      lista». O `text-headline` traz tamanho, entrelinha e
+                      peso de uma vez (15/22, 600). A altura reservada passa a
+                      ser DUAS ENTRELINHAS do token — `min-h-11` = 2,75rem =
+                      2 × 1,375rem —, e não 2,7em, que com a entrelinha nova
+                      já não chegava às duas linhas e voltava a desalinhar a
+                      fila. */}
                   <p
                     title={t.name}
-                    className="line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-[var(--bo-text)]"
+                    className="line-clamp-2 min-h-11 text-headline text-[var(--bo-text)]"
                   >
                     {t.name}
                   </p>
@@ -2379,9 +2712,24 @@ export default function Temas() {
                       Agora os números são um só rasto, pela ordem em que
                       respondem à pergunta «o que é este tema?»: quantas fotos
                       tem, quantas vezes saiu, e há quanto tempo não lhe tocam.
-                      Com `truncate`, o que cai primeiro é a data — que é a
-                      menos decisiva das três, e é por isso que está no fim. */}
-                  <p className="bo-text-muted mt-0.5 truncate text-xs">
+                      A data vai no fim por ser a menos decisiva das três.
+
+                      Era `truncate`, e com a data absoluta (a partir de 30
+                      dias, «15/08/2026») o rasto deixou de caber num cartão de
+                      seis colunas: lia-se «15/08/2…», que é uma data que não
+                      diz o ano. O desenho do cartão na Parte 3 do documento
+                      parte o rasto em DUAS linhas («14 fotos · / 1 proposta ·
+                      ⚑»), e é isso que fica: quebra entre palavras, nunca a
+                      meio de um número, e no máximo duas linhas. Os cartões
+                      da mesma fila continuam da mesma altura — a grelha estica
+                      cada célula à mais alta. */}
+                  {/* «caption, --fg-tertiary, tabular-nums» (Parte 3). Os
+                      algarismos com a mesma largura são o que deixa «9 fotos»
+                      e «14 fotos» alinharem de cartão para cartão, e a cor é
+                      o terceiro papel de texto da casa
+                      (`--bo-texto-terciario`, 4,7:1 sobre o cartão branco e
+                      5,7:1 sobre o escuro, os números da Parte 5.2). */}
+                  <p className="mt-0.5 line-clamp-2 text-caption tabular-nums text-[var(--bo-texto-terciario)]">
                     {photoCountLabel(t.imageCount, t.truncated)}
                     {/* «7 propostas» ou «Nunca usado» — a segunda é a metade
                         mais útil: é o que distingue um tema que a biblioteca
@@ -2410,13 +2758,16 @@ export default function Temas() {
                         que se lê de relance numa grelha de 28) e a data
                         inteira vai no `title`, que é o que responde quando a
                         pergunta passa a ser «isto foi antes ou depois do
-                        casamento dos Ferreira?». */}
+                        casamento dos Ferreira?». A partir dos 30 dias a
+                        própria linha passa a dizer a data — ver
+                        `desdeQuando`. */}
                     {t.imageCount !== null && desdeQuando(t.updatedAt) ? (
                       <span title={dataPorExtenso(t.updatedAt)}>
                         {` · ${desdeQuando(t.updatedAt)}`}
                       </span>
                     ) : null}
-                    {/* A BANDEIRA DO FIXADO, que era o chip aceso por cima da
+                    {/* A BANDEIRA DO FAVORITO (era «Fixado no topo»; a palavra
+                        passou a ser a do menu e do filtro), que era o chip aceso por cima da
                         fotografia. Fica no fim da linha, como no desenho do
                         `ThemeCard` (Parte 3), e leva nome escrito: um glifo
                         sozinho não diz nada a quem ouve o ecrã. */}
@@ -2424,7 +2775,7 @@ export default function Temas() {
                       <span className="text-[var(--bo-accent)]">
                         {" · "}
                         <span aria-hidden="true">★</span>
-                        <span className="sr-only">Fixado no topo</span>
+                        <span className="sr-only">Favorito</span>
                       </span>
                     ) : null}
                   </p>
@@ -2501,8 +2852,10 @@ export default function Temas() {
 interface FolderState {
   total: number | null;
   truncated: boolean;
-  /** `undefined` = não se sabe (deixar o cartão como está); `null` = pasta vazia. */
-  coverUrl?: string | null;
+  /** A fotografia da capa, inteira — e não só o endereço: o cartão precisa
+   *  dos quatro campos dela (ver `capa-do-cartao.ts`). `undefined` = não se
+   *  sabe (deixar o cartão como está); `null` = pasta vazia. */
+  capa?: ThemeImage | null;
 }
 
 /** Uma foto que não subiu, com o ficheiro guardado para se poder repetir. */
@@ -2907,10 +3260,12 @@ function ThemeFolder({
   onRename,
   onCover,
   onCopiedTo,
-  onDelete,
+  accoes,
   aoArrastar,
   aoSubir,
   pedidoDeMover,
+  pedidoAPasta,
+  aoServirPedido,
 }: {
   theme: ThemeSummary;
   /** Todos os temas — para o "Copiar para…" saber para onde pode levar. */
@@ -2918,11 +3273,15 @@ function ThemeFolder({
   onBack: () => void;
   onFolderState: (state: FolderState) => void;
   onRename: (name: string) => void;
-  onCover: (coverPath: string, coverUrl?: string) => void;
+  /** A capa mudou. Vai com os campos TODOS da fotografia nova — ver
+   *  `capa-do-cartao.ts`, e o defeito que ele fecha. */
+  onCover: (coverPath: string, capa: CapaDoCartao) => void;
   /** Chegaram `added` fotos ao tema `destId` — o cartão dele tem de somar.
    *  Um número NEGATIVO subtrai, que é o que o «Anular» de um arrasto pede. */
   onCopiedTo: (destId: string, added: number) => void;
-  onDelete: () => void;
+  /** As acções do tema, para o «⋯» do cabeçalho — a mesma lista do cartão
+   *  (`accoesDoTema`, sem «Abrir»). */
+  accoes: readonly AccaoDeItem[];
   /** Começou (ou acabou) um arrasto de fotografias. Quem precisa de saber é a
    *  coluna da esquerda, que é irmã desta pasta e não a conhece. */
   aoArrastar?: (aArrastar: boolean) => void;
@@ -2931,6 +3290,11 @@ function ThemeFolder({
   aoSubir?: (aSubir: boolean) => void;
   /** Um lote largado num tema da coluna. Ver a nota no `Temas`. */
   pedidoDeMover?: { destino: ThemeSummary; carga: CargaDeFotos; n: number } | null;
+  /** «Adicionar fotografias…», «Renomear…» ou «Definir capa…», pedidos no
+   *  menu do tema. Ver `pedirAPasta` no `Temas`. */
+  pedidoAPasta?: PedidoAPasta | null;
+  /** O pedido foi servido — o `Temas` esquece-o. */
+  aoServirPedido?: (servido: PedidoAPasta) => void;
 }) {
   const { toast } = useToast();
   /** As fotos JÁ CARREGADAS, mais recentes primeiro. É sempre um PREFIXO da
@@ -2971,6 +3335,12 @@ function ThemeFolder({
   const [verifying, setVerifying] = useState<{ done: number; total: number } | null>(null);
   /** O diálogo "Copiar para…" está aberto. */
   const [copyOpen, setCopyOpen] = useState(false);
+  /** E em que modo abre: «Mover para…» do menu da fotografia abre em
+   *  «mover», a barra da selecção em «copiar». Sem isto a folha abria sempre
+   *  em «copiar» e o menu que dizia «Mover» copiava — ver `modoInicial` no
+   *  `ThemeCopyDialog`. Só muda no instante de abrir, por isso não salta a
+   *  meio da saída da folha. */
+  const [copyMode, setCopyMode] = useState<ThemeCopyMode>("copiar");
   /** O que aconteceu à última cópia/mudança — fica no ecrã enquanto houver
    *  fotos por levar (um número em que ela tem de agir não pode desaparecer). */
   const [copyReport, setCopyReport] = useState<ThemeCopyOutcome | null>(null);
@@ -3009,6 +3379,38 @@ function ThemeFolder({
   const [renaming, setRenaming] = useState(false);
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  /**
+   * ── O MODO «ESCOLHER A CAPA» ───────────────────────────────────────────
+   *
+   * «Definir capa…» no menu do tema abre a pasta neste modo: uma faixa com a
+   * instrução e «Cancelar» por cima da grelha, e o clique numa fotografia faz
+   * dela a capa (o mesmo `setAsCover` do «Definir como capa» da foto) em vez
+   * de a seleccionar. O Esc cancela. É a versão de um gesto só do que já se
+   * fazia em três (seleccionar, procurar o botão, carregar).
+   */
+  const [escolherCapa, setEscolherCapa] = useState(false);
+  /** O último pedido do menu do tema já servido — ver `pedidoAPasta`. */
+  const pedidoAPastaServido = useRef<PedidoAPasta | null>(null);
+  useEffect(() => {
+    const p = pedidoAPasta;
+    if (!p || p.temaId !== theme.id || p === pedidoAPastaServido.current) return;
+    pedidoAPastaServido.current = p;
+    aoServirPedido?.(p);
+    // O seletor de ficheiros só abre com um gesto recente da pessoa — e o
+    // clique no item do menu foi há uns milissegundos, no mesmo gesto.
+    if (p.accao === "adicionar") inputRef.current?.click();
+    else if (p.accao === "renomear") comecarARenomear();
+    else comecarAEscolherCapa();
+    // As duas acções são funções do corpo (fecham sobre o estado actual).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoAPasta, theme.id, aoServirPedido]);
+  function comecarARenomear() {
+    setName(theme.name);
+    setRenaming(true);
+  }
+  function comecarAEscolherCapa() {
+    setEscolherCapa(true);
+  }
   /** Um PATCH de cada vez: confirmar o nome com o Enter dispara também o onBlur. */
   const renamingBusy = useRef(false);
   /** Passa a falso ao sair da pasta — um lote que só termine depois disso não
@@ -3178,7 +3580,6 @@ function ThemeFolder({
    *  dentro do upload e da remoção punha o cartão a par de uma lista já
    *  ultrapassada — a contagem ficava a divergir da grelha. */
   const cover = coverPath ? images.find((i) => i.path === coverPath) : images[0];
-  const coverUrl = cover?.thumbUrl || cover?.url;
   useEffect(() => {
     if (loading || total === null) return;
     notify.current({
@@ -3187,9 +3588,9 @@ function ThemeFolder({
       // Uma capa escolhida que ainda não foi carregada (está numa página
       // adiante) não se sabe resolver: melhor não mexer no cartão do que
       // trocar-lhe a capa pela foto mais recente.
-      coverUrl: coverPath && !cover ? undefined : (coverUrl ?? null),
+      capa: coverPath && !cover ? undefined : (cover ?? null),
     });
-  }, [loading, total, truncated, coverPath, cover, coverUrl]);
+  }, [loading, total, truncated, coverPath, cover]);
 
   // Enquanto sobem fotos, fechar o separador perde o que falta. O browser
   // mostra o seu próprio aviso — é o único que ele deixa aparecer aqui.
@@ -4302,7 +4703,7 @@ function ThemeFolder({
       return;
     }
     setCoverPath(im.path);
-    onCover(im.path, im.thumbUrl || im.url);
+    onCover(im.path, capaDaFoto(im));
     clearSelection();
     // AQUI NÃO SE DIZ NADA, e é de propósito. A capa só muda depois de o
     // servidor confirmar, e o que ele confirmou aparece na própria foto que ela
@@ -4526,8 +4927,14 @@ function ThemeFolder({
       const aEscrever =
         !!alvo &&
         (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.isContentEditable);
+      // No modo «escolher a capa» o Esc cancela o modo — e só isso: a
+      // selecção que houvesse fica como estava.
+      if (e.key === "Escape" && escolherCapa && !janelaAberta) {
+        setEscolherCapa(false);
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && (e.key === "a" || e.key === "A")) {
-        if (aEscrever || janelaAberta || images.length === 0) return;
+        if (aEscrever || janelaAberta || escolherCapa || images.length === 0) return;
         e.preventDefault();
         setSelected(new Set(images.map((im) => im.path)));
         // A âncora fica na última: um Shift+clique a seguir a um ⌘A encurta a
@@ -4544,7 +4951,7 @@ function ThemeFolder({
     };
     document.addEventListener("keydown", noTeclado);
     return () => document.removeEventListener("keydown", noTeclado);
-  }, [images, copyOpen, aRemover, zoomAt, renaming]);
+  }, [images, copyOpen, aRemover, zoomAt, renaming, escolherCapa]);
 
   /**
    * ── A LARGADA CHEGA DA COLUNA DA ESQUERDA ──────────────────────────────
@@ -4584,50 +4991,73 @@ function ThemeFolder({
    * botão direito não existe. A razão está escrita por extenso na célula.
    */
   const accoesDaFoto = useCallback(
-    (im: ThemeImage, i: number): AccaoDeItem[] => [
-      { id: "ver", rotulo: "Ver em grande", onAccao: () => openZoom(i) },
-      /* ── A ALTERNATIVA POR MENU É OBRIGATÓRIA ─────────────────────────
-         «Alternativa por menu obrigatória — "Mover para…" faz o mesmo sem
-         arrastar.» [APPLE], Parte 4. Um arrasto precisa de rato, de precisão
-         e de duas mãos livres; um menu não precisa de nenhuma das três, e é
-         o único caminho no telemóvel — onde o arrasto HTML5 não pega.
+    (im: ThemeImage, i: number): AccaoDeItem[] =>
+      emGrupos(
+        /* ── PELA ORDEM DO DOCUMENTO ──────────────────────────────────────
+           Parte 3 do `docs/APPLE-TEMAS.md`: «Pré-visualizar · Abrir tamanho
+           real — separador — Mover para… · Duplicar para… · Definir como
+           capa — separador — Remover do tema». O «Remover do tema…» guarda
+           as reticências porque continua a perguntar antes de remover.
 
-         Abre a folha que já existe (`ThemeCopyDialog`, com «Mover»
-         escolhido), e leva a foto do menu se ela não estiver na selecção. */
-      ...(otherThemes.length > 0
-        ? [
-            {
-              id: "mover",
-              rotulo: "Mover para…",
-              onAccao: () => {
-                setSelected((prev) => (prev.has(im.path) ? prev : new Set([im.path])));
-                setCopyOpen(true);
-              },
-            },
-          ]
-        : []),
-      ...(i > 0
-        ? [
-            {
-              id: "inicio",
-              rotulo: "Mover para o início",
-              onAccao: () => moveTo(i, 0),
-            },
-          ]
-        : []),
-      ...(im.path === coverPath
-        ? []
-        : [{ id: "capa", rotulo: "Definir como capa", onAccao: () => void setAsCover(im) }]),
-      {
-        id: "remover",
-        rotulo: "Remover do tema…",
-        destrutiva: true,
-        onAccao: () => pedirParaRemoverUma(im),
-      },
-    ],
-    // `moveTo`, `setAsCover` e `pedirParaRemoverUma` são funções do corpo do
-    // componente e mudam a cada desenho de propósito (fecham sobre o estado
-    // actual da grelha). O que importa fixar é a foto e a capa.
+           «Mover para o início» saiu do menu (não está na lista do
+           documento) e continua onde também já estava: no botão ↑ da célula
+           e no Alt+Home. */
+        [
+          { id: "ver", rotulo: "Pré-visualizar", onAccao: () => openZoom(i) },
+          {
+            id: "original",
+            rotulo: "Abrir tamanho real",
+            // O original, num separador novo — o que o browser faz com ele é
+            // dele (ver, guardar, imprimir). `noopener`: a página aberta não
+            // fica com a mão nesta.
+            onAccao: () => void window.open(im.url, "_blank", "noopener"),
+          },
+        ],
+        [
+          /* ── A ALTERNATIVA POR MENU É OBRIGATÓRIA ─────────────────────
+             «Alternativa por menu obrigatória — "Mover para…" faz o mesmo sem
+             arrastar.» [APPLE], Parte 4. Abre a folha que já existe
+             (`ThemeCopyDialog`) no modo certo, e leva a foto do menu se ela
+             não estiver na selecção. «Duplicar para…» é a mesma folha em
+             «Copiar». Só com outros temas para onde levar. */
+          ...(otherThemes.length > 0
+            ? [
+                {
+                  id: "mover",
+                  rotulo: "Mover para…",
+                  onAccao: () => {
+                    setSelected((prev) => (prev.has(im.path) ? prev : new Set([im.path])));
+                    setCopyMode("mover");
+                    setCopyOpen(true);
+                  },
+                },
+                {
+                  id: "duplicar",
+                  rotulo: "Duplicar para…",
+                  onAccao: () => {
+                    setSelected((prev) => (prev.has(im.path) ? prev : new Set([im.path])));
+                    setCopyMode("copiar");
+                    setCopyOpen(true);
+                  },
+                },
+              ]
+            : []),
+          ...(im.path === coverPath
+            ? []
+            : [{ id: "capa", rotulo: "Definir como capa", onAccao: () => void setAsCover(im) }]),
+        ],
+        [
+          {
+            id: "remover",
+            rotulo: "Remover do tema…",
+            destrutiva: true,
+            onAccao: () => pedirParaRemoverUma(im),
+          },
+        ],
+      ),
+    // `setAsCover` e `pedirParaRemoverUma` são funções do corpo do componente
+    // e mudam a cada desenho de propósito (fecham sobre o estado actual da
+    // grelha). O que importa fixar é a foto e a capa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [coverPath, openZoom, otherThemes.length],
   );
@@ -4691,9 +5121,15 @@ function ThemeFolder({
           >
             Adicionar fotos
           </Button>
-          <Button variant="ghost" size="sm" onClick={onDelete}>
-            Eliminar tema
-          </Button>
+          {/* ── «ELIMINAR TEMA» SAIU DAQUI ───────────────────────────────
+              T3 do `docs/PROPOSTAS-E-TEMAS-APPLE.md` e ponto 20 da auditoria
+              do `APPLE-TEMAS.md`: era um botão de texto encostado a
+              «Adicionar fotos» — uma acção destrutiva com o peso de um link,
+              ao lado da acção principal. Passa para o «⋯» das acções do
+              tema, a vermelho e no fim, com a confirmação que diz o custo.
+              O «⋯» está sempre à vista: aqui não há linha nenhuma a cujo
+              hover ele pudesse responder. */}
+          <MenuDeAccoes accoes={accoes} sobre={theme.name} sempreVisivel />
         </div>
       </div>
 
@@ -4942,7 +5378,16 @@ function ThemeFolder({
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {selectedCount > 0 && (
-              <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  // Repetir é repetir O MESMO: um lote de «mover» parado a
+                  // meio não pode ser retomado como cópia.
+                  setCopyMode(copyReport.mode);
+                  setCopyOpen(true);
+                }}
+              >
                 Tentar novamente
               </Button>
             )}
@@ -5042,7 +5487,14 @@ function ThemeFolder({
                 proibida para ela, senão passam a existir dois significados no
                 mesmo sítio. Só aparece havendo outro tema para onde levar. */}
                 {otherThemes.length > 0 && (
-                  <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setCopyMode("copiar");
+                      setCopyOpen(true);
+                    }}
+                  >
                     Copiar para…
                   </Button>
                 )}
@@ -5106,6 +5558,7 @@ function ThemeFolder({
       {copiaNoEcra && (
         <ThemeCopyDialog
           aberto={copyOpen}
+          modoInicial={copyMode}
           sourceTheme={theme}
           themes={themes}
           // Congelada no instante do fecho, para a contagem não mudar a meio
@@ -5132,6 +5585,23 @@ function ThemeFolder({
           // — aí abre como abria, do centro.
           origem={origemDaLupa}
         />
+      )}
+
+      {/* A faixa do modo «escolher a capa». Opaca, como a grelha por baixo
+          dela — vidro só no que flutua (`docs/LIQUID-GLASS.md`, Parte 5), e
+          esta vista já tem a sua camada na barra da selecção. */}
+      {escolherCapa && (
+        <div
+          data-escolher-capa
+          className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[var(--bo-raio-conteudo)] bg-[var(--bo-accent-lavagem)] px-3 py-2"
+        >
+          <p role="status" className="text-sm text-[var(--bo-text)]">
+            Escolhe a fotografia da capa.
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => setEscolherCapa(false)}>
+            Cancelar
+          </Button>
+        </div>
       )}
 
       <div
@@ -5372,13 +5842,23 @@ function ThemeFolder({
                       type="button"
                       role="checkbox"
                       aria-checked={isSelected}
-                      aria-label={`Selecionar foto ${i + 1} de ${images.length}`}
-                      onClick={(e) =>
+                      aria-label={
+                        escolherCapa
+                          ? `Usar a foto ${i + 1} de ${images.length} como capa`
+                          : `Selecionar foto ${i + 1} de ${images.length}`
+                      }
+                      onClick={(e) => {
+                        // No modo «escolher a capa», o clique escolhe-a.
+                        if (escolherCapa) {
+                          setEscolherCapa(false);
+                          void setAsCover(im);
+                          return;
+                        }
                         // `ctrlKey` ao lado do `metaKey` porque o back office
                         // também se abre em Windows e em Linux, onde o gesto
                         // de somar à selecção é o Ctrl.
-                        toggleAt(i, { shift: e.shiftKey, somar: e.metaKey || e.ctrlKey })
-                      }
+                        toggleAt(i, { shift: e.shiftKey, somar: e.metaKey || e.ctrlKey });
+                      }}
                       // ── `ESPAÇO` PRÉ-VISUALIZA ──────────────────────────
                       // «É o gesto que qualquer utilizador de Mac tenta
                       // primeiro» (ponto 23), e o critério 5 do documento.
@@ -5405,6 +5885,19 @@ function ThemeFolder({
                         if (e.key === " " || e.key === "Spacebar") {
                           e.preventDefault();
                           openZoom(i);
+                          return;
+                        }
+                        // Shift+F10 e a tecla de menu: o botão direito do
+                        // teclado, ancorado ao canto de baixo da célula.
+                        if (teclaDeMenu(e)) {
+                          e.preventDefault();
+                          const r = e.currentTarget.getBoundingClientRect();
+                          setMenuDaFoto({
+                            x: r.left,
+                            y: r.bottom,
+                            sobre: `foto ${i + 1} de ${images.length}`,
+                            accoes: accoesDaFoto(im, i),
+                          });
                           return;
                         }
                         // Alt + setas move a foto. Sem o Alt, as setas continuam

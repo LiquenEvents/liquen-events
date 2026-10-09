@@ -380,6 +380,71 @@ describe("Fase 08 — arrastar fotografias entre temas", () => {
     // (ou está no telemóvel, onde o arrasto HTML5 não pega) não tem caminho.
     expect(screen.getByRole("menuitem", { name: /Mover para…/ })).toBeTruthy();
   });
+
+  it("«Mover para…» abre a folha em «Mover» e o pedido sai como mover", async () => {
+    // B1: a folha abria sempre em «Copiar». Quem escolhia «Mover para…» e
+    // carregava no botão do fundo COPIAVA — a foto ficava nos dois temas.
+    desenhar();
+    await abrir(/Terracotta/);
+
+    await act(async () => {
+      fireEvent.contextMenu(celula(1, 2).parentElement!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: /Mover para…/ }));
+    });
+
+    const folha = await screen.findByRole("dialog", { name: /foto selecionada/ });
+    const modo = within(folha).getByRole("radiogroup", { name: "O que fazer" });
+    expect(within(modo).getByRole("radio", { name: "Mover" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(modo).getByRole("radio", { name: "Copiar" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+
+    rota("POST /api/temas/t1/imagens/copiar", () =>
+      ok({ copied: [{ from: "t1/foto-1.jpg" }], existing: [], failed: [] }),
+    );
+    await act(async () => {
+      fireEvent.click(within(folha).getByRole("button", { name: "Mover 1 foto" }));
+    });
+    expect(corpos("POST /api/temas/t1/imagens/copiar")).toEqual([
+      { paths: ["t1/foto-1.jpg"], destino: "t2", modo: "mover" },
+    ]);
+  });
+
+  it("«Copiar para…» da barra da selecção continua a abrir em «Copiar»", async () => {
+    // O outro lado do B1: a porta da barra é a da cópia, e não pode herdar o
+    // «Mover» de uma ida anterior pelo menu.
+    desenhar();
+    await abrir(/Terracotta/);
+
+    await act(async () => {
+      fireEvent.contextMenu(celula(1, 2).parentElement!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: /Mover para…/ }));
+    });
+    const primeira = await screen.findByRole("dialog", { name: /foto selecionada/ });
+    await act(async () => {
+      fireEvent.click(within(primeira).getByRole("button", { name: "Cancelar" }));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Copiar para…" })[0]);
+    });
+    const folha = await screen.findByRole("dialog", { name: /foto selecionada/ });
+    expect(within(folha).getByRole("radio", { name: "Copiar" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════

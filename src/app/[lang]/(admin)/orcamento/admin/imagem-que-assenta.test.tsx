@@ -105,4 +105,35 @@ describe("a fotografia que chega assenta em vez de aparecer", () => {
       else delete (proto as unknown as Record<string, unknown>).naturalWidth;
     }
   });
+
+  /**
+   * «Nunca ícone partido» (T1/T2). Com as duas fontes a falhar, o `<img>`
+   * ficava no ecrã a 100 — e um `<img>` que falhou é o navegador a desenhar o
+   * seu ícone partido por cima do borrão. Sai, e fica a caixa com o borrão.
+   */
+  it("com as duas fontes partidas, a imagem sai e fica só o borrão", () => {
+    const { container } = render(
+      <ImagemComPlanoB
+        src="/derivada-que-nao-existe.webp"
+        planoB="/original-que-tambem-falha.jpg"
+        lqip="data:image/webp;base64,BBBB"
+        className="h-full w-full object-cover"
+      />,
+    );
+    fireEvent.error(imagem(container));
+    expect(imagem(container).getAttribute("src")).toBe("/original-que-tambem-falha.jpg");
+    fireEvent.error(imagem(container));
+
+    expect(container.querySelector("img")).toBeNull();
+    const lugar = container.querySelector("[data-imagem-falhou]") as HTMLElement;
+    expect(lugar).not.toBeNull();
+    expect(lugar.className).toContain("h-full w-full");
+    expect(lugar.style.backgroundImage).toContain("BBBB");
+  });
+
+  it("sem plano B, a primeira falha já tira a imagem", () => {
+    const { container } = render(<ImagemComPlanoB src="/so-esta.webp" />);
+    fireEvent.error(imagem(container));
+    expect(container.querySelector("img")).toBeNull();
+  });
 });

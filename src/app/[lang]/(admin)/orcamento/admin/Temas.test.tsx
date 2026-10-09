@@ -35,6 +35,7 @@ import Temas, {
   PISO_DA_CELULA_PX,
   contarFotosDaBiblioteca,
   desdeQuando,
+  fraseDeEliminar,
   mergePage,
   moveItem,
   ordenarTemas,
@@ -330,7 +331,7 @@ function accaoNoMenuDoTema(tema: RegExp, accao: string | RegExp): HTMLElement {
 /** Abre a pasta de um tema e espera que a leitura das fotos assente. */
 async function openFolder(name: RegExp) {
   fireEvent.click(await acharCartaoDoTema(name));
-  await screen.findByRole("button", { name: "Eliminar tema" });
+  await screen.findByRole("button", { name: "Adicionar fotos" });
   await act(async () => {});
   await settlePhotos();
 }
@@ -520,8 +521,10 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     //
     // Eliminar deixou de ser um clique: passa pela pergunta da casa, com a
     // lista do que se perde lá dentro. O que este caso mede — um tema criado
-    // enquanto um DELETE falhado ia a caminho — não muda.
-    fireEvent.click(screen.getByRole("button", { name: "Eliminar tema" }));
+    // enquanto um DELETE falhado ia a caminho — não muda. E chega-se lá pelo
+    // «⋯» do cabeçalho: o botão de texto «Eliminar tema» saiu (T3).
+    fireEvent.click(screen.getByRole("button", { name: "Acções de Terracotta" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Eliminar tema…" }));
     const caixa = await screen.findByRole("dialog");
     await act(async () => {
       fireEvent.click(within(caixa).getByRole("button", { name: "Eliminar o tema" }));
@@ -643,7 +646,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
 
     renderTemas();
     fireEvent.click(await acharCartaoDoTema(/Terracotta/));
-    await screen.findByRole("button", { name: "Eliminar tema" });
+    await screen.findByRole("button", { name: "Adicionar fotos" });
     await act(async () => {});
 
     const started = () => imgs().filter((i) => i.getAttribute("src")).length;
@@ -673,7 +676,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
 
     renderTemas();
     fireEvent.click(await acharCartaoDoTema(/Terracotta/));
-    await screen.findByRole("button", { name: "Eliminar tema" });
+    await screen.findByRole("button", { name: "Adicionar fotos" });
     await act(async () => {});
 
     expect(imgs().filter((i) => i.getAttribute("src"))).toHaveLength(THEME_PAGE_SIZE);
@@ -1154,15 +1157,101 @@ describe("Biblioteca de Temas — um botão sobre a fotografia", () => {
     expect(flutuantes[0].getAttribute("aria-haspopup")).toBe("menu");
   });
 
+  /**
+   * B3. «`⋯` só aparece no hover ou quando o cartão tem foco de teclado —
+   * senão é inacessível por teclado» (Parte 3). O Tab pousa primeiro no botão
+   * do CARTÃO, que é irmão do «⋯» e não pai; com `focus-within` na caixa do
+   * «⋯» e `focus-visible` no gatilho, nenhum dos dois acendia com o cartão
+   * focado. O jsdom não avalia media queries nem `:focus-within`, portanto o
+   * que se prende é o contrato das classes, inteiras (um `toContain` na cadeia
+   * apanhava «com-rato:focus-within» dentro de «group-focus-within»).
+   */
+  it("o «⋯» volta com o foco no CARTÃO, e não só com o foco nele", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    expect(grupo.className.split(/\s+/)).toContain("group");
+    const gatilho = within(grupo).getByRole("button", { name: "Acções de Terracotta" });
+    const classes = gatilho.className.split(/\s+/);
+    expect(classes).toContain("com-rato:opacity-0");
+    expect(classes).toContain("com-rato:group-focus-within:opacity-100");
+    // O vidro vive DENTRO do gatilho desde a Fase 02 (a `pastilha`), e por
+    // isso esconde-se e volta com o mesmo `opacity` — já não há uma caixa de
+    // fora a repetir as variantes à mão.
+    expect(gatilho.querySelector(".bo-vidro-claro")).not.toBeNull();
+  });
+
+  /**
+   * Fase 02: «botão glass, 28px» e «28 px visuais e 40 px de alvo» (Partes 3 e
+   * 7). Era o «⋯» de linha, 44 × 44, com o vidro a toda a volta.
+   */
+  it("o «⋯» sobre a capa tem 28 px à vista e 40 px de alvo", async () => {
+    um();
+    renderTemas();
+    const grupo = await screen.findByRole("group", { name: "Terracotta" });
+    const gatilho = within(grupo).getByRole("button", { name: "Acções de Terracotta" });
+    const alvo = gatilho.className.split(/\s+/);
+    expect(alvo).toEqual(expect.arrayContaining(["h-10", "w-10", "alvo-toque"]));
+    expect(alvo).not.toContain("h-11");
+    const pastilha = gatilho.querySelector(".bo-vidro-claro")!;
+    expect(pastilha.className.split(/\s+/)).toEqual(expect.arrayContaining(["h-7", "w-7"]));
+  });
+
   /** A estrela era um chip aceso sobre a fotografia; a informação não se
    *  perdeu, mudou de sítio — para o rasto de números, com nome escrito. */
-  it("um tema fixado di-lo na linha dos números, e não por cima da capa", async () => {
+  it("um tema favorito di-lo na linha dos números, e não por cima da capa", async () => {
     route("GET /api/temas", () =>
       ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, favorito: true }]),
     );
     renderTemas();
     const grupo = await screen.findByRole("group", { name: "Terracotta" });
-    expect(within(grupo).getByText("Fixado no topo")).toBeTruthy();
+    // «Favorito», a palavra do menu e do filtro (era «Fixado no topo»).
+    expect(within(grupo).getByText("Favorito")).toBeTruthy();
+  });
+
+  /**
+   * ── NUNCA UM CARTÃO VAZIO (T1) ──────────────────────────────────────────
+   *
+   * Um tema com fotos e sem capa assinada (o Storage estourou o tempo da
+   * lista) mostrava o ícone de pasta, que diz «vazio». Passa a mostrar o lugar
+   * com a cor da capa; o ícone fica só para a pasta vazia de verdade.
+   */
+  it("um tema com fotos e sem capa mostra a cor dela, não o ícone de pasta", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Terracotta", imageCount: 9, coverCor: "#a07850" },
+        { ...THEME, id: "t2", name: "Itália", imageCount: 0 },
+      ]),
+    );
+    renderTemas();
+    const cheio = await acharCartaoDoTema(/Terracotta/);
+    expect(cheio.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    expect(cheio.querySelector("[data-pasta-vazia]")).toBeNull();
+    // A pasta vazia continua a dizer que está vazia.
+    expect(cartaoDoTema(/Itália/).querySelector("[data-pasta-vazia]")).not.toBeNull();
+  });
+
+  it("a cor fica por baixo da capa e, com as duas fontes partidas, fica só ela", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        {
+          ...THEME,
+          imageCount: 9,
+          coverUrl: "https://cdn.test/thumb-404.webp",
+          coverFallbackUrl: "https://cdn.test/original-404.jpg",
+          coverCor: "#a07850",
+        },
+      ]),
+    );
+    renderTemas();
+    const cartao = await acharCartaoDoTema(/Terracotta/);
+    expect(cartao.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    fireEvent.error(cartao.querySelector("img")!);
+    fireEvent.error(cartao.querySelector("img")!);
+    // Nenhum `<img>` partido no cartão — e o lugar pintado continua lá.
+    expect(cartao.querySelector("img")).toBeNull();
+    expect(cartao.querySelector('[data-cor="#a07850"]')).not.toBeNull();
+    expect(cartao.querySelector("[data-pasta-vazia]")).toBeNull();
   });
 
   /** «Datas relativas sem data absoluta em tooltip» é proibido pela Parte 9. */
@@ -1276,6 +1365,61 @@ describe("Biblioteca de Temas — o cartão", () => {
     expect(titulo.className).toMatch(/min-h-/);
   });
 
+  /**
+   * Fase 02, ponto 11: «cartões delimitados por borda em vez de sombra», e a
+   * Parte 9 proíbe «borda a marcar elevação». A sombra é a de repouso da casa
+   * e ergue-se sob o rato; nunca `scale` no hover.
+   */
+  it("o cartão eleva-se por sombra, e não por borda", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9 }]));
+    renderTemas();
+    const botao = await acharCartaoDoTema(/Terracotta/);
+    const classes = botao.className.split(/\s+/);
+    expect(classes).toContain("shadow-[var(--bo-sombra-repouso)]");
+    expect(classes).toContain("hover:shadow-[var(--bo-sombra-erguida)]");
+    expect(classes.filter((c) => /^(?:hover:)?border(?:-|$)/.test(c))).toEqual([]);
+    expect(classes.filter((c) => /scale/.test(c) && c.startsWith("hover:"))).toEqual([]);
+  });
+
+  /**
+   * «Raio 12 px» (Parte 3, `ThemeCard`), e a decisão dela: «sim à sombra,
+   * cantos a 12». O cartão tem UM raio, o do token — e o token tem os 12.
+   */
+  it("o cartão tem os cantos a 12, pelo token do mosaico", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9 }]));
+    renderTemas();
+    const botao = await acharCartaoDoTema(/Terracotta/);
+    const raios = botao.className.split(/\s+/).filter((c) => /^rounded(?:-|$)/.test(c));
+    expect(raios).toEqual(["rounded-tile"]);
+    const tema = readFileSync(join(process.cwd(), "src/app/tema.css"), "utf8");
+    expect(tema).toMatch(/--radius-tile:\s*12px;/);
+  });
+
+  /**
+   * «headline/600, line-clamp 2, altura reservada» e «caption, --fg-tertiary,
+   * tabular-nums» (Parte 3). Eram `text-[14px]` e o cinzento de apoio.
+   */
+  it("o nome usa o tipo da casa, e os números alinham", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
+    );
+    renderTemas();
+    const titulo = await screen.findByText("Terracotta", { selector: "p" });
+    const t = titulo.className.split(/\s+/);
+    expect(t).toContain("text-headline");
+    expect(
+      t.filter((c) => /^text-\[\d/.test(c)),
+      "tamanho escrito à mão",
+    ).toEqual([]);
+    // Duas entrelinhas do `text-headline` (1,375rem) = 2,75rem = `min-h-11`.
+    expect(t).toContain("min-h-11");
+    const rasto = screen.getByText(/9 fotos/);
+    const r = rasto.className.split(/\s+/);
+    expect(r).toEqual(
+      expect.arrayContaining(["tabular-nums", "text-caption", "text-[var(--bo-texto-terciario)]"]),
+    );
+  });
+
   it("os números vão todos no mesmo rasto", async () => {
     route("GET /api/temas", () =>
       ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
@@ -1284,10 +1428,26 @@ describe("Biblioteca de Temas — o cartão", () => {
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
     await act(async () => {});
-    // Uma linha só: fotos, uso, e a data por último — que é a que cai primeiro
-    // quando não cabe, por ser a menos decisiva das três.
+    // Um rasto só: fotos, uso, e a data por último. Parte-se em duas linhas
+    // quando não cabe (o desenho da Parte 3), em vez de cortar a data a meio.
     const rasto = screen.getByText(/9 fotos · 4 propostas/);
-    expect(rasto.className).toMatch(/truncate/);
+    expect(rasto.className).toMatch(/\bline-clamp-2\b/);
+    expect(rasto.className, "`truncate` cortava a data absoluta a meio").not.toMatch(
+      /\btruncate\b/,
+    );
+  });
+
+  it("o cartão enche a célula da grelha, para a fila ter uma altura só", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
+    );
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const rasto = screen.getByText(/9 fotos/);
+    const cartao = rasto.closest("button")!;
+    expect(cartao.className, "sem `h-full`, um rasto de duas linhas desalinha a fila").toMatch(
+      /\bh-full\b/,
+    );
   });
 
   /**
@@ -1415,6 +1575,69 @@ describe("Biblioteca de Temas — a barra de controlos", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Acções de Biblioteca de Temas/ }));
     expect(screen.getByRole("menuitem", { name: "Rever etiquetas…" })).toBeTruthy();
+  });
+
+  /**
+   * ── FASE 01: O CAMPO DIZ O QUE PROCURA, A 10 px, E A FILA TEM UMA ALTURA ──
+   *
+   * «Procurar temas» e não «… e fotografias»: a procura só lê o nome e a nota
+   * (o teste de cima acha por nome; o dos âmbitos, por nota). Uma fotografia
+   * não tem texto por onde se ache.
+   */
+  it("o campo diz «Procurar temas» e não promete o que não procura", async () => {
+    cinco();
+    renderTemas();
+    const campo = await screen.findByLabelText(/Procurar tema/);
+    expect(campo.getAttribute("placeholder")).toBe("Procurar temas");
+  });
+
+  /**
+   * Ponto 5 da auditoria: «campo de pesquisa a 10 px, como tudo o resto. E
+   * alinhado na mesma linha e na mesma baseline dos outros controlos.» Pelas
+   * classes davam 42, 34–38, 34, 36 e 32 px. O jsdom não tem caixas, portanto
+   * prende-se o contrato das classes: o degrau `h-10` em todos (o `md` do
+   * `ui/Button`) e o raio do token do controlo nos dois que usam o `.bo-input`.
+   */
+  it("os controlos da barra partilham uma altura, e o campo o raio do controlo", async () => {
+    cinco();
+    renderTemas();
+    const campo = await screen.findByLabelText(/Procurar tema/);
+    const ordenar = screen.getByRole("combobox", { name: "Ordenar os temas" });
+    const reticencias = screen.getByRole("button", { name: /Acções de Biblioteca de Temas/ });
+    const novo = screen.getByRole("button", { name: /Novo tema/ });
+    const tamanhos = screen.getByRole("group", { name: /Tamanho dos cartões/ });
+
+    for (const [nome, no] of [
+      ["campo", campo],
+      ["ordenação", ordenar],
+      ["«⋯»", reticencias],
+      ["«Novo tema»", novo],
+    ] as const) {
+      expect(no.className.split(/\s+/), `${nome} fora dos 40 px da fila`).toContain("h-10");
+    }
+    expect(tamanhos.className.split(/\s+/)).toContain("min-h-10");
+    for (const no of [campo, ordenar]) {
+      expect(no.className.split(/\s+/)).toContain("[--bo-radius:var(--radius-control)]");
+    }
+    // E o token existe mesmo, com os 10 px que o documento pede.
+    const tema = readFileSync(join(process.cwd(), "src/app/tema.css"), "utf8");
+    expect(tema).toMatch(/--radius-control:\s*10px;/);
+  });
+
+  /**
+   * Parte 6: «Fotos de inspiração por tema, prontas para as propostas» →
+   * «(fora — a secção chama-se Temas)». O subtítulo vive no `AdminClient`,
+   * que este ficheiro não monta; lê-se o mapa onde ele está escrito.
+   */
+  it("a secção não tem subtítulo por cima do título", () => {
+    const fonte = readFileSync(
+      join(process.cwd(), "src/app/[lang]/(admin)/orcamento/admin/AdminClient.tsx"),
+      "utf8",
+    );
+    const inicio = fonte.indexOf("const VIEW_SUB");
+    expect(inicio, "o mapa dos subtítulos mudou de nome").toBeGreaterThan(-1);
+    const mapa = fonte.slice(inicio, fonte.indexOf("};", inicio));
+    expect(mapa).toMatch(/^\s*temas: "",$/m);
   });
 
   it("a ordenação e o tamanho dos cartões ficam no mesmo grupo", async () => {
@@ -1707,9 +1930,17 @@ describe("Biblioteca de Temas — os atalhos da selecção", () => {
     const celula = screen.getByRole("checkbox", { name: "Selecionar foto 2 de 3" }).parentElement!;
     fireEvent.contextMenu(celula, { clientX: 20, clientY: 20 });
 
+    // Pela ordem da Parte 3 do `docs/APPLE-TEMAS.md`. Sem outros temas não há
+    // para onde mover nem duplicar, e esses dois escondem-se (Parte 9.8).
     const itens = screen.getAllByRole("menuitem").map((m) => m.textContent);
-    expect(itens[0]).toBe("Ver em grande");
-    expect(itens[itens.length - 1]).toBe("Remover do tema…");
+    expect(itens).toEqual([
+      "Pré-visualizar",
+      "Abrir tamanho real",
+      "Definir como capa",
+      "Remover do tema…",
+    ]);
+    // Três grupos, dois filetes.
+    expect(screen.getByRole("menu").querySelectorAll('[role="separator"]')).toHaveLength(2);
   });
 });
 
@@ -2605,8 +2836,18 @@ describe("desdeQuando", () => {
     expect(desdeQuando(dias(0), agora)).toBe("hoje");
     expect(desdeQuando(dias(1), agora)).toBe("ontem");
     expect(desdeQuando(dias(9), agora)).toBe("há 9 dias");
-    expect(desdeQuando(dias(60), agora)).toBe("há 2 meses");
-    expect(desdeQuando(dias(400), agora)).toBe("há 1 ano");
+    expect(desdeQuando(dias(29), agora)).toBe("há 29 dias");
+  });
+
+  /**
+   * Fase 02, ponto 13: «a partir de 30 dias mostra a data». Era «há 2 meses» e
+   * «há 1 ano» — dois temas com «há 1 ano» podiam estar onze meses afastados.
+   * Mudou de propósito; o formato é o da casa, `DD/MM/AAAA`.
+   */
+  it("a partir de 30 dias diz a data, e não «há N meses»", () => {
+    expect(desdeQuando(dias(30), agora)).toBe("06/07/2026");
+    expect(desdeQuando(dias(60), agora)).toBe("06/06/2026");
+    expect(desdeQuando(dias(400), agora)).toBe("01/07/2025");
   });
 
   /** Um relógio trocado (ou uma escrita acabada de acontecer) não pode produzir
@@ -3265,6 +3506,58 @@ describe("a pasta de um tema diz o que mudou", () => {
     expect(screen.queryByText("Tema renomeado.")).toBeNull();
   });
 
+  /**
+   * A capa nova no CARTÃO, e não só na pasta.
+   *
+   * O cartão desenha quatro endereços da mesma fotografia — a derivada, o AVIF
+   * que o `<picture>` oferece primeiro, o original de reserva e o borrão. A
+   * troca mudava só o primeiro: o AVIF ficava da capa antiga e, como o
+   * `<source>` ganha ao `<img>`, o cartão continuava a mostrá-la.
+   */
+  it("trocar a capa troca os quatro campos do cartão, não só o endereço", async () => {
+    const comLqip = (n: number): ThemeImage => ({
+      ...photo(n, true),
+      lqip: `data:image/webp;base64,LQIP${n}`,
+    });
+    route("GET /api/temas", () =>
+      ok([
+        {
+          ...THEME,
+          imageCount: 2,
+          coverUrl: "https://cdn.test/thumb-1.jpg",
+          coverAvif: "https://cdn.test/avif-1.avif",
+          coverFallbackUrl: "https://cdn.test/foto-1.jpg",
+          coverLqip: "data:image/webp;base64,LQIP1",
+        },
+      ]),
+    );
+    route("GET /api/temas/t1/imagens", () =>
+      ok({ ok: true, images: [comLqip(1), comLqip(2)], total: 2 }),
+    );
+    route("PATCH /api/temas/t1", () => ok({ ...THEME, coverPath: "t1/foto-2.jpg" }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 2 de 2" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Definir como capa" }));
+    });
+    // De volta à grelha dos cartões.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "← Temas" }));
+    });
+
+    const cartao = await acharCartaoDoTema(/Terracotta/);
+    const img = cartao.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("https://cdn.test/thumb-2.jpg");
+    // O AVIF da capa ANTIGA não pode continuar à frente da nova.
+    expect(cartao.querySelector('source[type="image/avif"]')).toBeNull();
+    expect(img.style.backgroundImage).toContain("LQIP2");
+    // E o plano B é o original da NOVA.
+    fireEvent.error(img);
+    expect(img.getAttribute("src")).toBe("https://cdn.test/foto-2.jpg");
+  });
+
   it("definir a capa NÃO diz nada — a etiqueta aparece na própria foto", async () => {
     route("GET /api/temas", () => ok([{ ...THEME, imageCount: 2 }]));
     route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 2, true), total: 2 }));
@@ -3281,5 +3574,259 @@ describe("a pasta de um tema diz o que mudou", () => {
     expect(await screen.findByText("Capa")).toBeInTheDocument();
     // E por isso não há aviso nenhum a repetir o que já se lê.
     expect(screen.queryByText("Capa do tema definida.")).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * FASE 2 — OS MENUS DO TEMA E DA FOTOGRAFIA, PELA ORDEM DO DOCUMENTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Parte 3 do `docs/APPLE-TEMAS.md` e T3 do `PROPOSTAS-E-TEMAS-APPLE.md`. O
+ * menu do tema tem oito itens em três grupos — ela respondeu «podes» a
+ * encurtá-lo: saiu «Pré-visualizar» e ficou «Juntar a outro tema…» —, o
+ * «Eliminar tema» sai do cabeçalho da pasta para o «⋯» dele, e os três itens
+ * que só a pasta sabe fazer abrem-na a fazê-los.
+ */
+describe("Biblioteca de Temas — os menus da Fase 2", () => {
+  const ORDEM_DO_TEMA = [
+    "Abrir",
+    "Adicionar fotografias…",
+    "Renomear…",
+    "Definir capa…",
+    "Favorito",
+    "Arquivar",
+    "Juntar a outro tema…",
+    "Eliminar tema…",
+  ];
+
+  const comFotos = (n = 3) => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: n }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, n, true), total: n }));
+  };
+
+  it("o menu do tema tem oito itens em três grupos", async () => {
+    comFotos();
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    fireEvent.click(screen.getByRole("button", { name: "Acções de Terracotta" }));
+    const menu = screen.getByRole("menu");
+    expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(ORDEM_DO_TEMA);
+    expect(ORDEM_DO_TEMA).toHaveLength(8);
+    expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(2);
+  });
+
+  it("numa pasta vazia, «Definir capa…» esconde-se, e não há «Pré-visualizar»", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 0 }]));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    fireEvent.click(screen.getByRole("button", { name: "Acções de Terracotta" }));
+    const itens = screen.getAllByRole("menuitem").map((m) => m.textContent);
+    expect(itens).not.toContain("Pré-visualizar");
+    expect(itens).not.toContain("Definir capa…");
+    expect(itens[0]).toBe("Abrir");
+  });
+
+  it("um favorito diz «Tirar dos favoritos» — um item comutável, não dois", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 3, favorito: true }]));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    fireEvent.click(screen.getByRole("button", { name: "Acções de Terracotta" }));
+    expect(screen.getByRole("menuitem", { name: "Tirar dos favoritos" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Favorito" })).toBeNull();
+  });
+
+  it("o cabeçalho da pasta não tem o botão «Eliminar tema»; o «⋯» dele tem", async () => {
+    comFotos();
+    renderTemas();
+    await openFolder(/Terracotta/);
+    expect(screen.queryByRole("button", { name: "Eliminar tema" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Acções de Terracotta" }));
+    const itens = screen.getAllByRole("menuitem").map((m) => m.textContent);
+    // A mesma lista do cartão, sem «Abrir» (já se está lá dentro).
+    expect(itens).toEqual(ORDEM_DO_TEMA.filter((i) => i !== "Abrir"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Eliminar tema…" }));
+    expect(await screen.findByText(/Eliminar o tema «Terracotta»/)).toBeTruthy();
+  });
+
+  it("Shift+F10 num cartão abre o mesmo menu, e o Escape devolve o foco ao cartão", async () => {
+    comFotos();
+    renderTemas();
+    const cartao = await acharCartaoDoTema(/Terracotta/);
+    cartao.focus();
+    fireEvent.keyDown(cartao, { key: "F10", shiftKey: true });
+    expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(ORDEM_DO_TEMA);
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(cartao);
+  });
+
+  it("a tecla de menu numa fotografia abre o menu dela", async () => {
+    comFotos();
+    renderTemas();
+    await openFolder(/Terracotta/);
+    const celula = screen.getByRole("checkbox", { name: "Selecionar foto 2 de 3" });
+    fireEvent.keyDown(celula, { key: "ContextMenu" });
+    expect(screen.getByRole("menu", { name: "Acções de foto 2 de 3" })).toBeTruthy();
+  });
+
+  it("«Adicionar fotografias…» abre a pasta e o seletor de ficheiros", async () => {
+    comFotos();
+    const escolher = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const item = accaoNoMenuDoTema(/Terracotta/, "Adicionar fotografias…");
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    await screen.findByRole("button", { name: "Adicionar fotos" });
+    expect(escolher).toHaveBeenCalledTimes(1);
+    expect((escolher.mock.contexts[0] as HTMLInputElement).type).toBe("file");
+  });
+
+  it("«Renomear…» abre a pasta com o campo do nome", async () => {
+    comFotos();
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const item = accaoNoMenuDoTema(/Terracotta/, "Renomear…");
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    const campo = await screen.findByRole("textbox", { name: "Nome do tema" });
+    expect((campo as HTMLInputElement).value).toBe("Terracotta");
+  });
+
+  it("«Definir capa…» abre a pasta a escolher a capa: um clique numa foto e está", async () => {
+    comFotos();
+    route("PATCH /api/temas/t1", () => ok({ ...THEME, coverPath: "t1/foto-2.jpg" }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const item = accaoNoMenuDoTema(/Terracotta/, "Definir capa…");
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    expect(await screen.findByText("Escolhe a fotografia da capa.")).toBeTruthy();
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(screen.getByRole("checkbox", { name: "Usar a foto 2 de 3 como capa" }));
+    });
+    const patch = requests.find((r) => routeKey(r.url, r.init) === "PATCH /api/temas/t1");
+    expect(JSON.parse(String(patch?.init?.body))).toEqual({ coverPath: "t1/foto-2.jpg" });
+    // O modo acaba, e a foto não ficou seleccionada pelo caminho.
+    expect(screen.queryByText("Escolhe a fotografia da capa.")).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "Selecionar foto 2 de 3" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("no modo «escolher a capa», o Escape cancela sem mexer em nada", async () => {
+    comFotos();
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    const item = accaoNoMenuDoTema(/Terracotta/, "Definir capa…");
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    await screen.findByText("Escolhe a fotografia da capa.");
+    await act(async () => {});
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText("Escolhe a fotografia da capa.")).toBeNull();
+    expect(callsTo("PATCH /api/temas/t1")).toBe(0);
+  });
+
+  it("menu da foto: «Abrir tamanho real» abre o original num separador novo", async () => {
+    comFotos();
+    const abrir = vi.spyOn(window, "open").mockReturnValue(null);
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.contextMenu(
+      screen.getByRole("checkbox", { name: "Selecionar foto 2 de 3" }).parentElement!,
+      { clientX: 20, clientY: 20 },
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Abrir tamanho real" }));
+    expect(abrir).toHaveBeenCalledWith(photo(2).url, "_blank", "noopener");
+  });
+
+  it("menu da foto: «Duplicar para…» abre a folha em «Copiar»", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, imageCount: 3 },
+        { ...THEME, id: "t2", name: "Zen", imageCount: 1 },
+      ]),
+    );
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.contextMenu(
+      screen.getByRole("checkbox", { name: "Selecionar foto 2 de 3" }).parentElement!,
+      { clientX: 20, clientY: 20 },
+    );
+    expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
+      "Pré-visualizar",
+      "Abrir tamanho real",
+      "Mover para…",
+      "Duplicar para…",
+      "Definir como capa",
+      "Remover do tema…",
+    ]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Duplicar para…" }));
+    });
+    const folha = await screen.findByRole("dialog", { name: /foto selecionada/ });
+    const modo = within(folha).getByRole("radiogroup", { name: "O que fazer" });
+    expect(within(modo).getByRole("radio", { name: "Copiar" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+});
+
+/**
+ * ── A PERGUNTA DE ELIMINAR DIZ OS NÚMEROS (T3) ────────────────────────────
+ *
+ * «Uma confirmação que diz quantas fotos e propostas são afectadas.» Dizia
+ * «as propostas já feitas com estas fotos não são afectadas» — sem número.
+ */
+describe("Biblioteca de Temas — eliminar diz quantas fotos e propostas", () => {
+  it("as frases, no singular e no plural, e os casos sem número", () => {
+    expect(fraseDeEliminar({ imageCount: 5 }, 2)).toEqual({
+      fotos: "Desaparecem 5 fotografias.",
+      propostas: "Está em 2 propostas — essas guardam as fotos que usam e não mudam.",
+    });
+    expect(fraseDeEliminar({ imageCount: 1 }, 1)).toEqual({
+      fotos: "Desaparece 1 fotografia.",
+      propostas: "Está em 1 proposta — essa guarda as fotos que usa e não muda.",
+    });
+    // Nenhuma proposta: não há nada a dizer sobre elas.
+    expect(fraseDeEliminar({ imageCount: 5 }, 0).propostas).toBeNull();
+    // A contagem truncada é um mínimo; a pasta ilegível não tem número.
+    expect(fraseDeEliminar({ imageCount: 500, truncated: true }, 0).fotos).toBe(
+      "Desaparecem 500+ fotografias.",
+    );
+    expect(fraseDeEliminar({ imageCount: null }, 0).fotos).toBe(
+      "Desaparecem as fotografias que estiverem lá dentro.",
+    );
+    expect(fraseDeEliminar({ imageCount: 0 }, 0).fotos).toMatch(/vazia/);
+    // Sem a contagem de usos, fica a frase de antes — que continua verdadeira.
+    expect(fraseDeEliminar({ imageCount: 5 }, null).propostas).toBe(
+      "As propostas já feitas com estas fotos não são afectadas.",
+    );
+  });
+
+  it("a confirmação mostra N fotografias e M propostas, e que não se anula", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 7 }]));
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 3 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    // O número de propostas já chegou ao cartão.
+    await screen.findByText(/3 propostas/);
+    fireEvent.click(accaoNoMenuDoTema(/Terracotta/, "Eliminar tema…"));
+    const caixa = await screen.findByRole("dialog");
+    expect(within(caixa).getByText("Desaparecem 7 fotografias.")).toBeTruthy();
+    expect(
+      within(caixa).getByText("Está em 3 propostas — essas guardam as fotos que usam e não mudam."),
+    ).toBeTruthy();
+    expect(within(caixa).getByText("Esta acção não pode ser anulada.")).toBeTruthy();
   });
 });

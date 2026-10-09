@@ -62,10 +62,20 @@ const FICHEIROS = execSync(
   .split("\n")
   .filter(Boolean);
 
-/** As duas — e só estas duas — podem aparecer no back office. */
+/**
+ * As duas do que flutua — e, desde a Fase 02 dos temas, as duas do cartão que
+ * se abre (repouso e erguida). Os documentos dela pedem-nas por escrito: «em
+ * claro a elevação faz-se por sombra» (Parte 5.3 do `docs/DESIGN-SYSTEM.md`) e,
+ * no cartão de tema, «sombra, sem borda», com «borda a marcar elevação» nas
+ * proibições (`docs/APPLE-TEMAS.md`, Partes 3 e 9). O que este teste guardava
+ * continua guardado: nenhum valor escrito à mão, nenhuma `shadow-sm` solta —
+ * só tokens com nome, todos feitos das mesmas tintas (ver o caso de baixo).
+ */
 const PERMITIDAS = new Set([
   "shadow-[var(--bo-sombra-suspensa)]",
   "shadow-[var(--bo-sombra-modal)]",
+  "shadow-[var(--bo-sombra-repouso)]",
+  "shadow-[var(--bo-sombra-erguida)]",
   // `shadow-none` é o contrário de uma sombra: é o que desliga a de cima num
   // ponto de quebra onde o elemento deixa de flutuar (a gaveta do menu e o
   // painel de detalhe fazem exactamente isso ao passar para ecrã largo).
@@ -105,10 +115,21 @@ describe("as sombras do back office", () => {
     expect(intrusas).toEqual([]);
   });
 
-  it("define as duas sombras, e mais nenhuma, em globals.css", () => {
+  it("define as sombras com nome, e mais nenhuma, em globals.css", () => {
     const css = semComentarios(readFileSync("src/app/globals.css", "utf8"));
     expect(css).toContain("--bo-sombra-suspensa:");
     expect(css).toContain("--bo-sombra-modal:");
+    // As do cartão são feitas das MESMAS tintas: é isso que lhes dá o modo
+    // escuro (o `light-dark()` troca as tintas, não a geometria) e o que
+    // impede uma família de sombras paralela de nascer ao lado desta.
+    for (const nome of ["--bo-sombra-repouso", "--bo-sombra-erguida"]) {
+      const m = css.match(new RegExp(`${nome}:([^;]+);`));
+      expect(m, `${nome} não existe`).not.toBeNull();
+      const camadas = m![1].split(/,(?![^(]*\))/);
+      for (const camada of camadas) {
+        expect(camada, `${nome} tem uma cor escrita à mão`).toMatch(/var\(--bo-sombra-tinta-\d\)/);
+      }
+    }
     // Os dois tokens antigos foram-se: um era a sombra de repouso que este
     // bloco apagou, o outro não tinha um único consumidor.
     expect(css).not.toContain("--bo-shadow-sm");
