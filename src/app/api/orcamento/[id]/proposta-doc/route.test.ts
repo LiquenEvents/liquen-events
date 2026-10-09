@@ -96,7 +96,7 @@ vi.mock("@/lib/proposal-doc-render", () => ({
   renderStoredProposalDocPdf: vi.fn(async () => Buffer.from("%PDF-1.4")),
   // A rota passou a usar a variante que também conta as fotos que não
   // resolveram, para poder avisar antes de a proposta seguir para o cliente.
-  renderStoredProposalDocPdfWithReport: vi.fn(async () => {
+  renderStoredEditorialPdfWithReport: vi.fn(async () => {
     const i = renderMock.chamadas++;
     return {
       pdf: Buffer.from("%PDF-1.4"),
@@ -171,7 +171,7 @@ vi.mock("@/lib/envios-de-proposta", () => ({
 
 import { GET, POST } from "./route";
 import { sendMail } from "@/lib/mail";
-import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { renderStoredEditorialPdfWithReport } from "@/lib/proposal-doc-render";
 import { createProposal, updateProposal } from "@/lib/proposals-store";
 import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 
@@ -489,7 +489,7 @@ describe("o tempo que resta", () => {
     const real = Date.now;
     let agora = real();
     vi.spyOn(Date, "now").mockImplementation(() => agora);
-    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async () => {
+    vi.mocked(renderStoredEditorialPdfWithReport).mockImplementationOnce(async () => {
       agora += 40_000; // o desenho levou 40 s
       return { pdf: Buffer.from("%PDF"), missingImages: 0, truncations: [] } as never;
     });
@@ -504,13 +504,13 @@ describe("o tempo que resta", () => {
     const real = Date.now;
     let agora = real();
     vi.spyOn(Date, "now").mockImplementation(() => agora);
-    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async () => {
+    vi.mocked(renderStoredEditorialPdfWithReport).mockImplementationOnce(async () => {
       agora += 25_000;
       return { pdf: Buffer.from("%PDF"), missingImages: 1, truncations: [] } as never;
     });
     await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     vi.mocked(Date.now).mockRestore();
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -547,7 +547,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o documento fica guardado", 
     const res = await POST(sendReq(enorme), { params });
     expect(res.status).toBe(413);
     expect(created.last).toBeNull();
-    expect(renderStoredProposalDocPdfWithReport).not.toHaveBeenCalled();
+    expect(renderStoredEditorialPdfWithReport).not.toHaveBeenCalled();
   });
 
   it("uma base sem a coluna `doc` guarda a proposta na mesma, e diz o que faltou", async () => {
@@ -611,7 +611,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a segunda tentativa do envio
     const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(2);
     // A proposta que seguiu é a SEGUNDA, a que está completa.
     expect(body.missingImages).toBe(0);
   });
@@ -619,7 +619,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a segunda tentativa do envio
   it("com tudo resolvido à primeira NÃO se desenha duas vezes", async () => {
     // Repetir sempre seria pagar o desenho a dobrar em todos os envios bons.
     await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
   });
 
   it("se a segunda correr PIOR, fica-se com a primeira", async () => {
@@ -642,7 +642,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a segunda tentativa do envio
     renderMock.missing = 2;
     const res = await POST(previewReq(baseDoc({ totalAmount: 3000 })), { params });
     expect(res.headers.get("X-Fotos-Em-Falta")).toBe("2");
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -883,7 +883,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha
    * rota PASSA a língua, não a forma exacta do tipo.
    */
   function idiomaDaChamada(n = 0): unknown {
-    const chamada = vi.mocked(renderStoredProposalDocPdfWithReport).mock.calls[n] as unknown[];
+    const chamada = vi.mocked(renderStoredEditorialPdfWithReport).mock.calls[n] as unknown[];
     const segundo = chamada?.[1];
     // Aceita as duas formas — `(doc, "en")` e `(doc, { idioma: "en" })` — porque
     // o que este teste guarda é que a rota PASSA a língua, não a forma exacta
@@ -966,7 +966,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha
       },
     );
     expect(res.status).toBe(200);
-    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(2);
     expect(idiomaDaChamada(0)).toBe("en");
     expect(idiomaDaChamada(1)).toBe("en");
   });

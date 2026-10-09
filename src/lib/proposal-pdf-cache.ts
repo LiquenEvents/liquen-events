@@ -1,6 +1,6 @@
 import "server-only";
 import type { ProposalDoc } from "@/lib/proposal-doc";
-import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { renderStoredEditorialPdfWithReport } from "@/lib/proposal-doc-render";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { guardarPdfDaProposta, lerPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { log } from "@/lib/logger";
@@ -232,14 +232,14 @@ export async function pdfDaPropostaEmCache(
    * frio — o mesmo erro de gravar uma falha como se fosse um facto que já
    * apareceu na cache de fotografias e na célula do estúdio.
    */
-  let ultimo = await renderStoredProposalDocPdfWithReport(doc, idioma);
+  let ultimo = await renderStoredEditorialPdfWithReport(doc, idioma);
   if (ultimo.missingImages > 0) {
     log.warn("proposta-pdf: fotos em falta, a tentar segunda vez", {
       emFalta: ultimo.missingImages,
     });
     // A repetição é para apanhar uma foto que não resolveu, não para mudar o
     // que sai: MESMO documento, MESMA língua.
-    ultimo = await renderStoredProposalDocPdfWithReport(doc, idioma);
+    ultimo = await renderStoredEditorialPdfWithReport(doc, idioma);
   }
   if (ultimo.missingImages > 0) {
     /**

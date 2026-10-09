@@ -6498,12 +6498,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   //    o que lhe chegou. A cópia demora segundos; um PDF sem a foto que ela
   //    escolheu dura para sempre. O botão fica desligado enquanto houver fotos
   //    a caminho, com a razão escrita ao lado, e volta sozinho quando assentam.
-  /**
-   * `desenho: "editorial"` pede o desenho NOVO do PDF (o do exemplo «Mafalda &
-   * João»), que ainda está a ser aprovado por partes. Só se vê: o envio
-   * continua a sair no desenho de hoje até ela dizer que o novo está bom.
-   */
-  async function preview(desenho?: "editorial") {
+  async function preview() {
     if (busy) return;
     setBusy("preview");
     // De ponta a ponta, que é o que ela espera — e não o que o servidor demora
@@ -6522,7 +6517,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           mode: "preview",
           idioma: idiomaDoPdf,
           doc: stripPendingImages(doc),
-          ...(desenho ? { desenho } : {}),
         }),
       });
       if (!res.ok) {
@@ -6568,9 +6562,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         },
         idiomaDoPdf,
       );
-      // O desenho novo não pode ter o nome do que segue para o casal: na pasta
-      // de transferências os dois ficavam lado a lado sem se saber qual é qual.
-      a.download = desenho ? nome.replace(/(\.pdf)?$/i, " (desenho novo).pdf") : nome;
+      a.download = nome;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -6590,11 +6582,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gera outra vez daqui a pouco."
             : `PDF gerado sem ${fotosPorConfirmar} fotos que ainda estão a entrar na proposta. Gera outra vez daqui a pouco.`,
           "info",
-        );
-      } else if (desenho) {
-        toast(
-          "Desenho novo gerado (PDF descarregado). Ainda está a ser feito por partes.",
-          "success",
         );
       } else {
         toast("Pré-visualização gerada (PDF descarregado)", "success");
@@ -10862,11 +10849,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             split={split}
             pctSinal={pctSinal}
           />
-          <CustoDaGeracao
-            fotos={totalDeFotos}
-            capas={doc.coverImages.filter(Boolean).length}
-            amostras={amostras}
-          />
+          <CustoDaGeracao fotos={totalDeFotos} amostras={amostras} />
         </div>
       )}
 
@@ -11827,26 +11810,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
                 />
               ) : (
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => preview()}
-                    disabled={busy !== null}
-                  >
-                    Descarregar PDF
-                  </Button>
-                  {/* O desenho novo, por partes, só para ver. Sai daqui quando
-                      ela o aprovar e o envio passar a usá-lo. */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => preview("editorial")}
-                    disabled={busy !== null}
-                  >
-                    Ver desenho novo
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => preview()}
+                  disabled={busy !== null}
+                >
+                  Descarregar PDF
+                </Button>
               )}
               {/* ══════════════════════════════════════════════════════════
                   A RESSALVA TEM DE SER VERIFICÁVEL NO PAPEL
@@ -12266,8 +12237,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
  * Sem o id do pedido de propósito: o que se aprende numa proposta serve para a
  * seguinte — é a mesma máquina, a mesma ligação e o mesmo servidor. Preso à
  * proposta, a primeira geração de cada uma seria sempre uma adivinha.
+ *
+ * A chave mudou com o desenho novo do PDF (`pdf-editorial`): as medições do
+ * antigo — ~1 s e ~190 KB por foto — ensinavam a recta errada ao novo, que
+ * custa quase tudo à cabeça. As antigas ficam esquecidas no navegador.
  */
-const AMOSTRAS_KEY = "liquen-proposal-studio:geracoes";
+const AMOSTRAS_KEY = "liquen-proposal-studio:geracoes-editorial";
 
 /**
  * A partir de quantas fotos a página começa a ficar apertada.
@@ -13494,17 +13469,7 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
   );
 }
 
-function CustoDaGeracao({
-  fotos,
-  capas,
-  amostras,
-}: {
-  fotos: number;
-  /** As tiras da capa — contam à parte porque custam seis vezes mais do que
-   *  uma célula de mood board (medido: 590 ms contra 90). */
-  capas: number;
-  amostras: AmostraDeGeracao[];
-}) {
+function CustoDaGeracao({ fotos, amostras }: { fotos: number; amostras: AmostraDeGeracao[] }) {
   if (fotos === 0) return null;
   const ms = tempoEstimado(fotos, amostras);
   const bytes = tamanhoEstimado(fotos, amostras);
@@ -13513,12 +13478,12 @@ function CustoDaGeracao({
    * ── E O TECTO DA ROTA, QUE É OUTRA COISA ────────────────────────────────
    *
    * O tempo acima é o que ELA espera, medido daqui. Este é o que o SERVIDOR
-   * gasta — e o servidor tem um tecto que ela não tem como saber: as rotas que
-   * redesenham o documento para o casal morrem aos 20 segundos. Não é a mesma
+   * gasta — e o servidor tem um tecto que ela não tem como saber: a rota que
+   * redesenha o documento para o casal morre ao fim de `TECTO_DA_ROTA_MS`. Não é a mesma
    * conta nem a mesma pergunta, e por isso não se mistura com a frase de cima:
    * uma diz «vais esperar isto», a outra diz «isto está a chegar ao limite».
    */
-  const orcamento = orcamentoDeTempo(fotos, capas);
+  const orcamento = orcamentoDeTempo(fotos);
   // Com medições, diz-se que são medições — «cerca de» com uma amostra atrás é
   // outra coisa do que «cerca de» com um modelo por omissão.
   const medido = amostras.length >= 2;
@@ -13546,9 +13511,10 @@ function CustoDaGeracao({
           <span>
             Com esta quantidade de fotografias, o servidor demora{" "}
             {tempoEmPalavras(orcamento.msOptimista)} a {tempoEmPalavras(orcamento.msPessimista)} a
-            desenhar o documento — e a página onde o casal o abre desiste aos 20 segundos. O PDF do
-            envio sai na mesma (tem mais tempo); quem pode ficar sem ele é o casal, ao carregar no
-            link. Tira algumas fotografias das páginas mais cheias.
+            desenhar o documento — e a página onde o casal o abre desiste ao fim de{" "}
+            {tempoEmPalavras(orcamento.tectoMs).replace(/^cerca de /, "")}. O PDF do envio sai na
+            mesma (tem mais tempo); quem pode ficar sem ele é o casal, ao carregar no link. Tira
+            algumas fotografias das páginas mais cheias.
           </span>
         </p>
       )}

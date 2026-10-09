@@ -97,7 +97,7 @@ vi.mock("@/lib/proposal-pdf-chave", () => ({
 }));
 
 import { readFileSync } from "node:fs";
-import { TECTO_DA_ROTA_MS } from "./custo-do-pdf";
+import { PIOR_DESENHO_MS } from "./custo-do-pdf";
 import {
   aquecerPdfsEmFalta,
   CHAO_MS,
@@ -422,8 +422,9 @@ describe("o que fica para trás quando acaba", () => {
  * trabalho é dado como falhado por causa do aquecimento. Exactamente o que não
  * pode acontecer.
  *
- * A conta usa números MEDIDOS, não escolhidos: `TECTO_DA_ROTA_MS` é o custo de
- * uma proposta pesada em `custo-do-pdf.ts`, derivado de oito execuções reais.
+ * A conta usa números MEDIDOS, não escolhidos: `PIOR_DESENHO_MS` é o custo de
+ * uma proposta no tecto do gerador (80 fotografias) em `custo-do-pdf.ts`,
+ * medido no desenho novo num só processador, com a rede do mau dia.
  *
  * É também a razão de o remédio para a lentidão NÃO ser subir o orçamento:
  * subir o orçamento aproxima o fim da janela do tecto da função. Quem trata da
@@ -445,12 +446,12 @@ describe("o chão do orçamento cabe o pior desenho", () => {
     const tecto = tectoDaFuncaoMs();
     // O mais tarde que um desenho pode arrancar, e quando acabaria no pior caso.
     const arranqueMaisTarde = ORCAMENTO_MS - CHAO_MS;
-    const fimNoPiorCaso = arranqueMaisTarde + TECTO_DA_ROTA_MS;
+    const fimNoPiorCaso = arranqueMaisTarde + PIOR_DESENHO_MS;
 
     expect(
       fimNoPiorCaso,
       `um desenho que arranque ao segundo ${arranqueMaisTarde / 1000} e demore ` +
-        `${TECTO_DA_ROTA_MS / 1000}s acaba ao ${fimNoPiorCaso / 1000} — e a função morre ao ` +
+        `${PIOR_DESENHO_MS / 1000}s acaba ao ${fimNoPiorCaso / 1000} — e a função morre ao ` +
         `${tecto / 1000}, com ${MARGEM_PARA_GRAVAR_MS / 1000}s reservados para gravar a ` +
         `memória das falhas.\n\nSuba o CHAO_MS, não o ORCAMENTO_MS: subir o orçamento ` +
         `aproxima o desastre em vez de o afastar.`,

@@ -8,8 +8,8 @@
  * limite de anexo de email (8 MB)».
  *
  * O botão «Descarregar PDF» é a acção mais lenta do estúdio — vai buscar até
- * oitenta fotografias ao armazenamento, redimensiona cada uma e desenha uma
- * dúzia de páginas. Sem número nenhum à frente, dez segundos e sessenta são a
+ * oitenta fotografias ao armazenamento, redimensiona cada uma e desenha umas
+ * vinte e seis páginas. Sem número nenhum à frente, dez segundos e sessenta são a
  * mesma coisa: uma barra a rodar. Com um número, ela decide se espera ou se vai
  * fazer outra coisa — e, sobretudo, sabe quando é que alguma coisa correu mal.
  *
@@ -19,10 +19,9 @@
  * `{fotos, ms, bytes}`, e a estimativa é uma recta ajustada a essas amostras:
  * um custo fixo mais um custo por fotografia.
  *
- * Sem amostras nenhumas há um modelo de arranque, medido nesta casa e escrito
- * no gerador: ~259 ms fixos e ~75 ms por fotografia do lado do servidor, que de
- * ponta a ponta arredondamos para cima — a rede dela não é a do servidor.
- *
+ * Sem amostras nenhumas há um modelo de arranque, medido nesta casa no
+ * desenho novo (ver {@link ARRANQUE}), arredondado para cima — a rede dela não
+ * é a do servidor. *
  * ── PORQUE É QUE A RECTA É AJUSTADA E NÃO UMA MÉDIA ───────────────────────
  * Porque o que se quer prever é uma proposta de 40 fotos a partir de gerações
  * de 6 e de 25. Uma média de tempos responderia «o costume», que é a resposta
@@ -59,8 +58,23 @@ export const AMOSTRAS_GUARDADAS = 12;
  */
 export const LIMITE_DE_ANEXO = 8 * 1024 * 1024;
 
-/** O modelo de arranque, do lado do servidor (ver `proposta-doc/route.ts`). */
-const ARRANQUE = { msFixo: 900, msPorFoto: 110, bytesFixo: 180_000, bytesPorFoto: 190_000 };
+/**
+ * O modelo de arranque, de ponta a ponta, para o desenho NOVO (`pdf-editorial`).
+ *
+ * Mudou com ele, e muito: o desenho antigo era ~1 s fixo e pesava ~190 KB por
+ * fotografia; o novo tem ~26 páginas, a maioria com fotografias de página
+ * inteira (capa, separadores, painéis), e o custo deixou de crescer com as
+ * fotos — com 6 já está quase todo pago. Medido num só processador:
+ *
+ *      fotos   desenho     ficheiro
+ *          6    8,5 s      3,4 MB
+ *         80   12,1 s      5,3 MB
+ *
+ * Por fotografia ainda há a ida ao armazenamento (o ORIGINAL, não a miniatura)
+ * e a redução a 1800 px (~65 ms de `sharp`). Arredondado para cima: a rede
+ * dela não é a do servidor. As gerações medidas substituem isto ao fim de duas.
+ */
+const ARRANQUE = { msFixo: 9_500, msPorFoto: 220, bytesFixo: 3_300_000, bytesPorFoto: 25_000 };
 
 interface Recta {
   fixo: number;
@@ -172,45 +186,43 @@ export function passaDoAnexo(bytes: number): boolean {
  * **isto ainda cabe no tempo que a plataforma dá à função?**
  *
  * ── O TECTO ───────────────────────────────────────────────────────────────
- * As duas rotas que voltam a DESENHAR o documento para o casal — o link da
- * proposta e o portal — declaram `maxDuration = 20`. Vinte segundos, e ao fim
- * deles a função é morta: o que aparece do outro lado não é um erro que se
- * perceba, é um pedido que falhou sem dizer porquê. O envio tem 60, que é
- * outro tecto e é o folgado; o apertado é o do casal, e é por isso que é este
- * o número que aqui está.
+ * A rota que volta a DESENHAR o documento para o casal (o link da proposta)
+ * declara `maxDuration = 60`, o mesmo que o envio. Eram 20, do tempo em que o
+ * desenho era o antigo; subiu quando o ficheiro guardado passou a ser
+ * encaminhado por ela. Ao fim do tecto a função é morta: o que aparece do
+ * outro lado não é um erro que se perceba, é um pedido que falhou sem dizer
+ * porquê.
  *
  * ── O MODELO, MEDIDO ──────────────────────────────────────────────────────
- * Oito documentos gerados a sério, com fotografias reais, cronometrados só no
- * DESENHO (sharp + pdf-lib, sem ir buscar nada ao armazenamento):
+ * O desenho NOVO (`pdf-editorial`), com fotografias de 1800 px já em memória,
+ * cronometrado só no DESENHO e preso a UM processador (`taskset -c 0`), que é
+ * o pior caso de uma função pequena:
  *
  *      fotos   desenho medido
- *          0        329 ms
- *          6      1 914 ms
- *         42      4 513 ms
- *         80      7 631 ms
+ *          0      2 613 ms
+ *          6      8 543 ms
+ *         80     12 066 ms
  *
- * A recta que sai daqui: **330 ms fixos, ~90 ms por fotografia de mood board e
- * ~590 ms por cada tira de capa** — a capa é a maior caixa do documento e é a
- * que mais trabalho dá ao `sharp`. Nos casos grandes o modelo fica ACIMA do
- * medido (8,5 s calculados contra 7,6 s medidos nas 80 fotos), e fica de
- * propósito: um orçamento de tempo que peca por baixo não serve para avisar.
+ * O desenho antigo crescia com as fotografias (330 ms + 90 por foto). Este
+ * não: a capa, a contracapa, os separadores e os painéis são fotografias de
+ * página inteira, e com meia dúzia de fotos já estão todos desenhados. A recta:
+ * **8,6 s fixos e ~45 ms por fotografia** — acima do medido nos dois pontos,
+ * de propósito: um orçamento de tempo que peca por baixo não serve para avisar.
  *
  * ── E A REDE, QUE NÃO ESTÁ NO MEDIDO ──────────────────────────────────────
- * Aquilo tudo foi medido com as fotografias já em memória. Em produção há que
- * ir buscá-las ao armazenamento, **quatro de cada vez**, e cada uma custa 300
- * a 600 ms com um URL assinado. Para 80 fotografias são vinte lotes: +6 s no
- * bom dia, +12 s no mau. É isso que faz a conta fechar em
+ * Em produção há que ir buscar cada ORIGINAL ao armazenamento, **quatro de cada
+ * vez**, a 300–600 ms cada ida, e reduzi-lo a 1800 px (~65 ms de `sharp`,
+ * medido no mesmo processador). Para 80 fotografias:
  *
- *     80 fotos:  7,6 s de desenho + 6 a 12 s de rede  =  14 a 20 s   ← o tecto
+ *     80 fotos:  12,2 s de desenho + 5,2 s de redução + 6 a 12 s de rede
+ *             =  23 a 29 s                                   ← tecto: 60 s
  *
- * Uma proposta de oitenta fotografias está encostada ao tecto. Não é uma
- * observação de produção: é aritmética sobre medições — e é exactamente por
- * isso que tem de aparecer ANTES, no ecrã onde as fotos se escolhem, e não
- * depois, quando a rota morrer com uma proposta a meio.
+ * Cabe com folga. O aviso fica — é o que acende se alguém baixar o tecto, ou
+ * se o desenho ficar mais caro —, mas com os números de hoje não acende.
  */
 
-/** O tecto das rotas que redesenham o PDF para o casal (`maxDuration = 20`). */
-export const TECTO_DA_ROTA_MS = 20_000;
+/** O tecto da rota que redesenha o PDF para o casal (`maxDuration = 60`). */
+export const TECTO_DA_ROTA_MS = 60_000;
 
 /** Quantas fotografias se vão buscar ao armazenamento ao mesmo tempo. */
 const LOTE_DO_STORAGE = 4;
@@ -219,7 +231,10 @@ const LOTE_DO_STORAGE = 4;
 const MS_POR_FOTO_NO_STORAGE = { optimista: 300, pessimista: 600 };
 
 /** O modelo do desenho, medido (ver o bloco acima). */
-const DESENHO = { msFixo: 330, msPorFotoDeBoard: 90, msPorTiraDeCapa: 590 };
+const DESENHO = { msVazio: 2_700, msFixo: 8_600, msPorFoto: 45, msPorReducao: 65 };
+
+/** O tecto de fotografias que o gerador aceita (`MAX_IMAGES_PER_DOC`). */
+export const FOTOS_NO_TECTO_DO_GERADOR = 80;
 
 export interface OrcamentoDeTempo {
   /** Só o desenho — sharp e pdf-lib, sem rede. */
@@ -243,18 +258,17 @@ export interface OrcamentoDeTempo {
 /**
  * Quanto tempo esta proposta vai custar ao servidor, e quanto lhe sobra.
  *
- * @param fotosDeBoard as fotografias dos mood boards.
- * @param tirasDeCapa as fotografias da capa (0, 1 ou 2) — custam seis vezes
- *        mais do que uma célula de mood board, e por isso contam à parte.
+ * @param fotos todas as fotografias do documento — a da capa conta como as
+ *        outras: no desenho novo é uma fotografia de página inteira entre
+ *        várias, e não a caixa mais cara do documento.
  */
-export function orcamentoDeTempo(fotosDeBoard: number, tirasDeCapa: number): OrcamentoDeTempo {
-  const board = Math.max(0, fotosDeBoard);
-  const capa = Math.max(0, tirasDeCapa);
+export function orcamentoDeTempo(fotos: number): OrcamentoDeTempo {
+  const n = Math.max(0, fotos);
   const desenhoMs = Math.round(
-    DESENHO.msFixo + DESENHO.msPorFotoDeBoard * board + DESENHO.msPorTiraDeCapa * capa,
+    n === 0 ? DESENHO.msVazio : DESENHO.msFixo + (DESENHO.msPorFoto + DESENHO.msPorReducao) * n,
   );
   // Quatro de cada vez: o que custa é o número de LOTES, não o de fotografias.
-  const lotes = Math.ceil((board + capa) / LOTE_DO_STORAGE);
+  const lotes = Math.ceil(n / LOTE_DO_STORAGE);
   const msOptimista = desenhoMs + lotes * MS_POR_FOTO_NO_STORAGE.optimista;
   const msPessimista = desenhoMs + lotes * MS_POR_FOTO_NO_STORAGE.pessimista;
   return {
@@ -265,3 +279,10 @@ export function orcamentoDeTempo(fotosDeBoard: number, tirasDeCapa: number): Orc
     aperta: msPessimista >= TECTO_DA_ROTA_MS * 0.75,
   };
 }
+
+/**
+ * O PIOR desenho que o servidor pode ter de fazer: o tecto de fotografias do
+ * gerador, no mau dia da rede. É o número com que o aquecimento nocturno conta
+ * para não deixar um desenho a meio quando a função da cópia de segurança morre.
+ */
+export const PIOR_DESENHO_MS = orcamentoDeTempo(FOTOS_NO_TECTO_DO_GERADOR).msPessimista;

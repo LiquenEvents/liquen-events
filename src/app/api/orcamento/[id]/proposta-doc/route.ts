@@ -18,10 +18,7 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
  *  pode citar. O porquê da separação está no `money.ts`. */
 import { eur, eurDocumento } from "@/lib/money";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
-import {
-  renderStoredEditorialPdfWithReport,
-  renderStoredProposalDocPdfWithReport,
-} from "@/lib/proposal-doc-render";
+import { renderStoredEditorialPdfWithReport } from "@/lib/proposal-doc-render";
 import { chaveDoPdf } from "@/lib/proposal-pdf-cache";
 import { guardarPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { enderecoDoPdfDaProposta } from "@/lib/proposta-link-curto";
@@ -201,13 +198,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * A escolha nova tem de ser explícita para tirar alguma coisa.
        */
       porEmail?: unknown;
-      /**
-       * «editorial» desenha a PRÉ-VISUALIZAÇÃO no desenho novo (o do exemplo
-       * «Mafalda & João»), que ainda está a ser aprovado. No envio é ignorado:
-       * o que segue para o casal continua a ser o desenho de hoje até ela dizer
-       * que o novo está bom.
-       */
-      desenho?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
@@ -367,10 +357,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
-    let relatorio =
-      mode === "preview" && body?.desenho === "editorial"
-        ? await renderStoredEditorialPdfWithReport(doc, idioma)
-        : await renderStoredProposalDocPdfWithReport(doc, idioma);
+    // É o desenho NOVO (`pdf-editorial`): ela aprovou-o — «Sim, passa a enviar
+    // o novo». O gerador antigo fica no código, sem uso nas rotas.
+    let relatorio = await renderStoredEditorialPdfWithReport(doc, idioma);
 
     /**
      * ════════════════════════════════════════════════════════════════════════
@@ -414,7 +403,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
       // A segunda tentativa é o MESMO documento na MESMA língua: repetir é para
       // apanhar uma foto que não resolveu, não para mudar o que sai.
-      const segunda = await renderStoredProposalDocPdfWithReport(doc, idioma);
+      const segunda = await renderStoredEditorialPdfWithReport(doc, idioma);
       if (segunda.missingImages < relatorio.missingImages) relatorio = segunda;
       if (relatorio.missingImages > 0) {
         log.error("proposta-doc: a proposta segue com fotos a menos", null, {
@@ -1705,7 +1694,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // menos e ninguém a avisou. Mas ficou só no caminho da pré-visualização — e
     // os passos do estúdio são clicáveis, portanto dá para ir do Conteúdo
     // direito ao Enviar sem passar por lá. Nesse caminho o número era calculado
-    // (é o mesmo `renderStoredProposalDocPdfWithReport` lá em cima) e deitado
+    // (é o mesmo `renderStoredEditorialPdfWithReport` lá em cima) e deitado
     // fora, o que deixava a porta aberta exactamente para o caso que a magoou:
     // a proposta segue para o noivo com fotos a menos, em silêncio.
     //

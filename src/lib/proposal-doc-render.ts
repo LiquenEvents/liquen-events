@@ -642,13 +642,15 @@ async function reduzirParaEditorial(bytes: Buffer): Promise<Buffer> {
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * O DESENHO EDITORIAL — SÓ PARA VER, ATÉ ELA APROVAR
+ * O DESENHO EDITORIAL — O QUE SEGUE PARA O CASAL
  * ══════════════════════════════════════════════════════════════════════════
  *
  * O mesmo caminho do de cima (os textos fixos, as fotografias do armazenamento,
  * o relatório do que falta e do que ficou cortado), com o desenho novo de
- * `pdf-editorial/`. Só a pré-visualização o chama, com `desenho: "editorial"`;
- * o envio e o link do casal continuam no desenho antigo até ela o aprovar.
+ * `pdf-editorial/`. Ela aprovou-o («Sim, passa a enviar o novo»): é o que o
+ * estúdio descarrega, o que segue no envio, e o que o link do casal desenha
+ * quando não há ficheiro guardado. O de cima fica, sem uso nas rotas, até ela
+ * enviar algumas propostas no desenho novo.
  */
 export async function renderStoredEditorialPdfWithReport(
   doc: ProposalDoc,

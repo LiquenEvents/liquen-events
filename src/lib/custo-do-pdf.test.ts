@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   AMOSTRAS_GUARDADAS,
+  FOTOS_NO_TECTO_DO_GERADOR,
   LIMITE_DE_ANEXO,
+  PIOR_DESENHO_MS,
+  TECTO_DA_ROTA_MS,
   comNovaAmostra,
   orcamentoDeTempo,
   passaDoAnexo,
@@ -124,47 +128,54 @@ describe("as palavras", () => {
  * O ORÇAMENTO DE TEMPO — O TECTO QUE A PROPOSTA NÃO SABE QUE TEM
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Os números vêm de oito documentos gerados a sério (ver o bloco no
- * `custo-do-pdf.ts`). O que estes testes prendem é a FORMA da conta: que a
- * capa custa muito mais do que uma célula, que a rede entra por lotes de
- * quatro, e que o aviso acende antes de a conta deixar de caber — não depois.
+ * Os números vêm do desenho novo medido num só processador (ver o bloco no
+ * `custo-do-pdf.ts`). O que estes testes prendem é a FORMA da conta: que o
+ * desenho já custa quase tudo com poucas fotos, que a rede entra por lotes de
+ * quatro, e que o tecto é o da rota a sério — lido do ficheiro dela.
  */
 describe("o orçamento de tempo de uma proposta", () => {
+  it("o tecto é o `maxDuration` da rota do casal, e não um número à parte", () => {
+    const fonte = readFileSync("src/app/api/proposta/[token]/pdf/route.ts", "utf8");
+    const m = fonte.match(/export const maxDuration = (\d+)/);
+    expect(m, "o `maxDuration` da rota do PDF do casal desapareceu").not.toBeNull();
+    expect(TECTO_DA_ROTA_MS).toBe(Number(m![1]) * 1000);
+  });
+
   it("uma proposta normal fica com o tecto todo à frente", () => {
-    // 14 fotos + 2 tiras de capa: medido, 2,4 s de desenho e 1 a 2 de rede.
-    const o = orcamentoDeTempo(14, 2);
+    const o = orcamentoDeTempo(16);
     expect(o.aperta).toBe(false);
     expect(o.msPessimista).toBeLessThan(o.tectoMs / 2);
   });
 
-  it("as 80 fotografias do tecto do gerador chegam ao tecto da rota", () => {
-    // 78 de mood board + 2 tiras de capa. Medido: 7,6 s de desenho; a rede põe
-    // lá +6 a +12 s. O mau dia bate nos 20 s da rota.
-    const o = orcamentoDeTempo(78, 2);
-    expect(o.aperta, "a proposta maior que o gerador aceita não acendeu aviso nenhum").toBe(true);
-    expect(o.msPessimista).toBeGreaterThanOrEqual(o.tectoMs * 0.75);
+  it("as 80 fotografias do tecto do gerador cabem no tecto da rota, no mau dia", () => {
+    // Medido: 12,1 s de desenho num processador; a redução e a rede põem lá
+    // +11 a +17 s. Fica abaixo dos três quartos de 60 s.
+    const o = orcamentoDeTempo(FOTOS_NO_TECTO_DO_GERADOR);
+    expect(o.aperta).toBe(false);
+    expect(o.msPessimista).toBe(PIOR_DESENHO_MS);
+    expect(o.msPessimista).toBeLessThan(o.tectoMs);
   });
 
-  it("uma tira de capa custa muito mais do que uma célula de mood board", () => {
-    // É a maior caixa do documento e é a que mais trabalho dá ao sharp: 590 ms
-    // contra 90. Sem esta diferença, uma proposta de duas fotos de capa e mais
-    // nada parecia grátis.
-    const soCapa = orcamentoDeTempo(0, 2).desenhoMs;
-    const soBoard = orcamentoDeTempo(2, 0).desenhoMs;
-    expect(soCapa).toBeGreaterThan(soBoard * 2);
+  it("o modelo fica ACIMA do medido — um orçamento por baixo não avisa", () => {
+    expect(orcamentoDeTempo(0).desenhoMs).toBeGreaterThanOrEqual(2_613);
+    expect(orcamentoDeTempo(6).desenhoMs).toBeGreaterThanOrEqual(8_543);
+    expect(orcamentoDeTempo(80).desenhoMs).toBeGreaterThanOrEqual(12_066);
+  });
+
+  it("com poucas fotografias o desenho já está quase todo pago", () => {
+    // A capa, os separadores e os painéis são páginas inteiras: com seis fotos
+    // já estão desenhados. Passar de 6 para 80 não chega a duplicar.
+    expect(orcamentoDeTempo(80).desenhoMs).toBeLessThan(orcamentoDeTempo(6).desenhoMs * 2);
   });
 
   it("a rede conta por LOTES de quatro, não por fotografia", () => {
-    // Quatro fotografias e uma custam a mesma ida — é o que a concorrência de
-    // 4 dos downloads quer dizer, e ignorá-lo multiplicava a estimativa por
-    // quatro nas propostas grandes.
-    const uma = orcamentoDeTempo(1, 0);
-    const quatro = orcamentoDeTempo(4, 0);
+    const uma = orcamentoDeTempo(1);
+    const quatro = orcamentoDeTempo(4);
     expect(quatro.msPessimista - quatro.desenhoMs).toBe(uma.msPessimista - uma.desenhoMs);
   });
 
   it("um documento sem fotografias nenhumas não gasta rede nenhuma", () => {
-    const o = orcamentoDeTempo(0, 0);
+    const o = orcamentoDeTempo(0);
     expect(o.msOptimista).toBe(o.desenhoMs);
     expect(o.aperta).toBe(false);
   });

@@ -70,24 +70,25 @@ export const ORCAMENTO_MS = 45_000;
  * Um desenho a meio que é cortado pelo tecto da função não deixa ficheiro
  * nenhum e gastou o tempo à mesma. Mais vale não abrir o próximo.
  *
- * ── PORQUE É QUE SUBIU DE 8 s PARA 15 s ───────────────────────────────────
+ * ── PORQUE É QUE SUBIU DE 8 s PARA 15 s, E DEPOIS PARA 20 s ──────────────
  *
- * Porque 8 s não chegava, e a conta mostra-o. O repositório tem o custo de um
- * desenho MEDIDO em oito execuções reais (ver `custo-do-pdf.ts`): uma proposta
- * de 46 fotografias são 9 a 13 segundos, e uma de 80 chega aos 20.
+ * Porque o chão tem de caber o PIOR desenho, e a conta mostra-o. Com 8 s, no
+ * desenho antigo (80 fotografias chegavam aos 20 s), o último desenho ARRANCAVA
+ * aos 37 s dos 45 e acabava aos 57 — e a gravação da memória das falhas vem
+ * DEPOIS disso, numa função que morre aos 60. A cópia de segurança já tinha
+ * seguido e o trabalho era dado como falhado por causa do aquecimento, que é
+ * precisamente o que este ficheiro promete que nunca acontece. Subiu para 15.
  *
- * Com o chão a 8 s, o pior caso era este: o último desenho ARRANCA com 8 s de
- * orçamento (aos 37 s dos 45) e demora 20 — acaba aos 57 s, e a gravação da
- * memória das falhas vem DEPOIS disso, numa função que morre aos 60. Ou seja,
- * a cópia de segurança já tinha seguido e o trabalho era dado como falhado por
- * causa do aquecimento, que é precisamente o que este ficheiro promete que
- * nunca acontece.
+ * O desenho novo (`pdf-editorial`, ~26 páginas) é mais caro: 80 fotografias
+ * são 23 a 29 s no mau dia (`PIOR_DESENHO_MS`, em `custo-do-pdf.ts`). Com o
+ * chão a 15 s acabava aos 59; a 20 s arranca no máximo aos 25 e acaba aos 54,
+ * antes dos 55 que deixam tempo para gravar.
  *
- * A 15 s o pior caso honesto passa a caber. É por isso que o remédio para a
- * lentidão NÃO é subir o orçamento: subir o orçamento aproxima o desastre.
- * Quem trata da lentidão é a varredura, que corre noutra função e noutra hora.
+ * É por isso que o remédio para a lentidão NÃO é subir o orçamento: subir o
+ * orçamento aproxima o desastre. Quem trata da lentidão é a varredura, que
+ * corre noutra função e noutra hora.
  */
-export const CHAO_MS = 15_000;
+export const CHAO_MS = 20_000;
 
 /** Quantas propostas por noite, no aquecimento que viaja com a cópia. */
 export const TECTO_POR_NOITE = 6;
