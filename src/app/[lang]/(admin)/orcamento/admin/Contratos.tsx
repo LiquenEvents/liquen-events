@@ -300,7 +300,7 @@ export default function Contratos() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Procurar por cliente ou referência…"
+              placeholder="Cliente ou referência…"
               aria-label="Procurar contratos"
               className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
             />

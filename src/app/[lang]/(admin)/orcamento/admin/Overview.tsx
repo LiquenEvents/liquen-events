@@ -17,7 +17,7 @@ import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravac
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
-import { esperaEmPalavras } from "@/lib/orcamento/espera";
+import { A_ESPERAR_RESPOSTA, esperaEmPalavras } from "@/lib/orcamento/espera";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
@@ -100,9 +100,12 @@ function TempoDesde({ iso, className }: { iso: string; className?: string }) {
 
 /** A small ▲/▼ delta pill comparing this month to last. */
 function Delta({ now, prev }: { now: number; prev: number }) {
-  if (prev === 0 && now === 0) return null;
+  // Sem nada no mês anterior não há percentagem que diga alguma coisa: «↑100%»
+  // a partir de zero era uma conta inventada (de 0 para 500 € e de 0 para
+  // 50 000 € davam o mesmo número). Sem base, não há seta.
+  if (prev === 0) return null;
   const up = now >= prev;
-  const pct = prev === 0 ? 100 : Math.round(((now - prev) / prev) * 100);
+  const pct = Math.round(((now - prev) / prev) * 100);
   if (pct === 0) return null;
   return (
     <span
@@ -1322,15 +1325,17 @@ export default function Overview({
       }
     }
 
-    const todayMs = Date.now();
+    // Dias contados entre DIAS (chaves «aaaa-mm-dd» ao meio-dia), e não entre
+    // instantes: `floor((agora − instante)/dia)` mudava de valor à hora a que
+    // cada pedido entrou, e não à meia-noite que o comentário de cima promete.
+    const diasEntre = (de: string, ate: string) =>
+      Math.round((Date.parse(`${ate}T12:00:00`) - Date.parse(`${de}T12:00:00`)) / 86400000);
     // Next upcoming confirmed event (accepted within next 90 days)
     const nextEvent =
       quotes
         .filter((q) => q.date && q.date >= hoje && (q.status === "aceite" || q.status === "cotado"))
         .sort((a, b) => a.date!.localeCompare(b.date!))[0] ?? null;
-    const nextEventDays = nextEvent?.date
-      ? Math.round((new Date(nextEvent.date + "T12:00:00").getTime() - Date.now()) / 86400000)
-      : null;
+    const nextEventDays = nextEvent?.date ? diasEntre(hoje, nextEvent.date) : null;
 
     const needAction = quotes
       .filter((q) => {
@@ -1339,8 +1344,7 @@ export default function Overview({
         return true;
       })
       .map((q) => {
-        const lastMs = new Date(q.lastUpdated ?? q.submittedAt).getTime();
-        const daysSince = Math.floor((todayMs - lastMs) / 86400000);
+        const daysSince = diasEntre(chaveLocal(new Date(q.lastUpdated ?? q.submittedAt)), hoje);
         return { q, daysSince, isStale: daysSince >= 14 };
       })
       .sort((a, b) => {
@@ -1448,10 +1452,15 @@ export default function Overview({
       bits.push(`${data.eventsToday} evento${data.eventsToday !== 1 ? "s" : ""} hoje`);
     else if (data.eventsThisWeek > 0)
       bits.push(`${data.eventsThisWeek} evento${data.eventsThisWeek !== 1 ? "s" : ""} esta semana`);
-    if (data.needAction.length > 0)
-      bits.push(
-        `${data.needAction.length} pedido${data.needAction.length !== 1 ? "s" : ""} a precisar de atenção`,
-      );
+    // «Por responder» é o MESMO número da barra de baixo (`A_ESPERAR_RESPOSTA`):
+    // contavam-se aqui também as propostas enviadas, e a Visão Geral dizia 134
+    // ao lado de uma barra que dizia 133. Uma proposta enviada está à espera
+    // do cliente, não de nós — continua na lista de atenção, mas não na frase.
+    const porResponder = data.needAction.filter((n) =>
+      A_ESPERAR_RESPOSTA.includes(n.q.status),
+    ).length;
+    if (porResponder > 0)
+      bits.push(`${porResponder} pedido${porResponder !== 1 ? "s" : ""} por responder`);
     // Minimalista: só fala quando há algo a pedir ação — sem frases de enchimento.
     if (bits.length === 0) return "";
     return `Tem ${bits.join(" e ")}.`;
