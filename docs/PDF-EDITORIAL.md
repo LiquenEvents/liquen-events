@@ -15,53 +15,75 @@ ela aprovar o novo.
 
 ## Parte −1 — o que ela decidiu e onde a execução se afastou do texto
 
+**A referência mudou a 9 de outubro.** Ela substituiu o `referencia-liquen.zip`
+por um com o exemplo NOVO (5,5 MB, 26 páginas): o índice com um painel de
+fotografia nítida à esquerda, «A proposta» com fotografia nítida a página
+inteira, separadores com DUAS fotografias grandes e título a 72 px, e páginas
+com faixa de fotografia à direita no orçamento e nas condições. O CSS não
+mudou; mudou a composição de cada página. É esta versão que conta. O texto do
+prompt aqui em baixo é o da primeira versão: o `PROMPT-…md` atualizado ainda
+não chegou cá.
+
 **O que já está feito, e o que falta** (auditado no código):
 
-| Parte | O quê | Estado |
-|---|---|---|
-| 1 | Componentes de página, capa, índice, «A proposta», separadores, citação, contracapa, rodapé | feito, à espera da aprovação dela |
-| 1 | Botão «Ver desenho novo» no estúdio (só pré-visualização, `desenho: "editorial"`) | feito |
-| 2 | «O que propomos», paleta e ambiente (5 cores extraídas), as galerias de cada tema (1, 2–3, 4, 5, 6+, >12, 0 fotografias) | por fazer |
-| 3 | Separador «Investimento», orçamento, total, notas, condições gerais, pagamento e cancelamento | por fazer |
-| — | Trocar o envio para o desenho novo | só depois de ela aprovar |
+| O quê | Estado |
+|---|---|
+| Capa, índice, «A proposta», «O que propomos», paleta e ambiente | feito |
+| Separadores dos capítulos e as páginas dos temas (0, 1, 2–3, 4, 5, 6–12, > 12 fotografias) | feito |
+| Citação a meio da inspiração | feito |
+| Investimento: separador, quadro, total com sinal e saldo | feito (só quando há orçamento) |
+| Condições: notas, condições gerais, pagamento e cancelamento, contactos | feito (SEMPRE) |
+| Contracapa | feito |
+| Modelo Organização: cronograma e linhas com preço | feito, sem exemplo visual para comparar |
+| Botão «Ver desenho novo» no estúdio (só pré-visualização) | feito |
+| Trocar o envio para o desenho novo | só depois de ela aprovar |
 
 **Decisões dela:**
 
 - **Grupos de inspiração: «Pelo nome do tema».** O sistema não guarda o grupo
   de cada tema; lê-se das palavras do título (`grupos.ts`). Nenhum campo novo.
   O que não encaixa vai para «Ambiente».
+- **Nenhuma página com fundo desfocado.** Palavras dela, com o exemplo novo à
+  frente: «Nenhuma página tem fundo desfocado a encher a página.» Vale também
+  para as duas páginas onde o próprio exemplo o tem — «O que propomos» e o
+  tema de cinco fotografias desalinhadas —, que ficam com o fundo escuro liso.
+- **O rodapé leva «LÍQUEN EVENTS» em texto**, como o exemplo. Esteve com o
+  símbolo do logótipo (o primeiro texto pedia-o); ela viu-o pequeno demais.
+- **«A proposta» não tem o bloco «Serviços».** Contava os GRUPOS de serviços
+  («Serviços: 1»); o exemplo novo já não o tem, e saiu.
 
 **Onde a execução se afasta do texto, e porquê:**
 
 1. **A cor de destaque é uma só, `#d8bd5a`** — o dourado do logótipo
-   (`#cfb12a`) aclarado para o fundo escuro, que é o do exemplo. O exemplo tem
-   um segundo dourado (`#e6d28a`) no «&» e nos sobretítulos sobre fotografia;
-   o texto abaixo diz «uma cor de destaque, não duas», e foi o texto que
-   ganhou.
-2. **O rodapé segue o texto, não o exemplo.** O exemplo escreve «LÍQUEN
-   EVENTS» no lugar do símbolo; o texto pede «símbolo pequeno da marca à
-   esquerda, uma linha vertical fina». O símbolo é recortado do logótipo que
-   já existe (`proposal-assets.ts`), não redesenhado.
-3. **Os tamanhos dos títulos são os do exemplo** (46 px nas páginas, 76 px na
-   capa, 58 px nos separadores), e não os «cerca de 39 px» do texto: o
-   exemplo é «o alvo».
-4. **O logótipo e o símbolo do rodapé são as duas únicas imagens com
-   transparência.** São formas recortadas, não ficam por cima de fotografias
-   de forma a criar o «cor-de-rosa», e o gerador antigo já fazia o mesmo na
-   capa. Todos os degradés, desfoques e sombras estão fundidos nas JPEG; o
-   teste `montar.test.ts` conta as máscaras e as opacidades.
-5. **A Cormorant tem os algarismos direitos cozidos no ficheiro.** O pdf-lib
-   não aplica `font-feature-settings: 'lnum'`; os algarismos 0–9 da letra
-   embutida apontam para os glifos direitos (ver o cabeçalho de `letras.ts`).
-6. **Peso:** página inteira até 1 800 px, fundos desfocados até 1 200 px,
-   células até 1 250 px, JPEG mozjpeg 70–78. O limite que se persegue é o do
-   anexo de email desta casa (8 MB), que é mais apertado do que os 10 MB do
-   texto. A amostra da parte 1 (9 páginas) pesa 0,9 MB.
-7. **A capa e a contracapa usam as duas fotografias de capa que ela já
-   escolhe hoje** (`coverImages`): a primeira desfocada de fundo, a segunda no
-   painel. Os fundos do índice e de «A proposta» e a fotografia da citação são
-   escolhidos entre as de inspiração — deitadas e de maior resolução primeiro,
-   sem repetir.
+   (`#cfb12a`) aclarado para o fundo escuro. O exemplo tem um segundo dourado
+   (`#e6d28a`); o texto diz «uma cor de destaque, não duas».
+2. **Os tamanhos dos títulos são os do exemplo**, não os «cerca de 39 px» do
+   texto: o exemplo é «o alvo».
+3. **O logótipo é a única imagem com transparência.** Todos os degradés e a
+   sombra do painel estão fundidos nas JPEG; o teste `montar.test.ts` conta as
+   máscaras e as opacidades.
+4. **A Cormorant tem os algarismos direitos cozidos no ficheiro** (o pdf-lib
+   não aplica `lnum`) — ver o cabeçalho de `letras.ts`.
+5. **Peso:** página inteira até 1 800 px, células até 1 250 px, JPEG mozjpeg
+   70–78; uma foto que aparece duas vezes na mesma forma entra uma vez no
+   ficheiro. Medido com 72 fotografias de 1 800 px fabricadas: 5,5 MB e
+   ~11 s de desenho. O limite é o do anexo de email (8 MB).
+6. **A fotografia de fundo da capa** é a primeira de capa se tiver pelo menos
+   1 600 px no lado maior; senão, a deitada de maior resolução da inspiração
+   (era uma foto pequena ampliada e desfocada). O painel é a segunda de capa.
+7. **As fotografias dos painéis, fundos e separadores** saem das de
+   inspiração (`fotos.ts`): da forma que o lugar pede, as de maior resolução
+   primeiro, nunca a mesma em duas páginas seguidas.
+8. **As células do mosaico têm a forma da sua fotografia** (a largura é
+   proporcional ao aspecto, como o `flex` do exemplo), por isso não há «célula
+   maior» para onde mandar a foto de mais resolução, nem troca a fazer: cada
+   foto fica na sua ordem, recortada o mínimo.
+9. **O subtítulo do orçamento diz só «Seis serviços».** O exemplo acrescenta
+   «com montagem e desmontagem incluídas»; isso não está nos dados da
+   proposta, e não se escreve o que os dados não dizem.
+10. **O tijolo de quatro fotografias tem o texto sempre em cima à esquerda**
+    (como as duas páginas de quatro do exemplo); só o mosaico de seis ou mais
+    alterna de lado.
 
 ---
 

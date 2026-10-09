@@ -2,8 +2,9 @@ import "server-only";
 import type { PDFPage } from "pdf-lib";
 import { SITE } from "@/lib/site";
 import { PAGINA_H } from "@/lib/proposal-geometria";
-import { LADO_FUNDO, paginaInteira, pixeisDaCaixa, preparar, type Sombra } from "../imagens";
-import { FOLHA, imagemNaCaixa, linha, novaPagina, sobretitulo, type Contexto } from "../moldura";
+import type { Foto } from "../fotos";
+import { LADO_PAGINA, type Sombra, type Tratamento } from "../imagens";
+import { FOLHA, fotoNaCaixa, linha, novaPagina, sobretitulo, type Contexto } from "../moldura";
 import { COR, FOLHA_PX_W, LETRA, MARGEM, px } from "../paleta";
 import {
   baseDaLinha,
@@ -22,14 +23,16 @@ import {
  * CAPA E CONTRACAPA — a mesma composição, abrir e fechar
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Como no exemplo: a primeira fotografia de capa, desfocada e escurecida, a
- * cobrir a folha; a segunda num painel alto à direita, nítida, com sombra; o
- * texto à esquerda. As duas fotografias são as DUAS que ela já escolhe hoje
- * para a capa (`coverImages`), pela mesma ordem — nenhum campo novo. Com uma
- * só, a mesma serve de fundo e de painel.
+ * Como no exemplo: uma fotografia a cobrir a folha, escurecida SÓ DO LADO
+ * ESQUERDO, onde está o texto; outra num painel alto à direita, com sombra.
+ *
+ * O fundo é NÍTIDO. Esteve desfocado, e ela viu-o assim: «uma fotografia
+ * pequena, ampliada e desfocada». A fotografia de fundo é a de MAIOR
+ * resolução que serve para a página — ver `montar.ts`, que a escolhe —, e o
+ * painel é a segunda fotografia de capa que ela já escolhe hoje.
  *
  * A contracapa repete a composição: o documento fecha com a imagem com que
- * abriu.
+ * abriu (e, por isso, com as mesmas duas imagens no ficheiro, não quatro).
  */
 
 /** O painel do exemplo: 300 px de largura, de 70 px do topo a 70 px do fundo. */
@@ -40,52 +43,31 @@ const SOMBRA: Sombra = { ...PAINEL, desfoque: 60, desce: 30, opacidade: 0.45 };
 /** A caixa do logótipo (`150 × 88`, `contain`). */
 const LOGO = { w: 150, h: 88 } as const;
 
-/** O fundo: a foto desfocada, mais escura do lado do texto. */
-async function fundoDaCapa(foto: Buffer): Promise<Buffer | null> {
-  const { w, h } = paginaInteira(LADO_FUNDO);
-  return preparar(foto, w, h, FOLHA_PX_W, {
-    desfoque: 7,
-    brilho: 0.82,
-    sombra: SOMBRA,
-    degrades: [
-      // Da esquerda — onde está o texto — para a direita.
-      {
-        de: [0, 0],
-        para: [1, 0],
-        paragens: [
-          { em: 0, cobre: 0.72 },
-          { em: 0.5, cobre: 0.42 },
-          { em: 1, cobre: 0.18 },
-        ],
-      },
-      // De baixo, para a faixa dos dados assentar.
-      {
-        de: [0, 0],
-        para: [0, 1],
-        paragens: [
-          { em: 0.55, cobre: 0 },
-          { em: 1, cobre: 0.55 },
-        ],
-      },
-    ],
-  });
-}
+/** O fundo: a foto nítida, escura à esquerda, limpa à direita, com a sombra do painel. */
+const FUNDO: Tratamento = {
+  sombra: SOMBRA,
+  degrades: [
+    {
+      de: [0, 0],
+      para: [1, 0],
+      paragens: [
+        { em: 0, cobre: 0.84 },
+        { em: 0.42, cobre: 0.62 },
+        { em: 0.68, cobre: 0.12 },
+        { em: 1, cobre: 0 },
+      ],
+    },
+  ],
+};
 
 async function fundoEPainel(
   ctx: Contexto,
   pagina: PDFPage,
-  fotos: readonly (Buffer | null)[],
-  nomes: readonly string[],
+  fundo: Foto | null,
+  painel: Foto | null,
 ) {
-  const [a, b] = fotos;
-  const fundo = a ?? b ?? null;
-  const painel = b ?? a ?? null;
-  if (fundo) await imagemNaCaixa(ctx, pagina, await fundoDaCapa(fundo), FOLHA, nomes[0] ?? "capa");
-  if (painel) {
-    const { w, h } = pixeisDaCaixa(PAINEL.w, PAINEL.h);
-    const jpeg = await preparar(painel, w, h, PAINEL.w, { qualidade: 78 });
-    await imagemNaCaixa(ctx, pagina, jpeg, PAINEL, nomes[1] ?? nomes[0] ?? "capa");
-  }
+  await fotoNaCaixa(ctx, pagina, fundo, FOLHA, FUNDO, LADO_PAGINA);
+  await fotoNaCaixa(ctx, pagina, painel, PAINEL, { qualidade: 78 }, LADO_PAGINA, 2.2);
 }
 
 /** O logótipo dentro da caixa do exemplo, centrado como o `contain`. */
@@ -111,9 +93,8 @@ export interface DadosDaCapa {
   nomes: string;
   /** Rótulo e valor de cada campo da faixa de baixo; vazios não aparecem. */
   faixa: readonly { rotulo: string; valor: string }[];
-  fotos: readonly (Buffer | null)[];
-  /** O que identifica cada foto no relatório, se não se desenhar. */
-  origens: readonly string[];
+  fundo: Foto | null;
+  painel: Foto | null;
 }
 
 /** O texto da capa ocupa 560 px, como no exemplo. */
@@ -121,7 +102,7 @@ const LARGURA_TEXTO = 560;
 
 export async function capa(ctx: Contexto, d: DadosDaCapa): Promise<PDFPage> {
   const p = novaPagina(ctx);
-  await fundoEPainel(ctx, p, d.fotos, d.origens);
+  await fundoEPainel(ctx, p, d.fundo, d.painel);
   logotipo(ctx, p, MARGEM, 78);
 
   const topoSobre = 78 + LOGO.h + 120;
@@ -273,13 +254,13 @@ export interface DadosDaContracapa {
   lema: string;
   /** «Esta proposta é válida até 27 de novembro de 2026.» */
   validade: string;
-  fotos: readonly (Buffer | null)[];
-  origens: readonly string[];
+  fundo: Foto | null;
+  painel: Foto | null;
 }
 
 export async function contracapa(ctx: Contexto, d: DadosDaContracapa): Promise<PDFPage> {
   const p = novaPagina(ctx);
-  await fundoEPainel(ctx, p, d.fotos, d.origens);
+  await fundoEPainel(ctx, p, d.fundo, d.painel);
   const largura = 520;
   let topo = sobretitulo(ctx, p, d.sobretitulo, MARGEM, 150) + 16;
 

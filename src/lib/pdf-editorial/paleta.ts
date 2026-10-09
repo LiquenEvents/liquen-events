@@ -35,9 +35,9 @@ export const RODAPE = { fundo: 38, tamanho: 12 } as const;
 
 /* ── Cores ───────────────────────────────────────────────────────────────── */
 
-type Hex = `#${string}`;
+export type Hex = `#${string}`;
 
-function hexParaRgb(hex: Hex): RGB {
+export function hexParaRgb(hex: Hex): RGB {
   const n = Number.parseInt(hex.slice(1), 16);
   return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
 }
@@ -110,41 +110,68 @@ export function misturaNoFundo(cor: Hex, opacidade: number): Hex {
 
 /**
  * Os tamanhos do exemplo, em píxeis, com o espaçamento entre letras em `em`.
- *
- * Só os que a parte 1 usa. Os do quadro do orçamento e das condições entram com
- * a parte 3.
+ * Cada um diz de onde vem no HTML do exemplo (`referencia/modelo-html/`).
  */
 export const LETRA = {
   /** `.eb` — sobretítulo em maiúsculas, dourado. */
   sobretitulo: { tam: 11.5, espaco: 0.2 },
-  /** `h1` — título de página. */
+  /** `h1` — título das páginas de texto (índice). */
   titulo: { tam: 46, entrelinha: 1.06 },
+  /** O `h1` de 40 px das páginas de conteúdo (serviços, paleta, orçamento, condições). */
+  tituloConteudo: { tam: 40, entrelinha: 1.06 },
+  /** O `h1` de «A proposta». */
+  tituloProposta: { tam: 50, entrelinha: 1.04 },
+  /** O subtítulo em itálico por baixo de um `h1` de conteúdo. */
+  subtitulo: { tam: 20 },
   /** O título da capa (os nomes). */
   tituloCapa: { tam: 76, entrelinha: 0.98, minimo: 40 },
   /** O «&» entre os nomes, em itálico. */
   eComercial: { tam: 52 },
-  /** O título dos separadores («Cerimónia»). */
-  tituloSeparador: { tam: 58 },
+  /** O título dos separadores («Cerimónia»), a ~72 px como no exemplo novo. */
+  tituloSeparador: { tam: 72 },
   /** A frase da página de citação. */
   citacao: { tam: 54, entrelinha: 1.12 },
   /** A frase da contracapa. */
   agradecimento: { tam: 50, entrelinha: 1.1 },
   /** O lema por baixo do logótipo, na contracapa. */
   lema: { tam: 21 },
-  /** `.lead`. */
-  lead: { tam: 16, entrelinha: 1.6 },
   /** `.meta .k` — rótulo da faixa da capa. */
   metaRotulo: { tam: 10.5, espaco: 0.2 },
   /** `.meta .v` — valor da faixa da capa. */
   metaValor: { tam: 14.5, entrelinha: 1.35 },
-  /** `.kf small` — rótulo dos factos. */
-  factoRotulo: { tam: 10.5, espaco: 0.18 },
-  /** `.kf b` — valor dos factos. */
-  factoValor: { tam: 17, entrelinha: 1.25 },
+  /** O rótulo dos factos de «A proposta» (um `.eb` de 10 px). */
+  factoRotulo: { tam: 10, espaco: 0.2 },
+  /** O valor dos factos. */
+  factoValor: { tam: 16.5, entrelinha: 1.3 },
   /** As linhas do índice. */
-  indice: { tam: 15 },
+  indice: { tam: 15.5 },
   /** O rodapé. */
-  rodape: { tam: 12, espaco: 0.02 },
+  rodape: { tam: 12, espaco: 0.02, marcaEspaco: 0.14 },
   /** Os contactos da contracapa. */
   contactos: { tam: 13.5, entrelinha: 1.8 },
+
+  // ── O mosaico de texto dos temas ──
+  mosaicoSobre: { tam: 10.5, espaco: 0.2 },
+  mosaicoTitulo: { tam: 33, entrelinha: 1.05 },
+  mosaicoSub: { tam: 21 },
+  mosaicoNota: { tam: 16.5, entrelinha: 1.4, minimo: 11 },
+  mosaicoNumero: { tam: 120 },
+  mosaicoPe: { tam: 10.5, espaco: 0.14 },
+
+  // ── Cartões de serviço ──
+  cartaoNumero: { tam: 10, espaco: 0.18 },
+  cartaoNome: { tam: 14.5, entrelinha: 1.3 },
+  cartaoDescricao: { tam: 12, entrelinha: 1.4 },
+
+  // ── Orçamento ──
+  linhaOrcamento: { tam: 16 },
+  numeroOrcamento: { tam: 13 },
+  preco: { tam: 112 },
+  linhaTotal: { tam: 15 },
+  marco: { tam: 22 },
+  marcoTexto: { tam: 12.5, entrelinha: 1.4 },
+
+  // ── Listas das condições (`.sm li`, `h3`) ──
+  h3: { tam: 15.5, entrelinha: 1.3 },
+  item: { tam: 12.5, entrelinha: 1.5 },
 } as const;

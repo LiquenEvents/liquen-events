@@ -1,7 +1,9 @@
 import "server-only";
 import type { PDFPage } from "pdf-lib";
-import { LADO_PAGINA, paginaInteira, preparar, tiras } from "../imagens";
-import { FOLHA, imagemNaCaixa, novaPagina, sobretitulo, type Contexto } from "../moldura";
+import type { Foto } from "../fotos";
+import { LADO_PAGINA, type Degrade, type Tratamento } from "../imagens";
+import { FOLHA, fotoNaCaixa, novaPagina, sobretitulo, type Contexto } from "../moldura";
+import { VAO } from "../mosaico";
 import { COR, FOLHA_PX_H, FOLHA_PX_W, LETRA, MARGEM, px } from "../paleta";
 import { bloco, caber, type Estilo } from "../texto";
 
@@ -14,40 +16,45 @@ import { bloco, caber, type Estilo } from "../texto";
  * baixo, à esquerda, sobre um degradé que sobe do fundo — fundido na imagem.
  */
 
-/** O degradé de baixo dos separadores: a foto limpa em cima, escura em baixo. */
-const DE_BAIXO = {
-  de: [0, 0] as const,
-  para: [0, 1] as const,
+/** O degradé de baixo: a foto limpa em cima, escura em baixo. */
+export const DE_BAIXO: Degrade = {
+  de: [0, 0],
+  para: [0, 1],
   paragens: [
-    { em: 0.4, cobre: 0 },
-    { em: 0.75, cobre: 0.45 },
-    { em: 1, cobre: 0.85 },
+    { em: 0.45, cobre: 0 },
+    { em: 0.78, cobre: 0.5 },
+    { em: 1, cobre: 0.86 },
   ],
 };
 
 export interface DadosDoSeparador {
-  /** «02 · Inspiração». */
+  /** «02 · Inspiração», ou «06» no investimento. */
   sobretitulo: string;
   /** «Cerimónia». */
   titulo: string;
-  /** Até quatro fotos do capítulo, em tiras verticais. */
-  fotos: readonly Buffer[];
-  origens: readonly string[];
+  /** As duas fotografias, lado a lado. Com uma só, a página inteira. */
+  fotos: readonly Foto[];
 }
 
-/** O intervalo entre as tiras: «4 a 6 px», no documento dela. */
-const FENDA = 4;
-
-/** Quantas tiras tem o separador do exemplo. */
-export const TIRAS_DO_SEPARADOR = 4;
-
+/**
+ * O separador do exemplo novo: DUAS fotografias grandes lado a lado, com 4 px
+ * entre elas, e o nome do capítulo a 72 px. Eram quatro tiras estreitas; ela
+ * comparou com o exemplo e pediu as duas grandes — as de maior resolução do
+ * grupo, que é o que `montar.ts` lhe passa.
+ */
 export async function separador(ctx: Contexto, d: DadosDoSeparador): Promise<PDFPage> {
   const p = novaPagina(ctx);
-  const { w, h } = paginaInteira(LADO_PAGINA);
-  const fotos = d.fotos.slice(0, TIRAS_DO_SEPARADOR);
-  if (fotos.length) {
-    const jpeg = await tiras(fotos, w, h, FENDA, { degrades: [DE_BAIXO], qualidade: 70 });
-    await imagemNaCaixa(ctx, p, jpeg, FOLHA, d.origens[0] ?? "separador");
+  const fotos = d.fotos.slice(0, 2);
+  const t: Tratamento = { degrades: [DE_BAIXO], qualidade: 72 };
+  if (fotos.length === 1) {
+    await fotoNaCaixa(ctx, p, fotos[0], FOLHA, t, LADO_PAGINA);
+  } else if (fotos.length === 2) {
+    const w = (FOLHA_PX_W - VAO) / 2;
+    await Promise.all(
+      fotos.map((f, i) =>
+        fotoNaCaixa(ctx, p, f, { x: i * (w + VAO), y: 0, w, h: FOLHA_PX_H }, t, LADO_PAGINA),
+      ),
+    );
   }
   const tit: Estilo = {
     letra: ctx.letras.titulo,
@@ -55,12 +62,12 @@ export async function separador(ctx: Contexto, d: DadosDoSeparador): Promise<PDF
     cor: COR.texto,
     espaco: -0.01,
   };
-  const { estilo, linhas } = caber(tit, d.titulo, px(FOLHA_PX_W - 2 * MARGEM), 2, 36);
+  const { estilo, linhas } = caber(tit, d.titulo, px(FOLHA_PX_W - 2 * MARGEM), 2, 40);
   const entrelinha = 1.06;
   const altTitulo = linhas.length * estilo.tam * entrelinha;
   // Assenta a 66 px do fundo (`bottom: 66px`).
   const topoTitulo = FOLHA_PX_H - 66 - altTitulo;
-  const topoSobre = topoTitulo - 10 - LETRA.sobretitulo.tam * 1.21;
+  const topoSobre = topoTitulo - 8 - LETRA.sobretitulo.tam * 1.21;
   sobretitulo(ctx, p, d.sobretitulo, MARGEM, topoSobre);
   bloco(p, estilo, linhas, MARGEM, topoTitulo, entrelinha);
   return p;
@@ -75,35 +82,28 @@ export interface DadosDaCitacao {
   aspas: readonly [string, string];
   /** «Líquen Events». */
   assinatura: string;
-  foto: Buffer;
-  origem: string;
+  foto: Foto;
 }
 
-/**
- * A foto inteira, escurecida SÓ NA BASE — é o que ela pede para esta página: a
- * fotografia fica intacta, e o degradé só existe onde a frase assenta.
- */
-async function fundoDaCitacao(foto: Buffer) {
-  const { w, h } = paginaInteira(LADO_PAGINA);
-  return preparar(foto, w, h, FOLHA_PX_W, {
-    qualidade: 74,
-    degrades: [
-      {
-        de: [0, 0],
-        para: [0, 1],
-        paragens: [
-          { em: 0.4, cobre: 0 },
-          { em: 0.75, cobre: 0.5 },
-          { em: 1, cobre: 0.82 },
-        ],
-      },
-    ],
-  });
-}
+/** A foto inteira, escurecida SÓ NA BASE, onde a frase assenta. */
+const DA_CITACAO: Tratamento = {
+  qualidade: 74,
+  degrades: [
+    {
+      de: [0, 0],
+      para: [0, 1],
+      paragens: [
+        { em: 0.4, cobre: 0 },
+        { em: 0.75, cobre: 0.5 },
+        { em: 1, cobre: 0.82 },
+      ],
+    },
+  ],
+};
 
 export async function citacao(ctx: Contexto, d: DadosDaCitacao): Promise<PDFPage> {
   const p = novaPagina(ctx);
-  await imagemNaCaixa(ctx, p, await fundoDaCitacao(d.foto), FOLHA, d.origem);
+  await fotoNaCaixa(ctx, p, d.foto, FOLHA, DA_CITACAO, LADO_PAGINA);
   const c = LETRA.citacao;
   const e: Estilo = { letra: ctx.letras.tituloItalico, tam: c.tam, cor: COR.texto };
   // A quebra do exemplo é depois da vírgula: «Decoramos eventos, / eternizamos

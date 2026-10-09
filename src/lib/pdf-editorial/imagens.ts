@@ -1,6 +1,6 @@
 import "server-only";
 import sharp, { type OverlayOptions } from "sharp";
-import { FOLHA_PX_H, FOLHA_PX_W, HEX } from "./paleta";
+import { HEX } from "./paleta";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -17,14 +17,12 @@ import { FOLHA_PX_H, FOLHA_PX_W, HEX } from "./paleta";
  * ── O peso ─────────────────────────────────────────────────────────────────
  * O objectivo dela é ~10 MB; o limite real desta casa é o anexo de email, 8 MB
  * (`custo-do-pdf.ts`). Por isso: página inteira até {@link LADO_PAGINA} px,
- * fundos desfocados mais pequenos (o desfoque não precisa de pixéis), células
- * até {@link LADO_CELULA} px, e JPEG mozjpeg a {@link QUALIDADE}.
+ * células até
+ * {@link LADO_CELULA} px, e JPEG mozjpeg a {@link QUALIDADE}.
  */
 
 /** Lado maior de uma fotografia que ocupa a página inteira, nítida. */
 export const LADO_PAGINA = 1800;
-/** Lado maior de um fundo desfocado: o desfoque apaga o detalhe que sobraria. */
-export const LADO_FUNDO = 1200;
 /** Lado maior de uma célula de mosaico ou do painel da capa. */
 export const LADO_CELULA = 1250;
 /** Qualidade JPEG por omissão — dentro dos 62–80 que ela pediu. */
@@ -143,12 +141,6 @@ export async function preparar(
   }
 }
 
-/** Uma imagem da página inteira, em píxeis, para um dado lado maior. */
-export const paginaInteira = (lado: number) => ({
-  w: lado,
-  h: Math.round((lado * FOLHA_PX_H) / FOLHA_PX_W),
-});
-
 /**
  * Píxeis de uma caixa de `wPx × hPx` (píxeis do exemplo), com o lado maior
  * limitado a `lado`. A 1123 px de folha, uma caixa de 300 px de largura numa
@@ -157,64 +149,6 @@ export const paginaInteira = (lado: number) => ({
 export function pixeisDaCaixa(wPx: number, hPx: number, lado = LADO_CELULA, densidade = 2.2) {
   const k = Math.min(densidade, lado / Math.max(wPx, hPx));
   return { w: Math.round(wPx * k), h: Math.round(hPx * k) };
-}
-
-/**
- * Várias fotografias lado a lado, em tiras verticais, numa só imagem.
- *
- * É o fundo dos separadores («02 · Inspiração / Cerimónia»): quatro fotos do
- * grupo, com uma fenda escura entre elas e o degradé de baixo já fundido. Uma
- * imagem em vez de quatro é menos peso e nenhuma costura entre tiras no leitor.
- */
-export async function tiras(
-  fotos: readonly Buffer[],
-  w: number,
-  h: number,
-  fendaPx: number,
-  t: Tratamento = {},
-): Promise<Buffer | null> {
-  // Só entram as que se deixam ler: uma foto estragada não pode deixar uma
-  // tira vazia — as que sobram repartem a largura entre si.
-  const legiveis = (
-    await Promise.all(
-      fotos.map((b) =>
-        sharp(b, { failOn: "none" })
-          .metadata()
-          .then((): Buffer | null => b)
-          .catch((): Buffer | null => null),
-      ),
-    )
-  ).filter((b): b is Buffer => b !== null);
-  if (!legiveis.length) return null;
-  const escala = w / FOLHA_PX_W;
-  const fenda = Math.round(fendaPx * escala);
-  const n = legiveis.length;
-  const larguraTira = Math.floor((w - fenda * (n - 1)) / n);
-  // A última tira leva os píxeis que a divisão deixou: sem isto ficava uma
-  // risca do fundo na borda direita.
-  const larguraDe = (i: number) => (i === n - 1 ? w - i * (larguraTira + fenda) : larguraTira);
-  const boas: Buffer[] = [];
-  for (const [i, b] of legiveis.entries()) {
-    const peca = await sharp(b, { failOn: "none" })
-      .rotate()
-      .resize(larguraDe(i), h, { fit: "cover", position: sharp.strategy.attention })
-      .flatten({ background: HEX.fundo })
-      .toBuffer()
-      .catch((): Buffer | null => null);
-    if (!peca) return null;
-    boas.push(peca);
-  }
-  try {
-    const tela = await sharp({
-      create: { width: w, height: h, channels: 3, background: HEX.fundo },
-    })
-      .composite(boas.map((input, i) => ({ input, left: i * (larguraTira + fenda), top: 0 })))
-      .png()
-      .toBuffer();
-    return await preparar(tela, w, h, FOLHA_PX_W, t);
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -235,44 +169,5 @@ export async function logotipoNaCor(png: Buffer, hex: string): Promise<Buffer> {
       .toBuffer();
   } catch {
     return png;
-  }
-}
-
-/**
- * Só o SÍMBOLO do logótipo (o líquen), sem as letras — para o rodapé.
- *
- * O documento dela pede no rodapé «símbolo pequeno da marca à esquerda». O
- * projeto tem o logótipo inteiro, e o símbolo é a parte de cima dele: corta-se
- * pela primeira faixa de linhas vazias abaixo do desenho. É o mesmo ficheiro,
- * não um logótipo redesenhado.
- *
- * Devolve `null` se não encontrar a faixa (um logótipo novo com outra forma):
- * o rodapé sai então sem o símbolo, em vez de sair com o logótipo esmagado.
- */
-export async function simboloDoLogotipo(png: Buffer, hex: string): Promise<Buffer | null> {
-  try {
-    const { data, info } = await sharp(png)
-      .trim()
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const { width, height, channels } = info;
-    // O PNG tem um véu de alfa quase nulo em toda a parte; só conta a tinta.
-    const temTinta = (y: number) => {
-      for (let x = 0; x < width; x++) if (data[(y * width + x) * channels + 3] > 40) return true;
-      return false;
-    };
-    let y = 0;
-    while (y < height && !temTinta(y)) y++;
-    while (y < height && temTinta(y)) y++;
-    if (y >= height) return null;
-    const topo = await sharp(png)
-      .trim()
-      .extract({ left: 0, top: 0, width, height: y })
-      .png()
-      .toBuffer();
-    return await logotipoNaCor(topo, hex);
-  } catch {
-    return null;
   }
 }

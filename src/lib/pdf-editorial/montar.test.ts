@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeAll } from "vitest";
 import { PDFDocument, PDFPage, PDFName, PDFDict, PDFRawStream, PDFNumber } from "pdf-lib";
 import sharp from "sharp";
 import { withProposalDefaults, resolveValidUntil, type ProposalDoc } from "@/lib/proposal-doc";
-import { textosDaProposta } from "@/lib/proposal-doc-textos";
+import { blocosFixosNaLingua, textosDaProposta } from "@/lib/proposal-doc-textos";
 import { PAGINA_H, PAGINA_W } from "@/lib/proposal-geometria";
 import { SITE } from "@/lib/site";
 import { renderEditorialPdf } from "./montar";
@@ -10,20 +10,22 @@ import { textosEditoriais } from "./textos";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * O PDF EDITORIAL, PARTE 1 — capa, índice, «A proposta», separadores,
- * citação e contracapa
+ * O PDF EDITORIAL — a proposta inteira
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * O que se guarda aqui é o que ela pediu por escrito e o que não se vê a olho
- * numa página: os números do índice são os das páginas verdadeiras, nada sai
- * da folha, os textos da casa saem tal e qual, e não há transparência por cima
- * das fotografias (é ela que dá o «cor-de-rosa» em alguns leitores).
+ * O que ela pediu por escrito, depois de gerar a proposta «Margarida &
+ * Duarte» e encontrar 8 páginas onde o exemplo tem 26:
  *
- * As fotografias são fabricadas aqui, com cores lisas e formas diferentes —
- * nenhuma foto de cliente entra num teste.
+ *   · todas as secções do exemplo, pela mesma ordem;
+ *   · cada tema com TODAS as suas fotografias, o título e a nota;
+ *   · as condições sempre, iguais às do gerador antigo, com ou sem orçamento;
+ *   · o índice com «Investimento» e «Condições» nas páginas reais;
+ *   · nenhuma transparência por cima das fotografias.
+ *
+ * As fotografias são fabricadas aqui — nenhuma foto de cliente entra num teste.
  */
 
-vi.setConfig({ testTimeout: 90_000 });
+vi.setConfig({ testTimeout: 180_000 });
 
 async function foto(w: number, h: number, cor: string): Promise<string> {
   const b = await sharp({ create: { width: w, height: h, channels: 3, background: cor } })
@@ -34,14 +36,17 @@ async function foto(w: number, h: number, cor: string): Promise<string> {
 
 let DEITADA = "";
 let AO_ALTO = "";
-let OUTRA = "";
+let QUADRADA = "";
+const fotos = (n: number) =>
+  Array.from({ length: n }, (_, i) => [DEITADA, AO_ALTO, QUADRADA][i % 3]);
 
 beforeAll(async () => {
-  DEITADA = await foto(1600, 1000, "#7a8a6a");
-  AO_ALTO = await foto(800, 1200, "#c9a37a");
-  OUTRA = await foto(1200, 1200, "#5a6a7a");
+  DEITADA = await foto(1800, 1200, "#7a8a6a");
+  AO_ALTO = await foto(900, 1350, "#c9a37a");
+  QUADRADA = await foto(1200, 1200, "#5a6a7a");
 });
 
+/** A proposta do exemplo: os mesmos valores, com nomes TESTE. */
 function docDeTeste(p: Partial<ProposalDoc> = {}): ProposalDoc {
   return withProposalDefaults({
     template: "decoracao",
@@ -50,25 +55,46 @@ function docDeTeste(p: Partial<ProposalDoc> = {}): ProposalDoc {
     eventType: "Casamento",
     eventDate: "8 de julho de 2028",
     location: "Évora · Exterior",
-    guests: "120 pax",
+    guests: "50 a 100",
     ceremony: "Civil",
     coverImages: [DEITADA, AO_ALTO],
     serviceGroups: [
-      { title: "Decoração Cerimónia", items: [{ label: "Altar" }] },
-      { title: "Decoração Cocktail", items: [{ label: "Bar" }] },
+      {
+        letter: "a)",
+        title: "Decoração Floral e Decoração",
+        items: [
+          { label: "Decoração Cerimónia" },
+          { label: "Decoração Cocktail" },
+          { label: "Decoração Mesas Jantar" },
+        ],
+      },
     ],
     moodBoards: [
-      { title: "Decoração Cerimónia", images: [AO_ALTO, DEITADA, OUTRA] },
-      { title: "Decor Cocktail", images: [OUTRA, AO_ALTO] },
-      { title: "Mesas de Jantar", images: [DEITADA, DEITADA, AO_ALTO, OUTRA, AO_ALTO] },
+      { title: "Decoração Cerimónia", images: fotos(3) },
+      { title: "Decor Cocktail", images: fotos(5) },
+      { title: "Mesas de Jantar", images: fotos(8), annotation: "TESTE nota do jantar." },
     ],
-    budgetItems: [],
+    budgetItems: ["Decoração Cerimónia", "Decoração Cocktail", "Decoração Mesas Jantar"],
     totalLabel: "Valor Total Decoração",
-    totalText: "",
+    totalText: "3.200,00 € + IVA",
+    totalAmount: 3200,
+    totalVatMode: "acrescer",
+    vatRate: 0.23,
+    depositPercent: 30,
+    budgetExtras: [{ label: "Deslocação equipa Líquen", valueText: "460,00 €" }],
+    budgetExtrasSomam: true,
     validUntil: "2026-11-27",
     ...p,
   } as ProposalDoc);
 }
+
+/** Sem orçamento nenhum: sem linhas, sem total. */
+const semOrcamento: Partial<ProposalDoc> = {
+  budgetItems: [],
+  totalText: "",
+  totalAmount: undefined,
+  budgetExtras: [],
+};
 
 interface Escrita {
   pagina: number;
@@ -79,15 +105,18 @@ interface Escrita {
   texto: string;
 }
 
-/** Desenha e devolve tudo o que foi escrito, com a página e a posição. */
+/** Desenha e devolve tudo o que foi escrito e quantas imagens cada página leva. */
 async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
   const paginas: PDFPage[] = [];
   const escritas: Escrita[] = [];
+  const imagens: number[] = [];
   const addPage = PDFDocument.prototype.addPage;
   const drawText = PDFPage.prototype.drawText;
+  const drawImage = PDFPage.prototype.drawImage;
   PDFDocument.prototype.addPage = function (...a: Parameters<typeof addPage>) {
     const p = addPage.apply(this, a) as PDFPage;
     paginas.push(p);
+    imagens.push(0);
     return p;
   };
   PDFPage.prototype.drawText = function (texto: string, o?: Parameters<typeof drawText>[1]) {
@@ -102,120 +131,210 @@ async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
     });
     return drawText.call(this, texto, o);
   };
+  PDFPage.prototype.drawImage = function (...a: Parameters<typeof drawImage>) {
+    imagens[paginas.indexOf(this)]++;
+    return drawImage.apply(this, a);
+  };
   try {
     const r = await renderEditorialPdf(doc, idioma);
-    return { ...r, escritas, paginas: paginas.length };
+    return { ...r, escritas, imagens, paginas: paginas.length };
   } finally {
     PDFDocument.prototype.addPage = addPage;
     PDFPage.prototype.drawText = drawText;
+    PDFPage.prototype.drawImage = drawImage;
   }
 }
 
+/** Todo o texto de uma página numa só linha, com os espaços normalizados. */
 const naPagina = (e: Escrita[], n: number) =>
   e
     .filter((x) => x.pagina === n)
     .map((x) => x.texto)
-    .join(" | ");
+    .join(" ")
+    .replace(/[\s  ]+/g, " ");
+const tudo = (e: Escrita[]) =>
+  e
+    .map((x) => x.texto)
+    .join(" ")
+    .replace(/[\s  ]+/g, " ");
 
-describe("o plano das páginas", () => {
-  it("capa, índice, «A proposta», um separador por capítulo, a citação e a contracapa", async () => {
+describe("a sequência do exemplo, pela mesma ordem", () => {
+  it("capa, índice, proposta, serviços, paleta, capítulos, citação, investimento, condições, contracapa", async () => {
     const { paginas, escritas } = await desenhar(docDeTeste());
-    // 3 capítulos (Cerimónia, Cocktail, Jantar) → 1+1+1+3+1+1.
-    expect(paginas).toBe(8);
-    expect(naPagina(escritas, 4)).toContain("Cerimónia");
-    expect(naPagina(escritas, 5)).toContain("Cocktail");
-    // A citação vem a seguir ao capítulo do meio, como no exemplo.
-    expect(naPagina(escritas, 6)).toContain("eternizamos memórias.»");
-    expect(naPagina(escritas, 7)).toContain("Jantar");
+    const t = textosDaProposta("pt");
+    const te = textosEditoriais("pt");
+    const esperado: [number, string][] = [
+      [1, "PROPOSTA · DECORAÇÃO"],
+      [2, te.tituloIndice],
+      [3, "Uma decoração pensada para o dia de TESTE e TESTE"],
+      [4, "Três serviços de decoração floral e decoração"],
+      [5, te.tituloAmbiente],
+      [6, "02 · INSPIRAÇÃO Cerimónia"],
+      [7, "Decoração Cerimónia"],
+      [8, "03 · INSPIRAÇÃO Cocktail"],
+      [9, "Decor Cocktail"],
+      [10, "eternizamos memórias.»"],
+      [11, "04 · INSPIRAÇÃO Jantar"],
+      [12, "TESTE nota do jantar."],
+      [13, "05 Investimento"],
+      [14, te.tituloOrcamento],
+      [15, "4.501,80 €"],
+      [16, te.tituloNotas],
+      [17, te.tituloCondicoesGerais],
+      [18, te.tituloPagamento],
+      [19, t.obrigada],
+    ];
+    expect(paginas).toBe(19);
+    for (const [n, texto] of esperado)
+      expect(naPagina(escritas, n), `página ${n}`).toContain(texto);
   });
 
-  it("o índice diz a página VERDADEIRA de cada capítulo", async () => {
+  it("o índice diz a página VERDADEIRA de cada secção, investimento e condições incluídos", async () => {
     const { escritas } = await desenhar(docDeTeste());
     const indice = escritas.filter((e) => e.pagina === 2);
-    const linhaDe = (titulo: string) => {
+    const paginaDe = (titulo: string) => {
       const t = indice.find((e) => e.texto === titulo);
       expect(t, titulo).toBeDefined();
-      // O número da página está na mesma linha, à direita.
       return indice.find((e) => Math.abs(e.y - t!.y) < 0.5 && e.x > t!.x && /^\d\d$/.test(e.texto))
         ?.texto;
     };
-    expect(linhaDe("A proposta")).toBe("03");
-    expect(linhaDe("Inspiração · Cerimónia")).toBe("04");
-    expect(linhaDe("Inspiração · Cocktail")).toBe("05");
-    // A citação (página 6) não entra no índice: o Jantar é a 7.
-    expect(linhaDe("Inspiração · Jantar")).toBe("07");
-  });
-
-  it("o separador diz o número do capítulo no índice", async () => {
-    const { escritas } = await desenhar(docDeTeste());
-    expect(naPagina(escritas, 4)).toContain("02 · INSPIRAÇÃO");
-    expect(naPagina(escritas, 7)).toContain("04 · INSPIRAÇÃO");
-  });
-
-  it("sem temas: sem separadores nem citação — e sem falhar", async () => {
-    const { paginas } = await desenhar(docDeTeste({ moodBoards: [] }));
-    expect(paginas).toBe(4);
-  });
-
-  it("sem fotografia nenhuma, sai na mesma (fundo liso)", async () => {
-    const r = await desenhar(docDeTeste({ coverImages: ["", ""], moodBoards: [] }));
-    expect(r.paginas).toBe(4);
-    expect(r.undrawnImages).toBe(0);
+    expect(paginaDe("A proposta")).toBe("03");
+    expect(paginaDe("Inspiração · Cerimónia")).toBe("06");
+    expect(paginaDe("Inspiração · Cocktail")).toBe("08");
+    expect(paginaDe("Inspiração · Jantar")).toBe("11");
+    expect(paginaDe("Investimento")).toBe("13");
+    expect(paginaDe("Condições")).toBe("16");
   });
 });
 
-describe("o rodapé", () => {
-  it("só nas páginas de texto, com o número da página", async () => {
-    const { escritas } = await desenhar(docDeTeste());
-    const linha = "Proposta de decoração · TESTE Ana Sousa & TESTE Rui Matos · 8 de julho de 2028";
-    const comRodape = escritas.filter((e) => e.texto === linha).map((e) => e.pagina);
-    expect(comRodape).toEqual([2, 3]);
-    // O número fica na mesma linha, com dois algarismos.
-    for (const n of [2, 3]) {
-      const texto = escritas.find((e) => e.pagina === n && e.texto === linha)!;
-      const numero = escritas.find(
-        (e) => e.pagina === n && Math.abs(e.y - texto.y) < 0.5 && e.texto === `0${n}`,
-      );
-      expect(numero, `página ${n}`).toBeDefined();
+describe("os temas: todas as fotografias, o título e a nota", () => {
+  it.each([0, 1, 2, 3, 4, 5, 8, 12])("um tema com %i fotografias desenha-as todas", async (n) => {
+    const doc = docDeTeste({
+      moodBoards: [{ title: "Corredor", images: fotos(n), annotation: "TESTE nota" }],
+    });
+    const { escritas, imagens } = await desenhar(doc);
+    const pagina = escritas.find((e) => e.texto === "Corredor")!.pagina;
+    // A página do tema leva exactamente as suas fotografias.
+    expect(imagens[pagina - 1]).toBe(n);
+    expect(naPagina(escritas, pagina)).toContain("TESTE nota");
+  });
+
+  it("acima de doze, reparte por duas páginas — a segunda diz «Mais ideias…»", async () => {
+    const doc = docDeTeste({ moodBoards: [{ title: "Corredor", images: fotos(13) }] });
+    const { escritas, imagens } = await desenhar(doc);
+    const paginas = [
+      ...new Set(escritas.filter((e) => e.texto === "Corredor").map((e) => e.pagina)),
+    ];
+    expect(paginas).toHaveLength(2);
+    expect(paginas.reduce((s, p) => s + imagens[p - 1], 0)).toBe(13);
+    expect(naPagina(escritas, paginas[1])).toContain("Mais ideias…");
+  });
+
+  it("uma nota muito longa encolhe e não passa do mosaico", async () => {
+    const longa = "TESTE uma nota muito comprida, escrita à mão no estúdio. ".repeat(14);
+    const doc = docDeTeste({
+      moodBoards: [{ title: "Corredor", images: fotos(8), annotation: longa }],
+    });
+    const { escritas } = await desenhar(doc);
+    const pagina = escritas.find((e) => e.texto === "Corredor")!.pagina;
+    // O mosaico ocupa a metade de cima (395 px) — nada da nota passa abaixo dela.
+    const fundoDoMosaico = PAGINA_H - (395 * PAGINA_W) / 1123;
+    for (const e of escritas.filter((x) => x.pagina === pagina)) {
+      expect(e.y, e.texto).toBeGreaterThan(fundoDoMosaico);
     }
   });
 });
 
-describe("os textos da casa saem tal e qual", () => {
-  it("a capa, o agradecimento, o lema, os contactos e a validade", async () => {
+describe("as condições: sempre, e palavra por palavra", () => {
+  it.each([
+    ["com orçamento", {}],
+    ["SEM orçamento", semOrcamento],
+  ])("%s, cada ponto dos blocos fixos está no PDF tal e qual", async (_, extra) => {
+    const doc = docDeTeste(extra);
+    const fixos = blocosFixosNaLingua(doc, "pt");
+    const { escritas } = await desenhar(doc);
+    const texto = tudo(escritas);
+    const pontos = [
+      ...fixos.notasImportantes,
+      ...fixos.incluido,
+      ...fixos.naoIncluido,
+      ...fixos.observacoesGerais,
+      ...fixos.condicoesGerais,
+      ...fixos.faseamento,
+      ...fixos.cancelamento,
+    ];
+    expect(pontos.length).toBeGreaterThan(10);
+    for (const p of pontos) expect(texto).toContain(p.replace(/\s+/g, " "));
+    expect(texto).toContain(SITE.email);
+    expect(texto).toContain(SITE.phoneDisplay);
+  });
+
+  it("sem orçamento, não há «Investimento» no índice e as condições continuam lá", async () => {
+    const { escritas } = await desenhar(docDeTeste(semOrcamento));
+    const indice = naPagina(escritas, 2);
+    expect(indice).not.toContain("Investimento");
+    expect(indice).toContain("Condições");
+  });
+});
+
+describe("os números do orçamento são os do gerador antigo", () => {
+  it("os sete valores do exemplo", async () => {
+    const texto = tudo((await desenhar(docDeTeste())).escritas);
+    for (const v of [
+      "3.200,00 €",
+      "+ 460,00 €",
+      "3.660,00 €",
+      "841,80 €",
+      "4.501,80 €",
+      "1.350,54 €",
+      "3.151,26 €",
+    ]) {
+      expect(texto).toContain(v);
+    }
+  });
+});
+
+describe("o rodapé", () => {
+  it("«LÍQUEN EVENTS», o nome da proposta e o número, nas páginas de texto", async () => {
+    const { escritas } = await desenhar(docDeTeste());
+    // Nas páginas com painel de fotografia o rodapé é mais estreito e o nome
+    // da proposta acaba em «…», como no exemplo — conta o princípio.
+    const comRodape = escritas
+      .filter((e) => e.y < 45 && e.texto.startsWith("Proposta de decoração · TESTE"))
+      .map((e) => e.pagina);
+    // Índice, proposta, serviços, paleta, orçamento, total, três de condições.
+    expect(comRodape).toEqual(expect.arrayContaining([2, 3, 4, 5, 14, 15, 16, 17, 18]));
+    for (const n of comRodape) {
+      const marca = escritas.find((e) => e.pagina === n && e.texto === "LÍQUEN EVENTS" && e.y < 45);
+      expect(marca, `marca na página ${n}`).toBeDefined();
+    }
+  });
+});
+
+describe("os textos da casa", () => {
+  it("a contracapa sai como no gerador antigo", async () => {
     const t = textosDaProposta("pt");
     const doc = docDeTeste();
     const { escritas, paginas } = await desenhar(doc);
-    expect(naPagina(escritas, 1)).toContain("PROPOSTA · DECORAÇÃO");
     const contracapa = naPagina(escritas, paginas);
     expect(contracapa).toContain(t.obrigada);
-    expect(contracapa.replace(/ \| /g, " ")).toContain(t.agradecimento);
+    expect(contracapa).toContain(t.agradecimento);
     expect(contracapa).toContain(SITE.slogan);
-    expect(contracapa).toContain(`${SITE.email} · ${SITE.phoneDisplay}`);
     expect(contracapa).toContain(t.passoValidade(t.data(resolveValidUntil(doc))));
   });
 
   it("em inglês, os rótulos do desenho são os ingleses", async () => {
     const te = textosEditoriais("en");
-    const { escritas, paginas } = await desenhar(docDeTeste(), "en");
-    const tudo = escritas.map((e) => e.texto).join(" | ");
-    expect(tudo).toContain(te.tituloIndice);
-    expect(tudo).toContain("Inspiration · Ceremony");
-    expect(tudo).not.toContain("Conteúdo da proposta");
-    expect(naPagina(escritas, paginas)).toContain(textosDaProposta("en").obrigada);
+    const { escritas } = await desenhar(docDeTeste(), "en");
+    const texto = tudo(escritas);
+    expect(texto).toContain(te.tituloIndice);
+    expect(texto).toContain("Inspiration · Ceremony");
+    expect(texto).toContain(te.tituloPagamento);
+    expect(texto).not.toContain("Conteúdo da proposta");
   });
 });
 
-describe("nada sai da folha", () => {
-  const dentro = (e: Escrita) => {
-    // O espaçamento entre letras não entra na largura do pdf-lib. Conta-se o
-    // do desenho: 0,2 em por letra nas maiúsculas espaçadas (sobretítulos,
-    // rótulos), 0,02 no resto (o rodapé).
-    const espaco = /\p{Ll}/u.test(e.texto) ? 0.02 : 0.2;
-    const folga = espaco * e.tamanho * [...e.texto].length;
-    return e.x >= 0 && e.y >= 0 && e.x + e.largura + folga <= PAGINA_W + 0.5 && e.y <= PAGINA_H;
-  };
-
+describe("nada sai da folha nem desce ao rodapé", () => {
   it("com nomes e local compridos", async () => {
     const { escritas, truncations } = await desenhar(
       docDeTeste({
@@ -225,32 +344,18 @@ describe("nada sai da folha", () => {
           "Quinta da Herdade do Monte Alto das Oliveiras Velhas · Montemor-o-Novo · Exterior",
       }),
     );
-    const fora = escritas.filter((e) => !dentro(e));
+    const fora = escritas.filter((e) => {
+      const espaco = /\p{Ll}/u.test(e.texto) ? 0.02 : 0.2;
+      const folga = espaco * e.tamanho * [...e.texto].length;
+      return e.x < 0 || e.y < 0 || e.x + e.largura + folga > PAGINA_W + 0.5 || e.y > PAGINA_H;
+    });
     expect(fora).toEqual([]);
-    // Os nomes encolhem antes de cortar; se cortarem, o relatório di-lo.
     for (const c of truncations) expect(c.dropped).toBeGreaterThan(0);
-  });
-
-  it("os nomes não descem até à faixa dos dados da capa", async () => {
-    const { escritas } = await desenhar(
-      docDeTeste({
-        clientNames:
-          "TESTE Maria Inês de Albuquerque Sousa Coutinho Vasconcelos & TESTE João Pedro Barros e Cunha de Menezes Albergaria",
-      }),
-    );
-    const capa = escritas.filter((e) => e.pagina === 1);
-    const evento = capa.find((e) => e.texto === "EVENTO")!;
-    const nomes = capa.filter((e) => e.tamanho > 25);
-    expect(nomes.length).toBeGreaterThan(0);
-    // A linha mais baixa dos nomes fica acima do fio da faixa (que está acima
-    // dos rótulos), com margem.
-    const maisBaixa = Math.min(...nomes.map((e) => e.y));
-    expect(maisBaixa).toBeGreaterThan(evento.y + 40);
   });
 });
 
 describe("sem transparência por cima das fotografias", () => {
-  it("nenhuma imagem tem máscara, a não ser o logótipo, e não há opacidade parcial", async () => {
+  it("só o logótipo tem máscara, e não há opacidade parcial", async () => {
     const { bytes } = await desenhar(docDeTeste());
     const pdf = await PDFDocument.load(bytes);
     let comMascara = 0;
@@ -269,9 +374,7 @@ describe("sem transparência por cima das fotografias", () => {
         if (v instanceof PDFNumber && v.asNumber() < 1) opacidades++;
       }
     }
-    // Só o logótipo e o símbolo do rodapé têm recorte (são formas, não
-    // rectângulos) — nenhuma fotografia.
-    expect(comMascara).toBe(2);
+    expect(comMascara).toBe(1);
     expect(opacidades).toBe(0);
   });
 });

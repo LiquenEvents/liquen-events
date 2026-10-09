@@ -33,14 +33,92 @@ export interface TextosEditoriais {
     noivos: string;
     cliente: string;
     cerimonia: string;
-    servicos: string;
-    validaAte: string;
+    servico: string;
+    hora: string;
   };
   inspiracao: string;
+  /** O subtítulo da segunda página de um tema com mais de doze fotografias. */
+  maisIdeias: string;
   grupos: Readonly<Record<Grupo, string>>;
   /** A linha do rodapé depois da marca: «Proposta de decoração». */
   rodapeModelo: (organizacao: boolean) => string;
+
+  // ── O que propomos ──
+  /** «Seis serviços de decoração floral e decoração» — `grupo` é o título do
+   *  grupo de serviços quando há um só, já em minúsculas. */
+  tituloServicos: (quantos: number, grupo: string | null) => string;
+
+  // ── Paleta e ambiente ──
+  sobretituloAmbiente: string;
+  tituloAmbiente: string;
+  subtituloAmbiente: string;
+
+  // ── Investimento ──
+  investimento: string;
+  tituloOrcamento: string;
+  /** «Seis serviços» — o subtítulo do quadro. */
+  quantosServicos: (quantos: number) => string;
+  comIvaIncluido: string;
+
+  // ── Condições ──
+  condicoes: string;
+  tituloNotas: string;
+  tituloCondicoesGerais: string;
+  tituloPagamento: string;
+  continuacao: string;
 }
+
+/** Os números por extenso, de um a vinte — o «Seis serviços» do exemplo. */
+const EXTENSO_PT = [
+  "zero",
+  "um",
+  "dois",
+  "três",
+  "quatro",
+  "cinco",
+  "seis",
+  "sete",
+  "oito",
+  "nove",
+  "dez",
+  "onze",
+  "doze",
+  "treze",
+  "catorze",
+  "quinze",
+  "dezasseis",
+  "dezassete",
+  "dezoito",
+  "dezanove",
+  "vinte",
+];
+const EXTENSO_EN = [
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+  "twenty",
+];
+const comMaiuscula = (s: string) => s.charAt(0).toLocaleUpperCase("pt-PT") + s.slice(1);
+/** «Seis» de 6; acima de vinte, o algarismo. */
+const porExtenso = (n: number, tabela: readonly string[]) =>
+  comMaiuscula(n <= 20 ? tabela[n] : String(n));
 
 const PT: TextosEditoriais = {
   indice: "Índice",
@@ -58,10 +136,11 @@ const PT: TextosEditoriais = {
     noivos: "Noivos",
     cliente: "Cliente",
     cerimonia: "Cerimónia",
-    servicos: "Serviços",
-    validaAte: "Válida até",
+    servico: "Serviço",
+    hora: "Hora",
   },
   inspiracao: "Inspiração",
+  maisIdeias: "Mais ideias…",
   grupos: {
     cerimonia: "Cerimónia",
     cocktail: "Cocktail",
@@ -70,6 +149,27 @@ const PT: TextosEditoriais = {
     ambiente: "Ambiente",
   },
   rodapeModelo: (org) => (org ? "Proposta de organização" : "Proposta de decoração"),
+
+  tituloServicos: (n, grupo) => {
+    // «Um serviço», no singular; e «um» e não «uma»: «serviço» é masculino.
+    const base = n === 1 ? "Um serviço" : `${porExtenso(n, EXTENSO_PT)} serviços`;
+    return grupo ? `${base} de ${grupo}` : base;
+  },
+
+  sobretituloAmbiente: "Ambiente",
+  tituloAmbiente: "A paleta e o ambiente do evento",
+  subtituloAmbiente: "Cores retiradas das fotografias de inspiração desta proposta",
+
+  investimento: "Investimento",
+  tituloOrcamento: "Orçamento proposto",
+  quantosServicos: (n) => (n === 1 ? "Um serviço" : `${porExtenso(n, EXTENSO_PT)} serviços`),
+  comIvaIncluido: "Com IVA incluído.",
+
+  condicoes: "Condições",
+  tituloNotas: "Notas, condições de reserva e próximos passos",
+  tituloCondicoesGerais: "Condições gerais",
+  tituloPagamento: "Pagamento e cancelamento",
+  continuacao: "(cont.)",
 };
 
 const EN: TextosEditoriais = {
@@ -88,10 +188,11 @@ const EN: TextosEditoriais = {
     noivos: "Couple",
     cliente: "Client",
     cerimonia: "Ceremony",
-    servicos: "Services",
-    validaAte: "Valid until",
+    servico: "Service",
+    hora: "Time",
   },
   inspiracao: "Inspiration",
+  maisIdeias: "More ideas…",
   grupos: {
     cerimonia: "Ceremony",
     cocktail: "Cocktail",
@@ -100,6 +201,25 @@ const EN: TextosEditoriais = {
     ambiente: "Atmosphere",
   },
   rodapeModelo: (org) => (org ? "Planning proposal" : "Decoration proposal"),
+
+  // O nome do grupo é dela e fica em português; em inglês o título diz só
+  // quantos são, que é o que se lê sem tradução.
+  tituloServicos: (n) => (n === 1 ? "One service" : `${porExtenso(n, EXTENSO_EN)} services`),
+
+  sobretituloAmbiente: "Atmosphere",
+  tituloAmbiente: "The palette and mood of the day",
+  subtituloAmbiente: "Colours taken from the inspiration photographs in this proposal",
+
+  investimento: "Investment",
+  tituloOrcamento: "Quotation",
+  quantosServicos: (n) => (n === 1 ? "One service" : `${porExtenso(n, EXTENSO_EN)} services`),
+  comIvaIncluido: "VAT included.",
+
+  condicoes: "Conditions",
+  tituloNotas: "Notes, booking conditions and next steps",
+  tituloCondicoesGerais: "General conditions",
+  tituloPagamento: "Payment and cancellation",
+  continuacao: "(cont.)",
 };
 
 export function textosEditoriais(idioma: IdiomaDaProposta): TextosEditoriais {
