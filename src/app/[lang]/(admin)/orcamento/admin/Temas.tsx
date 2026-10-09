@@ -1744,12 +1744,15 @@ export default function Temas() {
    * alguém concluir que faltam fotos e as voltar a carregar.
    */
   const estadoDaVista = useMemo(() => {
+    // A ler, a lista ainda está vazia — e «0 temas · 0 fotografias» é uma
+    // afirmação, dita antes de haver resposta. Quem a lê pensa que perdeu tudo.
+    if (loading) return "A contar…";
     const { fotos, temas, ilegiveis } = contarFotosDaBiblioteca(visible);
     const base = `${plural(temas, "tema", "temas")} · ${plural(fotos, "fotografia", "fotografias")}`;
     return ilegiveis > 0
       ? `${base} · ${plural(ilegiveis, "pasta não se deixou ler", "pastas não se deixaram ler")}`
       : base;
-  }, [visible]);
+  }, [visible, loading]);
 
   // A revisão em lote trabalha sobre a biblioteca TODA, não sobre um tema — é
   // um ecrã irmão da lista, não um separador dentro dela.
@@ -1906,7 +1909,11 @@ export default function Temas() {
 
   // O campo de procura só aparece quando há lista que chegue para justificar
   // um controlo a mais — com três temas, procurar é mais trabalho do que ler.
-  const searchable = themes.length > 4;
+  // A ler, o campo já lá está (desligado): aparecia só depois de a lista
+  // chegar, e a contagem ao lado era empurrada para a linha de baixo a 390 px
+  // — MEDIDO como um salto da página. Uma biblioteca com quatro temas ou menos
+  // perde-o depois; a dela tem dezenas.
+  const searchable = loading || themes.length > 4;
 
   return (
     <div>
@@ -2027,6 +2034,7 @@ export default function Temas() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Procurar temas"
                   aria-label="Procurar tema por nome ou nota"
+                  disabled={loading}
                   className="bo-input h-10 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30 [--bo-radius:var(--radius-control)]"
                 />
               </div>

@@ -160,11 +160,22 @@ export default function FechosMeta() {
         casamentos e não para formulários.
       </p>
 
-      {aLer && <p className="mt-4 text-xs text-foreground/40">A contar…</p>}
+      {/* A espera tem a altura da frase que vem a seguir (uma linha
+          `text-sm`, 20 px — o caso mais comum é «Não há casamentos fechados
+          por enviar.»), e não a de uma linha `text-xs`: era essa diferença
+          que fazia o cartão crescer à vista quando o relatório chegava. */}
+      {aLer && (
+        <div role="status" aria-busy="true" className="mt-4">
+          <span className="sr-only">A contar…</span>
+          <div aria-hidden="true" className="bo-skeleton h-5 w-2/3 rounded-md" />
+        </div>
+      )}
 
       {falhouALeitura && (
         <div className="mt-4">
-          <p className="text-xs text-[var(--bo-perigo)]">Não foi possível contar os casamentos fechados.</p>
+          <p className="text-xs text-[var(--bo-perigo)]">
+            Não foi possível contar os casamentos fechados.
+          </p>
           <button
             type="button"
             onClick={() => {

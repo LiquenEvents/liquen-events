@@ -115,11 +115,20 @@ export default function AnalisePropostas() {
   // Estatísticas e a lista chegar era desenhado como «ainda não enviaste
   // nenhuma proposta» — a mesma afirmação de baixo, dita antes de haver
   // resposta.
+  //
+  // E com a FORMA do que vem: a linha de texto tinha 20 px e dava lugar a uma
+  // grelha de quatro números com quase cem — MEDIDO nas Estatísticas, a
+  // secção «Dinheiro» e o cartão da Meta, que vêm a seguir, saltavam para
+  // baixo quando as propostas chegavam (0,047 a 1440; 0,098 a 390 no
+  // escuro). Os quatro mosaicos guardam o lugar da primeira fila.
   if (loading && !propostas) {
     return (
-      <p role="status" aria-busy="true" className="bo-text-muted text-sm">
-        A ler as propostas…
-      </p>
+      <div role="status" aria-busy="true" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <span className="sr-only">A ler as propostas…</span>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} aria-hidden="true" className="bo-skeleton h-21 rounded-2xl" />
+        ))}
+      </div>
     );
   }
 

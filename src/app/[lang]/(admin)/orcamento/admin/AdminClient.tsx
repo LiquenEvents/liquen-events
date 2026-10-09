@@ -5837,14 +5837,22 @@ export default function AdminClient({
               acima: as seis portas que abrem um pedido estão espalhadas por
               cinco vistas, e o sinal tem de aparecer naquela em que o dedo
               tocou. */}
+          {/* FORA DO FLUXO: no fluxo, o aviso empurrava a lista para baixo ao
+              aparecer e deixava-a subir ao sair — MEDIDO a 390 px ao abrir uma
+              proposta a partir das Propostas, um salto de 0,157 (acima do 0,1
+              que já é «mau»). Fica numa âncora de altura zero, por cima do
+              topo da vista, com fundo opaco para não se ler através dele. */}
           {aAbrir && (
-            <EmCurso
-              className="mb-4"
-              titulo={`A abrir o pedido de ${aAbrir.nome}`}
-              estimadoMs={1200}
-              nota="Vai buscar os convidados, a checklist e o cronograma — é o que falta ao resumo da lista."
-              notaDemorada="A ligação está lenta. Podes esperar, ou voltar atrás e tentar daqui a pouco."
-            />
+            <div className="relative z-10 h-0" data-ancora-em-curso>
+              <div className="absolute inset-x-0 top-0 rounded-xl bg-[var(--bo-surface)] shadow-[var(--bo-sombra-suspensa)]">
+                <EmCurso
+                  titulo={`A abrir o pedido de ${aAbrir.nome}`}
+                  estimadoMs={1200}
+                  nota="Vai buscar os convidados, a checklist e o cronograma — é o que falta ao resumo da lista."
+                  notaDemorada="A ligação está lenta. Podes esperar, ou voltar atrás e tentar daqui a pouco."
+                />
+              </div>
+            </div>
           )}
 
           {/* ── Overview ── */}
