@@ -27,6 +27,7 @@ import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { unidadeNaContagem } from "@/lib/unidade-na-contagem";
 
 /**
  * CATÁLOGO DE MATERIAL DE LOGÍSTICA.
@@ -923,7 +924,7 @@ function Catalogo() {
                     <span className="bo-text-muted text-xs">{i.category}</span>
                     <span className="text-sm">
                       {i.stock}
-                      {i.unit ? ` ${i.unit}` : ""}
+                      {i.unit ? ` ${unidadeNaContagem(i.stock, i.unit)}` : ""}
                     </span>
                     {abaixoDoMinimo(i) && (
                       <span className="rounded-md bg-[var(--bo-perigo-lavagem)] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-[var(--bo-perigo)] uppercase">
