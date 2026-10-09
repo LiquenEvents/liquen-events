@@ -37,8 +37,14 @@ import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
  * ── A ordem da lista não é alfabética, é por urgência ─────────────────────
  * À cabeça vêm os pedidos que ainda ESPERAM proposta (novos e em revisão), e
  * dentro desses os de data de evento mais próxima. É a ordem por que o trabalho
- * se faz. Quem já tem proposta enviada aparece a seguir, apagado — continua
- * alcançável, para refazer ou rever, mas não disputa a atenção.
+ * se faz.
+ *
+ * ── E SÓ OS QUE AINDA NÃO TÊM PROPOSTA ────────────────────────────────────
+ * Palavras dela, com a lista à frente: «quero que aqui o sistema retire as
+ * propostas que já foram feitas e fique apenas as que ainda não se fizeram».
+ * Quem já tem proposta enviada (ou ganha, ou perdida) NÃO aparece aqui: está em
+ * «Propostas», que é onde as feitas se reveem, e continua a abrir-se no estúdio
+ * pelo pedido. Uma procura que só encontre um desses di-lo, e leva lá.
  */
 
 /**
@@ -72,26 +78,20 @@ const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
 const A_ESPERA: QuoteStatus[] = ["pendente", "em_revisao"];
 
 /**
- * A FILA DE FILTROS — e porque é que não há um «Todos».
+ * A FILA DE FILTROS — só os dois estados que ainda esperam proposta.
  *
- * A lista misturava novos, enviados e perdidos, e um casamento que se perdeu há
- * seis meses ficava entre dois que esperam proposta hoje. Estas pastilhas são a
- * triagem: a fila é a ordem do funil, e cada uma diz quantos lá estão.
- *
- * Por omissão fica em «Activos», que é tudo menos os perdidos. Não se chama
- * «Todos» de propósito — chamar-lhe «Todos» e depois esconder uma parte seria
- * mentir na etiqueta. Quem quiser ver os perdidos toca na pastilha deles; não
- * há nenhum trabalho que se faça com perdidos e activos misturados, que é
- * exactamente a queixa que deu origem a isto.
+ * Era a fila do funil inteiro (Activos, Novo, Aguardar resposta, Proposta
+ * enviada, Ganho, Perdido). Com a lista a mostrar só o que ainda não tem
+ * proposta (ver o cabeçalho), sobram dois estados: «Novo» — ninguém respondeu —
+ * e «Aguardar resposta» — já se respondeu por mensagem, falta o cliente. Por
+ * omissão vêm os dois, em «Por fazer»; não se chama «Todos» porque não é.
  */
 const FILTROS: { id: QuoteStatus; label: string }[] = [
   { id: "pendente", label: "Novo" },
   { id: "em_revisao", label: "Aguardar resposta" },
-  { id: "cotado", label: "Proposta enviada" },
-  { id: "aceite", label: "Ganho" },
 ];
 
-type Filtro = QuoteStatus | "activos";
+type Filtro = QuoteStatus | "por-fazer";
 
 function tipoDeEvento(q: Quote): string {
   if (q.category && q.eventType) {
@@ -99,6 +99,11 @@ function tipoDeEvento(q: Quote): string {
     if (et) return et.label;
   }
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "Evento";
+}
+
+/** O pedido bate com a procura `t` (já em minúsculas)? Vazia, bate tudo. */
+function bate(t: string, q: Quote): boolean {
+  return !t || casaComAProcura(t, [q.name, q.email, q.location, q.id, tipoDeEvento(q)]);
 }
 
 /** "12 de Setembro de 2026", ou o que lá estiver escrito se não for uma data
@@ -131,6 +136,8 @@ interface Props {
    * voltas de distância para quem entrou por ali.
    */
   onAbrirPedido: (quote: Quote) => void;
+  /** Ir para «Propostas», onde vivem as que já foram feitas. Ver a procura. */
+  onIrParaPropostas?: () => void;
 }
 
 export default function FazerProposta({
@@ -141,9 +148,10 @@ export default function FazerProposta({
   onSent,
   onQuoteUpdated,
   onAbrirPedido,
+  onIrParaPropostas,
 }: Props) {
   const [procura, setProcura] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("activos");
+  const [filtro, setFiltro] = useState<Filtro>("por-fazer");
   // O mesmo padrão do resto do back office: a escrita responde já, e o
   // filtro sobre a lista toda corre com prioridade mais baixa.
   const procuraAdiada = useDeferredValue(procura);
@@ -163,37 +171,38 @@ export default function FazerProposta({
    */
   const procurados = useMemo(() => {
     const t = procuraAdiada.trim().toLowerCase();
-    const bate = (q: Quote) =>
-      !t || casaComAProcura(t, [q.name, q.email, q.location, q.id, tipoDeEvento(q)]);
-
+    // Só os que ainda esperam proposta — ver o cabeçalho.
     return quotes
-      .filter((q) => !q.archived && bate(q))
+      .filter((q) => !q.archived && A_ESPERA.includes(q.status) && bate(t, q))
       .sort((a, b) => {
-        // Primeiro os que esperam proposta.
-        const ea = A_ESPERA.includes(a.status) ? 0 : 1;
-        const eb = A_ESPERA.includes(b.status) ? 0 : 1;
-        if (ea !== eb) return ea - eb;
-        // Depois, o evento mais próximo primeiro. Sem data vai para o fim: não
-        // se pode dizer que é urgente o que não tem quando.
+        // O evento mais próximo primeiro. Sem data vai para o fim: não se pode
+        // dizer que é urgente o que não tem quando.
         const da = a.date || "9999";
         const db = b.date || "9999";
         return da.localeCompare(db);
       });
   }, [quotes, procuraAdiada]);
 
+  /**
+   * A procura que só encontra pedidos que JÁ têm proposta.
+   *
+   * Sem isto, procurar um casal com proposta enviada dava «Ninguém com esse
+   * nome» — e o casal existe. Diz-se onde está, e leva-se lá.
+   */
+  const jaComProposta = useMemo(() => {
+    const t = procuraAdiada.trim().toLowerCase();
+    if (!t) return [];
+    return quotes.filter((q) => !q.archived && !A_ESPERA.includes(q.status) && bate(t, q));
+  }, [quotes, procuraAdiada]);
+
   const contagens = useMemo(() => {
     const por: Record<string, number> = {};
     for (const q of procurados) por[q.status] = (por[q.status] ?? 0) + 1;
-    return { por, activos: procurados.filter((q) => q.status !== "rejeitado").length };
+    return { por, todos: procurados.length };
   }, [procurados]);
 
-  const perdidos = contagens.por.rejeitado ?? 0;
-
   const lista = useMemo(
-    () =>
-      procurados.filter((q) =>
-        filtro === "activos" ? q.status !== "rejeitado" : q.status === filtro,
-      ),
+    () => procurados.filter((q) => filtro === "por-fazer" || q.status === filtro),
     [procurados, filtro],
   );
 
@@ -374,15 +383,12 @@ export default function FazerProposta({
           className="-mt-1 flex flex-nowrap gap-1.5 overflow-x-auto py-1 lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {[
-            { id: "activos" as Filtro, label: "Activos", n: contagens.activos },
+            { id: "por-fazer" as Filtro, label: "Por fazer", n: contagens.todos },
             ...FILTROS.map((f) => ({
               id: f.id as Filtro,
               label: f.label,
               n: contagens.por[f.id] ?? 0,
             })),
-            // «Perdido» só existe na fila quando há algum. Uma pastilha a zero
-            // é um convite para um ecrã vazio.
-            ...(perdidos > 0 ? [{ id: "rejeitado" as Filtro, label: "Perdido", n: perdidos }] : []),
           ].map((f) => (
             <button
               key={f.id}
@@ -410,11 +416,30 @@ export default function FazerProposta({
         <EmptyState
           title="Nada neste estado"
           description={`Não há pedidos em «${
-            filtro === "activos"
-              ? "Activos"
+            filtro === "por-fazer"
+              ? "Por fazer"
               : (ESTADO[filtro as QuoteStatus]?.label ?? String(filtro))
           }»${procura ? " dentro do que procuraste" : ""}.`}
-          action={{ label: "Ver os activos", onClick: () => setFiltro("activos") }}
+          action={{ label: "Ver os por fazer", onClick: () => setFiltro("por-fazer") }}
+        />
+      ) : lista.length === 0 && jaComProposta.length > 0 ? (
+        // Encontrou-se — mas já tem proposta, e por isso não está nesta lista.
+        <EmptyState
+          title={
+            jaComProposta.length === 1
+              ? `${jaComProposta[0].name} já tem proposta`
+              : `${jaComProposta.length} pedidos com esse nome já têm proposta`
+          }
+          description={
+            jaComProposta.length === 1
+              ? `Está em «${ESTADO[jaComProposta[0].status]?.label ?? jaComProposta[0].status}». As propostas já feitas reveem-se em Propostas.`
+              : "As propostas já feitas reveem-se em Propostas."
+          }
+          action={
+            onIrParaPropostas
+              ? { label: "Ver em Propostas", onClick: onIrParaPropostas }
+              : undefined
+          }
         />
       ) : lista.length === 0 ? (
         <EmptyState
@@ -429,7 +454,6 @@ export default function FazerProposta({
       ) : (
         <ul className="flex flex-col gap-2">
           {lista.map((q) => {
-            const espera = A_ESPERA.includes(q.status);
             const choque = comChoque.get(q.id);
             const e = ESTADO[q.status] ?? {
               // Um estado que não conheçamos mostra-se cru e em cinzento, em vez
@@ -442,11 +466,7 @@ export default function FazerProposta({
                 <button
                   type="button"
                   onClick={() => onSelect(q.id)}
-                  className={`alvo-toque !justify-start w-full rounded-2xl border p-4 text-left ${MOV_ESTADO} ${PRESSAO} ${
-                    espera
-                      ? "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:border-sage-600/40"
-                      : "border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] hover:border-foreground/20"
-                  }`}
+                  className={`alvo-toque !justify-start w-full rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-4 text-left hover:border-sage-600/40 ${MOV_ESTADO} ${PRESSAO}`}
                 >
                   {/* AS ETIQUETAS VÊM PRIMEIRO, E É DE PROPÓSITO.
                       Estavam à direita do nome, e num ecrã de 390 px «Aguardar
@@ -480,9 +500,7 @@ export default function FazerProposta({
                       </span>
                     </span>
                     <span className="min-w-0">
-                      <span
-                        className={`block truncate text-sm font-medium ${espera ? "text-[var(--bo-text)]" : "text-[var(--bo-text-muted)]"}`}
-                      >
+                      <span className="block truncate text-sm font-medium text-[var(--bo-text)]">
                         {q.name}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-foreground/45">
