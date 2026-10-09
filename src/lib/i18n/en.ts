@@ -190,7 +190,6 @@ export const en: Dict = {
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We make memories last.",
-    manifestoText: "Over 100 events since 2018.",
     // Corner caption (chapter idiom) over the manifesto photograph.
     manifestoImageCaption: "Events · since 2018",
     statementLead: "We don't just decorate spaces.",

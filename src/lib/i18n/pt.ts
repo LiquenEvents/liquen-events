@@ -193,7 +193,6 @@ export const pt = {
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Mais de 100 eventos desde 2018.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
     manifestoImageCaption: "Eventos · desde 2018",
     statementLead: "Não decoramos apenas espaços.",
