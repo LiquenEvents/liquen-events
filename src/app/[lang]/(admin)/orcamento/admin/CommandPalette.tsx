@@ -165,6 +165,16 @@ export default function CommandPalette({
     // Escolher fecha a seco: a vista de destino é que é a resposta.
     if (!open && !porEscolha) comecarSaida(CHAVE);
     setPorEscolha(false);
+    // A procura limpa-se AQUI, no próprio desenho em que a paleta reabre, e
+    // não num efeito: durante a animação de saída a caixa continua montada
+    // com a procura antiga, e reabrir nos ~100 ms seguintes mostrava-a no
+    // primeiro fotograma — e as teclas carregadas antes de o efeito correr
+    // somavam-se a ela («tarefastarefas», sem resultados). MEDIDO a 9 de
+    // outubro.
+    if (open) {
+      setQuery("");
+      setActive(0);
+    }
   }
 
   /** Correr um comando: o fecho que vem a seguir é uma ESCOLHA, não uma saída. */
@@ -175,11 +185,7 @@ export default function CommandPalette({
   }
 
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActive(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (open) requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
 
   const results = useMemo(() => {

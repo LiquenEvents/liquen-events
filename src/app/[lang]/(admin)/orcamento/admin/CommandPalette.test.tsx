@@ -99,4 +99,31 @@ describe("CommandPalette", () => {
     expect(rolar).toHaveBeenCalled();
     expect(rolar.mock.instances).toContain(opcoes[1]);
   });
+
+  it("reabrir durante a saída começa com a procura vazia, logo no primeiro desenho", async () => {
+    // MEDIDO a 9 de outubro: Esc e ⌘K outra vez nos ~100 ms da animação de
+    // saída traziam a procura anterior, e o que se escrevia somava-se a ela.
+    const props = {
+      onClose: vi.fn(),
+      navCommands: NAV,
+      quotes: QUOTES,
+      onOpenQuote: vi.fn(),
+    };
+    const { rerender } = render(<CommandPalette open {...props} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("combobox"), "tarefas");
+    rerender(<CommandPalette open={false} {...props} />);
+    rerender(<CommandPalette open {...props} />);
+    expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("");
+
+    // O `act` do Testing Library esvazia os efeitos antes de se poder olhar,
+    // por isso o caso de cima passava também com a limpeza num efeito. O que
+    // prende a correcção é ONDE ela está: no bloco da transição, que corre no
+    // próprio desenho — não num `useEffect`, que corre depois do fotograma.
+    const { readFileSync } = await import("node:fs");
+    const fonte = readFileSync("src/app/[lang]/(admin)/orcamento/admin/CommandPalette.tsx", "utf8");
+    const bloco = fonte.slice(fonte.indexOf("if (abertoAntes !== open) {"));
+    expect(bloco.slice(0, bloco.indexOf("\n  }\n"))).toMatch(/if \(open\) \{\s*setQuery\(""\);/);
+    expect(fonte).not.toMatch(/useEffect\(\(\) => \{\s*if \(open\) \{\s*setQuery/);
+  });
 });
