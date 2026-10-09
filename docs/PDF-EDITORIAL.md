@@ -10,9 +10,11 @@ As referências (`referencia/` na raiz) **não vão para o git**: são 22 MB e
 trazem fotografias de clientes. Estão no `.gitignore`. Quem continuar este
 trabalho precisa de lhas pedir outra vez se a pasta não estiver lá.
 
-O código está em `src/lib/pdf-editorial/`. O gerador antigo
-(`src/lib/proposal-doc-pdf.ts`) não foi tocado e continua a ser o do envio até
-ela aprovar o novo.
+O código está em `src/lib/pdf-editorial/`. **Ela aprovou o desenho novo** («Sim,
+passa a enviar o novo», 9 de outubro): é ele que o estúdio descarrega, que
+segue no envio e que o link do casal desenha. O gerador antigo
+(`src/lib/proposal-doc-pdf.ts`) fica no código, sem uso nas rotas, e apaga-se
+num PR à parte depois de ela enviar algumas propostas no desenho novo.
 
 ## Parte −1 — o que ela decidiu e onde a execução se afastou do texto
 
@@ -37,8 +39,8 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
 | Regra geral: nenhuma página só texto sobre fundo liso, nenhum fundo desfocado | feito |
 | Rodapé com o logótipo da Líquen | feito |
 | Modelo Organização: cronograma e linhas com preço | feito, sem exemplo visual para comparar |
-| Botão «Ver desenho novo» no estúdio (só pré-visualização) | feito |
-| Trocar o envio para o desenho novo | só depois de ela aprovar |
+| O envio, o link do casal e o aquecimento nocturno usam o desenho novo | feito (aprovado por ela) |
+| O estúdio adaptado ao desenho novo (ver «O estúdio», em baixo) | feito |
 
 **Decisões dela:**
 
@@ -85,8 +87,10 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
    70–78; uma foto que aparece duas vezes na mesma forma entra uma vez no
    ficheiro. Medido com 72 fotografias de 1 800 px fabricadas: 5,5 MB e
    ~11 s de desenho. O limite é o do anexo de email (8 MB).
-8. **A fotografia de fundo da capa** é a primeira de capa se tiver pelo menos
-   1 600 px no lado maior; senão, a deitada de maior resolução da inspiração.
+8. **A fotografia de fundo da capa** é a que ela escolheu no estúdio
+   («Fotografia da capa») se for deitada e tiver pelo menos 1 200 px no lado
+   maior (`regra-da-capa.ts`); senão, a deitada de maior resolução da
+   inspiração. Era 1 600 px antes de ela escolher «Usa a minha, com aviso».
 9. **As fotografias dos painéis e fundos** saem das de inspiração (`fotos.ts`):
    da forma que o lugar pede, as de maior resolução primeiro, nunca a mesma em
    duas páginas seguidas. **Os separadores** levam as duas de MAIOR resolução
@@ -102,6 +106,46 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
 12. **O tijolo de quatro fotografias tem o texto sempre em cima à esquerda**
     (como as duas páginas de quatro do exemplo); só o mosaico de seis ou mais
     alterna de lado.
+
+**O estúdio, adaptado ao PDF novo** («altera tudo à volta de forma a que o
+sistema de fazer proposta se adapte à forma como agora está o PDF»). As três
+perguntas que lhe pus, e as respostas:
+
+- **«Sim, passa a enviar o novo».** O envio, o link do casal (`proposal-pdf-
+  cache.ts`) e o aquecimento nocturno desenham com o gerador novo. **A chave dos
+  ficheiros guardados (`chaveDoPdf`) NÃO mudou**: as propostas já enviadas
+  continuam a servir o PDF que receberam. As enviadas que nunca tiveram
+  ficheiro guardado (as anteriores a 26/08 que o aquecimento ainda não tratou)
+  passam a ser desenhadas no novo quando o casal abrir o link — quantas ainda
+  há, não verificado (não se consultaram dados de produção).
+- **Capa: «Usa a minha, com aviso».** Um lugar, «Fotografia da capa», em vez de
+  «Esquerda/Direita». Se for ao alto ou pequena, o estúdio di-lo ao lado da
+  fotografia e o PDF usa a melhor deitada dos temas. A segunda fotografia das
+  propostas antigas fica guardada e não sai.
+- **Estrela: «Passa a ser a foto do cartão».** A fotografia principal de cada
+  tema é a do cartão em «O que propomos» e a primeira do mosaico — sempre
+  (`ordemDoDesenho`, em `plano.ts`).
+
+O que mudou à volta:
+
+- **`plano.ts`** — a sequência de páginas do PDF novo sem desenhar o PDF. O
+  estúdio conta por ele («PDF com cerca de N», a confirmação do envio, a
+  posição dos temas nos avisos), e a Vista de conjunto e o painel «O que vai
+  sair» desenham-no. Um teste desenha o PDF e compara página a página. O texto
+  que transborda (orçamento, condições) é estimado por caracteres.
+- **`PaginaEditorial.tsx`** — a miniatura de uma página, na folha escura
+  (tokens `--bo-papel-pdf*`, presos aos `HEX` por um teste). Os temas têm as
+  caixas exactas do mosaico; as outras páginas, a sua estrutura. Saíram a
+  `PreviaDaPagina`, a `FolhaDaProposta` e o `proposal-paginas.ts`.
+- **Os temas** — saíram a disposição, o «Manter a forma», os avisos de recorte
+  e da última fila, e o limite de 10 fotografias. Fica uma linha só de leitura
+  com o capítulo e a composição, e «ocupa 2 páginas» acima de 12.
+- **A Conferência** — o desenho novo não imprime folhas vazias; o aviso passou
+  a dizer as listas fixas que não saem por estarem vazias.
+- **`custo-do-pdf.ts`** — recalibrado no desenho novo, medido num processador:
+  6 fotos 8,5 s, 80 fotos 12,1 s e 5,3 MB. O tecto é o `maxDuration` da rota do
+  casal (60 s), lido do ficheiro por um teste; o chão do aquecimento subiu de
+  15 para 20 s. As amostras de tempo do estúdio mudaram de chave.
 
 ---
 

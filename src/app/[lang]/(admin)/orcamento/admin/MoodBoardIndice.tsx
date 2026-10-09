@@ -235,7 +235,10 @@ function EntradaDoIndice({
         // informação, e quem lê por voz também precisa dela.
         aria-current={activo ? "true" : undefined}
         title={oQueFalta ? `Página ${pos + 1}: ${oQueFalta}` : undefined}
-        className={`alvo-toque flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] leading-tight  ${
+        // `relative`: o `sr-only` do «por acabar» lá dentro é `absolute`, e sem
+        // um antepassado posicionado DENTRO da fita que desliza ele escapava-lhe
+        // e alargava a página — 40 px de deslize lateral a 390 (medido).
+        className={`alvo-toque relative flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] leading-tight  ${
           activo
             ? "border-sage-600/55 bg-sage-600/[0.07] text-[var(--bo-text)]"
             : vazio
