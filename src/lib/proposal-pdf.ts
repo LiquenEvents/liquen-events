@@ -14,6 +14,7 @@ import { winAnsiSafe } from "@/lib/pdf-text";
  * a ser respeitada — ver lá.
  */
 import { eurDocumento } from "@/lib/money";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -27,7 +28,7 @@ const MARGIN = 56;
  * O fuso em que esta proposta é lida, e por isso o único em que pode ser
  * escrita. Mesmo valor e mesma razão do `FUSO` do contract-pdf.
  */
-const FUSO = "Europe/Lisbon";
+const FUSO = FUSO_DO_ESTUDIO;
 
 /**
  * Quebra um texto em linhas que cabem em `maxWidth` (respeita \n internos).

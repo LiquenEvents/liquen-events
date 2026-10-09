@@ -119,6 +119,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export const maxDuration = 60;
 
 /**
+ * ── O ORÇAMENTO DE TEMPO DESTE PEDIDO (A10-004, A10-005) ──────────────────
+ *
+ * Tudo isto cabe em {@link maxDuration} segundos — o desenho do PDF (até duas
+ * vezes, com fotografias que podem demorar 8 s cada), e depois o email, com
+ * tempos de 8/8/20 s no SMTP. Ninguém contava o tempo que já tinha passado: um
+ * PDF lento empurrava o SMTP para lá dos 60 s, a plataforma matava a função a
+ * meio do envio, e ela via um erro sem saber se o email tinha saído.
+ *
+ * Duas regras, contadas a partir da chegada do pedido:
+ *  · a SEGUNDA tentativa do PDF só corre se ainda houver tempo para ela e para
+ *    o email depois dela;
+ *  · o email só começa com {@link FOLGA_DO_EMAIL_MS} pela frente. Sem ela, não
+ *    se começa: a proposta fica gravada como «gerada, por enviar» e a frase
+ *    diz-lhe para carregar outra vez — um reenvio que já não paga o desenho.
+ */
+const FOLGA_DO_EMAIL_MS = 25_000;
+/** O que uma segunda passagem do PDF costuma levar, com folga. */
+const FOLGA_DA_SEGUNDA_PASSAGEM_MS = 15_000;
+const ORCAMENTO_MS = maxDuration * 1000;
+
+/**
  * O texto que ela escreveu, em HTML que não se parte.
  *
  * Era uma função escrita aqui; mudou-se inteira para o `email-corpo-escrito`,
@@ -134,6 +155,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { id } = await params;
+  const chegou = Date.now();
+  const resta = () => ORCAMENTO_MS - (Date.now() - chegou);
 
   try {
     const quote = await getQuote(id);
@@ -367,7 +390,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * A pré-visualização não repete: é onde ela DESCOBRE o que falta, e é para
      * ser rápida.
      */
-    if (mode === "send" && relatorio.missingImages > 0) {
+    if (
+      mode === "send" &&
+      relatorio.missingImages > 0 &&
+      resta() > FOLGA_DO_EMAIL_MS + FOLGA_DA_SEGUNDA_PASSAGEM_MS
+    ) {
       log.warn("proposta-doc: fotos em falta no envio, a desenhar segunda vez", {
         id,
         emFalta: relatorio.missingImages,
@@ -1384,6 +1411,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
     } else if (!hasRecipient) {
       emailError = "O pedido não tem um email de cliente válido.";
+    } else if (resta() < FOLGA_DO_EMAIL_MS) {
+      emailError =
+        "O documento demorou mais do que o costume e o email não chegou a sair. A proposta ficou gravada: carregue outra vez em enviar.";
+      log.warn("proposta-doc: sem tempo para o email, não se começa", {
+        id,
+        restaMs: resta(),
+      });
     } else {
       try {
         const mail = await sendMail({

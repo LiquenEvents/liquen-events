@@ -50,6 +50,8 @@ export interface TextosDaPagina {
   tentarDeNovo: string;
   /** O botão que volta a pedir as assinaturas ao servidor. */
   recarregarFotos: string;
+  /** Quando esse botão também não conseguiu (A9-008). */
+  recarregarFalhou: string;
   /** O índice no topo, para se chegar às fotografias sem rolar tudo. */
   nestaPagina: string;
   inspiracao: string;
@@ -170,6 +172,7 @@ const PT: TextosDaPagina = {
   fotoFalhou: "Não foi possível mostrar esta fotografia.",
   tentarDeNovo: "Tentar de novo",
   recarregarFotos: "Voltar a carregar as fotografias",
+  recarregarFalhou: "Ainda não deu. Verifique a ligação e tente outra vez daqui a pouco.",
   nestaPagina: "Nesta página",
   inspiracao: "Inspiração",
   semFotos: "As fotografias desta secção não estão disponíveis neste momento.",
@@ -207,6 +210,7 @@ const EN: TextosDaPagina = {
   fotoFalhou: "This photo could not be shown.",
   tentarDeNovo: "Try again",
   recarregarFotos: "Load the photos again",
+  recarregarFalhou: "That didn't work yet. Please check your connection and try again in a moment.",
   nestaPagina: "On this page",
   inspiracao: "Inspiration",
   semFotos: "The photos in this section are not available right now.",

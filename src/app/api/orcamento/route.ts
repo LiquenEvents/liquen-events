@@ -36,6 +36,7 @@ import { eur0 as eur } from "@/lib/money";
 import { enviarEventos, ipDoPedido } from "@/lib/meta/capi";
 import { EVENTOS as EVENTOS_META } from "@/lib/meta/eventos";
 import { desserializar as desserializarMeta } from "@/lib/meta/click-id";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 export const maxDuration = 30;
 
@@ -495,7 +496,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     contacto: linhasDeContacto,
     notas: form.notes ?? "",
     referencia: id,
-    quando: new Date().toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" }),
+    quando: new Date().toLocaleString("pt-PT", { timeZone: FUSO_DO_ESTUDIO }),
   });
 
   // ── A PRIMEIRA LINHA DESTE TEXTO É A PRÉ-VISUALIZAÇÃO DA CAIXA DE CORREIO ──

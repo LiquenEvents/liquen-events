@@ -30,10 +30,20 @@ describe("date helpers", () => {
     expect(isWeekend("2026-01-05")).toBe(false); // Monday
   });
 
-  it("flags summer months and December as high season", () => {
-    expect(isHighSeason("2026-07-15")).toBe(true); // July
-    expect(isHighSeason("2026-12-10")).toBe(true); // December
-    expect(isHighSeason("2026-03-15")).toBe(false); // March
+  // Decisão dela, a 9 de outubro de 2026: a época alta é de Maio a Outubro —
+  // a mesma que a página de confirmação já dizia ao casal (A8-011).
+  it("a época alta é de Maio a Outubro, e Dezembro já não conta", () => {
+    expect(isHighSeason("2026-05-01")).toBe(true); // Maio
+    expect(isHighSeason("2026-07-15")).toBe(true); // Julho
+    expect(isHighSeason("2026-10-31")).toBe(true); // Outubro
+    expect(isHighSeason("2026-04-30")).toBe(false); // Abril
+    expect(isHighSeason("2026-11-01")).toBe(false); // Novembro
+    expect(isHighSeason("2026-12-10")).toBe(false); // Dezembro
+  });
+
+  it("o preço e a frase da confirmação usam a MESMA função", async () => {
+    const { isHighSeason: daFrase } = await import("@/lib/workdays");
+    expect(isHighSeason).toBe(daFrase);
   });
 
   it("handles empty date defensively", () => {

@@ -11,6 +11,7 @@ import {
   blocoEDaCasa,
   blocosFixosNaLingua,
   camposDoEventoNaLingua,
+  preencherNaLingua,
   rotuloDoTotalNaLingua,
   textosDaProposta,
   type CampoDoEvento,
@@ -22,6 +23,7 @@ import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import {
   descricaoNaLingua,
   escolhasParaOCasal,
+  escolhasParaOEcra,
   notaNaLingua,
   rotuloNaLingua,
   tituloNaLingua,
@@ -1064,7 +1066,7 @@ export default function Documento({
             {p.escolhasIntro}
           </p>
           <Escolhas
-            escolhas={escolhas}
+            escolhas={escolhasParaOEcra(escolhas)}
             escolhido={escolhido}
             fotos={fotosDasEscolhas}
             token={token}
@@ -1372,7 +1374,9 @@ export default function Documento({
           {/* Os marcadores («a data do evento», «o número de convidados») são
               preenchidos com a MESMA função do gerador — senão o casal lia aqui
               um «{{data}}» que o PDF dele não tem. */}
-          <Lista itens={(fixos.condicoesGerais ?? []).map((l) => preencherMarcadores(l, doc))} />
+          <Lista
+            itens={(fixos.condicoesGerais ?? []).map((l) => preencherNaLingua(l, doc, idioma))}
+          />
         </SeccaoDobrada>
       )}
 

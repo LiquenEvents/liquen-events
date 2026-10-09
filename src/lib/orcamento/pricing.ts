@@ -1,5 +1,6 @@
 import type { QuoteFormData, PriceBreakdown } from "./types";
 import { EVENT_TYPES_BY_CATEGORY, PACKAGES, LOCATION_SURCHARGES } from "./data";
+import { isHighSeason } from "@/lib/workdays";
 
 export function isWeekend(dateStr: string): boolean {
   if (!dateStr) return false;
@@ -7,12 +8,15 @@ export function isWeekend(dateStr: string): boolean {
   return d.getDay() === 5 || d.getDay() === 6;
 }
 
-export function isHighSeason(dateStr: string): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr + "T12:00:00");
-  const m = d.getMonth();
-  return (m >= 5 && m <= 8) || m === 11;
-}
+/**
+ * ── UMA ÉPOCA ALTA SÓ (A8-011) ─────────────────────────────────────────────
+ * Havia duas: esta (Junho a Setembro, mais Dezembro, em meses contados a
+ * partir de zero) fazia os +10 % do preço, e a de `workdays.ts` (Maio a
+ * Outubro) fazia a frase da página de confirmação — discordavam em Maio,
+ * Outubro e Dezembro. Ela escolheu, a 9 de outubro de 2026: **Maio a
+ * Outubro**. Fica uma só, a de `workdays.ts`, lida da cadeia ISO.
+ */
+export { isHighSeason } from "@/lib/workdays";
 
 export function formatPrice(n: number): string {
   return new Intl.NumberFormat("pt-PT", {

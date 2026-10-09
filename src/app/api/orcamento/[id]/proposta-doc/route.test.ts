@@ -480,6 +480,40 @@ describe("POST /api/orcamento/[id]/proposta-doc — conteúdo CORTADO pelo desen
   });
 });
 
+/**
+ * O ORÇAMENTO DE TEMPO (A10-004, A10-005): um PDF lento empurrava o SMTP para
+ * lá dos 60 s da função, e a plataforma matava o envio a meio.
+ */
+describe("o tempo que resta", () => {
+  it("sem 25 s pela frente, o email não começa — e a frase diz para carregar outra vez", async () => {
+    const real = Date.now;
+    let agora = real();
+    vi.spyOn(Date, "now").mockImplementation(() => agora);
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async () => {
+      agora += 40_000; // o desenho levou 40 s
+      return { pdf: Buffer.from("%PDF"), missingImages: 0, truncations: [] } as never;
+    });
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    vi.mocked(Date.now).mockRestore();
+    expect(sendMail).not.toHaveBeenCalled();
+    const corpo = await res.json();
+    expect(JSON.stringify(corpo)).toContain("carregue outra vez em enviar");
+  });
+
+  it("com fotos em falta e pouco tempo, não há segunda passagem do PDF", async () => {
+    const real = Date.now;
+    let agora = real();
+    vi.spyOn(Date, "now").mockImplementation(() => agora);
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async () => {
+      agora += 25_000;
+      return { pdf: Buffer.from("%PDF"), missingImages: 1, truncations: [] } as never;
+    });
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    vi.mocked(Date.now).mockRestore();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ── O DOCUMENTO fica GUARDADO com a proposta ─────────────────────────────────
 //
 // Durante muito tempo não ficava: a proposta era gravada sem o `doc` e o

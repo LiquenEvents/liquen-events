@@ -11,6 +11,7 @@ import { SITE } from "@/lib/site";
 import { LOGO_DARK_PNG_B64 } from "@/lib/proposal-assets";
 import type { Contract } from "@/lib/contract-types";
 import { winAnsiSafe } from "@/lib/pdf-text";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 /**
  * Gera o PDF do contrato — a prova em papel do aceite dos Termos & Condições.
@@ -75,7 +76,7 @@ export function wrap(font: PDFFont, rawText: string, size: number, maxWidth: num
  * escrito. Mesmo valor e mesma razão do `FUSO` da rota dos lembretes e do módulo
  * das conversões offline.
  */
-const FUSO = "Europe/Lisbon";
+const FUSO = FUSO_DO_ESTUDIO;
 
 /**
  * ISO → "18 de julho de 2026 às 14:32" (data + hora; o aceite é pontual).
@@ -438,10 +439,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
     text(contract.clientName || "—", MARGIN, y, { font: bold, size: 12 });
     y -= 16;
     text(
-      w.confirmadoPor(
-        contract.registadoPor || SITE.name,
-        fmtDateTime(contract.acceptedAt, idioma),
-      ),
+      w.confirmadoPor(contract.registadoPor || SITE.name, fmtDateTime(contract.acceptedAt, idioma)),
       MARGIN,
       y,
       { size: 9.5, color: INK },

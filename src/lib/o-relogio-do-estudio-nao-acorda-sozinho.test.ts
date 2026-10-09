@@ -38,7 +38,11 @@ import { resolveValidUntil } from "./proposal-doc";
  * O caso a seguir a este é o controlo: prova que a preguiça não mudou uma
  * única data.
  */
-const FONTE = readFileSync("src/lib/proposal-doc.ts", "utf8");
+// O relógio do estúdio mudou-se para `fuso.ts` (A8-016, um fuso só); a regra
+// vai com ele. Lêem-se os dois: o `proposal-doc.ts` também não pode voltar a
+// construir um `Intl` no topo.
+const FONTE =
+  readFileSync("src/lib/fuso.ts", "utf8") + "\n" + readFileSync("src/lib/proposal-doc.ts", "utf8");
 
 /** A fonte sem comentários — senão a própria explicação acima faria o teste
  *  passar ou reprovar por engano, que é uma armadilha que esta casa já pisou. */

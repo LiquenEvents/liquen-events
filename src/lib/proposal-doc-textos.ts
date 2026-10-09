@@ -41,6 +41,7 @@ import {
   DIAS_PARA_CONFIRMAR_CONVIDADOS,
   depositPercentOf,
   faseamentoPorOmissao,
+  POR_DEFINIR_PT,
   preencherMarcadores,
   type ProposalDoc,
   type RedaccoesSemDado,
@@ -979,6 +980,29 @@ function textosDaCasa(
   };
 }
 
+/** O «a definir» de uma cláusula em inglês (A4-010). */
+export const POR_DEFINIR_EN = "to be confirmed";
+
+/**
+ * Preenche uma linha das condições na língua da proposta: as redacções «sem
+ * dado» dessa língua, o «a definir» dessa língua e os dados do evento
+ * escritos nessa língua. Era o `preencherMarcadores` português para todas —
+ * e uma proposta inglesa lia «a definir» no meio de uma cláusula em inglês.
+ */
+export function preencherNaLingua(
+  texto: string,
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): string {
+  if (idioma !== "en") return preencherMarcadores(texto, doc);
+  return preencherMarcadores(
+    texto,
+    camposDoEventoNaLingua(doc, "en"),
+    EN_CONDICOES_SEM_DADO,
+    POR_DEFINIR_EN,
+  );
+}
+
 export function blocosFixosNaLingua(
   doc: ProposalDoc,
   idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
@@ -988,11 +1012,26 @@ export function blocosFixosNaLingua(
   /** O bloco em inglês, se o que está no documento for o da casa. */
   const naLingua = (atual: string[], campo: keyof BlocosFixos) =>
     saoIguais(atual, casa[campo].pt) ? [...casa[campo].en] : atual;
+  /**
+   * ── AS CONDIÇÕES COMPARAM-SE DEPOIS DE PREENCHIDAS OUTRA VEZ (A4-005) ────
+   * Gravadas sem data, ficavam com a redacção «sem data»; a da casa, com a
+   * data que entretanto chegou, já tem a outra. A comparação dizia «ela
+   * reescreveu isto» e o bloco inteiro saía em PORTUGUÊS numa proposta
+   * inglesa. Voltar a preencher o que está gravado põe os dois lados na mesma
+   * redacção antes de comparar.
+   *
+   * E o que ela reescreveu de facto fica dela — mas o «a definir» que o
+   * preenchimento português lá deixou passa a «to be confirmed».
+   */
+  const condicoes = (doc.condicoesGerais ?? []).map((l) => preencherMarcadores(l, doc));
+  const condicoesNaLingua = saoIguais(condicoes, casa.condicoesGerais.pt)
+    ? [...casa.condicoesGerais.en]
+    : condicoes.map((l) => l.replaceAll(POR_DEFINIR_PT, POR_DEFINIR_EN));
   return {
     notasImportantes: naLingua(doc.notasImportantes, "notasImportantes"),
     incluido: naLingua(doc.incluido, "incluido"),
     naoIncluido: naLingua(doc.naoIncluido, "naoIncluido"),
-    condicoesGerais: naLingua(doc.condicoesGerais, "condicoesGerais"),
+    condicoesGerais: condicoesNaLingua,
     observacoesGerais: naLingua(doc.observacoesGerais, "observacoesGerais"),
     faseamento: naLingua(doc.faseamento, "faseamento"),
     cancelamento: naLingua(doc.cancelamento, "cancelamento"),

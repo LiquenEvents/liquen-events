@@ -88,7 +88,11 @@ export function comoSeDiz(f: FotoRepetida): string {
   const [primeiro] = f.usos;
   if (!primeiro) return "Já usada";
   const quando = primeiro.data
-    ? new Date(primeiro.data).toLocaleDateString("pt-PT", {
+    ? // Ao meio-dia (A8-018): «2026-09-12» sozinho lê-se como meia-noite UTC,
+      // e a oeste de Greenwich dava o dia anterior.
+      new Date(
+        /^\d{4}-\d{2}-\d{2}$/.test(primeiro.data) ? `${primeiro.data}T12:00:00` : primeiro.data,
+      ).toLocaleDateString("pt-PT", {
         day: "numeric",
         month: "short",
         year: "numeric",

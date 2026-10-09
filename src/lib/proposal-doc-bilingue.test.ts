@@ -524,3 +524,17 @@ describe("o inglês que ficou para trás", () => {
     expect(estadoDoIngles(comGrupo("  "), campo)).toBe("sem-portugues");
   });
 });
+
+describe("docTemIngles vê as alternativas (A6-011)", () => {
+  it("o inglês escrito só nas escolhas do casal conta como inglês", async () => {
+    const { docTemIngles } = await import("./proposal-doc-bilingue");
+    expect(
+      docTemIngles({
+        escolhas: [{ id: "e1", titulo: "Paleta", tituloEn: "Palette", opcoes: [] }],
+      } as never),
+    ).toBe(true);
+    expect(docTemIngles({ escolhas: [{ id: "e1", titulo: "Paleta", opcoes: [] }] } as never)).toBe(
+      false,
+    );
+  });
+});

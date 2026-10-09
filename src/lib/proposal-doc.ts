@@ -976,20 +976,42 @@ export function preencherMarcadores(
   texto: string,
   doc: Pick<ProposalDoc, "eventDate" | "guests">,
   semDado: RedaccoesSemDado = CONDICOES_SEM_DADO,
+  porDefinir: string = DADO_POR_DEFINIR,
 ): string {
   const data = (doc.eventDate ?? "").trim();
   const convidados = (doc.guests ?? "").trim();
-  const faltaODado =
-    (!data && texto.includes(MARCADOR_DATA)) ||
-    (!convidados && texto.includes(MARCADOR_CONVIDADOS));
-  const frase = faltaODado ? (semDado[texto] ?? texto) : texto;
+  const temOsDados = (frase: string) =>
+    (!!data || !frase.includes(MARCADOR_DATA)) &&
+    (!!convidados || !frase.includes(MARCADOR_CONVIDADOS));
+
+  /**
+   * ── E O CAMINHO DE VOLTA (A4-004) ─────────────────────────────────────────
+   * As condições são GRAVADAS já preenchidas. Uma proposta gravada antes de
+   * haver data ficava com a redacção «válida para a data que vier a ser
+   * confirmada» — e, como essa frase já não tem marcador, nada a voltava a
+   * trocar quando a data chegava. A capa dizia «12 de setembro de 2026» e as
+   * Condições Gerais, três páginas à frente, diziam o contrário.
+   *
+   * Agora a troca vai nos dois sentidos: uma redacção «sem dado» que a casa
+   * conhece volta à frase com marcador assim que o dado existe. Repara também
+   * as propostas que já estão gravadas, sem migração nenhuma.
+   */
+  let frase = texto;
+  const comDado = Object.entries(semDado).find(([, sem]) => sem === texto)?.[0];
+  if (comDado && temOsDados(comDado)) frase = comDado;
+  else if (!temOsDados(texto)) frase = semDado[texto] ?? texto;
+
   // `replaceAll` e não `replace`: com uma string, o `replace` troca só a
   // PRIMEIRA ocorrência — uma condição editada à mão que repetisse o marcador
   // saía com o segundo literal, «{DATA}» impresso no PDF do cliente.
   return frase
-    .replaceAll(MARCADOR_DATA, data || DADO_POR_DEFINIR)
-    .replaceAll(MARCADOR_CONVIDADOS, convidados || DADO_POR_DEFINIR);
+    .replaceAll(MARCADOR_DATA, data || porDefinir)
+    .replaceAll(MARCADOR_CONVIDADOS, convidados || porDefinir);
 }
+
+/** O «a definir» das condições, para quem precisa de o reconhecer depois de
+ *  preenchido (a versão inglesa troca-o pelo seu — ver A4-010). */
+export const POR_DEFINIR_PT = DADO_POR_DEFINIR;
 
 /**
  * "Faseamento do Pagamento" — as duas primeiras linhas seguem a percentagem.
@@ -1324,73 +1346,8 @@ export function totalAmountParaBase(
   return mode === "acrescer" ? b : round2(b * (1 + taxa));
 }
 
-/** O fuso do estúdio. A validade de uma proposta é um DIA DO CALENDÁRIO, e o
- *  calendário que conta é o de quem a envia — ver {@link resolveValidUntil}. */
-export const FUSO_DO_ESTUDIO = "Europe/Lisbon";
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * CONSTRUÍDO À PRIMEIRA UTILIZAÇÃO, E NÃO À LEITURA DO FICHEIRO
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Estava no topo do módulo, e custava 19,91 ms MEDIDOS a cada arranque a frio
- * — porque o primeiro `Intl.DateTimeFormat` de um processo carrega o ICU
- * inteiro. O segundo custa 0,14 ms.
- *
- * E quem o usa (o {@link hojeNoEstudio}, para os prazos das facturas) NÃO é
- * chamado pela página que o casal abre. Ela pagava vinte milissegundos, em
- * cada abertura fria, para construir um formatador de datas que nunca ia usar.
- *
- * Vinte milissegundos parecem nada até se lembrar onde caem: no arranque a
- * frio da função, que é precisamente o instante em que o casal está a olhar
- * para um ecrã branco à espera da proposta.
- *
- * Quem o usa continua a pagá-los, uma vez, na primeira chamada — já os pagava.
- */
-let camposDoDia: Intl.DateTimeFormat | null = null;
-
-/** O ano/mês/dia que o relógio de Portugal marca neste instante. */
-function diaDoEstudio(instante: Date): [ano: number, mes: number, dia: number] {
-  camposDoDia ??= new Intl.DateTimeFormat("en-US", {
-    timeZone: FUSO_DO_ESTUDIO,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const partes = camposDoDia.formatToParts(instante);
-  const campo = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
-  return [campo("year"), campo("month"), campo("day")];
-}
-
-const doisDigitos = (n: number) => String(n).padStart(2, "0");
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * HOJE (`yyyy-mm-dd`) — E «HOJE» É O DIA QUE PORTUGAL ESTÁ A VIVER
- * ════════════════════════════════════════════════════════════════════════════
- *
- * `new Date().toISOString().slice(0, 10)` é o dia de GREENWICH. Os servidores
- * correm em UTC e, no Verão, Portugal está uma hora à frente: das 00:00 à 01:00
- * o dia já virou cá e ainda não virou lá.
- *
- * Isto não é um detalhe de ecrã. É a data que fica num DOCUMENTO FISCAL: um
- * casal que aceita a proposta às 00:30 de 14 de agosto ficava com a factura do
- * sinal — auto-emitida, sem passar por ecrã nenhum — datada de 13 de agosto. É
- * essa data que sai impressa no PDF e que decide o período de IVA.
- *
- * O ecrã das Faturas já tinha esta regra escrita (`todayKey()`, em
- * `admin/util.ts`, com o relógio do browser, que aí é o de quem está sentado à
- * frente dele). Do lado do SERVIDOR o relógio da máquina não serve para nada:
- * o dia tem de ser lido no fuso do estúdio, e é o que o {@link diaDoEstudio} já
- * fazia para a validade das propostas. Isto é só esse dia escrito por extenso —
- * uma quarta versão do «hoje» era a que ia ficar por corrigir.
- *
- * `instante` é injectável para os testes poderem fixar a hora.
- */
-export function hojeNoEstudio(instante: Date = new Date()): string {
-  const [ano, mes, dia] = diaDoEstudio(instante);
-  return `${ano}-${doisDigitos(mes)}-${doisDigitos(dia)}`;
-}
+export { FUSO_DO_ESTUDIO, hojeNoEstudio } from "./fuso";
+import { hojeNoEstudio } from "./fuso";
 
 /**
  * O dia de calendário `dias` depois de `dia` (ambos `yyyy-mm-dd`).

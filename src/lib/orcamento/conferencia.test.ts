@@ -902,3 +902,45 @@ describe("títulos seguidos, na língua que vai sair", () => {
     expect(achar(vs, "titulos-seguidos").severidade).toBe("aviso");
   });
 });
+
+describe("uma condição com «a definir» no meio (A4-009)", () => {
+  it("avisa, e mostra qual é", () => {
+    const vs = conferir({
+      doc: documento({ condicoesGerais: ["O orçamento cobre a definir convidados."] }),
+      quote: pedido(),
+      ...base,
+    });
+    const v = vs.find((x) => x.id === "condicoes-por-definir")!;
+    expect(v.severidade).toBe("aviso");
+    expect(v.detalhe).toContain("O orçamento cobre a definir convidados.");
+  });
+
+  it("as cláusulas da casa, ditas sem data, não são acusadas", () => {
+    const vs = conferir({
+      doc: documento({
+        condicoesGerais: [
+          "Esta proposta só é válida para a data do evento que vier a ser confirmada por escrito.",
+        ],
+      }),
+      quote: pedido(),
+      ...base,
+    });
+    expect(vs.find((x) => x.id === "condicoes-por-definir")!.severidade).toBe("ok");
+  });
+});
+
+describe("as alternativas contam no idioma (A6-010)", () => {
+  it("uma proposta inglesa com as escolhas em português não passa como «ok»", () => {
+    const vs = conferir({
+      doc: documento({
+        escolhas: [{ id: "e1", titulo: "Paleta", opcoes: [{ id: "o1", rotulo: "Terracota" }] }],
+      } as never),
+      quote: pedido(),
+      ...base,
+      idioma: "en",
+    });
+    const v = vs.find((x) => x.id === "idioma")!;
+    expect(v.detalhe).toContain("Escolha «Paleta»");
+    expect(v.detalhe).toContain("Opção «Terracota»");
+  });
+});

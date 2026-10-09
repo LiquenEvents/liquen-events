@@ -55,7 +55,10 @@ describe("uma escolha só sai para o casal quando é mesmo uma escolha", () => {
     // É exactamente o estado em que o estúdio fica assim que ela carrega em
     // «acrescentar opção». Não pode sair para o casal, e não pode gritar.
     const aMeio = escolha({
-      opcoes: [{ id: "o1", rotulo: "Verde-oliva e branco" }, { id: "o2", rotulo: "  " }],
+      opcoes: [
+        { id: "o1", rotulo: "Verde-oliva e branco" },
+        { id: "o2", rotulo: "  " },
+      ],
     });
     expect(escolhaPronta(aMeio)).toBe(false);
   });
@@ -200,7 +203,13 @@ describe("o que se aceita gravar", () => {
   });
 
   it("recusa uma opção de outra escolha", () => {
-    const outra = escolha({ id: "e2", opcoes: [{ id: "z1", rotulo: "A" }, { id: "z2", rotulo: "B" }] });
+    const outra = escolha({
+      id: "e2",
+      opcoes: [
+        { id: "z1", rotulo: "A" },
+        { id: "z2", rotulo: "B" },
+      ],
+    });
     expect(respostaAceitavel([escolha(), outra], "e1", "z1")).toBe(false);
   });
 
@@ -306,5 +315,20 @@ describe("o PDF continua exactamente como está", () => {
     expect(NUNCA_VISTO_PELO_CASAL).not.toContain("headerTitle");
     // E o controlo: o que o casal mesmo não vê continua de fora.
     expect(NUNCA_VISTO_PELO_CASAL).toContain("notasInternas");
+  });
+});
+
+describe("o que atravessa para o browser (A7-001)", () => {
+  it("só os identificadores — nunca o caminho da fotografia", async () => {
+    const { escolhasParaOEcra } = await import("./proposta-escolhas");
+    const saida = escolhasParaOEcra([
+      {
+        id: "e1",
+        titulo: "Paleta",
+        opcoes: [{ id: "o1", rotulo: "Terracota", imagem: "pedidos/LIQ-A/terracota.jpg" }],
+      },
+    ] as never);
+    expect(saida).toEqual([{ id: "e1", opcoes: [{ id: "o1" }] }]);
+    expect(JSON.stringify(saida)).not.toContain("pedidos/");
   });
 });

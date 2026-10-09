@@ -135,6 +135,32 @@ export function escolhasParaOCasal(escolhas: Escolha[] | undefined): Escolha[] {
   }));
 }
 
+/** Uma opção como chega ao componente do browser: só o identificador. */
+export interface OpcaoParaOEcra {
+  id: string;
+}
+/** Uma escolha como chega ao componente do browser: só os identificadores. */
+export interface EscolhaParaOEcra {
+  id: string;
+  opcoes: OpcaoParaOEcra[];
+}
+
+/**
+ * ── O QUE ATRAVESSA PARA O BROWSER (A7-001) ───────────────────────────────
+ *
+ * O componente das escolhas é um Client Component: tudo o que recebe vai
+ * escrito no HTML da página. Recebia as escolhas INTEIRAS — com o `imagem` de
+ * cada opção, que é o caminho da fotografia no armazenamento (a pasta do
+ * pedido, o nome do ficheiro). Não é segredo que abra nada, mas é a forma
+ * interna da casa a passear num HTML que o casal reenvia.
+ *
+ * O componente só usa os identificadores: o texto chega-lhe já traduzido e a
+ * fotografia por um id opaco. É isso, e só isso, que passa.
+ */
+export function escolhasParaOEcra(escolhas: Escolha[]): EscolhaParaOEcra[] {
+  return escolhas.map((e) => ({ id: e.id, opcoes: e.opcoes.map((o) => ({ id: o.id })) }));
+}
+
 /** O texto na língua da proposta, com o português como recurso. */
 export function tituloNaLingua(e: Escolha, idioma: IdiomaDaProposta): string {
   return idioma === "en" ? (texto(e.tituloEn) || e.titulo).trim() : e.titulo.trim();

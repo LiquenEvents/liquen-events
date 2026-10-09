@@ -183,6 +183,7 @@ import {
   ActivityLog,
   EventTasks,
 } from "./lazy";
+import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
 
 // Quantos pedidos a lista renderiza de cada vez ("Mostrar mais" carrega o resto).
 const LIST_PAGE_SIZE = 50;
@@ -1069,7 +1070,7 @@ const QuoteCard = memo(function QuoteCard({
               {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
                 // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
                 // diferentes entre a meia-noite e a uma — erro de hidratação.
-                timeZone: "Europe/Lisbon",
+                timeZone: FUSO_DO_ESTUDIO,
                 day: "numeric",
                 month: "short",
               })}
@@ -7783,7 +7784,7 @@ export default function AdminClient({
                           {new Date(selected.submittedAt).toLocaleString("pt-PT", {
                             // Achado n.º 20: o servidor (UTC) e o browser (Lisboa) escreviam dias
                             // diferentes entre a meia-noite e a uma — erro de hidratação.
-                            timeZone: "Europe/Lisbon",
+                            timeZone: FUSO_DO_ESTUDIO,
                             day: "numeric",
                             month: "long",
                             year: "numeric",

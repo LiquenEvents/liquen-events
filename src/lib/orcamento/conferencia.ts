@@ -1,10 +1,11 @@
-import type { ProposalDoc } from "@/lib/proposal-doc";
+import { POR_DEFINIR_PT, type ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "./types";
 import { foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
 import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { paginasEmBranco } from "@/lib/proposal-paginas";
+import { camposDeEscolhaPorTraduzir } from "@/lib/proposta-escolhas";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -406,6 +407,25 @@ export function conferir({
         : "",
   });
 
+  // ── Uma condição que ficou com «a definir» no meio (A4-009) ─────────────
+  //
+  // As cláusulas da CASA sabem dizer-se sem a data e sem o número («válida para
+  // a data que vier a ser confirmada»). Uma que ela escreveu à mão com
+  // `{CONVIDADOS}` não sabe, e o preenchimento põe lá «a definir»: o casal lia
+  // «O orçamento cobre a definir convidados.» numa cláusula contratual. Não se
+  // adivinha a redacção dela — avisa-se, e ela decide (pôr o dado, ou
+  // reescrever a frase).
+  const porDefinir = (doc.condicoesGerais ?? []).filter((l) => l.includes(POR_DEFINIR_PT));
+  v.push({
+    id: "condicoes-por-definir",
+    titulo: "Condições Gerais",
+    severidade: porDefinir.length > 0 ? "aviso" : "ok",
+    detalhe:
+      porDefinir.length > 0
+        ? `${porDefinir.length === 1 ? "Uma condição diz" : `${porDefinir.length} condições dizem`} «a definir» porque falta a data ou o número de convidados: «${porDefinir[0].slice(0, 90)}${porDefinir[0].length > 90 ? "…" : ""}»`
+        : "",
+  });
+
   // ── Duas secções seguidas com o mesmo título ────────────────────────────
   //
   // Numa proposta que já seguiu, «Complementos dos Noivos» era o título de
@@ -503,7 +523,13 @@ export function conferir({
   // que aquelas oito rubricas são nomes próprios.
   const doCliente = idiomaDoCliente(quote);
   if (idioma === "en") {
-    const faltam = camposPorTraduzir(doc);
+    // As ALTERNATIVAS também (A6-010): não entravam em contagem nenhuma, e a
+    // Conferência dava «Idioma: ok» a uma proposta inglesa com as escolhas do
+    // casal em português.
+    const faltam = [
+      ...camposPorTraduzir(doc),
+      ...camposDeEscolhaPorTraduzir(doc.escolhas).map((c) => ({ rotulo: c.rotulo })),
+    ];
     const primeiros = faltam.slice(0, 3).map((c) => c.rotulo);
     v.push({
       id: "idioma",

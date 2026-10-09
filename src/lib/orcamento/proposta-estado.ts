@@ -1,4 +1,5 @@
 import type { Proposal, ProposalStatus, Quote } from "./types";
+import { hojeNoEstudio } from "@/lib/fuso";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -30,7 +31,9 @@ export function estaEmAberto(p: Proposal): boolean {
 export function diasAte(iso: string | undefined, hoje = new Date()): number | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
   const alvo = new Date(`${iso}T12:00:00Z`).getTime();
-  const base = Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate(), 12);
+  // O dia de PORTUGAL, e não o de Greenwich (A8-013): entre a meia-noite e a
+  // uma da manhã, no Verão, o dia UTC ainda é o de ontem.
+  const base = new Date(`${hojeNoEstudio(hoje)}T12:00:00Z`).getTime();
   if (Number.isNaN(alvo)) return null;
   return Math.round((alvo - base) / 86_400_000);
 }

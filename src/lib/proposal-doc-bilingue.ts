@@ -491,8 +491,19 @@ export function porTraduzirPorSeccao(doc: Partial<ProposalDoc>): Record<string, 
 }
 
 export function docTemIngles(doc: Partial<ProposalDoc>): boolean {
-  return camposDoDocumento(doc).some(
-    ({ campo }) => temVersaoInglesa(campo) && limpo(lerEn(doc, campo)) !== "",
+  // As alternativas contam (A6-011): uma proposta cujo único inglês escrito
+  // estava nas escolhas do casal era dada como «sem inglês nenhum».
+  const nasAlternativas = (doc.escolhas ?? []).some(
+    (e) =>
+      limpo(e.tituloEn) !== "" ||
+      limpo(e.notaEn) !== "" ||
+      (e.opcoes ?? []).some((o) => limpo(o.rotuloEn) !== "" || limpo(o.descricaoEn) !== ""),
+  );
+  return (
+    nasAlternativas ||
+    camposDoDocumento(doc).some(
+      ({ campo }) => temVersaoInglesa(campo) && limpo(lerEn(doc, campo)) !== "",
+    )
   );
 }
 

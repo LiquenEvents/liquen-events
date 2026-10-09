@@ -172,6 +172,7 @@ export async function generateMetadata({
  * As DATAS já eram localizadas pelo `t.dateLocale` e continuam.
  */
 import { eurDocumento, montanteNaLingua } from "@/lib/money";
+import { FUSO_DO_ESTUDIO, hojeNoEstudio } from "@/lib/fuso";
 
 function Shell({ children, lang }: { children: React.ReactNode; lang: string }) {
   return (
@@ -412,18 +413,24 @@ export default async function ProposalPage({
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
   // 23:59:59) so the client sees an "expired" notice up front instead of only
   // discovering it on a 410 after clicking Accept.
+  //
+  // Comparam-se DIAS, e o «hoje» é o de Portugal (A8-014): o `Date.parse` de
+  // «…T23:59:59» lia-se no fuso do servidor (UTC), e a proposta dava-se por
+  // caducada uma hora antes de acabar o último dia, no Verão.
   const expired = proposal.validUntil
-    ? (() => {
-        const e = Date.parse(`${proposal.validUntil.slice(0, 10)}T23:59:59`);
-        return !Number.isNaN(e) && e < Date.now();
-      })()
+    ? /^\d{4}-\d{2}-\d{2}/.test(proposal.validUntil) &&
+      proposal.validUntil.slice(0, 10) < hojeNoEstudio()
     : false;
   /** O dia em que o CONTEÚDO mudou pela última vez, na língua do documento. */
+  // No fuso do estúdio (A8-001): sem ele saía no dia de Greenwich, e uma
+  // revisão às 00:30 de 14 de agosto lia-se «Atualizada a 13 de agosto», ao
+  // lado de «Emitida a» que já tinha o fuso certo.
   const atualizadaLabel = doLink?.versaoEm
     ? new Date(doLink.versaoEm).toLocaleDateString(t.dateLocale, {
         day: "numeric",
         month: "long",
         year: "numeric",
+        timeZone: FUSO_DO_ESTUDIO,
       })
     : null;
   /**
@@ -448,7 +455,7 @@ export default async function ProposalPage({
           day: "numeric",
           month: "long",
           year: "numeric",
-          timeZone: "Europe/Lisbon",
+          timeZone: FUSO_DO_ESTUDIO,
         });
   })();
 
@@ -682,6 +689,21 @@ export default async function ProposalPage({
             ]
               .filter(Boolean)
               .join(" · ")}
+          </p>
+        )}
+
+        {/* ── A VERSÃO MUDOU DEPOIS DO «SIM» (A6-005) ────────────────────────
+            O estado era calculado (`proposta-do-link.ts`) e ninguém o desenhava.
+            Depois de um aceite o link mostra a versão ACEITE, congelada; se
+            entretanto houve uma revisão, o casal não tinha maneira de o saber.
+            Diz-se uma vez, sem alarme: o que ele vê é o que aceitou, e nada
+            muda sem uma conversa. */}
+        {doLink?.estado === "revista" && (
+          <p
+            role="note"
+            className="mx-auto mt-4 max-w-md rounded-md border border-moss/30 bg-moss/5 px-4 py-3 text-center text-xs leading-relaxed text-foreground/80"
+          >
+            {t.revistaDepoisDeAceite}
           </p>
         )}
 

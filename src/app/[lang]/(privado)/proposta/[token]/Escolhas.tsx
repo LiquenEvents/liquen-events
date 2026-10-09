@@ -4,7 +4,7 @@ import { enderecoDaRotaDaFoto } from "./endereco-da-foto";
 import { useState } from "react";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
-import type { Escolha, OpcaoDeEscolha } from "@/lib/proposta-escolhas";
+import type { EscolhaParaOEcra, OpcaoParaOEcra } from "@/lib/proposta-escolhas";
 import type { TextosDaPagina } from "./textos-da-pagina";
 
 /**
@@ -43,7 +43,9 @@ import type { TextosDaPagina } from "./textos-da-pagina";
  */
 
 interface Props {
-  escolhas: Escolha[];
+  /** Só os identificadores: o texto vem já traduzido em `emLingua` e a
+   *  fotografia em `fotos`. Ver `escolhasParaOEcra`. */
+  escolhas: EscolhaParaOEcra[];
   /** O que já estava escolhido quando a página foi desenhada, no servidor. */
   escolhido: Record<string, string>;
   /** A fotografia de cada opção, pelo id opaco `e{i}o{j}` — ver `proposta-fotos`. */
@@ -136,7 +138,7 @@ export default function Escolhas({ escolhas, escolhido, fotos, token, textos, em
    */
   const [tentado, setTentado] = useState<Record<string, string>>({});
 
-  const escolher = async (escolha: Escolha, opcao: OpcaoDeEscolha) => {
+  const escolher = async (escolha: EscolhaParaOEcra, opcao: OpcaoParaOEcra) => {
     const anterior = respostas[escolha.id];
     setTentado((t) => ({ ...t, [escolha.id]: opcao.id }));
     // O ecrã responde já: a escolha é uma preferência, e esperar meio segundo
@@ -148,6 +150,10 @@ export default function Escolhas({ escolhas, escolhido, fotos, token, textos, em
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ escolhaId: escolha.id, opcaoId: opcao.id }),
+        // A9-007: sem prazo, uma rede que pendura deixava o botão em «a
+        // enviar» para sempre. Ao fim de 15 s dá-se por falhado, e o casal
+        // tem o «Tentar outra vez».
+        signal: AbortSignal.timeout?.(15_000),
       });
       if (!res.ok) throw new Error(String(res.status));
       setEstados((e) => ({ ...e, [escolha.id]: "seguiu" }));
