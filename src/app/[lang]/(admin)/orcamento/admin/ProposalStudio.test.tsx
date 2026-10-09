@@ -1896,22 +1896,24 @@ describe("fotos da biblioteca em estado provisório", () => {
     ]);
   });
 
-  it("a capa reservada não encolhe a outra posição (a foto da direita sai à direita)", async () => {
+  it("a capa reservada grava-se no lugar da capa, e só quando entra", async () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    // Posição 1 = capa DIREITA. Um array compactado mandava-a imprimir à esquerda.
+    // UM lugar de capa: o primeiro «Da biblioteca de temas» do passo é o dela.
     const daBiblioteca = await screen.findAllByRole("button", { name: "Da biblioteca de temas" });
-    await user.click(daBiblioteca[1]);
+    await user.click(daBiblioteca[0]);
     await reservar(user);
     await proximaGravacao();
     expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).coverImages).toEqual(["", ""]);
 
     await confirmar(user);
     await proximaGravacao();
+    // Escreve-se na posição e não se compacta: a segunda das propostas antigas
+    // fica onde estava.
     expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).coverImages).toEqual([
-      "",
       "LQ-001/copia-1.jpg",
+      "",
     ]);
   });
 
@@ -4322,9 +4324,9 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
   });
 
   /**
-   * A capa é o único sítio onde o corte é inevitável: a tira tem aspecto
-   * 0,467:1 e nenhuma fotografia normal tem essa forma. O que se pode fazer é
-   * DIZER o número, para escolher uma vertical deixar de ser sorte.
+   * A capa do desenho novo é UMA fotografia a cobrir a folha deitada. Ela
+   * escolheu «Usa a minha, com aviso»: se a dela não servir, o estúdio diz
+   * porquê e o que o PDF faz em vez disso.
    */
   const comCapas = (capas: string[]) => {
     // O servidor CONHECE estas fotos: sem endereço assinado o `Thumb` não
@@ -4386,67 +4388,47 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     });
   }
 
-  it("na capa, diz quanto é que AQUELA fotografia perde", async () => {
-    comCapas(["capas/uma.jpg", ""]);
-    // Deitada 3:2 — a tira da capa é quase 1:2, e o corte é grande.
+  it("há UM lugar, «Fotografia da capa», e não dois", async () => {
+    comCapas(["", ""]);
+    const seccao = await waitFor(() => {
+      const el = document.getElementById("sec-capas");
+      if (!el) throw new Error("a secção da capa ainda não está desenhada");
+      return el;
+    });
+    expect(within(seccao).getAllByText(/^Fotografia da capa$/).length).toBeGreaterThan(0);
+    expect(within(seccao).queryByText(/Capa esquerda|Capa direita/)).toBeNull();
+  });
+
+  it("uma fotografia ao alto: diz que a capa é deitada e o que o PDF usa", async () => {
+    comCapas(["capas/ao-alto.jpg", ""]);
+    await medirCapas([{ w: 1000, h: 1500 }]);
+    const aviso = await screen.findByText(/É ao alto, e a capa é deitada/);
+    expect(aviso.textContent).toMatch(/melhor fotografia deitada dos temas/);
+    expect(within(aviso.closest("p")!).getByRole("button", { name: "Trocar" })).toBeTruthy();
+  });
+
+  it("uma deitada não tem aviso nenhum", async () => {
+    comCapas(["capas/deitada.jpg", ""]);
     await medirCapas([{ w: 1500, h: 1000 }]);
+    await waitFor(() => expect(screen.queryByText(/a capa é deitada/)).toBeNull());
+    // 3:2 numa folha de 1123 × 794 perde menos de um oitavo: não se avisa.
+    expect(screen.queryByText(/perde \d+% da área/i)).toBeNull();
+  });
+
+  it("uma panorâmica diz quanto perde na folha", async () => {
+    comCapas(["capas/panoramica.jpg", ""]);
+    await medirCapas([{ w: 3000, h: 1000 }]);
     expect(await screen.findByText(/perde \d+% da área/i)).toBeTruthy();
   });
 
-  // «Isto aqui também está enorme», «coloca isto mais bonito» e, por fim,
-  // «quero as fotos a preencher o retângulo»: as duas capas enchem a largura
-  // do cartão com uma altura fixa, e o número de cada uma vai numa etiqueta
-  // por cima DELA; a explicação, igual para as duas, diz-se uma vez.
-  it("as capas enchem o cartão, com o número por cima de cada uma e a explicação uma vez", async () => {
-    comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
-    await medirCapas([
-      { w: 1500, h: 1000 },
-      { w: 1500, h: 1000 },
-    ]);
-    const etiquetas = await screen.findAllByText(/perde \d+% da área/i);
-    const seccao = document.getElementById("sec-capas")!;
-    const img = [...seccao.querySelectorAll("img")].find((i) =>
-      (i.getAttribute("src") ?? "").includes("capas/"),
-    )!;
-    const moldura = img.closest(".h-64");
-    expect(moldura, "a capa deixou de ter a altura fixa").not.toBeNull();
-    expect(moldura!.className).toMatch(/\bw-full\b/);
-    // Sem a forma da tira: a fotografia enche a moldura.
-    expect((moldura as HTMLElement).style.aspectRatio).toBe("");
-    // A etiqueta vive na célula da SUA fotografia.
-    expect(etiquetas[0].closest(".relative")).toBe(moldura!.parentElement);
-    expect(within(seccao).getAllByText(/Uma fotografia ao alto perde menos/)).toHaveLength(1);
+  it("uma proposta antiga só com a da «Direita» mostra essa como a capa", async () => {
+    comCapas(["", "capas/direita.jpg"]);
+    await medirCapas([{ w: 1000, h: 1500 }]);
+    expect(await screen.findByText(/É ao alto/)).toBeTruthy();
   });
 
-  /**
-   * ── O AVISO ERA O MESMO PARA AS DUAS, E NÃO PODIA SER ──────────────────
-   *
-   * Palavras dela: «o mesmo texto aparece por baixo das duas imagens de capa,
-   * embora uma seja vertical e a outra horizontal — logo, perdem áreas
-   * diferentes».
-   */
-  it("duas fotografias de formas diferentes dão números diferentes", async () => {
-    comCapas(["capas/deitada.jpg", "capas/ao-alto.jpg"]);
-    await medirCapas([
-      { w: 1500, h: 1000 },
-      { w: 1000, h: 1500 },
-    ]);
-    const numeros = (await screen.findAllByText(/perde \d+% da área/i)).map(
-      (p) => /(\d+)%/.exec(p.textContent ?? "")?.[1],
-    );
-    // Pode haver só um aviso (a vertical perde pouco e não chega ao limiar) —
-    // o que NÃO pode haver é dois avisos com o mesmo número.
-    expect(new Set(numeros).size).toBe(numeros.length);
-  });
-
-  /**
-   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
-   */
-  it("sem a forma medida, NÃO se inventa um número", async () => {
-    // Era esta a causa: por medir, a conta caía na forma por omissão — a mesma
-    // para as duas — e a frase dizia «ESTA fotografia perde» sobre um número
-    // que não era dela. Não saber é não saber.
-    comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
+  it("sem a forma medida, NÃO se inventa um aviso", async () => {
+    comCapas(["capas/uma.jpg", ""]);
     await waitFor(() =>
       expect(
         [...document.querySelectorAll("img")].some((i) =>
@@ -4455,6 +4437,7 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
       ).toBe(true),
     );
     expect(screen.queryByText(/perde \d+% da área/i)).toBeNull();
+    expect(screen.queryByText(/a capa é deitada/)).toBeNull();
   });
 });
 

@@ -33,6 +33,7 @@ import { repartir as repartirFotos } from "./mosaico";
 import { HEX } from "./paleta";
 import { paletaDasFotos } from "./paleta-das-fotos";
 import { capa, contracapa } from "./paginas/capa";
+import { problemaDaCapa } from "./regra-da-capa";
 import {
   alturaDasColunas,
   comoTitulo,
@@ -111,11 +112,13 @@ export async function renderEditorialPdf(
     const bytes = bytesDaFoto(dado);
     return bytes ? medir(bytes, origem, proximoId++, tema) : Promise.resolve(null);
   };
-  const capaFotos = (
-    await Promise.all(
-      (doc.coverImages ?? []).slice(0, 2).map((d, i) => medida(d, `Capa · foto ${i + 1}`, null)),
-    )
-  ).filter((f): f is Foto => f !== null);
+  // UMA fotografia de capa: a primeira que houver. As propostas antigas tinham
+  // dois lugares, «Esquerda» e «Direita», e há-as só com a da direita.
+  const fotoDaCapa = await medida(
+    (doc.coverImages ?? []).find((d) => d && d.trim()),
+    "Capa · fotografia",
+    null,
+  );
 
   // Os temas pela ordem do documento (a mesma do gerador antigo), e as fotos
   // de cada um pela ordem dela, com a «principal» à frente.
@@ -160,17 +163,14 @@ export async function renderEditorialPdf(
     String(entradas.findIndex((e) => e.pagina === pagina) + 1).padStart(2, "0");
 
   // ── Capa ──
-  // O fundo é a fotografia de maior resolução que serve para a página: a
-  // primeira de capa se tiver pixéis para isso; senão, a melhor deitada da
-  // inspiração; senão, a segunda de capa. Não há painel: ela pediu a capa só
-  // com a fotografia de fundo.
-  const RESOLUCAO_DE_FUNDO = 1600;
-  const [capa1, capa2] = capaFotos;
-  const capa1Serve =
-    capa1 && Math.max(capa1.w, capa1.h) >= RESOLUCAO_DE_FUNDO && capa1.aspecto >= 1;
-  const fundoDaCapa = capa1Serve
-    ? capa1
-    : (album.escolher(1, "deitada")[0] ?? capa1 ?? capa2 ?? null);
+  // A fotografia que ela escolheu, se servir para a página inteira (deitada e
+  // com pixéis para isso — `regra-da-capa.ts`, a mesma regra do aviso do
+  // estúdio); senão, a melhor deitada da inspiração; senão, a dela na mesma.
+  // Não há painel: ela pediu a capa só com a fotografia de fundo.
+  const fundoDaCapa =
+    fotoDaCapa && !problemaDaCapa(fotoDaCapa.w, fotoDaCapa.h)
+      ? fotoDaCapa
+      : (album.escolher(1, "deitada")[0] ?? fotoDaCapa ?? null);
   plano.push({
     desenhar: () =>
       capa(ctx, {

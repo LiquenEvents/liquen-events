@@ -157,11 +157,16 @@ import {
   linhasDaLegendaAprox,
   PAGINA_H,
   PAGINA_W,
-  perdaNaCapa,
   perdasDoMoodboard,
   PERDA_QUE_SE_AVISA,
   type LayoutDeMoodboard,
 } from "@/lib/proposal-geometria";
+import {
+  LADO_MINIMO_DA_CAPA,
+  perdaNaFolha,
+  problemaDaCapa,
+} from "@/lib/pdf-editorial/regra-da-capa";
+import { useTamanhoDoOriginal } from "./tamanhoDoOriginal";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -1750,6 +1755,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const registarAspeto = useCallback((ref: string, aspeto: number) => {
     setAspetosDasFotos((m) => (m[ref] === aspeto ? m : { ...m, [ref]: aspeto }));
   }, []);
+  /** O lugar da fotografia da capa: a primeira que houver (ver a secção). */
+  const idxDaCapa = Math.max(0, (doc.coverImages ?? []).findIndex(Boolean));
+  const caminhoDaCapa = doc.coverImages?.[idxDaCapa] || undefined;
+  /** Os pixéis do original da capa — para o aviso «é pequena». */
+  const tamanhoDaCapa = useTamanhoDoOriginal(
+    caminhoDaCapa ? assetOriginais[caminhoDaCapa] : undefined,
+  );
   const [refEdited, setRefEdited] = useState(false);
   /**
    * ── O CARREGAMENTO DE FOTOS, CONTADO ────────────────────────────────────
@@ -6050,10 +6062,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }));
   }
 
-  // ── Cover images (two slots) ──
-  // A capa tem DUAS posições fixas: a 0 imprime à esquerda do painel do
-  // logótipo, a 1 à direita. Escrever na posição (em vez de compactar a lista)
-  // é o que garante que a foto escolhida para a direita sai à direita.
+  // ── A fotografia da capa ──
+  // Escreve-se NA POSIÇÃO e não se compacta a lista: as propostas antigas têm
+  // duas, e a segunda fica guardada como estava (o PDF novo usa uma só).
   function setCoverAt(idx: number, path: string) {
     setDoc((d) => {
       const cover = normaliseCoverImages(d.coverImages);
@@ -8121,165 +8132,121 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               />
             </Section>
 
-            {/* Cover images */}
+            {/* ── A FOTOGRAFIA DA CAPA — uma, a cobrir a folha ──────────────
+                Eram duas, «Esquerda» e «Direita», as tiras altas do PDF antigo.
+                O desenho novo tem UMA fotografia a cobrir a folha deitada
+                inteira, e ela escolheu: «Usa a minha, com aviso». O PDF usa a
+                que ela escolher; se não servir para a página inteira (ao alto,
+                ou pequena), usa a melhor deitada dos temas — e isso diz-se
+                AQUI, ao lado da fotografia, antes de o PDF existir. A regra é a
+                mesma do servidor (`regra-da-capa.ts`).
+
+                O lugar é a primeira fotografia que houver: há propostas antigas
+                só com a «Direita». A segunda que exista fica guardada e não sai. */}
             <Section
-              title="Imagens de capa (2)"
+              title="Fotografia da capa"
               id="capas"
-              rodape={notaDaSeccao("capas", "Nota sobre as capas")}
+              rodape={notaDaSeccao("capas", "Nota sobre a capa")}
             >
-              {/* ── DUAS COLUNAS SÓ QUANDO DUAS COLUNAS CABEM ────────────────
-                Era `grid-cols-2` fixo, sem degrau nenhum — a única grelha desta
-                coluna sem guarda de contentor (as vizinhas usam
-                `@min-[26rem]:grid-cols-2`).
-
-                MEDIDO num Chromium, no painel que abre a partir do cartão de um
-                cliente: com a coluna a 136 px, cada célula ficava com 37 px, e é
-                aí que «esta fotografia perde 49% da área» e «Capa esquerda /
-                arraste ou clique» quebram letra a letra. A 1440 as duas células
-                chegavam a sobrepor-se — lia-se «CapaCapa esquerdadireita».
-
-                A causa de fundo está corrigida acima; isto é a rede por baixo:
-                mesmo que a coluna volte a apertar, as capas empilham em vez de
-                se espremerem. */}
-              {/* ── AS FOTOGRAFIAS ENCHEM O CARTÃO ──────────────────────────────
-                  Palavras dela, em três capturas seguidas: «isto aqui também
-                  está enorme» (cada tira com ~630 px de altura), depois
-                  «coloca isto mais bonito», e por fim, sobre duas tiras
-                  estreitas encostadas à esquerda: «não gosto. quero as fotos
-                  a preencher o retângulo».
-
-                  As duas capas ocupam a largura toda do cartão, meia cada, e
-                  uma altura fixa de 256 px — cabem as duas no ecrã com a
-                  secção à volta. Perde-se a pré-visualização do recorte exacto
-                  da tira (era o `aspeto` da capa), e o que a substitui é o
-                  NÚMERO: a etiqueta por cima de cada fotografia diz quanto
-                  dela fica de fora no PDF, medido pela mesma conta de antes.
-                  A explicação, igual para as duas, diz-se uma vez por baixo. */}
-              <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-3">
-                {[0, 1].map((idx) => {
-                  const path = doc.coverImages?.[idx];
-                  /**
-                   * ── O ÚNICO SÍTIO ONDE O RECORTE NÃO SE PODE EVITAR ─────────
-                   *
-                   * As tiras da capa correm de topo a fundo da página e têm
-                   * aspecto 0,467:1 — quase 1:2. Nenhuma fotografia normal tem
-                   * essa forma, e dar-lhe a forma da foto deixaria uma barra de
-                   * fundo entre ela e a aresta da folha, que é pior.
-                   *
-                   * O que se pode fazer é DIZER o número antes: uma fotografia ao
-                   * alto perde ali ~30%, uma deitada ~69%. Com o número à frente,
-                   * escolher uma vertical para a capa deixa de ser sorte — e ela
-                   * deixa de descobrir o corte com o PDF já feito.
-                   */
-                  /*
-                   * ── O NÚMERO É DESTA FOTOGRAFIA, OU NÃO HÁ NÚMERO ───────────
-                   *
-                   * Palavras dela: «o mesmo texto aparece por baixo das duas
-                   * imagens de capa, embora uma seja vertical e a outra
-                   * horizontal — logo, perdem áreas diferentes».
-                   *
-                   * A conta já era por fotografia. O que não era é o DADO: a
-                   * forma só se sabe depois de a miniatura carregar e o `Thumb`
-                   * a medir, e até lá caía-se na forma por omissão — a mesma
-                   * para as duas. Duas fotografias diferentes, uma forma
-                   * inventada, o mesmo 69% debaixo de ambas, e a frase a dizer
-                   * «ESTA fotografia perde» sobre um número que não é dela.
-                   *
-                   * Sem medida não há aviso. É a regra da casa em todo o lado
-                   * onde isto aparece: não saber é não saber, e um número errado
-                   * dito com confiança é pior do que nenhum — sobretudo este,
-                   * que existe para ela ESCOLHER a fotografia.
-                   */
-                  const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
-                  const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
+              {(() => {
+                const idx = idxDaCapa;
+                const path = doc.coverImages?.[idx];
+                const aspeto = path ? aspetosDasFotos[path] : undefined;
+                const problema = tamanhoDaCapa
+                  ? problemaDaCapa(tamanhoDaCapa.w, tamanhoDaCapa.h)
+                  : aspeto && aspeto < 1
+                    ? "ao-alto"
+                    : null;
+                const perda = aspeto && !problema ? perdaNaFolha(aspeto) : 0;
+                if (!path) {
                   return (
-                    <div key={idx} className="relative">
-                      {path ? (
-                        <>
-                          <Thumb
-                            url={assetUrls[path]}
-                            // A cascata, do mais leve para o mais pesado. Ver
-                            // `assetMedias`: o degrau do meio poupa ~900 KB por
-                            // célula sempre que a miniatura falha.
-                            planoB={[assetMedias[path], assetOriginais[path]]}
-                            estadoDosUrls={estadoDosUrls}
-                            aoTentarDeNovo={() => void tentarBuscarFotos()}
-                            aoMorrer={marcarUrlMorto}
-                            // As capas são duas e estão no topo do passo: nunca
-                            // esperam pela fila das fotos que estão fora do ecrã.
-                            priority
-                            onRemove={() => removeCoverAt(idx)}
-                            className="h-64 w-full"
-                            // Medir aqui é o que dá o número do aviso de baixo —
-                            // a mesma medida que os mood boards já faziam, na
-                            // célula que já está no ecrã e sem pedir nada ao
-                            // servidor.
-                            onMedida={(a) => registarAspeto(path, a)}
-                            pendente={isPendingImage(path)}
-                            onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
-                            refDoc={path}
-                          />
-                          {/* O nome do lado e, se perder muito, o número — numa
-                              etiqueta escura por cima da fotografia, como o
-                              «×» de remover que já lá vive. */}
-                          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white">
-                            {idx === 0 ? "Esquerda" : "Direita"}
-                            {perdaDaCapa > PERDA_QUE_SE_AVISA && (
-                              <>
-                                {" · "}
-                                <span className="tabular-nums">
-                                  perde {Math.round(perdaDaCapa * 100)}% da área
-                                </span>
-                              </>
-                            )}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadArea
-                            // O lado é fixo: a posição 0 imprime à esquerda do
-                            // painel do logótipo, a 1 à direita.
-                            label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                            progresso={uploading[`cover-${idx}`]}
-                            multiple={false}
-                            curto
-                            onFiles={(files) =>
-                              handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
-                                setCoverAt(idx, paths[0]),
-                              )
-                            }
-                          />
-                          <button
-                            type="button"
-                            className={`${ADD_BTN} mt-1.5 ${ESTADO} ${PRESSAO}`}
-                            onClick={() => setPicker({ kind: "cover", idx })}
-                            // Ao passar o rato já se vai buscar o que o diálogo
-                            // precisa. Quando ela carrega, está lá. `focus` para
-                            // quem navega por teclado, e `touchstart` para o
-                            // telemóvel, onde não há hover nenhum — é o instante
-                            // entre pousar o dedo e o levantar.
-                            onPointerEnter={aquecerBiblioteca}
-                            onFocus={aquecerBiblioteca}
-                            onTouchStart={aquecerBiblioteca}
-                          >
-                            Da biblioteca de temas
-                          </button>
-                        </>
-                      )}
+                    <div className="max-w-md">
+                      <UploadArea
+                        label="Fotografia da capa"
+                        progresso={uploading[`cover-${idx}`]}
+                        multiple={false}
+                        curto
+                        onFiles={(files) =>
+                          handleUpload(`cover-${idx}`, files.slice(0, 1), (paths) =>
+                            setCoverAt(idx, paths[0]),
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        className={`${ADD_BTN} mt-1.5 ${ESTADO} ${PRESSAO}`}
+                        onClick={() => setPicker({ kind: "cover", idx })}
+                        // Ao passar o rato já se vai buscar o que o diálogo
+                        // precisa. `focus` para o teclado, `touchstart` para o
+                        // telemóvel, onde não há hover nenhum.
+                        onPointerEnter={aquecerBiblioteca}
+                        onFocus={aquecerBiblioteca}
+                        onTouchStart={aquecerBiblioteca}
+                      >
+                        Da biblioteca de temas
+                      </button>
+                      <p className="mt-2 text-caption text-[var(--bo-text-muted)]">
+                        Uma fotografia deitada, a cobrir a primeira página e a última.
+                      </p>
                     </div>
                   );
-                })}
-              </div>
-              {[0, 1].some((i) => {
-                const p = doc.coverImages?.[i];
-                const a = p ? aspetosDasFotos[p] : undefined;
-                return a ? perdaNaCapa(a) > PERDA_QUE_SE_AVISA : false;
-              }) && (
-                <p className="mt-3 max-w-prose text-caption text-[var(--bo-text-muted)]">
-                  A tira da capa é quase duas vezes mais alta do que larga, por isso a fotografia é
-                  cortada dos lados. Uma fotografia ao alto perde menos.
-                </p>
-              )}
+                }
+                return (
+                  <div className="max-w-md">
+                    <div className="relative">
+                      <Thumb
+                        url={assetUrls[path]}
+                        // A cascata, do mais leve para o mais pesado. Ver
+                        // `assetMedias`: o degrau do meio poupa ~900 KB por
+                        // célula sempre que a miniatura falha.
+                        planoB={[assetMedias[path], assetOriginais[path]]}
+                        estadoDosUrls={estadoDosUrls}
+                        aoTentarDeNovo={() => void tentarBuscarFotos()}
+                        aoMorrer={marcarUrlMorto}
+                        // A capa está no topo do passo: nunca espera pela fila
+                        // das fotos que estão fora do ecrã.
+                        priority
+                        onRemove={() => removeCoverAt(idx)}
+                        // A forma da folha do PDF (1123 × 794): o que se vê
+                        // aqui é o recorte que sai.
+                        className="aspect-[1123/794] w-full"
+                        onMedida={(a) => registarAspeto(path, a)}
+                        pendente={isPendingImage(path)}
+                        onde="capa"
+                        refDoc={path}
+                      />
+                      {perda > PERDA_QUE_SE_AVISA && (
+                        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white tabular-nums">
+                          perde {Math.round(perda * 100)}% da área
+                        </span>
+                      )}
+                    </div>
+                    {problema && (
+                      <p
+                        role="status"
+                        className="mt-2 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+                      >
+                        <span aria-hidden="true">⚠</span>
+                        <span>
+                          {problema === "ao-alto"
+                            ? "É ao alto, e a capa é deitada. "
+                            : `É pequena para a capa (${Math.max(tamanhoDaCapa?.w ?? 0, tamanhoDaCapa?.h ?? 0)} px; pede ${LADO_MINIMO_DA_CAPA}). `}
+                          O PDF usa a melhor fotografia deitada dos temas.{" "}
+                          <button
+                            type="button"
+                            className="font-medium underline underline-offset-2"
+                            onClick={() => setPicker({ kind: "cover", idx })}
+                            onPointerEnter={aquecerBiblioteca}
+                            onFocus={aquecerBiblioteca}
+                          >
+                            Trocar
+                          </button>
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </Section>
 
             {/* Service groups */}
@@ -13543,7 +13510,9 @@ function PreviewSummary({
   /** A percentagem do sinal DESTA proposta (`depositPercentOf`), não um 30 fixo. */
   pctSinal: number;
 }) {
-  const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
+  // UMA capa no desenho novo: a primeira que houver (a segunda das propostas
+  // antigas fica guardada e não sai no PDF — não se mostra como se saísse).
+  const covers = (doc.coverImages ?? []).filter(Boolean).slice(0, 1) as string[];
   const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);
   const extras = (doc.budgetExtras ?? []).filter(
     (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
@@ -13571,7 +13540,7 @@ function PreviewSummary({
       )}
 
       {covers.length > 0 && (
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        <div className="mb-5 max-w-sm">
           {covers.map((path, i) => (
             <PreviewThumb
               key={i}
