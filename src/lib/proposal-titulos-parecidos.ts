@@ -1,5 +1,5 @@
 import type { ProposalDoc } from "./proposal-doc";
-import { boardsQueSaem } from "./proposal-paginas";
+import { temasComPagina } from "./pdf-editorial/plano";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -76,7 +76,7 @@ export function titulosParecidos(doc: ProposalDoc): TitulosParecidos[] {
   const boards = doc.moodBoards ?? [];
   const porEssencia = new Map<string, number[]>();
 
-  for (const bi of boardsQueSaem(doc)) {
+  for (const bi of temasComPagina(doc)) {
     const titulo = (boards[bi]?.title ?? "").trim();
     if (!titulo) continue;
     const chave = essenciaDoTitulo(titulo);

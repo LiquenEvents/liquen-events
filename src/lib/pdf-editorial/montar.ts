@@ -12,7 +12,6 @@ import {
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
 import { chaveDeRubrica, ordemDeSaida } from "@/lib/proposal-ordem";
-import { ordemDasFotos } from "@/lib/proposal-moodboard";
 import { eurDocumento, milharesComPonto, montanteNaLingua, round2 } from "@/lib/money";
 import {
   normalizarValor,
@@ -33,6 +32,7 @@ import { repartir as repartirFotos } from "./mosaico";
 import { HEX } from "./paleta";
 import { paletaDasFotos } from "./paleta-das-fotos";
 import { capa, contracapa } from "./paginas/capa";
+import { ordemDoDesenho, servicosDoDocumento } from "./plano";
 import { problemaDaCapa } from "./regra-da-capa";
 import {
   alturaDasColunas,
@@ -57,8 +57,11 @@ import { embutirLetras } from "./texto";
  * contactos e o logótipo são os mesmos do gerador antigo e vêm das mesmas
  * funções (`textosDaProposta`, `blocosFixosNaLingua`, `totaisDaProposta`,
  * `camposDoEventoNaLingua`, `docNaLingua`, `resolveValidUntil`, `SITE`). O
- * gerador antigo (`proposal-doc-pdf.ts`) não é tocado e continua a ser o do
- * envio até ela aprovar este.
+ * gerador antigo (`proposal-doc-pdf.ts`) não é tocado; deixou de ser o do
+ * envio quando ela aprovou este («Sim, passa a enviar o novo»).
+ *
+ * A mesma sequência, sem desenhar, está em `plano.ts` — é o que o estúdio
+ * conta e mostra. Um teste prende as duas uma à outra.
  *
  * A sequência é a do exemplo novo (26 páginas):
  *
@@ -121,7 +124,8 @@ export async function renderEditorialPdf(
   );
 
   // Os temas pela ordem do documento (a mesma do gerador antigo), e as fotos
-  // de cada um pela ordem dela, com a «principal» à frente.
+  // de cada um pela ordem dela, com a «principal» à frente — sempre: é a foto
+  // do cartão em «O que propomos» e a primeira do mosaico (`plano.ts`).
   const ordem = ordemDeSaida(original, original.moodBoards, (b) => b.title ?? "");
   const temas = await Promise.all(
     ordem.map(async (i, vez) => {
@@ -129,7 +133,7 @@ export async function renderEditorialPdf(
       const naLingua = doc.moodBoards[i] ?? pt;
       const fotos = (
         await Promise.all(
-          ordemDasFotos(pt).map((k) =>
+          ordemDoDesenho(pt).map((k) =>
             medida(pt.images?.[k], `Tema «${pt.title}» · foto ${k + 1}`, vez),
           ),
         )
@@ -639,35 +643,6 @@ export async function renderEditorialPdf(
 }
 
 /* ── Os serviços ─────────────────────────────────────────────────────────── */
-
-/**
- * Os serviços do documento, para os cartões de «O que propomos».
- *
- * São os ITENS dos grupos de serviços — na proposta dela, o grupo «Decoração
- * Floral e Decoração» com seis serviços dentro. Um grupo sem itens conta pelo
- * seu título. A chave (em português, que é o que ela escreveu) serve para
- * casar o serviço com o seu tema de inspiração.
- */
-function servicosDoDocumento(original: ProposalDoc, doc: ProposalDoc) {
-  const lista: { nome: string; descricao: string; chave: string }[] = [];
-  (original.serviceGroups ?? []).forEach((g, gi) => {
-    const gl = doc.serviceGroups?.[gi] ?? g;
-    const itens = (g.items ?? []).map((it, ii) => ({ pt: it, naLingua: gl.items?.[ii] ?? it }));
-    const comNome = itens.filter((x) => (x.pt.label ?? "").trim());
-    if (comNome.length) {
-      for (const x of comNome) {
-        lista.push({
-          nome: x.naLingua.label.trim(),
-          descricao: (x.naLingua.desc ?? "").trim(),
-          chave: chaveDeRubrica(x.pt.label),
-        });
-      }
-    } else if ((g.title ?? "").trim()) {
-      lista.push({ nome: gl.title.trim(), descricao: "", chave: chaveDeRubrica(g.title) });
-    }
-  });
-  return lista;
-}
 
 /**
  * O tema que corresponde a um serviço, pelo nome: a mesma chave que o resto

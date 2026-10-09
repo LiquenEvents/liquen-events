@@ -97,12 +97,14 @@ describe("as páginas com títulos que se lêem como o mesmo nome", () => {
   /**
    * SÓ AS PÁGINAS QUE CHEGAM A SAIR.
    *
-   * Uma página sem fotografias não é impressa. Acusar um choque com uma folha
-   * que não existe é mandar corrigir o que ninguém vai ler.
+   * No desenho novo do PDF, um tema só com título TEM página (uma página de
+   * texto com uma fotografia de outro tema ao lado) — por isso choca. Um tema
+   * sem título, sem texto e sem fotografias é que não sai, e não choca com
+   * nada (ver `temasComPagina`, em `pdf-editorial/plano.ts`).
    */
-  it("uma página sem fotografias não choca com nada", () => {
+  it("uma página só com título sai no PDF novo, e por isso choca", () => {
     const doc = com({ titulo: "Mesas", fotos: 1 }, { titulo: "As Mesas", fotos: 0 });
-    expect(titulosParecidos(doc)).toEqual([]);
+    expect(titulosParecidos(doc)).not.toEqual([]);
   });
 
   /**

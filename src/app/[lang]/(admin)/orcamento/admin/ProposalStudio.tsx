@@ -141,7 +141,7 @@ import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
-import { boardsQueSaem, folhasAproximadas } from "@/lib/proposal-paginas";
+import { planoDaProposta, temasComPagina } from "@/lib/pdf-editorial/plano";
 import { avisoDeTituloParecido, titulosParecidos } from "@/lib/proposal-titulos-parecidos";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
@@ -3838,14 +3838,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * vazio não imprime nada (o gerador salta-o, para nunca mostrar uma folha em
    * branco a um cliente).
    *
-   * O total do PDF é MEDIDO e não estimado a olho: sete páginas fixas (capa,
-   * apresentação, serviços, orçamento, condições, observações, contracapa) mais
-   * uma por página de inspiração. Um texto muito longo pode empurrar uma secção
-   * para a folha seguinte, e é por isso que se diz «cerca de».
+   * O total do PDF sai do PLANO do desenho novo (`pdf-editorial/plano.ts`):
+   * a mesma sequência que o gerador desenha, presa a ele por um teste. Só o
+   * texto que transborda (o orçamento e as condições) é estimado, e é por isso
+   * que se diz «cerca de».
    */
   const fotosPorBoard = doc.moodBoards.map((b) => b.images.length);
   const totalDeFotos = fotosPorBoard.reduce((a, b) => a + b, 0);
-  const paginasDeInspiracao = fotosPorBoard.filter((n) => n > 0).length;
+  const planoDoPdf = useMemo(() => planoDaProposta(doc as ProposalDoc), [doc]);
+  const paginasDeInspiracao = planoDoPdf.filter((p) => p.tipo === "tema").length;
   const tempoDaProposta = tempoMostrado > 0 ? ` · ${emPalavras(tempoMostrado)} de trabalho` : "";
   const contagemDosBoards =
     `${paginasDeInspiracao} ${paginasDeInspiracao === 1 ? "página" : "páginas"} · ` +
@@ -3853,7 +3854,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // O número sai da MESMA lista que a vista de conjunto desenha. Eram duas
     // contas sobre o mesmo documento — «7 páginas» na vista e «cerca de 14» na
     // frase — e discordavam porque contavam coisas diferentes.
-    `PDF com cerca de ${folhasAproximadas(doc as ProposalDoc)}${tempoDaProposta}`;
+    `PDF com cerca de ${planoDoPdf.length}${tempoDaProposta}`;
 
   /**
    * ── OS TÍTULOS QUE SE LÊEM COMO O MESMO NOME ────────────────────────────
@@ -5271,18 +5272,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // acima da dobra. Num documento comprido, «bloco inserido» é a única coisa
     // que não interessa saber: o que interessa é a página em que ele calhou.
     //
-    // A posição SAI do `boardsQueSaem`, que é a mesma função que o gerador do
-    // PDF usa — contar cartões no ecrã dizia «a 3.ª» de uma página que é a 5.ª
-    // no documento. Uma página sem fotografias não chega a sair, e a frase
-    // di-lo em vez de inventar um número.
+    // A posição SAI do `temasComPagina`, a mesma lista que o gerador do PDF
+    // usa — contar cartões no ecrã dizia «a 3.ª» de uma página que é a 5.ª no
+    // documento. Um tema sem fotografias e sem texto não chega a sair, e a
+    // frase di-lo em vez de inventar um número.
     const depois = { ...doc, moodBoards: [...doc.moodBoards, novo] } as ProposalDoc;
-    const saem = boardsQueSaem(depois);
+    const saem = temasComPagina(depois);
     const pos = saem.indexOf(doc.moodBoards.length);
     const nome = (novo.title ?? "").trim() || `Inspiração ${doc.moodBoards.length + 1}`;
     toast(
       pos >= 0
         ? `«${nome}» entrou como a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.`
-        : `«${nome}» entrou no fim das páginas de inspiração. Sem fotografias, não sai no PDF.`,
+        : `«${nome}» entrou no fim das páginas de inspiração. Sem fotografias nem texto, não sai no PDF.`,
       "success",
     );
 
@@ -5373,11 +5374,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       apagar();
       return;
     }
-    // A posição SAI da mesma função que o gerador do PDF usa (`boardsQueSaem`),
+    // A posição SAI da mesma lista que o gerador do PDF usa (`temasComPagina`),
     // e não de contar cartões no ecrã: a ordem de saída respeita os capítulos
     // dos serviços, e as páginas sem fotos não chegam a sair. Uma segunda
     // contagem aqui dizia «a página 3» de uma página que é a 5.ª no documento.
-    const saem = boardsQueSaem(doc as ProposalDoc);
+    const saem = temasComPagina(doc as ProposalDoc);
     const pos = saem.indexOf(bi);
     const conta =
       fotos > 0
@@ -6018,12 +6019,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       ...doc,
       moodBoards: [...doc.moodBoards.slice(0, bi + 1), copiado, ...doc.moodBoards.slice(bi + 1)],
     } as ProposalDoc;
-    const saem = boardsQueSaem(depois);
+    const saem = temasComPagina(depois);
     const pos = saem.indexOf(bi + 1);
     toast(
       pos >= 0
         ? `«${nome}» duplicado — a cópia é a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.`
-        : `«${nome}» duplicado — a cópia ficou logo a seguir. Sem fotografias, não sai no PDF.`,
+        : `«${nome}» duplicado — a cópia ficou logo a seguir. Sem fotografias nem texto, não sai no PDF.`,
       "info",
     );
   }
@@ -12004,14 +12005,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  total, e EM QUE LÍNGUA. São exactamente os quatro dados que o
                  cliente vai ver, e é a última vez que alguém os pode olhar.
 
-                 Os números saem de onde já saíam antes: `folhasAproximadas` é a
+                 Os números saem de onde já saíam antes: `planoDoPdf` é a
                  mesma conta do «PDF com cerca de N páginas» que a barra mostra,
                  e `totais.aPagar` é o mesmo bloco de totais que o gerador do
                  PDF usa. Uma segunda conta aqui era garantir que um dia a
                  pergunta e o documento diziam números diferentes.
 
                  «cerca de» porque é isso que é: um texto muito longo empurra
-                 uma secção para a folha seguinte (ver `proposal-paginas.ts`),
+                 uma secção para a folha seguinte (ver `pdf-editorial/plano.ts`),
                  e prometer um número exacto seria mentir na última frase. */
               <div className="ml-auto flex max-w-lg flex-col items-end gap-2">
                 <p className="text-right text-sm leading-relaxed text-[var(--bo-tinta-72)]">
@@ -12019,7 +12020,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <strong className="font-medium text-[var(--bo-text)]">
                     {quote.email || "o cliente"}
                   </strong>
-                  ? Vai um PDF de cerca de {folhasAproximadas(doc as ProposalDoc)} páginas,{" "}
+                  ? Vai um PDF de cerca de {planoDoPdf.length} páginas,{" "}
                   {idiomaDoPdf === "en" ? "em inglês" : "em português"}, com{" "}
                   <strong className="font-medium text-[var(--bo-text)]">
                     {eur(totais.aPagar)}
