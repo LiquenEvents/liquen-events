@@ -705,7 +705,16 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       chave: "local",
       cabecalho: "Local",
       soLargo: true,
-      celula: (q) => <span className="block truncate">{q.location || "—"}</span>,
+      // Numa tabela de largura automática o `truncate` sozinho não corta: o texto
+      // inteiro passa a ser a largura MÍNIMA da coluna. MEDIDO a 1440: um local
+      // comprido fez a coluna com 479 px e a tabela com 1457 numa caixa de 1358
+      // — «Pax» cortado e «À espera» só a deslizar. Fica no degrau de 240 da
+      // escala de larguras (DESIGN-SYSTEM §9.9), com o texto inteiro no `title`.
+      celula: (q) => (
+        <span className="block max-w-60 truncate" title={q.location || undefined}>
+          {q.location || "—"}
+        </span>
+      ),
     },
     {
       chave: "pax",
