@@ -739,6 +739,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
           <Segmented
             ariaLabel="Filtrar propostas por estado"
             size="sm"
+            quebra="rolar"
             value={filter}
             onChange={setFilter}
             options={filterOptions}

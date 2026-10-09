@@ -46,6 +46,17 @@ export interface SegmentedProps<T extends string> {
   ariaLabel: string;
   /** Shrink the control (denser toolbars). */
   size?: "sm" | "md";
+  /**
+   * O que fazer quando os segmentos não cabem na largura.
+   *
+   * `"linha"` (por omissão) quebra para a linha de baixo — é o que serve dois
+   * rótulos compridos como os do IVA. Com MUITOS segmentos curtos dá uma
+   * pílula de duas linhas, larga e torta: MEDIDO a 390 px nos seis filtros
+   * das Propostas. `"rolar"` mantém-nos numa linha só e deixa o contentor
+   * (que tem de ter `overflow-x-auto`) rolar com o dedo, como as pílulas de
+   * estado dos Pedidos — e traz o segmento escolhido para dentro do ecrã.
+   */
+  quebra?: "linha" | "rolar";
   className?: string;
 }
 
@@ -55,6 +66,7 @@ export function Segmented<T extends string>({
   onChange,
   ariaLabel,
   size = "md",
+  quebra = "linha",
   className,
 }: SegmentedProps<T>) {
   // 44 px de altura onde se toca com o dedo, a densidade de sempre com rato —
@@ -128,6 +140,15 @@ export function Segmented<T extends string>({
    * fundos ao mesmo tempo, e nunca há nenhum.
    */
   const grupoRef = useRef<HTMLDivElement>(null);
+
+  // Numa fila que rola, o segmento escolhido pode estar fora do ecrã (escolhido
+  // pelas setas, ou reposto de antes). Traz-se para dentro, sem mexer na
+  // página na vertical.
+  useEffect(() => {
+    if (quebra !== "rolar") return;
+    const activo = grupoRef.current?.querySelector<HTMLElement>('[data-activo="sim"]');
+    activo?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+  }, [quebra, value]);
   const [marca, setMarca] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   // Só se anima a partir da SEGUNDA medição: a primeira punha a pílula a
   // deslizar do canto superior esquerdo até ao segmento activo, à chegada.
@@ -188,7 +209,8 @@ export function Segmented<T extends string>({
         // descrevia isto como «uma pequena pílula de opções mutuamente
         // exclusivas» — passou a sê-lo. Ver a nota no `ui/Button.tsx`: a curva
         // máxima é de quem se clica.
-        "relative inline-flex flex-wrap items-center gap-1 rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)] p-1",
+        "relative inline-flex items-center gap-1 rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-tinta-6)] p-1",
+        quebra === "rolar" ? "flex-nowrap" : "flex-wrap",
         className,
       )}
     >
@@ -239,6 +261,7 @@ export function Segmented<T extends string>({
                  estica a pílula para lá do que o rótulo ocupa. */
               `alvo-toque relative inline-flex items-center gap-1.5 rounded-full font-medium ${ESTADO} ${PRESSAO}`,
               pad,
+              quebra === "rolar" && "shrink-0 whitespace-nowrap",
               active
                 ? // O fundo próprio é a rede de antes de a pílula existir. Sai
                   // no instante em que ela está medida e no sítio — nunca há
