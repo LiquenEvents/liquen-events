@@ -11,6 +11,7 @@ import {
   blocoEDaCasa,
   blocosFixosNaLingua,
   camposDoEventoNaLingua,
+  preencherNaLingua,
   rotuloDoTotalNaLingua,
   textosDaProposta,
   type CampoDoEvento,
@@ -1372,7 +1373,9 @@ export default function Documento({
           {/* Os marcadores («a data do evento», «o número de convidados») são
               preenchidos com a MESMA função do gerador — senão o casal lia aqui
               um «{{data}}» que o PDF dele não tem. */}
-          <Lista itens={(fixos.condicoesGerais ?? []).map((l) => preencherMarcadores(l, doc))} />
+          <Lista
+            itens={(fixos.condicoesGerais ?? []).map((l) => preencherNaLingua(l, doc, idioma))}
+          />
         </SeccaoDobrada>
       )}
 

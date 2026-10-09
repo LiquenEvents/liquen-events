@@ -976,20 +976,42 @@ export function preencherMarcadores(
   texto: string,
   doc: Pick<ProposalDoc, "eventDate" | "guests">,
   semDado: RedaccoesSemDado = CONDICOES_SEM_DADO,
+  porDefinir: string = DADO_POR_DEFINIR,
 ): string {
   const data = (doc.eventDate ?? "").trim();
   const convidados = (doc.guests ?? "").trim();
-  const faltaODado =
-    (!data && texto.includes(MARCADOR_DATA)) ||
-    (!convidados && texto.includes(MARCADOR_CONVIDADOS));
-  const frase = faltaODado ? (semDado[texto] ?? texto) : texto;
+  const temOsDados = (frase: string) =>
+    (!!data || !frase.includes(MARCADOR_DATA)) &&
+    (!!convidados || !frase.includes(MARCADOR_CONVIDADOS));
+
+  /**
+   * ── E O CAMINHO DE VOLTA (A4-004) ─────────────────────────────────────────
+   * As condições são GRAVADAS já preenchidas. Uma proposta gravada antes de
+   * haver data ficava com a redacção «válida para a data que vier a ser
+   * confirmada» — e, como essa frase já não tem marcador, nada a voltava a
+   * trocar quando a data chegava. A capa dizia «12 de setembro de 2026» e as
+   * Condições Gerais, três páginas à frente, diziam o contrário.
+   *
+   * Agora a troca vai nos dois sentidos: uma redacção «sem dado» que a casa
+   * conhece volta à frase com marcador assim que o dado existe. Repara também
+   * as propostas que já estão gravadas, sem migração nenhuma.
+   */
+  let frase = texto;
+  const comDado = Object.entries(semDado).find(([, sem]) => sem === texto)?.[0];
+  if (comDado && temOsDados(comDado)) frase = comDado;
+  else if (!temOsDados(texto)) frase = semDado[texto] ?? texto;
+
   // `replaceAll` e não `replace`: com uma string, o `replace` troca só a
   // PRIMEIRA ocorrência — uma condição editada à mão que repetisse o marcador
   // saía com o segundo literal, «{DATA}» impresso no PDF do cliente.
   return frase
-    .replaceAll(MARCADOR_DATA, data || DADO_POR_DEFINIR)
-    .replaceAll(MARCADOR_CONVIDADOS, convidados || DADO_POR_DEFINIR);
+    .replaceAll(MARCADOR_DATA, data || porDefinir)
+    .replaceAll(MARCADOR_CONVIDADOS, convidados || porDefinir);
 }
+
+/** O «a definir» das condições, para quem precisa de o reconhecer depois de
+ *  preenchido (a versão inglesa troca-o pelo seu — ver A4-010). */
+export const POR_DEFINIR_PT = DADO_POR_DEFINIR;
 
 /**
  * "Faseamento do Pagamento" — as duas primeiras linhas seguem a percentagem.

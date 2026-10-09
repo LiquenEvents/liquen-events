@@ -1,4 +1,4 @@
-import type { ProposalDoc } from "@/lib/proposal-doc";
+import { POR_DEFINIR_PT, type ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "./types";
 import { foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
@@ -403,6 +403,25 @@ export function conferir({
     detalhe:
       restos.length > 0
         ? `Ficou por substituir: ${restos.slice(0, 3).join(" · ")}${restos.length > 3 ? "…" : ""}`
+        : "",
+  });
+
+  // ── Uma condição que ficou com «a definir» no meio (A4-009) ─────────────
+  //
+  // As cláusulas da CASA sabem dizer-se sem a data e sem o número («válida para
+  // a data que vier a ser confirmada»). Uma que ela escreveu à mão com
+  // `{CONVIDADOS}` não sabe, e o preenchimento põe lá «a definir»: o casal lia
+  // «O orçamento cobre a definir convidados.» numa cláusula contratual. Não se
+  // adivinha a redacção dela — avisa-se, e ela decide (pôr o dado, ou
+  // reescrever a frase).
+  const porDefinir = (doc.condicoesGerais ?? []).filter((l) => l.includes(POR_DEFINIR_PT));
+  v.push({
+    id: "condicoes-por-definir",
+    titulo: "Condições Gerais",
+    severidade: porDefinir.length > 0 ? "aviso" : "ok",
+    detalhe:
+      porDefinir.length > 0
+        ? `${porDefinir.length === 1 ? "Uma condição diz" : `${porDefinir.length} condições dizem`} «a definir» porque falta a data ou o número de convidados: «${porDefinir[0].slice(0, 90)}${porDefinir[0].length > 90 ? "…" : ""}»`
         : "",
   });
 
