@@ -928,3 +928,19 @@ describe("uma condição com «a definir» no meio (A4-009)", () => {
     expect(vs.find((x) => x.id === "condicoes-por-definir")!.severidade).toBe("ok");
   });
 });
+
+describe("as alternativas contam no idioma (A6-010)", () => {
+  it("uma proposta inglesa com as escolhas em português não passa como «ok»", () => {
+    const vs = conferir({
+      doc: documento({
+        escolhas: [{ id: "e1", titulo: "Paleta", opcoes: [{ id: "o1", rotulo: "Terracota" }] }],
+      } as never),
+      quote: pedido(),
+      ...base,
+      idioma: "en",
+    });
+    const v = vs.find((x) => x.id === "idioma")!;
+    expect(v.detalhe).toContain("Escolha «Paleta»");
+    expect(v.detalhe).toContain("Opção «Terracota»");
+  });
+});

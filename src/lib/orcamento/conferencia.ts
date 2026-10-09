@@ -5,6 +5,7 @@ import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal
 import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { paginasEmBranco } from "@/lib/proposal-paginas";
+import { camposDeEscolhaPorTraduzir } from "@/lib/proposta-escolhas";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -522,7 +523,13 @@ export function conferir({
   // que aquelas oito rubricas são nomes próprios.
   const doCliente = idiomaDoCliente(quote);
   if (idioma === "en") {
-    const faltam = camposPorTraduzir(doc);
+    // As ALTERNATIVAS também (A6-010): não entravam em contagem nenhuma, e a
+    // Conferência dava «Idioma: ok» a uma proposta inglesa com as escolhas do
+    // casal em português.
+    const faltam = [
+      ...camposPorTraduzir(doc),
+      ...camposDeEscolhaPorTraduzir(doc.escolhas).map((c) => ({ rotulo: c.rotulo })),
+    ];
     const primeiros = faltam.slice(0, 3).map((c) => c.rotulo);
     v.push({
       id: "idioma",
