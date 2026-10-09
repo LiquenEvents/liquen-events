@@ -345,11 +345,13 @@ function Sub({ title, children }: { title: string; children: React.ReactNode }) 
 
 type Period = "all" | "6m" | "3m" | "1y";
 
+// Rótulos curtos: a 390 px os compridos («Últimos 6 meses») partiam a pílula
+// em duas linhas. O grupo chama-se «Período», e é ele que dá o contexto.
 const PERIOD_LABELS: Record<Period, string> = {
-  all: "Todo o período",
-  "1y": "Último ano",
-  "6m": "Últimos 6 meses",
-  "3m": "Últimos 3 meses",
+  all: "Tudo",
+  "1y": "12 meses",
+  "6m": "6 meses",
+  "3m": "3 meses",
 };
 
 export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {

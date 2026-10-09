@@ -91,7 +91,7 @@ import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravac
 import BotaoGuardarTudo from "./GuardarTudo";
 import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
-import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
+import { diasDesde, eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -705,7 +705,16 @@ function COLUNAS_DE_PEDIDOS(ctx: {
       chave: "local",
       cabecalho: "Local",
       soLargo: true,
-      celula: (q) => <span className="block truncate">{q.location || "—"}</span>,
+      // Numa tabela de largura automática o `truncate` sozinho não corta: o texto
+      // inteiro passa a ser a largura MÍNIMA da coluna. MEDIDO a 1440: um local
+      // comprido fez a coluna com 479 px e a tabela com 1457 numa caixa de 1358
+      // — «Pax» cortado e «À espera» só a deslizar. Fica no degrau de 240 da
+      // escala de larguras (DESIGN-SYSTEM §9.9), com o texto inteiro no `title`.
+      celula: (q) => (
+        <span className="block max-w-60 truncate" title={q.location || undefined}>
+          {q.location || "—"}
+        </span>
+      ),
     },
     {
       chave: "pax",
@@ -783,7 +792,7 @@ const QuoteCard = memo(function QuoteCard({
       : null;
   // Lead parado: status ativo sem atividade há 14+ dias
   const lastActivity = q.lastUpdated ?? q.submittedAt;
-  const daysSince = Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86400000);
+  const daysSince = diasDesde(lastActivity, todayStr);
   const isStale =
     (q.status === "pendente" || q.status === "em_revisao" || q.status === "cotado") &&
     daysSince >= 14;
@@ -1390,6 +1399,11 @@ export default function AdminClient({
   const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>(vistaInicial ?? "overview");
   const [navOpen, setNavOpen] = useState(false);
+  // A gaveta é modal: com ela aberta, o Tab passeava pelo fundo desfocado
+  // (Ajuda → Tudo guardado → Pesquisar → Novo) e o foco ficava no botão que a
+  // abriu. A armadilha da casa leva o foco para dentro, prende o Tab, tira o
+  // fundo da árvore e devolve o foco a quem a abriu quando fecha.
+  const gavetaRef = useFocusTrap<HTMLDivElement>(navOpen);
   /**
    * ════════════════════════════════════════════════════════════════════════
    * O MENU ENCOLHIDO NO COMPUTADOR — E SOZINHO AO FAZER PROPOSTA
@@ -4477,11 +4491,33 @@ export default function AdminClient({
             o `lg:contents` do invólucro — sem ele, o invólucro volta a ser o
             bloco contentor que impede a página de se arrastar para o lado, e
             agora também no computador. */}
-        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)]">
+        <div
+          ref={gavetaRef}
+          className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)]"
+        >
+          {/* O véu vive DENTRO do invólucro da gaveta. Fora dele, a armadilha
+              de foco (que tira os irmãos da árvore) deixava-o inerte, e tocar
+              fora da gaveta deixava de a fechar. Cá dentro, também passa a
+              cobrir a barra de baixo — que, com a gaveta aberta, já não
+              responde. */}
+          {navOpen && (
+            <div
+              className="bo-entrada bo-entrada-fundo pointer-events-auto absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+              onClick={() => setNavOpen(false)}
+            />
+          )}
+          {/* A sombra só existe aberta: fechada, a gaveta está em x = −256 com
+              o bordo direito em x = 0, e a sombra pintava ~40 px de cinzento
+              no canto esquerdo de todos os ecrãs. */}
           <aside
             inert={!navOpen}
-            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] shadow-[var(--bo-sombra-modal)] motion-safe:transition-transform motion-safe:duration-300 ${
-              navOpen ? "translate-x-0" : "-translate-x-full"
+            role={navOpen ? "dialog" : undefined}
+            aria-modal={navOpen || undefined}
+            aria-label={navOpen ? "Menu" : undefined}
+            className={`bo-material-faixa bo-material-desfoque pointer-events-auto fixed top-0 z-40 h-screen w-64 shrink-0 flex flex-col border-r border-[var(--bo-hairline)] motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 ${
+              navOpen
+                ? "translate-x-0 shadow-[var(--bo-sombra-modal)]"
+                : "-translate-x-full shadow-none"
             }`}
           >
             {/* A cruz que fecha a gaveta. Deixou de ser «do telemóvel»: a
@@ -4820,14 +4856,6 @@ export default function AdminClient({
             </div>
           </aside>
         </div>
-
-        {/* Backdrop (mobile nav drawer) */}
-        {navOpen && (
-          <div
-            className="bo-entrada bo-entrada-fundo fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px]"
-            onClick={() => setNavOpen(false)}
-          />
-        )}
 
         {/* ══════════════════════════════════════════════════════════════════
             A BARRA DE DESTINOS DO TELEMÓVEL — UMA CÁPSULA QUE FLUTUA
@@ -5809,14 +5837,22 @@ export default function AdminClient({
               acima: as seis portas que abrem um pedido estão espalhadas por
               cinco vistas, e o sinal tem de aparecer naquela em que o dedo
               tocou. */}
+          {/* FORA DO FLUXO: no fluxo, o aviso empurrava a lista para baixo ao
+              aparecer e deixava-a subir ao sair — MEDIDO a 390 px ao abrir uma
+              proposta a partir das Propostas, um salto de 0,157 (acima do 0,1
+              que já é «mau»). Fica numa âncora de altura zero, por cima do
+              topo da vista, com fundo opaco para não se ler através dele. */}
           {aAbrir && (
-            <EmCurso
-              className="mb-4"
-              titulo={`A abrir o pedido de ${aAbrir.nome}`}
-              estimadoMs={1200}
-              nota="Vai buscar os convidados, a checklist e o cronograma — é o que falta ao resumo da lista."
-              notaDemorada="A ligação está lenta. Podes esperar, ou voltar atrás e tentar daqui a pouco."
-            />
+            <div className="relative z-10 h-0" data-ancora-em-curso>
+              <div className="absolute inset-x-0 top-0 rounded-xl bg-[var(--bo-surface)] shadow-[var(--bo-sombra-suspensa)]">
+                <EmCurso
+                  titulo={`A abrir o pedido de ${aAbrir.nome}`}
+                  estimadoMs={1200}
+                  nota="Vai buscar os convidados, a checklist e o cronograma — é o que falta ao resumo da lista."
+                  notaDemorada="A ligação está lenta. Podes esperar, ou voltar atrás e tentar daqui a pouco."
+                />
+              </div>
+            </div>
           )}
 
           {/* ── Overview ── */}
@@ -7660,9 +7696,12 @@ export default function AdminClient({
                             <div className="flex items-center gap-2">
                               <a
                                 href={`mailto:${selected.email}`}
-                                className={`alvo-toque !justify-start truncate text-xs text-sage-600 hover:underline ${ESTADO} ${PRESSAO}`}
+                                className={`alvo-toque !justify-start min-w-0 text-xs text-sage-600 hover:underline ${ESTADO} ${PRESSAO}`}
                               >
-                                {selected.email}
+                                {/* O corte vive num filho: num `inline-flex` (o
+                                    que o `alvo-toque` faz do link no dedo) o
+                                    `truncate` no próprio link é inerte. */}
+                                <span className="min-w-0 truncate">{selected.email}</span>
                               </a>
                               <button
                                 onClick={() => {

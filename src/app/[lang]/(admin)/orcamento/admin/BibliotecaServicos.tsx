@@ -137,7 +137,7 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
                       onEscolher(s);
                       toast(`"${s.nome}" acrescentado`, "success");
                     }}
-                    className={`alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
+                    className={`alvo-toque block w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-[var(--bo-hairline-strong)] hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
                   >
                     <span className="block text-xs font-medium text-[var(--bo-text)]">
                       {s.nome}

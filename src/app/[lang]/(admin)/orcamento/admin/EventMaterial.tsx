@@ -10,6 +10,7 @@ import { Button, PerguntaDestrutiva, SectionCard } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { unidadeNaContagem } from "@/lib/unidade-na-contagem";
 
 /**
  * A CHECKLIST DE MATERIAL DESTE EVENTO.
@@ -373,14 +374,18 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
                 {linhas.map((i) => (
                   <li key={i.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
                     {i.critical && (
-                      <span className="text-[var(--bo-perigo)]" aria-label="crítico" title="Crítico">
+                      <span
+                        className="text-[var(--bo-perigo)]"
+                        aria-label="crítico"
+                        title="Crítico"
+                      >
                         ▲
                       </span>
                     )}
                     <span>{i.name}</span>
                     <span className="text-sm">
                       {i.qty}
-                      {i.unit ? ` ${i.unit}` : ""}
+                      {i.unit ? ` ${unidadeNaContagem(i.qty, i.unit)}` : ""}
                     </span>
                     {/* A coluna que responde a "porque é que isto está aqui?" */}
                     <span className="bo-text-muted ml-auto text-xs">{i.originLabel}</span>

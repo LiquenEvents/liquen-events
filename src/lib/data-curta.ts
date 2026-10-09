@@ -63,3 +63,69 @@ export function dataCurta(iso?: string | null): string {
   if (mes < 1 || mes > 12) return iso;
   return `${Number(m[3])} ${MESES_CURTOS[mes - 1]} ${m[1]}`;
 }
+
+/**
+ * ── O DIA POR EXTENSO, COM O DIA DA SEMANA ───────────────────────────────
+ *
+ * «sexta-feira, 9 de outubro» — e, com `{ ano: true }`, «… de 2026».
+ *
+ * Existiam cinco cópias desta frase feitas com `toLocaleDateString` (o
+ * Calendário, os Guiões, a Agenda, a Visão Geral, o campo de data), e duas
+ * delas punham-lhe `capitalize` por cima. O `text-transform: capitalize`
+ * levanta a primeira letra de CADA palavra — MEDIDO no diálogo «Novo no
+ * calendário»: «Quinta-Feira, 1 De Outubro De 2026». E o título da vista de
+ * dia era montado à mão com os meses dos cabeçalhos: «9 de Outubro 2026», sem
+ * o «de» e com o mês em maiúscula, ao lado de uma Visão Geral que dizia
+ * «sexta-feira, 9 de outubro».
+ *
+ * Lê a cadeia directamente, como o `dataCurta` (ver em cima porque é que não
+ * passa por um instante nem pelo `Intl`). O dia da semana sai de uma conta em
+ * UTC sobre a própria data, que não tem fuso que a mexa.
+ *
+ * Minúsculas sempre, como se escrevem os dias e os meses em português. Quem
+ * a põe no início de uma frase usa `comMaiuscula`.
+ */
+const MESES_LONGOS = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+const DIAS_DA_SEMANA = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+];
+
+export function diaPorExtenso(
+  iso?: string | null,
+  { ano = false, semana = true }: { ano?: boolean; semana?: boolean } = {},
+): string {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const [a, mes, dia] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return iso;
+  const corpo = `${dia} de ${MESES_LONGOS[mes - 1]}${ano ? ` de ${a}` : ""}`;
+  if (!semana) return corpo;
+  const nome = DIAS_DA_SEMANA[new Date(Date.UTC(a, mes - 1, dia)).getUTCDay()];
+  return `${nome}, ${corpo}`;
+}
+
+/** A primeira letra em maiúscula — e SÓ a primeira, ao contrário do CSS. */
+export function comMaiuscula(texto: string): string {
+  return texto ? texto.charAt(0).toLocaleUpperCase("pt-PT") + texto.slice(1) : texto;
+}

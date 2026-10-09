@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
-import { eventCountdown, randomId, todayKey } from "./util";
+import { diasDesde, eventCountdown, randomId, todayKey } from "./util";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
@@ -99,13 +99,10 @@ const KanbanCard = memo(function KanbanCard({
   onDragEnd,
   onMove,
 }: CardProps) {
-  // O relógio é lido AQUI, dentro do cartão, e não passado como prop: um
-  // `nowMs` novo a cada render do quadro seria uma prop sempre diferente e
-  // desfazia o `memo()` — o cartão só volta a desenhar-se quando alguma coisa
-  // sua muda, e é então que o relógio interessa.
-  const daysSinceUpdate = Math.floor(
-    (Date.now() - new Date(q.lastUpdated ?? q.submittedAt).getTime()) / 86400000,
-  );
+  // Conta-se a partir do `todayKey` que o quadro já passa (uma cadeia que só
+  // muda à meia-noite, e por isso não desfaz o `memo()`), e não do relógio
+  // lido no desenho.
+  const daysSinceUpdate = diasDesde(q.lastUpdated ?? q.submittedAt, todayKey);
   const staleProposal = q.status === "cotado" && daysSinceUpdate >= 7;
   const cd = q.date ? eventCountdown(q.date) : null;
   const soon = cd && (cd.tone === "soon" || cd.tone === "today");

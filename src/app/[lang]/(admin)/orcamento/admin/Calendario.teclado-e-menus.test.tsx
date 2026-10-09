@@ -114,11 +114,11 @@ describe("voltar a hoje", () => {
     const user = await montar();
     await user.click(screen.getByRole("radio", { name: "Dia" }));
     await user.click(screen.getByRole("button", { name: "Dia seguinte" }));
-    expect(screen.getByRole("heading", { name: "11 de Setembro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "11 de setembro de 2026" })).toBeInTheDocument();
 
     tecla("t");
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "10 de Setembro 2026" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "10 de setembro de 2026" })).toBeInTheDocument(),
     );
   });
 
@@ -161,7 +161,7 @@ describe("as setas", () => {
     await user.click(screen.getByRole("radio", { name: "Dia" }));
     tecla("ArrowRight");
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "11 de Setembro 2026" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "11 de setembro de 2026" })).toBeInTheDocument(),
     );
   });
 
@@ -173,7 +173,7 @@ describe("as setas", () => {
     // que não está desenhado em lado nenhum: a tecla parecia avariada.
     tecla("ArrowRight", { altKey: true });
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "10 de Outubro 2026" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "10 de outubro de 2026" })).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("radio", { name: "Mês" }));
@@ -194,7 +194,7 @@ describe("as setas", () => {
     campo.focus();
 
     fireEvent.keyDown(campo, { key: "ArrowRight", bubbles: true });
-    expect(screen.getByRole("heading", { name: "10 de Setembro 2026" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "10 de setembro de 2026" })).toBeInTheDocument();
     campo.remove();
   });
 });
@@ -248,7 +248,7 @@ describe("o botão direito", () => {
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Ver na vista de dia" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "12 de Setembro 2026" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "12 de setembro de 2026" })).toBeInTheDocument(),
     );
   });
 

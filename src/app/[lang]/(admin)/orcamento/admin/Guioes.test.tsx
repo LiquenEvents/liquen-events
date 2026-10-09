@@ -394,9 +394,12 @@ describe("Timelines — abrir e editar", () => {
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
 
+    // `findByRole` e não `findByLabelText`: sob carga, o rótulo pode achar
+    // primeiro o `<select>` provisório que o `Escolha` desenha antes de montar,
+    // e o `escolher` operava nele em vez de no controlo verdadeiro.
     await escolher(
       user,
-      await screen.findByLabelText("Juntar um modelo a esta timeline"),
+      await screen.findByRole("combobox", { name: "Juntar um modelo a esta timeline" }),
       MODELOS_DA_CASA[0].nome,
     );
 
@@ -404,10 +407,17 @@ describe("Timelines — abrir e editar", () => {
      * Dois sítios a dizer coisas diferentes sobre o mesmo dia é o defeito que
      * esta vista existe para não ter. Sem a escrita de volta na lista, a
      * pastilha «Sem timeline» ficava colada à linha até alguém recarregar.
+     *
+     * Mesmo remédio que o caso de cima, pela mesma razão: falhava em passagens
+     * completas (e já falhava na de 8 de outubro), porque o `waitFor` contava
+     * num relógio falso que o laço esfomeado não fazia andar. Faz-se andar o
+     * relógio, e depois olha-se — sem esperar.
      */
-    await waitFor(() => {
-      const linha = screen.getByRole("button", { name: /Carla e Diogo/ });
-      expect(within(linha).queryByText("Sem timeline")).toBeNull();
-    });
+    for (let i = 0; i < 40 && gravados.length === 0; i++) {
+      await vi.advanceTimersByTimeAsync(25);
+    }
+    expect(gravados, "a escolha do modelo não chegou a gravar").toHaveLength(1);
+    const linha = screen.getByRole("button", { name: /Carla e Diogo/ });
+    expect(within(linha).queryByText("Sem timeline")).toBeNull();
   });
 });

@@ -32,6 +32,7 @@ import EventTimeline, { GRAVAR_AO_ESCREVER_MS } from "./EventTimeline";
 import { BotaoWhatsApp } from "./ui/BotaoWhatsApp";
 import { timelineParaWhatsApp } from "@/lib/whatsapp";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { diaPorExtenso } from "@/lib/data-curta";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -230,12 +231,10 @@ function Pastilha({ sinal }: { sinal: SinalDoGuiao }) {
   );
 }
 
-/** «sábado, 12 de junho» — a data como se diz ao telefone. */
-function dataPorExtenso(data: string): string {
-  const d = new Date(`${data}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return data;
-  return d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
-}
+/** «sábado, 12 de junho» — a data como se diz ao telefone. Uma fonte só para
+ *  esta frase em todo o back office (`diaPorExtenso`), que não depende do fuso
+ *  nem dos dados de língua da máquina. */
+const dataPorExtenso = (data: string) => diaPorExtenso(data);
 
 /**
  * «Hoje», «amanhã», «daqui a 12 dias», «há 3 dias».
@@ -1062,7 +1061,7 @@ function LinhaDeGuiao({
       onClick={aoAbrir}
       aria-label={nome}
       aria-current={activo ? "true" : undefined}
-      className={`alvo-toque w-full rounded-[var(--bo-raio-conteudo)] border p-3 text-left ${ESTADO} ${PRESSAO} ${
+      className={`alvo-toque block w-full rounded-[var(--bo-raio-conteudo)] border p-3 text-left ${ESTADO} ${PRESSAO} ${
         activo
           ? "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)]"
           : "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:bg-[var(--bo-tinta-3)]"

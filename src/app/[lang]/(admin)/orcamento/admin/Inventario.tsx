@@ -24,6 +24,7 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 import ModoDeCarga from "./ModoDeCarga";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { unidadeNaContagem } from "@/lib/unidade-na-contagem";
 
 /* Os dois ícones da linha, escritos uma vez: servem os botões soltos da tabela
    do computador e os itens do menu «⋯» de quem não tem rato. */
@@ -928,7 +929,12 @@ export default function Inventario() {
                       <div className="shrink-0 text-right">
                         <p className="tabular-nums text-[var(--bo-tinta-72)]">
                           {i.quantity}
-                          {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
+                          {i.unit ? (
+                            <span className="text-foreground/35">
+                              {" "}
+                              {unidadeNaContagem(i.quantity, i.unit)}
+                            </span>
+                          ) : null}
                         </p>
                         <div className="mt-1">
                           <ConditionChip condition={i.condition} />
@@ -998,7 +1004,12 @@ export default function Inventario() {
                     ) : (
                       <span className="whitespace-nowrap tabular-nums text-[var(--bo-tinta-72)]">
                         {i.quantity}
-                        {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
+                        {i.unit ? (
+                          <span className="text-foreground/35">
+                            {" "}
+                            {unidadeNaContagem(i.quantity, i.unit)}
+                          </span>
+                        ) : null}
                       </span>
                     ),
                 },

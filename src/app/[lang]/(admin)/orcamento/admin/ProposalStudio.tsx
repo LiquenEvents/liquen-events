@@ -3123,7 +3123,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // A mensagem do envio conta como trabalho por gravar: sem ela nesta lista, o
     // indicador dizia «guardado às 14:32» com o texto dela ainda por escrever no
     // rascunho — e é essa frase que faz uma pessoa fechar o portátil descansada.
-  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente, bilingue, nadaPorGravar]);
+    // `marcaDoTrabalho` na lista não muda nada: o `nadaPorGravar` já depende
+    // dela, e o efeito já corria quando ela mudava. Fica escrita para a regra
+    // das dependências não ter de ser lida duas vezes.
+  }, [
+    doc,
+    assetUrls,
+    themeOrigins,
+    refEdited,
+    mensagemAoCliente,
+    bilingue,
+    nadaPorGravar,
+    marcaDoTrabalho,
+  ]);
 
   useEffect(() => {
     if (!hydrated.current) return;
