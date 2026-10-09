@@ -173,6 +173,42 @@ export async function coresDeCaminhos(paths: readonly string[]): Promise<Map<str
   return saida;
 }
 
+/**
+ * OS BORRÕES E AS CORES de um conjunto de caminhos, na MESMA leitura.
+ *
+ * A lista de temas precisa dos dois para cada capa — o borrão que se pinta no
+ * primeiro fotograma e a cor que pinta o lugar quando nem o borrão existe — e
+ * os dois vivem na mesma linha da mesma tabela. Chamar o `lqipsDeCaminhos` e o
+ * `coresDeCaminhos` lado a lado lia cada pasta DUAS vezes: com trinta e seis
+ * temas, trinta e seis consultas a mais para trazer uma coluna. Aqui é uma
+ * consulta por pasta, e as duas colunas saem dela.
+ *
+ * Mesmas promessas dos gémeos: uma foto sem linha (ou sem a coluna) não entra
+ * no mapa, e nunca lança — os dois são acessórios.
+ */
+export async function lqipsECoresDeCaminhos(
+  paths: readonly string[],
+): Promise<{ lqips: Map<string, string>; cores: Map<string, string> }> {
+  const lqips = new Map<string, string>();
+  const cores = new Map<string, string>();
+  if (paths.length === 0) return { lqips, cores };
+  const pastas = new Set(paths.map((p) => p.split("/")[0]).filter(Boolean));
+  const querido = new Set(paths);
+  try {
+    const listas = await Promise.all(
+      [...pastas].map((pasta) => repo.where("pasta", pasta, (f) => f.pasta === pasta)),
+    );
+    for (const f of listas.flat()) {
+      if (!querido.has(f.path)) continue;
+      if (f.lqip) lqips.set(f.path, f.lqip);
+      if (f.cor) cores.set(f.path, f.cor);
+    }
+  } catch {
+    /* sem borrões nem cores — os cartões desenham-se na mesma */
+  }
+  return { lqips, cores };
+}
+
 /** A forma de uma fotografia, em pixels do ficheiro guardado. */
 export interface FormaDaFoto {
   largura: number;

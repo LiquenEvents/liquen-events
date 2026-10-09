@@ -842,6 +842,36 @@ body:is(.admin-mode, :has([data-admin-mode])) {
     0 24px 48px -12px var(--bo-sombra-tinta-3), 0 8px 16px -8px var(--bo-sombra-tinta-4);
 
   /* ══════════════════════════════════════════════════════════════════════
+     E UMA TERCEIRA, DE REPOUSO — SÓ PARA O CARTÃO QUE SE ABRE
+     ══════════════════════════════════════════════════════════════════════
+
+     O bloco de cima tirou a sombra a TODO o conteúdo (o censo está no
+     `sombras-do-back-office.test.ts`), com duas razões: o chão era branco e
+     o fio fazia o trabalho todo, e uma sombra de `0 1px 2px / 0,04` não se
+     via. Os dois documentos dela, que vieram depois, pedem o contrário para
+     um caso: «em claro a elevação faz-se por SOMBRA» (Parte 5.3 do
+     `docs/DESIGN-SYSTEM.md`, que dá a `--shadow-raised`) e, no cartão de
+     tema, «sombra `--shadow-raised`, sem borda» com «borda a marcar
+     elevação» na lista de proibições (Partes 3 e 9 do
+     `docs/APPLE-TEMAS.md`). E a primeira razão caiu entretanto: o chão foi
+     tingido («tinta o chão, quero o vidro», `--bo-chao`), o branco do cartão
+     já se distingue dele, e o fio deixou de ser a única coisa a separar.
+
+     Não é uma família nova: são as MESMAS tintas (`--bo-sombra-tinta-*`), e
+     por isso o modo escuro vem de graça pelo `light-dark()` do fim do
+     ficheiro. A `--shadow-raised` do documento (6 % e 4 %) é a que este
+     ficheiro já deu como invisível; os 8 % e 10 % são os dois degraus de
+     tinta mais fracos que existem.
+
+       REPOUSO   o cartão parado — uma aresta em baixo e uma penumbra curta.
+       ERGUIDA   o mesmo cartão sob o rato: «Hover: elevação» (Parte 3), e
+                 nunca `scale`. Fica ABAIXO da suspensa (queda 6 contra 12):
+                 um cartão que se levanta não é um menu que flutua. */
+  --bo-sombra-repouso: 0 1px 2px var(--bo-sombra-tinta-2), 0 2px 8px -2px var(--bo-sombra-tinta-4);
+  --bo-sombra-erguida:
+    0 6px 16px -6px var(--bo-sombra-tinta-1), 0 2px 4px -2px var(--bo-sombra-tinta-2);
+
+  /* ══════════════════════════════════════════════════════════════════════
      O MATERIAL DO QUE APARECE POR CIMA
      ══════════════════════════════════════════════════════════════════════
 
@@ -3991,6 +4021,37 @@ body[data-menu-open] .whatsapp-fixed {
    fotograma, que é o oposto do que esta casa promete no telemóvel dela. */
 .bo-entrada-fundo {
   --bo-entrada-y: 0px;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   O MENU CRESCE A PARTIR DE QUEM O ABRIU
+   ══════════════════════════════════════════════════════════════════════════
+
+   «O menu cresce a partir do botão, com `--ease-quick`, e `transform-origin`
+   no canto de origem» (Parte 9.7 do `docs/DESIGN-SYSTEM.md`), e a tabela da
+   Parte 5 do `docs/APPLE-TEMAS.md` dá-lhe o número: 325 ms. Os dois menus da
+   casa (o do «⋯», `ui/MenuDeAccoes.tsx`, e o do botão direito,
+   `MenuDeContexto.tsx`) entravam com a `.bo-entrada` nua — 240 ms de
+   deslocação, sem escala nenhuma, e por isso sem sítio de onde crescer.
+
+   Isto não é uma entrada nova: é a MESMA `.bo-entrada` (o mesmo `@keyframes`,
+   os mesmos 4 px), com três coisas reescritas a partir de tokens que já
+   existem — a duração (`--transition-duration-quick`), a curva (`--ease-
+   quick`, a mola) e a escala de chegada das caixas convocadas
+   (`--bo-escala-chegada`). O `transform-origin` é de quem a usa: o «⋯» cresce
+   do canto de cima à direita, o do botão direito do ponteiro.
+
+   Quem pediu menos movimento não vê nada disto: o `animation: none` da regra
+   de baixo apaga o nome da animação, e sem nome não há duração nem curva. */
+.bo-entrada-menu {
+  --bo-entrada-escala: var(--bo-escala-chegada);
+  animation-duration: var(--transition-duration-quick);
+}
+/* A mola é um `linear()`; quem não o entende fica com a curva da
+   `.bo-entrada` — o mesmo recuo da regra da folha, aqui em cima. */
+@supports (animation-timing-function: linear(0, 1)) {
+  .bo-entrada-menu {
+    animation-timing-function: var(--ease-quick);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .bo-entrada {

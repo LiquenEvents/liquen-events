@@ -72,6 +72,13 @@ export async function usoDosTemas(agora = Date.now()): Promise<Map<string, numbe
     const por = new Map<string, number>();
     for (const p of propostas) {
       if (!p.doc) continue;
+      // O cabeçalho deste ficheiro diz que os rascunhos não entram, e durante
+      // meses o ciclo não o verificava: um tema escolhido num rascunho a meio
+      // contava como «usado», e o filtro «Nunca usado» (critério 7 do
+      // `docs/APPLE-TEMAS.md`: «devolve exatamente os temas com zero
+      // propostas») escondia-o. A regra está escrita lá em cima; aqui só se
+      // cumpre.
+      if (p.status === "rascunho") continue;
       // Por PROPOSTA: um tema com catorze fotos no mesmo mood board conta uma
       // vez. É para isso que o conjunto existe.
       const temas = new Set<string>();

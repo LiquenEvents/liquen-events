@@ -1,6 +1,14 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as TeclaDoReact,
+  type ReactNode,
+} from "react";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
 import { SAIDA, useSaidaDeUmSo } from "./saida";
@@ -33,6 +41,40 @@ import { SAIDA, useSaidaDeUmSo } from "./saida";
  * JavaScript, zero piscar, e o mesmo desenho do lado do servidor.
  */
 
+/** Quanto o painel se afasta da borda da janela — o mesmo 8 do `MenuDeContexto`. */
+const MARGEM_DA_JANELA = 8;
+
+/** O glifo do «⋯», o mesmo nos dois tamanhos. */
+const RETICENCIAS = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <circle cx="5" cy="12" r="1.6" />
+    <circle cx="12" cy="12" r="1.6" />
+    <circle cx="19" cy="12" r="1.6" />
+  </svg>
+);
+
+/**
+ * ── ESCONDIDO EM REPOUSO, SÓ COM RATO, E DE VOLTA COM O FOCO NA LINHA ─────
+ *
+ * Eram três maneiras de reaparecer: o rato sobre o `group` (a linha, o
+ * cartão), e o foco de teclado no PRÓPRIO botão. Faltava a do meio: o foco de
+ * teclado noutra coisa da mesma linha. No cartão de tema: o Tab pousa
+ * primeiro no botão do cartão (que abre o tema) e o «⋯» continuava a zero de
+ * opacidade — quem anda de teclado não tinha como saber que havia um menu ali
+ * até o Tab seguinte cair num botão que não se via. O `docs/APPLE-TEMAS.md`
+ * (Parte 3) di-lo à letra: «`⋯` só aparece no hover OU QUANDO O CARTÃO TEM
+ * FOCO DE TECLADO — senão é inacessível por teclado».
+ *
+ * `group-focus-within` e não `group-has-[:focus-visible]`: um clique de rato
+ * num controlo da linha também revela o «⋯», e isso não é defeito — é o mesmo
+ * que o rato por cima já fazia. Todos os `group` que hoje embrulham um
+ * `MenuDeAccoes` são do tamanho de UMA linha ou de UM cartão (Tarefas,
+ * Fornecedores, TabelaOuCartoes, Temas), portanto o foco numa não acende as
+ * outras.
+ */
+const ESCONDIDO_COM_RATO =
+  "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100";
+
 export interface AccaoDeItem {
   id: string;
   rotulo: string;
@@ -43,6 +85,105 @@ export interface AccaoDeItem {
    *  espera de acontecer. */
   destrutiva?: boolean;
   desativada?: boolean;
+  /**
+   * Um filete ANTES deste item — o começo de um grupo.
+   *
+   * «Agrupa com separadores» (Parte 9.7 do `docs/DESIGN-SYSTEM.md`): o menu
+   * do tema tem três grupos («Abrir · Adicionar… · Renomear… · Definir
+   * capa… | Favorito · Arquivar · Juntar… | Eliminar…»), e o filete que já existia só sabia
+   * separar a primeira destrutiva. Este é declarado por quem escreve a lista,
+   * porque só ela sabe onde acaba um grupo.
+   *
+   * Desenha-se com `role="separator"` — é estrutura que o leitor de ecrã
+   * anuncia, e não enfeite. Ignorado no primeiro item desenhado (um filete
+   * no topo não separa nada). Num item que é também a primeira destrutiva
+   * desenha-se UM filete, este. Quem não usa o campo fica com o desenho de
+   * sempre, sem `role="separator"` nenhum.
+   */
+  separadorAntes?: boolean;
+}
+
+/**
+ * O filete entre dois grupos de um menu — o mesmo traço nos dois menus (o do
+ * «⋯» e o do botão direito), com a folga da pastilha para as três fronteiras
+ * verticais (moldura, filete, pastilha) lerem como uma coluna só.
+ *
+ * `semantico` diz se é um separador A SÉRIO (`separadorAntes`) ou o filete
+ * antigo antes da primeira destrutiva, que continua decorativo para não mudar
+ * o que os outros ecrãs dizem a quem ouve.
+ */
+export function SeparadorDoMenu({ semantico }: { semantico: boolean }) {
+  return (
+    <div
+      {...(semantico ? { role: "separator" } : { "aria-hidden": "true" })}
+      className="mx-2.5 my-1 border-t border-[var(--bo-hairline)]"
+    />
+  );
+}
+
+/**
+ * Junta grupos de acções numa lista, com o `separadorAntes` no primeiro item
+ * de cada grupo a seguir ao primeiro.
+ *
+ * Os grupos podem vir vazios ou com itens escondidos («oculta itens
+ * indisponíveis», Parte 9.8): o filete vai sempre no primeiro item QUE FICOU,
+ * e um grupo vazio não deixa dois filetes seguidos. Escrever o campo à mão em
+ * cada item obrigava cada lista a saber qual dos seus itens sobreviveu.
+ */
+export function emGrupos(...grupos: readonly (readonly AccaoDeItem[])[]): AccaoDeItem[] {
+  const lista: AccaoDeItem[] = [];
+  for (const grupo of grupos) {
+    grupo.forEach((a, i) =>
+      lista.push(i === 0 && lista.length > 0 ? { ...a, separadorAntes: true } : a),
+    );
+  }
+  return lista;
+}
+
+/** O filete que vai antes do item `i` de uma lista desenhada, se algum. */
+export function separadorAntesDe(
+  itens: readonly AccaoDeItem[],
+  i: number,
+): "semantico" | "decorativo" | null {
+  if (i === 0) return null;
+  const a = itens[i];
+  if (a.separadorAntes) return "semantico";
+  const primeiraDestrutiva = a.destrutiva && !itens.slice(0, i).some((x) => x.destrutiva);
+  return primeiraDestrutiva ? "decorativo" : null;
+}
+
+/**
+ * ── AS SETAS DENTRO DE UM MENU ─────────────────────────────────────────────
+ *
+ * ↓ e ↑ andam pelos itens (e dão a volta), Home e End vão às pontas. Os
+ * filetes não contam (não são `menuitem`) e os itens desactivados também não.
+ * É o teclado que o padrão de menu do APG pede, e é o mesmo nos dois menus.
+ *
+ * `stopPropagation` de propósito: por cima de um menu há ecrãs com as suas
+ * próprias setas (a lista das Tarefas anda de linha em linha com elas). Uma
+ * seta dentro do menu é do menu; deixá-la subir punha a lista a saltar por
+ * baixo dele.
+ */
+export function teclasDoMenu(e: TeclaDoReact<HTMLElement>): void {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+  const itens = Array.from(
+    e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'),
+  );
+  if (itens.length === 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const agora = itens.indexOf(document.activeElement as HTMLButtonElement);
+  const proximo =
+    e.key === "Home"
+      ? 0
+      : e.key === "End"
+        ? itens.length - 1
+        : e.key === "ArrowDown"
+          ? (agora + 1) % itens.length
+          : agora <= 0
+            ? itens.length - 1
+            : agora - 1;
+  itens[proximo].focus();
 }
 
 export interface MenuDeAccoesProps {
@@ -53,6 +194,40 @@ export interface MenuDeAccoesProps {
   /** Quantas acções aparecem soltas (em vez de dentro do menu) quando há
    *  espaço. As restantes ficam no "…". */
   soltasNoEcraGrande?: number;
+  /**
+   * O tamanho do «⋯».
+   *
+   *  · `normal` — 44 px, o de sempre: a linha de uma tabela, um cartão de
+   *    lista. O alvo e o desenho são a mesma caixa.
+   *  · `pequeno` — 28 px VISÍVEIS dentro de 40 px de ALVO. É o «⋯» que pousa
+   *    em cima de uma fotografia: «botão glass, 28px» e «o `⋯` sobre a imagem
+   *    tem 28 px visuais e 40 px de alvo» (`docs/APPLE-TEMAS.md`, Partes 3 e
+   *    7). Um círculo de 44 tapava um quarto da largura de um cartão
+   *    compacto; o de 28 deixa ver a fotografia, e o alvo não encolhe com
+   *    ele. No dedo, o `.alvo-toque` leva o alvo aos 44 da casa e a pastilha
+   *    continua nos 28.
+   *
+   * Só o gatilho muda: as acções soltas (`soltasNoEcraGrande`) são botões
+   * de linha e ficam nos 44.
+   */
+  tamanho?: "normal" | "pequeno";
+  /**
+   * O material da pastilha visível em `pequeno` — no cartão de tema, o vidro
+   * claro. Vai DENTRO do botão, e não à volta dele, para esconder-e-mostrar
+   * com o mesmo `opacity` do glifo: um véu escuro parado com um glifo
+   * invisível lá dentro era o defeito que a caixa de fora obrigava a evitar
+   * à mão. Sem `pequeno` não é usado.
+   */
+  pastilha?: string;
+  /**
+   * O «⋯» à vista sempre, também com rato.
+   *
+   * O esconder-no-hover é para o «⋯» de uma LINHA ou de um CARTÃO, que tem um
+   * `group` à volta para o fazer voltar. No cabeçalho de uma pasta não há
+   * linha nenhuma: o «⋯» é o sítio das acções do tema, e escondido seria um
+   * botão que só aparece a quem já sabe que lá está.
+   */
+  sempreVisivel?: boolean;
   className?: string;
 }
 
@@ -73,11 +248,51 @@ export function MenuDeAccoes({
   accoes,
   sobre,
   soltasNoEcraGrande = 0,
+  tamanho = "normal",
+  pastilha,
+  sempreVisivel = false,
   className,
 }: MenuDeAccoesProps) {
+  const pequeno = tamanho === "pequeno";
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
   const abridorRef = useRef<HTMLButtonElement>(null);
+  const painelRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * ── E SE NÃO COUBER POR BAIXO, ABRE PARA CIMA ────────────────────────────
+   *
+   * O painel pende do «⋯» (`top-full`). Num cartão da segunda fila de uma
+   * grelha a 1440 × 900, o menu do tema (nove itens, ~430 px) passava o fundo
+   * da janela e ficava por baixo da barra de navegação — visto na captura da
+   * Fase 2. Mede-se ao abrir, antes de pintar, e só se vira quando por baixo
+   * não cabe E por cima cabe; escreve-se no nó (é posicionar um elemento
+   * medido, como no `MenuDeContexto`) e a origem da entrada vira com ele.
+   */
+  useLayoutEffect(() => {
+    const el = painelRef.current;
+    if (!aberto || !el) return;
+    // Reaberto a meio da saída é o mesmo nó: mede-se sempre a partir de baixo.
+    for (const p of ["top", "bottom", "marginTop", "marginBottom", "transformOrigin"] as const) {
+      el.style[p] = "";
+    }
+    const r = el.getBoundingClientRect();
+    const abridor = abridorRef.current?.getBoundingClientRect();
+    if (!abridor || r.height === 0) return;
+    const naoCabeEmBaixo = r.bottom > window.innerHeight - MARGEM_DA_JANELA;
+    const cabeEmCima = abridor.top - r.height - MARGEM_DA_JANELA > 0;
+    if (naoCabeEmBaixo && cabeEmCima) {
+      el.style.top = "auto";
+      el.style.bottom = "100%";
+      el.style.marginTop = "0";
+      el.style.marginBottom = "0.25rem";
+      el.style.transformOrigin = "bottom right";
+    }
+  }, [aberto]);
+  /* O foco NÃO entra sozinho no menu ao abrir, e as setas no próprio «⋯»
+     não o abrem: há ecrãs (as Tarefas) em que ↓/↑ num botão de uma linha
+     anda de linha em linha, e o Tab a seguir ao «⋯» já cai no primeiro item.
+     As setas são de quem já está DENTRO do menu — ver `teclasDoMenu`. */
 
   // Reabrir a meio da saída traz o menu de volta: o `aberto` é que manda, e
   // não a marca — a regra vem de dentro do gancho.
@@ -150,7 +365,9 @@ export function MenuDeAccoes({
               ? "text-[var(--bo-perigo)] active:bg-[var(--bo-perigo)]/[0.12]"
               : "text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
             // O coração deste componente: só se esconde onde há mesmo rato.
-            "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
+            // E volta com o foco DENTRO da linha, não só sobre si — ver a nota
+            // `ESCONDIDO_COM_RATO`.
+            ESCONDIDO_COM_RATO,
           )}
         >
           {a.icone ?? a.rotulo.slice(0, 1)}
@@ -167,23 +384,36 @@ export function MenuDeAccoes({
             aria-expanded={aberto}
             onClick={() => setAberto((v) => !v)}
             className={cn(
-              `alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)] ${ESTADO} ${PRESSAO}`,
+              `alvo-toque flex items-center justify-center ${ESTADO} ${PRESSAO}`,
+              pequeno
+                ? /* O alvo de 40 é transparente e redondo (o anel de foco
+                     segue-o); quem se vê é a pastilha lá dentro. Sem a lavagem
+                     do `active:` — um quadrado cinzento de 40 px por cima de
+                     uma fotografia era um segundo desenho por trás do primeiro.
+                     A pressão continua a ser o `PRESSAO`. */
+                  "h-10 w-10 rounded-full"
+                : "h-11 w-11 rounded-lg text-[var(--bo-text-muted)] hover:text-[var(--bo-tinta-72)] active:bg-[var(--bo-tinta-10)]",
               // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
               // menu deixava o menu a flutuar sem nada que o segurasse.
-              aberto
-                ? "opacity-100"
-                : "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
+              aberto || sempreVisivel ? "opacity-100" : ESCONDIDO_COM_RATO,
             )}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <circle cx="5" cy="12" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="19" cy="12" r="1.6" />
-            </svg>
+            {pequeno ? (
+              <span
+                aria-hidden="true"
+                className={cn("flex h-7 w-7 items-center justify-center rounded-full", pastilha)}
+              >
+                {RETICENCIAS}
+              </span>
+            ) : (
+              RETICENCIAS
+            )}
           </button>
 
           {(aberto || aSairAgora) && (
             <div
+              ref={painelRef}
+              onKeyDown={teclasDoMenu}
               /* A SAIR, ISTO JÁ NÃO É UM MENU. O nó fica montado 200 ms para
                  ter o que animar, mas para quem ouve o ecrã e para quem anda de
                  Tab a escolha acabou no instante do gesto: sem `role`, sem
@@ -208,15 +438,24 @@ export function MenuDeAccoes({
                    num sítio só. */
                 "bo-material bo-material-desfoque p-[var(--bo-material-folga)]",
                 "shadow-[var(--bo-sombra-suspensa)]",
-                aSairAgora ? SAIDA : "bo-entrada",
+                /* ── CRESCE A PARTIR DO «⋯» ────────────────────────────────
+                   «Menu a abrir: 325 ms, `--ease-quick`, `transform-origin`
+                   no botão» (Parte 5 do `docs/APPLE-TEMAS.md`; Parte 9.7 do
+                   sistema de design). A `.bo-entrada-menu` só reescreve a
+                   duração, a curva e a escala da `.bo-entrada` com os tokens
+                   da casa — ver o `globals.css`. O painel pende do canto de
+                   cima à direita do «⋯» (`right-0 top-full`), e é desse canto
+                   que cresce. */
+                "origin-top-right",
+                aSairAgora ? SAIDA : "bo-entrada bo-entrada-menu",
               )}
             >
               {noMenu.map((a, i) => {
                 // Uma linha a separar antes da primeira destrutiva: é o que
                 // impede o toque distraído em "Eliminar" quando se queria
-                // "Duplicar", que fica logo por cima.
-                const primeiraDestrutiva =
-                  a.destrutiva && !noMenu.slice(0, i).some((x) => x.destrutiva);
+                // "Duplicar", que fica logo por cima. E uma no começo de cada
+                // grupo que a lista declare (`separadorAntes`).
+                const filete = separadorAntesDe(noMenu, i);
                 return (
                   <Fragment key={a.id}>
                     {/* ── O FILETE SAIU DE DENTRO DO ITEM ───────────────────
@@ -227,12 +466,7 @@ export function MenuDeAccoes({
                         Passa a ser um elemento seu, entre as duas linhas, com
                         a folga da pastilha — para as três fronteiras verticais
                         (moldura, filete, pastilha) lerem como uma coluna só. */}
-                    {primeiraDestrutiva && i > 0 && (
-                      <div
-                        aria-hidden="true"
-                        className="mx-2.5 my-1 border-t border-[var(--bo-hairline)]"
-                      />
-                    )}
+                    {filete && <SeparadorDoMenu semantico={filete === "semantico"} />}
                     <button
                       type="button"
                       role="menuitem"
@@ -245,7 +479,12 @@ export function MenuDeAccoes({
                         a.onAccao();
                       }}
                       className={cn(
-                        `alvo-toque flex w-full items-center gap-2.5 px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
+                        // `whitespace-nowrap`: um rótulo de menu não se parte
+                        // («Adicionar fotografias…» partia-se nos 192 px do
+                        // `min-w-48`) — é o menu que alarga. `justify-start`:
+                        // no dedo, o `.alvo-toque` centra o conteúdo, e os
+                        // itens apareciam centrados (visto a 390 na Fase 2).
+                        `alvo-toque flex w-full items-center justify-start gap-2.5 whitespace-nowrap px-2.5 py-2.5 text-left text-sm disabled:opacity-30 ${ESTADO} ${PRESSAO}`,
                         "rounded-[var(--bo-material-raio-pastilha)]",
                         /* ── A LINHA SOB O RATO É UMA PASTILHA CHEIA ────────
                            Era uma lavagem de 6% de preto (e de 7% de vermelho).

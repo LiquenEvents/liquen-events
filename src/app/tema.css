@@ -185,6 +185,15 @@
   /* ---------- FORMA ---------- */
   --radius-badge: 6px;
   --radius-control: 10px;
+  /* O mosaico de uma galeria — o cartão de tema, capa 4:3 em cima e nome por
+     baixo. Doze, e não os 16 do cartão: «Raio 12 px, sombra, sem borda»
+     (`docs/APPLE-TEMAS.md`, Parte 3, `ThemeCard`), e a decisão foi dela —
+     «sim à sombra, cantos a 12». Fica entre o controlo e o cartão porque é
+     isso que é: uma peça repetida numa grelha, mais pequena do que um painel
+     e maior do que um botão. As células de fotografia do tema aberto NÃO o
+     usam: a Parte 3 pede os 12 ao cartão e à imagem do Quick Look, e à
+     grelha de fotografias não pede raio nenhum. */
+  --radius-tile: 12px;
   --radius-card: 16px;
   --radius-panel: 20px;
   --radius-sheet: 26px;

@@ -239,7 +239,7 @@ async function abrirAPasta() {
     .getAllByRole("button", { name: /Clássico Intemporal/ })
     .find((b) => b.getAttribute("aria-haspopup") !== "menu")!;
   fireEvent.click(cartao);
-  await screen.findByRole("button", { name: "Eliminar tema" });
+  await screen.findByRole("button", { name: "Adicionar fotos" });
   await assentar();
 }
 

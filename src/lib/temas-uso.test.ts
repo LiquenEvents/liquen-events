@@ -26,8 +26,11 @@ vi.mock("@/lib/proposals-store", () => ({
 
 import { esquecerUsoDosTemas, usoDosTemas } from "./temas-uso";
 
-const proposta = (id: string, doc: unknown): Partial<Proposal> =>
-  ({ id, doc }) as Partial<Proposal>;
+const proposta = (
+  id: string,
+  doc: unknown,
+  status: Proposal["status"] = "enviada",
+): Partial<Proposal> => ({ id, doc, status }) as Partial<Proposal>;
 const foto = (tema: string, n: number) => `tema:${tema}/f${n}.jpg`;
 
 beforeEach(() => {
@@ -70,6 +73,22 @@ describe("a unidade é a proposta", () => {
 });
 
 describe("o que não conta", () => {
+  /**
+   * O cabeçalho do módulo promete-o («um rascunho é uma proposta a meio») e o
+   * ciclo não o cumpria. Sem isto, um tema escolhido num rascunho aberto
+   * desaparecia do filtro «Nunca usado».
+   */
+  it("um rascunho não conta", async () => {
+    st.propostas = [
+      proposta("p1", { moodBoards: [{ images: [foto("t-1", 1)] }] }, "rascunho"),
+      proposta("p2", { moodBoards: [{ images: [foto("t-2", 1)] }] }, "rascunho"),
+      proposta("p3", { coverImages: [foto("t-2", 2)] }, "aceite"),
+    ];
+    const r = await usoDosTemas();
+    expect(r.get("t-1")).toBeUndefined();
+    expect(r.get("t-2")).toBe(1);
+  });
+
   it("uma proposta sem documento não conta", async () => {
     st.propostas = [proposta("p1", undefined)];
     expect((await usoDosTemas()).size).toBe(0);

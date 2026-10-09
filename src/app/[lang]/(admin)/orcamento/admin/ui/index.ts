@@ -88,7 +88,7 @@ export type { ListaAgrupadaProps, LinhaAgrupadaProps } from "./ListaAgrupada";
 export { EsqueletoDeCor } from "../Skeleton";
 export type { EsqueletoDeCorProps } from "../Skeleton";
 
-export { MenuDeAccoes } from "./MenuDeAccoes";
+export { MenuDeAccoes, emGrupos } from "./MenuDeAccoes";
 export type { MenuDeAccoesProps, AccaoDeItem } from "./MenuDeAccoes";
 
 export { CampoData, porExtenso } from "./CampoData";

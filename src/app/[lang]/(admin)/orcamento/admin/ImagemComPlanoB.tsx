@@ -22,6 +22,16 @@ import { useState } from "react";
  * único que existe de certeza. Troca-se UMA vez: se o original também falhar,
  * fica o fundo, porque insistir era um ciclo.
  *
+ * ── E QUANDO O FUNDO FICA, A IMAGEM SAI ─────────────────────────────────
+ *
+ * «Nunca ícone partido» (T1/T2 do `docs/PROPOSTAS-E-TEMAS-APPLE.md`). Com as
+ * duas fontes a falhar, o `<img>` continuava no ecrã, pintado a 100 — e um
+ * `<img>` que falhou é o navegador a desenhar o seu ícone de imagem partida
+ * (ou o contorno dela) por cima do borrão. Passa a sair: no lugar dele fica um
+ * `<span>` com a MESMA forma e o borrão no fundo, e sem borrão fica
+ * transparente — vê-se o que quem a usa puser por trás (no cartão de tema e na
+ * coluna, o lugar pintado com a cor da fotografia, `EsqueletoDeCor`).
+ *
  * Vive num ficheiro só para os dois ecrãs que mostram derivadas (a Biblioteca
  * de Temas e a revisão de etiquetas) partilharem o mesmo plano B — duas cópias
  * eram duas oportunidades de só uma delas o ter.
@@ -79,6 +89,8 @@ export default function ImagemComPlanoB({
 }) {
   const [actual, setActual] = useState(src);
   const [pintada, setPintada] = useState(false);
+  /** As duas fontes falharam — ver «E QUANDO O FUNDO FICA, A IMAGEM SAI». */
+  const [falhou, setFalhou] = useState(false);
   // Um `src` novo (outra capa escolhida, outra listagem) recomeça do princípio:
   // sem isto, uma imagem que caiu para o original ficava lá presa.
   const [visto, setVisto] = useState(src);
@@ -86,11 +98,31 @@ export default function ImagemComPlanoB({
     setVisto(src);
     setActual(src);
     setPintada(false);
+    setFalhou(false);
   }
   /* Depois de cair para o plano B, o AVIF sai da mesa: a oferta era para a
      derivada que falhou, e insistir nela era oferecer outra vez o que não
      está lá. */
   const oferta = avif && actual === src ? avif : undefined;
+
+  /* O borrão vai no FUNDO do próprio `<img>`, e não num irmão por baixo:
+     assim herda o `object-cover` e o arredondamento da célula sem precisar
+     de saber nada sobre o desenho de quem o usa — e os cartões, a grelha e
+     as tiras têm formas diferentes. */
+  const borrao = lqip
+    ? {
+        backgroundImage: `url("${lqip}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : undefined;
+
+  if (falhou) {
+    // A mesma caixa (as classes de quem a usa dão-lhe a forma), sem `<img>`.
+    return (
+      <span aria-hidden data-imagem-falhou className={`${className ?? ""} block`} style={borrao} />
+    );
+  }
 
   const imagem = (
     // eslint-disable-next-line @next/next/no-img-element
@@ -116,23 +148,12 @@ export default function ImagemComPlanoB({
       onLoad={() => setPintada(true)}
       onError={() => {
         if (planoB && actual !== planoB) setActual(planoB);
-        // Se nem o plano B abriu, o borrão fica: é melhor do que um vazio, e é
-        // a única coisa que ainda diz de que cor era a fotografia.
-        else setPintada(true);
+        // Se nem o plano B abriu, o borrão fica — mas sem o `<img>` partido
+        // por cima dele. É melhor do que um vazio, e é a única coisa que ainda
+        // diz de que cor era a fotografia.
+        else setFalhou(true);
       }}
-      /* O borrão vai no FUNDO do próprio `<img>`, e não num irmão por baixo:
-         assim herda o `object-cover` e o arredondamento da célula sem precisar
-         de saber nada sobre o desenho de quem o usa — e os cartões, a grelha e
-         as tiras têm formas diferentes. */
-      style={
-        lqip
-          ? {
-              backgroundImage: `url("${lqip}")`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }
-          : undefined
-      }
+      style={borrao}
       /* ── E A FOTOGRAFIA ASSENTA SEMPRE, TENHA OU NÃO BORRÃO ──────────────
          Era `pintada || !lqip`: sem `lqip` a célula nascia a 100 e a fotografia
          APARECIA num fotograma, por cima do fundo neutro. Com borrão havia

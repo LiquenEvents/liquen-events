@@ -11,6 +11,7 @@ import {
 } from "@/lib/theme-storage";
 import { BUCKET_FILE_SIZE_LIMIT, UPLOAD_MIME_TYPES } from "@/lib/proposal-storage";
 import { getSupabase, isDatabaseConfigured } from "@/lib/supabase";
+import { MINIATURA } from "@/lib/derivadas-medidas";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -50,14 +51,14 @@ export const maxDuration = 60;
  */
 
 /**
- * A miniatura tem de sair IGUAL à que o navegador faz (`image-prep.ts`:
- * THUMB_EDGE = 400, THUMB_QUALITY = 0,72), senão a grelha ficava com dois
- * tamanhos de miniatura conforme a foto fosse antiga ou nova. Estão repetidos
- * aqui de propósito: `image-prep.ts` é um módulo "use client" e não tem nada
- * que ser importado por uma rota.
+ * O lado e a qualidade da miniatura são a `MINIATURA` partilhada
+ * (`derivadas-medidas.ts`, 400 px e q78) — os MESMOS do lote das derivadas e
+ * do `scripts/derivadas-em-falta.mjs`. Eram números próprios (400 e q72,
+ * copiados do `image-prep.ts` do navegador), e a mesma fotografia saía com
+ * duas qualidades conforme a miniatura tivesse sido feita aqui ou no lote. O
+ * formato continua JPEG: é o que esta rota sempre gravou, na chave do
+ * original.
  */
-const THUMB_EDGE = 400;
-const THUMB_QUALITY = 72;
 
 /**
  * Quantas fotos se EXAMINAM por pedido. Examinar é barato (uma listagem de
@@ -73,7 +74,9 @@ const SCAN_WINDOW = 200;
  * q72 custa 37 ms de CPU (mediana de 12; o `sharp` desce a resolução ainda
  * dentro do descodificador de JPEG, por isso nem chega a montar a imagem
  * grande em memória) e sai com ~29 KB — o mesmo tamanho da miniatura que o
- * navegador faz. Um lote de 8 com três em voo são 127 ms de CPU.
+ * navegador faz. Um lote de 8 com três em voo são 127 ms de CPU. (Medido a
+ * q72, antes de a rota passar à `MINIATURA` de q78; a q78 o ficheiro sai um
+ * pouco maior e o CPU é da mesma ordem — não foi remedido.)
  *
  * Ou seja: o custo de um lote NÃO é o `sharp`, são os 8 descarregamentos de
  * 2,6 MB entre o Storage e a função. Oito é o número que mantém cada pedido
@@ -185,8 +188,8 @@ async function makeThumb(path: string): Promise<boolean> {
       // `rotate()` sem argumentos = aplica a orientação do EXIF. Sem isto uma
       // foto de telemóvel deitada aparecia deitada só na miniatura.
       .rotate()
-      .resize(THUMB_EDGE, THUMB_EDGE, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: THUMB_QUALITY, progressive: false, chromaSubsampling: "4:2:0" })
+      .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: MINIATURA.qualidade, progressive: false, chromaSubsampling: "4:2:0" })
       .toBuffer();
     if (thumb.byteLength === 0 || thumb.byteLength > MAX_THUMB_BYTES) return false;
     const { error } = await sb.storage
