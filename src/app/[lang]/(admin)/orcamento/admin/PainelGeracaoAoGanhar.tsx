@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import type { PreviaGeracaoDoEvento, ResultadoGeracaoDoEvento } from "@/lib/semear-producao";
+import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import { Button, Card } from "./ui";
 
 /**
@@ -46,22 +47,61 @@ interface Props {
 
 type Estado =
   | { fase: "a_carregar" }
-  | { fase: "erro"; mensagem: string }
+  | { fase: "erro"; mensagem: string; repetir: boolean }
   | { fase: "previa"; previa: PreviaGeracaoDoEvento }
   | { fase: "a_gerar"; previa: PreviaGeracaoDoEvento }
   | { fase: "gerado"; resultado: ResultadoGeracaoDoEvento };
 
+/**
+ * ── «FAILED TO FETCH», EM INGLÊS, NUM ECRÃ EM PORTUGUÊS ────────────────────
+ * O `catch` mostrava o `e.message` tal como vinha — e quando a rede cai, o que
+ * vem é o `TypeError` do próprio browser. MEDIDO na passagem de 9 de outubro.
+ * As frases passam a ser as da casa (`porque-falhou.ts`): o que aconteceu,
+ * porquê e o que fazer, e se repetir tem alguma hipótese de funcionar.
+ */
+class FalhaDoPedido extends Error {
+  constructor(readonly falha: Falha) {
+    super(falha.mensagem);
+  }
+}
+
 async function pedir(id: string, acao: "prever" | "gerar") {
-  const res = await fetch(`/api/orcamento/${id}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ acao }),
-  });
+  const oQue = acao === "prever" ? "ver o que falta gerar" : "gerar a produção";
+  let res: Response;
+  try {
+    res = await fetch(`/api/orcamento/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao }),
+    });
+  } catch {
+    throw new FalhaDoPedido(porqueRebentou(oQue));
+  }
   if (!res.ok) {
     const corpo = await res.json().catch(() => null);
-    throw new Error((corpo && corpo.error) || `O servidor respondeu ${res.status}`);
+    throw new FalhaDoPedido(porqueFalhou(oQue, res, corpo));
   }
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    throw new FalhaDoPedido(porqueRebentou(oQue));
+  }
+}
+
+/** O estado de erro a partir do que o `catch` apanhou. */
+function erroDe(e: unknown, reserva: string): Extract<Estado, { fase: "erro" }> {
+  if (e instanceof FalhaDoPedido) {
+    return { fase: "erro", mensagem: e.falha.mensagem, repetir: e.falha.vaidaAdianteRepetir };
+  }
+  if (e instanceof FormaInesperada) return { fase: "erro", mensagem: e.message, repetir: true };
+  return { fase: "erro", mensagem: reserva, repetir: true };
+}
+
+/** A única outra coisa que se atira daqui — escrita em casa, em português. */
+class FormaInesperada extends Error {
+  constructor() {
+    super("O servidor respondeu com uma forma inesperada. Recarrega a página e repete.");
+  }
 }
 
 /**
@@ -101,10 +141,10 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
   const buscarPrevia = useCallback(async () => {
     try {
       const previa = await pedir(quote.id, "prever");
-      if (!ehPrevia(previa)) throw new Error("O servidor respondeu com uma forma inesperada.");
+      if (!ehPrevia(previa)) throw new FormaInesperada();
       setEstado({ fase: "previa", previa });
     } catch (e) {
-      setEstado({ fase: "erro", mensagem: e instanceof Error ? e.message : "Falhou a prévia." });
+      setEstado(erroDe(e, "Não deu para ver o que falta gerar. Repete daqui a pouco."));
     }
   }, [quote.id]);
 
@@ -125,15 +165,11 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
     setEstado({ fase: "a_gerar", previa: estado.previa });
     try {
       const resultado = await pedir(quote.id, "gerar");
-      if (!ehResultado(resultado))
-        throw new Error("O servidor respondeu com uma forma inesperada.");
+      if (!ehResultado(resultado)) throw new FormaInesperada();
       setEstado({ fase: "gerado", resultado });
       onGerado?.(resultado);
     } catch (e) {
-      setEstado({
-        fase: "erro",
-        mensagem: e instanceof Error ? e.message : "Falhou a geração.",
-      });
+      setEstado(erroDe(e, "Não deu para gerar a produção. Repete daqui a pouco."));
     }
   }
 
@@ -159,9 +195,13 @@ export default function PainelGeracaoAoGanhar({ quote, onGerado }: Props) {
       {estado.fase === "erro" && (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-[var(--bo-perigo)]">{estado.mensagem}</p>
-          <Button variant="secondary" size="sm" onClick={tentarOutraVez}>
-            Tentar outra vez
-          </Button>
+          {/* Um botão que não pode funcionar (sessão expirada, pedido que já
+              não existe, recusa do conteúdo) é pior do que nenhum. */}
+          {estado.repetir && (
+            <Button variant="secondary" size="sm" onClick={tentarOutraVez}>
+              Tentar outra vez
+            </Button>
+          )}
         </div>
       )}
 

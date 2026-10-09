@@ -133,7 +133,7 @@ describe("PainelGeracaoAoGanhar", () => {
     render(<PainelGeracaoAoGanhar quote={{ id: "Q1", status: "aceite" }} />);
 
     await waitFor(() =>
-      expect(screen.getByText("O servidor não está a aceitar gravações")).toBeTruthy(),
+      expect(screen.getByText(/O servidor não está a aceitar gravações/)).toBeTruthy(),
     );
     await user.click(screen.getByRole("button", { name: "Tentar outra vez" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Gerar" })).toBeTruthy());
@@ -146,7 +146,31 @@ describe("PainelGeracaoAoGanhar", () => {
     );
     render(<PainelGeracaoAoGanhar quote={{ id: "Q1", status: "aceite" }} />);
     await waitFor(() =>
-      expect(screen.getByText("O pedido ainda não está marcado como Ganho")).toBeTruthy(),
+      expect(screen.getByText(/O pedido ainda não está marcado como Ganho/)).toBeTruthy(),
     );
+  });
+
+  it("com a rede em baixo diz o que aconteceu em português, e não «Failed to fetch»", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    render(<PainelGeracaoAoGanhar quote={{ id: "Q1", status: "aceite" }} />);
+    await waitFor(() => expect(screen.getByText(/Sem ligação/)).toBeTruthy());
+    expect(screen.queryByText(/Failed to fetch/)).toBeNull();
+    // A rede volta: repetir tem hipótese, por isso o botão fica.
+    expect(screen.getByRole("button", { name: "Tentar outra vez" })).toBeTruthy();
+  });
+
+  it("com a sessão expirada não oferece um «Tentar outra vez» que falha sempre", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => reply(401, { error: "Unauthorized" })),
+    );
+    render(<PainelGeracaoAoGanhar quote={{ id: "Q1", status: "aceite" }} />);
+    await waitFor(() => expect(screen.getByText(/A sessão expirou/)).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Tentar outra vez" })).toBeNull();
   });
 });
