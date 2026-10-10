@@ -155,8 +155,14 @@ export default function Servicos() {
       const anterior = (servicos ?? []).find((s) => s.id === id);
       if (!(await gravarServico(id, patch, oQue, anterior))) return;
       if (!anterior) return;
+      // Um campo que antes nem existia (um serviço nunca arquivado não tem
+      // `arquivado`) volta como `false` — `undefined` sumia do JSON e o
+      // «Anular» ia vazio.
       const inverso = Object.fromEntries(
-        Object.keys(patch).map((k) => [k, anterior[k as keyof ServicoDaBiblioteca]]),
+        Object.entries(patch).map(([k, v]) => [
+          k,
+          anterior[k as keyof ServicoDaBiblioteca] ?? (typeof v === "boolean" ? false : null),
+        ]),
       ) as Partial<ServicoDaBiblioteca>;
       anular(comoDizer, () =>
         gravarServico(id, inverso, `repor «${anterior.nome}» como estava`, undefined),
