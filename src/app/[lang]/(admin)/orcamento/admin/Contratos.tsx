@@ -6,6 +6,8 @@ import { useMemo, useState, useDeferredValue } from "react";
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
 // bundle cliente. O tipo vive no módulo client-safe `contract-types`.
 import type { Contract, ContractStatus } from "@/lib/contract-types";
+import type { AceiteComContrato, AceiteSemContrato, ItemDosAceites } from "@/lib/orcamento/aceites";
+import type { Quote } from "@/lib/orcamento/types";
 import { TERMS_VERSION } from "@/lib/contract-terms";
 import { SkeletonList } from "./Skeleton";
 import { downloadCsv, dateStamp } from "./export";
@@ -71,6 +73,91 @@ function statusMeta(status: string): { label: string; bg: string; text: string }
       bg: "var(--bo-tinta-3)",
       text: "var(--bo-text-muted)",
     }
+  );
+}
+
+/**
+ * Uma linha com contrato, ou um negócio ganho que ainda não o tem.
+ *
+ * Uma linha sem `tipo` conta como contrato: é a forma que a rota devolvia antes
+ * de as Propostas Aceites passarem a juntar os ganhos sem contrato
+ * (`juntarAceites`), e uma resposta em cache dessa altura não pode partir isto.
+ */
+const ehContrato = (i: ItemDosAceites): i is AceiteComContrato => i.tipo !== "sem-contrato";
+
+/** Quem aceitou, ou quem o registou pela equipa («Marcar como assinado»). */
+const aceitePorDe = (c: Contract) => c.acceptedName || c.registadoPor || "";
+
+type Filtro = "all" | ContractStatus | "sem-contrato";
+
+function SemContratoChip() {
+  return (
+    <span
+      className="inline-block px-2 py-0.5 rounded-md text-[10px] tracking-[0.08em] uppercase font-medium"
+      style={{ background: "var(--bo-tinta-3)", color: "var(--bo-text-muted)" }}
+    >
+      Sem contrato
+    </span>
+  );
+}
+
+/**
+ * «Criar contrato», num negócio ganho que ainda não o tem. É ela que carrega:
+ * nada cria contratos sozinho para trás. Sem proposta não há termos nem sinal
+ * a congelar, e diz-se em vez de pôr um botão que só podia falhar.
+ */
+function CriarContrato({ item, feito }: { item: AceiteSemContrato; feito: () => void }) {
+  const { toast } = useToast();
+  const [aCriar, setACriar] = useState(false);
+  if (!item.proposalId) {
+    return (
+      <span className="text-xs text-[var(--bo-text-muted)]">
+        Sem proposta — não há termos a registar
+      </span>
+    );
+  }
+  async function criar() {
+    if (aCriar) return;
+    setACriar(true);
+    try {
+      const res = await fetch("/api/contratos/criar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quoteId: item.quoteId }),
+      });
+      const corpo = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(corpo?.error || `O servidor respondeu ${res.status}.`);
+      toast("Contrato criado — fica pendente até o casal assinar.", "success");
+      feito();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível criar o contrato.", "error");
+    } finally {
+      setACriar(false);
+    }
+  }
+  return (
+    <Button size="sm" variant="subtle" onClick={() => void criar()} loading={aCriar}>
+      Criar contrato
+    </Button>
+  );
+}
+
+/** «Abrir pedido» — só quando o pedido está na lista que o ecrã conhece. */
+function AbrirPedido({
+  quoteId,
+  quotes,
+  onOpenQuote,
+}: {
+  quoteId: string;
+  quotes: Quote[];
+  onOpenQuote?: (q: Quote) => void;
+}) {
+  const pedido = quotes.find((q) => q.id === quoteId);
+  if (!pedido || !onOpenQuote) return null;
+  return (
+    <Button size="sm" variant="ghost" onClick={() => onOpenQuote(pedido)}>
+      Abrir pedido
+    </Button>
   );
 }
 
@@ -175,18 +262,27 @@ function RegistarAceite({ contrato, feito }: { contrato: Contract; feito: () => 
   );
 }
 
-export default function Contratos() {
+export default function Contratos({
+  quotes = [],
+  onOpenQuote,
+}: {
+  /** Os pedidos que o back office já tem — para «Abrir pedido». */
+  quotes?: Quote[];
+  onOpenQuote?: (q: Quote) => void;
+}) {
   const {
-    data: contracts = [],
+    data: itens = [],
     loading,
     error,
     errorMessage,
     refresh,
-  } = useCachedList<Contract[]>("contratos", "/api/contratos");
+  } = useCachedList<ItemDosAceites[]>("contratos", "/api/contratos");
+  const contracts = useMemo(() => itens.filter(ehContrato), [itens]);
+  const semContrato = itens.length - contracts.length;
   const [search, setSearch] = useState("");
   // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
   const dSearch = useDeferredValue(search);
-  const [status, setStatus] = useState<"all" | ContractStatus>("all");
+  const [status, setStatus] = useState<Filtro>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   /**
    * A MESMA PERGUNTA QUE O `TabelaOuCartoes` FAZ POR DENTRO — os termos
@@ -198,21 +294,22 @@ export default function Contratos() {
 
   const filtered = useMemo(() => {
     const q = dSearch.trim().toLowerCase();
-    return contracts.filter((c) => {
-      if (status !== "all" && c.status !== status) return false;
-      if (
-        q &&
-        !casaComAProcura(q, [c.clientName, c.clientEmail, c.acceptedName, c.quoteId, c.proposalId])
-      )
+    return itens.filter((c) => {
+      if (status === "sem-contrato") {
+        if (ehContrato(c)) return false;
+      } else if (status !== "all" && (!ehContrato(c) || c.status !== status)) return false;
+      const quem = ehContrato(c) ? aceitePorDe(c) : c.marcadoPor;
+      if (q && !casaComAProcura(q, [c.clientName, c.clientEmail, quem, c.quoteId, c.proposalId]))
         return false;
       return true;
     });
-  }, [contracts, dSearch, status]);
+  }, [itens, dSearch, status]);
 
   const aceites = useMemo(() => contracts.filter((c) => c.status === "aceite").length, [contracts]);
 
   /** O contrato cujos termos estão abertos, se ainda estiver na lista filtrada. */
-  const aberto = expanded ? (filtered.find((c) => c.id === expanded) ?? null) : null;
+  const abertoItem = expanded ? filtered.find((c) => c.id === expanded) : undefined;
+  const aberto = abertoItem && ehContrato(abertoItem) ? abertoItem : null;
 
   function exportCsv() {
     const rows: (string | number)[][] = [
@@ -227,17 +324,31 @@ export default function Contratos() {
         "Aceite por",
         "Versão dos termos",
       ],
-      ...filtered.map((c) => [
-        c.clientName,
-        c.clientEmail,
-        c.quoteId,
-        c.proposalId,
-        statusMeta(c.status).label,
-        fmtDate(c.createdAt),
-        c.acceptedAt ? fmtDateTime(c.acceptedAt) : "",
-        c.acceptedName ?? "",
-        c.termsVersion,
-      ]),
+      ...filtered.map((c) =>
+        ehContrato(c)
+          ? [
+              c.clientName,
+              c.clientEmail,
+              c.quoteId,
+              c.proposalId,
+              statusMeta(c.status).label,
+              fmtDate(c.createdAt),
+              c.acceptedAt ? fmtDateTime(c.acceptedAt) : "",
+              aceitePorDe(c),
+              c.termsVersion,
+            ]
+          : [
+              c.clientName,
+              c.clientEmail,
+              c.quoteId,
+              c.proposalId ?? "",
+              "Sem contrato",
+              "",
+              c.ganhoEm ? fmtDateTime(c.ganhoEm) : "",
+              c.marcadoPor ?? "",
+              "",
+            ],
+      ),
     ];
     downloadCsv(`contratos-${dateStamp()}`, rows);
   }
@@ -247,7 +358,7 @@ export default function Contratos() {
   // proposta", que descreve um sistema a funcionar e a aguardar clientes. O
   // contrato que ela procura pode estar assinado há uma semana. Ver
   // `AvisoDeFalha`.
-  if (error && contracts.length === 0) {
+  if (error && itens.length === 0) {
     return (
       <AvisoDeFalha
         titulo="Não foi possível ler os contratos"
@@ -274,8 +385,8 @@ export default function Contratos() {
         style={{ "--cena": 0 } as React.CSSProperties}
         className="bo-cena mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]"
       >
-        Cada contrato é a prova de que o cliente aceitou a proposta. Aparecem aqui automaticamente,
-        com a data e o nome de quem aceitou.
+        Todas as propostas aceites e os pedidos marcados como Ganho. O contrato regista os termos
+        que o cliente aceitou; quando ainda falta, cria-se aqui.
       </p>
 
       {/* Toolbar */}
@@ -307,7 +418,7 @@ export default function Contratos() {
           </div>
         }
         end={
-          contracts.length > 0 ? (
+          itens.length > 0 ? (
             <Button
               variant="secondary"
               size="sm"
@@ -334,7 +445,7 @@ export default function Contratos() {
             aria-pressed={status === "all"}
             onClick={() => setStatus("all")}
           >
-            Todos · {contracts.length}
+            Todos · {itens.length}
           </Button>
           {STATUSES.map((s) => {
             const count = contracts.filter((c) => c.status === s).length;
@@ -350,6 +461,16 @@ export default function Contratos() {
               </Button>
             );
           })}
+          {semContrato > 0 && (
+            <Button
+              size="sm"
+              variant={status === "sem-contrato" ? "subtle" : "ghost"}
+              aria-pressed={status === "sem-contrato"}
+              onClick={() => setStatus("sem-contrato")}
+            >
+              Sem contrato · {semContrato}
+            </Button>
+          )}
         </div>
         {aceites > 0 && (
           <span className="ml-auto self-center text-xs text-foreground/40">
@@ -385,14 +506,14 @@ export default function Contratos() {
                 <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             }
-            title={contracts.length === 0 ? "Sem contratos ainda" : "Nenhum contrato encontrado"}
+            title={itens.length === 0 ? "Ainda sem propostas aceites" : "Nada encontrado"}
             description={
-              contracts.length === 0
+              itens.length === 0
                 ? // O botão de aceitar pelo link foi RETIRADO — «um casamento não se
                   // fecha num botão» — e esta frase ficou a descrever um caminho
                   // que já não existe. Um ecrã vazio que explica mal é pior do
                   // que um ecrã vazio: manda esperar por uma coisa que nunca vem.
-                  "Os contratos aparecem aqui quando um pedido é marcado como Ganho. Depois de o casal assinar, marca-o aqui como assinado."
+                  "Aparecem aqui quando uma proposta é aceite ou um pedido é marcado como Ganho. Depois de o casal assinar, marca-o aqui como assinado."
                 : "Tenta outra pesquisa ou estado."
             }
           />
@@ -418,18 +539,29 @@ export default function Contratos() {
               // («Ver termos», «PDF», «Marcar como assinado»): embrulhá-lo no
               // botão do primitivo dava um botão dentro de outro botão.
               semMoldura
-              cartao={(c) => (
-                <CartaoDeContrato
-                  c={c}
-                  aberto={expanded === c.id}
-                  onAlternar={() => setExpanded(expanded === c.id ? null : c.id)}
-                  aoRegistar={refresh}
-                />
-              )}
+              cartao={(c) =>
+                ehContrato(c) ? (
+                  <CartaoDeContrato
+                    c={c}
+                    aberto={expanded === c.id}
+                    onAlternar={() => setExpanded(expanded === c.id ? null : c.id)}
+                    aoRegistar={refresh}
+                  />
+                ) : (
+                  <CartaoSemContrato
+                    item={c}
+                    quotes={quotes}
+                    onOpenQuote={onOpenQuote}
+                    feito={refresh}
+                  />
+                )
+              }
               colunas={colunasDeContratos({
                 aberto: expanded,
                 alternar: (c) => setExpanded((e) => (e === c.id ? null : c.id)),
                 aoRegistar: refresh,
+                quotes,
+                onOpenQuote,
               })}
             />
 
@@ -562,7 +694,7 @@ function CartaoDeContrato({
         {c.status === "aceite" ? (
           <>
             Aceite {fmtDateTime(c.acceptedAt)}
-            {c.acceptedName && <> · por {c.acceptedName}</>}
+            {aceitePorDe(c) && <> · por {aceitePorDe(c)}</>}
           </>
         ) : (
           <>
@@ -586,6 +718,48 @@ function CartaoDeContrato({
   );
 }
 
+/** Para ordenar «Aceite em»: o aceite do contrato, ou quando ficou ganho. */
+const quandoAceite = (i: ItemDosAceites) => (ehContrato(i) ? i.acceptedAt : i.ganhoEm) ?? "";
+
+/** O cartão do telemóvel de um negócio ganho que ainda não tem contrato. */
+function CartaoSemContrato({
+  item,
+  quotes,
+  onOpenQuote,
+  feito,
+}: {
+  item: AceiteSemContrato;
+  quotes: Quote[];
+  onOpenQuote?: (q: Quote) => void;
+  feito: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-[var(--bo-text)]" title={item.clientName}>
+            {item.clientName || "—"}
+          </p>
+          {item.clientEmail && (
+            <p className="mt-0.5 truncate text-xs text-foreground/40">{item.clientEmail}</p>
+          )}
+        </div>
+        <div className="shrink-0">
+          <SemContratoChip />
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-foreground/45">
+        Ganho {item.ganhoEm ? fmtDateTime(item.ganhoEm) : ""}
+        {item.marcadoPor && <> · por {item.marcadoPor}</>}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <CriarContrato item={item} feito={feito} />
+        <AbrirPedido quoteId={item.quoteId} quotes={quotes} onOpenQuote={onOpenQuote} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * AS SETE COLUNAS DA TABELA — as mesmas que já lá estavam.
  *
@@ -598,11 +772,15 @@ function colunasDeContratos({
   aberto,
   alternar,
   aoRegistar,
+  quotes,
+  onOpenQuote,
 }: {
   aberto: string | null;
   alternar: (c: Contract) => void;
   aoRegistar: () => void;
-}): Coluna<Contract>[] {
+  quotes: Quote[];
+  onOpenQuote?: (q: Quote) => void;
+}): Coluna<ItemDosAceites>[] {
   return [
     {
       chave: "cliente",
@@ -643,29 +821,42 @@ function colunasDeContratos({
     {
       chave: "estado",
       cabecalho: "Estado",
-      celula: (c) => <StatusChip status={c.status} />,
+      celula: (c) => (ehContrato(c) ? <StatusChip status={c.status} /> : <SemContratoChip />),
     },
     {
       chave: "aceiteEm",
       cabecalho: "Aceite em",
-      ordenar: (a, b) => (a.acceptedAt ?? "").localeCompare(b.acceptedAt ?? ""),
+      ordenar: (a, b) => quandoAceite(a).localeCompare(quandoAceite(b)),
       celula: (c) => (
         <span className="whitespace-nowrap text-foreground/50">
-          {c.status === "aceite" ? fmtDateTime(c.acceptedAt) : "—"}
+          {ehContrato(c) ? (
+            c.status === "aceite" ? (
+              fmtDateTime(c.acceptedAt)
+            ) : (
+              "—"
+            )
+          ) : c.ganhoEm ? (
+            <>Ganho {fmtDateTime(c.ganhoEm)}</>
+          ) : (
+            "Ganho"
+          )}
         </span>
       ),
     },
     {
       chave: "aceitePor",
       cabecalho: "Aceite por",
-      celula: (c) => (
-        <span
-          className="block max-w-[160px] truncate text-[var(--bo-text-muted)]"
-          title={c.acceptedName ?? undefined}
-        >
-          {c.acceptedName || "—"}
-        </span>
-      ),
+      celula: (c) => {
+        const quem = ehContrato(c) ? aceitePorDe(c) : (c.marcadoPor ?? "");
+        return (
+          <span
+            className="block max-w-[160px] truncate text-[var(--bo-text-muted)]"
+            title={quem || undefined}
+          >
+            {quem || "—"}
+          </span>
+        );
+      },
     },
     {
       chave: "termos",
@@ -673,7 +864,7 @@ function colunasDeContratos({
       soLargo: true,
       celula: (c) => (
         <span className="whitespace-nowrap tabular-nums text-foreground/45">
-          Versão {c.termsVersion}
+          {ehContrato(c) ? `Versão ${c.termsVersion}` : "—"}
         </span>
       ),
     },
@@ -681,20 +872,26 @@ function colunasDeContratos({
       chave: "contrato",
       cabecalho: "Contrato",
       alinharADireita: true,
-      celula: (c) => (
-        <span className="inline-flex items-center justify-end gap-1.5">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => alternar(c)}
-            aria-expanded={aberto === c.id}
-          >
-            {aberto === c.id ? "Fechar" : "Ver termos"}
-          </Button>
-          <PdfDoContrato id={c.id} />
-          <RegistarAceite contrato={c} feito={aoRegistar} />
-        </span>
-      ),
+      celula: (c) =>
+        ehContrato(c) ? (
+          <span className="inline-flex items-center justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => alternar(c)}
+              aria-expanded={aberto === c.id}
+            >
+              {aberto === c.id ? "Fechar" : "Ver termos"}
+            </Button>
+            <PdfDoContrato id={c.id} />
+            <RegistarAceite contrato={c} feito={aoRegistar} />
+          </span>
+        ) : (
+          <span className="inline-flex items-center justify-end gap-1.5">
+            <AbrirPedido quoteId={c.quoteId} quotes={quotes} onOpenQuote={onOpenQuote} />
+            <CriarContrato item={c} feito={aoRegistar} />
+          </span>
+        ),
     },
   ];
 }

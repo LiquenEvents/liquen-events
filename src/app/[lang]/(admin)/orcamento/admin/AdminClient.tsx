@@ -6091,7 +6091,7 @@ export default function AdminClient({
           {/* ── Contratos ── */}
           {view === "contratos" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Contratos />
+              <Contratos quotes={quotes} onOpenQuote={openQuote} />
             </div>
           )}
 

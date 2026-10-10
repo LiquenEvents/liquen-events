@@ -457,6 +457,7 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./contratos/route", methods: ["GET"] },
   { path: "./contratos/[id]/route", methods: ["PATCH"] },
   { path: "./contratos/[id]/pdf/route", methods: ["GET"] },
+  { path: "./contratos/criar/route", methods: ["POST"] },
   // ── Guiões do dia ─────────────────────────────────────────────────────────
   // O guião de um evento diz a que horas a equipa entra na quinta, quem faz o
   // quê e quando o espaço fica vazio. É logística interna e nomes de clientes:

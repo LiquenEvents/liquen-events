@@ -29,6 +29,8 @@ vi.mock("@/lib/proposals-store", () => ({
   deleteProposal: store.remove,
 }));
 vi.mock("@/lib/quotes-store", () => ({ updateQuoteWith: quotes.updateWith }));
+const contrato = vi.hoisted(() => ({ nascer: vi.fn(async () => ({ created: true })) }));
+vi.mock("@/lib/contrato-do-ganho", () => ({ nascerContratoDoGanho: contrato.nascer }));
 
 import { DELETE, PATCH } from "./route";
 
@@ -281,6 +283,30 @@ describe("o estado do pedido segue o estado da proposta", () => {
     const res = await PATCH(req({ status: "enviada" }), ctx("p1"));
     expect(res.status).toBe(200);
     expect((await res.json()).pedido).toBeUndefined();
+  });
+
+  it("aceitar a proposta faz nascer o contrato — e ela aparece nas Propostas Aceites", async () => {
+    // «já houve mais propostas aceites e não estão aqui»: o «Aceitar» das
+    // Propostas punha o pedido em Ganho sem contrato.
+    authed.ok = true;
+    await PATCH(req({ status: "aceite" }), ctx("p1"));
+    expect(contrato.nascer).toHaveBeenCalledTimes(1);
+    expect(contrato.nascer).toHaveBeenCalledWith("q1", expect.objectContaining({ id: "p1" }));
+  });
+
+  it("outros estados não criam contrato", async () => {
+    authed.ok = true;
+    for (const status of ["enviada", "em_negociacao", "rejeitada"]) {
+      await PATCH(req({ status }), ctx("p1"));
+    }
+    expect(contrato.nascer).not.toHaveBeenCalled();
+  });
+
+  it("se o contrato não nascer, a proposta aceite não falha", async () => {
+    authed.ok = true;
+    contrato.nascer.mockRejectedValueOnce(new Error("rede"));
+    const res = await PATCH(req({ status: "aceite" }), ctx("p1"));
+    expect(res.status).toBe(200);
   });
 
   it("uma proposta sem pedido associado não rebenta", async () => {
