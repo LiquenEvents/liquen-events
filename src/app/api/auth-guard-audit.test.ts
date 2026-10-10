@@ -550,6 +550,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./admin/equipa/route", methods: ["GET"] },
   { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
+  // «Ver as propostas que já mandei»: o PDF que seguiu, o link do casal e as
+  // cópias dos emails — tudo dados de clientes, só com sessão.
+  { path: "./orcamento/[id]/propostas/[pid]/pdf/route", methods: ["GET"] },
+  { path: "./orcamento/[id]/propostas/[pid]/link/route", methods: ["GET"] },
+  { path: "./orcamento/[id]/envios/route", methods: ["GET"] },
   // A memória de preços atravessa TODAS as propostas já enviadas: o que se
   // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
   // resposta JSON.

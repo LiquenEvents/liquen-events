@@ -70,6 +70,7 @@ import PasskeysDialog from "./PasskeysDialog";
 import SessaoExpirada from "./SessaoExpirada";
 import NotificationBell from "./NotificationBell";
 import NotaDaProposta from "./NotaDaProposta";
+import PropostasDoPedido from "./PropostasDoPedido";
 import {
   downloadCsv,
   quotesToCsvRows,
@@ -1399,6 +1400,9 @@ export default function AdminClient({
   /** Quando foi a última revalidação, para não a repetir a cada piscar de olhos. */
   const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>(vistaInicial ?? "overview");
+  /** A procura com que «Propostas» abre quando se chega lá a partir de outra
+   *  vista («Ver em Propostas» do Fazer proposta). */
+  const [procuraEmPropostas, setProcuraEmPropostas] = useState("");
   const [navOpen, setNavOpen] = useState(false);
   // A gaveta é modal: com ela aberta, o Tab passeava pelo fundo desfocado
   // (Ajuda → Tudo guardado → Pesquisar → Novo) e o foco ficava no botão que a
@@ -5935,7 +5939,10 @@ export default function AdminClient({
                 // Pedidos e trata da espera com nome.
                 onAbrirPedido={openQuote}
                 // As propostas já feitas não estão nesta lista — estão lá.
-                onIrParaPropostas={() => setView("propostas")}
+                onIrParaPropostas={(procura) => {
+                  setProcuraEmPropostas(procura ?? "");
+                  setView("propostas");
+                }}
                 onNovoPedido={() => setNewQuoteOpen(true)}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
@@ -5962,6 +5969,7 @@ export default function AdminClient({
               <Propostas
                 quotes={quotes}
                 userName={userName}
+                procuraInicial={procuraEmPropostas}
                 onOpenQuote={openQuote}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
@@ -7210,6 +7218,10 @@ export default function AdminClient({
                             </div>
                           );
                         })()}
+
+                        {/* ── As propostas que seguiram — o PDF, o link do casal e o
+                          email, aqui no pedido. Sem nenhuma, não aparece. ── */}
+                        <PropostasDoPedido key={selected.id} quoteId={selected.id} />
 
                         {/* ── Gestão do pedido — o formulário de trabalho, SEMPRE
                           visível (nada escondido atrás de "Mostrar mais"). ── */}
