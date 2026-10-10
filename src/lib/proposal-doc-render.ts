@@ -36,6 +36,8 @@ import { TECTO_DA_ROTA_MS } from "@/lib/custo-do-pdf";
 import { log } from "@/lib/logger";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { renderEditorialPdf } from "@/lib/pdf-editorial/montar";
+import { focoAutomatico, LADO_PAGINA, pixeisDaCaixa, type Foco } from "@/lib/pdf-editorial/imagens";
+import { FOLHA } from "@/lib/pdf-editorial/moldura";
 
 /**
  * Lado maior das miniaturas que o navegador fabrica no carregamento
@@ -660,4 +662,21 @@ export async function renderStoredEditorialPdfWithReport(
   const { doc: resolved, missing } = await resolveImages(withDefaults, { originais: true });
   const { bytes, truncations, undrawnImages } = await renderEditorialPdf(resolved, idioma);
   return { pdf: Buffer.from(bytes), missingImages: missing + undrawnImages, truncations };
+}
+
+/**
+ * O enquadramento que o PDF escolheria sozinho para esta fotografia na CAPA —
+ * a mesma conta, com os mesmos bytes e o mesmo tamanho que o desenho usa
+ * (`reduzirParaEditorial` e a caixa da folha inteira em `LADO_PAGINA`, com a
+ * densidade por omissão do `fotoNaCaixa`).
+ *
+ * É o que deixa o estúdio mostrar, na caixa da capa, o recorte que vai sair —
+ * e é a partir dele que ela arrasta, se não gostar. `null` se a fotografia não
+ * se deixar ler: o estúdio mostra o centro e não promete nada.
+ */
+export async function focoAutomaticoDaCapa(ref: string): Promise<Foco | null> {
+  const bytes = await fetchProposalImageBytes(ref);
+  if (!bytes) return null;
+  const { w, h } = pixeisDaCaixa(FOLHA.w, FOLHA.h, LADO_PAGINA, 1.7);
+  return focoAutomatico(await reduzirParaEditorial(bytes), w, h);
 }

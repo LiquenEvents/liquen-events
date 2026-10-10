@@ -97,6 +97,8 @@ export async function fotoNaCaixa(
 ): Promise<boolean> {
   if (!foto) return false;
   const { w, h } = pixeisDaCaixa(caixa.w, caixa.h, lado, densidade);
+  // O enquadramento é da FOTOGRAFIA (escolhido à mão para ela), e não da página.
+  if (foto.foco) t = { ...t, foco: foto.foco };
   const chave = `${foto.id}|${w}x${h}|${JSON.stringify(t)}`;
   let img = ctx.embutidas.get(chave);
   if (!img) {

@@ -550,6 +550,8 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./admin/equipa/route", methods: ["GET"] },
   { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
+  // O recorte automático da capa, para o estúdio o mostrar igual ao PDF.
+  { path: "./orcamento/[id]/foco-da-capa/route", methods: ["GET"] },
   // A memória de preços atravessa TODAS as propostas já enviadas: o que se
   // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
   // resposta JSON.

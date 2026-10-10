@@ -391,3 +391,40 @@ describe("sem transparência por cima das fotografias", () => {
     expect(opacidades).toBe(0);
   });
 });
+
+/**
+ * A CAPA AO ALTO, «MESMO ASSIM».
+ *
+ * Palavras dela: «diz que é esta a foto de capa mas depois quando abro o pdf
+ * está outra foto». A regra troca uma fotografia ao alto pela melhor deitada
+ * dos temas; com `capaMesmoAssim` vai a dela, recortada como o estúdio a mostra.
+ */
+describe("a capa ao alto", () => {
+  /** A cor média da primeira fotografia embutida — a da capa, que é a primeira página. */
+  async function corDaCapa(doc: ProposalDoc) {
+    const jpgs: Uint8Array[] = [];
+    const embedJpg = PDFDocument.prototype.embedJpg;
+    PDFDocument.prototype.embedJpg = function (b: Parameters<typeof embedJpg>[0]) {
+      jpgs.push(b as Uint8Array);
+      return embedJpg.call(this, b);
+    };
+    try {
+      await renderEditorialPdf(doc, "pt");
+    } finally {
+      PDFDocument.prototype.embedJpg = embedJpg;
+    }
+    const { channels } = await sharp(Buffer.from(jpgs[0])).stats();
+    return channels.slice(0, 3).map((c) => Math.round(c.mean));
+  }
+
+  it("sem nada dito, a dela ao alto dá lugar a uma deitada; com «mesmo assim», vai a dela", async () => {
+    const VERMELHA_AO_ALTO = await foto(1000, 1500, "#b02020");
+    const base = { coverImages: [VERMELHA_AO_ALTO, ""] } as Partial<ProposalDoc>;
+    // A capa leva o degradé por cima, por isso compara-se o TOM (vermelho
+    // contra verde), e não o brilho.
+    const [r1, g1] = await corDaCapa(docDeTeste(base));
+    expect(r1 - g1, "a regra trocou-a por uma deitada dos temas").toBeLessThan(20);
+    const [r2, g2] = await corDaCapa(docDeTeste({ ...base, capaMesmoAssim: true }));
+    expect(r2 - g2, "a dela, que é vermelha").toBeGreaterThan(50);
+  });
+});

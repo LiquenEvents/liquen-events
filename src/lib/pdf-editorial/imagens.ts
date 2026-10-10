@@ -54,7 +54,26 @@ export interface Sombra {
   opacidade: number;
 }
 
+/**
+ * Onde fica o recorte de uma fotografia que não cabe inteira na caixa — como o
+ * `object-position` do CSS, em fracções: `{ x: 0.5, y: 1 }` é «ao centro, em
+ * baixo». Só conta o eixo que sobra: numa foto ao alto numa caixa deitada, é o
+ * `y` que diz que fatia da altura fica à vista.
+ */
+export interface Foco {
+  x: number;
+  y: number;
+}
+
+const entre0e1 = (v: number) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.5);
+
 export interface Tratamento {
+  /**
+   * O enquadramento escolhido à mão (`focoDaCapa`). Sem ele, quem escolhe é a
+   * «atenção» do sharp — e o estúdio pergunta-lhe o mesmo, por
+   * {@link focoAutomatico}, para mostrar o recorte que vai sair.
+   */
+  foco?: Foco;
   /** Desfoque em píxeis do exemplo (σ). 0 = nítida. */
   desfoque?: number;
   /** Multiplicador do brilho (1 = como está). */
@@ -115,10 +134,13 @@ export async function preparar(
 ): Promise<Buffer | null> {
   try {
     const escala = w / larguraFolha;
-    let img = sharp(bytes, { failOn: "none" })
-      .rotate()
-      .resize(Math.round(w), Math.round(h), { fit: "cover", position: sharp.strategy.attention })
-      .flatten({ background: HEX.fundo });
+    let img = t.foco
+      ? await recortarComFoco(bytes, Math.round(w), Math.round(h), t.foco)
+      : sharp(bytes, { failOn: "none" }).rotate().resize(Math.round(w), Math.round(h), {
+          fit: "cover",
+          position: sharp.strategy.attention,
+        });
+    img = img.flatten({ background: HEX.fundo });
     if (t.desfoque && t.desfoque > 0) img = img.blur(Math.max(0.3, t.desfoque * escala));
     if (t.brilho && t.brilho !== 1) img = img.modulate({ brightness: t.brilho });
     const camadas: OverlayOptions[] = [];
@@ -138,6 +160,65 @@ export async function preparar(
       .toBuffer();
   } catch {
     return null;
+  }
+}
+
+/**
+ * O recorte `w × h` com o enquadramento dado — o `object-fit: cover` com o
+ * `object-position` em fracções, que é o que o estúdio desenha.
+ */
+async function recortarComFoco(bytes: Buffer, w: number, h: number, foco: Foco) {
+  const direita = await sharp(bytes, { failOn: "none" }).rotate().toBuffer({
+    resolveWithObject: true,
+  });
+  const { width: iw, height: ih } = direita.info;
+  const k = Math.max(w / iw, h / ih);
+  const rw = Math.max(w, Math.round(iw * k));
+  const rh = Math.max(h, Math.round(ih * k));
+  return sharp(direita.data)
+    .resize(rw, rh)
+    .extract({
+      left: Math.round((rw - w) * entre0e1(foco.x)),
+      top: Math.round((rh - h) * entre0e1(foco.y)),
+      width: w,
+      height: h,
+    });
+}
+
+/**
+ * O enquadramento que a «atenção» do sharp escolhe para esta caixa, em
+ * fracções — a MESMA conta que o {@link preparar} faz quando ninguém escolheu.
+ *
+ * Existe para o estúdio mostrar o recorte que vai sair: ela viu o meio da
+ * fotografia no ecrã (com o carro) e o PDF saiu com a parte de cima (os vasos e
+ * o céu). Duas contas diferentes para a mesma pergunta.
+ */
+export async function focoAutomatico(bytes: Buffer, w: number, h: number): Promise<Foco> {
+  try {
+    // A pergunta é feita aos MESMOS bytes e com a MESMA cadeia do `preparar`
+    // (rodar, e recortar pela atenção) — só assim a resposta é a do PDF.
+    const meta = await sharp(bytes, { failOn: "none" }).metadata();
+    const deLado = (meta.orientation ?? 1) >= 5;
+    const iw = (deLado ? meta.height : meta.width) ?? 0;
+    const ih = (deLado ? meta.width : meta.height) ?? 0;
+    if (!iw || !ih) return { x: 0.5, y: 0.5 };
+    const k = Math.max(w / iw, h / ih);
+    const rw = Math.max(Math.round(w), Math.round(iw * k));
+    const rh = Math.max(Math.round(h), Math.round(ih * k));
+    const { info } = await sharp(bytes, { failOn: "none" })
+      .rotate()
+      .resize(Math.round(w), Math.round(h), { fit: "cover", position: sharp.strategy.attention })
+      .toBuffer({ resolveWithObject: true });
+    // O sharp devolve o desvio do recorte como número NEGATIVO (é onde a imagem
+    // redimensionada começa em relação à caixa).
+    const esquerda = Math.abs(info.cropOffsetLeft ?? 0);
+    const topo = Math.abs(info.cropOffsetTop ?? 0);
+    return {
+      x: rw > w ? entre0e1(esquerda / (rw - Math.round(w))) : 0.5,
+      y: rh > h ? entre0e1(topo / (rh - Math.round(h))) : 0.5,
+    };
+  } catch {
+    return { x: 0.5, y: 0.5 };
   }
 }
 

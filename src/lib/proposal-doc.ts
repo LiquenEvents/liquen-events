@@ -434,6 +434,33 @@ export interface ProposalDoc {
   nomeDoFicheiro?: string;
 
   /**
+   * «Usa ESTA na capa, mesmo assim.»
+   *
+   * A regra (`regra-da-capa.ts`) troca uma fotografia ao alto, ou pequena, pela
+   * melhor deitada dos temas. Ela viu o estúdio a mostrar a dela — cortada para
+   * ficar deitada, e bonita assim — e o PDF a sair com outra: «diz que é esta a
+   * foto de capa mas depois quando abro o pdf está outra foto». Com isto ligado,
+   * a dela vai, recortada ao centro como o estúdio a mostra.
+   *
+   * Vale para a fotografia que estava na capa quando ela o escolheu: trocar a
+   * fotografia apaga-o (`setCoverAt`), para uma escolha antiga não passar em
+   * silêncio para uma fotografia que ela ainda não viu na folha.
+   */
+  capaMesmoAssim?: boolean;
+
+  /**
+   * O enquadramento da fotografia da capa, escolhido à mão — como o
+   * `object-position` em fracções (`{ x: 0.5, y: 0.8 }` = ao centro, mais para
+   * baixo). Ela arrasta a fotografia na caixa do estúdio até o que interessa
+   * ficar à vista: «não ficou com o carro… quero que o sistema fique
+   * inteligente para saber identificar isto». Sem ele, o PDF escolhe sozinho
+   * (a «atenção» do sharp) e o estúdio mostra essa escolha.
+   *
+   * Como o `capaMesmoAssim`, é da fotografia: trocá-la apaga-o.
+   */
+  focoDaCapa?: { x: number; y: number };
+
+  /**
    * ════════════════════════════════════════════════════════════════════════
    * CONTRA QUE PORTUGUÊS É QUE CADA TRADUÇÃO FOI ESCRITA
    * ════════════════════════════════════════════════════════════════════════
