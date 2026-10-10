@@ -3487,6 +3487,33 @@ export default function AdminClient({
    * com o nome de cada um. Dois recados ao mesmo tempo sobre a mesma gravação
    * seriam ruído, e o recado que sobra é sempre o menos exacto dos dois.
    */
+  /**
+   * Põe no ecrã o pedido que o «Anular» repôs: a lista, a gaveta, cada campo de
+   * edição e a linha de base da gravação automática — como o «Guardar» faz com o
+   * que acabou de gravar. Sem isto, os campos ficavam com o valor anulado e o
+   * botão voltava a gravá-lo.
+   */
+  function refletirPedidoReposto(q: Quote) {
+    setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+    setSelected((prev) => (prev?.id === q.id ? q : prev));
+    setEditStatus(q.status);
+    setEditPrice(textoDoPreco(q));
+    setEditNotes(q.adminNotes ?? "");
+    setEditAssigned(q.assignedTo ?? "");
+    setEditLostReason(q.lostReason ?? "");
+    setEditDate(q.date ?? "");
+    setEditGuests(String(q.guests ?? ""));
+    setEditLocation(q.location ?? "");
+    setEditNome(q.name ?? "");
+    setEditEmail(q.email ?? "");
+    setEditTelefone(q.phone ?? "");
+    escritoNoServidor.current = {
+      id: q.id,
+      adminNotes: q.adminNotes ?? "",
+      lostReason: q.lostReason ?? "",
+    };
+  }
+
   async function saveChanges(
     opcoes: { silencioso?: boolean } = {},
   ): Promise<{ ok: boolean; porque?: string }> {
@@ -3775,25 +3802,67 @@ export default function AdminClient({
         dizer(porque, "error");
         return { ok: false, porque };
       }
-      // `selected` aqui ainda é o pedido de ANTES desta gravação (o fecho do
-      // clique) — é para o estado dele que o «Anular» volta.
-      const estadoAntes = selected.status;
-      if (updated.status !== estadoAntes) {
-        anular("Pedido atualizado", async () => {
-          const reposto = await reporEstadoDoPedido({
+      /**
+       * ── «ANULAR» DE TUDO O QUE ESTE «GUARDAR» MUDOU ────────────────────────
+       *
+       * `selected` aqui ainda é o pedido de ANTES desta gravação (o fecho do
+       * clique). Para cada campo que foi no corpo, volta o valor que lá estava
+       * — com a mesma regra de `null`/`""` do envio, para apagar mesmo. Se o
+       * estado também mudou, vai tudo no mesmo gesto do `reporEstadoDoPedido`
+       * (que desfaz a cadeia do «Ganho»); senão, um PATCH com a linha no
+       * histórico.
+       */
+      const antes = selected;
+      const inverso: Record<string, unknown> = {};
+      if ("quotedPrice" in body) inverso.quotedPrice = antes.quotedPrice ?? null;
+      if ("adminNotes" in body) inverso.adminNotes = antes.adminNotes ?? "";
+      if ("assignedTo" in body) inverso.assignedTo = antes.assignedTo ?? null;
+      if ("lostReason" in body) inverso.lostReason = antes.lostReason ?? null;
+      if ("date" in body) inverso.date = antes.date ?? "";
+      if ("guests" in body) inverso.guests = antes.guests;
+      if ("location" in body) inverso.location = antes.location ?? "";
+      if ("name" in body) inverso.name = antes.name ?? "";
+      if ("email" in body) inverso.email = antes.email ?? "";
+      if ("phone" in body) inverso.phone = antes.phone ?? "";
+      const mudouEstado = updated.status !== antes.status;
+      if (opcoes.silencioso || (!mudouEstado && Object.keys(inverso).length === 0)) {
+        dizer("Pedido atualizado", "success");
+        return { ok: true };
+      }
+      anular("Pedido atualizado", async () => {
+        let reposto: Quote | null;
+        if (mudouEstado) {
+          reposto = await reporEstadoDoPedido({
             quoteId: updated.id,
-            de: estadoAntes,
+            de: antes.status,
             para: updated.status,
             actor: userName,
+            extra: inverso,
           });
-          if (!reposto) return;
-          setQuotes((prev) => prev.map((q) => (q.id === reposto.id ? reposto : q)));
-          setSelected((prev) => (prev?.id === reposto.id ? reposto : prev));
-          setEditStatus(reposto.status);
-        });
-      } else {
-        dizer("Pedido atualizado", "success");
-      }
+        } else {
+          const res = await fetch(`/api/orcamento/${encodeURIComponent(updated.id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...inverso,
+              activityLogAppend: [
+                {
+                  id: randomId(),
+                  at: new Date().toISOString(),
+                  kind: "note_added",
+                  actor: userName,
+                  summary: "Alterações anuladas",
+                },
+              ],
+            }),
+          });
+          const corpo = (await res.json().catch(() => null)) as (Quote & { error?: string }) | null;
+          if (!res.ok) throw new Error(corpo?.error || `Não foi possível anular (${res.status}).`);
+          reposto = corpo;
+        }
+        if (!reposto) return;
+        refletirPedidoReposto(reposto);
+      });
       return { ok: true };
     } catch {
       const porque = "Não foi possível guardar as alterações";

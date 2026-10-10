@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseMoney, randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
@@ -89,6 +90,7 @@ interface Colisao {
  */
 export default function EventCosts({ quote, onChange }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [items, setItems] = useState<EventSupplier[]>(quote.eventSuppliers ?? []);
   const [directory, setDirectory] = useState<Supplier[]>([]);
   /** A leitura do diretório falhou. Ver o `useEffect` mais abaixo: um diretório
@@ -209,7 +211,10 @@ export default function EventCosts({ quote, onChange }: Props) {
    */
   const base = useRef<EventSupplier[]>(quote.eventSuppliers ?? []);
 
-  function persist(oQue: string, reaplicar: (atuais: EventSupplier[]) => EventSupplier[]) {
+  function persist(
+    oQue: string,
+    reaplicar: (atuais: EventSupplier[]) => EventSupplier[],
+  ): Promise<boolean> {
     const next = reaplicar(items);
     const minha = ++gravacoes.current;
     setItems(next);
@@ -230,7 +235,7 @@ export default function EventCosts({ quote, onChange }: Props) {
       toast(mensagem, "error");
     };
 
-    void (async () => {
+    return (async () => {
       let res: Response;
       try {
         res = await fetch(`/api/orcamento/${quote.id}`, {
@@ -240,7 +245,7 @@ export default function EventCosts({ quote, onChange }: Props) {
         });
       } catch {
         reporEDizer(porqueRebentou(oQue).mensagem);
-        return;
+        return false;
       }
       /**
        * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
@@ -267,14 +272,15 @@ export default function EventCosts({ quote, onChange }: Props) {
         // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
         // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
         setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
-        return;
+        return false;
       }
       if (!res.ok) {
         const corpo = await res.json().catch(() => null);
         reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
-        return;
+        return false;
       }
       if (minha === gravacoes.current) gravado.current = next;
+      return true;
     })();
   }
 
@@ -307,17 +313,42 @@ export default function EventCosts({ quote, onChange }: Props) {
       status: "contactado",
     };
     persist(`acrescentar «${name}» aos custos do evento`, (atuais) => [...atuais, reserva]);
+    anular(`«${name}» acrescentado aos custos.`, () =>
+      persist(`tirar «${name}» dos custos`, (atuais) => atuais.filter((x) => x.id !== reserva.id)),
+    );
     setForm({ name: "", category: "Catering", estimatedCost: "", supplierId: "" });
     setAdding(false);
   }
 
   function update(oQue: string, id: string, patch: Partial<EventSupplier>) {
+    const antes = items.find((it) => it.id === id);
     persist(oQue, (atuais) => atuais.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+    if (!antes) return;
+    // Só há o que anular quando alguma coisa mudou mesmo: sair de um campo
+    // sem lhe mexer também grava, e um «Anular» por cada saída seria ruído.
+    const chaves = Object.keys(patch) as (keyof EventSupplier)[];
+    if (chaves.every((k) => antes[k] === patch[k])) return;
+    const voltar: Partial<EventSupplier> = {};
+    for (const k of chaves) (voltar as Record<string, unknown>)[k] = antes[k];
+    anular(`«${antes.name}» atualizado.`, () =>
+      persist(`voltar ao que estava em «${antes.name}»`, (atuais) =>
+        atuais.map((it) => (it.id === id ? { ...it, ...voltar } : it)),
+      ),
+    );
   }
   function remove(id: string) {
     const it = items.find((x) => x.id === id);
+    const onde = items.findIndex((x) => x.id === id);
     persist(`remover «${it?.name ?? "o fornecedor"}» dos custos`, (atuais) =>
       atuais.filter((x) => x.id !== id),
+    );
+    if (!it) return;
+    anular(`«${it.name}» saiu dos custos.`, () =>
+      persist(`repor «${it.name}» nos custos`, (atuais) =>
+        atuais.some((x) => x.id === id)
+          ? atuais
+          : [...atuais.slice(0, onde), it, ...atuais.slice(onde)],
+      ),
     );
   }
 
