@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { todayKey } from "./util";
 import {
   Button,
@@ -842,6 +843,7 @@ export default function Tarefas({
   pedidoDeNova?: number;
 }) {
   const { toast } = useToast();
+  const anular = useAnular();
   const {
     data: tasks = [],
     setData: setTasks,
@@ -1261,6 +1263,12 @@ export default function Tarefas({
       }),
     });
     if (!ok && anterior) setTasks((prev) => prev.map((t) => (t.id === id ? anterior : t)));
+    if (!ok || !anterior) return;
+    const voltar: Record<string, unknown> = {};
+    for (const k of Object.keys(editTaskFields) as (keyof Task)[]) voltar[k] = anterior[k] ?? null;
+    anular(`«${titulo}» atualizada.`, () =>
+      gravarCampos(id, voltar as Partial<Task>, `voltar ao que estava em «${titulo}»`),
+    );
   }
 
   async function add(fecharDepois = false) {
@@ -1322,6 +1330,20 @@ export default function Tarefas({
       return;
     }
     setTasks((prev) => [task, ...prev]);
+    // Acrescentar anula-se apagando a que se criou — nada mais aponta para ela.
+    anular(`Tarefa «${task.title}» criada.`, async () => {
+      setTasks((prev) => prev.filter((x) => x.id !== task.id));
+      const { ok: apagou } = await gravar(
+        `tirar a tarefa «${task.title}»`,
+        `/api/tarefas/${task.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+      if (!apagou)
+        setTasks((prev) => (prev.some((x) => x.id === task.id) ? prev : [task, ...prev]));
+      return apagou;
+    });
     setTitle("");
     setDueDate("");
     setPriority("normal");
@@ -1474,6 +1496,39 @@ export default function Tarefas({
       return ok;
     },
     [gravar, setTasks],
+  );
+
+  /**
+   * ── O MESMO, COM «ANULAR» ───────────────────────────────────────────────
+   * «Tem que haver em tudo uma forma de voltar atrás» (10/10,
+   * `docs/TUDO-REVERSIVEL.md`). Grava como o `gravarCampos` e, se ficou, oferece
+   * o «Anular» da casa com os valores de ANTES dos campos que mudaram — `null`
+   * quando não havia nada, para apagar mesmo (o esquema aceita `nullish`).
+   */
+  /* O `gravarCampos` pela ref, como o `alternar`: o resultado dele sai destas
+     funções (é o que o «Anular» espera), e o React Compiler deixava de
+     conseguir guardar a memorização do ecrã com ele na lista de dependências. */
+  const gravarCamposRef = useRef(gravarCampos);
+  useEffect(() => {
+    gravarCamposRef.current = gravarCampos;
+  }, [gravarCampos]);
+
+  const gravarComAnular = useCallback(
+    async (id: string, campos: Partial<Task>, oQue: string): Promise<boolean> => {
+      const anterior = tasksRef.current.find((t) => t.id === id);
+      const ok = await gravarCamposRef.current(id, campos, oQue);
+      if (!ok || !anterior) return ok;
+      const voltar: Record<string, unknown> = {};
+      for (const k of Object.keys(campos) as (keyof Task)[]) {
+        const antes = anterior[k];
+        voltar[k] = antes ?? (Array.isArray(campos[k]) ? [] : null);
+      }
+      anular(`Feito: ${oQue}.`, () =>
+        gravarCamposRef.current(id, voltar as Partial<Task>, `voltar atrás em «${anterior.title}»`),
+      );
+      return ok;
+    },
+    [anular],
   );
 
   // Uma passagem só: as pessoas, e quantas tarefas por fazer tem cada uma. Antes
@@ -1641,24 +1696,23 @@ export default function Tarefas({
    * filtro por pessoa ligado, mexer numa linha não pode reatribuir sítio às
    * tarefas que o filtro escondeu.
    */
-  const gravarOrdem = useCallback(
-    (ordem: readonly string[], mover: string) => {
-      /* As tarefas que já não existem saem antes de se calcular seja o que for:
+  const gravarOrdem = useCallback((ordem: readonly string[], mover: string) => {
+    /* As tarefas que já não existem saem antes de se calcular seja o que for:
          um id fantasma na ordem manual (uma tarefa eliminada noutro
          separador) obrigava a renumerar a lista toda e, pior, mandava um
          `PATCH` a um endereço que responde 404. */
-      const existentes = ordem.filter((id) => tasksRef.current.some((t) => t.id === id));
-      const escritas = posicoesDepoisDeMover(
-        existentes,
-        (id) => tasksRef.current.find((t) => t.id === id)?.posicao,
-        mover,
-      );
-      for (const e of escritas) {
-        void gravarCampos(e.id, { posicao: e.posicao }, "guardar a ordem das tarefas");
-      }
-    },
-    [gravarCampos],
-  );
+    const existentes = ordem.filter((id) => tasksRef.current.some((t) => t.id === id));
+    const escritas = posicoesDepoisDeMover(
+      existentes,
+      (id) => tasksRef.current.find((t) => t.id === id)?.posicao,
+      mover,
+    );
+    return Promise.all(
+      escritas.map((e) =>
+        gravarCamposRef.current(e.id, { posicao: e.posicao }, "guardar a ordem das tarefas"),
+      ),
+    ).then((r) => r.every(Boolean));
+  }, []);
 
   const aplicarOrdem = useCallback(
     (mover: string, destino: string | null) => {
@@ -1670,7 +1724,7 @@ export default function Tarefas({
       // nem se avisa, nem se oferece desfazer uma coisa que não aconteceu.
       if (nova.length === base.length && nova.every((id, i) => id === base[i])) return;
       setOrdemManual(nova);
-      gravarOrdem(nova, mover);
+      void gravarOrdem(nova, mover);
 
       /* ── O ANÚNCIO, E O DESFAZER ──────────────────────────────────────────
          «Arrasto com alternativa por menu e anúncio em `role="status"`»
@@ -1685,15 +1739,13 @@ export default function Tarefas({
       const visiveis = nova.filter((id) => idsVisiveisRef.current.includes(id));
       const onde = visiveis.indexOf(mover);
       const titulo = tasksRef.current.find((t) => t.id === mover)?.title ?? "Tarefa";
-      toast(`«${titulo}» movida — ${onde + 1} de ${visiveis.length}`, "success", {
-        rotulo: "Anular",
-        aoTocar: () => {
-          setOrdemManual(base);
-          gravarOrdem(base, mover);
-        },
+      // O «Anular» da casa: espera pelo servidor e diz «Anulado.» só se ficou.
+      anular(`«${titulo}» movida — ${onde + 1} de ${visiveis.length}`, () => {
+        setOrdemManual(base);
+        return gravarOrdem(base, mover);
       });
     },
-    [gravarOrdem, toast],
+    [gravarOrdem, anular],
   );
 
   /**
@@ -1784,13 +1836,13 @@ export default function Tarefas({
   const porPrazo = useCallback(
     (t: Task, quando: "hoje" | "amanha") => {
       const dia = quando === "hoje" ? todayStr : amanha(todayStr);
-      void gravarCampos(
+      void gravarComAnular(
         t.id,
         { dueDate: dia },
         `pôr «${t.title}» para ${quando === "hoje" ? "hoje" : "amanhã"}`,
       );
     },
-    [gravarCampos, todayStr],
+    [gravarComAnular, todayStr],
   );
 
   const escolher = useCallback((t: Task) => setEscolhida(t.id), []);
@@ -2597,7 +2649,7 @@ export default function Tarefas({
             tarefa={tarefaEscolhida}
             aoFechar={() => setEscolhida(null)}
             aoEditar={startEditTask}
-            aoGravar={gravarCampos}
+            aoGravar={gravarComAnular}
           />
         </div>
       </div>

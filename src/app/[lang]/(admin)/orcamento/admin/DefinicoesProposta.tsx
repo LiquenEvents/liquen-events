@@ -7,6 +7,7 @@ import { lerNumero, type LimitesDoNumero } from "@/lib/numero-escrito";
 import { porqueFalhou, porqueRecusou } from "@/lib/erro-do-servidor";
 import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { SkeletonList } from "./Skeleton";
 import Miniaturas from "./Miniaturas";
 import ValoresSuspeitos from "./ValoresSuspeitos";
@@ -281,9 +282,35 @@ const CAMPOS_DE = {
   margem: ["margemMinima"] as const,
 };
 
+/** Grava uma secção; devolve as definições como ficaram, ou atira a razão. */
+async function porNoServidor(id: "deslocacao" | "margem", valor: object): Promise<Parametros> {
+  const res = await fetch("/api/proposta-definicoes", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, valor }),
+  });
+  if (!res.ok) {
+    // A recusa do servidor tal como ele a explica — em português, e não
+    // «não foi possível guardar», que não diz o que fazer a seguir.
+    throw new Error((await porqueRecusou(res)) ?? "Não foi possível guardar.");
+  }
+  return (await res.json()) as Parametros;
+}
+
+/** O `valor` de uma secção, tirado das definições gravadas. */
+const valorDe = (p: Parametros, id: "deslocacao" | "margem"): object =>
+  id === "deslocacao" ? p.deslocacao : { minima: p.margemMinima };
+
 export default function DefinicoesProposta() {
   const { toast } = useToast();
+  const anular = useAnular();
   const [p, setP] = useState<Parametros | null>(null);
+  /**
+   * O que está GRAVADO, à parte do que está escrito. O `p` muda a cada tecla;
+   * o «Anular» de um «Guardar» tem de repor o que estava no servidor antes
+   * dele, e esse valor só existe aqui.
+   */
+  const gravado = useRef<Parametros | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aGravar, setAGravar] = useState(false);
   /** O que está escrito e não dá um número que sirva, campo a campo. */
@@ -308,7 +335,10 @@ export default function DefinicoesProposta() {
         const j = await r.json();
         if (!vivo) return;
         if (!r.ok) setErro(j?.error ?? "Não foi possível ler as definições.");
-        else setP(j as Parametros);
+        else {
+          gravado.current = j as Parametros;
+          setP(j as Parametros);
+        }
       })
       .catch(() => vivo && setErro("Não foi possível falar com o servidor."));
     return () => {
@@ -331,18 +361,27 @@ export default function DefinicoesProposta() {
       }
       setAGravar(true);
       try {
-        const res = await fetch("/api/proposta-definicoes", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, valor }),
-        });
-        if (!res.ok) {
-          // A recusa do servidor tal como ele a explica — em português, e não
-          // «não foi possível guardar», que não diz o que fazer a seguir.
-          throw new Error((await porqueRecusou(res)) ?? "Não foi possível guardar.");
+        const antes = gravado.current;
+        const agora = await porNoServidor(id, valor);
+        gravado.current = agora;
+        setP(agora);
+        const feito = "Guardado. As propostas seguintes já usam estes valores.";
+        if (!antes) {
+          toast(feito, "success");
+          return;
         }
-        setP((await res.json()) as Parametros);
-        toast("Guardado. As propostas seguintes já usam estes valores.", "success");
+        // O «Anular» grava a secção como estava antes deste «Guardar».
+        anular(feito, async () => {
+          try {
+            const reposto = await porNoServidor(id, valorDe(antes, id));
+            gravado.current = reposto;
+            setP(reposto);
+            return true;
+          } catch (e) {
+            toast(porqueFalhou(e, "Não foi possível anular. Verifica a ligação."), "error");
+            return false;
+          }
+        });
       } catch (e) {
         // Medido com a ligação cortada a meio do PUT: o aviso que aparecia no
         // ecrã era «Failed to fetch» — a frase do browser, em inglês, e que não
@@ -354,7 +393,7 @@ export default function DefinicoesProposta() {
         setAGravar(false);
       }
     },
-    [toast, porCorrigir],
+    [toast, anular, porCorrigir],
   );
 
   if (erro) {

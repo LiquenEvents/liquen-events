@@ -19,6 +19,7 @@ import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 const CATEGORIES = [
@@ -117,6 +118,7 @@ const PlusIcon = (
 
 export default function Fornecedores() {
   const { toast } = useToast();
+  const anular = useAnular();
 
   const {
     data: suppliers = [],
@@ -158,6 +160,7 @@ export default function Fornecedores() {
           s.preferred ? `tirar «${s.name}» dos preferidos` : `marcar «${s.name}» como preferido`,
           s.id,
           { preferred: !s.preferred },
+          s.preferred ? `«${s.name}» saiu dos preferidos.` : `«${s.name}» marcado como preferido.`,
         ),
     },
     { id: "editar", rotulo: "Editar", icone: LapisIcon, onAccao: () => startEdit(s) },
@@ -296,7 +299,17 @@ export default function Fornecedores() {
     }
   }
 
-  async function patchSupplier(oQue: string, id: string, patch: PatchFornecedor): Promise<boolean> {
+  /**
+   * Grava uma alteração à ficha. Com `feito` (a frase do que aconteceu), o
+   * aviso traz «Anular», que grava os campos tocados como estavam — `null` onde
+   * antes não havia nada, que é o «apagar este campo» que a rota entende.
+   */
+  async function patchSupplier(
+    oQue: string,
+    id: string,
+    patch: PatchFornecedor,
+    feito?: string,
+  ): Promise<boolean> {
     // O anterior é DESTA ficha (ver a nota em `remove`): repor a lista inteira
     // apagava do ecrã as alterações que outra gravação tivesse feito entretanto.
     const anterior = suppliers.find((s) => s.id === id);
@@ -315,6 +328,12 @@ export default function Fornecedores() {
     if (!ok) {
       if (anterior) setSuppliers((prev) => prev.map((s) => (s.id === id ? anterior : s)));
       return false;
+    }
+    if (feito && anterior) {
+      const inverso = Object.fromEntries(
+        Object.keys(patch).map((k) => [k, anterior[k as keyof Supplier] ?? null]),
+      ) as PatchFornecedor;
+      anular(feito, () => patchSupplier(`repor «${anterior.name}» como estava`, id, inverso));
     }
     return true;
   }
@@ -335,7 +354,15 @@ export default function Fornecedores() {
     // A edição só FECHA se o servidor tiver aceitado. Fechá-la de qualquer
     // maneira era mostrar-lhe o valor antigo de volta sem explicação nenhuma.
     const nome = suppliers.find((x) => x.id === id)?.name ?? editForm.name.trim();
-    if (!(await patchSupplier(`guardar as alterações a «${nome}»`, id, editForm))) return;
+    if (
+      !(await patchSupplier(
+        `guardar as alterações a «${nome}»`,
+        id,
+        editForm,
+        `«${editForm.name.trim() || nome}» guardado.`,
+      ))
+    )
+      return;
     setEditingId(null);
   }
 
@@ -705,6 +732,9 @@ export default function Fornecedores() {
                               : `marcar «${s.name}» como preferido`,
                             s.id,
                             { preferred: !s.preferred },
+                            s.preferred
+                              ? `«${s.name}» saiu dos preferidos.`
+                              : `«${s.name}» marcado como preferido.`,
                           )
                         }
                         className={`alvo-toque p-1.5 ${ESTADO} ${PRESSAO} ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-[var(--bo-text-muted)] hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
@@ -750,6 +780,9 @@ export default function Fornecedores() {
                               : `avaliar «${s.name}» com ${star} estrela${star !== 1 ? "s" : ""}`,
                             s.id,
                             { rating: s.rating === star ? null : star },
+                            s.rating === star
+                              ? `Tirada a avaliação de «${s.name}».`
+                              : `«${s.name}» com ${star} estrela${star !== 1 ? "s" : ""}.`,
                           )
                         }
                         /* MEDIDO a 375px: 13×13 px, 2px de uma estrela para a

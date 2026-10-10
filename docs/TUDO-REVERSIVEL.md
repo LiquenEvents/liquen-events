@@ -31,8 +31,8 @@ volta atrás (a rota respondia 409).
 | Fase | Estado |
 |---|---|
 | **R1** — o padrão, os estados do pedido e a cadeia do Ganho, Propostas e Acompanhamento, Propostas Aceites, pagamentos, os dois envios | Feita no ramo `feat/anular-r1` |
-| **R2a** — a gaveta do pedido: os campos do «Guardar» e todas as listas | Feita no ramo `feat/anular-r2a` |
-| **R2b** — o resto do back office, e os «Anular» antigos passam ao padrão | Por fazer |
+| **R2a** — a gaveta do pedido: os campos do «Guardar» e todas as listas | Feita (#188) |
+| **R2b** — o resto do back office, e os «Anular» antigos passam ao padrão | Feita no ramo `feat/anular-r2b` |
 | **R3** — a Reciclagem de 30 dias | Por fazer (precisa de uma migração, que só corre com a aprovação dela) |
 
 **Onde a R1 se afastou do plano.** Apagar um pagamento ficou com «Anular» e
@@ -49,6 +49,44 @@ alguém pode já ter começado seria apagar trabalho a meio de um «Anular».
 a mexer nela pisavam-se sem aviso (o servidor protege `guestList`, mas só pode recusar quando
 a `base` vem). Passou a mandá-la, como as outras listas da gaveta. Riscar/desriscar, o RSVP e o
 número de pessoas não levam «Anular»: desfazem-se no mesmo sítio, com o mesmo toque.
+
+**Na R2b:**
+
+- **Passaram ao padrão os «Anular» feitos à mão:**
+  - a linha removida de uma lista de material, que tinha uma barra de 8 s;
+  - os serviços do estúdio, que tinham uma barra de 5 s; o ⌘Z fica;
+  - o mover fotos por arrasto dos Temas.
+- **O reordenar das tarefas passou a esperar pelo servidor**, e diz quando falha.
+- **Ficam como estão, de propósito, o `EditorDeEscolhas`, o construtor e o «Limpar» do
+  estúdio.** Já duram 10 s e mostram a contagem decrescente à vista, que é o desenho do
+  estúdio inteiro. Trocá-los pelo aviso comum, dentro do mesmo ecrã, punha ali dois
+  desenhos diferentes para o mesmo gesto.
+- **Acrescentar anula-se apagando o que se criou** (tarefa, marcação do calendário, item do
+  catálogo ou do inventário): nada aponta ainda para uma coisa acabada de nascer.
+- **Remover uma marcação do calendário anula-se recriando-a**, com o mesmo título, tipo,
+  hora, nota e dia, mas com um id novo. Nada aponta para o id de uma marcação; a ligação às
+  datas-chave de um «Ganho» vive dentro da nota, que vai igual.
+- **Definições da proposta:** o «Anular» repõe o que estava **gravado** antes do
+  «Guardar», e não o que estava escrito no campo, que muda a cada tecla.
+- **Notas da equipa:** o «Anular» é o da sessão de escrita e aparece ao **fechar** o
+  editor, porque elas gravam sozinhas a cada pausa. **Notas e meta** voltam com a revisão
+  de agora: se outra pessoa gravou entretanto, aparece o aviso de conflito de sempre, com
+  as duas versões lado a lado, e não aparece «Anulado.».
+- **De passagem:** o «Anular» de arquivar um serviço que nunca tinha sido arquivado ia
+  vazio, porque o campo não existia e `undefined` não chega ao servidor. Volta como `false`,
+  e há um teste que o prende.
+
+**Ficou para a R3, e porquê:**
+- **Apagar material, listas, regras, fornecedores e tarefas.** O id tem de voltar igual,
+  porque as listas base e as regras apontam para ele, e os POST de hoje ignoram um id
+  vindo de fora.
+- **Fundir temas e apagar etiquetas de fotos.** As rotas não devolvem o que mudaram, por
+  isso não há com que repor.
+- **O «Mover/duplicar» por diálogo dos Temas.** Não guarda os destinos de cada foto.
+- **«Voltar a gerar» o material do evento, importar CSV e criar uma lista a partir de
+  outra.** Criam dezenas de linhas de uma vez, e anulá-los é a Reciclagem em lote.
+- **A capa de um tema, quando a capa de antes não está carregada na grelha.** Não há os
+  campos de que o cartão da lista precisa; aí não se oferece «Anular».
 
 ## O mapa — o que tinha e o que não tinha volta atrás (análise de 10/10)
 
@@ -88,7 +126,8 @@ que caiu não é um engano.
 | Editar o documento | ✅ «Desfazer» e ⌘Z (50 estados, na sessão) | — |
 | Limpar, remover foto/fase/linha/extra, «Criar a partir de…» | ✅ «Anular» 10 s | — |
 | Versões, resgate, «Repor os valores que seguiram» | ✅ | — |
-| Serviços, escolhas do casal, construtor, curadoria | ✅ «Anular» (5–10 s) → passa ao padrão | R2 |
+| Serviços | ✅ «Anular» da casa (era uma barra de 5 s); o ⌘Z fica | R2b |
+| Escolhas do casal, construtor, curadoria | ✅ «Anular» de 10 s com contagem à vista — fica, é o desenho do estúdio | — |
 | Enviar a proposta | 10 s para cancelar (depois da confirmação) | R1 |
 | Guardar como modelo / biblioteca | Apagar o modelo | R2 |
 
@@ -108,23 +147,29 @@ que caiu não é um engano.
 ### Calendário, Tarefas
 | Acção | Volta atrás | Fase |
 |---|---|---|
-| Novo / duplicar evento | Apagar | R2 |
-| Remover evento | «Anular» (recria) → Reciclagem | R2 · R3 |
-| Concluir tarefa, reordenar | ✅ «Anular» | — |
-| Editar, «Hoje/Amanhã», acrescentar | «Anular» | R2 |
+| Novo / duplicar evento | ✅ «Anular» (apaga o que se criou) | R2b |
+| Remover evento | ✅ «Anular» (recria) → Reciclagem | R2b · R3 |
+| Concluir tarefa, reordenar | ✅ «Anular» (o reordenar espera pelo servidor) | R2b |
+| Editar, notas, subtarefas, anexos, «Hoje/Amanhã», acrescentar | ✅ «Anular» | R2b |
 | Apagar tarefa | Reciclagem | R3 |
 
 ### Material, inventário, fornecedores, serviços, temas, definições
 | Acção | Volta atrás | Fase |
 |---|---|---|
-| Acrescentar / editar item, listas, importar CSV | «Anular» | R2 |
+| Acrescentar / editar item (catálogo e inventário) | ✅ «Anular» | R2b |
+| Importar CSV, criar lista a partir de outra, «Voltar a gerar» | Reciclagem em lote | R3 |
 | Remover item / lista / regra / fornecedor | Reciclagem | R3 |
-| Linha de lista removida, regra ligada/desligada, serviço arquivado | ✅ | — |
-| Temas: mover fotos, arquivar | ✅ | — |
-| Temas: renomear, capa, ordem, etiquetas, fundir | «Anular» | R2 |
+| Linha de lista removida | ✅ «Anular» da casa (era uma barra de 8 s) | R2b |
+| Regra ligada/desligada | ✅ «Anular» | R2b |
+| Fornecedores: editar, preferido, estrelas | ✅ «Anular» | R2b |
+| Serviços da biblioteca: arquivar, desarquivar, corrigir | ✅ «Anular» | R2b |
+| Temas: mover fotos por arrasto | ✅ «Anular» da casa | R2b |
+| Temas: arquivar, fixar | ✅ «Anular» | R2b |
+| Temas: renomear (na lista e na pasta), capa, ordem das fotos | ✅ «Anular» | R2b |
+| Temas: etiquetas, fundir, «Mover/duplicar» por diálogo | Reciclagem | R3 |
 | Temas: remover fotos / apagar tema | Reciclagem (as fotos vão para `reciclagem/`) | R3 |
 | Modelos de email (bilingues) | ✅ 10 versões e «Repor» | — |
-| Modelos de email (editor clássico), definições da proposta, notas da Visão Geral | «Anular» e versões | R2 |
+| Modelos de email (editor clássico), definições da proposta, notas e meta da Visão Geral | ✅ «Anular» | R2b |
 | Repor cópia de segurança | ✅ guarda «antes do restauro» | — |
 
 ### O que não se pode desfazer, por natureza
