@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Proposal, Quote } from "@/lib/orcamento/types";
+import { hojeNoEstudio } from "@/lib/fuso";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
 import Acompanhamento from "./Acompanhamento";
@@ -42,10 +43,17 @@ const response = (body: unknown) => ({
   json: async () => body,
 });
 
-/** Datas relativas a hoje, para o teste não apodrecer com o calendário. */
+/**
+ * Datas relativas a hoje, para o teste não apodrecer com o calendário.
+ *
+ * «Hoje» é o dia de LISBOA (`hojeNoEstudio`), porque é por ele que o painel
+ * conta (`diasAte`, em `proposta-estado.ts`). Contado em UTC, entre a
+ * meia-noite de Lisboa e a de UTC os dois dias não batiam certo, e três testes
+ * deste ficheiro ficavam vermelhos uma hora por noite em todos os PRs.
+ */
 function daquiA(dias: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + dias);
+  const d = new Date(`${hojeNoEstudio()}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
   return d.toISOString().slice(0, 10);
 }
 
@@ -149,6 +157,30 @@ describe("o que mostra", () => {
     await waitFor(() => expect(screen.getByText("Expirada")).toBeTruthy());
     const nomes = screen.getAllByText(/^(Viva|Expirada)$/).map((n) => n.textContent);
     expect(nomes[0]).toBe("Expirada");
+    expect(screen.getByText(/Validade acabou há 5 dias/)).toBeTruthy();
+  });
+});
+
+describe("a hora em que Lisboa já mudou de dia e UTC ainda não", () => {
+  // 23:30 UTC de 10 de Julho é 00:30 de 11 em Lisboa (hora de Verão). Era a
+  // hora em que estes testes falhavam: fixa-se aqui, para não depender do
+  // relógio do CI. Só o `Date` é falso — os temporizadores ficam verdadeiros,
+  // senão o `waitFor` não anda.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-07-10T23:30:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("conta os dias pelo dia de Lisboa", async () => {
+    expect(daquiA(0)).toBe("2026-07-11");
+    montar([
+      proposta({ id: "p-quase", clientName: "Quase", validUntil: daquiA(3) }),
+      proposta({ id: "p-acabou", clientName: "Acabou", validUntil: daquiA(-5) }),
+    ]);
+
+    await waitFor(() => expect(screen.getByText("Quase")).toBeTruthy());
+    expect(screen.getByText(/Validade acaba daqui a 3 dias/)).toBeTruthy();
     expect(screen.getByText(/Validade acabou há 5 dias/)).toBeTruthy();
   });
 });
