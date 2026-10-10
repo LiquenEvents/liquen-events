@@ -475,7 +475,9 @@ export default function DefinicoesProposta({
           30 dias. Não está no menu — é um destino de vez em quando —, e é aqui
           que se procura «onde foi parar o que apaguei». */}
       {onAbrirReciclagem && (
-        <Card padding="md" style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena">
+        // Sem degrau próprio: a escada desta vista já tem os quatro da casa
+        // (`vistas-que-se-compoem.test.ts`), e esta linha anda com a Aparência.
+        <Card padding="md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-sm font-medium text-[var(--bo-text)]">Reciclagem</h2>
