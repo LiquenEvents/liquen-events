@@ -1,5 +1,11 @@
 import type { Proposal } from "@/lib/orcamento/types";
-import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
+import {
+  createContractIfAbsent,
+  deleteContract,
+  getContractByProposal,
+  newContractId,
+} from "@/lib/contracts-store";
+import { listProposalsForQuote, updateProposal } from "@/lib/proposals-store";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { TERMS_VERSION, termosPara, termsToPlainText } from "@/lib/contract-terms";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
@@ -53,4 +59,48 @@ export function nascerContratoDoGanho(quoteId: string, proposta: Proposal) {
     ...(proposta.versaoSelo !== undefined ? { propostaVersaoSelo: proposta.versaoSelo } : {}),
     ...(proposta.versaoNumero !== undefined ? { propostaVersaoNumero: proposta.versaoNumero } : {}),
   });
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DESFAZER UM «GANHO» MARCADO POR ENGANO — E O QUE ELE ARRASTOU
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, a 10/10: «tem que haver no site todo, em tudo aquilo que se
+ * faz, uma forma de voltar atrás». Pôr um pedido em «Ganho» faz três coisas
+ * além de mudar a coluna: aceita a proposta, cria o contrato e pré-preenche a
+ * produção. O «Anular» do estado tem de levar as duas primeiras de volta, ou o
+ * pedido volta para trás e o contrato fica nas Propostas Aceites a dizer o
+ * contrário.
+ *
+ *  · a proposta aceite volta a `enviada`, sem data de resposta;
+ *  · o contrato dessa proposta sai — SÓ se ainda estiver `pendente` e sem
+ *    registo nenhum. Um contrato que alguém já marcou como assinado é trabalho
+ *    de uma pessoa, e não se apaga por arrasto;
+ *  · a produção pré-preenchida FICA. A sementeira é idempotente (marcar
+ *    «Ganho» outra vez não duplica nada) e o histórico diz o que entrou; e
+ *    tirar tarefas que alguém pode já ter começado a riscar seria apagar
+ *    trabalho a meio de um «Anular». Diz-se no aviso.
+ *
+ * Só corre quando o ecrã o pede explicitamente (`desfazerGanho` no PATCH do
+ * pedido) — mover um pedido de «Ganho» para «Perdido» porque o casamento caiu
+ * NÃO é desfazer, e o contrato desse fica para a história.
+ */
+export async function desfazerCadeiaDoGanho(quoteId: string): Promise<{
+  propostas: number;
+  contratos: number;
+}> {
+  let propostas = 0;
+  let contratos = 0;
+  for (const p of await listProposalsForQuote(quoteId)) {
+    if (p.status !== "aceite") continue;
+    await updateProposal(p.id, { status: "enviada", respondedAt: "" });
+    propostas++;
+    const c = await getContractByProposal(p.id);
+    if (c && c.status === "pendente" && !c.registadoComo && !c.acceptedAt) {
+      await deleteContract(c.id);
+      contratos++;
+    }
+  }
+  return { propostas, contratos };
 }

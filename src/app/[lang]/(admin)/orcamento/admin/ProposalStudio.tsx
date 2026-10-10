@@ -206,6 +206,7 @@ import {
   type ContextoDoPreco,
 } from "@/lib/preco-do-pedido";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { useEnvioAdiado } from "./ui/envio-adiado";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -1390,6 +1391,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [copiarAberto, setCopiarAberto] = useState(false);
   /** Quando apareceu a pergunta «Enviar para…?» — ver `CONFIRMAR_ENVIO_APOS_MS`. */
   const perguntaDoEnvioDesde = useRef(0);
+  /**
+   * ── DEZ SEGUNDOS PARA CANCELAR, DEPOIS DO «CONFIRMAR» ─────────────────────
+   *
+   * Ela escolheu «10 s para cancelar», como o Gmail (`docs/TUDO-REVERSIVEL.md`).
+   * Só no email: no WhatsApp a janela tem de abrir DENTRO do clique (achado
+   * n.º 4) e, de qualquer modo, é ela quem carrega em «Enviar» no WhatsApp —
+   * a última palavra já é dela. O envio lê-se pela ref no fim da espera, para
+   * levar o documento como está nesse instante e não como estava no clique.
+   */
+  const envioAdiado = useEnvioAdiado();
+  const enviarAgora = useRef<() => void>(() => {});
   const [copiaSubstitui, setCopiaSubstitui] = useState<string | null>(null);
   /**
    * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
@@ -6603,6 +6615,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * é o segundo clique: o mesmo envio, com a resposta dada. Não é um botão
    * diferente nem um caminho diferente — é o mesmo, com `cortesConfirmados`.
    */
+  // A ref aponta sempre para o `send` deste render (o documento de agora).
+  useEffect(() => {
+    enviarAgora.current = () => void send();
+  });
+  // Sair do passo do envio a meio da espera cancela: a faixa «A enviar em…»
+  // só existe neste passo, e nada sai sem ela estar a ver.
+  const cancelarEnvioAdiado = envioAdiado.cancelar;
+  useEffect(() => {
+    if (step !== "enviar" || sent) cancelarEnvioAdiado();
+  }, [step, sent, cancelarEnvioAdiado]);
   async function send(cortesConfirmados = false) {
     if (busy) return;
     // A trava do envio é o `canSend` (o botão nem chega a estar ligado), mas
@@ -11609,6 +11631,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   </Button>
                 </div>
               </div>
+            ) : envioAdiado.aEsperar ? (
+              <div
+                className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="text-right text-sm text-[var(--bo-text)]">
+                  A enviar para {quote.email || "o cliente"} em {envioAdiado.restam} s…{" "}
+                  <span className="text-xs text-[var(--bo-text-muted)]">
+                    Se saíres deste ecrã antes disso, não sai nada.
+                  </span>
+                </span>
+                <span className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={envioAdiado.cancelar}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={envioAdiado.enviarJa}>
+                    Enviar já
+                  </Button>
+                </span>
+              </div>
             ) : confirmSend ? (
               /* ── A ÚLTIMA PERGUNTA, COM O QUE VAI LÁ DENTRO ───────────────
                  Dizia «Enviar para maria@example.pt?» e mais nada. É a acção
@@ -11664,7 +11707,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       ) {
                         return;
                       }
-                      void send();
+                      if (canal === "whatsapp") {
+                        void send();
+                        return;
+                      }
+                      setConfirmSend(false);
+                      envioAdiado.agendar(() => enviarAgora.current());
                     }}
                     disabled={busy !== null}
                   >

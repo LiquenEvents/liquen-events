@@ -23,6 +23,7 @@ import {
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { referenciaCurta } from "@/lib/referencia-curta";
 
@@ -191,13 +192,71 @@ function StatusChip({ status }: { status: ContractStatus }) {
  * sem nada por trás, e o PDF do contrato ficava a afirmar um aceite que
  * ninguém consegue mostrar.
  */
+/**
+ * Desfaz o registo do «Marcar como assinado» — volta a `pendente`. Ver o
+ * bloco «E VOLTA ATRÁS» na rota. Atira com a frase do servidor quando ele
+ * recusa (um aceite electrónico do casal, que é prova e não se desfaz).
+ */
+async function desfazerRegisto(id: string) {
+  const res = await fetch(`/api/contratos/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ desfazer: true }),
+  });
+  const corpo = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (!res.ok) throw new Error(corpo?.error || `O servidor respondeu ${res.status}.`);
+}
+
+/** Um registo feito pela equipa — e por isso um que se pode desfazer. */
+const registadoPelaEquipa = (c: Contract) =>
+  c.status === "aceite" && !c.acceptedIp && !!(c.registadoComo || c.registadoPor || c.acceptedAt);
+
 function RegistarAceite({ contrato, feito }: { contrato: Contract; feito: () => void }) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [aberto, setAberto] = useState(false);
   const [como, setComo] = useState("");
   const [aGravar, setAGravar] = useState(false);
+  const [aDesfazer, setADesfazer] = useState(false);
 
-  if (contrato.status === "aceite") return null;
+  /**
+   * Já assinado: em vez de nada, a volta atrás — «Voltar a pendente», para um
+   * registo da equipa. Palavras dela: «tem que haver no site todo, em tudo
+   * aquilo que se faz, uma forma de voltar atrás».
+   */
+  if (contrato.status === "aceite") {
+    if (!registadoPelaEquipa(contrato)) return null;
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        loading={aDesfazer}
+        title="Desfaz o registo de que foi assinado — o contrato volta a pendente"
+        onClick={() => {
+          setADesfazer(true);
+          desfazerRegisto(contrato.id)
+            .then(() => {
+              anular("Contrato voltou a pendente.", async () => {
+                const res = await fetch(`/api/contratos/${encodeURIComponent(contrato.id)}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ como: contrato.registadoComo || "registo reposto" }),
+                });
+                if (!res.ok) throw new Error("Não foi possível repor o registo.");
+                feito();
+              });
+              feito();
+            })
+            .catch((e: unknown) =>
+              toast(e instanceof Error ? e.message : "Não foi possível voltar atrás.", "error"),
+            )
+            .finally(() => setADesfazer(false));
+        }}
+      >
+        Voltar a pendente
+      </Button>
+    );
+  }
 
   async function registar() {
     if (aGravar) return;
@@ -219,7 +278,10 @@ function RegistarAceite({ contrato, feito }: { contrato: Contract; feito: () => 
       if (!res.ok) throw new Error(corpo?.error || `O servidor respondeu ${res.status}.`);
       setAberto(false);
       setComo("");
-      toast("Contrato marcado como assinado.", "success");
+      anular("Contrato marcado como assinado.", async () => {
+        await desfazerRegisto(contrato.id);
+        feito();
+      });
       feito();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Não foi possível registar o aceite.", "error");

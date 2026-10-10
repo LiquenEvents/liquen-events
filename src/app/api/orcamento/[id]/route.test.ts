@@ -114,13 +114,18 @@ const propostas = vi.hoisted(() => ({
 vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: propostas.getByQuote,
   updateProposal: propostas.update,
+  listProposalsForQuote: async () => (propostas.daQuote ? [propostas.daQuote] : []),
 }));
 const contratos = vi.hoisted(() => ({
   criar: vi.fn(async (c: Record<string, unknown>) => ({ created: true, contract: c })),
+  daProposta: null as null | Record<string, unknown>,
+  apagar: vi.fn(async (_id: string) => {}),
 }));
 vi.mock("@/lib/contracts-store", () => ({
   createContractIfAbsent: contratos.criar,
   newContractId: () => "contrato-novo",
+  getContractByProposal: async () => contratos.daProposta,
+  deleteContract: contratos.apagar,
 }));
 /**
  * O apagamento a sério vive em `apagar-pedido.ts` e tem os seus próprios
@@ -157,6 +162,7 @@ beforeEach(() => {
   rl.result = { ok: true };
   store.override = {};
   propostas.daQuote = null;
+  contratos.daProposta = null;
   vi.clearAllMocks();
 });
 
@@ -1123,5 +1129,45 @@ describe("PATCH /api/orcamento/[id] — a base de uma lista inteira", () => {
       ctx("LIQ-1"),
     );
     expect(res.status).toBe(200);
+  });
+});
+
+describe("PATCH /api/orcamento/[id] — «Anular» um Ganho leva o que ele arrastou", () => {
+  /**
+   * «tem que haver no site todo, em tudo aquilo que se faz, uma forma de voltar
+   * atrás». Pôr em Ganho aceita a proposta e cria o contrato; o «Anular» do
+   * estado leva os dois de volta — e só o «Anular».
+   */
+  it("com desfazerGanho: a proposta volta a enviada e o contrato pendente sai", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    propostas.daQuote = proposta({ status: "aceite" });
+    contratos.daProposta = { id: "c-1", status: "pendente" };
+    const res = await PATCH(req("PATCH", { status: "cotado", desfazerGanho: true }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(propostas.update).toHaveBeenCalledWith("prop-1", { status: "enviada", respondedAt: "" });
+    expect(contratos.apagar).toHaveBeenCalledWith("c-1");
+  });
+
+  it("um contrato já marcado como assinado NÃO sai por arrasto", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    propostas.daQuote = proposta({ status: "aceite" });
+    contratos.daProposta = { id: "c-1", status: "aceite", registadoComo: "papel" };
+    await PATCH(req("PATCH", { status: "cotado", desfazerGanho: true }), ctx("LIQ-1"));
+    expect(contratos.apagar).not.toHaveBeenCalled();
+  });
+
+  it("sem desfazerGanho (o casamento caiu: Ganho → Perdido), nada se desfaz", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    propostas.daQuote = proposta({ status: "aceite" });
+    contratos.daProposta = { id: "c-1", status: "pendente" };
+    await PATCH(req("PATCH", { status: "cotado" }), ctx("LIQ-1"));
+    expect(contratos.apagar).not.toHaveBeenCalled();
+    expect(propostas.update).not.toHaveBeenCalledWith("prop-1", {
+      status: "enviada",
+      respondedAt: "",
+    });
   });
 });

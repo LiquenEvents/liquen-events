@@ -93,6 +93,8 @@ import BotaoGuardarTudo from "./GuardarTudo";
 import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
 import { diasDesde, eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
+import { useAnular } from "./ui/anular";
+import { reporEstadoDoPedido } from "./anular-estado";
 import { useFocusTrap } from "./useFocusTrap";
 import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -1816,6 +1818,7 @@ export default function AdminClient({
    */
   const barraDeDestinosRef = useRef<HTMLElement | null>(null);
   const { toast } = useToast();
+  const anular = useAnular();
   const searchRef = useRef<HTMLInputElement>(null);
   /**
    * Focus trap for the mobile detail drawer — active only while it's the overlay.
@@ -3772,7 +3775,25 @@ export default function AdminClient({
         dizer(porque, "error");
         return { ok: false, porque };
       }
-      dizer("Pedido atualizado", "success");
+      // `selected` aqui ainda é o pedido de ANTES desta gravação (o fecho do
+      // clique) — é para o estado dele que o «Anular» volta.
+      const estadoAntes = selected.status;
+      if (updated.status !== estadoAntes) {
+        anular("Pedido atualizado", async () => {
+          const reposto = await reporEstadoDoPedido({
+            quoteId: updated.id,
+            de: estadoAntes,
+            para: updated.status,
+            actor: userName,
+          });
+          if (!reposto) return;
+          setQuotes((prev) => prev.map((q) => (q.id === reposto.id ? reposto : q)));
+          setSelected((prev) => (prev?.id === reposto.id ? reposto : prev));
+          setEditStatus(reposto.status);
+        });
+      } else {
+        dizer("Pedido atualizado", "success");
+      }
       return { ok: true };
     } catch {
       const porque = "Não foi possível guardar as alterações";
@@ -3839,6 +3860,8 @@ export default function AdminClient({
   async function applyBulkStatus(status: QuoteStatus, ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
     setLote({ titulo: "A marcar os pedidos…", feito: 0, total: ids.length });
+    // O estado de cada um ANTES — é para onde o «Anular» os leva de volta.
+    const antes = new Map(quotes.filter((q) => ids.includes(q.id)).map((q) => [q.id, q.status]));
     try {
       const results = await Promise.all(
         ids.map((id) =>
@@ -3867,12 +3890,26 @@ export default function AdminClient({
       }
       const ok = updated.size;
       const failed = ids.length - ok;
-      toast(
-        failed === 0
-          ? `${ok} pedido${ok !== 1 ? "s" : ""} atualizado${ok !== 1 ? "s" : ""}`
-          : `${ok} atualizado(s), ${failed} falhou(ram)`,
-        failed === 0 ? "success" : "error",
-      );
+      if (failed === 0) {
+        // «Anular» repõe cada um no estado em que estava (e desfaz o Ganho dos
+        // que lá foram por este gesto). Ver `anular-estado.ts`.
+        anular(`${ok} pedido${ok !== 1 ? "s" : ""} atualizado${ok !== 1 ? "s" : ""}`, async () => {
+          const repostos = await Promise.all(
+            [...updated.keys()].map((id) => {
+              const de = antes.get(id);
+              if (!de || de === status) return Promise.resolve(null);
+              return reporEstadoDoPedido({ quoteId: id, de, para: status, actor: userName });
+            }),
+          );
+          const porId = new Map(
+            repostos.filter((q): q is Quote => !!q).map((q) => [q.id, q] as const),
+          );
+          setQuotes((prev) => prev.map((q) => porId.get(q.id) ?? q));
+          setSelected((prev) => (prev && porId.has(prev.id) ? porId.get(prev.id)! : prev));
+        });
+      } else {
+        toast(`${ok} atualizado(s), ${failed} falhou(ram)`, "error");
+      }
       esquecerDaSeleccao(ids);
     } finally {
       setLote(null);
