@@ -5,6 +5,7 @@ import { useMemo, useState, useDeferredValue, type ReactNode } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { downloadCsv, dateStamp } from "./export";
 import {
   Button,
@@ -310,6 +311,7 @@ function CampoLocalizacao({ f, set, className }: CampoDeEdicao) {
 
 export default function Inventario() {
   const { toast } = useToast();
+  const anular = useAnular();
   const {
     data: items = [],
     setData: setItems,
@@ -409,7 +411,24 @@ export default function Inventario() {
     setItems((prev) => [...prev, corpo].sort((a, b) => a.name.localeCompare(b.name)));
     setForm(EMPTY_FORM);
     setAdding(false);
-    toast("Item adicionado.", "success");
+    // Anula-se apagando o que se criou.
+    const criado = corpo;
+    anular(`«${criado.name}» adicionado ao inventário.`, async () => {
+      setItems((prev) => prev.filter((i) => i.id !== criado.id));
+      const { ok: tirou } = await gravar(
+        `tirar «${criado.name}» do inventário`,
+        `/api/inventario/${criado.id}`,
+        { method: "DELETE" },
+      );
+      if (!tirou) {
+        setItems((prev) =>
+          prev.some((i) => i.id === criado.id)
+            ? prev
+            : [...prev, criado].sort((a, b) => a.name.localeCompare(b.name)),
+        );
+      }
+      return tirou;
+    });
   }
 
   async function saveEdit(id: string) {
@@ -462,7 +481,28 @@ export default function Inventario() {
       prev.map((i) => (i.id === id ? corpo : i)).sort((a, b) => a.name.localeCompare(b.name)),
     );
     setEditingId(null);
-    toast("Alterações guardadas.", "success");
+    if (!anterior) {
+      toast("Alterações guardadas.", "success");
+      return;
+    }
+    // O «Anular» grava o item como estava, pelo mesmo PATCH.
+    anular(`«${payload.name}» guardado.`, async () => {
+      const { ok: voltou, corpo: reposto } = await gravar(
+        `repor «${anterior.name}» como estava`,
+        `/api/inventario/${id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(toPayload(fromItem(anterior))),
+        },
+      );
+      if (voltou && pareceItem(reposto)) {
+        setItems((prev) =>
+          prev.map((i) => (i.id === id ? reposto : i)).sort((a, b) => a.name.localeCompare(b.name)),
+        );
+      }
+      return voltou;
+    });
   }
 
   /** A pergunta, com a quantidade e o sítio lá dentro. Ver o topo do ficheiro. */
