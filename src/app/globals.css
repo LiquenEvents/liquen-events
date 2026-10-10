@@ -5643,7 +5643,7 @@ body:has(.barra-consentimento) footer {
 .cortina {
   position: fixed;
   inset: 0;
-  /* Acima da barra dos cookies (`z-[70]`) e do aviso de navegação (80).
+  /* Acima da barra dos cookies (`z-[70]`) e da linha de navegação (80).
      A fotografia mostrou o rodapé de consentimento a espreitar por baixo do
      lema, que parece uma página partida a meio e não uma a caminho. */
   z-index: 90;
@@ -5770,18 +5770,19 @@ body:has(.barra-consentimento) footer {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   O AVISO DE QUE UMA PÁGINA ESTÁ A DEMORAR
+   A LINHA DE QUE UMA PÁGINA ESTÁ A DEMORAR
    ══════════════════════════════════════════════════════════════════════════
 
-   O porquê está no `AvisoDeCarregamento.tsx`. A regra desta peça é a OPOSTA
-   da cortina, e é a diferença que importa ao ler isto: a cortina tem um
-   mínimo e vê-se sempre, porque é marca; isto é INFORMAÇÃO, e informação que
-   não é precisa é ruído. Nasce invisível e só aparece se a navegação demorar
-   mais de 400 ms — a receita que os próprios documentos do Next recomendam.
+   O porquê está no `LinhaDeCarregamento.tsx`: ela pediu para tirar o ecrã
+   creme com o logótipo e escolheu «Linha fina no topo». A página onde se está
+   fica à vista; só corre uma linha de 2 px no topo até a próxima chegar.
+
+   É INFORMAÇÃO, não marca: nasce invisível e só aparece se a navegação
+   demorar mais de 150 ms. Uma navegação rápida não pinta um pixel.
 
    Só `transform` e `opacity`. */
 
-@keyframes aviso-a-aparecer {
+@keyframes linha-a-aparecer {
   from {
     opacity: 0;
   }
@@ -5790,61 +5791,79 @@ body:has(.barra-consentimento) footer {
   }
 }
 
-/* A respiração do logótipo, tal como no exemplo dela: `from{opacity:.9;
-   transform:scale(.9)} to{opacity:1;transform:scale(1)}`, em alternado. */
-@keyframes aviso-logo-a-respirar {
+/* Avança depressa ao princípio e cada vez mais devagar, sem nunca chegar ao
+   fim: não se sabe quanto falta, e uma linha que enche e fica parada cheia
+   diz «acabou» quando não acabou. Enche-se só quando a página chega. */
+@keyframes linha-a-avancar {
   from {
-    opacity: 0.9;
-    transform: scale(0.9);
+    transform: scaleX(0);
   }
   to {
-    opacity: 1;
-    transform: scale(1);
+    transform: scaleX(0.85);
   }
 }
 
-.a-caminho {
+.linha-a-caminho {
   position: fixed;
-  inset: 0;
-  /* Acima da barra dos cookies, que é `z-[70]`.
-     MEDIDO numa fotografia: com os dois no mesmo nível, ganhava a barra —
-     desenhada depois — e o aviso saía com um rodapé de consentimento por
-     cima, que parece uma página partida a meio e não uma a caminho. */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  /* Acima da barra de navegação (50), da linha do scroll (60) e da barra dos
+     cookies (70) — fica na mesma altura da linha do scroll e tapa-a enquanto
+     corre. Abaixo da cortina (90). */
   z-index: 80;
-  display: grid;
-  place-items: center;
-  /* O creme da casa, e NÃO o verde-quase-preto da cortina.
-     A cortina cobre a chegada a uma proposta e pode ser escura — é um
-     momento. Isto acontece ENTRE duas páginas claras do sítio, e um flash
-     preto pelo meio lê-se como uma avaria, não como um cuidado. */
-  background: var(--color-cream);
+  pointer-events: none;
   opacity: 0;
-  animation: aviso-a-aparecer 0.25s ease 0.4s forwards;
+  animation: linha-a-aparecer 0.2s ease 0.15s forwards;
 }
 
-.a-caminho__logo {
-  /* Os 56 px do exemplo dela eram para um SÍMBOLO. Este logótipo traz as nove
-     letras de «LÍQUEN EVENTS» ao lado do emblema — a essa largura, medido numa
-     fotografia a 390 px, as letras não se liam. 150 px é a mesma medida do
-     ecrã de espera da proposta (`loading.tsx`), e é onde o nome se lê. */
-  width: 150px;
-  max-width: 45vw;
-  height: auto;
-  animation: aviso-logo-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
+.linha-a-caminho__traco {
+  display: block;
+  height: 100%;
+  background: var(--color-moss);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: linha-a-avancar 8s cubic-bezier(0.1, 0.7, 0.3, 1) 0.15s forwards;
 }
 
-/* ── AQUI O MOVIMENTO REDUZIDO NÃO APAGA A PEÇA ───────────────────────────
-   A cortina desaparece por completo para quem pediu menos movimento, porque
-   é decoração. Esta não pode: é o que diz que algo está a acontecer, e a
-   regra dela é que isso nunca falta. Fica o logótipo quieto, sem respirar e
-   sem aparição — e continua a só surgir se a página demorar mesmo. */
-@media (prefers-reduced-motion: reduce) {
-  .a-caminho {
-    animation: none;
+/* A página chegou: a linha enche-se e apaga-se. */
+.linha-a-caminho[data-fase="chegou"] {
+  opacity: 1;
+  animation: linha-a-apagar 0.25s ease forwards;
+}
+.linha-a-caminho[data-fase="chegou"] .linha-a-caminho__traco {
+  animation: none;
+  transform: scaleX(1);
+  transition: transform 0.2s ease-out;
+}
+
+@keyframes linha-a-apagar {
+  from {
     opacity: 1;
-    transition-delay: 0.4s;
   }
-  .a-caminho__logo {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── COM MOVIMENTO REDUZIDO, A LINHA FICA, QUIETA ─────────────────────────
+   É o que diz que algo está a acontecer, e isso não pode faltar a quem pediu
+   calma. Sem correr e sem desvanecer: aparece de uma vez, já cheia, MAS só
+   aos 150 ms — o atraso está numa animação de duração zero, que é o que o
+   aviso antigo não tinha (um `transition-delay` sem `transition` não atrasa
+   nada, e o logótipo aparecia em todos os cliques). */
+@media (prefers-reduced-motion: reduce) {
+  .linha-a-caminho {
+    animation: linha-a-aparecer 0s linear 0.15s forwards;
+  }
+  .linha-a-caminho__traco,
+  .linha-a-caminho[data-fase="chegou"] .linha-a-caminho__traco {
+    animation: none;
+    transition: none;
+    transform: scaleX(1);
+  }
+  .linha-a-caminho[data-fase="chegou"] {
     animation: none;
   }
 }
