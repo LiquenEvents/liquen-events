@@ -141,9 +141,11 @@ describe("Propostas: ver as que já seguiram", () => {
     await screen.findAllByText("TESTE Zé");
     await u.click(screen.getAllByRole("button", { name: /Mais acções|Acções/i })[0]);
     const menu = await screen.findByRole("menu");
-    await u.click(within(menu).getByRole("menuitem", { name: "Ver o que seguiu…" }));
+    await u.click(
+      within(menu).getByRole("menuitem", { name: "Ver o que foi enviado para o cliente…" }),
+    );
     const folha = await screen.findByRole("dialog");
-    for (const r of ["Abrir o PDF que seguiu", "Abrir como o casal vê", "Copiar link"])
+    for (const r of ["Abrir o PDF que foi enviado", "Abrir como o casal vê", "Copiar link"])
       expect(within(folha).getByRole("button", { name: r })).toBeTruthy();
     expect(within(folha).getByText("Email enviado")).toBeTruthy();
   });
@@ -159,7 +161,9 @@ describe("«Ver o que seguiu» está À VISTA, não só nos três pontinhos", ()
     const u = userEvent.setup();
     desenhar("Zé");
     await screen.findAllByText("TESTE Zé");
-    const botoes = screen.getAllByRole("button", { name: /Ver o que seguiu para o cliente/ });
+    const botoes = screen.getAllByRole("button", {
+      name: /Ver o que foi enviado para o cliente —/,
+    });
     expect(botoes.length).toBeGreaterThan(0);
     await u.click(botoes[0]);
     const folha = await screen.findByRole("dialog");
@@ -169,12 +173,16 @@ describe("«Ver o que seguiu» está À VISTA, não só nos três pontinhos", ()
   it("um rascunho não tem o botão — não seguiu nada", async () => {
     desenhar("Bia");
     await screen.findAllByText("TESTE Bia");
-    expect(screen.queryByRole("button", { name: /Ver o que seguiu para o cliente/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Ver o que foi enviado para o cliente —/ }),
+    ).toBeNull();
   });
 
   it("a frase de cima diz onde se vê", async () => {
     desenhar();
-    expect((await screen.findAllByText(/Ver o que seguiu/)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Ver o que foi enviado para o cliente/)).length,
+    ).toBeGreaterThan(0);
     expect(document.body.textContent).toMatch(
       /abres o PDF, o link e o email que o cliente recebeu/,
     );
@@ -187,9 +195,9 @@ describe("«Ver o que seguiu» está À VISTA, não só nos três pontinhos", ()
       </ToastProvider>,
     );
     await screen.findByText(/Versão 1/);
-    expect(screen.getAllByRole("button", { name: /Ver o que seguiu para o cliente/ }).length).toBe(
-      1,
-    );
+    expect(
+      screen.getAllByRole("button", { name: /Ver o que foi enviado para o cliente —/ }).length,
+    ).toBe(1);
   });
 });
 

@@ -644,8 +644,10 @@ export default function Propostas({
         className="bo-cena text-sm leading-relaxed text-[var(--bo-text-muted)]"
       >
         Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites. Em{" "}
-        <strong className="font-medium text-[var(--bo-text)]">Ver o que seguiu</strong>, em cada
-        proposta, abres o PDF, o link e o email que o cliente recebeu.
+        <strong className="font-medium text-[var(--bo-text)]">
+          Ver o que foi enviado para o cliente
+        </strong>
+        , em cada proposta, abres o PDF, o link e o email que o cliente recebeu.
       </p>
 
       {/*
