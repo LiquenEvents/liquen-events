@@ -149,6 +149,50 @@ describe("Propostas: ver as que já seguiram", () => {
   });
 });
 
+describe("«Ver o que seguiu» está À VISTA, não só nos três pontinhos", () => {
+  /**
+   * Palavras dela: «eu queria algo mais visível que desse conhecimento aos
+   * colaboradores da Líquen onde podem ver aquilo que está nos três
+   * pontinhos». Quem não abre o menu não sabe que lá está.
+   */
+  it("cada enviada tem o botão escrito, e ele abre a folha", async () => {
+    const u = userEvent.setup();
+    desenhar("Zé");
+    await screen.findAllByText("TESTE Zé");
+    const botoes = screen.getAllByRole("button", { name: /Ver o que seguiu para o cliente/ });
+    expect(botoes.length).toBeGreaterThan(0);
+    await u.click(botoes[0]);
+    const folha = await screen.findByRole("dialog");
+    expect(within(folha).getByRole("button", { name: "Abrir como o casal vê" })).toBeTruthy();
+  });
+
+  it("um rascunho não tem o botão — não seguiu nada", async () => {
+    desenhar("Bia");
+    await screen.findAllByText("TESTE Bia");
+    expect(screen.queryByRole("button", { name: /Ver o que seguiu para o cliente/ })).toBeNull();
+  });
+
+  it("a frase de cima diz onde se vê", async () => {
+    desenhar();
+    expect((await screen.findAllByText(/Ver o que seguiu/)).length).toBeGreaterThan(0);
+    expect(document.body.textContent).toMatch(
+      /abres o PDF, o link e o email que o cliente recebeu/,
+    );
+  });
+
+  it("no cartão do pedido, cada versão enviada também tem o botão", async () => {
+    render(
+      <ToastProvider>
+        <PropostasDoPedido quoteId="q2" />
+      </ToastProvider>,
+    );
+    await screen.findByText(/Versão 1/);
+    expect(screen.getAllByRole("button", { name: /Ver o que seguiu para o cliente/ }).length).toBe(
+      1,
+    );
+  });
+});
+
 describe("Propostas enviadas, no pedido", () => {
   it("lista as versões que seguiram, com as acções", async () => {
     render(

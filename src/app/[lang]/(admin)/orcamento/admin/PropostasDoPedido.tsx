@@ -41,7 +41,7 @@ const eur = (n: number) =>
 
 export default function PropostasDoPedido({ quoteId }: { quoteId: string }) {
   const [versoes, setVersoes] = useState<Versao[] | null>(null);
-  const { accoesDe, folha } = useAccoesDaPropostaEnviada();
+  const { accoesDe, botaoDe, folha } = useAccoesDaPropostaEnviada();
 
   useEffect(() => {
     let vivo = true;
@@ -59,6 +59,17 @@ export default function PropostasDoPedido({ quoteId }: { quoteId: string }) {
   }, [quoteId]);
 
   if (!versoes || versoes.length === 0) return null;
+
+  const paraAccoes = (v: Versao, i: number) => {
+    const enviada = v.estado !== "rascunho";
+    return {
+      id: v.id,
+      quoteId,
+      temDoc: true,
+      enviada,
+      titulo: `Versão ${versoes.length - i}${enviada ? ` · enviada ${dataCurta(v.enviadaEm)}` : ""}`,
+    };
+  };
 
   return (
     <>
@@ -80,15 +91,10 @@ export default function PropostasDoPedido({ quoteId }: { quoteId: string }) {
                     {eur(v.total)} c/ IVA · {ESTADO[v.estado] ?? v.estado}
                   </p>
                 </div>
+                {botaoDe(paraAccoes(v, i))}
                 <MenuDeAccoes
                   sobre={`versão ${versoes.length - i}`}
-                  accoes={accoesDe({
-                    id: v.id,
-                    quoteId,
-                    temDoc: true,
-                    enviada,
-                    titulo: `Versão ${versoes.length - i}${enviada ? ` · enviada ${dataCurta(v.enviadaEm)}` : ""}`,
-                  })}
+                  accoes={accoesDe(paraAccoes(v, i))}
                 />
               </li>
             );

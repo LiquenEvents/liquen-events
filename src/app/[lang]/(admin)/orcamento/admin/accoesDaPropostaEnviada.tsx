@@ -66,8 +66,16 @@ async function linkDoCasal(
  * seguiu…» — e a folha junta tudo o que seguiu para o casal num sítio só: o
  * PDF, o link, e o email tal e qual.
  *
- * Devolve `accoesDe(p)` (as entradas do menu) e `folha` (o elemento, a desenhar
- * uma vez no ecrã que usa isto).
+ * Devolve `accoesDe(p)` (as entradas do menu), `botaoDe(p)` (o mesmo, À VISTA)
+ * e `folha` (o elemento, a desenhar uma vez no ecrã que usa isto).
+ *
+ * ── E À VISTA, NÃO SÓ NOS TRÊS PONTINHOS ──────────────────────────────────
+ * Palavras dela, a 10/10: «eu queria algo mais visível que desse conhecimento
+ * aos colaboradores da Líquen onde podem ver aquilo que está nos três
+ * pontinhos». Um menu esconde o que lá está: quem não o abre não sabe que se
+ * pode ver o que seguiu para o cliente. Por isso cada proposta enviada tem
+ * também um botão com o nome escrito — `botaoDe(p)` — na linha, no cartão do
+ * telemóvel e no cartão do pedido. O menu continua a tê-lo, para quem lá vai.
  */
 export function useAccoesDaPropostaEnviada() {
   const { toast } = useToast();
@@ -167,6 +175,27 @@ export function useAccoesDaPropostaEnviada() {
     return p.temDoc ? [{ id: "pdf", rotulo: "Ver o PDF", onAccao: () => abrirPdf(p) }] : [];
   }
 
+  /** O botão visível da linha. Só nas enviadas: um rascunho não seguiu. */
+  function botaoDe(p: PropostaParaAccoes, opcoes: { largo?: boolean } = {}) {
+    if (!p.enviada) return null;
+    return (
+      <Button
+        size="sm"
+        variant="subtle"
+        fullWidth={opcoes.largo}
+        onClick={(e) => {
+          // Vive dentro de linhas e cartões que abrem o pedido ao toque.
+          e.stopPropagation();
+          abrirFolha(p);
+        }}
+        aria-label={`Ver o que seguiu para o cliente — ${p.titulo}`}
+        className="whitespace-nowrap"
+      >
+        Ver o que seguiu
+      </Button>
+    );
+  }
+
   const folha = (
     <FolhaOuDialogo
       aberto={!!aberta}
@@ -232,5 +261,5 @@ export function useAccoesDaPropostaEnviada() {
     </FolhaOuDialogo>
   );
 
-  return { accoesDe, folha };
+  return { accoesDe, botaoDe, folha };
 }
