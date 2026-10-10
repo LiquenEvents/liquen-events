@@ -18,19 +18,23 @@ import { useToast } from "../Toast";
  * a linha no histórico quando a acção a tem.
  *
  * Se o `repor` falhar, diz-se, com o erro que veio; nunca fica um «Anulado»
- * por cima de uma escrita que não aconteceu.
+ * por cima de uma escrita que não aconteceu. Um `repor` que já disse o erro à
+ * sua maneira (as listas da gaveta têm a frase da colisão, «foi alterada noutro
+ * sítio») devolve `false`: não aparece «Anulado.» nem um segundo aviso.
  */
 export function useAnular() {
   const { toast } = useToast();
   return useCallback(
-    (mensagem: string, repor: () => void | Promise<unknown>, anulado = "Anulado.") => {
+    (mensagem: string, repor: () => unknown, anulado = "Anulado.") => {
       toast(mensagem, "success", {
         rotulo: "Anular",
         aoTocar: () => {
           Promise.resolve()
             .then(repor)
             .then(
-              () => toast(anulado, "info"),
+              (r) => {
+                if (r !== false) toast(anulado, "info");
+              },
               (e: unknown) =>
                 toast(
                   e instanceof Error && e.message ? e.message : "Não foi possível anular.",

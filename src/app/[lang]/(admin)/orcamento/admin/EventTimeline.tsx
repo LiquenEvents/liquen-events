@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { printRunSheet } from "./export";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import {
@@ -149,6 +150,7 @@ interface Colisao {
 
 export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoModelo }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [items, setItems] = useState<TimelineItem[]>(quote.timeline ?? []);
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
@@ -255,7 +257,10 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
    * E o `oQue` nomeia o MOMENTO: a reversão desfaz uma linha de um guião com
    * uma dúzia delas, e sem o nome ninguém sabe qual é que voltou atrás.
    */
-  function persist(oQue: string, reaplicar: (atuais: TimelineItem[]) => TimelineItem[]) {
+  function persist(
+    oQue: string,
+    reaplicar: (atuais: TimelineItem[]) => TimelineItem[],
+  ): Promise<boolean> {
     const sorted = sortByTime(reaplicar(items));
     const minha = ++gravacoes.current;
     setItems(sorted);
@@ -277,7 +282,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       toast(mensagem, "error");
     };
 
-    void (async () => {
+    return (async () => {
       let res: Response;
       try {
         res = await fetch(`/api/orcamento/${quote.id}`, {
@@ -287,7 +292,7 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
         });
       } catch {
         reporEDizer(porqueRebentou(oQue).mensagem);
-        return;
+        return false;
       }
       /**
        * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
@@ -314,14 +319,15 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
         // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
         // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
         setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
-        return;
+        return false;
       }
       if (!res.ok) {
         const corpo = await res.json().catch(() => null);
         reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
-        return;
+        return false;
       }
       if (minha === gravacoes.current) gravado.current = sorted;
+      return true;
     })();
   }
 
@@ -358,6 +364,12 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       ...atuais,
       ...novos.filter((n) => !atuais.some((a) => a.id === n.id)),
     ]);
+    const ids = new Set(novos.map((n) => n.id));
+    anular(
+      `${novos.length} ${novos.length === 1 ? "momento acrescentado" : "momentos acrescentados"} do modelo.`,
+      () =>
+        persist("tirar os momentos do modelo", (atuais) => atuais.filter((i) => !ids.has(i.id))),
+    );
   }
 
   /**
@@ -406,6 +418,11 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
       ...(minutos > 0 ? { duracao: minutos } : {}),
     };
     persist(`acrescentar «${time} ${t}» à timeline`, (atuais) => [...atuais, momento]);
+    anular(`«${time} ${t}» acrescentado à timeline.`, () =>
+      persist(`tirar «${time} ${t}» da timeline`, (atuais) =>
+        atuais.filter((i) => i.id !== momento.id),
+      ),
+    );
     setTime("");
     setTitle("");
     setOwner("");
@@ -418,6 +435,13 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     persist(
       `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» da timeline`,
       (atuais) => atuais.filter((i) => i.id !== id),
+    );
+    if (!momento) return;
+    // O guião ordena-se pela hora, portanto o momento volta ao sítio dele sozinho.
+    anular(`«${momento.time} ${momento.title}» saiu da timeline.`, () =>
+      persist(`repor «${momento.time} ${momento.title}» na timeline`, (atuais) =>
+        atuais.some((i) => i.id === id) ? atuais : [...atuais, momento],
+      ),
     );
   }
 
@@ -555,6 +579,17 @@ export default function EventTimeline({ quote, onChange, modelos, aoGuardarComoM
     const minutos = Number(valor);
     const seguinte = Number.isFinite(minutos) && minutos > 0 ? Math.round(minutos) : undefined;
     if (duracaoDe(item) === (seguinte ?? 0)) return;
+    const duracaoAntes = item.duracao;
+    anular(`Duração de «${item.title}» mudada.`, () =>
+      persist(`voltar à duração de «${item.title}»`, (atuais) =>
+        atuais.map((i) => {
+          if (i.id !== id) return i;
+          const { duracao: _agora, ...resto } = i;
+          void _agora;
+          return duracaoAntes ? { ...resto, duracao: duracaoAntes } : resto;
+        }),
+      ),
+    );
     persist(
       seguinte
         ? `mudar a duração de «${item.title}» para ${porExtenso(seguinte)}`

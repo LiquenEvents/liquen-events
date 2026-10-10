@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import { checklistTemplate } from "@/lib/checklist-templates";
 import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
@@ -29,7 +30,14 @@ import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
  *
  *   LIMPAR AS CONCLUÍDAS leva PERGUNTA. Sai um punhado de linhas de uma vez, e
  *   o que se perde é o TEXTO delas — refazer é reescrever à mão o que já
- *   estava escrito. A pergunta diz quantas são e nomeia-as.
+ *   estava escrito. A pergunta diz quantas são e nomeia-as; e, como tudo na
+ *   casa desde 10/10 («tem que haver em tudo uma forma de voltar atrás»),
+ *   leva também «Anular» a seguir.
+ *
+ * O «Anular» é o da casa (`ui/anular.ts`, 10 s). Era uma tira própria de oito
+ * segundos aqui dentro; passou ao aviso comum para ser igual em todo o lado.
+ * Repõe a lista INTEIRA de antes, com a `base` — se outra pessoa mexeu
+ * entretanto, o servidor recusa e diz-se, sem pisar o trabalho dela.
  *
  * GERAR A CHECKLIST não pergunta nada, e é de propósito: o botão só existe no
  * ecrã vazio (`items.length === 0`), portanto ali não há nada para deitar fora.
@@ -50,16 +58,6 @@ interface Pergunta {
 }
 
 /** Uma alteração feita sem perguntar, reversível durante uns segundos. */
-interface Anulavel {
-  /** O que aconteceu, para a tira o poder dizer: ««Escadote» saiu da lista.» */
-  texto: string;
-  repor: () => void;
-}
-
-/** Quanto tempo fica o «Anular» no ecrã, em milissegundos. Oito segundos dá
- *  para ver o que desapareceu, perceber que foi engano e carregar — sem ficar
- *  lá pendurado a dizer que há alguma coisa por decidir. */
-const MS_PARA_ANULAR = 8000;
 
 /** Nomeia até três linhas e conta o resto. Uma lista de vinte nomes dentro de
  *  uma pergunta não se lê; três chegam para reconhecer o lote errado. */
@@ -83,8 +81,12 @@ export default function EventChecklist({ quote, onChange }: Props) {
   const [draft, setDraft] = useState("");
   /** A pergunta em curso — ver o comentário no topo do ficheiro. */
   const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
-  /** O último gesto que se pode anular, enquanto a janela estiver aberta. */
-  const [anular, setAnular] = useState<Anulavel | null>(null);
+  /** O «Anular» da casa (`ui/anular.ts`): 10 s, e diz «Anulado.» ou o erro. */
+  const anular = useAnular();
+  /** Anula um gesto repondo a lista INTEIRA de antes — a linha volta ao sítio. */
+  function anulavel(texto: string, oQueRepor: string, antes: ChecklistItem[]) {
+    anular(texto, () => persist(oQueRepor, antes));
+  }
 
   /**
    * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
@@ -132,7 +134,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
    * 3 concluídas»): a lista tem dezenas de linhas e a reversão desfaz UMA
    * delas — sem o nome, quem lê não sabe qual é que voltou atrás.
    */
-  function persist(oQue: string, next: ChecklistItem[]) {
+  function persist(oQue: string, next: ChecklistItem[]): Promise<boolean> {
     const minha = ++gravacoes.current;
     setItems(next);
     onChange(next);
@@ -151,7 +153,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
       toast(mensagem, "error");
     };
 
-    void (async () => {
+    return (async () => {
       let res: Response;
       try {
         res = await fetch(`/api/orcamento/${quote.id}`, {
@@ -161,7 +163,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
         });
       } catch {
         reporEDizer(porqueRebentou(oQue).mensagem);
-        return;
+        return false;
       }
       /**
        * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir
@@ -182,25 +184,17 @@ export default function EventChecklist({ quote, onChange }: Props) {
           onChange(doServidor);
         }
         toast("A checklist foi alterada noutro sítio. Está aqui a versão guardada.", "error");
-        return;
+        return false;
       }
       if (!res.ok) {
         const corpo = await res.json().catch(() => null);
         reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
-        return;
+        return false;
       }
       if (minha === gravacoes.current) gravado.current = next;
+      return true;
     })();
   }
-
-  // O «Anular» some-se sozinho. A dependência é o objecto inteiro de propósito:
-  // cada gesto põe lá um objecto NOVO, portanto o segundo reinicia a contagem em
-  // vez de herdar os segundos que sobravam do primeiro.
-  useEffect(() => {
-    if (!anular) return;
-    const relogio = setTimeout(() => setAnular(null), MS_PARA_ANULAR);
-    return () => clearTimeout(relogio);
-  }, [anular]);
 
   function seed() {
     const next = checklistTemplate(quote.category).map((label) => ({
@@ -208,7 +202,9 @@ export default function EventChecklist({ quote, onChange }: Props) {
       label,
       done: false,
     }));
+    const antes = items;
     persist("gerar a checklist deste evento", next);
+    anulavel("Checklist gerada.", "repor a checklist de antes", antes);
   }
   function toggle(id: string) {
     const item = items.find((i) => i.id === id);
@@ -235,13 +231,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
       `remover «${item?.label ?? "o item"}» da checklist`,
       items.filter((i) => i.id !== id),
     );
-    setAnular({
-      texto: `«${item?.label ?? "O item"}» saiu da checklist.`,
-      repor: () => {
-        setAnular(null);
-        persist(`repor «${item?.label ?? "o item"}» na checklist`, antes);
-      },
-    });
+    anulavel(
+      `«${item?.label ?? "O item"}» saiu da checklist.`,
+      `repor «${item?.label ?? "o item"}» na checklist`,
+      antes,
+    );
   }
   function add() {
     const l = newItem.trim();
@@ -272,13 +266,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
       "marcar toda a checklist como feita",
       items.map((i) => (i.done ? i : { ...i, done: true })),
     );
-    setAnular({
-      texto: `${quantas} ${quantas === 1 ? "item riscado" : "itens riscados"} de uma vez.`,
-      repor: () => {
-        setAnular(null);
-        persist("desmarcar o que a marcação em bloco riscou", antes);
-      },
-    });
+    anulavel(
+      `${quantas} ${quantas === 1 ? "item riscado" : "itens riscados"} de uma vez.`,
+      "desmarcar o que a marcação em bloco riscou",
+      antes,
+    );
   }
 
   /**
@@ -302,15 +294,22 @@ export default function EventChecklist({ quote, onChange }: Props) {
     setAPerguntar({
       titulo: `Remover ${quantas} ${quantas === 1 ? "concluída" : "concluídas"} da checklist?`,
       oQueSePerde: ateTres(concluidas.map((i) => i.label)),
-      aviso: `O texto delas não fica guardado em lado nenhum. Ficam ${ficam} ${
+      aviso: `Podes anular logo a seguir. Ficam ${ficam} ${
         ficam === 1 ? "linha" : "linhas"
       } na checklist.`,
       rotulo: quantas === 1 ? "Remover a concluída" : `Remover as ${quantas}`,
-      fazer: () =>
+      fazer: () => {
+        const antes = items;
         persist(
           `remover ${quantas} ${quantas === 1 ? "concluída" : "concluídas"} da checklist`,
           items.filter((i) => !i.done),
-        ),
+        );
+        anulavel(
+          `${quantas} ${quantas === 1 ? "concluída removida" : "concluídas removidas"}.`,
+          "repor as concluídas na checklist",
+          antes,
+        );
+      },
     });
   }
 
@@ -326,10 +325,12 @@ export default function EventChecklist({ quote, onChange }: Props) {
     const l = draft.trim();
     // Vazio ou inalterado cancela em vez de gravar um item sem texto.
     if (!item || !l || l === item.label) return;
+    const antes = items;
     persist(
       `mudar «${item.label}» para «${l}»`,
       items.map((i) => (i.id === id ? { ...i, label: l } : i)),
     );
+    anulavel(`«${item.label}» passou a «${l}».`, `voltar a «${item.label}»`, antes);
   }
 
   // Itens do modelo ainda em falta (dedupe por label exato, como o applyPlan
@@ -340,6 +341,13 @@ export default function EventChecklist({ quote, onChange }: Props) {
   );
   function addTemplateItems() {
     if (missingFromTemplate.length === 0) return;
+    const antes = items;
+    const n = missingFromTemplate.length;
+    anulavel(
+      `${n} ${n === 1 ? "item do modelo acrescentado" : "itens do modelo acrescentados"}.`,
+      "tirar o que veio do modelo",
+      antes,
+    );
     persist(
       `acrescentar ${missingFromTemplate.length} ${
         missingFromTemplate.length === 1 ? "item" : "itens"
@@ -442,49 +450,6 @@ export default function EventChecklist({ quote, onChange }: Props) {
               </button>
             )}
           </div>
-          {/* ── A JANELA PARA ANULAR ──────────────────────────────────────
-              Por cima da lista, onde os olhos já estão quando a linha
-              desaparece — e não num aviso no canto do ecrã, que num telemóvel
-              fica atrás do teclado. `role="status"` para quem não vê o ecrã
-              ouvir o que aconteceu e que ainda dá para voltar atrás.
-
-              ── E APARECE DE ALGUM SÍTIO: QUATRO PÍXEIS ────────────────────
-              Era montagem condicional e mais nada: a barra existia ou não
-              existia, e a diferença entre os dois estados era um fotograma.
-              Num sítio onde uma linha ACABOU DE DESAPARECER, uma caixa a
-              materializar-se por cima da lista lê-se como mais um salto — que
-              é exactamente o que a pessoa está a tentar perceber.
-
-              `.bo-entrada` sem variante: os quatro píxeis de um RÓTULO, e não
-              os oito de uma folha. Isto não é uma folha do telemóvel nem um
-              aviso no canto do ecrã — é uma tira que nasce dentro do painel,
-              encostada ao sítio de onde o item saiu.
-
-              ── E NÃO ATRASA O «ANULAR», QUE É O PONTO ────────────────────
-              Esta é a ÚNICA forma de desfazer, portanto «nenhuma animação pode
-              atrasar uma tarefa» é aqui uma condição e não um princípio.
-              Cumpre-se porque a `.bo-entrada` só mexe em `transform` e
-              `opacity`: o botão está no DOM, focável e clicável, no PRIMEIRO
-              fotograma — só lhe faltam quatro píxeis de percurso. Nenhum
-              `pointer-events`, nenhum atraso, nenhum estado intermédio. E com
-              `prefers-reduced-motion` o `globals.css` desliga-a por inteiro.
-
-              É por esta mesma conta que a barra NÃO ganha SAÍDA. A `.bo-saida`
-              larga os toques dentro da própria classe, durante 200 ms — o que
-              daria uma janela em que se VÊ «Anular» e não se consegue carregar
-              nele. Numa tira que se some sozinha ao fim de oito segundos, essa
-              janela cai precisamente no instante em que alguém se decide. */}
-          {anular && (
-            <div
-              role="status"
-              className="bo-entrada mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
-            >
-              <span>{anular.texto}</span>
-              <Button size="sm" variant="ghost" onClick={anular.repor}>
-                Anular
-              </Button>
-            </div>
-          )}
           <ul className="mb-5 flex flex-col gap-0.5">
             {items.map((i) => (
               <li

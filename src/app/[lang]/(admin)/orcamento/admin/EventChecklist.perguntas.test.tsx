@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import EventChecklist from "./EventChecklist";
+import { ToastProvider } from "./Toast";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -60,7 +61,13 @@ function servidor() {
   });
 }
 
-const montar = () => render(<EventChecklist quote={QUOTE} onChange={() => {}} />);
+// Dentro do `ToastProvider`: o «Anular» é o aviso da casa, e sem ele não há onde aparecer.
+const montar = () =>
+  render(
+    <ToastProvider>
+      <EventChecklist quote={QUOTE} onChange={() => {}} />
+    </ToastProvider>,
+  );
 
 beforeEach(() => {
   gravadas = [];
@@ -123,9 +130,9 @@ describe("Checklist do evento — remover um item anula-se", () => {
     await waitFor(() => expect(gravadas.length).toBe(1));
     expect(gravadas[0].map((i) => i.label)).toEqual(["Confirmar catering", "Levar extensões"]);
 
-    const tira = await screen.findByRole("status");
-    expect(within(tira).getByText(/«Reservar carrinha» saiu da checklist/i)).toBeTruthy();
-    await user.click(within(tira).getByRole("button", { name: /^Anular$/i }));
+    // O «Anular» é o aviso da casa (`ui/anular.ts`), e não uma tira própria.
+    expect(await screen.findByText(/«Reservar carrinha» saiu da checklist/i)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /^Anular$/i }));
 
     // Volta AO SÍTIO, e não ao fim: o que se guarda é a lista de antes.
     await waitFor(() => expect(gravadas.length).toBe(2));
@@ -147,9 +154,8 @@ describe("Checklist do evento — «Marcar todas» anula-se", () => {
     await waitFor(() => expect(gravadas.length).toBe(1));
     expect(gravadas[0].every((i) => i.done)).toBe(true);
 
-    const tira = await screen.findByRole("status");
-    expect(within(tira).getByText(/1 item riscado de uma vez/i)).toBeTruthy();
-    await user.click(within(tira).getByRole("button", { name: /^Anular$/i }));
+    expect(await screen.findByText(/1 item riscado de uma vez/i)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /^Anular$/i }));
 
     await waitFor(() => expect(gravadas.length).toBe(2));
     // Exactamente o que lá estava — e não «tudo por fazer».
