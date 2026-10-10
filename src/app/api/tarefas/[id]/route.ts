@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Task } from "@/lib/orcamento/types";
 import { isAuthed } from "@/lib/admin-auth";
-import { updateTask, deleteTask } from "@/lib/tasks-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
+import { updateTask } from "@/lib/tasks-store";
 import { taskUpdateSchema, firstError } from "@/lib/validation";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
@@ -71,8 +72,8 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteTask(id);
-    return NextResponse.json({ ok: true });
+    const reciclagem = await enviarParaAReciclagem("tarefa", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     log.error("tarefas DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

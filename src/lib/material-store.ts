@@ -84,3 +84,6 @@ export const updateMaterial = (
 ): Promise<MaterialItem | null> => repo.update(id, patch);
 
 export const deleteMaterial = (id: string): Promise<void> => repo.remove(id);
+
+/** Para a Reciclagem: repor um item tal e qual — com o MESMO id. */
+export const reporMaterial = (i: MaterialItem): Promise<void> => repo.create(i);

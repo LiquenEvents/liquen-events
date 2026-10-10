@@ -92,6 +92,10 @@ export const updateListItem = (
 
 export const removeListItem = (id: string): Promise<void> => repo.remove(id);
 
+/** Para a Reciclagem: ler uma linha, e repô-la tal e qual — com o MESMO id. */
+export const obterLinha = (id: string): Promise<MaterialListItem | null> => repo.get(id);
+export const reporLinha = (l: MaterialListItem): Promise<void> => repo.create(l);
+
 /**
  * Quantos apagamentos podem estar no ar ao mesmo tempo. O `Repository` não tem
  * apagamento em bloco (só `remove(id)`), e em série uma lista de cem linhas são
