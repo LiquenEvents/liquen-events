@@ -498,4 +498,5 @@ export const PHOTOS: PhotoSrc[] = [
   { src: "/imagens/galeria-outubro-52.jpg", label: "Casamento" },
   { src: "/imagens/galeria-outubro-53.jpg", label: "Casamento" },
   { src: "/imagens/galeria-outubro-54.jpg", label: "Casamento" },
+  { src: "/imagens/galeria-outubro-55.jpg", label: "Casamento" },
 ];
