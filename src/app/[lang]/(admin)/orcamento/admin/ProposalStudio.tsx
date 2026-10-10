@@ -18,6 +18,7 @@ import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import {
   withProposalDefaults,
+  DEFAULT_CONDICOES_GERAIS,
   resolveProposalMoney,
   totalAmountParaBase,
   detectVatMode,
@@ -133,6 +134,7 @@ import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
+import { hojeNoEstudio } from "@/lib/fuso";
 import {
   capituloDoTema,
   composicaoEmPalavras,
@@ -5935,7 +5937,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * vista e o foco.
    */
   function irParaAFalta(seccao?: string, campo?: string) {
-    setStep("conteudo");
+    // O email e o canal vivem no passo do ENVIO, e não no conteúdo: o salto
+    // ia para o «Conteúdo» e não encontrava nada para mostrar.
+    setStep(seccao === "envio" ? "enviar" : "conteudo");
     // Um campo de um mood board pode estar dentro de um cartão DOBRADO, e um
     // campo que não está desenhado não se foca: o salto morria na secção e
     // deixava-a a olhar para a lista de boards fechados. É a mesma abertura
@@ -6494,7 +6498,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   //    o que lhe chegou. A cópia demora segundos; um PDF sem a foto que ela
   //    escolheu dura para sempre. O botão fica desligado enquanto houver fotos
   //    a caminho, com a razão escrita ao lado, e volta sozinho quando assentam.
-  async function preview() {
+  /**
+   * ── O RASCUNHO (B1) ───────────────────────────────────────────────────────
+   * Com um erro por resolver, o PDF «final» não se descarrega — é a mesma
+   * regra do botão de enviar. Descarrega-se um RASCUNHO: o mesmo desenho, com
+   * «RASCUNHO» no rodapé de cada página e «(rascunho)» no nome do ficheiro,
+   * para nunca poder ser confundido com o que segue para o casal.
+   */
+  async function preview({ rascunho = false }: { rascunho?: boolean } = {}) {
     if (busy) return;
     setBusy("preview");
     // De ponta a ponta, que é o que ela espera — e não o que o servidor demora
@@ -6513,6 +6524,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           mode: "preview",
           idioma: idiomaDoPdf,
           doc: stripPendingImages(doc),
+          ...(rascunho ? { rascunho: true } : {}),
         }),
       });
       if (!res.ok) {
@@ -6558,7 +6570,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         },
         idiomaDoPdf,
       );
-      a.download = nome;
+      a.download = rascunho ? nome.replace(/\.pdf$/i, " (rascunho).pdf") : nome;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -6580,7 +6592,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           "info",
         );
       } else {
-        toast("Pré-visualização gerada (PDF descarregado)", "success");
+        toast(
+          rascunho
+            ? "Rascunho gerado (PDF descarregado, marcado como rascunho)"
+            : "Pré-visualização gerada (PDF descarregado)",
+          "success",
+        );
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro na pré-visualização.", "error");
@@ -7313,9 +7330,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * carregamento (o `ImagemComPlanoB` já as conhece) e não por uma ausência no
    * mapa.
    */
-  const contextoDoEnvio = useMemo(() => ({ idioma: idiomaDoPdf }), [idiomaDoPdf]);
-
+  //
+  // ── E O CANAL, COM O EMAIL DO PEDIDO (B1) ────────────────────────────────
+  // Sem email, uma proposta por email não chega a ninguém. O documento dela
+  // pô-lo entre os erros; com «só WhatsApp» não trava — é o caso normal de
+  // um pedido que entrou por telefone.
+  const contextoDoEnvio = useMemo(
+    () => ({ idioma: idiomaDoPdf, canal, emailDoCliente: quote.email }),
+    [idiomaDoPdf, canal, quote.email],
+  );
+  /**
+   * Há alguma coisa que TRAVA? É o que separa o PDF final do rascunho, no
+   * «Descarregar» do passo de pré-visualizar: o documento dela (B1) quer o
+   * mesmo bloqueio no envio e no descarregar o PDF «final», e um rascunho
+   * sempre disponível, marcado como tal.
+   */
   const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross, contextoDoEnvio);
+  const temErros = faltas.some((f) => f.trava);
   // A regra das FOTOS POR CONFIRMAR fica aqui e não em `proposal-progress`:
   // esse olha para o DOCUMENTO, e isto é um estado desta aba — a cópia que
   // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
@@ -10186,6 +10217,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   }}
                   placeholder={String(DEFAULT_VALID_DAYS)}
                   aria-label="Dias de validade"
+                  data-campo="validUntilDays"
                   // ── O ÚLTIMO CAMPO DO PASSO, LOGO ACIMA DA BARRA FIXA ───────
                   // MEDIDO num iPhone SE (375×667), a fechar este campo com o
                   // teclado aberto (~260 px): o teclado mais a barra de acção
@@ -10218,6 +10250,48 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   }
                 />
               </div>
+              {/* ── A VALIDADE QUE JÁ PASSOU (B1) ─────────────────────────────
+                Uma proposta que já seguiu traz a data de validade FIXADA lá
+                dentro — é o que faz o anexo do email e o PDF do link dizerem o
+                mesmo. Reaberta para reenviar depois dessa data, sairia com uma
+                validade que terminou, e é isso que trava o envio. O remédio é
+                um gesto: voltar a contar os dias a partir de hoje. */}
+              {doc.validUntil && doc.validUntil < hojeNoEstudio() && (
+                <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-[var(--bo-perigo)]/35 bg-[var(--bo-perigo)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                  <span>
+                    A validade desta proposta terminou a{" "}
+                    {doc.validUntil.split("-").reverse().join("/")}.
+                  </span>
+                  <button
+                    type="button"
+                    className={`alvo-toque relative font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                    onClick={() => patch({ validUntil: undefined })}
+                  >
+                    Contar {doc.validUntilDays ?? DEFAULT_VALID_DAYS} dias a partir de hoje
+                  </button>
+                </p>
+              )}
+              {/* ── AS CONDIÇÕES QUE NÃO SAEM (B1) ────────────────────────────
+                Não há editor das Condições Gerais no estúdio: são os textos da
+                casa, contratuais, e não se escrevem proposta a proposta. Se um
+                rascunho as perdeu, a página não sai no PDF — e o remédio é
+                repô-las tal como a casa as tem, sem tocar numa palavra. */}
+              {!withProposalDefaults(doc).condicoesGerais.some((l) => l.trim()) && (
+                <p
+                  className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-[var(--bo-perigo)]/35 bg-[var(--bo-perigo)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+                  data-campo="condicoesGerais"
+                  tabIndex={-1}
+                >
+                  <span>As Condições Gerais estão vazias e a página não sai no PDF.</span>
+                  <button
+                    type="button"
+                    className={`alvo-toque relative font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                    onClick={() => patch({ condicoesGerais: [...DEFAULT_CONDICOES_GERAIS] })}
+                  >
+                    Repor as Condições Gerais da casa
+                  </button>
+                </p>
+              )}
               {/* ══════════════════════════════════════════════════════════════
                 O BLOCO DE TOTAIS — UM SÓ, PELA ORDEM DO PAPEL
                 ══════════════════════════════════════════════════════════════
@@ -10539,7 +10613,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Os rótulos dizem o CANAL e não o verbo — «Email», «WhatsApp»,
                   «Os dois» — porque o verbo já está no botão a seguir, e repetir
                   «enviar» três vezes numa fila de três não ajuda a escolher. */}
-              <div className="mt-4">
+              <div className="mt-4 scroll-mt-24" id="seccao-envio">
                 <p className="bo-eyebrow mb-1.5 text-[var(--bo-text-muted)]">Por onde segue</p>
                 <Segmented
                   size="sm"
@@ -10583,9 +10657,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
                   <span aria-hidden="true">⚠</span>
                   <span>
-                    Este pedido não tem email de cliente. A proposta é gravada e o link continua a
-                    servir, mas não segue para ninguém — acrescenta o email nos{" "}
-                    <strong className="font-medium">contactos do pedido</strong>, em Detalhes.
+                    Este pedido não tem email de cliente, e sem ele a proposta não pode seguir por
+                    email. Acrescenta-o nos{" "}
+                    <strong className="font-medium">contactos do pedido</strong>, em Detalhes — ou
+                    escolhe «WhatsApp».
                   </span>
                 </p>
               )}
@@ -10817,6 +10892,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 // pedido que veio em inglês e calava-se sobre a metade da
                 // proposta que ia sair em português.
                 idioma={idiomaDoPdf}
+                // O canal e o email: sem eles a lista não sabia que uma
+                // proposta por email sem email não chega a ninguém (B1).
+                canal={canal}
+                emailDoCliente={quote.email}
                 onIr={(v) => irParaAFalta(v.seccao, v.campo)}
               />
               {/* ── AS FOTOGRAFIAS ESTÃO MESMO LÁ? ─────────────────────────
@@ -11397,13 +11476,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
                 />
               ) : (
+                /* ── O PDF FINAL SÓ SAI SEM ERROS (B1) ─────────────────────
+                    Com um erro na lista do «Rever e enviar», este botão passa
+                    a dar o RASCUNHO, e di-lo no rótulo. A razão vai no
+                    `title` e não numa frase por baixo: esta barra é fina por
+                    pedido dela, e a lista com as razões está no passo a
+                    seguir, com links para cada uma. */
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => preview()}
+                  onClick={() => preview({ rascunho: temErros })}
                   disabled={busy !== null}
+                  title={
+                    temErros
+                      ? "Há erros por resolver em «Rever e enviar». O PDF final fica disponível quando a lista estiver sem erros; o rascunho sai com «RASCUNHO» no rodapé."
+                      : undefined
+                  }
                 >
-                  Descarregar PDF
+                  {temErros ? "Descarregar rascunho" : "Descarregar PDF"}
                 </Button>
               )}
               {/* ══════════════════════════════════════════════════════════

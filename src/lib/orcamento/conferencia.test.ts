@@ -59,6 +59,11 @@ const documentoCompleto = (over: Partial<ProposalDoc> = {}): ProposalDoc =>
   documento({
     condicoesGerais: ["O orçamento é válido por 30 dias."],
     observacoesGerais: ["Montagem na véspera, a combinar com a quinta."],
+    // Um tema com título e nota: um tema mudo é um aviso (B1), e um documento
+    // certo não tem avisos.
+    moodBoards: [
+      { title: "Cerimónia", annotation: "Arco de flores brancas.", images: ["board/1.jpg"] },
+    ],
     ...over,
   } as Partial<ProposalDoc>);
 
@@ -477,7 +482,11 @@ describe("idioma", () => {
       ...base,
     });
     const v = achar(vs, "idioma");
-    expect(v.severidade).toBe("aviso");
+    // ERRO e não aviso: «por traduzir» trava o botão de enviar
+    // (`oQueFaltaParaEnviar`, «ingles»), e a linha que o diz tem de dizer o
+    // mesmo que o botão.
+    expect(v.severidade).toBe("erro");
+    expect(v.trava).toBe(true);
     // Quatro campos: o título do grupo, as duas linhas e a rubrica.
     expect(v.detalhe).toMatch(/\b4\b/);
     expect(v.detalhe).toMatch(/sair em português/i);
@@ -570,12 +579,25 @@ describe("a lista toda", () => {
  * conteúdo — o que pode faltar é o texto, e é isso que se diz.
  */
 describe("as secções que não saem", () => {
-  it("nomeia as duas listas do fecho quando estão vazias", () => {
-    const vs = conferir({ doc: documento(), quote: pedido(), ...base });
+  it("as Observações vazias são aviso; as Condições vazias são ERRO, numa linha só delas (B1)", () => {
+    const vs = conferir({
+      doc: documento({ condicoesGerais: [], observacoesGerais: [] } as Partial<ProposalDoc>),
+      quote: pedido(),
+      ...base,
+    });
     const f = achar(vs, "folhas-em-branco");
     expect(f.severidade).toBe("aviso");
-    expect(f.detalhe).toContain("Condições");
     expect(f.detalhe).toContain("Observações");
+    expect(f.detalhe, "as condições não se dizem duas vezes").not.toContain("Condições");
+    const c = achar(vs, "condicoes");
+    expect(c.severidade).toBe("erro");
+    expect(c.trava).toBe(true);
+  });
+
+  it("listas AUSENTES do rascunho são as da casa, e saem", () => {
+    const vs = conferir({ doc: documento(), quote: pedido(), ...base });
+    expect(achar(vs, "folhas-em-branco").severidade).toBe("ok");
+    expect(vs.some((v) => v.id === "condicoes")).toBe(false);
   });
 
   it("cala-se quando elas têm conteúdo", () => {
@@ -585,7 +607,7 @@ describe("as secções que não saem", () => {
 
   it("fala no singular quando é uma só", () => {
     const vs = conferir({
-      doc: documentoCompleto({ condicoesGerais: [] } as Partial<ProposalDoc>),
+      doc: documentoCompleto({ observacoesGerais: [] } as Partial<ProposalDoc>),
       quote: pedido(),
       ...base,
     });

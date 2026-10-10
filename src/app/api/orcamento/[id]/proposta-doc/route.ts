@@ -8,6 +8,7 @@ import {
   MAX_PROPOSAL_DOC_BYTES,
 } from "@/lib/proposal-doc";
 import { dinheiroDaProposta } from "@/lib/proposal-budget";
+import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { isAuthed } from "@/lib/admin-auth";
 import { isMissingTable, nomeDaColunaEmFalta } from "@/lib/repository";
 import { avisoDeColunasPerdidas } from "@/lib/estado-das-colunas";
@@ -46,6 +47,16 @@ import {
 import { resolverLigacaoDaProposta } from "@/lib/email-ligacao-reservada";
 import { listarEnvios, registarEnvio } from "@/lib/envios-de-proposta";
 import { log } from "@/lib/logger";
+
+/** Os erros do estúdio que a rota também recusa — ver «O QUE TRAVA NO ESTÚDIO». */
+const TRAVAM_NO_SERVIDOR: ReadonlySet<string> = new Set([
+  "nome",
+  "valor",
+  "data",
+  "validade",
+  "email",
+  "condicoes",
+]);
 
 export const runtime = "nodejs";
 
@@ -198,6 +209,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * A escolha nova tem de ser explícita para tirar alguma coisa.
        */
       porEmail?: unknown;
+      /** Só na pré-visualização: o PDF sai marcado «RASCUNHO» (B1). */
+      rascunho?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
@@ -359,7 +372,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // the public portal PDF route uses, so both emit an identical document.
     // É o desenho NOVO (`pdf-editorial`): ela aprovou-o — «Sim, passa a enviar
     // o novo». O gerador antigo fica no código, sem uso nas rotas.
-    let relatorio = await renderStoredEditorialPdfWithReport(doc, idioma);
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O QUE TRAVA NO ESTÚDIO TAMBÉM TRAVA AQUI (B1)
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * «Já saiu um PDF sem orçamento e sem condições, e nada no ecrã o
+     * impediu.» O estúdio passou a desligar o botão — mas o botão é uma porta
+     * do lado de lá, e um estúdio antigo aberto noutra aba, ou um pedido feito
+     * à mão, passava por cima. A regra é a MESMA (`oQueFaltaParaEnviar`), e
+     * aqui confere-se o que o documento dela listou como erro: o valor, as
+     * condições, a data, os nomes, a validade e o email.
+     *
+     * Os outros bloqueios do estúdio (serviços, marcadores, traduções…)
+     * continuam a ser do estúdio: dependem do que só a aba sabe, ou já têm
+     * guarda própria mais abaixo, e duplicá-los aqui seria uma segunda regra a
+     * poder discordar da primeira.
+     *
+     * Recusa ANTES de desenhar: um PDF de um minuto que não pode seguir é um
+     * minuto deitado fora.
+     */
+    if (mode === "send") {
+      const travam = oQueFaltaParaEnviar(doc, dinheiroDaProposta(doc).gross, {
+        idioma,
+        canal: body?.porEmail === false ? "whatsapp" : "email",
+        emailDoCliente: quote.email,
+      }).filter((f) => f.trava && TRAVAM_NO_SERVIDOR.has(f.id));
+      if (travam.length > 0) {
+        log.warn("proposta-doc: envio recusado, a proposta tem erros", {
+          id,
+          erros: travam.map((f) => f.id),
+        });
+        return NextResponse.json(
+          {
+            error: `A proposta não pode seguir: ${travam.map((f) => f.texto.toLowerCase()).join("; ")}.`,
+            faltas: travam,
+          },
+          { status: 422 },
+        );
+      }
+    }
+
+    // O rascunho só existe na pré-visualização: um envio nunca sai marcado.
+    const rascunho = mode === "preview" && body?.rascunho === true;
+    let relatorio = await renderStoredEditorialPdfWithReport(doc, idioma, { rascunho });
 
     /**
      * ════════════════════════════════════════════════════════════════════════
@@ -425,7 +481,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // de `proposta-preview (1).pdf`.
           "Content-Disposition": `inline; filename="${
             idioma === "en" ? "proposal-preview" : "proposta-preview"
-          }.pdf"`,
+          }${rascunho ? (idioma === "en" ? "-draft" : "-rascunho") : ""}.pdf"`,
           // Quantas fotos não entraram. O gerador salta a que não resolve, por
           // isso sem este cabeçalho o PDF sai com fotos a menos e o estúdio não
           // tem como saber. É lido em ProposalStudio para avisar antes de enviar.

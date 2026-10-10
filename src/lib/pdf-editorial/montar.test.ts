@@ -106,7 +106,11 @@ interface Escrita {
 }
 
 /** Desenha e devolve tudo o que foi escrito e quantas imagens cada página leva. */
-async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
+async function desenhar(
+  doc: ProposalDoc,
+  idioma: "pt" | "en" = "pt",
+  opcoes: { rascunho?: boolean } = {},
+) {
   const paginas: PDFPage[] = [];
   const escritas: Escrita[] = [];
   const imagens: number[] = [];
@@ -138,7 +142,7 @@ async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
     return drawImage.apply(this, a);
   };
   try {
-    const r = await renderEditorialPdf(doc, idioma);
+    const r = await renderEditorialPdf(doc, idioma, opcoes);
     return { ...r, escritas, imagens, paginas: paginas.length };
   } finally {
     PDFDocument.prototype.addPage = addPage;
@@ -389,5 +393,37 @@ describe("sem transparência por cima das fotografias", () => {
     }
     expect(comMascara).toBe(1);
     expect(opacidades).toBe(0);
+  });
+});
+
+/**
+ * B1 — o PDF descarregado com erros por resolver sai marcado. Nada mais muda
+ * no desenho: as mesmas páginas, o mesmo texto, e a marca à frente do rodapé.
+ */
+describe("o rascunho", () => {
+  it("leva «RASCUNHO» à frente do rodapé e no título, e o resto fica igual", async () => {
+    const normal = await desenhar(docDeTeste());
+    const rascunho = await desenhar(docDeTeste(), "pt", { rascunho: true });
+    expect(rascunho.paginas).toBe(normal.paginas);
+    expect(tudo(normal.escritas)).not.toContain("RASCUNHO");
+    const rodapesNormais = normal.escritas.filter((e) =>
+      e.texto.startsWith("Proposta de decoração"),
+    );
+    const comMarca = rascunho.escritas.filter((e) => e.texto.startsWith("RASCUNHO · "));
+    expect(comMarca.length, "uma marca por cada rodapé").toBe(rodapesNormais.length);
+    expect(comMarca.map((e) => e.pagina)).toEqual(rodapesNormais.map((e) => e.pagina));
+    // Fora do rodapé, o texto é exactamente o do PDF normal. No rodapé, a marca
+    // vai À FRENTE: num rodapé estreito (ao lado de uma fotografia) o que
+    // encolhe com «…» é o fim — a data —, e a marca fica sempre.
+    const semRodape = (e: Escrita[]) =>
+      tudo(e.filter((x) => !/^(RASCUNHO · )?Proposta de decoração/.test(x.texto)));
+    expect(semRodape(rascunho.escritas)).toBe(semRodape(normal.escritas));
+    const titulo = (await PDFDocument.load(rascunho.bytes)).getTitle();
+    expect(titulo).toMatch(/^RASCUNHO · /);
+  });
+
+  it("em inglês diz «DRAFT»", async () => {
+    const { escritas } = await desenhar(docDeTeste(), "en", { rascunho: true });
+    expect(escritas.some((e) => e.texto.startsWith("DRAFT · "))).toBe(true);
   });
 });
