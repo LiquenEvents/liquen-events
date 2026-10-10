@@ -3,7 +3,7 @@ import Footer from "@/components/Footer";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
-import { AvisoDeCarregamento } from "@/components/AvisoDeCarregamento";
+import { LinhaDeCarregamento } from "@/components/LinhaDeCarregamento";
 import { Cortina } from "@/components/Cortina";
 import SpeculationRules from "@/components/SpeculationRules";
 import PageTransition from "@/components/PageTransition";
@@ -112,20 +112,16 @@ export default function CromadoDoSitio({
       <Cortina locale={locale} />
       <ScrollProgress />
       {/*
-        O aviso de que uma página está a demorar. Palavras dela: «caso demore
-        tempo, quero que coloques aquela animação de está a carregar e metemos
-        o logo».
+        A linha fina no topo quando uma página demora a abrir. Palavras dela, a
+        10/10: «quero também retirar aquela página branca com o símbolo da
+        Líquen no meio» — escolheu «Linha fina no topo». O porquê inteiro está
+        no `LinhaDeCarregamento.tsx`.
 
         Vive AQUI, e num sítio só, porque é do sítio inteiro: os `<Link>` estão
         espalhados por vinte e dois ficheiros, e o `useLinkStatus` do Next só
-        funciona dentro de um deles. Vinte e duas cópias seriam vinte e duas
-        hipóteses de ficar esquecido no próximo link que alguém escrever.
-
-        Não custa nada quando não é preciso: nasce invisível e só começa a
-        aparecer aos 400 ms — uma navegação normal monta isto, não pinta um
-        pixel, e desmonta.
+        funciona dentro de um deles.
       */}
-      <AvisoDeCarregamento rotulo={getDictionary(locale).common.aAbrir} />
+      <LinhaDeCarregamento rotulo={getDictionary(locale).common.aAbrir} />
       <StickyCTA />
       <Navbar />
       {/* tabIndex=-1 so the skip link actually MOVES keyboard focus into
