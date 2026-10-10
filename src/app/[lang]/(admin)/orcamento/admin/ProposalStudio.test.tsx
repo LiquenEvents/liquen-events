@@ -5035,10 +5035,16 @@ describe("gerar a proposta em inglês", () => {
     espiaoDoClique = null;
   });
 
-  /** Chega ao passo onde se descarrega o PDF. */
+  /**
+   * Chega ao passo onde se descarrega o PDF.
+   *
+   * O botão diz «Descarregar rascunho» quando há um erro por resolver (B1) —
+   * e uma proposta em inglês com campos por traduzir tem um. Aqui o que se
+   * prova é a língua, não o rascunho: serve qualquer dos dois.
+   */
   async function irParaPrever(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
-    return await screen.findByRole("button", { name: /Descarregar PDF/ });
+    return await screen.findByRole("button", { name: /Descarregar (PDF|rascunho)/ });
   }
 
   /** O `idioma` do último POST à rota da proposta. */

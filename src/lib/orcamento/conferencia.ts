@@ -6,6 +6,8 @@ import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { listasQueNaoSaem } from "@/lib/pdf-editorial/plano";
 import { camposDeEscolhaPorTraduzir } from "@/lib/proposta-escolhas";
+import { choquesDeData } from "./choque-de-datas";
+import { isoDaDataPorExtenso } from "@/lib/proposal-doc-textos";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -200,6 +202,15 @@ export interface Contexto {
    * para quem nunca escolheu inglês.
    */
   idioma?: IdiomaDaProposta;
+  /**
+   * Por onde segue, e o email do pedido — o que o `oQueFaltaParaEnviar` precisa
+   * para saber se a falta do email trava. Ausentes, o email não se verifica:
+   * ver `ContextoDoEnvio.canal`.
+   */
+  canal?: "email" | "whatsapp" | "ambos";
+  emailDoCliente?: string;
+  /** O dia de hoje (yyyy-mm-dd), para a validade. Injetável para testes. */
+  hoje?: string;
 }
 
 /**
@@ -231,6 +242,9 @@ export function conferir({
   historico,
   totalBruto,
   idioma = IDIOMA_POR_OMISSAO,
+  canal,
+  emailDoCliente,
+  hoje,
 }: Contexto): Verificacao[] {
   const v: Verificacao[] = [];
 
@@ -599,7 +613,10 @@ export function conferir({
   //
   // `aviso` e não `erro` pela mesma razão que a data diferente da do pedido é
   // `aviso`: é sempre para olhar, e nem sempre é um defeito.
-  const faltam = listasQueNaoSaem(doc);
+  // As CONDIÇÕES saíram daqui: passaram a travar (B1 do documento dela) e têm
+  // linha própria, vinda de `oQueFaltaParaEnviar`. Ficam as Observações, que
+  // continuam a ser só para olhar.
+  const faltam = listasQueNaoSaem(doc).filter((p) => p.id !== "condicoes");
   v.push(
     faltam.length === 0
       ? { id: "folhas-em-branco", titulo: "Secções do documento", severidade: "ok", detalhe: "" }
@@ -614,11 +631,60 @@ export function conferir({
         },
   );
 
+  // ── A data ocupada ────────────────────────────────────────────────────
+  //
+  // O cartão «Data ocupada» já existia no Evento; faltava na lista do envio,
+  // que é a última coisa que ela lê antes do botão. A data é a que está
+  // ESCRITA na proposta quando se consegue ler, e a do pedido quando não —
+  // a mesma regra do cartão (`pedidoComADataDoDoc` no estúdio).
+  const dataLida = isoDaDataPorExtenso(texto(doc.eventDate)) ?? texto(quote.date);
+  const choques = dataLida
+    ? choquesDeData(
+        {
+          ...quote,
+          date: dataLida,
+          endDate: dataLida === quote.date ? quote.endDate : "",
+          location: texto(doc.location) || quote.location,
+        },
+        historico,
+      )
+    : [];
+  if (choques.length > 0) {
+    const mesmoDia = choques.filter((c) => c.proximidade === "mesmo-dia").length;
+    v.push({
+      id: "data-ocupada",
+      titulo: "Data ocupada",
+      severidade: "aviso",
+      detalhe:
+        mesmoDia > 0
+          ? mesmoDia === 1
+            ? "Há outro evento marcado no mesmo dia."
+            : `Há ${mesmoDia} eventos marcados no mesmo dia.`
+          : choques.length === 1
+            ? "Há um evento marcado na véspera ou no dia seguinte."
+            : `Há ${choques.length} eventos marcados na véspera ou no dia seguinte.`,
+      seccao: "evento",
+      campo: "eventDate",
+    });
+  }
+
   const porId = new Map(v.map((x) => [x.id, x]));
-  for (const falta of oQueFaltaParaEnviar(doc, totalBruto)) {
-    const jaDito = porId.get(falta.id);
+  for (const falta of oQueFaltaParaEnviar(doc, totalBruto, {
+    idioma,
+    canal,
+    emailDoCliente,
+    hoje,
+  })) {
+    // «Por traduzir» é o assunto que esta lista chama «Idioma» — a mesma
+    // pergunta com outro nome, e duas linhas sobre ela era uma a mais.
+    const jaDito = porId.get(falta.id === "ingles" ? "idioma" : falta.id);
     if (jaDito) {
-      if (falta.trava) jaDito.trava = true;
+      // Quem trava é um ERRO, diga a linha o que disser: um «aviso» amarelo
+      // ao lado de um botão desligado manda dois recados contrários.
+      if (falta.trava) {
+        jaDito.trava = true;
+        jaDito.severidade = "erro";
+      }
       continue;
     }
     v.push({

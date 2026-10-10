@@ -133,7 +133,7 @@ describe("estadoDasSeccoes", () => {
 });
 
 describe("oQueFaltaParaEnviar", () => {
-  it("numa proposta vazia, trava o nome, o título, o valor e os serviços", () => {
+  it("numa proposta vazia, trava o nome, o título, o valor, a data e os serviços", () => {
     const travam = oQueFaltaParaEnviar(RECEM_ABERTO, 0)
       .filter((f) => f.trava)
       .map((f) => f.texto);
@@ -141,6 +141,7 @@ describe("oQueFaltaParaEnviar", () => {
       "Falta o nome dos clientes",
       "Falta o título interno",
       "Falta o valor",
+      "Falta a data do evento",
       "A secção Serviços está vazia",
     ]);
   });
@@ -271,16 +272,18 @@ describe("oQueFaltaParaEnviar", () => {
  * passo de acontecer — e o que se prende é a REGRA, não a frase.
  */
 describe("os bloqueios que impedem um erro de sair", () => {
-  it("uma página de inspiração com título e sem fotos não sai", () => {
-    // Diferente de «sem mood boards», que é uma escolha legítima: esta ocupa
-    // uma folha do PDF e sai em branco.
+  it("um tema com título e sem fotos é AVISO, e diz qual — no desenho novo não sai em branco", () => {
+    // Travava quando a folha saía em branco. O desenho novo dá-lhe uma página
+    // de texto com uma fotografia de outro tema; o documento dela (B1) põe-no
+    // entre os avisos.
     const comBoardVazio = {
       ...COMPLETO,
       moodBoards: [{ title: "Bouquets", images: [] }],
     } as unknown as ProposalDoc;
     const f = oQueFaltaParaEnviar(comBoardVazio, 3997.5).find((x) => x.id === "moodboard-vazio");
-    expect(f?.trava).toBe(true);
-    expect(f?.texto, "diz QUAL página, senão não se sabe onde ir").toContain("Bouquets");
+    expect(f?.trava).toBe(false);
+    expect(f?.texto, "diz QUAL tema, senão não se sabe onde ir").toContain("Bouquets");
+    expect(f?.campo, "o salto leva ao título desse tema").toBe("boardTitulo:0");
   });
 
   it("mas uma página sem título e sem fotos é só uma página por começar", () => {
@@ -361,5 +364,114 @@ describe("os bloqueios que impedem um erro de sair", () => {
     // Quem chamar com dois argumentos — e há chamadas assim — não passa a ver
     // bloqueios que não pode resolver.
     expect(podeEnviar(COMPLETO, 3997.5)).toBe(true);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * B1 — OS ERROS QUE O DOCUMENTO DELA ACRESCENTOU
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Já saiu um PDF sem orçamento e sem condições, e nada no ecrã o impediu.»
+ * Cada regra nova tem aqui o caso que trava e o caso que deixa passar.
+ */
+describe("B1: os erros novos", () => {
+  const travaPor = (doc: ProposalDoc, total: number, ctx = {}) =>
+    oQueFaltaParaEnviar(doc, total, ctx)
+      .filter((f) => f.trava)
+      .map((f) => f.id);
+
+  it("sem data do evento não sai; «a definir» é texto e passa", () => {
+    expect(travaPor({ ...COMPLETO, eventDate: "" } as ProposalDoc, 3997.5)).toContain("data");
+    expect(travaPor({ ...COMPLETO, eventDate: "a definir" } as ProposalDoc, 3997.5)).not.toContain(
+      "data",
+    );
+  });
+
+  it("uma validade fixada que já passou trava, e diz o dia", () => {
+    const expirada = { ...COMPLETO, validUntil: "2026-08-19" } as ProposalDoc;
+    const f = oQueFaltaParaEnviar(expirada, 3997.5, { hoje: "2026-10-09" }).find(
+      (x) => x.id === "validade",
+    );
+    expect(f?.trava).toBe(true);
+    expect(f?.texto).toContain("19/08/2026");
+    expect(f?.campo, "o salto leva ao campo dos dias").toBe("validUntilDays");
+  });
+
+  it("a validade que acaba HOJE ainda vale, e sem data fixada conta-se a partir do envio", () => {
+    expect(
+      travaPor({ ...COMPLETO, validUntil: "2026-10-09" } as ProposalDoc, 3997.5, {
+        hoje: "2026-10-09",
+      }),
+    ).not.toContain("validade");
+    expect(travaPor(COMPLETO, 3997.5, { hoje: "2030-01-01" })).not.toContain("validade");
+  });
+
+  it("sem email, uma proposta por email não sai; por WhatsApp sai", () => {
+    expect(travaPor(COMPLETO, 3997.5, { canal: "email", emailDoCliente: "" })).toContain("email");
+    expect(travaPor(COMPLETO, 3997.5, { canal: "ambos", emailDoCliente: "sem-arroba" })).toContain(
+      "email",
+    );
+    expect(travaPor(COMPLETO, 3997.5, { canal: "whatsapp", emailDoCliente: "" })).not.toContain(
+      "email",
+    );
+    expect(
+      travaPor(COMPLETO, 3997.5, { canal: "email", emailDoCliente: "casal@example.com" }),
+    ).not.toContain("email");
+  });
+
+  it("sem canal dito, o email não se verifica — quem chama assim não está a enviar", () => {
+    expect(travaPor(COMPLETO, 3997.5, { emailDoCliente: "" })).not.toContain("email");
+  });
+
+  it("condições gerais vazias travam; ausentes são as da casa e passam", () => {
+    expect(travaPor({ ...COMPLETO, condicoesGerais: [] } as ProposalDoc, 3997.5)).toContain(
+      "condicoes",
+    );
+    expect(travaPor({ ...COMPLETO, condicoesGerais: ["  "] } as ProposalDoc, 3997.5)).toContain(
+      "condicoes",
+    );
+    expect(travaPor(COMPLETO, 3997.5)).not.toContain("condicoes");
+  });
+
+  it("total a zero continua a travar (é o «orçamento vazio» do documento dela)", () => {
+    expect(travaPor(COMPLETO, 0)).toContain("valor");
+  });
+});
+
+describe("B1: os avisos novos", () => {
+  const avisos = (doc: ProposalDoc) => oQueFaltaParaEnviar(doc, 3997.5).filter((f) => !f.trava);
+
+  it("um tema com fotografias e sem título é aviso, e leva a esse tema", () => {
+    const doc = {
+      ...COMPLETO,
+      moodBoards: [
+        { title: "Cerimónia", annotation: "x", images: ["a.jpg"] },
+        { title: "", images: ["b.jpg"] },
+      ],
+    } as unknown as ProposalDoc;
+    const f = avisos(doc).find((x) => x.id === "tema-sem-titulo");
+    expect(f?.campo).toBe("boardTitulo:1");
+  });
+
+  it("um tema com título e sem nota é aviso, e diz qual", () => {
+    const doc = {
+      ...COMPLETO,
+      moodBoards: [{ title: "Jantar", images: ["a.jpg"] }],
+    } as unknown as ProposalDoc;
+    const f = avisos(doc).find((x) => x.id === "tema-sem-nota");
+    expect(f?.texto).toContain("Jantar");
+    expect(f?.campo).toBe("boardNota:0");
+  });
+
+  it("nenhum aviso destes trava o envio", () => {
+    const doc = {
+      ...COMPLETO,
+      moodBoards: [
+        { title: "Jantar", images: [] },
+        { title: "", images: ["b.jpg"] },
+      ],
+    } as unknown as ProposalDoc;
+    expect(podeEnviar(doc, 3997.5)).toBe(true);
   });
 });
