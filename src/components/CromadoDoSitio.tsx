@@ -4,6 +4,7 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import StickyCTA from "@/components/StickyCTA";
 import ScrollProgress from "@/components/ScrollProgress";
 import { LinhaDeCarregamento } from "@/components/LinhaDeCarregamento";
+import { AnelSoDoTeclado } from "@/components/AnelSoDoTeclado";
 import { Cortina } from "@/components/Cortina";
 import SpeculationRules from "@/components/SpeculationRules";
 import PageTransition from "@/components/PageTransition";
@@ -122,6 +123,9 @@ export default function CromadoDoSitio({
         funciona dentro de um deles.
       */}
       <LinhaDeCarregamento rotulo={getDictionary(locale).common.aAbrir} />
+      {/* «Não quero estes quadrados à volta do menu» e «se há anéis desses
+          pelo site, retira» — o porquê está no `AnelSoDoTeclado.tsx`. */}
+      <AnelSoDoTeclado />
       <StickyCTA />
       <Navbar />
       {/* tabIndex=-1 so the skip link actually MOVES keyboard focus into
