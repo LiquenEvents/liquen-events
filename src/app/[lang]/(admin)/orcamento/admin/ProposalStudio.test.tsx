@@ -399,6 +399,11 @@ async function confirmarEnvio(user: { click: (el: Element) => Promise<void> }) {
   const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
   await new Promise((r) => setTimeout(r, 450));
   await user.click(botao);
+  // Por email, o envio espera 10 s para se poder cancelar (`useEnvioAdiado`).
+  // Os testes que medem o envio não esperam: carregam em «Enviar já». No
+  // WhatsApp não há espera, e o botão não aparece.
+  const ja = screen.queryByRole("button", { name: /^Enviar já$/ });
+  if (ja) await user.click(ja);
 }
 
 beforeEach(() => {
@@ -1569,6 +1574,57 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     // Depois de a ler, confirma.
     await confirmarEnvio(user);
     await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
+  });
+
+  /**
+   * «10 s para cancelar», a escolha dela (`docs/TUDO-REVERSIVEL.md`): depois do
+   * «Confirmar», o email ainda não saiu — há uma faixa «A enviar em N s…» com
+   * «Cancelar». Cancelar não manda nada; esperar os 10 s manda.
+   */
+  it("depois de confirmar, o envio por email espera e pode ser cancelado", async () => {
+    seedDraft(2);
+    propostaDoc = reply({ json: { ok: true, emailed: true } });
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
+    await new Promise((r) => setTimeout(r, 450));
+    await user.click(botao);
+    expect(await screen.findByText(/A enviar para .* em \d+ s/)).toBeTruthy();
+    expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: /^Cancelar$/ }));
+    expect(screen.queryByText(/A enviar para .* em \d+ s/)).toBeNull();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+    // E o botão volta, para enviar quando ela quiser.
+    expect(screen.getByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeTruthy();
+  });
+
+  it("sem cancelar, o envio sai sozinho ao fim dos 10 s", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["setInterval", "clearInterval", "Date"] });
+    try {
+      seedDraft(2);
+      propostaDoc = reply({ json: { ok: true, emailed: true } });
+      renderStudio();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+      await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+      const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
+      await new Promise((r) => setTimeout(r, 450));
+      await user.click(botao);
+      await screen.findByText(/A enviar para .* em \d+ s/);
+      await act(async () => {
+        vi.advanceTimersByTime(9_000);
+      });
+      expect(corpos("proposta-doc", "POST")).toHaveLength(0);
+      await act(async () => {
+        vi.advanceTimersByTime(1_500);
+      });
+      await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("o envio avisa das duas perdas ao mesmo tempo, sem as confundir", async () => {

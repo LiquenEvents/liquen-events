@@ -61,6 +61,16 @@ export function useToast() {
 }
 
 const TOAST_DURATION = 4000;
+/**
+ * Um aviso que oferece «Anular» fica DEZ segundos, e não quatro.
+ *
+ * Palavras dela, a 10/10: «tem que haver no site todo, em tudo aquilo que se
+ * faz, uma forma de voltar atrás». Quatro segundos é o tempo de ler a frase —
+ * não o de perceber que foi o gesto errado e ir lá carregar. Os «Anular» que
+ * cada ecrã tinha feito à mão andavam entre 4, 5, 8 e 10 s; passa a ser um só
+ * número, e é este. Continua a parar com o rato ou o foco por cima.
+ */
+export const TOAST_ANULAR_MS = 10_000;
 
 /**
  * ── QUANTOS AVISOS CABEM NO ECRÃ AO MESMO TEMPO ─────────────────────────────
@@ -688,7 +698,7 @@ function ToastItem({
   // hovered or focused (and resume from where it left off on leave/blur) so a
   // reader is never rushed off a message they're still engaging with.
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const remainingRef = useRef(TOAST_DURATION);
+  const remainingRef = useRef(toast.accao ? TOAST_ANULAR_MS : TOAST_DURATION);
   const startedRef = useRef(0);
   const onCloseRef = useRef(aoFechar);
   // Keep the ref current without touching it during render (refs are write-only

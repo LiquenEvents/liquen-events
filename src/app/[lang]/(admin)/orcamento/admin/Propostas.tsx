@@ -20,6 +20,8 @@ import {
 import { casaComAProcura } from "@/lib/procura";
 import { dataCurta } from "@/lib/data-curta";
 import { useAccoesDaPropostaEnviada } from "./accoesDaPropostaEnviada";
+import { useAnular } from "./ui/anular";
+import { reporEstadoDoPedido } from "./anular-estado";
 
 /**
  * Quando a proposta seguiu — ou, numa por enviar, quando foi gerada. É por
@@ -233,6 +235,7 @@ export default function Propostas({
   procuraInicial = "",
 }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const {
     accoesDe: accoesDaEnviada,
     botaoDe: botaoDaEnviada,
@@ -290,7 +293,15 @@ export default function Propostas({
    */
   async function updateStatus(id: string, status: ProposalStatus) {
     setActionBusy(id);
-    const nome = proposals.find((p) => p.id === id)?.clientName ?? "esta proposta";
+    // Pela ref, e não pelo `proposals` do fecho: o `confirmAndUpdate` que
+    // chama isto é estável (não muda de identidade), e por isso guarda o
+    // `updateStatus` do PRIMEIRO desenho — com a lista ainda vazia. Lida daí,
+    // a proposta «antes» não existia e o «Anular» nunca aparecia.
+    const antes = latest.current.proposals.find((p) => p.id === id);
+    const nome = antes?.clientName ?? "esta proposta";
+    // O pedido como estava ANTES — o «Aceitar» move-o para Ganho, e o «Anular»
+    // tem de o pôr de volta onde estava.
+    const pedidoAntes = antes ? latest.current.quotesById.get(antes.quoteId)?.status : undefined;
     const oQue = `marcar a proposta de «${nome}» como ${STATUS_META[status].label.toLowerCase()}`;
     try {
       const res = await fetch(`/api/propostas/${id}`, {
@@ -334,10 +345,43 @@ export default function Propostas({
       setProposals((prev) => prev.map((p) => (p.id === id ? updated : p)));
       if (pedido) onQuoteUpdated?.(pedido);
 
-      if (status === "aceite") {
-        toast(`Proposta de ${updated.clientName} aceite.`, "success");
-      } else if (status === "rejeitada") {
-        toast("Proposta marcada como recusada.", "info");
+      /**
+       * ── E VOLTA ATRÁS ───────────────────────────────────────────────────
+       * Palavras dela: «tem que haver no site todo, em tudo aquilo que se
+       * faz, uma forma de voltar atrás». «Anular» repõe a proposta como
+       * estava e, se o «Aceitar» pôs o pedido em Ganho, põe-no de volta —
+       * levando o contrato pendente que isso criou (ver `anular-estado.ts`).
+       */
+      if (antes && (status === "aceite" || status === "rejeitada")) {
+        anular(
+          status === "aceite"
+            ? `Proposta de ${updated.clientName} aceite.`
+            : "Proposta marcada como recusada.",
+          async () => {
+            if (pedido && pedidoAntes && pedidoAntes !== pedido.status) {
+              const reposto = await reporEstadoDoPedido({
+                quoteId: antes.quoteId,
+                de: pedidoAntes,
+                para: pedido.status,
+                actor: userName,
+              });
+              if (reposto) onQuoteUpdated?.(reposto);
+            }
+            const r = await fetch(`/api/propostas/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                status: antes.status,
+                respondedAt: antes.respondedAt ?? "",
+                actor: userName,
+              }),
+            });
+            if (!r.ok) throw new Error("Não foi possível repor a proposta.");
+            const { pedido: _p, ...reposta } = (await r.json()) as Proposal & { pedido?: Quote };
+            void _p;
+            setProposals((prev) => prev.map((x) => (x.id === id ? reposta : x)));
+          },
+        );
       }
     } catch {
       toast(porqueRebentou(oQue).mensagem, "error");
@@ -349,9 +393,9 @@ export default function Propostas({
   // A lista actual e o `onOpenQuote` do pai, numa ref: os manipuladores que
   // vão parar às 202 linhas memoizadas têm de manter a mesma identidade, senão
   // o `memo()` falha sempre e não poupa nada.
-  const latest = useRef({ proposals, onOpenQuote });
+  const latest = useRef({ proposals, onOpenQuote, quotesById });
   useEffect(() => {
-    latest.current = { proposals, onOpenQuote };
+    latest.current = { proposals, onOpenQuote, quotesById };
   });
 
   const handleOpenQuote = useCallback((q: Quote) => latest.current.onOpenQuote?.(q), []);
@@ -364,7 +408,7 @@ export default function Propostas({
       const name = p?.clientName ?? "este cliente";
       const message =
         status === "aceite"
-          ? `Marcar a proposta de ${name} como ACEITE?\n\nO pedido associado passa também a "Aceite".`
+          ? `Marcar a proposta de ${name} como ACEITE?\n\nO pedido associado passa também a "Ganho". Podes anular logo a seguir.`
           : `Marcar a proposta de ${name} como recusada?`;
       if (typeof window !== "undefined" && !window.confirm(message)) return;
       void updateStatus(id, status);

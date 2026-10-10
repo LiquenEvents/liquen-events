@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { parseMoney, randomId, eur2, todayKey, isDateKey } from "./util";
 import { Escolha, Button } from "./ui";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 import { splitSinal } from "@/lib/money";
 import { usePercentagemDoSinal } from "./percentagem-do-sinal";
@@ -117,6 +118,7 @@ interface Props {
 
 export default function PaymentsPanel({ quote, onChange, onContractRef }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [payments, setPayments] = useState<Payment[]>(quote.payments ?? []);
   const [kind, setKind] = useState<PaymentKind>("sinal");
   const [amount, setAmount] = useState("");
@@ -377,7 +379,20 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
    */
   async function persist(
     next: Payment[],
-    op: { id: string; ghost?: Payment | null; label: string; oQue: string },
+    op: {
+      id: string;
+      ghost?: Payment | null;
+      label: string;
+      oQue: string;
+      /**
+       * A volta atrás do gesto: a frase do aviso e a lista como estava. Ao
+       * «Anular», grava-se essa lista pelo mesmo caminho (com a `base`, para
+       * não pisar o que outra pessoa entretanto fez). Palavras dela: «tem que
+       * haver no site todo, em tudo aquilo que se faz, uma forma de voltar
+       * atrás».
+       */
+      desfazer?: { texto: string; antes: Payment[] };
+    },
   ) {
     const minha = ++gravacoes.current;
     setPayments(next);
@@ -422,6 +437,12 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
 
     if (res?.ok) {
       if (minha === gravacoes.current) gravado.current = next;
+      if (op.desfazer) {
+        const { texto, antes } = op.desfazer;
+        anular(texto, () =>
+          persist(antes, { id: op.id, ghost: null, label: op.label, oQue: `anular: ${op.oQue}` }),
+        );
+      }
       return;
     }
 
@@ -494,6 +515,10 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
         oQue: `dar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)} por ${
           p.paid ? "por receber" : "recebido"
         }`,
+        desfazer: {
+          texto: `${KIND_LABEL[p.kind]} de ${eur2(p.amount)} ${p.paid ? "por receber" : "recebido"}.`,
+          antes: payments,
+        },
       },
     );
   }
@@ -505,6 +530,12 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
         ghost: p,
         label: `${KIND_LABEL[p.kind]} ${eur2(p.amount)}`,
         oQue: `apagar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)}`,
+        // Apagar um pagamento não pedia confirmação nenhuma. Em vez de uma
+        // pergunta a cada linha, a volta atrás: «Anular» repõe-no tal e qual.
+        desfazer: {
+          texto: `${KIND_LABEL[p.kind]} de ${eur2(p.amount)} apagado.`,
+          antes: payments,
+        },
       },
     );
   }
@@ -534,6 +565,10 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
         ghost: null,
         label: `${KIND_LABEL[p.kind]} ${eur2(v)}`,
         oQue: `mudar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)} para ${eur2(v)}`,
+        desfazer: {
+          texto: `${KIND_LABEL[p.kind]}: ${eur2(p.amount)} → ${eur2(v)}.`,
+          antes: payments,
+        },
       },
     );
   }

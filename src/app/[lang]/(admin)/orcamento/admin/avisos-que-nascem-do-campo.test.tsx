@@ -70,17 +70,19 @@ const AVISOS: { ficheiro: string; marca: RegExp; oQue: string }[] = [
   },
   {
     ficheiro: "ClientMessenger.tsx",
-    marca: /className="bo-entrada text-\[var\(--bo-perigo\)\] text-xs mb-3 leading-relaxed" role="alert"/,
+    marca:
+      /className="bo-entrada text-\[var\(--bo-perigo\)\] text-xs mb-3 leading-relaxed" role="alert"/,
     oQue: "a mensagem que não foi ao cliente",
   },
   {
     ficheiro: "PaymentsPanel.tsx",
-    marca: /className="bo-entrada flex items-start gap-2\.5 rounded-lg border border-\[var\(--bo-aviso-tom\)\]/,
+    marca:
+      /className="bo-entrada flex items-start gap-2\.5 rounded-lg border border-\[var\(--bo-aviso-tom\)\]/,
     oQue: "o recebido acima do contratado",
   },
   {
     ficheiro: "PerguntaDeDesfecho.tsx",
-    marca: /role="alert" className="bo-entrada mt-2 text-\[var\(--bo-perigo\)\]/,
+    marca: /role="alert"\s+className="bo-entrada mt-2 text-\[var\(--bo-perigo\)\]/,
     oQue: "o valor de desfecho que não se percebe",
   },
   {
@@ -219,6 +221,8 @@ describe("no DOM, a classe está no nó que fala", () => {
 
     await user.type(screen.getByLabelText("Mensagem ao cliente"), "Olá");
     await user.click(screen.getByRole("button", { name: /Enviar e-mail/ }));
+    // O envio espera 10 s para se poder cancelar (`useEnvioAdiado`); aqui não.
+    await user.click(screen.getByRole("button", { name: /^Enviar já$/ }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     const aviso = screen.getByRole("alert");

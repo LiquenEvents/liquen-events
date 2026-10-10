@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Quote, QuoteMessage } from "@/lib/orcamento/types";
 import { Button, Field } from "./ui";
+import { useEnvioAdiado } from "./ui/envio-adiado";
 
 /**
  * O que a rota disse do ENVIO — não da gravação.
@@ -72,6 +73,8 @@ export default function ClientMessenger({ quote, onSent }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Dez segundos para cancelar, antes de o email sair — ver `envio-adiado.ts`.
+  const envio = useEnvioAdiado();
 
   const firstName = (quote.name || "").trim().split(/\s+/)[0] || "";
   function applyTemplate(tpl: string) {
@@ -179,6 +182,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
         rows={4}
         value={text}
         onChange={(e) => setText(e.target.value)}
+        disabled={envio.aEsperar}
         placeholder="Escreve a mensagem que será enviada por e-mail ao cliente…"
         className="resize-none"
         containerClassName="mb-3"
@@ -207,16 +211,39 @@ export default function ClientMessenger({ quote, onSent }: Props) {
         </p>
       )}
 
-      <Button
-        variant="primary"
-        fullWidth
-        onClick={send}
-        loading={sending}
-        disabled={!text.trim()}
-        iconRight={sending ? undefined : <span aria-hidden="true">→</span>}
-      >
-        {sending ? "A enviar…" : "Enviar e-mail"}
-      </Button>
+      {envio.aEsperar ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--bo-hairline-strong)] px-3.5 py-2.5"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-sm text-[var(--bo-text)]">
+            A enviar em {envio.restam} s…{" "}
+            <span className="text-xs text-[var(--bo-text-muted)]">
+              Se saíres deste ecrã antes disso, não sai nada.
+            </span>
+          </span>
+          <span className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={envio.cancelar}>
+              Cancelar
+            </Button>
+            <Button variant="ghost" size="sm" onClick={envio.enviarJa}>
+              Enviar já
+            </Button>
+          </span>
+        </div>
+      ) : (
+        <Button
+          variant="primary"
+          fullWidth
+          onClick={() => envio.agendar(() => void send())}
+          loading={sending}
+          disabled={!text.trim()}
+          iconRight={sending ? undefined : <span aria-hidden="true">→</span>}
+        >
+          {sending ? "A enviar…" : "Enviar e-mail"}
+        </Button>
+      )}
     </div>
   );
 }

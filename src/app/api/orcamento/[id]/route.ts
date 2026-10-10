@@ -10,7 +10,7 @@ import {
   gerarEventoAoGanhar,
 } from "@/lib/semear-producao";
 import { getProposalByQuote, updateProposal } from "@/lib/proposals-store";
-import { nascerContratoDoGanho } from "@/lib/contrato-do-ganho";
+import { desfazerCadeiaDoGanho, nascerContratoDoGanho } from "@/lib/contrato-do-ganho";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
@@ -221,6 +221,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
    *
    * `base` NÃO entra no `picked`: não é campo do pedido e nunca é gravado.
    */
+  /**
+   * O «Anular» de um «Ganho» (ver `desfazerCadeiaDoGanho`). Como a `base`, não
+   * é campo do pedido e nunca é gravado.
+   */
+  const desfazerGanho = (body as Record<string, unknown>).desfazerGanho === true;
   const baseBruta = "base" in body ? (body as Record<string, unknown>).base : undefined;
   const base = (baseBruta && typeof baseBruta === "object" ? baseBruta : {}) as Record<
     string,
@@ -495,6 +500,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
       } catch (e) {
         log.error("orcamento PATCH: propagação para a proposta/contrato falhou", e, { id });
+      }
+    }
+
+    if (desfazerGanho && updated.status !== "aceite") {
+      try {
+        await desfazerCadeiaDoGanho(id);
+      } catch (e) {
+        log.error("orcamento PATCH: desfazer o ganho (proposta/contrato) falhou", e, { id });
       }
     }
 
