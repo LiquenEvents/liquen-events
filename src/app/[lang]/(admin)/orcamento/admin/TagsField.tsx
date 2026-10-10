@@ -3,6 +3,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 /* A escala de movimento da casa — ver `ui/movimento.ts` para o censo que a
    motivou. `ESTADO` são os 120 ms do degrau `micro` numa lista fechada de
@@ -24,6 +25,7 @@ interface Props {
  */
 export default function TagsField({ quote, suggestions, onChange }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [tags, setTags] = useState<string[]>(quote.tags ?? []);
   const [input, setInput] = useState("");
   const id = useId();
@@ -56,7 +58,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
     toast(`${falha.mensagem} A lista de etiquetas voltou à que está gravada.`, "error");
   }
 
-  async function persist(next: string[], oQue: string) {
+  async function persist(next: string[], oQue: string): Promise<boolean> {
     // Otimista com reversão: falha do servidor repõe o estado e avisa.
     //
     // ── PORQUE É QUE A REVERSÃO NÃO PODE SER «O QUE ESTAVA ANTES DE MIM» ────
@@ -81,17 +83,18 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
         body: JSON.stringify({ tags: next }),
       });
     } catch {
-      if (minha !== ordem.current) return;
+      if (minha !== ordem.current) return false;
       reverter(porqueRebentou(oQue));
-      return;
+      return false;
     }
     if (!res.ok) {
       const corpo = await res.json().catch(() => null);
-      if (minha !== ordem.current) return;
+      if (minha !== ordem.current) return false;
       reverter(porqueFalhou(oQue, res, corpo));
-      return;
+      return false;
     }
     if (minha === ordem.current) confirmado.current = next;
+    return true;
   }
 
   function add(raw: string) {
@@ -110,6 +113,15 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
       tags.filter((x) => x !== t),
       `tirar a etiqueta «${t}» de «${quote.name}»`,
     );
+    // Volta a pôr a MESMA etiqueta por cima do que estiver gravado nessa
+    // altura — não a lista inteira de antes, que podia trazer de volta uma
+    // etiqueta tirada a seguir.
+    anular(`Etiqueta «${t}» tirada.`, () => {
+      const atuais = confirmado.current;
+      return atuais.includes(t)
+        ? true
+        : persist([...atuais, t], `voltar a pôr a etiqueta «${t}» em «${quote.name}»`);
+    });
   }
 
   // Suggestions not yet applied to this quote, filtered by what's typed.

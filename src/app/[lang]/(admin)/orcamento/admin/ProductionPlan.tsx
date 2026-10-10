@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { metaFor, tintaDoRotulo } from "./status-meta";
 import { Escolha, Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
@@ -46,6 +47,12 @@ const STATUS_LABEL: Record<EventSupplierStatus, { label: string; color: string }
 // para o plano gerado na UI e o gerado no aceite da proposta serem idênticos.
 const SEP = PRODUCTION_PHASE_SEP;
 
+/** O nome da tarefa sem a fase à frente — é assim que ela a lê no ecrã. */
+function rotuloCurto(label: string): string {
+  const i = label.indexOf(SEP);
+  return i >= 0 ? label.slice(i + SEP.length) : label;
+}
+
 /**
  * Decor production plan: a phased atelier timeline (Sourcing → Strike) stored
  * in the quote's own `productionPlan` field (separado do `checklist` do evento,
@@ -56,6 +63,7 @@ const SEP = PRODUCTION_PHASE_SEP;
  */
 export default function ProductionPlan({ quote, onChange }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   // Novo campo dedicado: default [] quando ausente. Sem migração de dados — em
   // orçamentos antigos, itens de produção que tenham ficado gravados em
   // `checklist` permanecem lá intactos até serem re-aplicados aqui.
@@ -117,7 +125,10 @@ export default function ProductionPlan({ quote, onChange }: Props) {
    * O `oQue` nomeia a TAREFA: o plano tem trinta linhas, a reversão desfaz uma
    * só, e sem o nome ninguém sabe qual delas se desriscou sozinha no ecrã.
    */
-  async function persist(oQue: string, reaplicar: (atuais: ChecklistItem[]) => ChecklistItem[]) {
+  async function persist(
+    oQue: string,
+    reaplicar: (atuais: ChecklistItem[]) => ChecklistItem[],
+  ): Promise<boolean> {
     const next = reaplicar(items);
     const minha = ++gravacoes.current;
     setItems(next);
@@ -148,7 +159,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       });
     } catch {
       reporEDizer(porqueRebentou(oQue).mensagem);
-      return;
+      return false;
     }
     /**
      * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
@@ -175,14 +186,15 @@ export default function ProductionPlan({ quote, onChange }: Props) {
       // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
       // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
       setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
-      return;
+      return false;
     }
     if (!res.ok) {
       const corpo = await res.json().catch(() => null);
       reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
-      return;
+      return false;
     }
     if (minha === gravacoes.current) gravado.current = next;
+    return true;
   }
 
   /**
@@ -203,6 +215,14 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     const existing = new Set(items.map((i) => i.label));
     const additions = buildProductionPlanItems(randomId, existing);
     if (additions.length === 0) return;
+    const ids = new Set(additions.map((a) => a.id));
+    anular(
+      `${additions.length} ${additions.length === 1 ? "tarefa do plano acrescentada" : "tarefas do plano acrescentadas"}.`,
+      () =>
+        persist("tirar o que o plano acrescentou", (atuais) =>
+          atuais.filter((i) => !ids.has(i.id)),
+        ),
+    );
     void persist(
       `aplicar o plano de produção (${additions.length} ${
         additions.length === 1 ? "tarefa" : "tarefas"
@@ -229,8 +249,19 @@ export default function ProductionPlan({ quote, onChange }: Props) {
 
   function removeItem(id: string) {
     const tarefa = items.find((i) => i.id === id);
+    const onde = items.findIndex((i) => i.id === id);
     void persist(`remover «${tarefa?.label ?? "a tarefa"}» do plano`, (atuais) =>
       atuais.filter((i) => i.id !== id),
+    );
+    if (!tarefa) return;
+    // O «Anular» volta a pôr a MESMA tarefa no sítio onde estava — como gesto,
+    // tal como os outros, para poder ser reaplicado por cima de uma colisão.
+    anular(`«${rotuloCurto(tarefa.label)}» saiu do plano.`, () =>
+      persist(`repor «${rotuloCurto(tarefa.label)}» no plano`, (atuais) =>
+        atuais.some((i) => i.id === id)
+          ? atuais
+          : [...atuais.slice(0, onde), tarefa, ...atuais.slice(onde)],
+      ),
     );
   }
 
@@ -244,6 +275,9 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     // tem de acrescentar a MESMA tarefa, não uma segunda cópia.
     const tarefa = { id: randomId(), label: `${phase.label}${SEP}${label}`, done: false };
     void persist(`acrescentar «${label}» a ${phase.label}`, (atuais) => [...atuais, tarefa]);
+    anular(`«${label}» acrescentada a ${phase.label}.`, () =>
+      persist(`tirar «${label}» do plano`, (atuais) => atuais.filter((i) => i.id !== tarefa.id)),
+    );
     setNewLabel("");
   }
 

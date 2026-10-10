@@ -31,7 +31,8 @@ volta atrás (a rota respondia 409).
 | Fase | Estado |
 |---|---|
 | **R1** — o padrão, os estados do pedido e a cadeia do Ganho, Propostas e Acompanhamento, Propostas Aceites, pagamentos, os dois envios | Feita no ramo `feat/anular-r1` |
-| **R2** — o resto do dia a dia, e os «Anular» antigos passam ao padrão | Por fazer |
+| **R2a** — a gaveta do pedido: os campos do «Guardar» e todas as listas | Feita no ramo `feat/anular-r2a` |
+| **R2b** — o resto do back office, e os «Anular» antigos passam ao padrão | Por fazer |
 | **R3** — a Reciclagem de 30 dias | Por fazer (precisa de uma migração, que só corre com a aprovação dela) |
 
 **Onde a R1 se afastou do plano.** Apagar um pagamento ficou com «Anular» e
@@ -44,6 +45,11 @@ dentro do clique, e é ela quem carrega em «Enviar» lá dentro.
 idempotente (marcar «Ganho» outra vez não duplica nada), e tirar tarefas que
 alguém pode já ter começado seria apagar trabalho a meio de um «Anular».
 
+**Na R2a, de passagem:** a lista de convidados gravava sem `base`, e por isso duas pessoas
+a mexer nela pisavam-se sem aviso (o servidor protege `guestList`, mas só pode recusar quando
+a `base` vem). Passou a mandá-la, como as outras listas da gaveta. Riscar/desriscar, o RSVP e o
+número de pessoas não levam «Anular»: desfazem-se no mesmo sítio, com o mesmo toque.
+
 ## O mapa — o que tinha e o que não tinha volta atrás (análise de 10/10)
 
 A coluna «Fase» diz quando passa a ter. ✅ = já tinha antes desta análise.
@@ -54,13 +60,14 @@ A coluna «Fase» diz quando passa a ter. ✅ = já tinha antes desta análise.
 | Arrastar no Kanban / mover pelo teclado | `Kanban.tsx` | «Anular» repõe o estado anterior (e a cadeia do Ganho) | R1 |
 | «Marcar como» em massa | `AdminClient.tsx` | «Anular» repõe o estado de cada um | R1 |
 | «Ganhou? / Perdeu?» e motivo | `PerguntaDeDesfecho.tsx` | «Anular» | R1 |
-| Guardar os campos da gaveta (estado, preço, data, convidados, local, contactos, responsável) | `AdminClient.tsx` | «Anular» com os valores anteriores | R1 (estado) · R2 (resto) |
+| Guardar os campos da gaveta (estado, preço, data, convidados, local, contactos, responsável) | `AdminClient.tsx` | «Anular» repõe todos os campos que o gesto mudou | ✅ R1 (estado) · R2a (resto) |
 | Arquivar / Restaurar pedido | `AdminClient.tsx` | ✅ «Restaurar pedido» | — |
 | Duplicar / Novo pedido | `AdminClient.tsx`, `NewQuoteModal.tsx` | Arquivar ou apagar a cópia | R2 |
 | Apagar pedido (e em massa) | `AdminClient.tsx` | Reciclagem | R3 |
-| Etiquetas, seguimento, convidados, custos, guião, plano de produção, notas | vários | «Anular» | R2 |
-| Lista de verificação: remover, «Marcar todas» | `EventChecklist.tsx` | ✅ «Anular» 8 s → passa ao padrão | R2 |
-| Lista de verificação: «Limpar concluídas», gerar, modelo | `EventChecklist.tsx` | «Anular» | R2 |
+| Etiquetas (tirar), seguimento (atalhos), convidados, custos, guião, plano de produção | vários | «Anular» — gesto ao contrário, com a `base` | ✅ R2a |
+| Notas e motivo (gravam sozinhos ao escrever) | `AdminClient.tsx` | Anulam-se pelo «Guardar» quando vão nele; ao escrever, não — um aviso por tecla seria ruído | — |
+| Lista de verificação: remover, «Marcar todas» | `EventChecklist.tsx` | «Anular» da casa (era uma tira própria de 8 s) | ✅ R2a |
+| Lista de verificação: «Limpar concluídas», gerar, modelo, editar | `EventChecklist.tsx` | «Anular» | ✅ R2a |
 | Pagamentos: apagar, «Pago», editar | `PaymentsPanel.tsx` | «Anular» (repõe a lista como estava) | R1 |
 | Pagamentos: nº de contrato | `PaymentsPanel.tsx` | «Anular» | R2 |
 | Mensagem ao cliente (email, sem confirmação) | `ClientMessenger.tsx` | 10 s para cancelar | R1 |

@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { metaFor, tintaDoRotulo } from "./status-meta";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
@@ -29,6 +30,7 @@ interface Props {
  */
 export default function GuestList({ quote, onChange }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [guests, setGuests] = useState<Guest[]>(quote.guestList ?? []);
   const [name, setName] = useState("");
   const [party, setParty] = useState("1");
@@ -63,6 +65,13 @@ export default function GuestList({ quote, onChange }: Props) {
    */
   const gravacoes = useRef(0);
   const gravado = useRef<Guest[]>(quote.guestList ?? []);
+  /**
+   * A versão de que esta lista partiu — como nas outras listas da gaveta. Não
+   * ia nenhuma, e por isso o servidor (que protege `guestList` com 409) nunca
+   * podia recusar: duas pessoas a mexer na mesma lista pisavam-se sem aviso.
+   * Avança ao ENVIAR, pela mesma razão das outras.
+   */
+  const base = useRef<Guest[]>(quote.guestList ?? []);
 
   /**
    * ══════════════════════════════════════════════════════════════════════
@@ -80,45 +89,77 @@ export default function GuestList({ quote, onChange }: Props) {
    * não têm nada a dizer a ninguém — o aviso delas seria sobre trabalho que a
    * gravação seguinte já leva lá dentro.
    */
-  async function gravar(oQue: string, next: Guest[]): Promise<{ ok: boolean; aviso: string }> {
+  async function gravar(
+    oQue: string,
+    next: Guest[],
+    baseAnterior: Guest[],
+  ): Promise<{ ok: boolean; aviso: string; doServidor?: Guest[] }> {
     let res: Response;
     try {
       res = await fetch(`/api/orcamento/${quote.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestList: next }),
+        body: JSON.stringify({ guestList: next, base: { guestList: baseAnterior } }),
       });
     } catch {
       return { ok: false, aviso: porqueRebentou(oQue).mensagem };
     }
     const corpo = await res.json().catch(() => null);
+    if (res.status === 409) {
+      const doServidor =
+        (corpo as { current?: { guestList?: Guest[] } } | null)?.current?.guestList ?? [];
+      return {
+        ok: false,
+        aviso: "A lista de convidados foi alterada noutro sítio. Está aqui a versão guardada.",
+        doServidor,
+      };
+    }
     if (!res.ok) return { ok: false, aviso: porqueFalhou(oQue, res, corpo).mensagem };
     return { ok: true, aviso: "" };
   }
 
-  async function persist(next: Guest[], oQue: string) {
+  /** Devolve se ficou gravado — o «Anular» usa-o para não dizer «Anulado.» em falso. */
+  async function persist(next: Guest[], oQue: string): Promise<boolean> {
     const minha = ++gravacoes.current;
     setGuests(next);
     onChange(next);
-    const { ok, aviso } = await gravar(oQue, next);
+    const baseAnterior = base.current;
+    base.current = next;
+    const { ok, aviso, doServidor } = await gravar(oQue, next, baseAnterior);
     if (ok) {
       if (minha === gravacoes.current) gravado.current = next;
-      return;
+      return true;
     }
+    // 409: adopta-se o que o servidor tem, e diz-se — não se repõe nada.
+    if (doServidor) {
+      gravado.current = doServidor;
+      base.current = doServidor;
+      if (minha === gravacoes.current) {
+        setGuests(doServidor);
+        onChange(doServidor);
+      }
+      toast(aviso, "error");
+      return false;
+    }
+    // A base acompanha o que fica no ecrã: declarar uma versão que nunca
+    // chegou a ser gravada dava um 409 inventado na gravação seguinte.
+    base.current = gravado.current;
     // Já foi substituída por uma gravação mais recente: o que essa levar
     // contém o que esta levava, portanto não há nada a desfazer nem nada a
     // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
-    if (minha !== gravacoes.current) return;
+    if (minha !== gravacoes.current) return false;
     setGuests(gravado.current);
     onChange(gravado.current);
     toast(aviso, "error");
+    return false;
   }
 
   function add() {
     const n = name.trim();
     if (!n) return;
     const trimmedNote = note.trim();
-    persist(
+    const antes = guests;
+    void persist(
       [
         ...guests,
         {
@@ -131,15 +172,21 @@ export default function GuestList({ quote, onChange }: Props) {
       ],
       `acrescentar «${n}» à lista de convidados`,
     );
+    anular(`«${n}» acrescentado à lista.`, () => persist(antes, `tirar «${n}» da lista`));
     setName("");
     setParty("1");
     setNote("");
   }
   function remove(id: string) {
     const g = guests.find((x) => x.id === id);
-    persist(
+    const antes = guests;
+    void persist(
       guests.filter((x) => x.id !== id),
       `remover «${g?.name ?? "convidado"}» da lista`,
+    );
+    // Remover não pergunta — anula-se, e a família volta ao sítio onde estava.
+    anular(`«${g?.name ?? "O convidado"}» saiu da lista.`, () =>
+      persist(antes, `repor «${g?.name ?? "o convidado"}» na lista`),
     );
   }
   // Estado do RSVP escolhido diretamente (um clique para qualquer estado), em vez

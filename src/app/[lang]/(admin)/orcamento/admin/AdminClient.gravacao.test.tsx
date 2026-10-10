@@ -678,3 +678,34 @@ describe("Painel do pedido — os rótulos", () => {
     expect(estado.getAttribute("aria-label")).toBeNull();
   });
 });
+
+/**
+ * «Tem que haver no site todo, em tudo aquilo que se faz, uma forma de voltar
+ * atrás» (10/10). O «Anular» do «Guardar» só repunha o estado; passa a repor
+ * TODOS os campos que o gesto mudou, com os valores de antes.
+ */
+describe("Painel do pedido — «Anular» depois de «Guardar alterações»", () => {
+  it("repõe o preço e o local que estavam, e escreve no histórico", async () => {
+    montar(makeQuote({ quotedPrice: 1000, location: "Évora" }));
+    await abrirPedido();
+
+    fireEvent.change(screen.getByPlaceholderText("Ex.: 12500"), { target: { value: "4321" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Guardar alterações$/ }));
+    });
+    await passar(500);
+    expect(gravacoes.at(-1)?.corpo.quotedPrice).toBe(4321);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Anular" }));
+    });
+    await passar(500);
+    const inverso = gravacoes.at(-1)?.corpo ?? {};
+    expect(inverso.quotedPrice).toBe(1000);
+    // Só volta o que o gesto mudou — o local não foi tocado, não viaja.
+    expect(inverso).not.toHaveProperty("location");
+    expect(inverso).not.toHaveProperty("status");
+    expect(JSON.stringify(inverso.activityLogAppend)).toMatch(/anuladas/);
+    expect(screen.getByText("Anulado.")).toBeInTheDocument();
+  });
+});
