@@ -233,7 +233,11 @@ export default function Propostas({
   procuraInicial = "",
 }: Props) {
   const { toast } = useToast();
-  const { accoesDe: accoesDaEnviada, folha: folhaDoEmail } = useAccoesDaPropostaEnviada();
+  const {
+    accoesDe: accoesDaEnviada,
+    botaoDe: botaoDaEnviada,
+    folha: folhaDoEmail,
+  } = useAccoesDaPropostaEnviada();
   const [procura, setProcura] = useState(procuraInicial);
   // A mesma procura de outra vista, quando ela volta cá com outro nome.
   useEffect(() => setProcura(procuraInicial), [procuraInicial]);
@@ -550,15 +554,16 @@ export default function Propostas({
    * embrulhavam para a linha de baixo, com "Apagar" a acabar ao lado de
    * "Aceitar".
    */
+  const paraAccoes = (p: Proposal) => ({
+    id: p.id,
+    quoteId: p.quoteId,
+    temDoc: !!p.doc,
+    enviada: !!p.sentAt,
+    titulo: `${p.clientName}${p.sentAt ? ` · enviada ${dataCurta(p.sentAt)}` : ""}`,
+  });
   const accoesDa = (p: Proposal): AccaoDeItem[] => {
     // Primeiro, VER o que seguiu — a pergunta que este ecrã não sabia responder.
-    const lista: AccaoDeItem[] = accoesDaEnviada({
-      id: p.id,
-      quoteId: p.quoteId,
-      temDoc: !!p.doc,
-      enviada: !!p.sentAt,
-      titulo: `${p.clientName}${p.sentAt ? ` · enviada ${dataCurta(p.sentAt)}` : ""}`,
-    });
+    const lista: AccaoDeItem[] = accoesDaEnviada(paraAccoes(p));
     if (p.status === "enviada") {
       lista.push({
         id: "aceitar",
@@ -594,7 +599,9 @@ export default function Propostas({
         style={{ "--cena": 0 } as React.CSSProperties}
         className="bo-cena text-sm leading-relaxed text-[var(--bo-text-muted)]"
       >
-        Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites.
+        Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites. Em{" "}
+        <strong className="font-medium text-[var(--bo-text)]">Ver o que seguiu</strong>, em cada
+        proposta, abres o PDF, o link e o email que o cliente recebeu.
       </p>
 
       {/*
@@ -930,6 +937,16 @@ export default function Propostas({
                   ),
                 },
                 {
+                  // À VISTA, e não só no menu: ver o que seguiu é a pergunta
+                  // que este ecrã existe para responder (ver o cabeçalho de
+                  // `accoesDaPropostaEnviada.tsx`).
+                  chave: "seguiu",
+                  interactiva: true,
+                  cabecalho: "",
+                  alinharADireita: true,
+                  celula: (p) => botaoDaEnviada(paraAccoes(p)),
+                },
+                {
                   chave: "accoes",
                   interactiva: true,
                   cabecalho: "",
@@ -971,7 +988,7 @@ export default function Propostas({
                     </span>
                   </>
                 );
-                return (
+                const linha = (
                   <div className="flex items-start gap-3 p-3.5">
                     {pedido ? (
                       <button
@@ -994,6 +1011,15 @@ export default function Propostas({
                       <MenuDeAccoes sobre={p.clientName} accoes={accoesDa(p)} />
                     </div>
                   </div>
+                );
+                const botao = botaoDaEnviada(paraAccoes(p), { largo: true });
+                return botao ? (
+                  <div>
+                    {linha}
+                    <div className="px-3.5 pb-3.5">{botao}</div>
+                  </div>
+                ) : (
+                  linha
                 );
               }}
             />
