@@ -6,6 +6,7 @@ import { updateQuoteWith } from "@/lib/quotes-store";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import type { AcontecimentoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { eur } from "@/lib/money";
+import { nascerContratoDoGanho } from "@/lib/contrato-do-ganho";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -198,6 +199,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
      */
     const actor = typeof body.actor === "string" ? body.actor.trim().slice(0, 80) : undefined;
     const pedido = "status" in patch ? await moverOPedido(updated, actor || undefined) : undefined;
+    /**
+     * Aceite aqui é «Ganho» como no Quadro: nasce o contrato por assinar.
+     *
+     * Sem isto, o «Aceitar» das Propostas e o Acompanhamento punham o pedido em
+     * «Ganho» sem contrato, e a proposta não aparecia nas Propostas Aceites —
+     * «já houve mais propostas aceites e não estão aqui», nas palavras dela.
+     * Melhor esforço, como o pedido acima: a proposta já está gravada.
+     */
+    if (patch.status === "aceite" && updated.quoteId) {
+      try {
+        await nascerContratoDoGanho(updated.quoteId, updated);
+      } catch (e) {
+        log.error("propostas PATCH: a proposta ficou aceite mas o contrato não nasceu", e, {
+          id,
+        });
+      }
+    }
     return NextResponse.json(pedido ? { ...updated, pedido } : updated);
   } catch (err) {
     // A proposta é o documento que seguiu para o casal e tem vários donos ao

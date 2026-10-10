@@ -10,10 +10,7 @@ import {
   gerarEventoAoGanhar,
 } from "@/lib/semear-producao";
 import { getProposalByQuote, updateProposal } from "@/lib/proposals-store";
-import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
-import { idiomaDaProposta } from "@/lib/proposta-idioma";
-import { TERMS_VERSION, termosPara, termsToPlainText } from "@/lib/contract-terms";
-import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
+import { nascerContratoDoGanho } from "@/lib/contrato-do-ganho";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
@@ -487,90 +484,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
 
           /**
-           * ══════════════════════════════════════════════════════════════════
-           * O CONTRATO NASCE QUANDO A EQUIPA MARCA «GANHO» — POR ASSINAR
-           * ══════════════════════════════════════════════════════════════════
-           *
-           * `createContract` e `createContractIfAbsent` não tinham um único
-           * chamador de produção: nasciam do fluxo de
-           * aceitação por botão que saiu (ver `nada-de-aceitar-por-botao.test.ts`).
-           * Ficaram órfãos o PDF do contrato, os termos com versão e
-           * congelamento, e o botão do portal do casal.
-           *
-           * `createContractIfAbsent` é o LOCK: marcar «Ganho» duas vezes (dois
-           * separadores, uma correção para trás e para a frente) não nasce dois
-           * contratos — a segunda chamada encontra o primeiro pela `proposalId`
-           * e não faz nada.
-           *
-           * ── O QUE ESTE CONTRATO NÃO FINGE ─────────────────────────────────
-           * O aceite electrónico antigo guardava nome, hora, IP e termos
-           * congelados — provas de que o CLIENTE tinha carregado no botão.
-           * Quem marca agora é a EQUIPA, a partir de um email, um telefonema ou
-           * um WhatsApp, e não há aqui nem nome escrito, nem IP, nem o
-           * momento em que o casal disse que sim — só o momento em que a
-           * equipa o registou. Por isso o contrato nasce com `status:
-           * "pendente"` — por assinar — e SEM `acceptedAt`/`acceptedName`/
-           * `acceptedIp`: inventá-los seria fingir um aceite que este sistema
-           * não presenciou. Quem assina (e como isso fica confirmado) continua
-           * a ser tratado fora do sistema; `updateContract` já existe para o
-           * dia em que essa confirmação ganhar um caminho próprio.
-           *
-           * Os termos vão CONGELADOS na versão actual (`TERMS_VERSION`),
-           * calculados sobre a percentagem de sinal DESTA proposta — não os
-           * 30% por omissão — exactamente como o aceite antigo fazia. O selo
-           * do PDF (sha256/bytes) só vai quando a proposta o tem: propostas
-           * enviadas antes desse campo existir ficam sem selo, e é assim que
-           * deve ser — um selo inventado a posteriori não provaria nada.
+           * O contrato nasce quando a equipa marca «Ganho» — por assinar. O
+           * porquê inteiro (o lock, o que ele não finge, os termos congelados)
+           * está em `nascerContratoDoGanho`, que é a mesma função que o
+           * «Aceitar» das Propostas e o botão «Criar contrato» usam.
            */
           if (desfechoConfirmadoAgora && updated.status === "aceite") {
-            await createContractIfAbsent({
-              id: newContractId(),
-              quoteId: id,
-              proposalId: proposta.id,
-              clientName: proposta.clientName,
-              clientEmail: proposta.clientEmail,
-              termsVersion: TERMS_VERSION,
-              /**
-               * ── E NA LÍNGUA DA PROPOSTA ─────────────────────────────────
-               *
-               * Os termos existem nas duas línguas desde que ela o pediu («o
-               * contrato quer que exista também em inglês»), e a língua não é
-               * uma escolha nova: é a que a proposta levou. Um casal que
-               * recebeu a proposta em inglês aceita o contrato em inglês.
-               *
-               * O snapshot congela o texto NA LÍNGUA QUE ELES VIRAM — é essa a
-               * função dele, ser a cópia do que foi aceite. A versão portuguesa
-               * prevalece numa divergência, e é o próprio texto inglês que o
-               * diz (ponto 9); ver o cabeçalho do `DEFAULT_TERMS_EN`.
-               */
-              idioma: idiomaDaProposta(proposta),
-              termsSnapshot: termsToPlainText(
-                termosPara(
-                  depositPercentOf(proposta.doc as ProposalDoc | undefined),
-                  idiomaDaProposta(proposta),
-                ),
-              ),
-              status: "pendente",
-              createdAt: new Date().toISOString(),
-              ...(proposta.pdfSha256 !== undefined
-                ? { propostaPdfSha256: proposta.pdfSha256 }
-                : {}),
-              ...(proposta.pdfBytes !== undefined ? { propostaPdfBytes: proposta.pdfBytes } : {}),
-              /**
-               * QUE VERSÃO É QUE FOI ACEITE. Sem isto não se pode dizer nem
-               * «o documento de agora é o que foi aceite» nem «foi revisto
-               * depois do sim» — só adivinhar, e um aviso adivinhado sobre
-               * dinheiro é pior do que nenhum. As propostas anteriores às
-               * colunas de versão não têm selo, e então não vai nada: ausente
-               * lê-se como «não se sabe», nunca como «foi revisto».
-               */
-              ...(proposta.versaoSelo !== undefined
-                ? { propostaVersaoSelo: proposta.versaoSelo }
-                : {}),
-              ...(proposta.versaoNumero !== undefined
-                ? { propostaVersaoNumero: proposta.versaoNumero }
-                : {}),
-            });
+            await nascerContratoDoGanho(id, { ...proposta, ...patchProposta });
           }
         }
       } catch (e) {
