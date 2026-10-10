@@ -25,7 +25,7 @@ describe("páginas de serviços — texto corrido justificado", () => {
   });
 
   it("as respostas das perguntas frequentes", () => {
-    expect(servico).toMatch(/<p className="[^"]*text-justify[^"]*">\{f\.a\}<\/p>/);
+    expect(servico).toMatch(/<p className="[^"]*text-justify[^"]*">\s*\{f\.a\}\s*<\/p>/);
   });
 
   it("o texto do bloco de SEO da lista", () => {
