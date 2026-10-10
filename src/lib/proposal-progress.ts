@@ -1,8 +1,9 @@
-import { type ProposalDoc } from "./proposal-doc";
+import { type ProposalDoc, withProposalDefaults } from "./proposal-doc";
 import { desalinhamento, dinheiroDaProposta } from "./proposal-budget";
 import { camposPorTraduzir } from "./proposal-doc-bilingue";
 import { camposDoDocumento, lerCampo } from "./proposal-ortografia";
 import { eur } from "./money";
+import { hojeNoEstudio } from "./fuso";
 
 /**
  * ONDE ESTOU, O QUE JÁ ESTÁ FEITO, E O QUE FALTA PARA PODER ENVIAR.
@@ -230,7 +231,23 @@ export interface ContextoDoEnvio {
   imagensQueFaltam?: readonly string[];
   /** O email do cliente. Sem ele gera-se, mas não se envia. */
   emailDoCliente?: string;
+  /**
+   * Por onde a proposta segue — o selector «Por onde segue» do passo do envio.
+   *
+   * Só com ele presente é que o email se verifica: quem chama sem dizer o
+   * canal (a Conferência fora do envio, os testes antigos) não está a enviar,
+   * e acusar um email em falta a quem não vai enviar nada é ruído.
+   */
+  canal?: "email" | "whatsapp" | "ambos";
+  /** O dia de hoje (yyyy-mm-dd), no fuso do estúdio. Injetável para testes. */
+  hoje?: string;
 }
+
+/** O mesmo critério do passo do envio (`emailDoCliente` no estúdio). */
+const EMAIL_VALIDO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** «2026-10-09» → «09/10/2026», para a frase. */
+const diaEscrito = (iso: string) => iso.split("-").reverse().join("/");
 
 /** Um `{{marcador}}` que sobreviveu até ao texto final. */
 const TEM_CHAVETAS = /\{\{/;
@@ -277,13 +294,78 @@ export function oQueFaltaParaEnviar(
     });
   }
 
+  /**
+   * ── A DATA PASSOU A TRAVAR ────────────────────────────────────────────────
+   *
+   * Era só conselho. O documento dela («Melhorias ao fluxo Fazer proposta»,
+   * B1) pô-la entre os erros: uma proposta de casamento sem dia não é uma
+   * proposta — a capa, a validade das condições e o calendário dependem dela.
+   * Quem ainda não sabe o dia escreve «a definir», que é texto e passa.
+   */
   if (!temTexto(doc.eventDate)) {
     faltas.push({
       id: "data",
       seccao: "evento",
       campo: "eventDate",
-      texto: "Sem data do evento",
-      trava: false,
+      texto: "Falta a data do evento",
+      trava: true,
+    });
+  }
+
+  /**
+   * ── A VALIDADE JÁ PASSOU ──────────────────────────────────────────────────
+   *
+   * Uma proposta nova conta a validade a partir do dia em que segue (os «dias
+   * de validade», 60 por omissão), por isso nunca fica «por definir». O que
+   * acontece é o contrário: uma proposta que já seguiu leva a data FIXADA lá
+   * dentro (ver `proposta-doc`, `doc.validUntil`), e reaberta para reenviar
+   * dois meses depois sairia com uma validade que terminou — e o link do casal
+   * recusa aceitar uma proposta expirada.
+   */
+  const hoje = ctx.hoje ?? hojeNoEstudio();
+  if (doc.validUntil && /^\d{4}-\d{2}-\d{2}$/.test(doc.validUntil) && doc.validUntil < hoje) {
+    faltas.push({
+      id: "validade",
+      seccao: "total",
+      campo: "validUntilDays",
+      texto: `A validade terminou a ${diaEscrito(doc.validUntil)}`,
+      trava: true,
+    });
+  }
+
+  /**
+   * ── SEM EMAIL, A PROPOSTA NÃO CHEGA A NINGUÉM ────────────────────────────
+   *
+   * Até aqui era um aviso cor de laranja no passo do envio: a proposta ficava
+   * gravada e o email não saía. Com «só WhatsApp» não ter email é o caso
+   * normal de um pedido que entrou por telefone, e não trava.
+   */
+  if (ctx.canal && ctx.canal !== "whatsapp" && !EMAIL_VALIDO.test(ctx.emailDoCliente ?? "")) {
+    faltas.push({
+      id: "email",
+      seccao: "envio",
+      texto: "Falta o email do cliente",
+      trava: true,
+    });
+  }
+
+  /**
+   * ── AS CONDIÇÕES QUE NÃO SAEM ─────────────────────────────────────────────
+   *
+   * «Já saiu um PDF sem orçamento e sem condições, e nada no ecrã o impediu.»
+   * O PDF novo não imprime uma secção vazia — a página das Condições Gerais
+   * simplesmente não sai, e o casal recebe uma proposta sem a parte
+   * contratual. Lê-se o que o PDF vai ler: o documento com os textos da casa
+   * por omissão (`withProposalDefaults`), e não o rascunho cru, onde a lista
+   * ausente quer dizer «as da casa».
+   */
+  if (!withProposalDefaults(doc).condicoesGerais.some(temTexto)) {
+    faltas.push({
+      id: "condicoes",
+      seccao: "total",
+      campo: "condicoesGerais",
+      texto: "As Condições Gerais estão vazias e não saem no PDF",
+      trava: true,
     });
   }
   if (!temTexto(doc.location)) {
@@ -317,11 +399,17 @@ export function oQueFaltaParaEnviar(
   }
 
   /**
-   * Uma PÁGINA de inspiração sem fotografias.
+   * Um TEMA sem fotografias.
    *
-   * Diferente de «sem mood boards», que é uma escolha legítima: isto é uma
-   * página com título, que conta para a contagem, que ocupa uma folha do PDF —
-   * e que sai em branco. Quem a criou queria lá pôr fotos.
+   * Diferente de «sem mood boards», que é uma escolha legítima: isto é um tema
+   * com título, que conta para a contagem — e quem o criou queria lá pôr
+   * fotos.
+   *
+   * ── DEIXOU DE TRAVAR ──────────────────────────────────────────────────────
+   * Travava porque no desenho antigo a folha saía EM BRANCO. O desenho novo
+   * dá a um tema sem fotografias uma página de texto com uma fotografia de
+   * outro tema ao lado (`composicaoEmPalavras(0)`) — não sai buraco nenhum.
+   * O documento dela (B1) põe-no entre os avisos, e é isso que passa a ser.
    */
   const boardsVazios = (doc.moodBoards ?? []).filter(
     (b) => temTexto(b.title) && (b.images ?? []).length === 0,
@@ -331,14 +419,53 @@ export function oQueFaltaParaEnviar(
       .map((b) => `«${b.title.trim()}»`)
       .slice(0, 2)
       .join(" e ");
+    const primeiro = (doc.moodBoards ?? []).indexOf(boardsVazios[0]);
     faltas.push({
       id: "moodboard-vazio",
       seccao: "moodboards",
+      campo: `boardTitulo:${primeiro}`,
       texto:
         boardsVazios.length === 1
-          ? `A página ${quais} não tem fotografias`
-          : `${boardsVazios.length} páginas de inspiração sem fotografias (${quais}…)`,
-      trava: true,
+          ? `O tema ${quais} não tem fotografias`
+          : `${boardsVazios.length} temas sem fotografias (${quais}…)`,
+      trava: false,
+    });
+  }
+
+  /**
+   * Um tema com fotografias e sem TÍTULO, ou com título e sem NOTA.
+   *
+   * Não trava: o PDF desenha-o na mesma (o capítulo sai do nome, e sem nome
+   * cai no genérico). Mas é o texto que o casal lê ao lado das fotografias, e
+   * um tema mudo é quase sempre um esquecimento.
+   */
+  const boardsComTrabalho = (doc.moodBoards ?? []).map((b, i) => ({ b, i }));
+  const semTitulo = boardsComTrabalho.filter(
+    ({ b }) => (b.images ?? []).length > 0 && !temTexto(b.title),
+  );
+  if (semTitulo.length > 0) {
+    faltas.push({
+      id: "tema-sem-titulo",
+      seccao: "moodboards",
+      campo: `boardTitulo:${semTitulo[0].i}`,
+      texto:
+        semTitulo.length === 1
+          ? "Um tema com fotografias não tem título"
+          : `${semTitulo.length} temas com fotografias não têm título`,
+      trava: false,
+    });
+  }
+  const semNota = boardsComTrabalho.filter(({ b }) => temTexto(b.title) && !temTexto(b.annotation));
+  if (semNota.length > 0) {
+    faltas.push({
+      id: "tema-sem-nota",
+      seccao: "moodboards",
+      campo: `boardNota:${semNota[0].i}`,
+      texto:
+        semNota.length === 1
+          ? `O tema «${semNota[0].b.title.trim()}» não tem nota`
+          : `${semNota.length} temas sem nota`,
+      trava: false,
     });
   }
 

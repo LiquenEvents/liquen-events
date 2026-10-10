@@ -22,6 +22,15 @@ a barra de destinos do fundo desaparecer em favor de uma coluna à esquerda, e e
 respondeu **«Fica a barra de baixo»** quando lhe pus a escolha à frente. A fase
 01 desse documento não se faz; tudo o resto vale.
 
+# E as melhorias desse ecrã também
+
+`docs/FAZER-PROPOSTA-MELHORIAS.md` é o documento dela com sete melhorias ao
+«Fazer proposta» (passos, pré-visualização real, fotografias, bloqueio do envio,
+rapidez, duplicados). A **Parte −1** tem a tabela do que está feito e os sítios
+onde a execução se afastou do texto. A regra que manda no envio continua a ser
+uma só, em `proposal-progress.ts` (`oQueFaltaParaEnviar`): a Conferência copia
+a marca de «trava» de lá, e a rota do envio recusa os mesmos erros.
+
 # E o ecrã de entrada tem outro
 
 `docs/LOGIN.md` reconstrói `/orcamento/admin/login`. Tem no topo uma tabela com

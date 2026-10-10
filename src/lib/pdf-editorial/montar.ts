@@ -78,6 +78,12 @@ import { embutirLetras } from "./texto";
 export async function renderEditorialPdf(
   original: ProposalDoc,
   idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+  /**
+   * `rascunho`: o PDF descarregado com erros por resolver (B1 do documento
+   * dela). Sai igual, com «RASCUNHO» à frente do rodapé de cada página e no
+   * título do ficheiro — nada mais muda no desenho.
+   */
+  { rascunho = false }: { rascunho?: boolean } = {},
 ): Promise<{ bytes: Uint8Array; truncations: DocTruncation[]; undrawnImages: number }> {
   const doc = docNaLingua(original, idioma);
   const t = textosDaProposta(idioma);
@@ -91,7 +97,9 @@ export async function renderEditorialPdf(
   const eurDoc = (n: number) => dinheiro(eurDocumento(n));
 
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${te.rodapeModelo(org)} · ${doc.clientNames}`);
+  pdf.setTitle(
+    `${rascunho ? `${te.rascunho} · ` : ""}${te.rodapeModelo(org)} · ${doc.clientNames}`,
+  );
   pdf.setAuthor(SITE.name);
   const ctx: Contexto = {
     pdf,
@@ -99,7 +107,9 @@ export async function renderEditorialPdf(
     idioma,
     t,
     te,
-    rodape: [te.rodapeModelo(org), doc.clientNames, evento.eventDate]
+    // A marca do rascunho vai À FRENTE: o rodapé encolhe pelo fim quando não
+    // cabe (`moldura.rodape`), e a marca é a única parte que não pode cair.
+    rodape: [rascunho ? te.rascunho : "", te.rodapeModelo(org), doc.clientNames, evento.eventDate]
       .map((s) => (s ?? "").trim())
       .filter(Boolean)
       .join(" · "),

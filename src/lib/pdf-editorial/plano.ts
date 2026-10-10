@@ -1,4 +1,9 @@
-import { depositPercentOf, type MoodBoard, type ProposalDoc } from "@/lib/proposal-doc";
+import {
+  depositPercentOf,
+  withProposalDefaults,
+  type MoodBoard,
+  type ProposalDoc,
+} from "@/lib/proposal-doc";
 import { blocosFixosNaLingua, textosDaProposta } from "@/lib/proposal-doc-textos";
 import { totaisDaProposta } from "@/lib/proposal-budget";
 import { chaveDeRubrica, ordemDeSaida } from "@/lib/proposal-ordem";
@@ -452,14 +457,18 @@ export function planoDaProposta(doc: ProposalDoc): EntradaDoPlano[] {
  * sem conteúdo: a folha não sai. O que pode faltar é o TEXTO, e é isso que a
  * conferência passa a dizer.
  */
-export function listasQueNaoSaem(doc: ProposalDoc): { nome: string; seccao: string }[] {
-  const fixos = blocosFixosNaLingua(doc, "pt");
+export function listasQueNaoSaem(
+  doc: ProposalDoc,
+): { id: "condicoes" | "observacoes"; nome: string; seccao: string }[] {
+  // Com os textos da casa por omissão, como o PDF os lê: uma lista AUSENTE no
+  // rascunho quer dizer «as da casa», e sai — só uma lista vazia não sai.
+  const fixos = blocosFixosNaLingua(withProposalDefaults(doc), "pt");
   const t = textosDaProposta("pt");
-  const faltam: { nome: string; seccao: string }[] = [];
+  const faltam: { id: "condicoes" | "observacoes"; nome: string; seccao: string }[] = [];
   if (!(fixos.condicoesGerais ?? []).some((l) => temTexto(l)))
-    faltam.push({ nome: t.tituloCondicoes, seccao: "total" });
+    faltam.push({ id: "condicoes", nome: t.tituloCondicoes, seccao: "total" });
   if (!(fixos.observacoesGerais ?? []).some((l) => temTexto(l)))
-    faltam.push({ nome: t.observacoesGerais, seccao: "total" });
+    faltam.push({ id: "observacoes", nome: t.observacoesGerais, seccao: "total" });
   return faltam;
 }
 
