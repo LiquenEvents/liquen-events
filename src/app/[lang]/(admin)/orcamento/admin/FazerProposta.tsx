@@ -45,6 +45,17 @@ import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
  * Quem já tem proposta enviada (ou ganha, ou perdida) NÃO aparece aqui: está em
  * «Propostas», que é onde as feitas se reveem, e continua a abrir-se no estúdio
  * pelo pedido. Uma procura que só encontre um desses di-lo, e leva lá.
+ *
+ * ── E OS QUE ESTÃO A AGUARDAR RESPOSTA TAMBÉM SAEM ────────────────────────
+ * Palavras dela, com um «Aguardar resposta» na captura: «mesmo para as que
+ * estão a aguardar resposta retira do fazer proposta». Fica só o que é NOVO —
+ * ninguém lhe respondeu ainda. Um pedido em «Aguardar resposta» já teve
+ * mensagem nossa e está do lado do cliente.
+ *
+ * O estado não volta sozinho a «Novo» quando o cliente responde (`ESTADO_APOS`,
+ * em `estado-do-pedido.ts`, só sobe). Por isso a procura por um desses não se
+ * cala: diz onde ele está e oferece «Fazer a proposta na mesma» — é o caminho
+ * daqui para o casal que entretanto respondeu.
  */
 
 /**
@@ -73,25 +84,14 @@ const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
   rejeitado: { label: "Perdido", classe: "bg-[var(--bo-tinta-10)] text-foreground/30" },
 };
 
-/** Estados que ainda não têm proposta enviada — os que este ecrã existe para
- *  despachar. */
-const A_ESPERA: QuoteStatus[] = ["pendente", "em_revisao"];
-
 /**
- * A FILA DE FILTROS — só os dois estados que ainda esperam proposta.
+ * O estado que este ecrã existe para despachar: o pedido NOVO.
  *
- * Era a fila do funil inteiro (Activos, Novo, Aguardar resposta, Proposta
- * enviada, Ganho, Perdido). Com a lista a mostrar só o que ainda não tem
- * proposta (ver o cabeçalho), sobram dois estados: «Novo» — ninguém respondeu —
- * e «Aguardar resposta» — já se respondeu por mensagem, falta o cliente. Por
- * omissão vêm os dois, em «Por fazer»; não se chama «Todos» porque não é.
+ * Eram dois («Novo» e «Aguardar resposta»), com uma fila de pastilhas para
+ * escolher entre eles. Com um só, as pastilhas não tinham nada para filtrar e
+ * sairam — ver o cabeçalho.
  */
-const FILTROS: { id: QuoteStatus; label: string }[] = [
-  { id: "pendente", label: "Novo" },
-  { id: "em_revisao", label: "Aguardar resposta" },
-];
-
-type Filtro = QuoteStatus | "por-fazer";
+const POR_FAZER: QuoteStatus = "pendente";
 
 function tipoDeEvento(q: Quote): string {
   if (q.category && q.eventType) {
@@ -151,7 +151,6 @@ export default function FazerProposta({
   onIrParaPropostas,
 }: Props) {
   const [procura, setProcura] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("por-fazer");
   // O mesmo padrão do resto do back office: a escrita responde já, e o
   // filtro sobre a lista toda corre com prioridade mais baixa.
   const procuraAdiada = useDeferredValue(procura);
@@ -162,52 +161,37 @@ export default function FazerProposta({
   );
 
   /**
-   * O que a procura deixou passar — antes de o filtro de estado entrar.
-   *
-   * É daqui que saem as contagens das pastilhas, e é de propósito: as contagens
-   * dizem quantos há DENTRO do que ela procurou. Contadas sobre a lista toda,
-   * uma pastilha diria «Novo · 12» e ao tocar-lhe apareceria um só — o que
-   * procurou.
+   * Os pedidos novos que batem com a procura, o evento mais próximo primeiro.
+   * Sem data vão para o fim: não se pode dizer que é urgente o que não tem
+   * quando.
    */
-  const procurados = useMemo(() => {
+  const lista = useMemo(() => {
     const t = procuraAdiada.trim().toLowerCase();
-    // Só os que ainda esperam proposta — ver o cabeçalho.
     return quotes
-      .filter((q) => !q.archived && A_ESPERA.includes(q.status) && bate(t, q))
-      .sort((a, b) => {
-        // O evento mais próximo primeiro. Sem data vai para o fim: não se pode
-        // dizer que é urgente o que não tem quando.
-        const da = a.date || "9999";
-        const db = b.date || "9999";
-        return da.localeCompare(db);
-      });
+      .filter((q) => !q.archived && q.status === POR_FAZER && bate(t, q))
+      .sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
   }, [quotes, procuraAdiada]);
 
   /**
-   * A procura que só encontra pedidos que JÁ têm proposta.
+   * A procura que só encontra pedidos FORA desta lista.
    *
-   * Sem isto, procurar um casal com proposta enviada dava «Ninguém com esse
-   * nome» — e o casal existe. Diz-se onde está, e leva-se lá.
+   * Sem isto, procurar um casal com proposta enviada — ou à espera da nossa
+   * mensagem — dava «Ninguém com esse nome», e o casal existe. Diz-se onde
+   * está, e leva-se lá.
    */
-  const jaComProposta = useMemo(() => {
+  const foraDaLista = useMemo(() => {
     const t = procuraAdiada.trim().toLowerCase();
-    if (!t) return [];
-    return quotes.filter((q) => !q.archived && !A_ESPERA.includes(q.status) && bate(t, q));
+    if (!t) return { aAguardar: [] as Quote[], comProposta: [] as Quote[] };
+    const fora = quotes.filter((q) => !q.archived && q.status !== POR_FAZER && bate(t, q));
+    return {
+      aAguardar: fora.filter((q) => q.status === "em_revisao"),
+      comProposta: fora.filter((q) => q.status !== "em_revisao"),
+    };
   }, [quotes, procuraAdiada]);
-
-  const contagens = useMemo(() => {
-    const por: Record<string, number> = {};
-    for (const q of procurados) por[q.status] = (por[q.status] ?? 0) + 1;
-    return { por, todos: procurados.length };
-  }, [procurados]);
-
-  const lista = useMemo(
-    () => procurados.filter((q) => filtro === "por-fazer" || q.status === filtro),
-    [procurados, filtro],
-  );
+  const { aAguardar, comProposta: jaComProposta } = foraDaLista;
 
   const porFazer = useMemo(
-    () => quotes.filter((q) => !q.archived && A_ESPERA.includes(q.status)).length,
+    () => quotes.filter((q) => !q.archived && q.status === POR_FAZER).length,
     [quotes],
   );
 
@@ -367,60 +351,22 @@ export default function FazerProposta({
         </div>
       </Card>
 
-      {/* ── A FILA DE ESTADOS ────────────────────────────────────────────
-          Uma fila só, que se arrasta com o polegar. Seis pastilhas a quebrar
-          em duas linhas gastam ecrã que aqui não sobra, e um contentor com
-          scroll próprio é a única forma de sair da margem que a auditoria de
-          toque aceita — a mesma escolha, e o mesmo desenho, da fila de estados
-          dos Pedidos (`AdminClient.tsx`).
-
-          `py-1` não é enfeite: `overflow-x` recorta também na vertical, e sem
-          essa folga o anel de foco das pastilhas ficava cortado. */}
-      {procurados.length > 0 && (
-        <div
-          role="group"
-          aria-label="Filtrar por estado"
-          className="-mt-1 flex flex-nowrap gap-1.5 overflow-x-auto py-1 lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {[
-            { id: "por-fazer" as Filtro, label: "Por fazer", n: contagens.todos },
-            ...FILTROS.map((f) => ({
-              id: f.id as Filtro,
-              label: f.label,
-              n: contagens.por[f.id] ?? 0,
-            })),
-          ].map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFiltro(f.id)}
-              aria-pressed={filtro === f.id}
-              className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] ${MOV_ESTADO} ${PRESSAO} ${
-                filtro === f.id
-                  ? "bg-[var(--bo-seleccao)] text-[var(--bo-sobre-seleccao)] "
-                  : /* `hover:bg-…-6` era o MESMO token do fundo em repouso: a
-                       pastilha não escolhida não mudava de fundo ao passar o
-                       rato. Sobe um degrau na escada de tinta da casa (3/6/10). */
-                    "bg-[var(--bo-tinta-6)] text-foreground/40 hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-text-muted)]"
-              }`}
-            >
-              {f.label} · {f.n}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {lista.length === 0 && procurados.length > 0 ? (
-        // Há pedidos — foi a pastilha que os deixou de fora. Dizer «ainda não há
-        // pedidos» aqui seria mandá-la criar um cliente que ela já tem.
+      {lista.length === 0 && aAguardar.length > 0 ? (
+        // Encontrou-se — mas está à espera do cliente, e por isso não está
+        // nesta lista. Não volta sozinho a «Novo» quando o cliente responde:
+        // daqui, o caminho é o botão.
         <EmptyState
-          title="Nada neste estado"
-          description={`Não há pedidos em «${
-            filtro === "por-fazer"
-              ? "Por fazer"
-              : (ESTADO[filtro as QuoteStatus]?.label ?? String(filtro))
-          }»${procura ? " dentro do que procuraste" : ""}.`}
-          action={{ label: "Ver os por fazer", onClick: () => setFiltro("por-fazer") }}
+          title={
+            aAguardar.length === 1
+              ? `${aAguardar[0].name} está a aguardar resposta`
+              : `${aAguardar.length} pedidos com esse nome estão a aguardar resposta`
+          }
+          description="Já lhes respondeste por mensagem, e por isso não estão nesta lista. Se o cliente já respondeu, a proposta faz-se na mesma — o pedido não volta sozinho a «Novo»."
+          action={
+            aAguardar.length === 1
+              ? { label: "Fazer a proposta na mesma", onClick: () => onSelect(aAguardar[0].id) }
+              : undefined
+          }
         />
       ) : lista.length === 0 && jaComProposta.length > 0 ? (
         // Encontrou-se — mas já tem proposta, e por isso não está nesta lista.
