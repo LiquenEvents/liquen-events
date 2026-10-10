@@ -229,7 +229,7 @@ export default async function ServiceDetailPage({
       <section className="py-20 lg:py-28 bg-surface">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-16">
           <AnimateIn>
-            <div className="flex flex-col gap-6 text-foreground/72 text-[16px] leading-[1.8] text-justify">
+            <div className="flex flex-col gap-6 text-foreground/72 text-[16px] leading-[1.8] text-justify hyphens-auto">
               {/* Todos os parágrafos com o mesmo corpo e a mesma cor: o primeiro
                   vinha maior e mais escuro, e a mudança de tamanho a meio do
                   texto lia-se como se fossem duas coisas diferentes. */}
@@ -437,7 +437,9 @@ export default async function ServiceDetailPage({
                   <h3 className="text-white text-base font-bold uppercase tracking-display mb-3">
                     {f.q}
                   </h3>
-                  <p className="text-white/80 text-sm leading-[1.9] text-justify">{f.a}</p>
+                  <p className="text-white/80 text-sm leading-[1.9] text-justify hyphens-auto">
+                    {f.a}
+                  </p>
                 </div>
               ))}
               <div className="border-t border-white/12" />
