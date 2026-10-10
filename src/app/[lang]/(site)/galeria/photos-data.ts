@@ -913,7 +913,6 @@ export const PHOTOS: PhotoSrc[] = [
   { src: "/imagens/galeria-instagram-95-05.jpg", label: "Evento" },
   { src: "/imagens/galeria-instagram-95-06.jpg", label: "Evento" },
   { src: "/imagens/galeria-instagram-96-01.jpg", label: "Evento" },
-  { src: "/imagens/galeria-instagram-96-02.jpg", label: "Evento" },
   { src: "/imagens/galeria-instagram-96-03.jpg", label: "Evento" },
   { src: "/imagens/galeria-instagram-96-04.jpg", label: "Evento" },
   { src: "/imagens/galeria-instagram-96-05.jpg", label: "Evento" },
