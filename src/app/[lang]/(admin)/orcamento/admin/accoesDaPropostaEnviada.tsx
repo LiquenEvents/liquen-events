@@ -170,7 +170,13 @@ export function useAccoesDaPropostaEnviada() {
 
   function accoesDe(p: PropostaParaAccoes): AccaoDeItem[] {
     if (p.enviada) {
-      return [{ id: "seguiu", rotulo: "Ver o que seguiu…", onAccao: () => abrirFolha(p) }];
+      return [
+        {
+          id: "seguiu",
+          rotulo: "Ver o que foi enviado para o cliente…",
+          onAccao: () => abrirFolha(p),
+        },
+      ];
     }
     return p.temDoc ? [{ id: "pdf", rotulo: "Ver o PDF", onAccao: () => abrirPdf(p) }] : [];
   }
@@ -188,10 +194,10 @@ export function useAccoesDaPropostaEnviada() {
           e.stopPropagation();
           abrirFolha(p);
         }}
-        aria-label={`Ver o que seguiu para o cliente — ${p.titulo}`}
+        aria-label={`Ver o que foi enviado para o cliente — ${p.titulo}`}
         className="whitespace-nowrap"
       >
-        Ver o que seguiu
+        Ver o que foi enviado para o cliente
       </Button>
     );
   }
@@ -203,7 +209,7 @@ export function useAccoesDaPropostaEnviada() {
         setAberta(null);
         setEmail(null);
       }}
-      titulo="O que seguiu para o cliente"
+      titulo="O que foi enviado para o cliente"
       sobretitulo={aberta?.titulo}
       largura="md"
       nivel={90}
@@ -213,7 +219,7 @@ export function useAccoesDaPropostaEnviada() {
           <div className="flex flex-wrap gap-2">
             {aberta.temDoc && (
               <Button size="sm" variant="primary" onClick={() => abrirPdf(aberta)}>
-                Abrir o PDF que seguiu
+                Abrir o PDF que foi enviado
               </Button>
             )}
             <Button size="sm" variant="secondary" onClick={() => abrirComoOCasal(aberta)}>
