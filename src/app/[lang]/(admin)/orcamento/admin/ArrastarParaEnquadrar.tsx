@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -142,7 +143,7 @@ export function ArrastarParaEnquadrar({
             type="button"
             onClick={() => setModoDedo((v) => !v)}
             aria-pressed={modoDedo}
-            className="alvo-toque relative font-medium text-sage-600 underline underline-offset-2 sm:hidden"
+            className={`alvo-toque relative font-medium text-sage-600 underline underline-offset-2 sm:hidden ${ESTADO} ${PRESSAO}`}
           >
             {modoDedo ? "Pronto" : "Enquadrar"}
           </button>
