@@ -497,6 +497,19 @@ describe("PATCH /api/orcamento/[id] — o estado segue o que se registou", () =>
     expect(gravado()).toMatchObject({ status: "aceite" });
   });
 
+  /**
+   * As contagens da folha do guião (adultos, crianças, equipa) vinham do ecrã
+   * dos Guiões e eram deitadas fora aqui: o campo não estava na lista do que a
+   * rota aceita, e a resposta era um 200. O PDF do guião nunca as via.
+   */
+  it("grava as contagens da folha do guião", async () => {
+    authed.ok = true;
+    const folha = { adultos: "120", criancas: "8", staff: "14" };
+    const res = await PATCH(req("PATCH", { folhaDaTimeline: folha }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(gravado()).toMatchObject({ folhaDaTimeline: folha });
+  });
+
   it("apagar a referência do contrato não desfaz nada", async () => {
     authed.ok = true;
     store.override = { status: "aceite", contractRef: "2026-042" };
