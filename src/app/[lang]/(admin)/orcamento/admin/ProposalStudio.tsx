@@ -148,8 +148,10 @@ import {
   LADO_MINIMO_DA_CAPA,
   perdaNaFolha,
   problemaDaCapa,
+  ASPETO_DA_FOLHA,
 } from "@/lib/pdf-editorial/regra-da-capa";
 import { useTamanhoDoOriginal } from "./tamanhoDoOriginal";
+import { ArrastarParaEnquadrar } from "./ArrastarParaEnquadrar";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -1745,6 +1747,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const tamanhoDaCapa = useTamanhoDoOriginal(
     caminhoDaCapa ? assetOriginais[caminhoDaCapa] : undefined,
   );
+  /**
+   * O recorte que o PDF faria SOZINHO da fotografia da capa — perguntado ao
+   * servidor, que faz a mesma conta que o desenho (`focoAutomaticoDaCapa`).
+   *
+   * Palavras dela: «não ficou com o carro». A caixa mostrava o meio da
+   * fotografia e o PDF recortava pela «atenção» do sharp. Com isto mostra o
+   * mesmo — e é daqui que ela arrasta, se não gostar.
+   */
+  const [focoAutoDaCapa, setFocoAutoDaCapa] = useState<{
+    caminho: string;
+    foco: { x: number; y: number };
+  } | null>(null);
+  useEffect(() => {
+    if (!caminhoDaCapa || isPendingImage(caminhoDaCapa)) return;
+    let vivo = true;
+    fetch(
+      `/api/orcamento/${encodeURIComponent(quote.id)}/foco-da-capa?caminho=${encodeURIComponent(caminhoDaCapa)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { foco?: { x: number; y: number } } | null) => {
+        if (vivo && j?.foco) setFocoAutoDaCapa({ caminho: caminhoDaCapa, foco: j.foco });
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [caminhoDaCapa, quote.id]);
   const [refEdited, setRefEdited] = useState(false);
   /**
    * ── O CARREGAMENTO DE FOTOS, CONTADO ────────────────────────────────────
@@ -6056,7 +6085,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       cover[idx] = path;
       // «Usar esta na mesma» é sobre a fotografia que lá estava. Uma nova volta
       // à regra até ela a ver e decidir — ver `capaMesmoAssim`.
-      return { ...d, coverImages: cover, capaMesmoAssim: undefined };
+      return { ...d, coverImages: cover, capaMesmoAssim: undefined, focoDaCapa: undefined };
     });
   }
   function removeCoverAt(idx: number) {
@@ -8182,45 +8211,75 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     </div>
                   );
                 }
+                /**
+                 * O enquadramento que se VÊ é o que sai: o escolhido à mão, ou
+                 * o que o PDF escolheria sozinho (perguntado ao servidor), ou o
+                 * centro enquanto a resposta não chega.
+                 */
+                const focoVisto = doc.focoDaCapa ??
+                  (focoAutoDaCapa?.caminho === path ? focoAutoDaCapa.foco : undefined) ?? {
+                    x: 0.5,
+                    y: 0.5,
+                  };
                 return (
                   <div className="max-w-md">
-                    <div className="relative">
-                      <Thumb
-                        url={assetUrls[path]}
-                        // A cascata, do mais leve para o mais pesado. Ver
-                        // `assetMedias`: o degrau do meio poupa ~900 KB por
-                        // célula sempre que a miniatura falha.
-                        planoB={[assetMedias[path], assetOriginais[path]]}
-                        estadoDosUrls={estadoDosUrls}
-                        aoTentarDeNovo={() => void tentarBuscarFotos()}
-                        aoMorrer={marcarUrlMorto}
-                        // A capa está no topo do passo: nunca espera pela fila
-                        // das fotos que estão fora do ecrã.
-                        priority
-                        onRemove={() => removeCoverAt(idx)}
-                        // A forma da folha do PDF (1123 × 794): o que se vê
-                        // aqui é o recorte que sai.
-                        className="aspect-[1123/794] w-full"
-                        onMedida={(a) => registarAspeto(path, a)}
-                        pendente={isPendingImage(path)}
-                        onde="capa"
-                        refDoc={path}
-                      />
-                      {/* ── O QUE SE VÊ AQUI TEM DE SER O QUE SAI ─────────────
+                    <ArrastarParaEnquadrar
+                      aspeto={aspeto}
+                      aspetoDaCaixa={ASPETO_DA_FOLHA}
+                      foco={focoVisto}
+                      activo={!naoVai}
+                      onFoco={(f) => patch({ focoDaCapa: f })}
+                    >
+                      {(posicao) => (
+                        <div className="relative">
+                          <Thumb
+                            posicao={naoVai ? undefined : posicao}
+                            url={assetUrls[path]}
+                            // A cascata, do mais leve para o mais pesado. Ver
+                            // `assetMedias`: o degrau do meio poupa ~900 KB por
+                            // célula sempre que a miniatura falha.
+                            planoB={[assetMedias[path], assetOriginais[path]]}
+                            estadoDosUrls={estadoDosUrls}
+                            aoTentarDeNovo={() => void tentarBuscarFotos()}
+                            aoMorrer={marcarUrlMorto}
+                            // A capa está no topo do passo: nunca espera pela fila
+                            // das fotos que estão fora do ecrã.
+                            priority
+                            onRemove={() => removeCoverAt(idx)}
+                            // A forma da folha do PDF (1123 × 794): o que se vê
+                            // aqui é o recorte que sai.
+                            className="aspect-[1123/794] w-full"
+                            onMedida={(a) => registarAspeto(path, a)}
+                            pendente={isPendingImage(path)}
+                            onde="capa"
+                            refDoc={path}
+                          />
+                          {/* ── O QUE SE VÊ AQUI TEM DE SER O QUE SAI ─────────────
                           A caixa recorta-a deitada, e assim parece servir. Ela
                           leu-a como a capa e o PDF saiu com outra. Quando não
                           vai, di-lo em cima dela, e não só por baixo. */}
-                      {naoVai && (
-                        <span className="pointer-events-none absolute top-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-caption whitespace-nowrap text-white">
-                          Não vai para o PDF
-                        </span>
+                          {naoVai && (
+                            <span className="pointer-events-none absolute top-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-caption whitespace-nowrap text-white">
+                              Não vai para o PDF
+                            </span>
+                          )}
+                          {perda > PERDA_QUE_SE_AVISA && (
+                            <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white tabular-nums">
+                              perde {Math.round(perda * 100)}% da área
+                            </span>
+                          )}
+                        </div>
                       )}
-                      {perda > PERDA_QUE_SE_AVISA && (
-                        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white tabular-nums">
-                          perde {Math.round(perda * 100)}% da área
-                        </span>
-                      )}
-                    </div>
+                    </ArrastarParaEnquadrar>
+                    {doc.focoDaCapa && !naoVai && (
+                      <button
+                        type="button"
+                        className={`alvo-toque relative mt-1 text-caption font-medium text-sage-600 underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                        onClick={() => patch({ focoDaCapa: undefined })}
+                      >
+                        Voltar ao enquadramento automático
+                      </button>
+                    )}
                     {mesmoAssim && (
                       <p
                         role="status"
@@ -13352,7 +13411,10 @@ function Thumb({
   // `refDoc` e não `ref`: o React trata `ref` como prop especial, e uma string
   // ali dentro é o padrão antigo das string refs, que ele recusa.
   refDoc,
+  posicao,
 }: {
+  /** O `object-position` da imagem — o enquadramento da capa (`focoDaCapa`). */
+  posicao?: string;
   url?: string;
   /**
    * PARA ONDE CAIR, do mais leve para o mais pesado.
@@ -13702,6 +13764,8 @@ function Thumb({
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
           className="h-full w-full object-cover"
+          style={posicao ? { objectPosition: posicao } : undefined}
+          draggable={false}
           onError={(e) => {
             largarAVez();
             aoFalhar();

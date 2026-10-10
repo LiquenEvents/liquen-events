@@ -1,5 +1,6 @@
 import "server-only";
 import sharp from "sharp";
+import type { Foco } from "./imagens";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -27,6 +28,8 @@ export interface Foto {
   pixeis: number;
   /** O índice do tema de onde vem, ou `null` para as fotos de capa. */
   tema: number | null;
+  /** O enquadramento escolhido à mão — ver `Foco` em `imagens.ts`. */
+  foco?: Foco;
 }
 
 /** Lê o tamanho do cabeçalho — sem descodificar a imagem. */

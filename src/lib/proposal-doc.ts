@@ -449,6 +449,18 @@ export interface ProposalDoc {
   capaMesmoAssim?: boolean;
 
   /**
+   * O enquadramento da fotografia da capa, escolhido à mão — como o
+   * `object-position` em fracções (`{ x: 0.5, y: 0.8 }` = ao centro, mais para
+   * baixo). Ela arrasta a fotografia na caixa do estúdio até o que interessa
+   * ficar à vista: «não ficou com o carro… quero que o sistema fique
+   * inteligente para saber identificar isto». Sem ele, o PDF escolhe sozinho
+   * (a «atenção» do sharp) e o estúdio mostra essa escolha.
+   *
+   * Como o `capaMesmoAssim`, é da fotografia: trocá-la apaga-o.
+   */
+  focoDaCapa?: { x: number; y: number };
+
+  /**
    * ════════════════════════════════════════════════════════════════════════
    * CONTRA QUE PORTUGUÊS É QUE CADA TRADUÇÃO FOI ESCRITA
    * ════════════════════════════════════════════════════════════════════════

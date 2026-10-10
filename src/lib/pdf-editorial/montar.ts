@@ -172,9 +172,13 @@ export async function renderEditorialPdf(
   // estúdio); senão, a melhor deitada da inspiração; senão, a dela na mesma.
   // Não há painel: ela pediu a capa só com a fotografia de fundo.
   // Ou a dela na mesma, quando ela o disse (`capaMesmoAssim`).
+  // O enquadramento escolhido à mão (`focoDaCapa`) é da fotografia DELA: só
+  // vai com ela, nunca com a deitada que a substitui.
   const fundoDaCapa =
     fotoDaCapa && (doc.capaMesmoAssim || !problemaDaCapa(fotoDaCapa.w, fotoDaCapa.h))
-      ? fotoDaCapa
+      ? doc.focoDaCapa
+        ? { ...fotoDaCapa, foco: doc.focoDaCapa }
+        : fotoDaCapa
       : (album.escolher(1, "deitada")[0] ?? fotoDaCapa ?? null);
   plano.push({
     desenhar: () =>
