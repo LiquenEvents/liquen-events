@@ -6054,7 +6054,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setDoc((d) => {
       const cover = normaliseCoverImages(d.coverImages);
       cover[idx] = path;
-      return { ...d, coverImages: cover };
+      // «Usar esta na mesma» é sobre a fotografia que lá estava. Uma nova volta
+      // à regra até ela a ver e decidir — ver `capaMesmoAssim`.
+      return { ...d, coverImages: cover, capaMesmoAssim: undefined };
     });
   }
   function removeCoverAt(idx: number) {
@@ -8142,7 +8144,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   : aspeto && aspeto < 1
                     ? "ao-alto"
                     : null;
-                const perda = aspeto && !problema ? perdaNaFolha(aspeto) : 0;
+                /** Ela disse «usa esta na mesma»: vai, recortada como aqui. */
+                const mesmoAssim = !!problema && !!doc.capaMesmoAssim;
+                /** A fotografia que se vê aqui NÃO é a que vai para o PDF. */
+                const naoVai = !!problema && !mesmoAssim;
+                const perda = aspeto && (!problema || mesmoAssim) ? perdaNaFolha(aspeto) : 0;
                 if (!path) {
                   return (
                     <div className="max-w-md">
@@ -8200,13 +8206,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         onde="capa"
                         refDoc={path}
                       />
+                      {/* ── O QUE SE VÊ AQUI TEM DE SER O QUE SAI ─────────────
+                          A caixa recorta-a deitada, e assim parece servir. Ela
+                          leu-a como a capa e o PDF saiu com outra. Quando não
+                          vai, di-lo em cima dela, e não só por baixo. */}
+                      {naoVai && (
+                        <span className="pointer-events-none absolute top-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-caption whitespace-nowrap text-white">
+                          Não vai para o PDF
+                        </span>
+                      )}
                       {perda > PERDA_QUE_SE_AVISA && (
                         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-caption whitespace-nowrap text-white tabular-nums">
                           perde {Math.round(perda * 100)}% da área
                         </span>
                       )}
                     </div>
-                    {problema && (
+                    {mesmoAssim && (
+                      <p
+                        role="status"
+                        className="mt-2 flex items-start gap-1.5 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
+                      >
+                        <span>
+                          {problema === "ao-alto"
+                            ? "Vai para a capa recortada para ficar deitada, como aqui. "
+                            : "Vai para a capa, e numa página inteira pode ver-se o grão. "}
+                          <button
+                            type="button"
+                            className={`alvo-toque relative font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                            onClick={() => patch({ capaMesmoAssim: undefined })}
+                          >
+                            Usar a melhor deitada dos temas
+                          </button>
+                        </span>
+                      </p>
+                    )}
+                    {naoVai && (
                       <p
                         role="status"
                         className="mt-2 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]"
@@ -8216,10 +8250,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           {problema === "ao-alto"
                             ? "É ao alto, e a capa é deitada. "
                             : `É pequena para a capa (${Math.max(tamanhoDaCapa?.w ?? 0, tamanhoDaCapa?.h ?? 0)} px; pede ${LADO_MINIMO_DA_CAPA}). `}
-                          O PDF usa a melhor fotografia deitada dos temas.{" "}
+                          Por isso o PDF usa a melhor fotografia deitada dos temas, e não esta.{" "}
                           <button
                             type="button"
-                            className={`alvo-toque font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                            className={`alvo-toque relative font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                            onClick={() => patch({ capaMesmoAssim: true })}
+                          >
+                            Usar esta na mesma
+                          </button>
+                          {" · "}
+                          <button
+                            type="button"
+                            className={`alvo-toque relative font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
                             onClick={() => setPicker({ kind: "cover", idx })}
                             onPointerEnter={aquecerBiblioteca}
                             onFocus={aquecerBiblioteca}

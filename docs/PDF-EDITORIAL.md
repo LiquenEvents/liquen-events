@@ -122,6 +122,13 @@ perguntas que lhe pus, e as respostas:
   «Esquerda/Direita». Se for ao alto ou pequena, o estúdio di-lo ao lado da
   fotografia e o PDF usa a melhor deitada dos temas. A segunda fotografia das
   propostas antigas fica guardada e não sai.
+  - **E «Usar esta na mesma» (10/10).** O aviso não chegou: a caixa do estúdio
+    recortava a fotografia ao alto para ficar deitada, ela parecia servir, e o
+    PDF saía com outra («diz que é esta a foto de capa mas depois quando abro o
+    pdf está outra foto»). Agora a fotografia que não vai leva «Não vai para o
+    PDF» por cima, e o aviso oferece «Usar esta na mesma» (`capaMesmoAssim` no
+    documento): vai a dela, recortada ao centro como o estúdio a mostra. Trocar
+    a fotografia apaga a escolha.
 - **Estrela: «Passa a ser a foto do cartão».** A fotografia principal de cada
   tema é a do cartão em «O que propomos» e a primeira do mosaico — sempre
   (`ordemDoDesenho`, em `plano.ts`).
