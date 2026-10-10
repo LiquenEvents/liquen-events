@@ -125,7 +125,9 @@ que caiu não é um engano.
 - **Os fechos enviados à Meta** e o email do modelo do dossier: já mostram tudo antes
   de enviar; ficam assim.
 
-## Erro encontrado de passagem
-Os números de adultos, crianças e equipa dos Guiões parecem não ficar gravados: o
-`Guioes.tsx` manda `folhaDaTimeline` e a rota do pedido não o tem na lista do que
-aceita. **Não verificado** num browser; confirma-se e corrige-se na R2.
+## Erro encontrado de passagem — corrigido
+Os números de adultos, crianças e equipa dos Guiões não ficavam gravados: o
+`Guioes.tsx` manda `folhaDaTimeline` e a rota do pedido não o tinha na lista do que
+aceita — deitava-o fora e respondia 200, por isso o ecrã não mostrava erro e o PDF do
+guião nunca via os números. Confirmado com um teste que falhava antes da correcção e
+com um pedido TESTE no servidor local (grava, recarrega, volta igual).

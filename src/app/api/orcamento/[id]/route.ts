@@ -174,6 +174,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "phone",
     "contractRef",
     "archived",
+    // As contagens da folha do guião (adultos, crianças, equipa), escritas no
+    // ecrã dos Guiões. Faltavam aqui: o PATCH respondia 200 e não gravava nada,
+    // e o PDF do guião nunca as via. O esquema já as declarava.
+    "folhaDaTimeline",
   ];
   const picked: Record<string, unknown> = {};
   for (const key of allowed) {
