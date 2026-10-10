@@ -17,6 +17,16 @@ import {
   explicacaoDoLugar,
   type LugarNoCliente,
 } from "@/lib/orcamento/propostas-do-mesmo-cliente";
+import { casaComAProcura } from "@/lib/procura";
+import { dataCurta } from "@/lib/data-curta";
+import { useAccoesDaPropostaEnviada } from "./accoesDaPropostaEnviada";
+
+/**
+ * Quando a proposta seguiu — ou, numa por enviar, quando foi gerada. É por
+ * aqui que a lista se ordena: palavras dela, «se eu quiser ver as propostas
+ * que já mandei não consigo», e a lista estava por ordem alfabética do cliente.
+ */
+const quandoDe = (p: Proposal) => p.sentAt || p.createdAt;
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -208,10 +218,26 @@ interface Props {
   onQuoteUpdated?: (q: Quote) => void;
   /** Quem está a trabalhar — vai como `actor` na entrada do histórico do pedido. */
   userName?: string;
+  /**
+   * A procura com que o ecrã abre — o «Ver em Propostas» do Fazer proposta
+   * traz o nome que ela procurou lá, em vez de a deixar na lista inteira.
+   */
+  procuraInicial?: string;
 }
 
-export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userName }: Props) {
+export default function Propostas({
+  quotes,
+  onOpenQuote,
+  onQuoteUpdated,
+  userName,
+  procuraInicial = "",
+}: Props) {
   const { toast } = useToast();
+  const { accoesDe: accoesDaEnviada, folha: folhaDoEmail } = useAccoesDaPropostaEnviada();
+  const [procura, setProcura] = useState(procuraInicial);
+  // A mesma procura de outra vista, quando ela volta cá com outro nome.
+  useEffect(() => setProcura(procuraInicial), [procuraInicial]);
+  const procuraAdiada = useDeferredValue(procura);
   const {
     data: proposals = [],
     setData: setProposals,
@@ -394,26 +420,25 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
    */
   const lugares = useMemo(() => lugaresNoCliente(proposals), [proposals]);
 
-  const filtered = useMemo(
-    () =>
-      (deferredFilter === "all" ? proposals : proposals.filter((p) => p.status === deferredFilter))
-        .slice()
-        .sort((a, b) => {
-          // Enviadas com expiração iminente first
-          const aExp = a.validUntil ? new Date(a.validUntil + "T12:00:00").getTime() : Infinity;
-          const bExp = b.validUntil ? new Date(b.validUntil + "T12:00:00").getTime() : Infinity;
-          // Acima de tudo, as que ficaram por enviar: são as únicas em que o
-          // atraso é nosso. Uma proposta à espera de resposta espera pelo
-          // cliente; esta espera por ela.
-          if (a.status === "rascunho" && b.status !== "rascunho") return -1;
-          if (a.status !== "rascunho" && b.status === "rascunho") return 1;
-          if (a.status === "enviada" && b.status !== "enviada") return -1;
-          if (a.status !== "enviada" && b.status === "enviada") return 1;
-          if (a.status === "enviada" && b.status === "enviada") return aExp - bExp;
-          return +new Date(b.createdAt) - +new Date(a.createdAt);
-        }),
-    [proposals, deferredFilter],
-  );
+  /**
+   * ── A MAIS RECENTE PRIMEIRO ───────────────────────────────────────────────
+   *
+   * Havia aqui uma ordem pensada à mão (por enviar, depois as enviadas pela
+   * validade) — e a tabela anulava-a, porque abria ordenada por cliente. Na
+   * prática a lista era alfabética, e ela não encontrava a proposta que tinha
+   * mandado ontem. Passa a ser a data em que seguiu, a mais recente em cima,
+   * que é a pergunta que se faz a este ecrã. As por enviar e as que expiram
+   * continuam a ter o seu aviso lá em cima.
+   */
+  const filtered = useMemo(() => {
+    const t = procuraAdiada.trim().toLowerCase();
+    return (
+      deferredFilter === "all" ? proposals : proposals.filter((p) => p.status === deferredFilter)
+    )
+      .filter((p) => casaComAProcura(t, [p.clientName, p.clientEmail, p.quoteId]))
+      .slice()
+      .sort((a, b) => +new Date(quandoDe(b)) - +new Date(quandoDe(a)));
+  }, [proposals, deferredFilter, procuraAdiada]);
 
   const stats = useMemo(() => {
     // Re-sending a proposal for the same couple creates a NEW row (a revision),
@@ -526,7 +551,14 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
    * "Aceitar".
    */
   const accoesDa = (p: Proposal): AccaoDeItem[] => {
-    const lista: AccaoDeItem[] = [];
+    // Primeiro, VER o que seguiu — a pergunta que este ecrã não sabia responder.
+    const lista: AccaoDeItem[] = accoesDaEnviada({
+      id: p.id,
+      quoteId: p.quoteId,
+      temDoc: !!p.doc,
+      enviada: !!p.sentAt,
+      titulo: `${p.clientName}${p.sentAt ? ` · enviada ${dataCurta(p.sentAt)}` : ""}`,
+    });
     if (p.status === "enviada") {
       lista.push({
         id: "aceitar",
@@ -735,6 +767,14 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
 
       {/* Filter */}
       <div style={{ "--cena": 2 } as React.CSSProperties} className="bo-cena flex flex-col gap-2">
+        <input
+          type="search"
+          value={procura}
+          onChange={(e) => setProcura(e.target.value)}
+          placeholder="Procurar por cliente, email ou pedido…"
+          aria-label="Procurar propostas"
+          className="bo-input w-full max-w-md px-3 py-2.5 text-sm text-[var(--bo-tinta-72)]"
+        />
         <div className="max-w-full overflow-x-auto pb-1 -mb-1">
           <Segmented
             ariaLabel="Filtrar propostas por estado"
@@ -789,12 +829,18 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
               </svg>
             }
             title={
-              deferredFilter !== "all" ? "Nenhuma proposta neste estado" : "Sem propostas ainda"
+              procuraAdiada.trim()
+                ? "Nenhuma proposta com esse nome"
+                : deferredFilter !== "all"
+                  ? "Nenhuma proposta neste estado"
+                  : "Sem propostas ainda"
             }
             description={
-              deferredFilter !== "all"
-                ? "Muda de filtro para ver as restantes."
-                : "As propostas enviadas a partir de um pedido aparecem aqui."
+              procuraAdiada.trim()
+                ? "Tenta outro nome, email ou número do pedido."
+                : deferredFilter !== "all"
+                  ? "Muda de filtro para ver as restantes."
+                  : "As propostas enviadas a partir de um pedido aparecem aqui."
             }
           />
         ) : (
@@ -803,7 +849,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
               itens={filtered}
               chaveDe={(p) => p.id}
               legenda="Propostas"
-              ordemInicial={{ chave: "cliente", ascendente: true }}
+              ordemInicial={{ chave: "enviada", ascendente: false }}
               // Achado n.º 11: clicar numa linha não fazia nada. Abre o pedido —
               // é de lá que se revê, reenvia ou acompanha a proposta.
               aoAbrir={
@@ -833,6 +879,17 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                       </span>
                     );
                   },
+                },
+                {
+                  chave: "enviada",
+                  cabecalho: "Enviada",
+                  ordenar: (a, b) => +new Date(quandoDe(a)) - +new Date(quandoDe(b)),
+                  celula: (p) =>
+                    p.sentAt ? (
+                      <span className="tabular-nums">{dataCurta(p.sentAt)}</span>
+                    ) : (
+                      <span className="text-[var(--bo-text-muted)]">por enviar</span>
+                    ),
                 },
                 { chave: "estado", cabecalho: "Estado", celula: (p) => <EstadoChip p={p} /> },
                 { chave: "validade", cabecalho: "Validade", celula: (p) => <ValidadeChip p={p} /> },
@@ -909,6 +966,9 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                       <EstadoChip p={p} />
                       <ValidadeChip p={p} />
                     </span>
+                    <span className="mt-1 block text-xs tabular-nums text-[var(--bo-text-muted)]">
+                      {p.sentAt ? `Enviada ${dataCurta(p.sentAt)}` : "Por enviar"}
+                    </span>
                   </>
                 );
                 return (
@@ -944,6 +1004,8 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       {/* ── A PERGUNTA É A DA CASA ──────────────────────────────────────────
           Folha inferior no telemóvel, ao pé do polegar; diálogo centrado no
           computador; e o verbo repetido no botão em vez de «OK». */}
+      {folhaDoEmail}
+
       <PerguntaDestrutiva
         aberto={!!aApagar}
         onFechar={() => setAApagar(null)}

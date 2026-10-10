@@ -137,7 +137,7 @@ interface Props {
    */
   onAbrirPedido: (quote: Quote) => void;
   /** Ir para «Propostas», onde vivem as que já foram feitas. Ver a procura. */
-  onIrParaPropostas?: () => void;
+  onIrParaPropostas?: (procura?: string) => void;
 }
 
 export default function FazerProposta({
@@ -383,7 +383,9 @@ export default function FazerProposta({
           }
           action={
             onIrParaPropostas
-              ? { label: "Ver em Propostas", onClick: onIrParaPropostas }
+              ? // Com a procura que ela fez: chegar à lista inteira e ter de
+                // procurar outra vez era a mesma pergunta duas vezes.
+                { label: "Ver em Propostas", onClick: () => onIrParaPropostas(procura.trim()) }
               : undefined
           }
         />
