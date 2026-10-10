@@ -5,6 +5,7 @@ import type { MaterialItem } from "@/lib/material-types";
 import type { MaterialList, MaterialListItem } from "@/lib/material-list-types";
 import type { MaterialRule, MatchKind } from "@/lib/material-rules";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -68,6 +69,7 @@ const AVISO_RELEITURA = "Gravado, mas não foi possível reler as regras. Atuali
 
 export default function MaterialRegras() {
   const { toast } = useToast();
+  const anular = useAnular();
   const {
     data: regras = [],
     setData: setRegras,
@@ -172,20 +174,30 @@ export default function MaterialRegras() {
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
-  async function alternar(regra: MaterialRule) {
-    // Desligar em vez de apagar: deixa experimentar sem perder o que se
-    // escreveu, que é o gesto mais útil quando se está a afinar regras.
+  /** Liga ou desliga, e relê. É o gesto e também o seu «Anular». */
+  async function porLigada(regra: MaterialRule, ligada: boolean): Promise<boolean> {
     const ok = await gravar(
-      `${regra.enabled ? "desligar" : "ligar"} a regra «${regra.name}»`,
+      `${ligada ? "ligar" : "desligar"} a regra «${regra.name}»`,
       `/api/material/regras/${regra.id}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !regra.enabled }),
+        body: JSON.stringify({ enabled: ligada }),
       },
     );
-    if (!ok) return;
+    if (!ok) return false;
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+    return true;
+  }
+
+  async function alternar(regra: MaterialRule) {
+    // Desligar em vez de apagar: deixa experimentar sem perder o que se
+    // escreveu, que é o gesto mais útil quando se está a afinar regras.
+    const antes = regra.enabled;
+    if (!(await porLigada(regra, !antes))) return;
+    anular(`Regra «${regra.name}» ${antes ? "desligada" : "ligada"}.`, () =>
+      porLigada(regra, antes),
+    );
   }
 
   /**

@@ -14,6 +14,7 @@ import { useEntradaAoChegar } from "./ui/useEntradaAoChegar";
 import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
 import { useGaveta } from "./ui/gaveta";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
+import { useAnular } from "./ui/anular";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
@@ -729,6 +730,17 @@ const NotasEquipa = memo(function NotasEquipa({
   // vista em vez de ser substituído pela versão antiga do servidor.
   const [rascunho, setRascunho] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState(false);
+  const anular = useAnular();
+  /**
+   * O texto gravado quando se abriu o editor. O «Anular» das notas é da
+   * SESSÃO de escrita, oferecido ao fechar — um aviso por gravação seria um
+   * por pausa a escrever.
+   */
+  const aoAbrir = useRef<string | null>(null);
+  function abrirEditor() {
+    aoAbrir.current = gravado;
+    setEditingNotes(true);
+  }
   // Texto que uma gravação falhada deixou pendurado sem ninguém o ter escrito
   // aqui — é o caso da passagem do browser para o servidor. Se não o
   // mostrássemos, ela via "Sem notas." com as notas dela a existir algures.
@@ -753,14 +765,25 @@ const NotasEquipa = memo(function NotasEquipa({
       void onGuardar(v);
     }, ATRASO_GRAVACAO);
   }
-  function fechar() {
+  async function fechar() {
     // Fechar não pode engolir o que ainda estava a caminho: o que estiver
     // pendente vai já.
-    if (notesTimer.current) {
-      cancelarTimer();
-      void onGuardar(teamNotes);
-    }
+    const pendente = notesTimer.current !== null;
+    const texto = teamNotes;
+    cancelarTimer();
     setEditingNotes(false);
+    const antes = aoAbrir.current;
+    aoAbrir.current = null;
+    const ok = pendente ? await onGuardar(texto) : !porGravar;
+    if (!ok || antes === null || antes === texto) return;
+    // Volta ao texto de quando se abriu, com a revisão de agora: se outra
+    // pessoa gravou entretanto, é o conflito de sempre (as duas lado a lado),
+    // e não aparece «Anulado.».
+    anular("Notas da equipa guardadas.", async () => {
+      const voltou = await onGuardar(antes);
+      if (voltou) setRascunho(null);
+      return voltou;
+    });
   }
   useEffect(() => cancelarTimer, []);
 
@@ -816,7 +839,7 @@ const NotasEquipa = memo(function NotasEquipa({
         <h3 className="bo-eyebrow">Notas da equipa</h3>
         {!editingNotes && carga !== "erro" && (
           <button
-            onClick={() => setEditingNotes(true)}
+            onClick={abrirEditor}
             className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-sage-600 ${ESTADO} ${PRESSAO} rounded ${FOCUS_RING}`}
           >
             {teamNotes ? "Editar" : "Adicionar nota"}
@@ -833,7 +856,7 @@ const NotasEquipa = memo(function NotasEquipa({
             value={teamNotes}
             onChange={(e) => escrever(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") fechar();
+              if (e.key === "Escape") void fechar();
             }}
             aria-label="Notas da equipa"
             placeholder="Notas partilhadas com a equipa — lembretes, contexto, próximos passos…"
@@ -846,7 +869,7 @@ const NotasEquipa = memo(function NotasEquipa({
               onTentarDeNovo={(texto) => void onGuardar(texto)}
             />
             <button
-              onClick={fechar}
+              onClick={() => void fechar()}
               className={`text-sage-600 text-[10px] tracking-[0.1em] uppercase font-medium hover:opacity-75 shrink-0 ${ESTADO} ${PRESSAO}`}
             >
               Fechar
@@ -860,7 +883,7 @@ const NotasEquipa = memo(function NotasEquipa({
           {teamNotes ? (
             <p
               className="text-[var(--bo-text-muted)] text-sm leading-relaxed whitespace-pre-wrap cursor-text"
-              onClick={() => setEditingNotes(true)}
+              onClick={abrirEditor}
             >
               {teamNotes}
             </p>
@@ -906,7 +929,20 @@ const NotasEquipa = memo(function NotasEquipa({
  */
 const PainelEquipa = memo(function PainelEquipa({ wonThisMonth }: { wonThisMonth: number }) {
   const { snapshot, carga, estado, guardar, resolver, recarregar } = usePainelEquipa();
-  const guardarMeta = useCallback((v: string) => guardar("meta", v), [guardar]);
+  const anular = useAnular();
+  const metaAntes = snapshot?.meta?.value ?? "";
+  // A meta anula-se para a de antes, com a revisão de agora (um 409 é o
+  // conflito de sempre, e não diz «Anulado.»).
+  const guardarMeta = useCallback(
+    async (v: string) => {
+      const ok = await guardar("meta", v);
+      if (ok && v !== metaAntes) {
+        anular("Meta do mês guardada.", () => guardar("meta", metaAntes));
+      }
+      return ok;
+    },
+    [guardar, anular, metaAntes],
+  );
   const guardarNotas = useCallback((v: string) => guardar("notas", v), [guardar]);
   const resolverMeta = useCallback(
     (c: Conflito, escolha: "meu" | "servidor") => void resolver("meta", c, escolha),

@@ -5,6 +5,7 @@ import type { ServicoDaBiblioteca } from "./BibliotecaServicos";
 import { Button, Card, EmptyState } from "./ui";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
@@ -70,8 +71,8 @@ function useGravar() {
 }
 
 export default function Servicos() {
-  const { toast } = useToast();
   const gravar = useGravar();
+  const anular = useAnular();
   const [servicos, setServicos] = useState<ServicoDaBiblioteca[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aEditar, setAEditar] = useState<string | null>(null);
@@ -120,9 +121,13 @@ export default function Servicos() {
    * assinalá-lo. Mexe-se só na linha em causa, e por função (`prev => …`), que
    * é o que impede uma gravação de escrever por cima da outra.
    */
-  const alterarServico = useCallback(
-    async (id: string, patch: Partial<ServicoDaBiblioteca>, oQue: string, comoDizer: string) => {
-      const anterior = (servicos ?? []).find((s) => s.id === id);
+  const gravarServico = useCallback(
+    async (
+      id: string,
+      patch: Partial<ServicoDaBiblioteca>,
+      oQue: string,
+      anterior: ServicoDaBiblioteca | undefined,
+    ): Promise<boolean> => {
       setServicos((prev) => (prev ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)));
       const { ok, corpo } = await gravar(oQue, `/api/servicos-catalogo/${id}`, {
         method: "PATCH",
@@ -133,15 +138,37 @@ export default function Servicos() {
         if (anterior) {
           setServicos((prev) => (prev ?? []).map((s) => (s.id === id ? anterior : s)));
         }
-        return;
+        return false;
       }
       const actualizado = corpo as ServicoDaBiblioteca | null;
       if (actualizado?.id) {
         setServicos((prev) => (prev ?? []).map((s) => (s.id === id ? actualizado : s)));
       }
-      toast(comoDizer, "success");
+      return true;
     },
-    [servicos, toast, gravar],
+    [gravar],
+  );
+
+  // Arquivar e desarquivar trazem «Anular», que grava o contrário.
+  const alterarServico = useCallback(
+    async (id: string, patch: Partial<ServicoDaBiblioteca>, oQue: string, comoDizer: string) => {
+      const anterior = (servicos ?? []).find((s) => s.id === id);
+      if (!(await gravarServico(id, patch, oQue, anterior))) return;
+      if (!anterior) return;
+      // Um campo que antes nem existia (um serviço nunca arquivado não tem
+      // `arquivado`) volta como `false` — `undefined` sumia do JSON e o
+      // «Anular» ia vazio.
+      const inverso = Object.fromEntries(
+        Object.entries(patch).map(([k, v]) => [
+          k,
+          anterior[k as keyof ServicoDaBiblioteca] ?? (typeof v === "boolean" ? false : null),
+        ]),
+      ) as Partial<ServicoDaBiblioteca>;
+      anular(comoDizer, () =>
+        gravarServico(id, inverso, `repor «${anterior.nome}» como estava`, undefined),
+      );
+    },
+    [servicos, gravarServico, anular],
   );
 
   if (erro && servicos === null) {
@@ -212,6 +239,7 @@ export default function Servicos() {
               setACriar(false);
               await carregar();
             }}
+            onRelido={carregar}
           />
         )}
       </Card>
@@ -238,6 +266,7 @@ export default function Servicos() {
                       setAEditar(null);
                       await carregar();
                     }}
+                    onRelido={carregar}
                   />
                 ) : (
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -298,12 +327,16 @@ function Editor({
   servico,
   onCancelar,
   onGravado,
+  onRelido,
 }: {
   servico: ServicoDaBiblioteca | null;
   onCancelar: () => void;
   onGravado: () => void | Promise<void>;
+  /** Relê a lista depois de um «Anular» — o formulário já fechou. */
+  onRelido: () => void | Promise<void>;
 }) {
   const { toast } = useToast();
+  const anular = useAnular();
   const gravar = useGravar();
   const [nome, setNome] = useState(servico?.nome ?? "");
   const [descricao, setDescricao] = useState(servico?.descricao ?? "");
@@ -333,7 +366,31 @@ function Editor({
     // fecha): fechá-lo à mesma deixava-a a olhar para o texto antigo na lista,
     // com o que escreveu perdido e um aviso que já desapareceu.
     if (!ok) return;
-    toast(servico ? "Serviço corrigido" : "Serviço guardado na biblioteca", "success");
+    if (servico) {
+      // Corrigir anula-se gravando o texto de antes, e relê-se a lista.
+      const antes = {
+        nome: servico.nome,
+        descricao: servico.descricao ?? "",
+        nomeEn: servico.nomeEn ?? "",
+        descricaoEn: servico.descricaoEn ?? "",
+        categoria: servico.categoria,
+      };
+      anular(`«${corpo.nome}» corrigido.`, async () => {
+        const { ok: voltou } = await gravar(
+          `repor «${servico.nome}» como estava`,
+          `/api/servicos-catalogo/${servico.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(antes),
+          },
+        );
+        if (voltou) await onRelido();
+        return voltou;
+      });
+    } else {
+      toast("Serviço guardado na biblioteca", "success");
+    }
     await onGravado();
   }
 
