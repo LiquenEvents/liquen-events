@@ -5,6 +5,7 @@ import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { todayKey } from "./util";
 import {
   Button,
@@ -844,6 +845,7 @@ export default function Tarefas({
 }) {
   const { toast } = useToast();
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const {
     data: tasks = [],
     setData: setTasks,
@@ -1428,7 +1430,7 @@ export default function Tarefas({
       // gravações tenham feito entretanto (ver a nota em `toggle`).
       const posicao = tasksRef.current.findIndex((x) => x.id === id);
       setTasks((prev) => prev.filter((x) => x.id !== id));
-      const { ok } = await gravar(
+      const { ok, corpo } = await gravar(
         `eliminar a tarefa «${t?.title ?? "sem título"}»`,
         `/api/tarefas/${id}`,
         {
@@ -1442,8 +1444,10 @@ export default function Tarefas({
           return [...prev.slice(0, onde), t, ...prev.slice(onde)];
         });
       }
+      // Foi para a Reciclagem: o aviso traz «Anular», que a repõe tal e qual.
+      if (ok && t) depoisDeApagar(corpo, `«${t.title}» eliminada.`, () => void refresh());
     },
-    [setTasks, gravar],
+    [setTasks, gravar, depoisDeApagar, refresh],
   );
 
   /**
@@ -2662,6 +2666,7 @@ export default function Tarefas({
         aberto={!!aEliminar}
         onFechar={() => setAEliminar(null)}
         titulo={`Eliminar a tarefa «${aEliminar?.title ?? ""}»?`}
+        aviso="Fica 30 dias na Reciclagem, de onde se repõe tal e qual."
         rotuloConfirmar="Eliminar"
         // Fecha PRIMEIRO e só depois age: a lista é optimista — a linha sai
         // logo e volta se o servidor recusar — e uma caixa aberta por cima

@@ -301,7 +301,12 @@ async function porNoServidor(id: "deslocacao" | "margem", valor: object): Promis
 const valorDe = (p: Parametros, id: "deslocacao" | "margem"): object =>
   id === "deslocacao" ? p.deslocacao : { minima: p.margemMinima };
 
-export default function DefinicoesProposta() {
+export default function DefinicoesProposta({
+  onAbrirReciclagem,
+}: {
+  /** Abre a vista da Reciclagem (fase R3). Sem ele, a linha não aparece. */
+  onAbrirReciclagem?: () => void;
+}) {
   const { toast } = useToast();
   const anular = useAnular();
   const [p, setP] = useState<Parametros | null>(null);
@@ -465,6 +470,25 @@ export default function DefinicoesProposta() {
           <EscolherAparencia />
         </div>
       </Card>
+
+      {/* A Reciclagem (fase R3 do «tudo reversível»): o que se apaga fica lá
+          30 dias. Não está no menu — é um destino de vez em quando —, e é aqui
+          que se procura «onde foi parar o que apaguei». */}
+      {onAbrirReciclagem && (
+        <Card padding="md" style={{ "--cena": 0 } as React.CSSProperties} className="bo-cena">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-medium text-[var(--bo-text)]">Reciclagem</h2>
+              <p className="mt-0.5 text-[13px] text-[var(--bo-text-muted)]">
+                O que se apaga fica lá 30 dias, e pode voltar tal e qual.
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onAbrirReciclagem}>
+              Abrir a Reciclagem
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
           Três blocos, pela ordem de leitura: a deslocação (0), a margem mínima

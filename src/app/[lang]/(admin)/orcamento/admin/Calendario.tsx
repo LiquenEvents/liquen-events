@@ -5,6 +5,7 @@ import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/ty
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { isDateKey, todayKey } from "./util";
 import {
   Button,
@@ -593,6 +594,7 @@ function LinhasDoDia({
 export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   const { toast } = useToast();
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -820,9 +822,11 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     const posicao = events.findIndex((e) => e.id === id);
     const removido = posicao < 0 ? null : events[posicao];
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    const { ok } = await gravar(`remover «${title}» do calendário`, `/api/calendario/${id}`, {
-      method: "DELETE",
-    });
+    const { ok, corpo: apagado } = await gravar(
+      `remover «${title}» do calendário`,
+      `/api/calendario/${id}`,
+      { method: "DELETE" },
+    );
     if (!ok && removido) {
       setEvents((prev) => {
         if (prev.some((e) => e.id === id)) return prev;
@@ -831,11 +835,17 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
       });
     }
     if (!ok || !removido) return;
-    /* ── «ANULAR» RECRIA A MARCAÇÃO ─────────────────────────────────────────
-       Com um id novo (o servidor dá-o sempre), e isso não faz mal a ninguém:
-       nada aponta para o id de uma marcação. A ligação às datas-chave de um
-       «Ganho» vive dentro da NOTA (`calendar-store.ts`), que vai igual. Na R3,
-       remover passa pela Reciclagem e repõe-se tal e qual. */
+    /* ── «ANULAR»: PELA RECICLAGEM, TAL E QUAL ──────────────────────────────
+       Com a Reciclagem ligada (R3), a marcação volta de lá com o MESMO id. */
+    const naReciclagem = (apagado as { reciclagem?: unknown } | null)?.reciclagem;
+    if (naReciclagem && typeof naReciclagem === "object") {
+      depoisDeApagar(apagado, `«${title}» removido do calendário.`, () => void recarregar());
+      return;
+    }
+    /* Sem ela (a migração ainda não correu), o «Anular» RECRIA a marcação —
+       com um id novo, o que não faz mal a ninguém: nada aponta para o id de
+       uma marcação. A ligação às datas-chave de um «Ganho» vive dentro da
+       NOTA (`calendar-store.ts`), que vai igual. */
     anular(`«${title}» removido do calendário.`, async () => {
       const { ok: voltou, corpo } = await gravar(
         `repor «${title}» no calendário`,
@@ -2386,6 +2396,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
         aberto={!!aRemover}
         onFechar={() => setARemover(null)}
         titulo={`Remover «${aRemover?.title ?? ""}» do calendário?`}
+        aviso="Fica 30 dias na Reciclagem, de onde se repõe tal e qual."
         rotuloConfirmar="Remover"
         // Fecha primeiro e só depois age: a grelha é optimista — a marcação sai
         // logo e volta se o servidor recusar.

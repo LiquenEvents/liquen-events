@@ -11,6 +11,7 @@ import {
 import type { PlanoCsv } from "@/lib/material-csv";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { downloadCsv, dateStamp } from "./export";
 import {
   Button,
@@ -219,6 +220,7 @@ export default function Material() {
 function Catalogo() {
   const { toast } = useToast();
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const {
     data: items = [],
     setData: setItems,
@@ -436,7 +438,8 @@ function Catalogo() {
         }`,
         "nas listas base, a linha dele passa a dizer «(item removido do catálogo)»",
       ],
-      aviso: "As checklists já geradas não mudam — foram copiadas. Não pode ser anulado.",
+      aviso:
+        "As checklists já geradas não mudam — foram copiadas. Fica 30 dias na Reciclagem, de onde se repõe tal e qual.",
       rotulo: "Remover do catálogo",
       fazer: () => remove(i.id),
     });
@@ -446,9 +449,14 @@ function Catalogo() {
     const removido = items.find((i) => i.id === id);
     if (!removido) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
-    const { ok } = await gravar(`remover «${removido.name}» do catálogo`, `/api/material/${id}`, {
-      method: "DELETE",
-    });
+    const { ok, corpo } = await gravar(
+      `remover «${removido.name}» do catálogo`,
+      `/api/material/${id}`,
+      { method: "DELETE" },
+    );
+    // Foi para a Reciclagem (com as regras que apontavam para ele): o aviso
+    // traz «Anular», que repõe tudo tal e qual.
+    if (ok) depoisDeApagar(corpo, `«${removido.name}» saiu do catálogo.`, () => void refresh());
     if (!ok) {
       // Reversão: o catálogo no ecrã não pode divergir do que está gravado.
       //
