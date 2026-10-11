@@ -34,7 +34,7 @@ vi.mock("@/lib/quotes-store", () => ({ updateQuoteWith: quotes.updateWith }));
 vi.mock("@/lib/reciclagem", () => ({
   quemApagou: () => undefined,
   enviarParaAReciclagem: async (_tipo: string, id: string) => {
-    await store.remove(id);
+    await (store.remove as (id: string) => Promise<void>)(id);
     return { id: "r1" };
   },
 }));

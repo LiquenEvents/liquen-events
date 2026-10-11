@@ -161,7 +161,7 @@ vi.mock("@/lib/reciclagem", () => ({
   NaoDeuParaApagar: reciclagem.NaoDeuParaApagar,
   quemApagou: () => undefined,
   enviarComDetalhe: async (_tipo: string, id: string) => {
-    const r = await apagamento.correr(id);
+    const r = await (apagamento.correr as (id: string) => ReturnType<typeof apagamento.correr>)(id);
     if (!r.apagado) throw new reciclagem.NaoDeuParaApagar("não", 0, r);
     return { reciclagem: { id: "r1" }, detalhe: r };
   },
