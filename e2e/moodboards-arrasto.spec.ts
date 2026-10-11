@@ -163,6 +163,18 @@ async function abrirEstudio(page: Page, nomeCliente: string): Promise<void> {
     .first()
     .click({ timeout: 20000 });
   await expect(page.getByText(/Estúdio de propostas/i).first()).toBeVisible({ timeout: 20000 });
+
+  // Desde a A2 os mood boards vivem no 3.º dos cinco passos, e o estúdio abre
+  // no 1.º. O clique INSISTE até aparecer a primeira pega: antes de o React
+  // assumir a página, o botão do passo fica focado e o passo não muda.
+  const passo3 = page
+    .getByRole("navigation", { name: "Passos da proposta" })
+    .getByRole("button", { name: /^3\s*Inspiração/ });
+  const pega = page.getByRole("button", { name: /^Arrastar a fotografia \d+$/ }).first();
+  await expect(async () => {
+    if (!(await pega.isVisible())) await passo3.click({ timeout: 5_000 });
+    await expect(pega, "as fotos do mood board, no passo 3").toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 60_000 });
 }
 
 /**
