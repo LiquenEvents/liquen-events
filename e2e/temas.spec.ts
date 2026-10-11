@@ -294,14 +294,18 @@ test.describe("Biblioteca de Temas", () => {
       // antes do clique é o que impede duas insistências criarem dois mood
       // boards.
       // Os mood boards vivem no 3.º dos cinco passos do estúdio (A2).
-      await page
+      // O clique no passo também insiste, pela mesma razão: antes de o React
+      // assumir a página, o botão fica focado e o passo não muda.
+      const passo3 = page
         .getByRole("navigation", { name: "Passos da proposta" })
-        .getByRole("button", { name: /^3\s*Inspiração/ })
-        .click();
+        .getByRole("button", { name: /^3\s*Inspiração/ });
       const adicionar = page.getByRole("button", { name: /\+ Adicionar mood board/i }).first();
       const escolher = page.getByRole("button", { name: /Escolher da biblioteca de temas/i });
       await expect(async () => {
-        if ((await escolher.count()) === 0) await adicionar.click();
+        if (!(await adicionar.isVisible()) && (await escolher.count()) === 0) {
+          await passo3.click({ timeout: 5_000 });
+        }
+        if ((await escolher.count()) === 0) await adicionar.click({ timeout: 5_000 });
         await expect(escolher.first()).toBeVisible({ timeout: 3_000 });
       }).toPass({ timeout: 60_000 });
       await escolher.first().click();

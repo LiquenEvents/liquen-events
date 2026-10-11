@@ -15,6 +15,27 @@ const LONGO = "Arranjos de mesa baixos com eucalipto e rosas de jardim ".repeat(
 const EMOJI = "Arco floral 🌿💐 — cerimónia ☀️";
 
 /**
+ * Leva o estúdio ao passo «Serviços» (o 2.º dos cinco, A2) e devolve a 1.ª
+ * linha do editor.
+ *
+ * O clique no passo INSISTE, como no `aquecer.setup.ts`: o estúdio chega
+ * desenhado antes de o React o assumir, e um clique nessa janela foca o botão
+ * e não muda de passo — o editor ficava escondido e o passeio falhava a dizer
+ * que ele não existia.
+ */
+async function irAosServicos(page: import("@playwright/test").Page) {
+  const linha1 = page.getByLabel(/^Linha 1 do grupo 1$/).first();
+  await expect(async () => {
+    await page
+      .getByRole("navigation", { name: "Passos da proposta" })
+      .getByRole("button", { name: /^2\s*Serviços/ })
+      .click({ timeout: 5_000 });
+    await expect(linha1, "o editor de serviços do estúdio").toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 60_000 });
+  return linha1;
+}
+
+/**
  * Abre o estúdio, criando o pedido de que ele precisa.
  *
  * ── O que estava errado ──────────────────────────────────────────────────
@@ -45,12 +66,7 @@ async function abrirEstudio(page: import("@playwright/test").Page) {
   // Passo 2 — o estúdio, com o editor de serviços montado (o chunk é
   // preguiçoso, daí a espera generosa). Os Serviços são o 2.º dos cinco
   // passos do estúdio (A2).
-  await page
-    .getByRole("navigation", { name: "Passos da proposta" })
-    .getByRole("button", { name: /^2\s*Serviços/ })
-    .click({ timeout: 30_000 });
-  const linha1 = page.getByLabel(/^Linha 1 do grupo 1$/).first();
-  await expect(linha1, "o editor de serviços do estúdio").toBeVisible({ timeout: 30_000 });
+  const linha1 = await irAosServicos(page);
   await assentar(page, 800);
 
   /**
@@ -86,8 +102,13 @@ async function abrirEstudio(page: import("@playwright/test").Page) {
    * antes de medir. Se falhar, `toPass` volta a tentar — e se nunca passar,
    * falha a dizer que o editor não aceita escrita, que é a verdade.
    */
+  //
+  // `focus()` e não `click()`: com os cinco passos, a barra dos passos fica
+  // colada ao topo e a barra de baixo é fixa — um clique pode cair numa delas
+  // conforme o sítio para onde a linha foi rolada. O que se quer provar é que
+  // o campo aceita escrita, não onde fica no ecrã.
   await expect(async () => {
-    await linha1.click();
+    await linha1.focus();
     await linha1.fill("");
     await page.keyboard.type("x");
     expect(await linha1.inputValue()).toBe("x");
@@ -171,8 +192,8 @@ test("A2 · emojis e acentos sobrevivem a gravar e reler", async ({ page }) => {
   });
   await cliente.click();
 
-  const relido = page.getByLabel(/^Linha 1 do grupo 1$/);
-  await expect(relido, "o editor depois de reabrir o estúdio").toBeVisible({ timeout: 30_000 });
+  // E o estúdio reabre no passo 1: os Serviços estão no 2.º.
+  const relido = await irAosServicos(page);
   const valor = await relido.inputValue();
   expect(valor, "Emojis/acentos perderam-se ao gravar e reler").toContain("Arco floral");
   exigirSilencio(r, "emojis");
