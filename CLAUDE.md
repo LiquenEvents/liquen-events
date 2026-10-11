@@ -122,3 +122,12 @@ feito, e os sítios onde a execução se afastou do texto (uma só cor de
 destaque, nenhum fundo desfocado, capa só com a fotografia de fundo, logótipo no
 rodapé). A
 referência que conta é o exemplo NOVO, de 26 páginas.
+
+# E o plano do site e da galeria, também
+
+`docs/PLANO-SITE-E-GALERIA.md` junta quatro análises de 11/10 (galeria, site
+público, segurança, áreas novas) num plano com códigos (GAL-, DES-, TXT-, PED-,
+NAV-, IA-, CON-, POS-, NEG-, SEG-) e um roteiro. **É uma lista para ela escolher,
+não uma ordem de trabalho**: antes de fazer um ponto, confirma que ela o escolheu.
+A Parte −1 diz o que ficou por verificar; a Parte 10 deixa de fora os pormenores
+de segurança enquanto o repositório estiver público.
