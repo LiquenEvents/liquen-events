@@ -6,6 +6,7 @@ import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { downloadCsv, dateStamp } from "./export";
 import {
   Button,
@@ -312,6 +313,7 @@ function CampoLocalizacao({ f, set, className }: CampoDeEdicao) {
 export default function Inventario() {
   const { toast } = useToast();
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const {
     data: items = [],
     setData: setItems,
@@ -514,7 +516,7 @@ export default function Inventario() {
         `${i.quantity} ${unidade} registadas${i.location ? ` em ${i.location}` : ""}`,
         "a linha sai da lista, do modo de carga e das exportações",
       ],
-      aviso: "Não pode ser anulado.",
+      aviso: "Fica 30 dias na Reciclagem, de onde se repõe tal e qual.",
       rotulo: "Remover do inventário",
       fazer: () => remove(i.id),
     });
@@ -524,7 +526,7 @@ export default function Inventario() {
     const it = items.find((x) => x.id === id);
     if (!it) return;
     setItems((prev) => prev.filter((x) => x.id !== id));
-    const { ok } = await gravar(
+    const { ok, corpo } = await gravar(
       `remover «${it?.name ?? "o item"}» do inventário`,
       `/api/inventario/${id}`,
       { method: "DELETE" },
@@ -543,7 +545,8 @@ export default function Inventario() {
       );
       return;
     }
-    toast("Item removido.", "success");
+    // Foi para a Reciclagem: o aviso traz «Anular», que o repõe tal e qual.
+    depoisDeApagar(corpo, `«${it.name}» removido.`, () => void refresh());
   }
 
   function startEdit(i: PropItem) {

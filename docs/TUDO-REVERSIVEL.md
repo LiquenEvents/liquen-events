@@ -33,7 +33,8 @@ volta atrás (a rota respondia 409).
 | **R1** — o padrão, os estados do pedido e a cadeia do Ganho, Propostas e Acompanhamento, Propostas Aceites, pagamentos, os dois envios | Feita no ramo `feat/anular-r1` |
 | **R2a** — a gaveta do pedido: os campos do «Guardar» e todas as listas | Feita (#188) |
 | **R2b** — o resto do back office, e os «Anular» antigos passam ao padrão | Feita no ramo `feat/anular-r2b` |
-| **R3** — a Reciclagem de 30 dias | Por fazer (precisa de uma migração, que só corre com a aprovação dela) |
+| **R3a** — a Reciclagem: o motor, o ecrã, a limpeza diária, e tudo o que não tem fotografias | Feita no ramo `feat/reciclagem`. **A migração (`db/migracoes/20261010_r3_reciclagem.sql`) NÃO está aplicada** — só corre com a aprovação dela |
+| **R3b** — a Reciclagem do que tem fotografias: pedido, proposta, tema, foto de tema | Por fazer |
 
 **Onde a R1 se afastou do plano.** Apagar um pagamento ficou com «Anular» e
 **sem** pergunta de confirmação: o «Anular» repõe-no tal e qual, e uma pergunta
@@ -76,6 +77,35 @@ número de pessoas não levam «Anular»: desfazem-se no mesmo sítio, com o mes
   vazio, porque o campo não existia e `undefined` não chega ao servidor. Volta como `false`,
   e há um teste que o prende.
 
+**Na R3a (a Reciclagem, `src/lib/reciclagem.ts`):**
+- **Apagar** guarda primeiro um retrato na tabela `reciclagem` — a linha e o que cai com
+  ela — e só depois apaga. **«Repor»** grava tudo de volta com o **mesmo id**; quando já
+  existe outra vez com aquele id, ou falta aquilo de que depende (o item de uma linha de
+  lista), diz porquê (409) e não pisa nada.
+- **As cascatas que só o Supabase faz vão no retrato:** as regras de um item de material, e
+  as linhas e as regras de uma lista. No ficheiro local não há cascata; ao repor, uma linha
+  que já lá está não se escreve duas vezes.
+- **Passam pela Reciclagem:** tarefas, marcações do calendário, fornecedores, serviços da
+  biblioteca, itens do catálogo de material e do inventário, listas de material e regras.
+  Depois de apagar, o aviso traz **«Anular»** (repõe pela Reciclagem), e as perguntas de
+  apagar passaram de «Não pode ser anulado» a «Fica 30 dias na Reciclagem».
+- **O ecrã** é a vista `?v=reciclagem`, aberta a partir das Definições («Abrir a
+  Reciclagem»): o quê, o tipo, quem apagou e quando, quanto falta para sair; «Repor» e
+  «Apagar de vez» (este pergunta).
+- **A limpeza dos 30 dias** corre dentro de `/api/cron/backup`, depois da cópia do dia — a
+  Vercel é Hobby e não há lugar para um terceiro agendamento. Se falhar, a cópia segue.
+- **A tabela fica fora da cópia de segurança** (`NOT_BACKED_UP`, com a razão): cada linha é
+  uma cópia de uma coisa que, viva, foi nas cópias diárias como as outras.
+- **Sem a migração** o site funciona como antes: apagar é definitivo, a resposta diz
+  `reciclagem: false`, o aviso diz «Apagado de vez: a Reciclagem ainda não está ligada», e
+  o ecrã diz o mesmo. No calendário, o «Anular» da R2b (recriar a marcação) continua a
+  valer nesse caso.
+- **Uma coisa acrescentada e logo anulada** (o «Anular» da R2b sobre um acrescentar) passa
+  também pela Reciclagem. Não faz mal a ninguém — sai sozinha em 30 dias —, e evita ter
+  uma porta de apagar definitivo ao lado da que não é.
+- **Fica como estava:** apagar um item de material que está numa lista base continua a
+  ser recusado pelo Supabase (`on delete restrict`), como antes.
+
 **Ficou para a R3, e porquê:**
 - **Apagar material, listas, regras, fornecedores e tarefas.** O id tem de voltar igual,
   porque as listas base e as regras apontam para ele, e os POST de hoje ignoram um id
@@ -101,7 +131,7 @@ A coluna «Fase» diz quando passa a ter. ✅ = já tinha antes desta análise.
 | Guardar os campos da gaveta (estado, preço, data, convidados, local, contactos, responsável) | `AdminClient.tsx` | «Anular» repõe todos os campos que o gesto mudou | ✅ R1 (estado) · R2a (resto) |
 | Arquivar / Restaurar pedido | `AdminClient.tsx` | ✅ «Restaurar pedido» | — |
 | Duplicar / Novo pedido | `AdminClient.tsx`, `NewQuoteModal.tsx` | Arquivar ou apagar a cópia | R2 |
-| Apagar pedido (e em massa) | `AdminClient.tsx` | Reciclagem | R3 |
+| Apagar pedido (e em massa) | `AdminClient.tsx` | Reciclagem | R3b |
 | Etiquetas (tirar), seguimento (atalhos), convidados, custos, guião, plano de produção | vários | «Anular» — gesto ao contrário, com a `base` | ✅ R2a |
 | Notas e motivo (gravam sozinhos ao escrever) | `AdminClient.tsx` | Anulam-se pelo «Guardar» quando vão nele; ao escrever, não — um aviso por tecla seria ruído | — |
 | Lista de verificação: remover, «Marcar todas» | `EventChecklist.tsx` | «Anular» da casa (era uma tira própria de 8 s) | ✅ R2a |
@@ -136,7 +166,7 @@ que caiu não é um engano.
 |---|---|---|
 | Aceitar / Recusar | «Anular» (e a cadeia do Ganho) | R1 |
 | Estado, motivo, seguimento, versão escolhida no Acompanhamento | «Anular» | R1 |
-| Apagar proposta | Reciclagem | R3 |
+| Apagar proposta | Reciclagem | R3b |
 
 ### Propostas Aceites
 | Acção | Volta atrás | Fase |
@@ -148,17 +178,17 @@ que caiu não é um engano.
 | Acção | Volta atrás | Fase |
 |---|---|---|
 | Novo / duplicar evento | ✅ «Anular» (apaga o que se criou) | R2b |
-| Remover evento | ✅ «Anular» (recria) → Reciclagem | R2b · R3 |
+| Remover evento | ✅ Reciclagem, e «Anular» logo a seguir | R2b · R3a |
 | Concluir tarefa, reordenar | ✅ «Anular» (o reordenar espera pelo servidor) | R2b |
 | Editar, notas, subtarefas, anexos, «Hoje/Amanhã», acrescentar | ✅ «Anular» | R2b |
-| Apagar tarefa | Reciclagem | R3 |
+| Apagar tarefa | ✅ Reciclagem, e «Anular» logo a seguir | R3a |
 
 ### Material, inventário, fornecedores, serviços, temas, definições
 | Acção | Volta atrás | Fase |
 |---|---|---|
 | Acrescentar / editar item (catálogo e inventário) | ✅ «Anular» | R2b |
 | Importar CSV, criar lista a partir de outra, «Voltar a gerar» | Reciclagem em lote | R3 |
-| Remover item / lista / regra / fornecedor | Reciclagem | R3 |
+| Remover item / lista / regra / fornecedor | ✅ Reciclagem, e «Anular» logo a seguir | R3a |
 | Linha de lista removida | ✅ «Anular» da casa (era uma barra de 8 s) | R2b |
 | Regra ligada/desligada | ✅ «Anular» | R2b |
 | Fornecedores: editar, preferido, estrelas | ✅ «Anular» | R2b |
@@ -167,7 +197,7 @@ que caiu não é um engano.
 | Temas: arquivar, fixar | ✅ «Anular» | R2b |
 | Temas: renomear (na lista e na pasta), capa, ordem das fotos | ✅ «Anular» | R2b |
 | Temas: etiquetas, fundir, «Mover/duplicar» por diálogo | Reciclagem | R3 |
-| Temas: remover fotos / apagar tema | Reciclagem (as fotos vão para `reciclagem/`) | R3 |
+| Temas: remover fotos / apagar tema | Reciclagem (as fotos vão para `reciclagem/`) | R3b |
 | Modelos de email (bilingues) | ✅ 10 versões e «Repor» | — |
 | Modelos de email (editor clássico), definições da proposta, notas e meta da Visão Geral | ✅ «Anular» | R2b |
 | Repor cópia de segurança | ✅ guarda «antes do restauro» | — |

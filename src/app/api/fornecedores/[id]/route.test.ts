@@ -7,6 +7,15 @@ const store = vi.hoisted(() => ({
   del: vi.fn(async (id: string) => id),
 }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+// Apagar passa pela Reciclagem (R3, `src/lib/reciclagem.ts`, com testes
+// próprios). Aqui interessa a rota: a guarda e o apagar que chega ao store.
+vi.mock("@/lib/reciclagem", () => ({
+  quemApagou: () => undefined,
+  enviarParaAReciclagem: async (_tipo: string, id: string) => {
+    await store.del(id);
+    return { id: "r1" };
+  },
+}));
 vi.mock("@/lib/suppliers-store", () => ({
   updateSupplier: store.update,
   deleteSupplier: store.del,

@@ -160,6 +160,7 @@ import {
   Acompanhamento,
   DefinicoesProposta,
   Servicos,
+  Reciclagem,
   Tarefas,
   Fornecedores,
   StatsDashboard,
@@ -4424,6 +4425,7 @@ export default function AdminClient({
     acompanhamento: "Acompanhamento",
     definicoes: "Definições",
     servicos: "Biblioteca de serviços",
+    reciclagem: "Reciclagem",
     "fazer-proposta": "Fazer proposta",
     guioes: "Timelines",
     tarefas: "Tarefas",
@@ -4469,6 +4471,7 @@ export default function AdminClient({
     acompanhamento: "O que está à espera de resposta, por ordem de urgência",
     definicoes: "Os números com que o estúdio faz contas",
     servicos: "As palavras que vão nas propostas, escritas com tempo",
+    reciclagem: "O que se apagou nos últimos 30 dias, e pode voltar",
     "fazer-proposta": "Escolhe o cliente e escreve a proposta",
     /* ── A DESCRIÇÃO DAS TIMELINES SAIU, COMO A DAS TAREFAS ────────────
        «A hierarquia do cabeçalho está invertida.» [APPLE] É a mesma regra dos
@@ -6095,7 +6098,14 @@ export default function AdminClient({
           {/* ── Definições: combustível, custo por km, margem mínima ── */}
           {view === "definicoes" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <DefinicoesProposta />
+              <DefinicoesProposta onAbrirReciclagem={() => setView("reciclagem")} />
+            </div>
+          )}
+
+          {/* ── Reciclagem: o que se apagou, 30 dias (fase R3) ── */}
+          {view === "reciclagem" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Reciclagem />
             </div>
           )}
 

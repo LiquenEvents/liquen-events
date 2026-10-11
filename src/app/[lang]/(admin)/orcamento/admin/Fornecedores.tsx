@@ -20,6 +20,7 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 const CATEGORIES = [
@@ -119,6 +120,7 @@ const PlusIcon = (
 export default function Fornecedores() {
   const { toast } = useToast();
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
 
   const {
     data: suppliers = [],
@@ -285,7 +287,7 @@ export default function Fornecedores() {
     // de já não existir na base de dados.
     const posicao = suppliers.findIndex((x) => x.id === id);
     setSuppliers((prev) => prev.filter((x) => x.id !== id));
-    const { ok } = await gravar(
+    const { ok, corpo } = await gravar(
       `remover o fornecedor «${s?.name ?? "sem nome"}»`,
       `/api/fornecedores/${id}`,
       { method: "DELETE" },
@@ -297,6 +299,8 @@ export default function Fornecedores() {
         return [...prev.slice(0, onde), s, ...prev.slice(onde)];
       });
     }
+    // Foi para a Reciclagem: o aviso traz «Anular», que o repõe tal e qual.
+    if (ok && s) depoisDeApagar(corpo, `«${s.name}» removido.`, () => void refresh());
   }
 
   /**
@@ -861,7 +865,7 @@ export default function Fornecedores() {
         aberto={!!aRemover}
         onFechar={() => setARemover(null)}
         titulo={`Remover o fornecedor «${aRemover?.name ?? ""}»?`}
-        aviso="Esta acção não pode ser anulada."
+        aviso="Fica 30 dias na Reciclagem, de onde se repõe tal e qual."
         rotuloConfirmar="Remover"
         // Fecha primeiro e só depois age: a lista é optimista — a ficha sai
         // logo e volta se o servidor recusar — e uma caixa por cima atrasaria

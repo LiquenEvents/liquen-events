@@ -196,6 +196,8 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
  * `db/schema.sql` esteja aqui ou em `BACKUP_DATASETS`.
  */
 export const NOT_BACKED_UP: Readonly<Record<string, string>> = {
+  reciclagem:
+    "O que se apagou nos últimos 30 dias (fase R3 do «tudo reversível»). Cada linha é uma CÓPIA de uma coisa que, enquanto existiu, foi nas cópias diárias como qualquer outra — a cópia do dia anterior ao apagar tem-na viva, na tabela dela. Levar a Reciclagem também seria levar o mesmo dado duas vezes, e uma reposição escreveria por cima a Reciclagem de hoje com a de há dois meses: ressuscitava, como apagado, o que entretanto foi reposto. O que fica de fora é só o que nasceu e se apagou no mesmo dia, entre duas cópias.",
   message_links:
     "As anotações da caixa de entrada de email — a ligação de uma mensagem a um pedido, as etiquetas, o alfinete e o arquivo. A caixa de entrada foi APAGADA a pedido dela (ver o cabeçalho do RUNBOOK): nada no sistema volta a escrever ou a ler esta tabela, e as linhas que lá estão apontam para identificadores de mensagens de um ecrã que já não existe. A tabela NÃO foi deitada abaixo — as linhas continuam na base de dados, intactas, e podem ser lidas ou apagadas à mão por quem quiser. O que deixou de fazer sentido é levá-las numa cópia de segurança que existe para repor o que a casa usa.",
   push_subscriptions:

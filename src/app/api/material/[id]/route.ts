@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { updateMaterial, deleteMaterial } from "@/lib/material-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
+import { updateMaterial } from "@/lib/material-store";
 import { MATERIAL_CATEGORIES, type MaterialItem } from "@/lib/material-types";
 import { log } from "@/lib/logger";
 import { isMissingTable } from "@/lib/repository";
@@ -94,8 +95,8 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteMaterial(id);
-    return NextResponse.json({ ok: true });
+    const reciclagem = await enviarParaAReciclagem("material", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     // A tabela em falta não é uma avaria: é uma instalação por acabar,
     // e tem uma resolução que ela pode fazer sozinha.
