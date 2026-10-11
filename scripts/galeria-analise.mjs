@@ -18,8 +18,8 @@
  *  · `pb` — a fotografia é a preto e branco (saturação média muito baixa);
  *  · `n` — a nitidez (variância do Laplaciano numa miniatura): baixa = tremida
  *          ou desfocada;
- *  · `f` — o ponto de interesse, em percentagem (`"x,y"`), pela estratégia
- *          `attention` do sharp: é para onde se recorta.
+ *  · `f` — para onde se recorta (`"x,y"`, o `object-position` em %), pelo
+ *          recorte que a estratégia `attention` do sharp escolhe.
  *
  * Funções puras e o cálculo com o sharp vivem aqui, num ficheiro só: o build e
  * os testes (`galeria/analise.test.ts`) usam ESTE código — não há uma segunda
@@ -27,7 +27,7 @@
  */
 
 /** Sobe quando o que se calcula muda: a cache do build refaz a análise. */
-export const VERSAO_ANALISE = 1;
+export const VERSAO_ANALISE = 3;
 
 /** Abaixo disto (0..1) a fotografia é a preto e branco. Calibrado nas 918. */
 export const LIMIAR_PB = 0.06;
@@ -120,17 +120,25 @@ export async function analisarFoto(sharp, buf) {
   for (const v of lap) variancia += (v - media) ** 2;
   variancia /= lap.length;
 
-  // ── Ponto de interesse: o recorte quadrado que o `attention` escolheria, e
-  //    o centro dele, em percentagem da foto.
+  // ── Ponto de interesse: o recorte quadrado que o `attention` escolhe,
+  //    escrito como `object-position` — a fracção do deslocamento possível
+  //    (0% encostado à esquerda/topo, 100% à direita/fundo). Num mosaico
+  //    quadrado isto reproduz exactamente o recorte do sharp; nos outros, puxa
+  //    para o mesmo lado. Só o eixo que se corta diz alguma coisa (numa foto
+  //    deitada, o horizontal); o outro fica a 50%.
+  //    (O `attentionX/Y` que o sharp também devolve não serve: medido nas 918,
+  //    sai a 0 em ~200 delas no eixo que não se corta.)
   const meta = await sharp(buf).metadata();
-  const lado = Math.min(meta.width ?? 1, meta.height ?? 1);
+  const largura = meta.width ?? 1;
+  const altura = meta.height ?? 1;
+  const lado = Math.min(largura, altura);
   const { info: corte } = await sharp(buf)
     .resize(lado, lado, { fit: "cover", position: sharp.strategy.attention })
     .toBuffer({ resolveWithObject: true });
-  const ax = typeof corte.attentionX === "number" ? corte.attentionX : (meta.width ?? 1) / 2;
-  const ay = typeof corte.attentionY === "number" ? corte.attentionY : (meta.height ?? 1) / 2;
-  const fx = Math.round((ax / (meta.width ?? 1)) * 100);
-  const fy = Math.round((ay / (meta.height ?? 1)) * 100);
+  const fraccao = (deslocado, folga) =>
+    folga > 0 ? Math.round((-(deslocado ?? 0) / folga) * 100) : 50;
+  const fx = fraccao(corte.cropOffsetLeft, largura - lado);
+  const fy = fraccao(corte.cropOffsetTop, altura - lado);
 
   return {
     h,
