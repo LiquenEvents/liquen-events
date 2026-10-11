@@ -306,8 +306,9 @@ type Cliente = NonNullable<ReturnType<typeof getSupabase>>;
 async function pastas(sb: Cliente, bucket: string): Promise<string[]> {
   const { data, error } = await sb.storage.from(bucket).list("", { limit: PAGINA });
   if (error) throw new Error(`${bucket}: ${error.message}`);
-  // Uma "pasta" no Storage é uma entrada sem `id`.
-  return (data ?? []).filter((e) => !e.id).map((e) => e.name);
+  // Uma "pasta" no Storage é uma entrada sem `id`. A `reciclagem` não é um
+  // tema: guarda fotos removidas, à espera de voltar (`reciclagem.ts`).
+  return (data ?? []).filter((e) => !e.id && e.name !== "reciclagem").map((e) => e.name);
 }
 
 /** Os ficheiros de uma pasta, paginados até ao fim. */

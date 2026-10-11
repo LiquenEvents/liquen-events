@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { apagarDeVez } from "@/lib/reciclagem";
+import { NaoDeuParaApagar, apagarDeVez } from "@/lib/reciclagem";
 import { log } from "@/lib/logger";
 
 /** «Apagar de vez»: a última cópia sai. Não há volta — o ecrã pergunta antes. */
@@ -17,6 +17,9 @@ export async function DELETE(
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof NaoDeuParaApagar) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     log.error("reciclagem DELETE falhou", err);
     return NextResponse.json({ error: "Não foi possível apagar de vez." }, { status: 500 });
   }

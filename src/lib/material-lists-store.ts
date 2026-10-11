@@ -82,7 +82,8 @@ export async function deleteList(id: string): Promise<void> {
 
 /** Para a Reciclagem: repor a lista tal e qual — com o MESMO id. As linhas
  *  voltam à parte (`reporLinha`). */
-export const reporList = (l: MaterialList): Promise<void> => repo.create(l);
+export const reporList = (l: MaterialList): Promise<void> =>
+  repo.create(l, { created_at: l.createdAt });
 
 /**
  * Duplica uma lista com as suas linhas, com ids NOVOS.

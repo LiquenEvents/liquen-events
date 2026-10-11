@@ -22,6 +22,7 @@ import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { textoDaRecusa, tituloDaRecusa } from "@/lib/erro-do-servidor";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar, useDepoisDeApagarVarios } from "./ui/depois-de-apagar";
 import { prepareImageWithThumb } from "./image-prep";
 import {
   Button,
@@ -273,12 +274,12 @@ export function fraseDeEliminar(
   const n = t.imageCount;
   const fotos =
     t.imageCount === null
-      ? "Desaparecem as fotografias que estiverem lá dentro."
+      ? "As fotografias que estiverem lá dentro vão com ele."
       : n === 0
-        ? "A pasta está vazia: não desaparece nenhuma fotografia."
+        ? "A pasta está vazia: não leva nenhuma fotografia."
         : n === 1 && !t.truncated
-          ? "Desaparece 1 fotografia."
-          : `Desaparecem ${n}${t.truncated ? "+" : ""} fotografias.`;
+          ? "Leva 1 fotografia com ele."
+          : `Leva ${n}${t.truncated ? "+" : ""} fotografias com ele.`;
   const frasePropostas =
     propostas === null
       ? "As propostas já feitas com estas fotos não são afectadas."
@@ -951,6 +952,8 @@ function useNoEcraAteSair<T>(aberto: boolean, aSair: boolean, valor: T | null): 
 export default function Temas() {
   const { toast } = useToast();
   const anular = useAnular();
+  // Eliminar um tema deixa-o 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagar = useDepoisDeApagar();
   // Sair da Biblioteca esquece o que o SELETOR de temas tinha guardado.
   //
   // Este ecrã é o único sítio onde a biblioteca muda — carregar, apagar,
@@ -1564,12 +1567,16 @@ export default function Temas() {
       reverter(porqueRebentou(oQue));
       return;
     }
+    const corpo = await res.json().catch(() => null);
     if (res.ok) {
       bibliotecaAlterada();
-      toast("Tema eliminado.", "success");
+      depoisDeApagar(corpo, `Tema «${t.name}» eliminado.`, () => {
+        restoreTheme(t);
+        bibliotecaAlterada();
+      });
       return;
     }
-    reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+    reverter(porqueFalhou(oQue, res, corpo));
   }
 
   /** Mantém o cartão do tema a par do que a pasta diz. A pasta é a fonte de
@@ -1817,7 +1824,7 @@ export default function Temas() {
                 {frasesDeEliminar.propostas}
               </span>
             )}
-            <span className="mt-3 block">Esta acção não pode ser anulada.</span>
+            <span className="mt-3 block">Fica 30 dias na Reciclagem, de onde pode voltar.</span>
           </>
         )
       }
@@ -3333,6 +3340,8 @@ function ThemeFolder({
 }) {
   const { toast } = useToast();
   const anular = useAnular();
+  // Remover fotos deixa-as 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagarVarios = useDepoisDeApagarVarios();
   /** As fotos JÁ CARREGADAS, mais recentes primeiro. É sempre um PREFIXO da
    *  lista do servidor — ver `nextOffset` abaixo. */
   const [images, setImages] = useState<ThemeImage[]>([]);
@@ -4351,6 +4360,9 @@ function ThemeFolder({
     bibliotecaAlterada();
 
     const errors: ThemeImage[] = [];
+    // As que saíram, e o que o servidor disse de cada uma: é daí que vem a
+    // entrada da Reciclagem para o «Anular».
+    const saidas: { im: ThemeImage; corpo: unknown }[] = [];
     /**
      * A primeira recusa que trouxe RESPOSTA — é ela que classifica a frase.
      *
@@ -4375,6 +4387,7 @@ function ThemeFolder({
           primeiraRecusa ??= res;
           throw new Error("falhou");
         }
+        saidas.push({ im, corpo: await res.json().catch(() => null) });
       } catch {
         errors.push(im);
       } finally {
@@ -4412,7 +4425,20 @@ function ThemeFolder({
       // prova a diferença é o ramo de cima — quando ele recusa, a foto volta ao
       // sítio onde estava. Sem esta frase, ver a foto sair não distingue «foi
       // removida» de «ainda vai a caminho».
-      toast(`${plural(targets.length, "foto removida", "fotos removidas")}.`, "success");
+      //
+      // E com «Anular» (R3b): as fotos ficam 30 dias na Reciclagem, e as que
+      // voltarem regressam ao sítio onde estavam na grelha.
+      depoisDeApagarVarios(
+        saidas.map((x) => x.corpo),
+        `${plural(targets.length, "foto removida", "fotos removidas")}.`,
+        (repostos) => {
+          if (!alive.current) return;
+          const voltaram = repostos.map((i) => saidas[i].im);
+          setImages((prev) => reinsertAt(prev, voltaram, positions));
+          setTotal((t) => (t === null ? null : t + voltaram.length));
+          bibliotecaAlterada();
+        },
+      );
     }
   }
 
@@ -6122,7 +6148,7 @@ function ThemeFolder({
               ? "Remover esta fotografia do tema?"
               : `Remover ${plural(aRemover.alvos.length, "fotografia", "fotografias")} de «${theme.name}»?`
         }
-        aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
+        aviso="As propostas já feitas com estas fotos não são afectadas. Ficam 30 dias na Reciclagem, de onde podem voltar."
         rotuloConfirmar={
           aRemover && aRemover.alvos.length > 1 ? "Remover as fotografias" : "Remover a fotografia"
         }

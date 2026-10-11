@@ -2,8 +2,11 @@
 -- R3 (tudo reversível, 10/10) — a Reciclagem de 30 dias
 -- ════════════════════════════════════════════════════════════════════════════
 --
--- NÃO APLICADA. Aplica-se só com a aprovação dela: colar este ficheiro no SQL
--- Editor do Supabase e correr. O mesmo bloco está em db/schema.sql.
+-- APLICADA a 11/10/2026 (00:51 UTC), com a aprovação dela («sim, aplica a
+-- migração da reciclagem»), pela ferramenta de migrações do Supabase — o mesmo
+-- SQL, sem o `begin`/`commit` (a ferramenta já corre numa transacção). Fica na
+-- lista de migrações do projecto como `r3_reciclagem`. O mesmo bloco está em
+-- db/schema.sql.
 --
 -- O que muda: apagar deixa de ser definitivo. Antes de apagar, o servidor
 -- guarda aqui um retrato do que se apaga (e do que cai com ele, como as regras

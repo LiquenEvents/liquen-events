@@ -109,4 +109,4 @@ export const deleteTask = (id: string): Promise<void> => repo.remove(id);
 /** Para a Reciclagem: ler uma, e repô-la tal e qual — com o MESMO id, que o
  *  `createTask` não deixa (gera sempre um novo, de propósito). */
 export const obterTarefa = (id: string): Promise<Task | null> => repo.get(id);
-export const reporTarefa = (t: Task): Promise<void> => repo.create(t);
+export const reporTarefa = (t: Task): Promise<void> => repo.create(t, { created_at: t.createdAt });

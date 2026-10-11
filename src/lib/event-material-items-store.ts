@@ -119,6 +119,9 @@ export const updateEventItem = (
 ): Promise<EventMaterialItem | null> => repo.update(id, patch);
 
 export const removeEventItem = (id: string): Promise<void> => repo.remove(id);
+export const obterEventItem = (id: string): Promise<EventMaterialItem | null> => repo.get(id);
+/** Volta da Reciclagem com o MESMO id. */
+export const reporEventItem = (l: EventMaterialItem): Promise<void> => repo.create(l);
 
 /**
  * Quantos apagamentos podem estar no ar ao mesmo tempo.

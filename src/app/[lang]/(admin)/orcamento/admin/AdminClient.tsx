@@ -94,6 +94,7 @@ import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
 import { diasDesde, eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar, useDepoisDeApagarVarios } from "./ui/depois-de-apagar";
 import { reporEstadoDoPedido } from "./anular-estado";
 import { useFocusTrap } from "./useFocusTrap";
 import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
@@ -1820,6 +1821,9 @@ export default function AdminClient({
   const barraDeDestinosRef = useRef<HTMLElement | null>(null);
   const { toast } = useToast();
   const anular = useAnular();
+  // Apagar um pedido deixa-o 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagar = useDepoisDeApagar();
+  const depoisDeApagarVarios = useDepoisDeApagarVarios();
   const searchRef = useRef<HTMLInputElement>(null);
   /**
    * Focus trap for the mobile detail drawer — active only while it's the overlay.
@@ -3993,10 +3997,11 @@ export default function AdminClient({
     setSelectedIds((prev) => new Set([...prev].filter((id) => !feitos.has(id))));
   }
 
-  // Permanently delete every selected pedido (hard delete, not archive). One
-  // confirm covers the whole batch; each id is DELETEd, then the successful
-  // ones are dropped from local state and the selection is cleared. Os `ids`
-  // são os que estão À VISTA — ver `applyBulkStatus`.
+  // Apaga cada pedido seleccionado — vão 30 dias para a Reciclagem, com um só
+  // «Anular» para todos (R3b). One confirm covers the whole batch; each id is
+  // DELETEd, then the successful ones are dropped from local state and the
+  // selection is cleared. Os `ids` são os que estão À VISTA — ver
+  // `applyBulkStatus`.
   function deleteSelected(ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
     // A pergunta NOMEIA-OS. «Apagar 12 pedidos?» é um número que não se
@@ -4021,7 +4026,7 @@ export default function AdminClient({
       const results = await Promise.all(
         ids.map((id) =>
           fetch(`/api/orcamento/${id}`, { method: "DELETE" })
-            .then((r) => (r.ok ? id : null))
+            .then(async (r) => (r.ok ? { id, corpo: await r.json().catch(() => null) } : null))
             .catch(() => null)
             // Ver `applyBulkStatus`: conta à passagem, sem serializar nada.
             .then((v) => {
@@ -4030,19 +4035,23 @@ export default function AdminClient({
             }),
         ),
       );
-      const removed = new Set(results.filter((x): x is string => x !== null));
+      const apagados = results.filter((x): x is { id: string; corpo: unknown } => x !== null);
+      const removed = new Set(apagados.map((x) => x.id));
       if (removed.size > 0) {
         setQuotes((prev) => prev.filter((q) => !removed.has(q.id)));
         setSelected((prev) => (prev && removed.has(prev.id) ? null : prev));
       }
       const ok = removed.size;
       const failed = ids.length - ok;
-      toast(
-        failed === 0
-          ? `${ok} pedido${ok !== 1 ? "s" : ""} apagado${ok !== 1 ? "s" : ""}`
-          : `${ok} apagado(s), ${failed} falhou(ram)`,
-        failed === 0 ? "success" : "error",
-      );
+      if (failed === 0) {
+        depoisDeApagarVarios(
+          apagados.map((x) => x.corpo),
+          `${ok} pedido${ok !== 1 ? "s" : ""} apagado${ok !== 1 ? "s" : ""}.`,
+          () => void revalidarPedidos(true),
+        );
+      } else {
+        toast(`${ok} apagado(s), ${failed} falhou(ram)`, "error");
+      }
       esquecerDaSeleccao(ids);
     } finally {
       setLote(null);
@@ -5890,7 +5899,7 @@ export default function AdminClient({
             onFechar={() => setAApagar(null)}
             titulo={`Apagar o pedido de ${aApagar?.name ?? ""}?`}
             oQueSePerde={oQueSePerdeComOPedido(aApagar)}
-            aviso="Não pode ser anulado. Para o tirar da lista sem o apagar, usa «Arquivar»."
+            aviso="Fica 30 dias na Reciclagem, de onde pode voltar. Para o tirar da lista sem o apagar, usa «Arquivar»."
             rotuloConfirmar="Apagar o pedido"
             onConfirmar={async () => {
               const alvo = aApagar;
@@ -5903,15 +5912,19 @@ export default function AdminClient({
                 toast(porqueRebentou(oQue).mensagem, "error");
                 return;
               }
+              const corpo = await res.json().catch(() => null);
               if (!res.ok) {
-                const corpo = await res.json().catch(() => null);
                 toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
                 return;
               }
               setQuotes((prev) => prev.filter((q) => q.id !== alvo.id));
               setSelected(null);
               setAApagar(null);
-              toast(`Pedido de ${alvo.name} apagado`, "success");
+              depoisDeApagar(
+                corpo,
+                `Pedido de ${alvo.name} apagado.`,
+                () => void revalidarPedidos(true),
+              );
             }}
           />
 
@@ -5925,7 +5938,7 @@ export default function AdminClient({
                saber se a selecção é a que pensa que é — e a única maneira de
                confirmar era cancelar e contar à mão. */
             oQueSePerde={nomesDoLote(aApagarLote)}
-            aviso="Não pode ser anulado."
+            aviso="Ficam 30 dias na Reciclagem, de onde podem voltar."
             rotuloConfirmar={`Apagar ${aApagarLote?.length ?? 0} pedido${
               (aApagarLote?.length ?? 0) === 1 ? "" : "s"
             }`}
@@ -7135,7 +7148,7 @@ export default function AdminClient({
                                   : []),
                                 {
                                   label: "Apagar pedido",
-                                  hint: "Ação definitiva — não pode ser anulada",
+                                  hint: "Fica 30 dias na Reciclagem",
                                   // A pergunta nomeia o pedido e enumera o que
                                   // vai atrás dele. Ver `PerguntaDestrutiva`.
                                   onClick: () => setAApagar(selected),

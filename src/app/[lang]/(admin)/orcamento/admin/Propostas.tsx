@@ -21,6 +21,7 @@ import { casaComAProcura } from "@/lib/procura";
 import { dataCurta } from "@/lib/data-curta";
 import { useAccoesDaPropostaEnviada } from "./accoesDaPropostaEnviada";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { reporEstadoDoPedido } from "./anular-estado";
 
 /**
@@ -236,6 +237,8 @@ export default function Propostas({
 }: Props) {
   const { toast } = useToast();
   const anular = useAnular();
+  // Apagar deixa a proposta 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagar = useDepoisDeApagar();
   const {
     accoesDe: accoesDaEnviada,
     botaoDe: botaoDaEnviada,
@@ -451,11 +454,12 @@ export default function Propostas({
         setActionBusy(null);
         return;
       }
-      if (!res.ok) reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
-      else toast("Proposta apagada.", "success");
+      const corpo = await res.json().catch(() => null);
+      if (!res.ok) reverter(porqueFalhou(oQue, res, corpo));
+      else depoisDeApagar(corpo, "Proposta apagada.", () => void retryLoad());
       setActionBusy(null);
     },
-    [setProposals, toast],
+    [setProposals, toast, depoisDeApagar, retryLoad],
   );
 
   /**
@@ -1082,7 +1086,7 @@ export default function Propostas({
         aberto={!!aApagar}
         onFechar={() => setAApagar(null)}
         titulo={`Apagar a proposta de ${aApagar?.nome ?? ""}?`}
-        aviso="Esta acção não pode ser anulada."
+        aviso="Fica 30 dias na Reciclagem, de onde pode voltar."
         rotuloConfirmar="Apagar a proposta"
         // Fecha primeiro e só depois age: a lista é optimista — a linha sai
         // logo e volta se o servidor recusar, com a frase a dizer de quem era.

@@ -339,3 +339,24 @@ describe("listProposalImages pagina a pasta", () => {
     );
   });
 });
+
+// ── A pasta de um pedido que saiu de vez da Reciclagem (R3b) ─────────────────
+describe("apagarPastaDoPedido", () => {
+  it("apaga os originais da pasta, e as mesmas nas derivadas", async () => {
+    st.objectos = [
+      { id: "1", name: "a.jpg" },
+      { id: "2", name: "b.jpg" },
+    ];
+    const { apagarPastaDoPedido } = await import("./proposal-storage");
+    expect(await apagarPastaDoPedido("LIQ-9")).toBe(true);
+    expect(st.listagens[0].prefixo).toBe("LIQ-9");
+    // Originais + miniaturas + médias + AVIF + capas: o mesmo caminho em cada.
+    expect(st.removed.filter((p) => p === "LIQ-9/a.jpg")).toHaveLength(5);
+  });
+
+  it("um id estranho não chega ao Storage", async () => {
+    const { apagarPastaDoPedido } = await import("./proposal-storage");
+    expect(await apagarPastaDoPedido("../")).toBe(false);
+    expect(st.listagens).toEqual([]);
+  });
+});

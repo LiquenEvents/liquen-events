@@ -33,8 +33,8 @@ volta atrás (a rota respondia 409).
 | **R1** — o padrão, os estados do pedido e a cadeia do Ganho, Propostas e Acompanhamento, Propostas Aceites, pagamentos, os dois envios | Feita no ramo `feat/anular-r1` |
 | **R2a** — a gaveta do pedido: os campos do «Guardar» e todas as listas | Feita (#188) |
 | **R2b** — o resto do back office, e os «Anular» antigos passam ao padrão | Feita no ramo `feat/anular-r2b` |
-| **R3a** — a Reciclagem: o motor, o ecrã, a limpeza diária, e tudo o que não tem fotografias | Feita no ramo `feat/reciclagem`. **A migração (`db/migracoes/20261010_r3_reciclagem.sql`) NÃO está aplicada** — só corre com a aprovação dela |
-| **R3b** — a Reciclagem do que tem fotografias: pedido, proposta, tema, foto de tema | Por fazer |
+| **R3a** — a Reciclagem: o motor, o ecrã, a limpeza diária, e tudo o que não tem fotografias | Feita (#193). **Ligada:** a migração (`db/migracoes/20261010_r3_reciclagem.sql`) foi aplicada a 11/10, com a aprovação dela |
+| **R3b** — a Reciclagem do que tem fotografias: pedido, proposta, tema, foto de tema | Feita no ramo `feat/reciclagem-fotos`. Usa a mesma tabela da R3a: **nenhuma migração nova** |
 
 **Onde a R1 se afastou do plano.** Apagar um pagamento ficou com «Anular» e
 **sem** pergunta de confirmação: o «Anular» repõe-no tal e qual, e uma pergunta
@@ -106,6 +106,44 @@ número de pessoas não levam «Anular»: desfazem-se no mesmo sítio, com o mes
 - **Fica como estava:** apagar um item de material que está numa lista base continua a
   ser recusado pelo Supabase (`on delete restrict`), como antes.
 
+**Na R3b (pedido, proposta, tema e foto de tema):**
+- **Pedido:** o retrato leva o pedido, as suas propostas, os quatro rascunhos do estúdio e o
+  material do evento com as linhas e o histórico (que no Supabase caem em cascata). Repor
+  devolve tudo com os mesmos ids **e com a data em que o pedido chegou** (`created_at`). Um
+  pedido com contrato continua a não se poder apagar (409, a mesma frase de antes).
+- **Proposta:** só volta para um pedido que exista; se o pedido também foi apagado, a frase
+  manda repô-lo primeiro.
+- **Tema:** antes de sair, as propostas que usam fotos dele ficam com a sua cópia, como já
+  ficavam. Sai a linha; **as fotos ficam na pasta**. Repor devolve a linha, e as fotos estão
+  onde sempre estiveram — mas as propostas continuam com as suas cópias. Não volta por cima
+  de outro tema com o mesmo nome.
+- **Foto de um tema:** sai da pasta para `theme-assets/reciclagem/<entrada>/<ficheiro>` com
+  um `move` (uma só chamada, atómica), e volta ao mesmo caminho. A miniatura e as outras
+  derivadas ficam onde estão; a linha da Biblioteca com as etiquetas nunca sai, e por isso
+  a foto volta com elas.
+- **Uma mudança ao plano, e porquê.** O plano dizia que as fotografias se mudavam todas
+  para `reciclagem/`. Só as da foto solta se mudam, porque essa vive dentro de um tema que
+  continua. A pasta de um **pedido** (`proposal-assets/<pedido>/`) e a de um **tema**
+  inteiro pertencem só à coisa apagada, e ninguém as mostra sem a linha: ficam no sítio 30
+  dias. Mudar centenas de ficheiros um a um no momento de apagar podia passar os 60 s da
+  função e deixar uma pasta a meio; assim, nem apagar nem repor tocam no Storage.
+- **A Biblioteca esconde** as fotos dos temas que estão na Reciclagem — a pasta continua no
+  Storage, e sem isto as fotos voltavam a aparecer lá.
+- **Os ficheiros só saem de vez com a entrada** («Apagar de vez», ou os 30 dias): a pasta do
+  pedido e as mesmas nas derivadas, a pasta do tema e as miniaturas, a foto guardada. Se o
+  Storage não confirmar, **a entrada fica** e tenta-se no dia seguinte — é a única
+  lembrança de que há uma pasta para apagar. A limpeza diária tem um tecto de 20 s; o que
+  não couber fica para amanhã.
+- **De passagem, na R3a:** tarefas, fornecedores, marcações e listas também voltam agora
+  com a data de criação de antes (repor punha a de hoje e mudava a ordem das listas).
+- **No ecrã:** apagar um pedido, vários pedidos, uma proposta, um tema, ou remover uma ou
+  várias fotos traz «Anular» — um só aviso por gesto, mesmo com vários. As perguntas
+  passaram de «Não pode ser anulado» a «Fica 30 dias na Reciclagem».
+- **Sem a migração**, os quatro fazem exactamente o que faziam: apagam de vez, fotografias
+  incluídas, e o aviso diz «Apagado de vez».
+- **Não verificado no browser:** temas e fotos. O servidor local não tem Storage (e já
+  não conseguia apagar um tema). Ficam cobertos por testes com o Storage simulado.
+
 **Ficou para a R3, e porquê:**
 - **Apagar material, listas, regras, fornecedores e tarefas.** O id tem de voltar igual,
   porque as listas base e as regras apontam para ele, e os POST de hoje ignoram um id
@@ -131,7 +169,7 @@ A coluna «Fase» diz quando passa a ter. ✅ = já tinha antes desta análise.
 | Guardar os campos da gaveta (estado, preço, data, convidados, local, contactos, responsável) | `AdminClient.tsx` | «Anular» repõe todos os campos que o gesto mudou | ✅ R1 (estado) · R2a (resto) |
 | Arquivar / Restaurar pedido | `AdminClient.tsx` | ✅ «Restaurar pedido» | — |
 | Duplicar / Novo pedido | `AdminClient.tsx`, `NewQuoteModal.tsx` | Arquivar ou apagar a cópia | R2 |
-| Apagar pedido (e em massa) | `AdminClient.tsx` | Reciclagem | R3b |
+| Apagar pedido (e em massa) | `AdminClient.tsx` | ✅ Reciclagem, e «Anular» logo a seguir | R3b |
 | Etiquetas (tirar), seguimento (atalhos), convidados, custos, guião, plano de produção | vários | «Anular» — gesto ao contrário, com a `base` | ✅ R2a |
 | Notas e motivo (gravam sozinhos ao escrever) | `AdminClient.tsx` | Anulam-se pelo «Guardar» quando vão nele; ao escrever, não — um aviso por tecla seria ruído | — |
 | Lista de verificação: remover, «Marcar todas» | `EventChecklist.tsx` | «Anular» da casa (era uma tira própria de 8 s) | ✅ R2a |
@@ -166,7 +204,7 @@ que caiu não é um engano.
 |---|---|---|
 | Aceitar / Recusar | «Anular» (e a cadeia do Ganho) | R1 |
 | Estado, motivo, seguimento, versão escolhida no Acompanhamento | «Anular» | R1 |
-| Apagar proposta | Reciclagem | R3b |
+| Apagar proposta | ✅ Reciclagem, e «Anular» logo a seguir | R3b |
 
 ### Propostas Aceites
 | Acção | Volta atrás | Fase |
@@ -197,7 +235,7 @@ que caiu não é um engano.
 | Temas: arquivar, fixar | ✅ «Anular» | R2b |
 | Temas: renomear (na lista e na pasta), capa, ordem das fotos | ✅ «Anular» | R2b |
 | Temas: etiquetas, fundir, «Mover/duplicar» por diálogo | Reciclagem | R3 |
-| Temas: remover fotos / apagar tema | Reciclagem (as fotos vão para `reciclagem/`) | R3b |
+| Temas: remover fotos / apagar tema | ✅ Reciclagem, e «Anular» logo a seguir (a foto vai para `reciclagem/`; a pasta de um tema inteiro fica no sítio) | R3b |
 | Modelos de email (bilingues) | ✅ 10 versões e «Repor» | — |
 | Modelos de email (editor clássico), definições da proposta, notas e meta da Visão Geral | ✅ «Anular» | R2b |
 | Repor cópia de segurança | ✅ guarda «antes do restauro» | — |

@@ -127,3 +127,5 @@ export const updateTheme = (
 ): Promise<ProposalTheme | null> => repo.update(id, patch);
 
 export const deleteTheme = (id: string): Promise<void> => repo.remove(id);
+/** Volta da Reciclagem com o MESMO id (o `createTheme` geraria outro). */
+export const reporTema = (t: ProposalTheme): Promise<void> => repo.create(t);
