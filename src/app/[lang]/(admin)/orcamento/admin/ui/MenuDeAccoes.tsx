@@ -279,8 +279,27 @@ export function MenuDeAccoes({
     const r = el.getBoundingClientRect();
     const abridor = abridorRef.current?.getBoundingClientRect();
     if (!abridor || r.height === 0) return;
-    const naoCabeEmBaixo = r.bottom > window.innerHeight - MARGEM_DA_JANELA;
-    const cabeEmCima = abridor.top - r.height - MARGEM_DA_JANELA > 0;
+    /**
+     * ── E A CAIXA QUE O CORTA ─────────────────────────────────────────────
+     *
+     * Virar para cima só olhava para a JANELA. Numa tabela (as Propostas, com
+     * oito acções por linha) o menu de uma linha perto do fundo virava-se, e a
+     * moldura da tabela — que recorta o que lhe sai de dentro — cortava-o por
+     * cima: via-se só o «Apagar». O limite é o mais apertado dos dois: a
+     * janela, ou a primeira caixa à volta que recorta.
+     */
+    let corte: DOMRect | null = null;
+    for (let a = caixaRef.current?.parentElement; a && a !== document.body; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (/(hidden|auto|scroll|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
+        corte = a.getBoundingClientRect();
+        break;
+      }
+    }
+    const fundo = Math.min(window.innerHeight, corte?.bottom ?? Infinity) - MARGEM_DA_JANELA;
+    const topo = Math.max(0, corte?.top ?? 0) + MARGEM_DA_JANELA;
+    const naoCabeEmBaixo = r.bottom > fundo;
+    const cabeEmCima = abridor.top - r.height - 4 >= topo;
     if (naoCabeEmBaixo && cabeEmCima) {
       el.style.top = "auto";
       el.style.bottom = "100%";

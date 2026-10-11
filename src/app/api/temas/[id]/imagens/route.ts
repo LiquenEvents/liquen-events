@@ -20,7 +20,7 @@ import {
   type ThemeImage,
 } from "@/lib/theme-types";
 import { isDatabaseConfigured } from "@/lib/supabase";
-import { apagarFotoDaBiblioteca } from "@/lib/theme-materializar";
+import { NaoDeuParaApagar, enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
 import { log } from "@/lib/logger";
 import { lqipAceitavel } from "@/lib/lqip";
 import { corNormalizada } from "@/lib/cor";
@@ -445,8 +445,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   return NextResponse.json({ ok: true, images: uploaded, duplicates });
 }
 
-/** Remove UMA foto do tema: `?path=<themeId>/<ficheiro>`. A miniatura sai com
- *  ela (melhor esforço — uma miniatura órfã nunca impede apagar a foto). */
+/** Remove UMA foto do tema: `?path=<themeId>/<ficheiro>`. Vai 30 dias para a
+ *  Reciclagem; sem ela, sai de vez com a miniatura (melhor esforço). */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -460,22 +460,16 @@ export async function DELETE(
     if (!isThemePath(path) || themeIdOfPath(path) !== themeFolder(id)) {
       return NextResponse.json({ error: "Caminho inválido." }, { status: 400 });
     }
-    // `apagarFotoDaBiblioteca` e não `deleteThemeImage`: uma foto escolhida
-    // para um mood board é REFERENCIADA, não copiada, por isso tem de ser posta
-    // a salvo antes de sair daqui. Ver `theme-materializar.ts`.
-    const { ok, motivo } = await apagarFotoDaBiblioteca(path);
-    if (!ok)
-      return NextResponse.json(
-        {
-          error:
-            motivo === "referencias"
-              ? "Esta foto é usada por uma proposta e não foi possível guardar lá uma cópia. A foto NÃO foi removida — tenta de novo."
-              : "Falha ao remover a imagem.",
-        },
-        { status: 502 },
-      );
-    return NextResponse.json({ ok: true });
+    // Pela Reciclagem (fase R3b de `docs/TUDO-REVERSIVEL.md`): a foto sai da
+    // pasta para `reciclagem/<entrada>/`, e volta ao mesmo caminho. Antes,
+    // como sempre, quem a referencia fica com a sua cópia — uma foto escolhida
+    // para um mood board é REFERENCIADA, não copiada (`theme-materializar.ts`).
+    const reciclagem = await enviarParaAReciclagem("foto-de-tema", path, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
+    if (err instanceof NaoDeuParaApagar) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return failed("temas imagens DELETE falhou", err, id);
   }
 }

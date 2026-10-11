@@ -114,13 +114,18 @@ const propostas = vi.hoisted(() => ({
 vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: propostas.getByQuote,
   updateProposal: propostas.update,
+  listProposalsForQuote: async () => (propostas.daQuote ? [propostas.daQuote] : []),
 }));
 const contratos = vi.hoisted(() => ({
   criar: vi.fn(async (c: Record<string, unknown>) => ({ created: true, contract: c })),
+  daProposta: null as null | Record<string, unknown>,
+  apagar: vi.fn(async (_id: string) => {}),
 }));
 vi.mock("@/lib/contracts-store", () => ({
   createContractIfAbsent: contratos.criar,
   newContractId: () => "contrato-novo",
+  getContractByProposal: async () => contratos.daProposta,
+  deleteContract: contratos.apagar,
 }));
 /**
  * O apagamento a sério vive em `apagar-pedido.ts` e tem os seus próprios
@@ -137,6 +142,30 @@ const apagamento = vi.hoisted(() => ({
   })),
 }));
 vi.mock("@/lib/apagar-pedido", () => ({ apagarPedidoSemContrato: apagamento.correr }));
+// Apagar passa pela Reciclagem (R3b, `src/lib/reciclagem.ts`, com testes
+// próprios). Aqui interessa a rota: a guarda, e as respostas de cada desfecho
+// do `apagarPedidoSemContrato` — que a Reciclagem devolve tal e qual.
+const reciclagem = vi.hoisted(() => {
+  class NaoDeuParaApagar extends Error {
+    constructor(
+      m: string,
+      readonly status: number,
+      readonly detalhe?: unknown,
+    ) {
+      super(m);
+    }
+  }
+  return { NaoDeuParaApagar };
+});
+vi.mock("@/lib/reciclagem", () => ({
+  NaoDeuParaApagar: reciclagem.NaoDeuParaApagar,
+  quemApagou: () => undefined,
+  enviarComDetalhe: async (_tipo: string, id: string) => {
+    const r = await (apagamento.correr as (id: string) => ReturnType<typeof apagamento.correr>)(id);
+    if (!r.apagado) throw new reciclagem.NaoDeuParaApagar("não", 0, r);
+    return { reciclagem: { id: "r1" }, detalhe: r };
+  },
+}));
 
 import { GET, PATCH, DELETE, POST } from "./route";
 import { corpoDaMarcacao, corpoDoMotivo } from "@/lib/orcamento/desfecho";
@@ -157,6 +186,7 @@ beforeEach(() => {
   rl.result = { ok: true };
   store.override = {};
   propostas.daQuote = null;
+  contratos.daProposta = null;
   vi.clearAllMocks();
 });
 
@@ -367,6 +397,7 @@ describe("DELETE /api/orcamento/[id]", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.contou).toEqual({ propostas: 2, fotos: 3, rascunhos: 1 });
+    expect(body.reciclagem).toEqual({ id: "r1" });
     expect(apagamento.correr).toHaveBeenCalledWith("LIQ-1");
   });
 
@@ -489,6 +520,19 @@ describe("PATCH /api/orcamento/[id] — o estado segue o que se registou", () =>
     store.override = { status: "em_revisao", contractRef: "" };
     await PATCH(req("PATCH", { contractRef: "2026-042" }), ctx("LIQ-1"));
     expect(gravado()).toMatchObject({ status: "aceite" });
+  });
+
+  /**
+   * As contagens da folha do guião (adultos, crianças, equipa) vinham do ecrã
+   * dos Guiões e eram deitadas fora aqui: o campo não estava na lista do que a
+   * rota aceita, e a resposta era um 200. O PDF do guião nunca as via.
+   */
+  it("grava as contagens da folha do guião", async () => {
+    authed.ok = true;
+    const folha = { adultos: "120", criancas: "8", staff: "14" };
+    const res = await PATCH(req("PATCH", { folhaDaTimeline: folha }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(gravado()).toMatchObject({ folhaDaTimeline: folha });
   });
 
   it("apagar a referência do contrato não desfaz nada", async () => {
@@ -1123,5 +1167,45 @@ describe("PATCH /api/orcamento/[id] — a base de uma lista inteira", () => {
       ctx("LIQ-1"),
     );
     expect(res.status).toBe(200);
+  });
+});
+
+describe("PATCH /api/orcamento/[id] — «Anular» um Ganho leva o que ele arrastou", () => {
+  /**
+   * «tem que haver no site todo, em tudo aquilo que se faz, uma forma de voltar
+   * atrás». Pôr em Ganho aceita a proposta e cria o contrato; o «Anular» do
+   * estado leva os dois de volta — e só o «Anular».
+   */
+  it("com desfazerGanho: a proposta volta a enviada e o contrato pendente sai", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    propostas.daQuote = proposta({ status: "aceite" });
+    contratos.daProposta = { id: "c-1", status: "pendente" };
+    const res = await PATCH(req("PATCH", { status: "cotado", desfazerGanho: true }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(propostas.update).toHaveBeenCalledWith("prop-1", { status: "enviada", respondedAt: "" });
+    expect(contratos.apagar).toHaveBeenCalledWith("c-1");
+  });
+
+  it("um contrato já marcado como assinado NÃO sai por arrasto", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    propostas.daQuote = proposta({ status: "aceite" });
+    contratos.daProposta = { id: "c-1", status: "aceite", registadoComo: "papel" };
+    await PATCH(req("PATCH", { status: "cotado", desfazerGanho: true }), ctx("LIQ-1"));
+    expect(contratos.apagar).not.toHaveBeenCalled();
+  });
+
+  it("sem desfazerGanho (o casamento caiu: Ganho → Perdido), nada se desfaz", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    propostas.daQuote = proposta({ status: "aceite" });
+    contratos.daProposta = { id: "c-1", status: "pendente" };
+    await PATCH(req("PATCH", { status: "cotado" }), ctx("LIQ-1"));
+    expect(contratos.apagar).not.toHaveBeenCalled();
+    expect(propostas.update).not.toHaveBeenCalledWith("prop-1", {
+      status: "enviada",
+      respondedAt: "",
+    });
   });
 });

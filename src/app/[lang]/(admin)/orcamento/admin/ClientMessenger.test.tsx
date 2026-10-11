@@ -46,6 +46,8 @@ const PORQUE =
 async function escreverEEnviar(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Mensagem ao cliente"), "Olá");
   await user.click(screen.getByRole("button", { name: /Enviar e-mail/ }));
+  // Os dez segundos para cancelar (ver `envio-adiado.ts`): aqui não se espera.
+  await user.click(screen.getByRole("button", { name: "Enviar já" }));
 }
 
 afterEach(() => {
@@ -154,5 +156,50 @@ describe("Mensageiro do cliente — quem fecha o email é a assinatura da casa",
   it("diz ao lado da caixa que a assinatura vai sozinha", () => {
     render(<ClientMessenger quote={QUOTE} />);
     expect(screen.getByText(/assinatura da Líquen/i)).toBeTruthy();
+  });
+});
+
+describe("Mensageiro do cliente — dez segundos para cancelar", () => {
+  /**
+   * «tem que haver no site todo, em tudo aquilo que se faz, uma forma de voltar
+   * atrás» — um email que saiu não volta, por isso espera antes de sair.
+   */
+  it("carregar em Enviar NÃO manda logo — mostra a contagem e «Cancelar»", async () => {
+    const pedido = vi.fn(async () => reply(200, { ok: true, emailed: true }));
+    vi.stubGlobal("fetch", pedido);
+    const user = userEvent.setup();
+    render(<ClientMessenger quote={QUOTE} />);
+    await user.type(screen.getByLabelText("Mensagem ao cliente"), "Olá");
+    await user.click(screen.getByRole("button", { name: /Enviar e-mail/ }));
+    expect(screen.getByText(/A enviar em 10 s/)).toBeTruthy();
+    expect(pedido).not.toHaveBeenCalled();
+  });
+
+  it("«Cancelar» não manda nada, e a mensagem fica escrita", async () => {
+    const pedido = vi.fn(async () => reply(200, { ok: true, emailed: true }));
+    vi.stubGlobal("fetch", pedido);
+    const user = userEvent.setup();
+    render(<ClientMessenger quote={QUOTE} />);
+    await user.type(screen.getByLabelText("Mensagem ao cliente"), "Olá");
+    await user.click(screen.getByRole("button", { name: /Enviar e-mail/ }));
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(pedido).not.toHaveBeenCalled();
+    expect((screen.getByLabelText("Mensagem ao cliente") as HTMLTextAreaElement).value).toBe("Olá");
+  });
+
+  it("passados os dez segundos, sai sozinha", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const pedido = vi.fn(async () => reply(200, { ok: true, emailed: true }));
+      vi.stubGlobal("fetch", pedido);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<ClientMessenger quote={QUOTE} />);
+      await user.type(screen.getByLabelText("Mensagem ao cliente"), "Olá");
+      await user.click(screen.getByRole("button", { name: /Enviar e-mail/ }));
+      await vi.advanceTimersByTimeAsync(10_500);
+      await waitFor(() => expect(pedido).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

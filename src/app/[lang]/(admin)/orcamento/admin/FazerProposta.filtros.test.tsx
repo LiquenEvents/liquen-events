@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import FazerProposta from "./FazerProposta";
@@ -80,14 +80,13 @@ afterEach(cleanup);
 
 describe("lista de pedidos — as etiquetas", () => {
   it("põe o estado antes do nome, e não ao lado dele", () => {
-    desenhar([pedido({ name: "Marta e Gonçalo", status: "em_revisao" })]);
+    desenhar([pedido({ name: "Marta e Gonçalo", status: "pendente" })]);
 
     const texto = cartao("Marta e Gonçalo").textContent ?? "";
-    expect(texto.indexOf("Aguardar resposta")).toBeGreaterThanOrEqual(0);
-    expect(
-      texto.indexOf("Aguardar resposta"),
-      "o estado tem de vir antes do nome no cartão",
-    ).toBeLessThan(texto.indexOf("Marta e Gonçalo"));
+    expect(texto.indexOf("Novo")).toBeGreaterThanOrEqual(0);
+    expect(texto.indexOf("Novo"), "o estado tem de vir antes do nome no cartão").toBeLessThan(
+      texto.indexOf("Marta e Gonçalo"),
+    );
   });
 
   it("põe «Data ocupada» à frente de tudo, incluindo do estado", () => {
@@ -117,12 +116,14 @@ describe("lista de pedidos — as etiquetas", () => {
 });
 
 /**
- * SÓ OS QUE AINDA NÃO TÊM PROPOSTA.
+ * SÓ OS NOVOS.
  *
  * Palavras dela, com a lista à frente: «quero que aqui o sistema retire as
- * propostas que já foram feitas e fique apenas as que ainda não se fizeram».
+ * propostas que já foram feitas e fique apenas as que ainda não se fizeram» — e
+ * depois, com um «Aguardar resposta» na captura: «mesmo para as que estão a
+ * aguardar resposta retira do fazer proposta».
  */
-describe("a lista mostra só o que está por fazer", () => {
+describe("a lista mostra só os pedidos novos", () => {
   const quotes = () => [
     pedido({ name: "Ana e Pedro", status: "pendente", date: "2027-03-01" }),
     pedido({ name: "Marta e Rui", status: "em_revisao", date: "2027-03-15" }),
@@ -131,55 +132,57 @@ describe("a lista mostra só o que está por fazer", () => {
     pedido({ name: "Sofia e Luís", status: "rejeitado", date: "2027-05-01" }),
   ];
 
-  it("os novos e os que aguardam resposta estão; enviados, ganhos e perdidos não", () => {
+  function desenharCom(over: Partial<Parameters<typeof FazerProposta>[0]> = {}) {
+    return render(
+      <FazerProposta
+        quotes={quotes()}
+        selectedId={null}
+        onSelect={() => {}}
+        onNovoPedido={() => {}}
+        onSent={() => {}}
+        onQuoteUpdated={() => {}}
+        onAbrirPedido={() => {}}
+        {...over}
+      />,
+    );
+  }
+
+  it("só os novos estão; a aguardar resposta, enviados, ganhos e perdidos não", () => {
     desenhar(quotes());
     expect(screen.getByRole("button", { name: /Ana e Pedro/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Marta e Rui/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Marta e Rui/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Rita e João/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Inês e Tiago/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Sofia e Luís/ })).toBeNull();
   });
 
-  it("a fila tem só «Por fazer», «Novo» e «Aguardar resposta», com as contagens", () => {
-    desenhar([...quotes(), pedido({ name: "Beatriz e Nuno", status: "pendente" })]);
-    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    const nomes = within(fila)
-      .getAllByRole("button")
-      .map((b) => b.textContent);
-    expect(nomes).toEqual(["Por fazer · 3", "Novo · 2", "Aguardar resposta · 1"]);
-  });
-
-  it("«Aguardar resposta» mostra só esses", async () => {
-    const u = userEvent.setup();
+  it("não há fila de filtros: com um estado só, não havia nada para escolher", () => {
     desenhar(quotes());
-    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    await u.click(within(fila).getByRole("button", { name: /Aguardar resposta/ }));
-    expect(screen.getByRole("button", { name: /Marta e Rui/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Ana e Pedro/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Filtrar por estado" })).toBeNull();
   });
 
-  it("as contagens são do que a procura deixou passar, não da lista toda", async () => {
-    const u = userEvent.setup();
-    desenhar([
-      pedido({ name: "Ana e Pedro", status: "pendente" }),
-      pedido({ name: "Beatriz e Nuno", status: "pendente" }),
-    ]);
-    await u.type(screen.getByRole("searchbox", { name: "Procurar cliente" }), "Ana");
-
-    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    expect(await within(fila).findByRole("button", { name: "Novo · 1" })).toBeTruthy();
+  it("o «à espera» do topo conta só os novos", () => {
+    desenhar([...quotes(), pedido({ name: "Beatriz e Nuno", status: "pendente" })]);
+    expect(screen.getByText("2 pedidos à espera.")).toBeTruthy();
   });
 
-  it("quando o filtro esvazia a lista, não manda criar um cliente que ela já tem", async () => {
+  /**
+   * O estado não volta sozinho a «Novo» quando o cliente responde — por isso a
+   * procura não se cala sobre quem está a aguardar resposta, e o botão é o
+   * caminho daqui para lhe fazer a proposta.
+   */
+  it("procurar quem aguarda resposta diz porquê, e deixa fazer a proposta na mesma", async () => {
     const u = userEvent.setup();
-    desenhar([pedido({ name: "Ana e Pedro", status: "pendente" })]);
-    const fila = screen.getByRole("group", { name: "Filtrar por estado" });
-    await u.click(within(fila).getByRole("button", { name: /^Aguardar resposta/ }));
-
-    expect(screen.getByText("Nada neste estado")).toBeTruthy();
-    expect(screen.queryByText("Ainda não há pedidos")).toBeNull();
-    await u.click(screen.getByRole("button", { name: "Ver os por fazer" }));
-    expect(screen.getByRole("button", { name: /Ana e Pedro/ })).toBeTruthy();
+    const escolher = vi.fn();
+    desenharCom({ onSelect: escolher });
+    await u.type(screen.getByRole("searchbox", { name: "Procurar cliente" }), "Marta");
+    expect(await screen.findByText("Marta e Rui está a aguardar resposta")).toBeTruthy();
+    expect(screen.queryByText("Ninguém com esse nome")).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Fazer a proposta na mesma" }));
+    // Abre ESSE pedido no estúdio (os ids nascem a cada `quotes()`, por isso
+    // compara-se pelo que a lista lhe deu: um só, e com a forma de um id).
+    expect(escolher).toHaveBeenCalledTimes(1);
+    expect(String(escolher.mock.calls[0][0])).toMatch(/^LQ-\d+$/);
   });
 
   /**
@@ -189,18 +192,7 @@ describe("a lista mostra só o que está por fazer", () => {
   it("procurar quem já tem proposta diz onde está, e leva a Propostas", async () => {
     const u = userEvent.setup();
     const irParaPropostas = vi.fn();
-    render(
-      <FazerProposta
-        quotes={quotes()}
-        selectedId={null}
-        onSelect={() => {}}
-        onNovoPedido={() => {}}
-        onSent={() => {}}
-        onQuoteUpdated={() => {}}
-        onAbrirPedido={() => {}}
-        onIrParaPropostas={irParaPropostas}
-      />,
-    );
+    desenharCom({ onIrParaPropostas: irParaPropostas });
     await u.type(screen.getByRole("searchbox", { name: "Procurar cliente" }), "Rita");
     expect(await screen.findByText("Rita e João já tem proposta")).toBeTruthy();
     expect(screen.getByText(/Está em «Proposta enviada»/)).toBeTruthy();

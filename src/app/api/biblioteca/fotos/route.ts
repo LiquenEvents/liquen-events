@@ -6,6 +6,7 @@ import { signThemePaths, signThemeThumbs } from "@/lib/theme-storage";
 import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import { isEixo, type Eixo } from "@/lib/biblioteca-types";
 import { porConfirmarSet, porFoto, responde, type Procura } from "@/lib/biblioteca-consulta";
+import { pastasDeTemasNaReciclagem } from "@/lib/reciclagem";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -69,12 +70,19 @@ export async function GET(request: NextRequest) {
   const inicio = inteiro(q.get("offset"), 0, 100_000);
 
   try {
-    const [fotos, ligacoes] = await Promise.all([listFotos(), listFotoEtiquetas()]);
+    const [fotos, ligacoes, naReciclagem] = await Promise.all([
+      listFotos(),
+      listFotoEtiquetas(),
+      pastasDeTemasNaReciclagem(),
+    ]);
     const etiquetasDe = porFoto(ligacoes);
     const adivinhadas = porConfirmarSet(ligacoes);
 
+    // Um tema na Reciclagem deixa a pasta no Storage durante 30 dias — e as
+    // fotos dele assinavam-se e voltavam a aparecer aqui. Não aparecem.
     const encontradas = fotos.filter(
       (f) =>
+        !naReciclagem.has(f.pasta) &&
         (!procura.pasta || f.pasta === procura.pasta) &&
         responde(etiquetasDe.get(f.path), procura, adivinhadas.has(f.path)),
     );

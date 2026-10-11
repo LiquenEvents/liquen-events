@@ -96,3 +96,6 @@ export const updateQuoteWith = (
     `archived` flag, still restorable and kept for the record) — this is a hard
     delete for junk/test leads and cannot be undone. */
 export const deleteQuote = (id: string): Promise<void> => repo.remove(id);
+/** Volta da Reciclagem com o MESMO id e a data em que chegou (`created_at`). */
+export const reporPedido = (q: Quote): Promise<void> =>
+  repo.create(q, { created_at: q.submittedAt });

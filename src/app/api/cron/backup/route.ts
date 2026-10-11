@@ -7,6 +7,8 @@ import { sendMail, MAIL_TO } from "@/lib/mail";
 import { construirManifesto, type ManifestoDeFotografias } from "@/lib/manifesto-de-fotografias";
 import { registarCopiaEnviada } from "@/lib/copia-de-seguranca-marcador";
 import { correrRetencao } from "@/lib/retencao";
+import { limparExpiradas } from "@/lib/reciclagem";
+import { isMissingTable } from "@/lib/repository";
 import { listQuotes } from "@/lib/quotes-store";
 import { log } from "@/lib/logger";
 import type { aquecerPdfsEmFalta } from "@/lib/aquecimento-de-pdf";
@@ -262,6 +264,36 @@ export async function GET(request: NextRequest) {
 
     /**
      * ══════════════════════════════════════════════════════════════════════
+     * A RECICLAGEM DOS 30 DIAS (fase R3 do «tudo reversível»)
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O que foi apagado há mais de 30 dias sai de vez. Aqui, e não num
+     * agendamento próprio, pela mesma razão da retenção: depois da cópia do
+     * dia, e sem apostar num plano de alojamento que não temos. Se falhar, a
+     * cópia seguiu na mesma — e amanhã tenta outra vez. Sem a tabela (a
+     * migração ainda não correu), não há nada para limpar.
+     */
+    let reciclagem: { apagadas: number; ficaram: number } | null = null;
+    try {
+      // 20 s: a função tem 60, e a cópia e a retenção já gastaram parte. O
+      // que não couber (uma pasta grande de fotos) fica para amanhã.
+      reciclagem = await limparExpiradas(new Date(), 50, 20_000);
+      if (reciclagem.ficaram > 0) {
+        log.warn("cron backup: há fotografias da Reciclagem que não saíram — fica para amanhã", {
+          dia,
+          ficaram: reciclagem.ficaram,
+        });
+      }
+    } catch (e) {
+      if (!isMissingTable(e)) {
+        log.error("cron backup: a limpeza da Reciclagem falhou (a cópia seguiu na mesma)", e, {
+          dia,
+        });
+      }
+    }
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
      * E, COM O TEMPO QUE SOBRAR, OS PDF DAS PROPOSTAS JÁ ENVIADAS
      * ══════════════════════════════════════════════════════════════════════
      *
@@ -315,6 +347,7 @@ export async function GET(request: NextRequest) {
           }
         : null,
       retencao,
+      reciclagem,
       aquecimento,
     });
   } catch (err) {

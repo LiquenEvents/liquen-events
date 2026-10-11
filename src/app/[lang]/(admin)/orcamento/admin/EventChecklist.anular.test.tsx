@@ -8,25 +8,20 @@ import type { ChecklistItem, Quote } from "@/lib/orcamento/types";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * A JANELA PARA ANULAR APARECE DE ALGUM SÍTIO — E NÃO SE FAZ ESPERAR
+ * O «ANULAR» DA CHECKLIST É O DA CASA — E COBRE MAIS GESTOS
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Apagar um item da checklist não pergunta nada: repõe-se com um toque. Essa
- * decisão só se aguenta enquanto a tira «… Anular» for boa — e ela é montagem
- * condicional pura, ou seja, existia ou não existia, com um fotograma entre os
- * dois estados. Numa lista onde uma linha ACABOU de desaparecer, uma caixa a
- * materializar-se por cima lê-se como mais um salto.
+ * Palavras dela, a 10/10: «tem que haver no site todo, em tudo aquilo que se
+ * faz, uma forma de voltar atrás». A checklist tinha uma tira própria de oito
+ * segundos, só para remover e «Marcar todas». Passou ao aviso comum
+ * (`ui/anular.ts`, 10 s), e ganharam «Anular» também «Limpar concluídas»,
+ * «Gerar», os itens do modelo e o editar.
  *
- * ── O QUE ESTE FICHEIRO GUARDA, POR ORDEM DE IMPORTÂNCIA ──────────────────
- *
- *  1. Que o «Anular» está CLICÁVEL no primeiro fotograma. Esta é a única
- *     forma de desfazer; uma animação que a atrase — ou pior, uma saída com
- *     `pointer-events: none` — transforma o desfazer num alvo que se vê e não
- *     se acerta. É a regra da casa no sítio onde ela é mais dura.
- *  2. Que a entrada é a palavra da casa e a distância certa: `.bo-entrada`
- *     nua, quatro píxeis de RÓTULO. Uma `.bo-entrada-folha` aqui seria dizer
- *     que isto vem de fora do painel, e não vem.
- *  3. Que ninguém lhe acrescenta uma saída sem ler a razão por que não a tem.
+ * O que se prende aqui:
+ *  1. o «Anular» repõe a lista INTEIRA de antes, com a `base` da gravação;
+ *  2. «Limpar concluídas» — a única que pergunta — também se anula depois;
+ *  3. quando outra pessoa mexeu entretanto (409), o «Anular» não pisa o
+ *     trabalho dela e NÃO diz «Anulado.».
  */
 
 function resposta(status: number, body: unknown = { ok: true }) {
@@ -39,27 +34,30 @@ function resposta(status: number, body: unknown = { ok: true }) {
 }
 
 const ITENS: ChecklistItem[] = [
-  { id: "c1", label: "Confirmar catering", done: false },
+  { id: "c1", label: "Confirmar catering", done: true },
   { id: "c2", label: "Reservar transporte", done: false },
+  { id: "c3", label: "Levar extensões", done: true },
 ];
 
-function montar() {
+let corpos: { checklist: ChecklistItem[]; base?: { checklist: ChecklistItem[] } }[] = [];
+
+function montar(fetchImpl?: (n: number) => Response) {
+  corpos = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      corpos.push(JSON.parse(String(init?.body ?? "{}")));
+      return fetchImpl ? fetchImpl(corpos.length) : resposta(200);
+    }),
+  );
   return render(
     <ToastProvider>
-      <EventChecklist quote={{ id: "q1", checklist: ITENS } as Quote} onChange={() => {}} />
+      <EventChecklist
+        quote={{ id: "q1", category: "particulares", checklist: ITENS } as Quote}
+        onChange={() => {}}
+      />
     </ToastProvider>,
   );
-}
-
-/**
- * A tira, e não a região de avisos do `ToastProvider` — que também é um
- * `role="status"` e está sempre montada. Procura-se pelo TEXTO do gesto, que é
- * o que distingue as duas coisas.
- */
-function tiraDeAnular(): HTMLElement {
-  const no = screen.getByText(/saiu da checklist/).closest('[role="status"]');
-  if (!no) throw new Error("a tira de anular não montou");
-  return no as HTMLElement;
 }
 
 afterEach(() => {
@@ -67,67 +65,55 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("a tira de anular da checklist", () => {
-  it("entra com a palavra da casa, à distância de um rótulo", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => resposta(200)),
-    );
+describe("«Anular» na checklist", () => {
+  it("remover: o aviso tem «Anular», e repõe a linha no sítio com a base certa", async () => {
     const user = userEvent.setup();
     montar();
+    await user.click(screen.getByRole("button", { name: "Remover Reservar transporte" }));
+    expect(await screen.findByText(/«Reservar transporte» saiu da checklist/)).toBeTruthy();
 
-    expect(screen.queryByText(/saiu da checklist/)).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Remover Confirmar catering" }));
-
-    const tira = await waitFor(tiraDeAnular);
-    expect(tira.className, "a tira ainda monta de repente, sem vir de sítio nenhum").toContain(
-      "bo-entrada",
-    );
-    // Quatro píxeis, e não oito: isto nasce dentro do painel, não é uma folha
-    // do telemóvel nem um aviso do canto do ecrã.
-    expect(tira.className, "a distância de uma folha num rótulo").not.toContain("bo-entrada-folha");
-    expect(tira.className).not.toContain("bo-entrada-fundo");
-  });
-
-  it("e o «Anular» está clicável no primeiro fotograma — a animação não o atrasa", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => resposta(200)),
-    );
-    const user = userEvent.setup();
-    montar();
-
-    await user.click(screen.getByRole("button", { name: "Remover Confirmar catering" }));
-    const tira = await waitFor(tiraDeAnular);
-
-    // A tira está a ANIMAR neste instante (a classe está lá) e mesmo assim o
-    // botão responde: nada de `pointer-events`, nada de atraso, nada de estado
-    // intermédio. É a diferença entre uma entrada e uma espera.
-    expect(tira.className).toContain("bo-entrada");
     const anular = screen.getByRole("button", { name: "Anular" });
     expect(anular).not.toBeDisabled();
     await user.click(anular);
 
-    await waitFor(() => expect(screen.getByText("Confirmar catering")).toBeTruthy());
-    expect(screen.queryByText(/saiu da checklist/)).toBeNull();
+    await waitFor(() => expect(corpos.length).toBe(2));
+    expect(corpos[1].checklist.map((i) => i.label)).toEqual([
+      "Confirmar catering",
+      "Reservar transporte",
+      "Levar extensões",
+    ]);
+    // A base do «Anular» é a lista que a remoção deixou — é contra ela que o
+    // servidor confere se alguém mexeu pelo meio.
+    expect(corpos[1].base?.checklist.map((i) => i.id)).toEqual(["c1", "c3"]);
+    expect(await screen.findByText("Anulado.")).toBeTruthy();
   });
 
-  it("e não ganhou saída — que aqui seria um alvo que se vê e não se acerta", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => resposta(200)),
-    );
+  it("«Limpar concluídas» pergunta, e depois ainda se anula", async () => {
     const user = userEvent.setup();
     montar();
+    await user.click(screen.getByRole("button", { name: /Limpar concluídas/i }));
+    await user.click(await screen.findByRole("button", { name: /Remover as 2/i }));
+    await waitFor(() => expect(corpos.length).toBe(1));
+    expect(corpos[0].checklist.map((i) => i.id)).toEqual(["c2"]);
 
-    await user.click(screen.getByRole("button", { name: "Remover Confirmar catering" }));
-    const tira = await waitFor(tiraDeAnular);
-    // A `.bo-saida` larga os toques dentro da própria classe, durante 200 ms.
-    // Numa tira que se some sozinha ao fim de oito segundos, essa janela cai
-    // exactamente no instante em que alguém se decide a carregar.
-    expect(
-      tira.className,
-      "a tira de anular ganhou uma saída — ver a nota no ficheiro",
-    ).not.toMatch(/\bbo-saida\b/);
+    expect(await screen.findByText(/2 concluídas removidas/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Anular" }));
+    await waitFor(() => expect(corpos.length).toBe(2));
+    expect(corpos[1].checklist.map((i) => i.id)).toEqual(["c1", "c2", "c3"]);
+  });
+
+  it("se a checklist mudou noutro sítio, o «Anular» não a pisa e não diz «Anulado.»", async () => {
+    const user = userEvent.setup();
+    const doServidor: ChecklistItem[] = [{ id: "x", label: "Da colega", done: false }];
+    montar((n) =>
+      n === 1 ? resposta(200) : resposta(409, { current: { checklist: doServidor } }),
+    );
+    await user.click(screen.getByRole("button", { name: "Remover Reservar transporte" }));
+    await screen.findByText(/saiu da checklist/);
+    await user.click(screen.getByRole("button", { name: "Anular" }));
+
+    expect(await screen.findByText(/foi alterada noutro sítio/)).toBeTruthy();
+    expect(screen.getByText("Da colega")).toBeTruthy();
+    expect(screen.queryByText("Anulado.")).toBeNull();
   });
 });

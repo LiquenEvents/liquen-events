@@ -75,3 +75,6 @@ export const updateItem = (id: string, patch: Partial<PropItem>): Promise<PropIt
   repo.update(id, patch);
 
 export const deleteItem = (id: string): Promise<void> => repo.remove(id);
+
+/** Para a Reciclagem: repor um item tal e qual — com o MESMO id. */
+export const reporItem = (i: PropItem): Promise<void> => repo.create(i);

@@ -31,6 +31,7 @@ import {
 import BibliotecaServicos, { guardarNaBiblioteca } from "./BibliotecaServicos";
 import CaixaInglesa from "./CaixaInglesa";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
 /**
@@ -310,12 +311,15 @@ export default function ServicesEditor({
     },
     [toast],
   );
-  const [removal, setRemoval] = useState<{
-    label: string;
-    groups: Groups;
-    focus: FocusTarget;
-  } | null>(null);
-  const removalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** O «Anular» da casa (`ui/anular.ts`, 10 s). Era uma barra própria de 5 s,
+   *  fixa no canto; passou ao aviso comum para ser igual em todo o lado. */
+  const anular = useAnular();
+  /** Os grupos de AGORA — o «Anular» corre segundos depois do gesto, e a
+   *  fotografia que guarda para o Cmd+Z tem de ser a do momento em que toca. */
+  const gruposAgora = useRef(groups);
+  useEffect(() => {
+    gruposAgora.current = groups;
+  });
 
   // A MESMA função de ref por chave: uma função nova a cada render faria o React
   // desligar e religar todos os campos em cada tecla escrita.
@@ -350,12 +354,6 @@ export default function ServicesEditor({
     }
   });
 
-  useEffect(() => {
-    return () => {
-      if (removalTimer.current) clearTimeout(removalTimer.current);
-    };
-  }, []);
-
   // Rascunhos antigos (e os que vêm do servidor) não têm ids. Preenche-os pela
   // POSIÇÃO — os mesmos que o render já usou como chave, por isso nenhuma linha
   // troca de identidade neste passo.
@@ -386,28 +384,26 @@ export default function ServicesEditor({
     if (!prev) return;
     pendingFocus.current = prev.focus ? { ...prev.focus, caret: "end" } : null;
     onGroupsChange(() => prev.groups);
-    setRemoval(null);
   }, [onGroupsChange]);
 
-  /** Anuncia uma remoção com o caminho de volta à vista durante 5 s. */
-  const announceRemoval = useCallback((label: string, before: Groups, focus: FocusTarget) => {
-    setRemoval({ label, groups: before, focus });
-    if (removalTimer.current) clearTimeout(removalTimer.current);
-    removalTimer.current = setTimeout(() => setRemoval(null), 5000);
-  }, []);
-
-  const undoRemoval = useCallback(() => {
-    if (!removal) return;
-    // Volta à fotografia DESTA remoção (e não simplesmente ao topo da pilha),
-    // que é o que o texto do aviso promete.
-    undoStack.current.push({
-      groups,
-      focus: activeKey.current ? { key: activeKey.current } : null,
-    });
-    pendingFocus.current = removal.focus ? { ...removal.focus, caret: "end" } : null;
-    onGroupsChange(() => removal.groups);
-    setRemoval(null);
-  }, [removal, groups, onGroupsChange]);
+  /**
+   * Anuncia uma remoção com o caminho de volta: «Anular» repõe a fotografia
+   * DESTA remoção (e não simplesmente o topo da pilha), que é o que o texto do
+   * aviso promete — e guarda o estado de agora na pilha, para o Cmd+Z o desfazer.
+   */
+  const announceRemoval = useCallback(
+    (label: string, before: Groups, focus: FocusTarget) => {
+      anular(label, () => {
+        undoStack.current.push({
+          groups: gruposAgora.current,
+          focus: activeKey.current ? { key: activeKey.current } : null,
+        });
+        pendingFocus.current = focus ? { ...focus, caret: "end" } : null;
+        onGroupsChange(() => before);
+      });
+    },
+    [anular, onGroupsChange],
+  );
 
   // Chaves de foco com o MESMO id de recurso que o render usa — incluindo o
   // derivado da posição, para um rascunho antigo (ainda sem ids) não ficar com
@@ -1115,24 +1111,6 @@ export default function ServicesEditor({
       <button type="button" className={`${ADD_BTN} mt-3`} onClick={addGroup}>
         + Adicionar grupo de serviços
       </button>
-
-      {/* Barra de anulação — FIXA, para aparecer e desaparecer sem mexer uma
-          linha do formulário. Fica à esquerda; os toasts do estúdio à direita. */}
-      {removal && (
-        <div
-          role="status"
-          className="fixed bottom-6 left-6 z-[80] flex items-center gap-3 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-4 py-3 text-sm shadow-[var(--bo-sombra-suspensa)] shadow-black/10"
-        >
-          <span className="text-[var(--bo-tinta-72)]">{removal.label}</span>
-          <button
-            type="button"
-            onClick={undoRemoval}
-            className={`font-medium text-sage-600 underline underline-offset-2 hover:text-[var(--bo-accent-hover)] ${ESTADO} ${PRESSAO}`}
-          >
-            Anular
-          </button>
-        </div>
-      )}
     </div>
   );
 }

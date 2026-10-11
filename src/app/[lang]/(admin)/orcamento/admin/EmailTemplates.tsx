@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { SkeletonList } from "./Skeleton";
 import { Button, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -204,6 +205,7 @@ function modelosComRascunho(chaves: string[]): Set<string> {
 
 function EditorClassico() {
   const { toast } = useToast();
+  const anular = useAnular();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   /**
@@ -376,6 +378,12 @@ function EditorClassico() {
     () => templates.find((t) => t.key === selectedKey) ?? null,
     [templates, selectedKey],
   );
+  /** Qual está aberto AGORA — o «Anular» corre dez segundos depois, e a
+   *  `selectedKey` que ele fecharia é a desse instante, não a de agora. */
+  const chaveAberta = useRef(selectedKey);
+  useEffect(() => {
+    chaveAberta.current = selectedKey;
+  }, [selectedKey]);
 
   const effectiveBody = computeBody(mode, doc, htmlBody);
   const dirty = selected ? subject !== selected.subject || effectiveBody !== baselineBody : false;
@@ -654,6 +662,7 @@ function EditorClassico() {
 
   async function save() {
     if (!selected || saving) return;
+    const antes = selected;
     if (!subject.trim()) {
       toast("O assunto não pode ficar vazio.", "error");
       return;
@@ -702,7 +711,30 @@ function EditorClassico() {
         next.delete(saved.key);
         return next;
       });
-      toast("Modelo guardado.", "success");
+      // O «Anular» publica outra vez a versão de antes deste «Guardar», e o
+      // editor volta a ela se o modelo ainda estiver aberto.
+      anular(`Modelo «${antes.name}» guardado.`, async () => {
+        const { ok: voltou, corpo: reposto } = await gravar(
+          `repor o modelo «${antes.name}» como estava`,
+          "/api/email-templates",
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              key: antes.key,
+              name: antes.name,
+              subject: antes.subject,
+              body: antes.body,
+            }),
+          },
+        );
+        if (!voltou) return false;
+        const t = reposto as EmailTemplate | null;
+        const ficou = t && typeof t.key === "string" ? t : antes;
+        setTemplates((prev) => prev.map((x) => (x.key === ficou.key ? ficou : x)));
+        if (chaveAberta.current === ficou.key) abrirOPublicado(ficou);
+        return true;
+      });
     } finally {
       setSaving(false);
     }

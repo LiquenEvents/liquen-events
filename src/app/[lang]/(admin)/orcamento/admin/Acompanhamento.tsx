@@ -11,6 +11,8 @@ import {
 import { opcionaisDe } from "@/lib/orcamento/versoes-da-proposta";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
+import { reporEstadoDoPedido } from "./anular-estado";
 import { Button, Card, EmptyState } from "./ui";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { useCachedList } from "./useCachedList";
@@ -191,6 +193,7 @@ export default function Acompanhamento({
     refresh,
   } = useCachedList<PropostaLeve[]>("propostas-leves", "/api/propostas?semDoc=1");
   const { toast } = useToast();
+  const anular = useAnular();
   const [aGravar, setAGravar] = useState<string | null>(null);
   /** Qual das linhas está com o formulário de "porque é que se perdeu" aberto. */
   const [aRecusar, setARecusar] = useState<string | null>(null);
@@ -279,6 +282,11 @@ export default function Acompanhamento({
        * na linha que falhou. Guardamos essa linha (e só essa) para a repor.
        */
       const linhaAntes = (propostas ?? []).find((p) => p.id === id);
+      // O pedido como estava ANTES — se este gesto o puser em Ganho, é para
+      // aqui que o «Anular» o devolve.
+      const pedidoAntes = linhaAntes
+        ? quotes.find((q) => q.id === linhaAntes.quoteId)?.status
+        : undefined;
       setData((prev) => (prev ?? []).map((p) => (p.id === id ? { ...p, ...paraOEcra } : p)));
       const reverter = (falha: Falha) => {
         setData((prev) => (prev ?? []).map((p) => (p.id === id && linhaAntes ? linhaAntes : p)));
@@ -321,12 +329,47 @@ export default function Acompanhamento({
         const actualizada = paraLeve(corpo as Proposal);
         setData((prev) => (prev ?? []).map((p) => (p.id === id ? actualizada : p)));
         if (pedidoMovido) onQuoteAtualizado?.(pedidoMovido);
-        toast(comoDizer, "success");
+        if (!linhaAntes) {
+          toast(comoDizer, "success");
+          return;
+        }
+        /**
+         * ── E VOLTA ATRÁS ─────────────────────────────────────────────────
+         * Palavras dela: «tem que haver no site todo, em tudo aquilo que se
+         * faz, uma forma de voltar atrás». O «Anular» grava os campos que este
+         * gesto mexeu tal como estavam, e, se o pedido foi para Ganho, põe-no
+         * de volta (com o contrato pendente que isso criou).
+         */
+        const inverso = Object.fromEntries(
+          Object.keys(patch).map((k) => [
+            k,
+            (linhaAntes as unknown as Record<string, unknown>)[k] ??
+              (k === "respondedAt" ? "" : null),
+          ]),
+        );
+        anular(comoDizer, async () => {
+          if (pedidoMovido && pedidoAntes && pedidoAntes !== pedidoMovido.status) {
+            const reposto = await reporEstadoDoPedido({
+              quoteId: pedidoMovido.id,
+              de: pedidoAntes,
+              para: pedidoMovido.status,
+            });
+            if (reposto) onQuoteAtualizado?.(reposto);
+          }
+          const r = await fetch(`/api/propostas/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(inverso),
+          });
+          if (!r.ok) throw new Error("Não foi possível repor a proposta.");
+          const reposta = paraLeve((await r.json()) as Proposal);
+          setData((prev) => (prev ?? []).map((p) => (p.id === id ? reposta : p)));
+        });
       } finally {
         setAGravar(null);
       }
     },
-    [propostas, setData, toast, onQuoteAtualizado],
+    [propostas, quotes, setData, toast, anular, onQuoteAtualizado],
   );
 
   // Este ecrã EXISTE para dizer o que está por responder. Uma leitura que

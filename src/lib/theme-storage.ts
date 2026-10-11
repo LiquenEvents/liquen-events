@@ -1229,6 +1229,121 @@ export async function deleteThemeImage(path: string): Promise<boolean> {
   return true;
 }
 
+// ── A Reciclagem (fase R3b de `docs/TUDO-REVERSIVEL.md`) ──────────────────
+//
+// Uma foto removida de um tema que CONTINUA vivo tem de sair da pasta: a pasta
+// é a fonte da verdade do que o tema mostra. Vai para `reciclagem/<entrada>/`
+// no mesmo bucket, com `move` — atómico por foto, como o `transferThemeImage`.
+// A miniatura e as outras derivadas ficam onde estão: nada as lista sem o
+// original, e ao repor a foto volta ao MESMO caminho e reencontra-as.
+//
+// O caminho na Reciclagem tem dois níveis, de propósito: o `isThemePath` só
+// aceita um, e portanto nenhuma porta de temas lhe chega por engano.
+
+/** A pasta, à raiz do bucket das fotos, onde esperam as fotos removidas. */
+export const PASTA_DA_RECICLAGEM = "reciclagem";
+
+/** `reciclagem/<entrada>/<ficheiro>`, ou `null` se algum dos dois for estranho. */
+export function caminhoNaReciclagem(path: string, entradaId: string): string | null {
+  if (!isThemePath(path) || !/^[a-zA-Z0-9-]{1,64}$/.test(entradaId)) return null;
+  return `${PASTA_DA_RECICLAGEM}/${entradaId}/${path.slice(path.indexOf("/") + 1)}`;
+}
+
+const naReciclagemValido = (c: string) =>
+  /^reciclagem\/[a-zA-Z0-9-]{1,64}\/[a-zA-Z0-9_-]+\.(jpe?g|png|webp)$/.test(c);
+
+/** Tira uma foto do tema para a Reciclagem. `true` se o Storage a mudou. */
+export async function levarFotoParaAReciclagem(path: string, destino: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb || !isThemePath(path) || !naReciclagemValido(destino)) return false;
+  if (!(await ensureBucket(THEME_BUCKET))) return false;
+  try {
+    const { error } = await sb.storage.from(THEME_BUCKET).move(path, destino);
+    if (error) {
+      log.error("theme-storage: foto não foi para a Reciclagem", error, { path });
+      return false;
+    }
+  } catch (e) {
+    log.error("theme-storage: foto não foi para a Reciclagem", e, { path });
+    return false;
+  }
+  invalidateThemeCount(themeIdOfPath(path));
+  forgetThemeFingerprints(themeIdOfPath(path));
+  return true;
+}
+
+/**
+ * Devolve a foto ao tema, no MESMO caminho.
+ *  · `"ok"`     — voltou;
+ *  · `"existe"` — já há uma foto com aquele nome no tema (a mesma, carregada
+ *                 outra vez): não se pisa;
+ *  · `"falhou"` — o Storage recusou, e a foto continua na Reciclagem.
+ */
+export async function trazerFotoDaReciclagem(
+  path: string,
+  origem: string,
+): Promise<"ok" | "existe" | "falhou"> {
+  const sb = getSupabase();
+  if (!sb || !isThemePath(path) || !naReciclagemValido(origem)) return "falhou";
+  try {
+    const { error } = await sb.storage.from(THEME_BUCKET).move(origem, path);
+    if (error) {
+      if (isAlreadyExists(error)) return "existe";
+      log.error("theme-storage: foto não voltou da Reciclagem", error, { path });
+      return "falhou";
+    }
+  } catch (e) {
+    log.error("theme-storage: foto não voltou da Reciclagem", e, { path });
+    return "falhou";
+  }
+  invalidateThemeCount(themeIdOfPath(path));
+  forgetThemeFingerprints(themeIdOfPath(path));
+  return "ok";
+}
+
+/** Há uma foto neste caminho? `null` quando não se conseguiu saber. */
+export async function fotoExisteNoTema(path: string): Promise<boolean | null> {
+  const sb = getSupabase();
+  if (!sb || !isThemePath(path)) return null;
+  const pasta = path.slice(0, path.indexOf("/"));
+  const nome = path.slice(path.indexOf("/") + 1);
+  try {
+    const { data, error } = await sb.storage
+      .from(THEME_BUCKET)
+      .list(pasta, { limit: 100, search: nome });
+    if (error || !data) return null;
+    return data.some((o) => o.name === nome);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A foto sai de vez da Reciclagem (ao fim dos 30 dias, ou «Apagar de vez»).
+ *
+ * As derivadas só saem se a foto NÃO tiver voltado ao tema entretanto: o
+ * mesmo ficheiro carregado outra vez tem o mesmo nome (a impressão digital), e
+ * a miniatura que ficou é já a dela. `true` quando o original guardado saiu;
+ * sem Storage não há nada guardado, e também é `true`.
+ */
+export async function largarFotoDaReciclagem(path: string, guardada: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return true;
+  if (!naReciclagemValido(guardada)) return false;
+  try {
+    const { error } = await sb.storage.from(THEME_BUCKET).remove([guardada]);
+    if (error) {
+      log.error("theme-storage: foto da Reciclagem não saiu", error, { guardada });
+      return false;
+    }
+  } catch (e) {
+    log.error("theme-storage: foto da Reciclagem não saiu", e, { guardada });
+    return false;
+  }
+  if ((await fotoExisteNoTema(path)) === false) await removeThumbs([path]);
+  return true;
+}
+
 /**
  * Esvazia a pasta de um tema (usado ao eliminar o tema).
  *

@@ -22,9 +22,19 @@ import MaterialListas from "./MaterialListas";
  *    o crítico que tinha.
  */
 
-const avisos = vi.hoisted(() => ({ ditos: [] as string[] }));
+const avisos = vi.hoisted(() => ({
+  ditos: [] as string[],
+  accao: undefined as { rotulo: string; aoTocar: () => void } | undefined,
+}));
 vi.mock("./Toast", () => ({
-  useToast: () => ({ toast: (texto: string) => avisos.ditos.push(texto) }),
+  useToast: () => ({
+    // A acção do aviso (o «Anular» da casa, `ui/anular.ts`) fica guardada para
+    // o teste a poder tocar, como ela tocaria.
+    toast: (texto: string, _tipo?: string, accao?: { rotulo: string; aoTocar: () => void }) => {
+      avisos.ditos.push(texto);
+      if (accao) avisos.accao = accao;
+    },
+  }),
 }));
 
 const LISTAS = {
@@ -73,6 +83,7 @@ function servidor() {
 
 beforeEach(() => {
   avisos.ditos = [];
+  avisos.accao = undefined;
   escritas = [];
   vi.stubGlobal("fetch", servidor());
 });
@@ -146,17 +157,20 @@ describe("Listas base — remover uma linha anula-se", () => {
     await waitFor(() =>
       expect(escritas.some((e) => (e.corpo as { remover?: string })?.remover === "l1")).toBe(true),
     );
-    // E a janela para voltar atrás, encostada à lista, a nomear a linha.
-    const tira = await screen.findByRole("status");
-    expect(within(tira).getByText(/«Escadote» saiu de «Essenciais de carrinha»/i)).toBeTruthy();
-    expect(within(tira).getByRole("button", { name: /^Anular$/i })).toBeTruthy();
+    // E o «Anular» da casa (`ui/anular.ts`), a nomear a linha.
+    await waitFor(() =>
+      expect(avisos.ditos.some((t) => /«Escadote» saiu de «Essenciais de carrinha»/i.test(t))).toBe(
+        true,
+      ),
+    );
+    expect(avisos.accao?.rotulo).toBe("Anular");
   });
 
   it("o «Anular» repõe a linha com a quantidade e o crítico que tinha", async () => {
     const user = userEvent.setup();
     await removerOEscadote(user);
-    const tira = await screen.findByRole("status");
-    await user.click(within(tira).getByRole("button", { name: /^Anular$/i }));
+    await waitFor(() => expect(avisos.accao?.rotulo).toBe("Anular"));
+    avisos.accao!.aoTocar();
 
     await waitFor(() =>
       expect(escritas.some((e) => (e.corpo as { linha?: unknown })?.linha)).toBe(true),
@@ -168,7 +182,7 @@ describe("Listas base — remover uma linha anula-se", () => {
       qty: 8,
       critical: true,
     });
-    // E a tira sai do ecrã, para dois toques não porem duas linhas iguais.
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    // E diz-se que ficou anulado.
+    await waitFor(() => expect(avisos.ditos).toContain("Anulado."));
   });
 });

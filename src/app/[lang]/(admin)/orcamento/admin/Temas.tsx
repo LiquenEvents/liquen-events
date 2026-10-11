@@ -21,6 +21,8 @@ import {
 import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { textoDaRecusa, tituloDaRecusa } from "@/lib/erro-do-servidor";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar, useDepoisDeApagarVarios } from "./ui/depois-de-apagar";
 import { prepareImageWithThumb } from "./image-prep";
 import {
   Button,
@@ -272,12 +274,12 @@ export function fraseDeEliminar(
   const n = t.imageCount;
   const fotos =
     t.imageCount === null
-      ? "Desaparecem as fotografias que estiverem lá dentro."
+      ? "As fotografias que estiverem lá dentro vão com ele."
       : n === 0
-        ? "A pasta está vazia: não desaparece nenhuma fotografia."
+        ? "A pasta está vazia: não leva nenhuma fotografia."
         : n === 1 && !t.truncated
-          ? "Desaparece 1 fotografia."
-          : `Desaparecem ${n}${t.truncated ? "+" : ""} fotografias.`;
+          ? "Leva 1 fotografia com ele."
+          : `Leva ${n}${t.truncated ? "+" : ""} fotografias com ele.`;
   const frasePropostas =
     propostas === null
       ? "As propostas já feitas com estas fotos não são afectadas."
@@ -949,6 +951,9 @@ function useNoEcraAteSair<T>(aberto: boolean, aSair: boolean, valor: T | null): 
 
 export default function Temas() {
   const { toast } = useToast();
+  const anular = useAnular();
+  // Eliminar um tema deixa-o 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagar = useDepoisDeApagar();
   // Sair da Biblioteca esquece o que o SELETOR de temas tinha guardado.
   //
   // Este ecrã é o único sítio onde a biblioteca muda — carregar, apagar,
@@ -1090,9 +1095,8 @@ export default function Temas() {
    *  lista à vista; falhar volta a pô-lo lá. Com «Não foi possível guardar.» o
    *  que ela via era um tema que tinha arrumado a reaparecer sozinho — e a
    *  conclusão natural é que o ecrã se enganou, não que a gravação não ficou. */
-  const alternarMarca = useCallback(
-    async (t: ThemeSummary, campo: "favorito" | "arquivado") => {
-      const novo = !t[campo];
+  const gravarMarca = useCallback(
+    async (t: ThemeSummary, campo: "favorito" | "arquivado", novo: boolean): Promise<boolean> => {
       const oQue =
         campo === "arquivado"
           ? `${novo ? "arquivar" : "desarquivar"} o tema "${t.name}"`
@@ -1119,17 +1123,33 @@ export default function Temas() {
         });
       } catch {
         reverter(porqueRebentou(oQue));
-        return;
+        return false;
       }
       if (!res.ok) {
         reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
-        return;
+        return false;
       }
-      if (campo === "arquivado") {
-        toast(novo ? `"${t.name}" arquivado` : `"${t.name}" de volta à lista`, "success");
-      }
+      return true;
     },
     [toast],
+  );
+
+  /** O gesto, com «Anular» — que é o mesmo PATCH com o valor de antes. */
+  const alternarMarca = useCallback(
+    async (t: ThemeSummary, campo: "favorito" | "arquivado") => {
+      const novo = !t[campo];
+      if (!(await gravarMarca(t, campo, novo))) return;
+      const feito =
+        campo === "arquivado"
+          ? novo
+            ? `"${t.name}" arquivado`
+            : `"${t.name}" de volta à lista`
+          : novo
+            ? `"${t.name}" fixado`
+            : `"${t.name}" deixou de estar fixado`;
+      anular(feito, () => gravarMarca({ ...t, [campo]: novo }, campo, !novo));
+    },
+    [gravarMarca, anular],
   );
 
   /**
@@ -1143,7 +1163,7 @@ export default function Temas() {
    * nome é o índice por onde ela procura, e mostrar um nome que o servidor
    * recusou é pior do que esperar meio segundo por ele.
    */
-  const renomearDaLista = useCallback(
+  const gravarNome = useCallback(
     async (t: ThemeSummary, nome: string): Promise<boolean> => {
       const oQue = `mudar "${t.name}" para "${nome}"`;
       let res: Response;
@@ -1172,10 +1192,20 @@ export default function Temas() {
         return false;
       }
       setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, name: nome } : x)));
-      toast(`"${t.name}" passou a "${nome}"`, "success");
       return true;
     },
     [toast],
+  );
+
+  /** O renomear da lista, com «Anular»: volta ao nome de antes. Se entretanto
+   *  outro tema ficou com esse nome, o 409 di-lo e não aparece «Anulado.». */
+  const renomearDaLista = useCallback(
+    async (t: ThemeSummary, nome: string): Promise<boolean> => {
+      if (!(await gravarNome(t, nome))) return false;
+      anular(`"${t.name}" passou a "${nome}"`, () => gravarNome({ ...t, name: nome }, t.name));
+      return true;
+    },
+    [gravarNome, anular],
   );
 
   /**
@@ -1537,12 +1567,16 @@ export default function Temas() {
       reverter(porqueRebentou(oQue));
       return;
     }
+    const corpo = await res.json().catch(() => null);
     if (res.ok) {
       bibliotecaAlterada();
-      toast("Tema eliminado.", "success");
+      depoisDeApagar(corpo, `Tema «${t.name}» eliminado.`, () => {
+        restoreTheme(t);
+        bibliotecaAlterada();
+      });
       return;
     }
-    reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+    reverter(porqueFalhou(oQue, res, corpo));
   }
 
   /** Mantém o cartão do tema a par do que a pasta diz. A pasta é a fonte de
@@ -1790,7 +1824,7 @@ export default function Temas() {
                 {frasesDeEliminar.propostas}
               </span>
             )}
-            <span className="mt-3 block">Esta acção não pode ser anulada.</span>
+            <span className="mt-3 block">Fica 30 dias na Reciclagem, de onde pode voltar.</span>
           </>
         )
       }
@@ -3305,6 +3339,9 @@ function ThemeFolder({
   aoServirPedido?: (servido: PedidoAPasta) => void;
 }) {
   const { toast } = useToast();
+  const anular = useAnular();
+  // Remover fotos deixa-as 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagarVarios = useDepoisDeApagarVarios();
   /** As fotos JÁ CARREGADAS, mais recentes primeiro. É sempre um PREFIXO da
    *  lista do servidor — ver `nextOffset` abaixo. */
   const [images, setImages] = useState<ThemeImage[]>([]);
@@ -4323,6 +4360,9 @@ function ThemeFolder({
     bibliotecaAlterada();
 
     const errors: ThemeImage[] = [];
+    // As que saíram, e o que o servidor disse de cada uma: é daí que vem a
+    // entrada da Reciclagem para o «Anular».
+    const saidas: { im: ThemeImage; corpo: unknown }[] = [];
     /**
      * A primeira recusa que trouxe RESPOSTA — é ela que classifica a frase.
      *
@@ -4347,6 +4387,7 @@ function ThemeFolder({
           primeiraRecusa ??= res;
           throw new Error("falhou");
         }
+        saidas.push({ im, corpo: await res.json().catch(() => null) });
       } catch {
         errors.push(im);
       } finally {
@@ -4384,7 +4425,20 @@ function ThemeFolder({
       // prova a diferença é o ramo de cima — quando ele recusa, a foto volta ao
       // sítio onde estava. Sem esta frase, ver a foto sair não distingue «foi
       // removida» de «ainda vai a caminho».
-      toast(`${plural(targets.length, "foto removida", "fotos removidas")}.`, "success");
+      //
+      // E com «Anular» (R3b): as fotos ficam 30 dias na Reciclagem, e as que
+      // voltarem regressam ao sítio onde estavam na grelha.
+      depoisDeApagarVarios(
+        saidas.map((x) => x.corpo),
+        `${plural(targets.length, "foto removida", "fotos removidas")}.`,
+        (repostos) => {
+          if (!alive.current) return;
+          const voltaram = repostos.map((i) => saidas[i].im);
+          setImages((prev) => reinsertAt(prev, voltaram, positions));
+          setTotal((t) => (t === null ? null : t + voltaram.length));
+          bibliotecaAlterada();
+        },
+      );
     }
   }
 
@@ -4521,9 +4575,13 @@ function ThemeFolder({
        coluna a caminho de outra coisa — e mover quarenta fotografias para o
        tema errado sem saída era a versão em ponto grande do `×` a um clique
        que o ponto 19 mandou tirar. */
-    toast(fraseDoMovimento(copied.length, destino.name), "success", {
-      rotulo: "Anular",
-      aoTocar: () => void anularMovimento(destino, copied),
+    //
+    // O «Anular» é o da casa (10 s, `ui/anular.ts`). O `anularMovimento` diz o
+    // resultado à sua maneira — quantas voltaram, e onde ficaram as outras —,
+    // por isso devolve `false` e não aparece um «Anulado.» por cima.
+    anular(fraseDoMovimento(copied.length, destino.name), async () => {
+      await anularMovimento(destino, copied);
+      return false;
     });
   }
 
@@ -4583,7 +4641,12 @@ function ThemeFolder({
    * data, atrás delas. É o que faz "pôr as boas à frente" custar meia dúzia de
    * caminhos em vez de uma cópia do catálogo.
    */
-  async function persistOrder(next: ThemeImage[], previous: ThemeImage[], destino: number) {
+  async function persistOrder(
+    next: ThemeImage[],
+    previous: ThemeImage[],
+    destino: number,
+    comAnular = true,
+  ): Promise<boolean> {
     const oQue = `guardar a nova ordem das fotos de "${theme.name}"`;
     // SÓ A ÚLTIMA ARRUMAÇÃO FALA. Cada Alt+seta é um PATCH seu, e cinco toques
     // seguidos a empurrar a mesma foto davam cinco avisos iguais empilhados —
@@ -4608,7 +4671,7 @@ function ThemeFolder({
       });
     } catch {
       reverter(porqueRebentou(oQue).mensagem);
-      return;
+      return false;
     }
     if (res.ok) {
       // O QUE NÃO SE VÊ É O SERVIDOR. A foto salta para o lugar novo no
@@ -4619,13 +4682,17 @@ function ThemeFolder({
       //
       // E diz a POSIÇÃO: numa grelha de sessenta fotos iguais, «ordem
       // guardada» não deixa reconhecer o gesto que foi mesmo guardado.
-      if (alive.current && minha === ordemMandada.current) {
-        toast(
-          `Ordem guardada — a foto ficou na posição ${destino + 1} de ${next.length}.`,
-          "success",
-        );
+      //
+      // E com «Anular»: a grelha volta à ordem de antes, gravada pelo mesmo
+      // PATCH. (O próprio «Anular» não traz outro — diz «Anulado.».)
+      if (comAnular && alive.current && minha === ordemMandada.current) {
+        anular(`Ordem guardada — a foto ficou na posição ${destino + 1} de ${next.length}.`, () => {
+          if (!alive.current) return false;
+          setImages(previous);
+          return persistOrder(previous, next, destino, false);
+        });
       }
-      return;
+      return true;
     }
     const data = await res.json().catch(() => null);
     // A queixa da instalação por acabar (`db/schema.sql`) passa inteira: é uma
@@ -4636,6 +4703,7 @@ function ThemeFolder({
         ? doServidor
         : porqueFalhou(oQue, res, data).mensagem,
     );
+    return false;
   }
 
   /** Move uma foto para outra posição da grelha (arrasto, setas ou "para o início"). */
@@ -4688,7 +4756,8 @@ function ThemeFolder({
   }
 
   /** Escolhe a foto que representa o tema na lista. */
-  async function setAsCover(im: ThemeImage) {
+  async function setAsCover(im: ThemeImage, comAnular = true): Promise<boolean> {
+    const capaAntes = coverPath;
     // Aqui não há nada a reverter: a capa só muda no ecrã depois de o servidor
     // confirmar. O que faltava era a frase saber distinguir a sessão expirada
     // do servidor em baixo — e nomear o tema, que é o que ela tem seis vezes
@@ -4703,16 +4772,24 @@ function ThemeFolder({
       });
     } catch {
       toast(porqueRebentou(oQue).mensagem, "error");
-      return;
+      return false;
     }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       toast(porqueFalhou(oQue, res, data).mensagem, "error");
-      return;
+      return false;
     }
     setCoverPath(im.path);
     onCover(im.path, capaDaFoto(im));
     clearSelection();
+    // Com «Anular» quando a capa de antes está à mão (carregada na grelha):
+    // volta a ser ela, pelo mesmo PATCH. Sem ela carregada não há os campos
+    // que o cartão da lista precisa (`capa-do-cartao.ts`), e não se oferece.
+    const fotoAntes = capaAntes ? images.find((i) => i.path === capaAntes) : undefined;
+    if (comAnular && fotoAntes && fotoAntes.path !== im.path) {
+      anular(`A capa de "${theme.name}" mudou.`, () => setAsCover(fotoAntes, false));
+    }
+    return true;
     // AQUI NÃO SE DIZ NADA, e é de propósito. A capa só muda depois de o
     // servidor confirmar, e o que ele confirmou aparece na própria foto que ela
     // escolheu — a etiqueta «Capa» no canto da célula, mais a barra da seleção
@@ -4765,7 +4842,35 @@ function ThemeFolder({
       // (`renomearDaLista`) já dizia. «Tema renomeado.» obrigava a ir conferir
       // ao cabeçalho se o que lá ficou era mesmo o que ela escreveu — e com
       // seis pastas abertas em separadores diferentes, nem dizia qual.
-      toast(`"${antigo}" passou a "${trimmed}"`, "success");
+      //
+      // Com «Anular»: o nome de antes, pelo mesmo PATCH. Um 409 (outro tema
+      // ficou entretanto com esse nome) diz-se e não aparece «Anulado.».
+      anular(`"${antigo}" passou a "${trimmed}"`, async () => {
+        const volta = `voltar a chamar "${antigo}" a "${trimmed}"`;
+        let r: Response;
+        try {
+          r = await fetch(`/api/temas/${theme.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: antigo }),
+          });
+        } catch {
+          toast(porqueRebentou(volta).mensagem, "error");
+          return false;
+        }
+        if (!r.ok) {
+          toast(
+            r.status === 409
+              ? `Já há um tema chamado "${antigo}".`
+              : porqueFalhou(volta, r, await r.json().catch(() => null)).mensagem,
+            "error",
+          );
+          return false;
+        }
+        onRename(antigo);
+        if (alive.current) setName(antigo);
+        return true;
+      });
     } finally {
       renamingBusy.current = false;
       setRenaming(false);
@@ -6043,7 +6148,7 @@ function ThemeFolder({
               ? "Remover esta fotografia do tema?"
               : `Remover ${plural(aRemover.alvos.length, "fotografia", "fotografias")} de «${theme.name}»?`
         }
-        aviso="As propostas já feitas com estas fotos não são afectadas. Esta acção não pode ser anulada."
+        aviso="As propostas já feitas com estas fotos não são afectadas. Ficam 30 dias na Reciclagem, de onde podem voltar."
         rotuloConfirmar={
           aRemover && aRemover.alvos.length > 1 ? "Remover as fotografias" : "Remover a fotografia"
         }

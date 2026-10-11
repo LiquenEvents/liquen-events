@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthed } from "@/lib/admin-auth";
-import { actualizarServico, apagarServico } from "@/lib/servicos-catalogo-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
+import { actualizarServico } from "@/lib/servicos-catalogo-store";
 import { firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
@@ -51,8 +52,8 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const { id } = await params;
-    await apagarServico(id);
-    return NextResponse.json({ ok: true });
+    const reciclagem = await enviarParaAReciclagem("servico", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     log.error("servicos-catalogo DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

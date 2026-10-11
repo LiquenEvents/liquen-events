@@ -51,7 +51,56 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
 
-  const body = (await request.json().catch(() => null)) as { como?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as {
+    como?: unknown;
+    desfazer?: unknown;
+  } | null;
+
+  /**
+   * ── E VOLTA ATRÁS ───────────────────────────────────────────────────────
+   *
+   * Palavras dela, a 10/10, com este botão como exemplo: «tem que haver no
+   * site todo, em tudo aquilo que se faz, uma forma de voltar atrás». Marcar
+   * como assinado por engano não podia ficar para sempre.
+   *
+   * Desfaz-se SÓ o registo feito pela equipa — o que este botão escreveu. Um
+   * aceite electrónico antigo (com IP) é a prova de que o casal carregou no
+   * botão; apagá-lo seria apagar a prova, e esse não volta para trás.
+   *
+   * Volta a `pendente` e limpa os campos do registo. Os campos limpam-se com
+   * texto vazio e não com `undefined`: o mapeamento só escreve o que vem
+   * definido, e um `undefined` deixava o nome antigo na base.
+   */
+  if (body?.desfazer === true) {
+    try {
+      const contrato = await getContract(id);
+      if (!contrato) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+      if (contrato.status !== "aceite") return NextResponse.json(contrato);
+      if (contrato.acceptedIp) {
+        return NextResponse.json(
+          {
+            error:
+              "Este aceite foi feito pelo casal no link, e é a prova disso — não se desfaz aqui.",
+          },
+          { status: 409 },
+        );
+      }
+      const gravado = await updateContract(id, {
+        status: "pendente",
+        acceptedAt: "",
+        acceptedName: "",
+        registadoPor: "",
+        registadoComo: "",
+      });
+      if (!gravado) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+      return NextResponse.json(gravado);
+    } catch (err) {
+      const conflito = respostaDeConflito(err);
+      if (conflito) return conflito;
+      log.error("contratos PATCH (desfazer) falhou", err, { id });
+      return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    }
+  }
   const como = String(body?.como ?? "")
     .replace(/\s+/g, " ")
     .trim()

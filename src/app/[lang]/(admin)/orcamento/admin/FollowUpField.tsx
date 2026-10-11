@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
 import { todayKey } from "./util";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import { ESTADO, PRESSAO } from "./ui/movimento";
@@ -36,6 +37,7 @@ function porExtenso(iso: string): string {
  */
 export default function FollowUpField({ quote, onChange }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [value, setValue] = useState<string>(quote.followUpAt ?? "");
   const id = useId();
   const hintId = `${id}-hint`;
@@ -56,7 +58,12 @@ export default function FollowUpField({ quote, onChange }: Props) {
    * por isso. Por isso a frase nomeia a data, diz porquê, e diz para onde é que
    * o campo recuou.
    */
-  async function persist(next: string | undefined) {
+  /**
+   * `comAnular`: os atalhos («+3 dias», «Tirar») mostram «Anular» com a data de
+   * antes. O campo de data não — escrever uma data à mão dispara uma gravação
+   * por tecla, e um aviso por tecla seria ruído.
+   */
+  async function persist(next: string | undefined, comAnular = false): Promise<boolean> {
     // Otimista com reversão: falha do servidor repõe o estado e avisa.
     const snapshot = quote.followUpAt;
     const oQue = next
@@ -85,9 +92,18 @@ export default function FollowUpField({ quote, onChange }: Props) {
       });
     } catch {
       reverter(porqueRebentou(oQue));
-      return;
+      return false;
     }
-    if (!res.ok) reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+    if (!res.ok) {
+      reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+      return false;
+    }
+    if (comAnular && (snapshot ?? "") !== (next ?? "")) {
+      anular(next ? `Seguimento marcado para ${porExtenso(next)}.` : "Seguimento retirado.", () =>
+        persist(snapshot),
+      );
+    }
+    return true;
   }
 
   const overdue = value && value < todayKey();
@@ -109,7 +125,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
         />
         {value && (
           <button
-            onClick={() => void persist(undefined)}
+            onClick={() => void persist(undefined, true)}
             className={`alvo-toque px-3 py-2 text-foreground/40 text-[10px] tracking-[0.15em] uppercase hover:text-[var(--bo-text-muted)] ${ESTADO} ${PRESSAO}`}
           >
             Limpar
@@ -124,7 +140,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
         ].map((p) => (
           <button
             key={p.label}
-            onClick={() => void persist(plusDays(p.days))}
+            onClick={() => void persist(plusDays(p.days), true)}
             className={`alvo-toque px-2.5 py-1 rounded-full bg-[var(--bo-tinta-6)] text-foreground/45 text-[11px] hover:bg-[var(--bo-tinta-10)] hover:text-[var(--bo-tinta-72)] ${ESTADO} ${PRESSAO}`}
           >
             {p.label}

@@ -501,6 +501,8 @@ function SatelliteTile({
             sizes="25vw"
             className={`object-cover ${zoomClass}`}
             aspectRatio={photo.aspectRatio}
+            // A satélite recorta: pelo ponto de interesse, não pelo centro.
+            foco={photo.foco}
             anchorRef={btnRef}
             unavailableLabel={unavailableLabel}
             blurDataURL={photo.blurDataURL}
@@ -1389,6 +1391,8 @@ export default function GaleriaClient({
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className={`object-cover ${zoomClass}`}
                     aspectRatio={visible[0].aspectRatio}
+                    // O 2×2 recorta: pelo ponto de interesse, não pelo centro.
+                    foco={visible[0].foco}
                     // The 2×2 flagship tile is the largest grid image, the LCP
                     // candidate on this route, and the lightbox morph source —
                     // eager so it resolves without a lazy delay / pop-in.
@@ -2193,6 +2197,9 @@ function Lightbox({
                 sizes="72px"
                 loader={galleryImageLoader}
                 className="object-cover"
+                // Um quadrado de 72 px corta muito: pelo ponto de interesse,
+                // e não pelo centro (gallery-meta.json).
+                style={pool[idx].foco ? { objectPosition: pool[idx].foco } : undefined}
               />
               <FocusRing />
             </button>

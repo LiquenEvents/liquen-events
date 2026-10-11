@@ -20,12 +20,15 @@ import type { ServiceGroup } from "@/lib/proposal-doc";
 /** O editor é controlado; aqui é o estado do estúdio que o segura. */
 function Host({ initial, onSave }: { initial: ServiceGroup[]; onSave?: () => void }) {
   const [groups, setGroups] = useState<ServiceGroup[]>(initial);
+  // Dentro do `ToastProvider`: o «Anular» é o aviso da casa (`ui/anular.ts`).
   return (
-    <ServicesEditor
-      groups={groups}
-      onGroupsChange={(update) => setGroups((prev) => update(prev))}
-      onSave={onSave}
-    />
+    <ToastProvider>
+      <ServicesEditor
+        groups={groups}
+        onGroupsChange={(update) => setGroups((prev) => update(prev))}
+        onSave={onSave}
+      />
+    </ToastProvider>
   );
 }
 
@@ -158,7 +161,8 @@ describe("anular", () => {
     await user.click(screen.getByRole("button", { name: "Anular" }));
 
     expect(linhas().map((i) => i.value)).toEqual(["Reunião inicial", "Montagem"]);
-    expect(screen.queryByText("Linha removida")).toBeNull();
+    // O aviso da casa diz que ficou anulado.
+    expect(await screen.findByText("Anulado.")).toBeTruthy();
   });
 
   it("Ctrl+Z repõe um grupo inteiro, com as suas linhas", async () => {
