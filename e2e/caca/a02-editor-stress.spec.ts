@@ -107,12 +107,50 @@ async function abrirEstudio(page: import("@playwright/test").Page) {
   // colada ao topo e a barra de baixo é fixa — um clique pode cair numa delas
   // conforme o sítio para onde a linha foi rolada. O que se quer provar é que
   // o campo aceita escrita, não onde fica no ecrã.
-  await expect(async () => {
-    await linha1.focus();
-    await linha1.fill("");
-    await page.keyboard.type("x");
-    expect(await linha1.inputValue()).toBe("x");
-  }).toPass({ timeout: 30_000 });
+  //
+  // Os tempos dentro do `toPass` são curtos de propósito: sem eles, um `fill`
+  // à espera de um campo que nunca fica editável comia os 30 s de uma vez, e o
+  // CI só dizia «Timeout … while waiting on the predicate», sem a razão. Se
+  // mesmo assim não passar, o erro leva o estado do campo e do ecrã.
+  try {
+    await expect(async () => {
+      await linha1.focus({ timeout: 5_000 });
+      await linha1.fill("", { timeout: 5_000 });
+      await page.keyboard.type("x");
+      expect(await linha1.inputValue({ timeout: 5_000 })).toBe("x");
+    }).toPass({ timeout: 30_000 });
+  } catch (erro) {
+    const estado = await page
+      .evaluate(() => {
+        const campos = [
+          ...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+            '[aria-label="Linha 1 do grupo 1"]',
+          ),
+        ];
+        const ativo = document.activeElement as HTMLElement | null;
+        return {
+          campos: campos.map((c) => ({
+            tag: c.tagName,
+            valor: c.value,
+            readOnly: c.readOnly,
+            disabled: c.disabled,
+            visivel: !!c.offsetParent,
+            inert: !!c.closest("[inert]"),
+          })),
+          ativo: ativo ? `${ativo.tagName} ${ativo.getAttribute("aria-label") ?? ""}` : null,
+          dialogo: [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
+            .map((d) => d.getAttribute("aria-label") ?? d.textContent?.slice(0, 60))
+            .slice(0, 3),
+          passo: document.querySelector(
+            'nav[aria-label="Passos da proposta"] [aria-current="step"]',
+          )?.textContent,
+        };
+      })
+      .catch((e) => String(e));
+    throw new Error(
+      `a linha 1 não aceita escrita: ${JSON.stringify(estado)} — ${String(erro).slice(0, 400)}`,
+    );
+  }
   await linha1.fill("");
   await assentar(page, 200);
 }
