@@ -5212,7 +5212,14 @@ body:has(.barra-consentimento) footer {
   }
 }
 .lb-backdrop {
-  background: radial-gradient(
+  /* O PRETO FICA SEMPRE POR BAIXO. A cor da foto é uma camada por cima, numa
+     declaração à parte: um browser que não saiba `color-mix()` (Safari antes
+     do 16.2, Chrome antes do 111) deita fora a declaração inteira em que ela
+     aparece. Com o degradé no `background` e nada mais, isso deixava o fundo
+     TRANSPARENTE e a grelha à vista por trás da foto aberta — ela viu-o assim.
+     Agora, no pior caso, o fundo é o preto de antes. */
+  background-color: black;
+  background-image: radial-gradient(
     farthest-corner at 50% 45%,
     color-mix(in oklab, var(--lb-cor) 35%, black) 0%,
     color-mix(in oklab, var(--lb-cor) 6%, black) 80%
