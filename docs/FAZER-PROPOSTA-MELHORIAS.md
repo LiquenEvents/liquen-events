@@ -59,8 +59,9 @@ Onde a execução da A2 se afasta do texto, e porquê:
   perde ao saltar, e o rascunho continua a ser gravado de 800 em 800 ms como
   antes.
 - **«Rever e enviar» junta o antigo «Pré-visualizar» e o antigo «Enviar».** O
-  «Descarregar PDF/rascunho» está na barra de baixo desse passo. O selector de
-  idioma saiu da barra porque o mesmo selector está no corpo do passo.
+  «Descarregar PDF/rascunho» está na barra de baixo desse passo, com o
+  selector da língua encostado, como ela pediu («na parte de descarregar ou
+  gerar, um botão para escolher gerar em inglês»).
 - **O estado de cada passo** sai das mesmas duas listas que o índice e o envio
   já usavam: erro quando há uma falta que trava nesse passo, por completar
   quando há uma secção vazia ou um conselho, completo no resto. O «Rever e

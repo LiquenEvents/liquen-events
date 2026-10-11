@@ -458,12 +458,41 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const renderStudio = () =>
-  render(
+/**
+ * Os cinco passos do estúdio (A2). Os passos 1 a 4 vivem num formulário só,
+ * sempre montado, e cada secção esconde-se fora do seu passo — um teste que
+ * mexe no orçamento ou nos mood boards vai primeiro ao passo deles, como ela.
+ */
+type NomeDoPasso =
+  | "Evento"
+  | "Serviços"
+  | "Inspiração"
+  | "Cronograma"
+  | "Orçamento"
+  | "Rever e enviar";
+const NUMERO_DO_PASSO: Record<NomeDoPasso, number> = {
+  Evento: 1,
+  Serviços: 2,
+  Inspiração: 3,
+  Cronograma: 3,
+  Orçamento: 4,
+  "Rever e enviar": 5,
+};
+function irAoPasso(nome: NomeDoPasso) {
+  fireEvent.click(
+    screen.getByRole("button", { name: new RegExp(`^${NUMERO_DO_PASSO[nome]}\\s*${nome}`) }),
+  );
+}
+
+const renderStudio = (passo?: NomeDoPasso) => {
+  const r = render(
     <ToastProvider>
       <ProposalStudio quote={quote} />
     </ToastProvider>,
   );
+  if (passo) irAoPasso(passo);
+  return r;
+};
 
 /**
  * O CASO DA CATARINA MARTINS.
@@ -992,7 +1021,7 @@ describe("total desalinhado da soma das linhas", () => {
    */
   it("o botão do aviso pergunta primeiro, com os dois valores à vista", async () => {
     seedComPrecos(4000);
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Usar/ }));
     const pergunta = await screen.findByText(/Substituir o total de/i);
@@ -1004,7 +1033,7 @@ describe("total desalinhado da soma das linhas", () => {
 
   it("confirmado, arruma o total e deixa dez segundos para anular", async () => {
     seedComPrecos(4000);
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Usar/ }));
     await user.click(await screen.findByRole("button", { name: /^Substituir$/ }));
@@ -1016,7 +1045,7 @@ describe("total desalinhado da soma das linhas", () => {
 
   it("e fica escrito no histórico do pedido", async () => {
     seedComPrecos(4000);
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Usar/ }));
     await user.click(await screen.findByRole("button", { name: /^Substituir$/ }));
@@ -1037,7 +1066,7 @@ describe("total desalinhado da soma das linhas", () => {
    */
   it("a pergunta caduca se o documento mudar entretanto", async () => {
     seedComPrecos(4000);
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Usar/ }));
     await screen.findByText(/Substituir o total de/i);
@@ -1048,7 +1077,7 @@ describe("total desalinhado da soma das linhas", () => {
 
   it("cancelado, não mexe no total nem escreve no histórico", async () => {
     seedComPrecos(4000);
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Usar/ }));
     await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
@@ -1461,7 +1490,7 @@ describe("um tema com mais fotografias do que uma página leva", () => {
 
   it("diz NO INSTANTE em que o tema passa a duas páginas", async () => {
     seedDraft(12);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
@@ -1474,7 +1503,7 @@ describe("um tema com mais fotografias do que uma página leva", () => {
 
   it("até doze não diz nada", async () => {
     seedDraft(12);
-    renderStudio();
+    renderStudio("Inspiração");
     await screen.findByRole("heading", { name: "Mood boards" });
     expect(screen.queryByText(/ocupa 2 páginas/)).toBeNull();
     expect(screen.queryByText("fora do PDF")).toBeNull();
@@ -1687,19 +1716,19 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     // E não se disfarça de avaria: não há «não foi possível enviar» nenhum.
     expect(screen.queryByText(/Não foi possível enviar/)).toBeNull();
     // O envio parou mesmo: o passo não ficou dado por feito.
-    expect(screen.queryByRole("button", { name: /Voltar ao conteúdo/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Voltar ao evento/ })).toBeNull();
 
     // O segundo clique é o mesmo envio, com a resposta dada.
     propostaDoc = reply({ json: { ok: true, emailed: true } });
     await user.click(await screen.findByRole("button", { name: /Enviar assim mesmo/ }));
-    await screen.findByRole("button", { name: /Voltar ao conteúdo/ });
+    await screen.findByRole("button", { name: /Voltar ao evento/ });
     const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c || "{}"));
     expect(enviados.at(-1)?.cortesConfirmados, "o segundo envio não levou a resposta").toBe(true);
     // E o primeiro NÃO a levava — senão a pergunta nunca chegaria a ser feita.
     expect(enviados.at(-2)?.cortesConfirmados).toBeUndefined();
   });
 
-  it("«voltar e corrigir» leva ao conteúdo e não envia nada", async () => {
+  it("«voltar e corrigir» leva ao passo do corte e não envia nada", async () => {
     seedDraft(2);
     propostaDoc = reply({
       ok: false,
@@ -1718,7 +1747,12 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
 
     // Um envio só — o que fez a pergunta.
     expect(corpos("proposta-doc", "POST")).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: /Voltar ao conteúdo/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Voltar ao evento/ })).toBeNull();
+    // E levou ao passo onde o nome da capa se corrige.
+    expect(screen.getByRole("button", { name: /^1\s*Evento/ })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
   });
 });
 
@@ -1773,7 +1807,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
   it("a foto entra no mood board no INSTANTE do clique, em estado provisório", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     /**
@@ -1814,7 +1848,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
   it("ao confirmar, o marcador dá lugar ao caminho definitivo NA MESMA POSIÇÃO", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     await reservar(user);
@@ -1838,7 +1872,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
   it("ao falhar, o marcador sai do documento — e o aviso não se repete", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     await reservar(user);
@@ -1855,7 +1889,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
   it("um marcador provisório NUNCA é gravado no rascunho", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     await reservar(user);
@@ -1895,7 +1929,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
   it("a pré-visualização sai sem o marcador e diz que a foto ainda não entrou", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     await reservar(user);
@@ -1914,7 +1948,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
   it("o ENVIO espera pelas fotos por confirmar, e depois leva o caminho definitivo", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await abrirBiblioteca(user);
     await reservar(user);
@@ -1922,7 +1956,11 @@ describe("fotos da biblioteca em estado provisório", () => {
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // O gesto irreversível não segue com a proposta a meio: fica travado, com
     // a razão escrita — e não uma mensagem a mandá-la preencher campos.
-    expect(await screen.findByText(/1 foto ainda está a entrar na proposta/)).toBeInTheDocument();
+    // (O resumo do mesmo passo diz a mesma coisa do PDF; a linha do ENVIO é
+    // a que diz que o envio espera.)
+    expect(
+      await screen.findByText(/1 foto ainda está a entrar na proposta\. O envio fica disponível/),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeDisabled();
     expect(corpos("proposta-doc", "POST")).toHaveLength(0);
 
@@ -1960,7 +1998,7 @@ describe("fotos da biblioteca em estado provisório", () => {
         totalVatMode: "acrescer",
       }),
     );
-    renderStudio();
+    renderStudio("Inspiração");
 
     // O TÍTULO da secção: a coluna lateral (NavEstudio) também diz "Mood
     // boards", e um `findByText` solto passou a encontrar os dois.
@@ -2092,7 +2130,7 @@ describe("linhas que escalam com os convidados", () => {
    * mudar o tipo de escala não faz o total saltar debaixo dos pés.
    */
   it("mostra a conta ao lado do número quando a linha passa a ser por mesa", async () => {
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
@@ -2119,7 +2157,7 @@ describe("linhas que escalam com os convidados", () => {
   });
 
   it("uma linha fixa não mostra fórmula nenhuma", async () => {
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /\+ Adicionar item/ }));
     expect(screen.queryByText(/mesas × /)).toBeNull();
@@ -2253,12 +2291,16 @@ describe("uma célula que não conseguiu desenhar a foto", () => {
  * O valor que o utilizador introduz é IMUTÁVEL. Só muda quando ele o altera.
  */
 describe("P0: o valor não muda sozinho entre visitas", () => {
-  const desenhar = (preco: number | undefined) =>
-    render(
+  const desenhar = (preco: number | undefined) => {
+    const r = render(
       <ToastProvider>
         <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
       </ToastProvider>,
     );
+    // O valor e os adicionais vivem no passo do Orçamento.
+    irAoPasso("Orçamento");
+    return r;
+  };
 
   /** O que está escrito no campo «Valor (sem IVA)» — o número DELA. */
   async function valorEscrito(): Promise<string> {
@@ -2430,12 +2472,16 @@ describe("P0: o valor não muda sozinho entre visitas", () => {
 
 describe("os valores adicionais somam ao total", () => {
   const comPreco = (preco?: number) => ({ ...quote, quotedPrice: preco }) as Quote;
-  const desenhar = (q: Quote) =>
-    render(
+  const desenhar = (q: Quote) => {
+    const r = render(
       <ToastProvider>
         <ProposalStudio quote={q} />
       </ToastProvider>,
     );
+    // O valor e os adicionais vivem no passo do Orçamento.
+    irAoPasso("Orçamento");
+    return r;
+  };
 
   /**
    * O campo do valor de um adicional passou a ser NUMÉRICO e a normalizar-se ao
@@ -3255,6 +3301,7 @@ describe("trocar o modo dos adicionais grava o preço no pedido", () => {
         <ProposalStudio quote={{ ...quote, quotedPrice: 3000 } as Quote} />
       </ToastProvider>,
     );
+    irAoPasso("Orçamento");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
     const campo = await screen.findByLabelText(/^Valor de /i);
@@ -3772,7 +3819,7 @@ describe("modelos parciais de mood board", () => {
 
   it("dá para guardar o TERCEIRO mood board, não só o primeiro", async () => {
     seedComTresBoards();
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     const guardar = await screen.findAllByRole("button", { name: /Guardar como modelo/ });
     // Um controlo por mood board (mais o da proposta inteira, no cabeçalho) —
@@ -3808,7 +3855,7 @@ describe("modelos parciais de mood board", () => {
     copiaServidor = {
       fotos: { "LQ-999/aaa.jpg": "q1/nova-1.jpg", "LQ-999/bbb.jpg": "q1/nova-2.jpg" },
     };
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await user.click((await screen.findAllByRole("button", { name: /De um modelo…/ }))[0]);
     await user.click(await screen.findByRole("button", { name: "Cerimónia na igreja" }));
@@ -4234,7 +4281,7 @@ describe("forçar a gravação do rascunho", () => {
 describe("as fotografias do mood board deixam de ser cortadas", () => {
   it("um mood board novo nasce a manter a forma das fotografias", async () => {
     seedDraft(0);
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Adicionar mood board/ }));
     await waitFor(
@@ -4810,7 +4857,7 @@ describe("arrumar a ordem do orçamento", () => {
 
   it("a marca «extra» viaja com a linha, como o preço", async () => {
     seedForaDeOrdem();
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click((await screen.findAllByRole("button", { name: "Arrumar eu" }))[0]);
 
@@ -5127,7 +5174,7 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await irParaPrever(user);
 
-    const grupo = screen.getByRole("radiogroup", { name: "Idioma do PDF" });
+    const grupo = screen.getByRole("radiogroup", { name: "Idioma da proposta" });
     expect(within(grupo).getByRole("radio", { name: "Português" })).toHaveAttribute(
       "aria-checked",
       "true",
@@ -5180,7 +5227,7 @@ describe("gerar a proposta em inglês", () => {
     const paragrafo = () => screen.getByText(/Da tua prosa sai em inglês/).closest("p")!;
     const emPortugues = paragrafo().textContent;
 
-    const grupo = screen.getByRole("radiogroup", { name: "Idioma do PDF" });
+    const grupo = screen.getByRole("radiogroup", { name: "Idioma da proposta" });
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
 
     expect(paragrafo().textContent).not.toBe(emPortugues);
@@ -5281,7 +5328,7 @@ describe("gerar a proposta em inglês", () => {
     const ingles = screen.getByRole("radio", { name: /^Inglês/ });
     // Começa pelo rótulo visível — o nome falado e o escrito não podem divergir.
     expect(ingles.getAttribute("aria-label")).toMatch(
-      /^Inglês — sai a moldura do documento em inglês; os campos que preencheste, incluindo a data do evento, ficam como os escreveste$/,
+      /^Inglês — o documento, o email ao cliente e a página onde ele responde saem em inglês; os campos que preencheste, incluindo a data do evento, ficam como os escreveste$/,
     );
   });
 
@@ -5401,23 +5448,14 @@ describe("gerar a proposta em inglês", () => {
     });
   });
 
-  /** A escolha é UMA: mudá-la no passo 3 muda a que a pré-visualização usa, e
-   *  ao contrário. Duas caixas com estados diferentes eram a maneira certa de
-   *  enviar em inglês um documento que ela pré-visualizou em português. */
-  it("a escolha do passo 3 e a do passo 2 são a mesma", async () => {
+  /** A escolha é UMA, e há UM controlo para ela. Com os cinco passos (A2), o
+   *  selector da pré-visualização e o do envio ficaram no mesmo ecrã — dois
+   *  controlos para o mesmo estado. Ficou o da barra, ao lado dos botões. */
+  it("no «Rever e enviar» há um selector da língua só", async () => {
     seedDraftEmIngles(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    const grupo = await screen.findByRole("radiogroup", { name: "Idioma da proposta" });
-    await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
-
-    await irParaPrever(user);
-    expect(
-      within(screen.getByRole("radiogroup", { name: "Idioma do PDF" })).getByRole("radio", {
-        name: /^Inglês/,
-      }),
-    ).toHaveAttribute("aria-checked", "true");
+    renderStudio("Rever e enviar");
+    await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    expect(screen.getAllByRole("radiogroup", { name: "Idioma da proposta" })).toHaveLength(1);
   });
 
   /**
@@ -5458,7 +5496,7 @@ describe("gerar a proposta em inglês", () => {
     const outra = userEvent.setup();
     await irParaPrever(outra);
     expect(
-      within(screen.getByRole("radiogroup", { name: "Idioma do PDF" })).getByRole("radio", {
+      within(screen.getByRole("radiogroup", { name: "Idioma da proposta" })).getByRole("radio", {
         name: /^Inglês/,
       }),
     ).toHaveAttribute("aria-checked", "true");
@@ -6416,8 +6454,11 @@ describe("traduzir com as fotos a meio", () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
 
+    // O interruptor da proposta bilingue vive no passo do Evento; o mood board,
+    // no da Inspiração.
     const botao = await botaoDeTraduzir(user);
     await user.click(botao);
+    irAoPasso("Inspiração");
 
     // Ela não fica a olhar para o botão: continua a montar o mood board.
     await user.click(
@@ -6447,8 +6488,11 @@ describe("traduzir com as fotos a meio", () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
 
+    // O interruptor da proposta bilingue vive no passo do Evento; o mood board,
+    // no da Inspiração.
     const botao = await botaoDeTraduzir(user);
     await user.click(botao);
+    irAoPasso("Inspiração");
 
     // Remover passou a ser uma acção da folha, e não um círculo em cima da
     // fotografia — ver «SEIS CÍRCULOS EM CIMA DA FOTOGRAFIA». O caminho é o
@@ -6724,7 +6768,7 @@ describe("porque é que ela não vê as fotografias", () => {
   it("quando a lista FALHA, a célula diz-o e dá um botão para tentar outra vez", async () => {
     seedDraft(2);
     assetsFalham = true;
-    renderStudio();
+    renderStudio("Inspiração");
 
     const aviso = await screen.findAllByText(/Não carregou/i);
     expect(aviso.length).toBeGreaterThan(0);
@@ -7000,7 +7044,7 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     assetsServidor = [
       { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
     ];
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /^Mais acções de / }));
     for (const nome of [
@@ -7054,7 +7098,7 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
         thumbUrl: "https://storage.exemplo/mini-0.jpg",
       },
     ];
-    renderStudio();
+    renderStudio("Inspiração");
 
     // As duas moradas falham, como falham quando o browser as recusa.
     const morrer = async () => {
@@ -7111,7 +7155,7 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     assetsServidor = [
       { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
     ];
-    renderStudio();
+    renderStudio("Inspiração");
     const morrer = async () => {
       const img = document.querySelector<HTMLImageElement>("[data-foto] img");
       if (!img) return;
@@ -7690,21 +7734,21 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
   const passarODebounce = () => new Promise((r) => setTimeout(r, 1400));
 
   it("não manda rascunho nenhum ao servidor", async () => {
-    renderStudio();
+    renderStudio("Inspiração");
     await screen.findByRole("heading", { name: "Mood boards" });
     await passarODebounce();
     expect(corpos("proposta-rascunho")).toEqual([]);
   });
 
   it("não deixa cópia local de um documento que ela não escreveu", async () => {
-    renderStudio();
+    renderStudio("Inspiração");
     await screen.findByRole("heading", { name: "Mood boards" });
     await passarODebounce();
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
   });
 
   it("e o indicador cala-se — não diz «guardado» ao que não foi feito", async () => {
-    renderStudio();
+    renderStudio("Inspiração");
     await screen.findByRole("heading", { name: "Mood boards" });
     await passarODebounce();
     expect(screen.queryByTitle(/a guardar/i)).toBeNull();
@@ -7716,7 +7760,7 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
     // decide é o documento ser igual ao que se abriu. Sem isto, tocar no ecrã
     // para ler acendia o alarme na mesma — e era esse o defeito.
     const user = userEvent.setup();
-    renderStudio();
+    renderStudio("Inspiração");
     await user.click(await screen.findByRole("heading", { name: "Mood boards" }));
     await passarODebounce();
     expect(corpos("proposta-rascunho")).toEqual([]);
@@ -7746,7 +7790,7 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
     // amanhã. Ver também «um marcador deixado num rascunho antigo» e «o preço
     // do pedido sobrevive ao rascunho do servidor».
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     await screen.findByRole("heading", { name: "Mood boards" });
     await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
       timeout: 3000,
@@ -7888,7 +7932,7 @@ describe("o orçamento a 390 px", () => {
         budgetItems: ["Decor Cerimónia"],
       }),
     );
-    renderStudio();
+    renderStudio("Orçamento");
     const nome = await screen.findByRole("textbox", { name: "Item de orçamento" });
     // `min-w-[12rem]` é o mesmo mínimo que a fase do cronograma e os títulos de
     // grupo do `ServicesEditor` já usam. Com ele, o `flex-wrap` que já lá estava
@@ -7906,7 +7950,7 @@ describe("o orçamento a 390 px", () => {
         budgetRows: [{ item: "Coordenação do dia", price: "1.500,00 €" }],
       }),
     );
-    renderStudio();
+    renderStudio("Orçamento");
     const item = await screen.findByRole("textbox", { name: "Item" });
     // A descrição ocupa a fila toda enquanto a LISTA for estreita, e o valor
     // desce para baixo — o mesmo desenho que as linhas adicionais já usavam.
@@ -8022,7 +8066,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
 
   it("remover uma página pergunta, e a pergunta nomeia, conta e diz onde ela saía", async () => {
     seedDuasPaginas();
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await screen.findAllByLabelText("Título do mood board");
     await user.click(screen.getAllByRole("button", { name: "Remover mood board" })[0]);
@@ -8041,7 +8085,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
 
   it("cancelar a remoção da página não perde nada nem escreve nada", async () => {
     seedDuasPaginas();
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await screen.findAllByLabelText("Título do mood board");
     // O que está gravado ANTES — é com isto que se compara no fim.
@@ -8063,7 +8107,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
 
   it("e confirmar remove mesmo — o caminho feliz não mudou", async () => {
     seedDuasPaginas();
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await screen.findAllByLabelText("Título do mood board");
     await user.click(screen.getAllByRole("button", { name: "Remover mood board" })[0]);
@@ -8078,7 +8122,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
 
   it("remover uma fase pergunta, nomeando-a e contando as tarefas", async () => {
     seedComCronograma();
-    renderStudio();
+    renderStudio("Cronograma");
     const user = userEvent.setup();
     await screen.findAllByLabelText("Título da fase");
     await user.click(screen.getAllByRole("button", { name: "Remover fase" })[0]);
@@ -8091,7 +8135,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
 
   it("cancelar a remoção da fase não perde nada nem escreve nada", async () => {
     seedComCronograma();
-    renderStudio();
+    renderStudio("Cronograma");
     const user = userEvent.setup();
     await screen.findAllByLabelText("Título da fase");
     await user.click(screen.getAllByRole("button", { name: "Remover fase" })[0]);
@@ -8110,7 +8154,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
     // A consequência que não se vê a olhar para o cartão: sem nenhuma fase com
     // tarefas, o cronograma deixa de ter folha no PDF.
     seedComCronograma();
-    renderStudio();
+    renderStudio("Cronograma");
     const user = userEvent.setup();
     await screen.findAllByLabelText("Título da fase");
     // Tira-se a segunda (uma tarefa só) e volta-se à primeira, que fica
@@ -8327,7 +8371,7 @@ describe("o estúdio diz o que mudou quando não se vê", () => {
         moodboard: { title: "Cerimónia", annotation: "", images: ["q1/cerimonia-1.jpg"] },
       },
     ];
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await user.click((await screen.findAllByRole("button", { name: /De um modelo…/ }))[0]);
     await user.click(await screen.findByRole("button", { name: "Cerimónia" }));
@@ -8362,7 +8406,7 @@ describe("o estúdio diz o que mudou quando não se vê", () => {
         totalVatMode: "acrescer",
       }),
     );
-    renderStudio();
+    renderStudio("Orçamento");
     const user = userEvent.setup();
     await user.click((await screen.findAllByRole("button", { name: "Arrumar eu" }))[0]);
 
@@ -8415,7 +8459,7 @@ describe("o estúdio diz o que mudou quando não se vê", () => {
   it("o «Tentar» de uma célula sem fotografia diz quando também não deu", async () => {
     seedDraft(1);
     assetsFalham = true;
-    renderStudio();
+    renderStudio("Inspiração");
 
     await user_clicarNoTentar();
     // Falha outra vez: a célula volta EXACTAMENTE ao que era antes do clique,
@@ -8452,7 +8496,7 @@ describe("o estúdio diz o que mudou quando não se vê", () => {
         totalVatMode: "acrescer",
       }),
     );
-    renderStudio();
+    renderStudio("Inspiração");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Duplicar o mood board 1" }));
 
@@ -8955,6 +8999,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
       seedDraft(4);
       renderStudio();
       await screen.findByRole("textbox", { name: "Clientes" });
+      irAoPasso("Inspiração");
       const indice = screen.getByRole("navigation", { name: "Índice das páginas de inspiração" });
       const grelha = indice.parentElement!;
       const tira = indice.querySelector("ul")!;
@@ -9043,7 +9088,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
           budgetItems: ["Decor Cerimónia"],
         }),
       );
-      renderStudio();
+      renderStudio("Orçamento");
       const nome = await screen.findByRole("textbox", { name: "Item de orçamento" });
       const linha = nome.parentElement!;
       const lista = contentorDe(nome);
@@ -9137,7 +9182,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
 
     it("os valores adicionais: cabeçalho, fila e descrição no MESMO limiar", async () => {
       seedComPrecosEAdicionais();
-      renderStudio();
+      renderStudio("Orçamento");
       const desc = await screen.findByRole("textbox", { name: "Descrição da linha adicional" });
       const linha = desc.parentElement!.parentElement!;
       const lista = contentorDe(desc);
@@ -9166,7 +9211,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
           budgetRows: [{ item: "Coordenação do dia", price: "1.500,00 €" }],
         }),
       );
-      renderStudio();
+      renderStudio("Orçamento");
       const item = await screen.findByRole("textbox", { name: "Item" });
       const linha = item.parentElement!;
       const daFila = varianteDe(linha.className, "grid-cols-[minmax");
@@ -9195,7 +9240,7 @@ describe("o estúdio numa coluna, e não numa janela", () => {
 
   it("o par PT/EN só fica lado a lado onde as duas caixas cabem — sem corte nenhum", async () => {
     seedDraftEmIngles(1);
-    renderStudio();
+    renderStudio("Orçamento");
     const rotulo = await screen.findByRole("textbox", { name: "Rótulo do total" });
     // O invólucro do par: `flex-wrap` puro, que é a resposta que o
     // `Cortes.contrato.test.ts` manda dar quando a pergunta é sobre a caixa.
@@ -9418,7 +9463,7 @@ describe("as dobras do estúdio apresentam o que abrem", () => {
 
   it("ao carregar a proposta, NENHUM corpo de secção anima", async () => {
     seedDraft(1);
-    renderStudio();
+    renderStudio("Inspiração");
     await screen.findByRole("heading", { name: "Mood boards" });
     const corpos = Array.from(document.querySelectorAll<HTMLElement>('[id^="sec-"]'));
     // CONTROLO POSITIVO: as secções estão MESMO desenhadas — senão «nenhuma
@@ -9616,5 +9661,106 @@ describe("o que não é um valor diz-se, e não se grava", () => {
     expect(document.getElementById("sinal-erro")?.textContent).toMatch(/entre 1% e 99%/);
     await user.tab();
     expect((sinal as HTMLInputElement).value).toBe("30");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS CINCO PASSOS (A2 de `docs/FAZER-PROPOSTA-MELHORIAS.md`)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O critério de pronto do documento dela: «percorro os cinco passos, saio e
+ * volto, e nada se perdeu; cada passo mostra o seu estado».
+ */
+describe("os cinco passos do estúdio", () => {
+  const passoActivo = () =>
+    screen
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("aria-current") === "step")
+      ?.textContent?.replace(/[✓•!]|,.*$/g, "")
+      .trim();
+
+  it("percorre os cinco com «Seguinte», volta ao primeiro, e nada se perdeu", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    const clientes = (await screen.findByLabelText(/^Clientes/)) as HTMLInputElement;
+    await user.clear(clientes);
+    await user.type(clientes, "Ana & Rui");
+
+    for (const proximo of ["Serviços", "Inspiração", "Orçamento", "Rever e enviar"]) {
+      await user.click(screen.getByRole("button", { name: new RegExp(`^Seguinte: ${proximo}`) }));
+      expect(passoActivo()).toMatch(new RegExp(proximo));
+    }
+
+    await user.click(screen.getByRole("button", { name: /^1\s*Evento/ }));
+    // O MESMO campo, e não um novo com o mesmo valor: o formulário não remontou.
+    const deVolta = screen.getByLabelText(/^Clientes/) as HTMLInputElement;
+    expect(deVolta).toBe(clientes);
+    expect(deVolta.value).toBe("Ana & Rui");
+  });
+
+  it("o «← anterior» só existe a partir do segundo passo", async () => {
+    seedDraft(1);
+    renderStudio();
+    await screen.findByLabelText(/^Clientes/);
+    expect(screen.queryByRole("button", { name: /^← / })).toBeNull();
+    irAoPasso("Serviços");
+    expect(screen.getByRole("button", { name: /^← Evento/ })).toBeTruthy();
+  });
+
+  it("uma falta que trava põe o seu passo e o «Rever e enviar» em erro", async () => {
+    seedDraft(1);
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+        clientNames: "",
+      }),
+    );
+    renderStudio();
+    await screen.findByLabelText(/^Clientes/);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^1\s*Evento/ })).toHaveAttribute(
+        "data-estado",
+        "erro",
+      ),
+    );
+    expect(screen.getByRole("button", { name: /^5\s*Rever e enviar/ })).toHaveAttribute(
+      "data-estado",
+      "erro",
+    );
+    // E di-lo a quem ouve, não só com o «!».
+    expect(screen.getByRole("button", { name: /^1\s*Evento/ }).textContent).toMatch(/com erros/);
+  });
+
+  it("o sinal do «Rever e enviar» bate com o botão de descarregar", async () => {
+    seedDraft(1);
+    renderStudio("Rever e enviar");
+    const descarregar = await screen.findByRole("button", { name: /^Descarregar (PDF|rascunho)$/ });
+    const estado = screen
+      .getByRole("button", { name: /^5\s*Rever e enviar/ })
+      .getAttribute("data-estado");
+    // A mesma lista decide as duas coisas: rascunho ⇔ erro.
+    expect(estado === "erro").toBe(/rascunho/.test(descarregar.textContent ?? ""));
+  });
+
+  it("na Inspiração o índice da esquerda sai, e volta no passo seguinte", async () => {
+    seedDraft(1);
+    renderStudio();
+    expect(await screen.findByRole("navigation", { name: "Secções da proposta" })).toBeTruthy();
+    irAoPasso("Inspiração");
+    expect(screen.queryByRole("navigation", { name: "Secções da proposta" })).toBeNull();
+    irAoPasso("Orçamento");
+    expect(screen.getByRole("navigation", { name: "Secções da proposta" })).toBeTruthy();
+  });
+
+  it("carregar no índice numa secção de outro passo leva a esse passo", async () => {
+    seedDraft(1);
+    renderStudio();
+    const indice = await screen.findByRole("navigation", { name: "Secções da proposta" });
+    const user = userEvent.setup();
+    await user.click(within(indice).getAllByRole("button", { name: /^Total/ })[0]);
+    await waitFor(() => expect(passoActivo()).toMatch(/Orçamento/));
   });
 });

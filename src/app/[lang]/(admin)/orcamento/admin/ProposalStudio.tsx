@@ -10759,52 +10759,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </p>
               )}
               {/* ══════════════════════════════════════════════════════════
-                  A LÍNGUA TAMBÉM SE ESCOLHE AQUI, ONDE SE ENVIA
+                  O QUE A LÍNGUA DECIDE, DITO ONDE SE ENVIA
                   ══════════════════════════════════════════════════════════
 
-                  A escolha vivia só por cima do «Descarregar PDF», e enquanto
-                  desenhava um PDF para ela ver isso chegava. Deixou de chegar:
-                  a língua fica GRAVADA com a proposta e decide o email que o
-                  casal recebe, o nome do anexo, a página onde ele responde e o
-                  que sai quando ele voltar a descarregar o documento.
-
-                  E os passos deste estúdio são clicáveis — dá para ir do
-                  Conteúdo direito ao Enviar sem passar pela pré-visualização.
-                  Sem este controlo, quem fizesse esse caminho mandava sempre
-                  português sem nunca ver a pergunta.
-
-                  É o MESMO estado do passo 2 (`idiomaDoPdf`), de propósito:
-                  duas caixas independentes eram a maneira certa de enviar em
-                  inglês um documento pré-visualizado em português.
-
-                  A nota diz o que muda ALÉM do PDF, porque é isso que é novo —
-                  a ressalva sobre o que o documento traduz (e o que não
-                  traduz) está no passo 2, ao lado do botão que o gera. */}
-              <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="text-sm text-[var(--bo-text-muted)]">Idioma</span>
-                <Segmented
-                  size="sm"
-                  ariaLabel="Idioma da proposta"
-                  value={idiomaDoPdf}
-                  onChange={setIdiomaDoPdf}
-                  options={[
-                    { value: "pt", label: "Português" },
-                    {
-                      value: "en",
-                      label: "Inglês",
-                      ariaLabel:
-                        "Inglês — o documento, o email ao cliente e a página onde ele responde saem em inglês",
-                    },
-                  ]}
-                />
-                <p className="w-full text-[11px] leading-snug text-foreground/50">
-                  Em inglês, o email ao cliente (assunto, texto e botão), o nome do ficheiro em
-                  anexo e a página onde ele responde saem em inglês, e é essa a língua que fica
-                  guardada com a proposta. O modelo «Proposta enviada» não é usado nesse caso, por
-                  estar escrito em português: sai o texto da casa. O contrato e a factura são
-                  documentos portugueses e não mudam.
-                </p>
-              </div>
+                  Havia aqui um segundo selector da língua, porque o primeiro
+                  vivia só no passo de pré-visualizar e dava para ir direito ao
+                  envio sem o ver. Com os cinco passos (A2) os dois ficaram no
+                  MESMO ecrã — dois controlos para a mesma coisa, a meio palmo
+                  um do outro. Fica um só, o da barra de baixo, encostado ao
+                  «Descarregar» e ao «Gerar e enviar», como ela pediu («na parte
+                  de descarregar ou gerar, um botão para escolher gerar em
+                  inglês»). Aqui fica a explicação do que a escolha decide além
+                  do PDF, porque é isso que ela tem de saber antes de enviar. */}
+              <p className="mt-5 text-[11px] leading-snug text-foreground/50">
+                A língua escolhe-se em baixo, ao lado do «Descarregar». Em inglês, o email ao
+                cliente (assunto, texto e botão), o nome do ficheiro em anexo e a página onde ele
+                responde saem em inglês, e é essa a língua que fica guardada com a proposta. O
+                modelo «Proposta enviada» não é usado nesse caso, por estar escrito em português:
+                sai o texto da casa. O contrato e a factura são documentos portugueses e não mudam.
+              </p>
               {/* ── A MENSAGEM QUE SEGUE COM A PROPOSTA ────────────────────
                   Aqui, logo abaixo do resumo do que vai seguir e ANTES das
                   conferências: faz parte do que o cliente vai receber, e é
@@ -11473,45 +11446,233 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             >
               ← {nomeDoPasso("orcamento")}
             </Button>
-            {/* ── O DESCARREGAR VEIO DO ANTIGO «PRÉ-VISUALIZAR» (A2) ──────────
+            {/* ── A LÍNGUA E O DESCARREGAR VIERAM DO ANTIGO «PRÉ-VISUALIZAR» (A2) ──
                 O documento junta pré-visualizar e enviar num passo só, «Rever
-                e enviar». A escolha da língua deixou de estar aqui: o mesmo
-                selector está no corpo do passo, ao pé do canal e da mensagem,
-                e dois selectores para a mesma coisa era um a mais. */}
-            {busy !== "send" &&
-              (busy === "preview" ? (
-                <EmCurso
-                  className="max-w-xs"
-                  // A língua continua dita enquanto roda: são dezenas de
-                  // segundos numa proposta cheia, tempo que chega para deixar
-                  // de haver a certeza do que se escolheu — o português
-                  // cala-se porque é o de sempre.
-                  titulo={idiomaDoPdf === "en" ? "A gerar o PDF em inglês…" : "A gerar o PDF…"}
-                  estimadoMs={tempoEstimado(totalDeFotos, amostras)}
-                  nota="Assim que estiver desenhado, o PDF é descarregado."
-                  notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
-                />
-              ) : (
-                /* ── O PDF FINAL SÓ SAI SEM ERROS (B1) ─────────────────────
-                      Com um erro na lista do «Rever e enviar», este botão passa
-                      a dar o RASCUNHO, e di-lo no rótulo. A razão vai no
-                      `title` e não numa frase por baixo: esta barra é fina por
-                      pedido dela, e a lista com as razões está neste mesmo
-                      passo, por cima, com links para cada uma. */
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => preview({ rascunho: temErros })}
-                  disabled={busy !== null}
-                  title={
-                    temErros
-                      ? "Há erros por resolver em «Rever e enviar». O PDF final fica disponível quando a lista estiver sem erros; o rascunho sai com «RASCUNHO» no rodapé."
-                      : undefined
-                  }
-                >
-                  {temErros ? "Descarregar rascunho" : "Descarregar PDF"}
-                </Button>
-              ))}
+                e enviar». O selector da língua fica encostado ao «Descarregar»,
+                como ela pediu (ver o comentário lá dentro), e é o mesmo estado
+                do selector do corpo do passo — mudar um muda o outro. */}
+            {busy !== "send" && (
+              <>
+                {/* ══════════════════════════════════════════════════════════════
+                    A LÍNGUA ESCOLHE-SE EM CIMA DO BOTÃO QUE GERA
+                    ══════════════════════════════════════════════════════════════
+
+                    Palavras dela: «na parte de descarregar ou gerar, um botão para
+                    escolher gerar em inglês».
+
+                    Fica encostado ao «Descarregar PDF» e À VISTA — não num menu,
+                    não nas definições da proposta. A escolha é sobre ESTE clique:
+                    a mesma proposta sai agora em português e daqui a um minuto em
+                    inglês, sem nada mudar no documento. Escondida, seria
+                    descoberta depois de o PDF já ter saído na língua errada — e
+                    gerar outra vez é um minuto de espera com fotografias a sério.
+
+                    ── E A ESCOLHA TEM DE DIZER O QUE FAZ ──────────────────────
+                    Só a MOLDURA é traduzida: rótulos, texto padrão da casa, datas
+                    e dinheiro. Os títulos dos serviços, as descrições e as
+                    legendas que ela escreveu saem tal e qual — foi decisão
+                    explícita, e está escrita no cabeçalho de
+                    `proposal-doc-textos`. Sem esta linha, quem carrega em «Inglês»
+                    abre um PDF meio inglês e conclui que está avariado; com ela,
+                    sabe que o remédio é escrever esses campos em inglês.
+
+                    A linha está sempre no ecrã, e não só depois de escolher: serve
+                    para DECIDIR, não para explicar um arrependimento. */}
+                <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
+                  <Segmented
+                    size="sm"
+                    ariaLabel="Idioma da proposta"
+                    value={idiomaDoPdf}
+                    onChange={setIdiomaDoPdf}
+                    options={[
+                      { value: "pt", label: "Português" },
+                      {
+                        value: "en",
+                        label: "Inglês",
+                        // Quem ouve o controlo em vez de o ver leva a mesma
+                        // ressalva que está escrita por baixo — o aviso não pode
+                        // viver só nos pixéis. Começa por «Inglês», que é o rótulo
+                        // visível, para o nome falado e o nome escrito não
+                        // divergirem.
+                        ariaLabel:
+                          "Inglês — o documento, o email ao cliente e a página onde ele responde saem em inglês; os campos que preencheste, incluindo a data do evento, ficam como os escreveste",
+                      },
+                    ]}
+                  />
+                  {/* ══════════════════════════════════════════════════════════
+                      ENQUANTO O PDF SE DESENHA
+                      ══════════════════════════════════════════════════════════
+
+                      É o MESMO desenho de documento que o envio faz, na mesma
+                      rota, com a mesma espera de 10 a 60 segundos — e aqui havia
+                      só um botão a rodar, que ao fim de meio minuto se lê como
+                      «isto encravou». A caixa entra no lugar do botão (é onde o
+                      estado já vivia, e assim não empurra o selector de idioma
+                      nem a ressalva de baixo) e a estimativa é a mesma que o
+                      `AEnviarAProposta` usa: aprendida das gerações anteriores
+                      desta instalação, e não um número escrito à mão.
+
+                      A espera é OPACA de propósito: é um pedido só, e do lado de
+                      cá não há nada para contar até a resposta chegar. */}
+                  {busy === "preview" ? (
+                    <EmCurso
+                      className="max-w-xs"
+                      // A língua continua dita enquanto roda: são dezenas de
+                      // segundos numa proposta cheia, tempo que chega para deixar
+                      // de haver a certeza do que se escolheu — o português
+                      // cala-se porque é o de sempre.
+                      titulo={idiomaDoPdf === "en" ? "A gerar o PDF em inglês…" : "A gerar o PDF…"}
+                      estimadoMs={tempoEstimado(totalDeFotos, amostras)}
+                      nota="Assim que estiver desenhado, o PDF é descarregado."
+                      notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
+                    />
+                  ) : (
+                    /* ── O PDF FINAL SÓ SAI SEM ERROS (B1) ─────────────────────
+                        Com um erro na lista do «Rever e enviar», este botão passa
+                        a dar o RASCUNHO, e di-lo no rótulo. A razão vai no
+                        `title` e não numa frase por baixo: esta barra é fina por
+                        pedido dela, e a lista com as razões está no passo a
+                        seguir, com links para cada uma. */
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => preview({ rascunho: temErros })}
+                      disabled={busy !== null}
+                      title={
+                        temErros
+                          ? "Há erros por resolver em «Rever e enviar». O PDF final fica disponível quando a lista estiver sem erros; o rascunho sai com «RASCUNHO» no rodapé."
+                          : undefined
+                      }
+                    >
+                      {temErros ? "Descarregar rascunho" : "Descarregar PDF"}
+                    </Button>
+                  )}
+                  {/* ══════════════════════════════════════════════════════════
+                      A RESSALVA TEM DE SER VERIFICÁVEL NO PAPEL
+                      ══════════════════════════════════════════════════════════
+
+                      Quem a lê vai a seguir mandar o PDF a um cliente inglês.
+
+                      Já esteve errada duas vezes, e das duas por prometer a
+                      descoberta ao cliente: prometeu «datas» quando a data do
+                      evento saía em português, e depois prometeu que os campos
+                      preenchidos ficavam TODOS como estavam — quando a data e o
+                      tipo de evento passaram a traduzir-se sozinhos e a prosa dela
+                      passou a ter uma segunda caixa.
+
+                      Diz agora as três coisas que são verdade, e nenhuma a mais:
+                      o que ela traduziu sai em inglês, o que não traduziu sai em
+                      português, e os valores ficam à portuguesa. */}
+                  {/* ── ISTO É PROSA DENTRO DE UMA BARRA COLADA, E ISSO CUSTA ECRÃ ──
+                      A barra do fundo é `sticky` e `flex-wrap`: um filho `w-full`
+                      não ocupa uma linha, ocupa uma LINHA SÓ PARA ELE. A 375 px
+                      estas três frases dão cinco linhas de texto, e a barra —
+                      que já se sobrepõe ao conteúdo e já lhe rouba a folga por
+                      baixo — cresce outro tanto. Ela mandou a fotografia: com a
+                      barra de navegação por baixo, sobrava menos de metade do ecrã
+                      para a proposta que estava a escrever.
+
+                      Já havia uma máquina a MEDIR a barra e a reservar essa altura
+                      ao conteúdo (ver o comentário do passo 1). Resolvia o sintoma
+                      — o que ficava por baixo deixou de ser inalcançável — e
+                      deixava a causa de pé: uma barra livre de crescer cresce.
+
+                      Não se esconde. Mostra-se QUANDO É A PERGUNTA: este parágrafo
+                      responde a «o que muda se eu escolher inglês?», e ela trabalha
+                      em português. Com «Português» escolhido fica uma linha, que
+                      chega para saber que há uma diferença e onde a ler; com
+                      «Inglês» escolhido abre inteiro, porque aí é a consequência do
+                      que ela acabou de fazer.
+
+                      Em ecrã largo abre sempre: lá a barra tem espaço, e a única
+                      razão para o encurtar era a que não existe. */}
+                  {/* ── E AGORA UMA LINHA SÓ, EM QUALQUER ECRÃ ─────────────────
+                      Palavras dela, com a captura desta barra e da do passo 3:
+                      «coloca estas barras muito mais finas de modo a não estarem
+                      a atrapalhar o trabalho de por trás». No ecrã largo o texto
+                      inteiro ocupava uma linha só para ele, e a barra tinha três
+                      andares (voltar · idioma e PDF · ressalva · «Rever e
+                      enviar»).
+
+                      Com «Português» fica a frase curta, À VISTA e na mesma fila
+                      dos controlos — continua dito, antes do clique, que o inglês
+                      muda o documento. O texto inteiro fica para o leitor de ecrã
+                      (`sr-only`) e abre à vista quando se escolhe «Inglês», que é
+                      quando passa a ser a consequência do que ela fez. */}
+                  <p
+                    className={
+                      idiomaDoPdf === "en"
+                        ? "w-full text-right text-[11px] leading-snug text-foreground/50"
+                        : "order-first text-[11px] leading-snug text-foreground/50"
+                    }
+                  >
+                    {idiomaDoPdf === "en" ? (
+                      <>
+                        Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
+                        data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
+                        «EN»; o que ficar em branco sai em português. Os valores continuam à
+                        portuguesa (1.234,56 €).
+                      </>
+                    ) : (
+                      <>
+                        <span aria-hidden="true">Em inglês muda a moldura do documento.</span>
+                        <span className="sr-only">
+                          Em inglês sai a moldura do documento — rótulos, textos da casa, condições,
+                          a data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas
+                          caixas «EN»; o que ficar em branco sai em português. Os valores continuam
+                          à portuguesa (1.234,56 €).
+                        </span>
+                      </>
+                    )}
+                  </p>
+                  {/* ── O QUE FALTA, DITO ANTES DO CLIQUE ──────────────────────
+                      Este é o sítio onde o PDF nasce, e o primeiro PDF inglês sai
+                      quase sempre antes de a Conferência ser vista. Um `toast` não
+                      serviria: o toast conta o que ACONTECEU, e isto conta o que
+                      vai acontecer — tem de estar à vista antes de se carregar.
+                      `aria-live` porque o número muda com o selector ao lado. */}
+                  {idiomaDoPdf === "en" &&
+                    (() => {
+                      /*
+                       * As duas contas, e as duas frases.
+                       *
+                       * «Vai sair em português» é verdade sobre um campo VAZIO e é
+                       * falso sobre um desactualizado — esse tem inglês e vai sair
+                       * em inglês, só que no inglês errado. Duas coisas com dois
+                       * remédios: uma traduz-se, a outra relê-se.
+                       */
+                      const faltam = camposPorTraduzir(doc as ProposalDoc);
+                      const velhas = camposPorRever(doc as ProposalDoc).filter(
+                        (c) => c.estado === "desactualizado",
+                      );
+                      if (faltam.length === 0 && velhas.length === 0) return null;
+                      const primeiro = faltam[0] ?? velhas[0];
+                      return (
+                        <p
+                          aria-live="polite"
+                          className="w-full text-right text-[11px] leading-snug text-[var(--bo-aviso)]"
+                        >
+                          {faltam.length > 0 &&
+                            (faltam.length === 1
+                              ? "1 campo ainda não tem versão inglesa — vai sair em português."
+                              : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`)}{" "}
+                          {velhas.length > 0 &&
+                            (velhas.length === 1
+                              ? "1 tradução ficou para trás do português."
+                              : `${velhas.length} traduções ficaram para trás do português.`)}{" "}
+                          <button
+                            type="button"
+                            onClick={() => irParaCampo(primeiro.campo, "en")}
+                            className={`font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+                          >
+                            Ver quais
+                          </button>
+                        </p>
+                      );
+                    })()}
+                </div>
+              </>
+            )}
             {/* ── ENQUANTO ESTÁ A IR ──────────────────────────────────────
                 «Ao enviar a proposta quero que haja uma animação que eu perceba
                 que está a ser enviado.» Não havia nenhuma: o `send()` fechava a
@@ -11559,12 +11720,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      // O corte de fotos é nos mood boards; o de linhas, nos
-                      // serviços — é lá que se corrige.
+                      // Leva ao passo onde o corte se corrige: as fotos a
+                      // mais estão nos mood boards, o nome comprido está na
+                      // capa (o passo do Evento), e as outras linhas cortadas
+                      // são de serviços.
+                      const corte = cortesPorConfirmar?.[0];
                       setStep(
-                        cortesPorConfirmar?.some((c) => c.unit === "fotos")
-                          ? "inspiracao"
-                          : "servicos",
+                        !corte
+                          ? "evento"
+                          : corte.unit === "fotos"
+                            ? "inspiracao"
+                            : /capa/i.test(corte.where)
+                              ? "evento"
+                              : "servicos",
                       );
                       setCortesPorConfirmar(null);
                     }}
