@@ -186,6 +186,11 @@ test("A2 · emojis e acentos sobrevivem a gravar e reler", async ({ page }) => {
   // Lia-se como «os emojis perderam-se», que é a acusação errada: o que se quer
   // provar é que o RASCUNHO os guardou, e para isso há que reabrir o estúdio —
   // que é o que uma pessoa faz.
+  //
+  // E recarregar nem sempre volta ao «Fazer proposta»: o `next dev` desta
+  // versão abre na Visão Geral e reescreve a vista guardada (está no
+  // AGENTS.md). Vai-se lá pelo mesmo caminho do `abrirEstudio`.
+  await irPara(page, /^Fazer proposta$/);
   const cliente = page.locator("main li button:visible").first();
   await expect(cliente, "a lista de clientes depois de recarregar").toBeVisible({
     timeout: 30_000,
