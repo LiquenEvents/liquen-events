@@ -654,7 +654,6 @@ export const PHOTOS: PhotoSrc[] = [
   { src: "/imagens/galeria-instagram-55-09.jpg", label: "Casamento" },
   { src: "/imagens/galeria-instagram-55-11.jpg", label: "Casamento" },
   { src: "/imagens/galeria-instagram-55-13.jpg", label: "Casamento" },
-  { src: "/imagens/galeria-instagram-55-16.jpg", label: "Casamento" },
   { src: "/imagens/galeria-instagram-55-17.jpg", label: "Casamento" },
   { src: "/imagens/galeria-instagram-55-18.jpg", label: "Casamento" },
   { src: "/imagens/galeria-instagram-55-19.jpg", label: "Casamento" },
