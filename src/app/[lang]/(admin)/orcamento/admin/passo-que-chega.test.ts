@@ -38,7 +38,7 @@ describe("o passo que chega apresenta-se", () => {
   it("os passos 1 a 4 entram com a classe, e o formulário continua montado quando sai", () => {
     // A classe depende do passo, e o `hidden` também: os dois no mesmo nó.
     expect(FONTE).toMatch(
-      /className=\{`@container\/estudio \$\{noFormulario \? "view-in" : ""\}`\}\s*\n\s*hidden=\{!noFormulario\}/,
+      /className=\{`@container\/estudio \$\{noFormulario \? "view-in" : ""\}`\}\s*hidden=\{!noFormulario\}/,
     );
   });
 
