@@ -65,7 +65,8 @@ export const deleteCalendarEvent = (id: string): Promise<void> => repo.remove(id
 
 /** Para a Reciclagem: ler uma marcação, e repô-la tal e qual — com o MESMO id. */
 export const obterEvento = (id: string): Promise<CalendarEvent | null> => repo.get(id);
-export const reporEvento = (e: CalendarEvent): Promise<void> => repo.create(e);
+export const reporEvento = (e: CalendarEvent): Promise<void> =>
+  repo.create(e, { created_at: e.createdAt });
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

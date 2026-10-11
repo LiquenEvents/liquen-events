@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { getTheme, updateTheme, deleteTheme, listThemes } from "@/lib/themes-store";
+import { getTheme, updateTheme, listThemes } from "@/lib/themes-store";
 import { isThemePath, themeIdOfPath, themeFolder } from "@/lib/theme-storage";
-import { apagarPastaDaBiblioteca } from "@/lib/theme-materializar";
+import { NaoDeuParaApagar, enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import {
@@ -166,29 +166,17 @@ export async function DELETE(
   try {
     const theme = await getTheme(id);
     if (!theme) return NextResponse.json({ error: "Tema não encontrado" }, { status: 404 });
-    // Storage primeiro, e só avançamos se ele CONFIRMAR a limpeza: apagar os
-    // metadados com fotos por apagar deixava-as órfãs e invisíveis, sem forma
-    // de lá voltar. Assim o tema continua listado e a ação pode ser repetida.
-    const cleaned = await apagarPastaDaBiblioteca(id);
-    if (!cleaned.ok) {
-      log.error("temas DELETE: limpeza do Storage falhou", null, {
-        id,
-        removed: cleaned.removed,
-        motivo: cleaned.motivo,
-      });
-      return NextResponse.json(
-        {
-          error:
-            cleaned.motivo === "referencias"
-              ? "Há propostas que usam fotos deste tema e não foi possível guardar lá uma cópia. O tema NÃO foi eliminado — tenta de novo."
-              : "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tenta de novo.",
-        },
-        { status: 502 },
-      );
-    }
-    await deleteTheme(id);
-    return NextResponse.json({ ok: true });
+    // Pela Reciclagem (fase R3b de `docs/TUDO-REVERSIVEL.md`): as propostas
+    // que usam fotos do tema ficam com a sua cópia, a linha sai, e as fotos
+    // ficam na pasta 30 dias. Sem a tabela é o de sempre: o Storage primeiro,
+    // e só se ele CONFIRMAR a limpeza é que a linha sai (`reciclagem.ts`).
+    const reciclagem = await enviarParaAReciclagem("tema", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
+    if (err instanceof NaoDeuParaApagar) {
+      log.error("temas DELETE: o tema não saiu", null, { id, porque: err.message });
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     if (isMissingTable(err)) {
       return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
     }

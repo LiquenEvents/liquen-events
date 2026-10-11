@@ -6,6 +6,7 @@ import {
   copyThemeImageToProposal,
   deleteThemeFolder,
   deleteThemeImage,
+  levarFotoParaAReciclagem,
   themeFolder,
 } from "./theme-storage";
 import { caminhoDoRefDeTema, ehRefDeTema, themeIdOfPath } from "./theme-ref";
@@ -260,4 +261,27 @@ export async function apagarPastaDaBiblioteca(
   const salvo = await materializarAntesDeApagar((p) => themeIdOfPath(p) === pasta);
   if (!salvo.ok) return { ok: false, removed: 0, motivo: "referencias" };
   return deleteThemeFolder(themeId);
+}
+
+// ── E as duas portas da Reciclagem (fase R3b de `docs/TUDO-REVERSIVEL.md`) ──
+//
+// A mesma salvaguarda, antes de a foto (ou o tema) sair de vista. As propostas
+// ficam com a sua cópia, como ficavam ao apagar; e ao repor continuam com ela.
+
+/** Leva UMA foto para a Reciclagem, depois de pôr a salvo quem a referencia. */
+export async function guardarFotoNaReciclagem(
+  path: string,
+  destino: string,
+): Promise<{ ok: boolean; motivo?: "referencias" }> {
+  const salvo = await materializarAntesDeApagar((p) => p === path);
+  if (!salvo.ok) return { ok: false, motivo: "referencias" };
+  return { ok: await levarFotoParaAReciclagem(path, destino) };
+}
+
+/** Põe a salvo quem referencia QUALQUER foto do tema, antes de o tema ir para
+ *  a Reciclagem. As fotos ficam onde estão: só a linha do tema sai. */
+export async function salvarAntesDeReciclarOTema(themeId: string): Promise<boolean> {
+  const pasta = themeFolder(themeId);
+  if (!pasta) return false;
+  return (await materializarAntesDeApagar((p) => themeIdOfPath(p) === pasta)).ok;
 }

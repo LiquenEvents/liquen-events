@@ -3,7 +3,8 @@ import type { Proposal, Quote } from "@/lib/orcamento/types";
 import { transicaoDoPedido, type AcontecimentoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { ehMotivoDeRecusa } from "@/lib/orcamento/desfecho";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
-import { apagarPedidoSemContrato } from "@/lib/apagar-pedido";
+import type { ResultadoDoApagamento } from "@/lib/apagar-pedido";
+import { NaoDeuParaApagar, enviarComDetalhe, quemApagou } from "@/lib/reciclagem";
 import {
   semearProducaoAoGanhar,
   preverGeracaoDoEvento,
@@ -618,11 +619,18 @@ export async function DELETE(
 
   const { id } = await params;
   try {
-    const r = await apagarPedidoSemContrato(id);
-    if (!r.apagado && r.motivo === "nao-existe") {
+    // Pela Reciclagem (fase R3b de `docs/TUDO-REVERSIVEL.md`): o pedido fica lá
+    // 30 dias, com as propostas, os rascunhos e o material — e a pasta das
+    // fotografias espera no Storage. Sem a tabela, é o apagar de sempre.
+    const { reciclagem, detalhe } = await enviarComDetalhe("pedido", id, quemApagou(request));
+    const r = detalhe as ResultadoDoApagamento;
+    return NextResponse.json({ ok: true, contou: r.contou, falhou: r.falhou, reciclagem });
+  } catch (err) {
+    const r = err instanceof NaoDeuParaApagar ? (err.detalhe as ResultadoDoApagamento) : null;
+    if (r?.motivo === "nao-existe") {
       return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     }
-    if (!r.apagado && r.motivo === "tem-contrato") {
+    if (r?.motivo === "tem-contrato") {
       return NextResponse.json(
         {
           error:
@@ -632,14 +640,12 @@ export async function DELETE(
         { status: 409 },
       );
     }
-    if (!r.apagado) {
+    if (r) {
       return NextResponse.json(
         { error: "Não consegui apagar este pedido.", falhou: r.falhou },
         { status: 500 },
       );
     }
-    return NextResponse.json({ ok: true, contou: r.contou, falhou: r.falhou });
-  } catch (err) {
     log.error("orcamento DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

@@ -142,6 +142,30 @@ const apagamento = vi.hoisted(() => ({
   })),
 }));
 vi.mock("@/lib/apagar-pedido", () => ({ apagarPedidoSemContrato: apagamento.correr }));
+// Apagar passa pela Reciclagem (R3b, `src/lib/reciclagem.ts`, com testes
+// próprios). Aqui interessa a rota: a guarda, e as respostas de cada desfecho
+// do `apagarPedidoSemContrato` — que a Reciclagem devolve tal e qual.
+const reciclagem = vi.hoisted(() => {
+  class NaoDeuParaApagar extends Error {
+    constructor(
+      m: string,
+      readonly status: number,
+      readonly detalhe?: unknown,
+    ) {
+      super(m);
+    }
+  }
+  return { NaoDeuParaApagar };
+});
+vi.mock("@/lib/reciclagem", () => ({
+  NaoDeuParaApagar: reciclagem.NaoDeuParaApagar,
+  quemApagou: () => undefined,
+  enviarComDetalhe: async (_tipo: string, id: string) => {
+    const r = await apagamento.correr(id);
+    if (!r.apagado) throw new reciclagem.NaoDeuParaApagar("não", 0, r);
+    return { reciclagem: { id: "r1" }, detalhe: r };
+  },
+}));
 
 import { GET, PATCH, DELETE, POST } from "./route";
 import { corpoDaMarcacao, corpoDoMotivo } from "@/lib/orcamento/desfecho";
@@ -373,6 +397,7 @@ describe("DELETE /api/orcamento/[id]", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.contou).toEqual({ propostas: 2, fotos: 3, rascunhos: 1 });
+    expect(body.reciclagem).toEqual({ id: "r1" });
     expect(apagamento.correr).toHaveBeenCalledWith("LIQ-1");
   });
 

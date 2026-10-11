@@ -18,6 +18,10 @@ const st = vi.hoisted(() => ({
   }),
   remove: vi.fn(async () => {}),
   folder: vi.fn(async () => st.cleanup),
+  /** A Reciclagem em memória; `semTabela` é antes da migração. */
+  reciclagem: [] as { id: string; tipo: string; origemId: string }[],
+  semTabela: false,
+  salvar: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
@@ -35,6 +39,29 @@ vi.mock("@/lib/theme-storage", async () => {
   // Normalização de nomes real (é o que estamos a testar); só o Storage é falso.
   const real = await vi.importActual<typeof import("@/lib/theme-storage")>("@/lib/theme-storage");
   return { ...real, deleteThemeFolder: st.folder };
+});
+// Apagar passa pela Reciclagem (R3b). O motor é o verdadeiro; a tabela vive em
+// memória, e a salvaguarda das propostas é falsa (tem testes próprios).
+vi.mock("@/lib/reciclagem-store", () => ({
+  guardarNaReciclagem: async (e: { id: string; tipo: string; origemId: string }) => {
+    if (st.semTabela) {
+      throw Object.assign(new Error('relation "public.reciclagem" does not exist'), {
+        code: "42P01",
+      });
+    }
+    st.reciclagem.push(e);
+  },
+  listarReciclagem: async () => st.reciclagem,
+  obterDaReciclagem: async (id: string) => st.reciclagem.find((e) => e.id === id) ?? null,
+  tirarDaReciclagem: async (id: string) => {
+    st.reciclagem = st.reciclagem.filter((e) => e.id !== id);
+  },
+}));
+vi.mock("@/lib/theme-materializar", async () => {
+  const real = await vi.importActual<typeof import("@/lib/theme-materializar")>(
+    "@/lib/theme-materializar",
+  );
+  return { ...real, salvarAntesDeReciclarOTema: st.salvar };
 });
 // Mesmo reconhecedor de 23505 do módulo real, sem arrastar a loja de faturas.
 vi.mock("@/lib/invoices-store", () => ({
@@ -74,7 +101,10 @@ beforeEach(() => {
   st.throwOnList = false;
   st.themes = [theme("t-1", "Terracotta"), theme("t-2", "Itália")];
   st.cleanup = { ok: true, removed: 0 };
+  st.reciclagem = [];
+  st.semTabela = false;
   vi.clearAllMocks();
+  st.salvar.mockResolvedValue(true);
 });
 
 describe("PATCH /api/temas/[id]", () => {
@@ -177,28 +207,56 @@ describe("DELETE /api/temas/[id]", () => {
     expect(st.remove).not.toHaveBeenCalled();
   });
 
-  it("apaga as fotos primeiro e só depois os metadados", async () => {
-    st.cleanup = { ok: true, removed: 7 };
+  it("vai para a Reciclagem: a linha sai, as fotos ficam na pasta", async () => {
     const res = await DELETE(...deleteReq());
     expect(res.status).toBe(200);
-    expect(st.folder).toHaveBeenCalledWith("t-1");
+    const { reciclagem } = await res.json();
+    expect(reciclagem).toEqual({ id: expect.any(String) });
+    expect(st.salvar).toHaveBeenCalledWith("t-1");
     expect(st.remove).toHaveBeenCalledWith("t-1");
+    // A pasta fica 30 dias: é ela que o «Repor» devolve.
+    expect(st.folder).not.toHaveBeenCalled();
+    expect(st.reciclagem).toMatchObject([{ id: reciclagem.id, tipo: "tema", origemId: "t-1" }]);
   });
 
-  it("NÃO elimina o tema quando a limpeza do Storage falha — 502 e nada perdido", async () => {
-    st.cleanup = { ok: false, removed: 2 };
+  it("se as propostas não ficam a salvo, não sai nada — 502, e nada na Reciclagem", async () => {
+    st.salvar.mockResolvedValueOnce(false);
     const res = await DELETE(...deleteReq());
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toBe(
-      "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tenta de novo.",
-    );
+    expect((await res.json()).error).toMatch(/O tema NÃO foi eliminado/);
     expect(st.remove).not.toHaveBeenCalled();
+    expect(st.reciclagem).toEqual([]);
   });
 
-  it("devolve 500 tratado quando o Storage rebenta", async () => {
-    st.folder.mockRejectedValueOnce(new Error("boom"));
-    expect((await DELETE(...deleteReq())).status).toBe(500);
-    expect(st.remove).not.toHaveBeenCalled();
+  describe("sem a tabela da Reciclagem (antes da migração), é o apagar de sempre", () => {
+    beforeEach(() => {
+      st.semTabela = true;
+    });
+
+    it("apaga as fotos primeiro e só depois os metadados", async () => {
+      st.cleanup = { ok: true, removed: 7 };
+      const res = await DELETE(...deleteReq());
+      expect(res.status).toBe(200);
+      expect((await res.json()).reciclagem).toBe(false);
+      expect(st.folder).toHaveBeenCalledWith("t-1");
+      expect(st.remove).toHaveBeenCalledWith("t-1");
+    });
+
+    it("NÃO elimina o tema quando a limpeza do Storage falha — 502 e nada perdido", async () => {
+      st.cleanup = { ok: false, removed: 2 };
+      const res = await DELETE(...deleteReq());
+      expect(res.status).toBe(502);
+      expect((await res.json()).error).toBe(
+        "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tenta de novo.",
+      );
+      expect(st.remove).not.toHaveBeenCalled();
+    });
+
+    it("devolve 500 tratado quando o Storage rebenta", async () => {
+      st.folder.mockRejectedValueOnce(new Error("boom"));
+      expect((await DELETE(...deleteReq())).status).toBe(500);
+      expect(st.remove).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -17,7 +17,10 @@ import path from "node:path";
  *  3. se já existe outra vez com aquele id, não se pisa — 409;
  *  4. um item de material volta com as suas regras, sem as duplicar;
  *  5. uma lista volta com as suas linhas;
- *  6. a limpeza dos 30 dias tira só o que passou do prazo.
+ *  6. a limpeza dos 30 dias tira só o que passou do prazo;
+ *  7. (R3b) um pedido volta com as propostas, os rascunhos e o material — e
+ *     com a data em que chegou; uma proposta só volta para um pedido que
+ *     exista; um tema não volta por cima de outro com o mesmo nome.
  */
 
 let dir: string;
@@ -227,7 +230,7 @@ describe("Reciclagem — a limpeza dos 30 dias", () => {
     await store.guardarNaReciclagem({ ...base, id: "no-limite", apagadoEm: dias(29) });
     await store.guardarNaReciclagem({ ...base, id: "nova", apagadoEm: dias(1) });
 
-    expect(await reciclagem.limparExpiradas()).toEqual({ apagadas: 1 });
+    expect(await reciclagem.limparExpiradas()).toEqual({ apagadas: 1, ficaram: 0 });
     expect((await store.listarReciclagem()).map((e) => e.id).sort()).toEqual(["no-limite", "nova"]);
   });
 
@@ -241,5 +244,184 @@ describe("Reciclagem — a limpeza dos 30 dias", () => {
       (new Date(linha.saiEm).getTime() - new Date(linha.apagadoEm).getTime()) / 86_400_000;
     expect(dias).toBe(30);
     expect(linha).not.toHaveProperty("retrato");
+  });
+});
+
+// ── R3b: pedido, proposta e tema (no ficheiro local; o Storage não entra) ──
+
+async function carregarR3b() {
+  const base = await carregar();
+  const pedidos = await import("./quotes-store");
+  const propostas = await import("./proposals-store");
+  const estado = await import("./app-state");
+  const rascunhos = await import("./proposal-drafts");
+  const material = await import("./event-material-store");
+  const itens = await import("./event-material-items-store");
+  const registo = await import("./event-material-log-store");
+  const temas = await import("./themes-store");
+  const contratos = await import("./contracts-store");
+  return {
+    ...base,
+    pedidos,
+    propostas,
+    estado,
+    rascunhos,
+    eventos: material,
+    itens,
+    registo,
+    temas,
+    contratos,
+  };
+}
+
+const UM_PEDIDO = {
+  id: "LIQ-TESTE-1",
+  name: "TESTE Mãe da noiva",
+  partnerA: "TESTE Ana",
+  partnerB: "TESTE Rui",
+  email: "teste@exemplo.pt",
+  submittedAt: "2026-03-02T10:00:00.000Z",
+  status: "pendente",
+  priceBreakdown: {},
+} as unknown as import("./orcamento/types").Quote;
+
+const umaProposta = (id: string, quoteId: string) =>
+  ({
+    id,
+    quoteId,
+    clientName: "TESTE Ana e Rui",
+    clientEmail: "teste@exemplo.pt",
+    currency: "EUR",
+    lineItems: [],
+    vatRate: 0.23,
+    subtotal: 0,
+    vat: 0,
+    total: 0,
+    status: "enviada",
+    createdAt: "2026-03-05T10:00:00.000Z",
+  }) as import("./orcamento/types").Proposal;
+
+describe("Reciclagem — pedido (R3b)", () => {
+  it("volta com as propostas, os rascunhos e o material, com os mesmos ids e datas", async () => {
+    const r = await carregarR3b();
+    await r.pedidos.createQuote(UM_PEDIDO);
+    await r.propostas.createProposal(umaProposta("P-TESTE-1", UM_PEDIDO.id));
+    await r.estado.setState(r.rascunhos.draftKey(UM_PEDIDO.id), { doc: { titulo: "TESTE" } });
+    const ev = await r.eventos.createEventMaterial({
+      quoteId: UM_PEDIDO.id,
+      status: "preparada",
+      vehicles: [],
+    });
+    const linha = await r.itens.addEventItem({
+      eventId: ev.id,
+      name: "TESTE Velas",
+      category: "Luz",
+      kind: "consumivel",
+      qty: 10,
+      critical: false,
+      origin: "manual",
+      originLabel: "À mão",
+      missing: false,
+    } as Parameters<typeof r.itens.addEventItem>[0]);
+    const marca = await r.registo.registar({
+      eventId: ev.id,
+      itemId: linha.id,
+      action: "loaded",
+      actor: "TESTE",
+      markedAt: "2026-03-06T08:00:00.000Z",
+      superseded: false,
+    } as Parameters<typeof r.registo.registar>[0]);
+
+    const res = await r.reciclagem.enviarComDetalhe("pedido", UM_PEDIDO.id, "Catarina");
+    expect(res.reciclagem).toEqual({ id: expect.any(String) });
+    expect(await r.pedidos.getQuote(UM_PEDIDO.id)).toBeNull();
+    expect(await r.propostas.getProposal("P-TESTE-1")).toBeNull();
+    expect(await r.estado.getState(r.rascunhos.draftKey(UM_PEDIDO.id))).toBeNull();
+    const [entrada] = await r.store.listarReciclagem();
+    expect(entrada).toMatchObject({ tipo: "pedido", rotulo: "TESTE Ana e TESTE Rui" });
+
+    // No Supabase o material cai em cascata; no ficheiro local fica. Simula-se.
+    await r.registo.listLogOf(ev.id);
+    await r.itens.removeItemsOfEvent(ev.id);
+    await r.eventos.deleteEventMaterial(ev.id);
+
+    await r.reciclagem.reporDaReciclagem(entrada.id);
+    expect(await r.pedidos.getQuote(UM_PEDIDO.id)).toMatchObject({
+      id: UM_PEDIDO.id,
+      submittedAt: UM_PEDIDO.submittedAt,
+    });
+    expect(await r.propostas.getProposal("P-TESTE-1")).toMatchObject({
+      createdAt: "2026-03-05T10:00:00.000Z",
+    });
+    expect(await r.estado.getState(r.rascunhos.draftKey(UM_PEDIDO.id))).toEqual({
+      doc: { titulo: "TESTE" },
+    });
+    expect(await r.eventos.getForQuote(UM_PEDIDO.id)).toMatchObject({ id: ev.id });
+    expect((await r.itens.listItemsOfEvent(ev.id)).map((l) => l.id)).toEqual([linha.id]);
+    expect((await r.registo.listLogOf(ev.id)).map((l) => l.id)).toEqual([marca.id]);
+    expect(await r.store.listarReciclagem()).toEqual([]);
+  });
+
+  it("um pedido com contrato não sai — e nada fica na Reciclagem", async () => {
+    const r = await carregarR3b();
+    await r.pedidos.createQuote(UM_PEDIDO);
+    await r.contratos.createContract({
+      id: "C-TESTE-1",
+      quoteId: UM_PEDIDO.id,
+      proposalId: "P-TESTE-1",
+      status: "pendente",
+      createdAt: "2026-03-05T10:00:00.000Z",
+    } as unknown as Parameters<typeof r.contratos.createContract>[0]);
+    await expect(r.reciclagem.enviarComDetalhe("pedido", UM_PEDIDO.id)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(await r.pedidos.getQuote(UM_PEDIDO.id)).not.toBeNull();
+    expect(await r.store.listarReciclagem()).toEqual([]);
+  });
+});
+
+describe("Reciclagem — proposta (R3b)", () => {
+  it("volta para o seu pedido; sem o pedido, diz para o repor primeiro", async () => {
+    const r = await carregarR3b();
+    await r.pedidos.createQuote(UM_PEDIDO);
+    await r.propostas.createProposal(umaProposta("P-TESTE-2", UM_PEDIDO.id));
+    await r.reciclagem.enviarParaAReciclagem("proposta", "P-TESTE-2");
+    const [entrada] = await r.store.listarReciclagem();
+    expect(entrada.rotulo).toBe("Proposta de TESTE Ana e Rui");
+
+    await r.pedidos.deleteQuote(UM_PEDIDO.id);
+    await expect(r.reciclagem.reporDaReciclagem(entrada.id)).rejects.toThrow(
+      /Repõe primeiro o pedido/,
+    );
+
+    await r.pedidos.createQuote(UM_PEDIDO);
+    await r.reciclagem.reporDaReciclagem(entrada.id);
+    expect(await r.propostas.getProposal("P-TESTE-2")).toMatchObject({ quoteId: UM_PEDIDO.id });
+  });
+});
+
+describe("Reciclagem — tema (R3b)", () => {
+  it("não volta por cima de outro tema com o mesmo nome", async () => {
+    const r = await carregarR3b();
+    const tema = {
+      id: "tema-teste-1",
+      name: "TESTE Terracota",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    await r.temas.reporTema(tema);
+    // Sem Storage, a salvaguarda das propostas não tem nada a copiar.
+    await r.reciclagem.enviarParaAReciclagem("tema", tema.id);
+    expect(await r.temas.getTheme(tema.id)).toBeNull();
+    const [entrada] = await r.store.listarReciclagem();
+    expect(await r.reciclagem.pastasDeTemasNaReciclagem()).toEqual(new Set([tema.id]));
+
+    await r.temas.reporTema({ ...tema, id: "tema-teste-2", name: "teste terracota " });
+    await expect(r.reciclagem.reporDaReciclagem(entrada.id)).rejects.toThrow(
+      /Já há outro tema chamado/,
+    );
+    await r.temas.deleteTheme("tema-teste-2");
+    await r.reciclagem.reporDaReciclagem(entrada.id);
+    expect(await r.temas.getTheme(tema.id)).toMatchObject({ name: "TESTE Terracota" });
   });
 });

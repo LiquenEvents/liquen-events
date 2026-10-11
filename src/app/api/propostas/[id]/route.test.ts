@@ -29,6 +29,15 @@ vi.mock("@/lib/proposals-store", () => ({
   deleteProposal: store.remove,
 }));
 vi.mock("@/lib/quotes-store", () => ({ updateQuoteWith: quotes.updateWith }));
+// Apagar passa pela Reciclagem (R3b, `src/lib/reciclagem.ts`, com testes
+// próprios). Aqui interessa a rota: a guarda, e o apagar que chega ao store.
+vi.mock("@/lib/reciclagem", () => ({
+  quemApagou: () => undefined,
+  enviarParaAReciclagem: async (_tipo: string, id: string) => {
+    await store.remove(id);
+    return { id: "r1" };
+  },
+}));
 const contrato = vi.hoisted(() => ({ nascer: vi.fn(async () => ({ created: true })) }));
 vi.mock("@/lib/contrato-do-ganho", () => ({ nascerContratoDoGanho: contrato.nascer }));
 
@@ -330,6 +339,8 @@ describe("DELETE /api/propostas/[id]", () => {
     const res = await DELETE(delReq(), ctx("p1"));
     expect(res.status).toBe(200);
     expect(store.remove).toHaveBeenCalledWith("p1");
+    // O ecrã precisa da entrada para o «Anular».
+    expect((await res.json()).reciclagem).toEqual({ id: "r1" });
   });
 
   it("returns 500 when the store throws", async () => {

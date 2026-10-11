@@ -23,6 +23,11 @@ const st = vi.hoisted(() => ({
    *  referenciam a foto tem casa própria (`theme-materializar.test.ts`); aqui
    *  o que se prova é o guarda de caminhos e o tratamento das avarias. */
   del: vi.fn(async (): Promise<{ ok: boolean; motivo?: "referencias" }> => ({ ok: true })),
+  /** Duplo de `guardarFotoNaReciclagem` — o mesmo contrato, com o destino. */
+  guardar: vi.fn(async (): Promise<{ ok: boolean; motivo?: "referencias" }> => ({ ok: true })),
+  /** A Reciclagem em memória (R3b); `semTabela` é antes da migração. */
+  reciclagem: [] as { id: string; tipo: string; origemId: string }[],
+  semTabela: false,
   upload: vi.fn(async (id: string) => ({
     kind: "created" as const,
     image: { path: `${id}/nova.jpg`, url: "https://signed/nova" },
@@ -51,7 +56,25 @@ vi.mock("@/lib/theme-storage", async () => {
     findThemeImageByBytes: st.byBytes,
   };
 });
-vi.mock("@/lib/theme-materializar", () => ({ apagarFotoDaBiblioteca: st.del }));
+vi.mock("@/lib/theme-materializar", () => ({
+  apagarFotoDaBiblioteca: st.del,
+  guardarFotoNaReciclagem: st.guardar,
+}));
+vi.mock("@/lib/reciclagem-store", () => ({
+  guardarNaReciclagem: async (e: { id: string; tipo: string; origemId: string }) => {
+    if (st.semTabela) {
+      throw Object.assign(new Error('relation "public.reciclagem" does not exist'), {
+        code: "42P01",
+      });
+    }
+    st.reciclagem.push(e);
+  },
+  listarReciclagem: async () => st.reciclagem,
+  obterDaReciclagem: async (id: string) => st.reciclagem.find((e) => e.id === id) ?? null,
+  tirarDaReciclagem: async (id: string) => {
+    st.reciclagem = st.reciclagem.filter((e) => e.id !== id);
+  },
+}));
 
 import { GET, POST, DELETE } from "./route";
 
@@ -112,6 +135,8 @@ beforeEach(() => {
       updatedAt: "2026-01-01T00:00:00.000Z",
     },
   ];
+  st.reciclagem = [];
+  st.semTabela = false;
   vi.clearAllMocks();
   // `clearAllMocks` limpa as CHAMADAS, não as implementações encenadas — sem
   // isto, um teste que encene a rede secundária contamina o seguinte.
@@ -188,9 +213,14 @@ describe("DELETE /api/temas/[id]/imagens", () => {
     expect(st.del).not.toHaveBeenCalled();
   });
 
-  it("remove uma foto da pasta deste tema", async () => {
-    expect((await DELETE(...del("t-1/a.jpg"))).status).toBe(200);
-    expect(st.del).toHaveBeenCalledWith("t-1/a.jpg");
+  it("leva a foto para a Reciclagem, e diz qual é a entrada", async () => {
+    const res = await DELETE(...del("t-1/a.jpg"));
+    expect(res.status).toBe(200);
+    const { reciclagem } = await res.json();
+    expect(reciclagem).toEqual({ id: expect.any(String) });
+    expect(st.guardar).toHaveBeenCalledWith("t-1/a.jpg", `reciclagem/${reciclagem.id}/a.jpg`);
+    expect(st.del).not.toHaveBeenCalled();
+    expect(st.reciclagem).toMatchObject([{ tipo: "foto-de-tema", origemId: "t-1/a.jpg" }]);
   });
 
   it("recusa caminhos de OUTRO tema, travessias e URLs — sem tocar no Storage", async () => {
@@ -198,33 +228,54 @@ describe("DELETE /api/temas/[id]/imagens", () => {
     expect((await DELETE(...del("../proposal-assets/q-1/privada.jpg"))).status).toBe(400);
     expect((await DELETE(...del("https://exemplo.pt/a.jpg"))).status).toBe(400);
     expect((await DELETE(...del(""))).status).toBe(400);
+    expect(st.guardar).not.toHaveBeenCalled();
     expect(st.del).not.toHaveBeenCalled();
   });
 
-  it("devolve 502 quando o Storage não confirma a remoção", async () => {
-    st.del.mockResolvedValueOnce({ ok: false });
+  it("devolve 502 quando o Storage não muda a foto — e nada fica na Reciclagem", async () => {
+    st.guardar.mockResolvedValueOnce({ ok: false });
     expect((await DELETE(...del("t-1/a.jpg"))).status).toBe(502);
+    expect(st.reciclagem).toEqual([]);
   });
 
-  /** Uma foto que está numa proposta e cuja salvaguarda falhou NÃO é apagada,
-   *  e a mensagem tem de dizer isso — senão ela repete a acção a achar que é
-   *  uma avaria do Storage. */
+  /** Uma foto que está numa proposta e cuja salvaguarda falhou NÃO sai, e a
+   *  mensagem tem de dizer isso — senão ela repete a acção a achar que é uma
+   *  avaria do Storage. */
   it("explica quando a foto ficou por apagar por estar numa proposta", async () => {
-    st.del.mockResolvedValueOnce({ ok: false, motivo: "referencias" });
+    st.guardar.mockResolvedValueOnce({ ok: false, motivo: "referencias" });
     const res = await DELETE(...del("t-1/a.jpg"));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toMatch(/proposta/i);
   });
 
   it("devolve 500 tratado (não um throw cru) quando a remoção rebenta", async () => {
-    st.del.mockRejectedValueOnce(new Error("boom"));
+    st.guardar.mockRejectedValueOnce(new Error("boom"));
     expect((await DELETE(...del("t-1/a.jpg"))).status).toBe(500);
   });
 
   it("devolve 503 quando o Storage nem sequer está configurado", async () => {
     st.dbConfigured = false;
-    st.del.mockRejectedValueOnce(new Error("boom"));
+    st.guardar.mockRejectedValueOnce(new Error("boom"));
     expect((await DELETE(...del("t-1/a.jpg"))).status).toBe(503);
+  });
+
+  describe("sem a tabela da Reciclagem (antes da migração)", () => {
+    beforeEach(() => {
+      st.semTabela = true;
+    });
+
+    it("apaga de vez, como sempre, e diz-lo (`reciclagem: false`)", async () => {
+      const res = await DELETE(...del("t-1/a.jpg"));
+      expect(res.status).toBe(200);
+      expect((await res.json()).reciclagem).toBe(false);
+      expect(st.del).toHaveBeenCalledWith("t-1/a.jpg");
+      expect(st.guardar).not.toHaveBeenCalled();
+    });
+
+    it("devolve 502 quando o Storage não confirma a remoção", async () => {
+      st.del.mockResolvedValueOnce({ ok: false });
+      expect((await DELETE(...del("t-1/a.jpg"))).status).toBe(502);
+    });
   });
 });
 

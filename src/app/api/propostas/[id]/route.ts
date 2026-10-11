@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { deleteProposal, updateProposal } from "@/lib/proposals-store";
+import { updateProposal } from "@/lib/proposals-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { updateQuoteWith } from "@/lib/quotes-store";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
@@ -238,8 +239,9 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const { id } = await params;
-    await deleteProposal(id);
-    return NextResponse.json({ ok: true });
+    // Fica 30 dias na Reciclagem (fase R3b de `docs/TUDO-REVERSIVEL.md`).
+    const reciclagem = await enviarParaAReciclagem("proposta", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     log.error("propostas DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
