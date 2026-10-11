@@ -31,17 +31,14 @@ import { describe, expect, it } from "vitest";
  * Não prende que a animação SE VEJA: isso é o browser, e mede-se num browser.
  */
 
-const FONTE = readFileSync(
-  "src/app/[lang]/(admin)/orcamento/admin/ProposalStudio.tsx",
-  "utf8",
-);
+const FONTE = readFileSync("src/app/[lang]/(admin)/orcamento/admin/ProposalStudio.tsx", "utf8");
 const CSS = readFileSync("src/app/globals.css", "utf8");
 
 describe("o passo que chega apresenta-se", () => {
-  it("o passo 1 entra com a classe, e continua montado quando sai", () => {
+  it("os passos 1 a 4 entram com a classe, e o formulário continua montado quando sai", () => {
     // A classe depende do passo, e o `hidden` também: os dois no mesmo nó.
     expect(FONTE).toMatch(
-      /className=\{`@container\/estudio \$\{step === "conteudo" \? "view-in" : ""\}`\}\s*\n\s*hidden=\{step !== "conteudo"\}/,
+      /className=\{`@container\/estudio \$\{noFormulario \? "view-in" : ""\}`\}\s*\n\s*hidden=\{!noFormulario\}/,
     );
   });
 
@@ -51,8 +48,8 @@ describe("o passo que chega apresenta-se", () => {
     );
   });
 
-  it("o passo 2 monta de raiz, portanto a classe basta-lhe", () => {
-    expect(FONTE).toMatch(/\{step === "prever" && \(\n(?:.*\n)*?\s*<div className="view-in">/);
+  it("o resumo do «Rever e enviar» monta de raiz, portanto a classe basta-lhe", () => {
+    expect(FONTE).toMatch(/\{step === "enviar" && \(\n(?:.*\n)*?\s*<div className="view-in">/);
   });
 
   /**
@@ -60,8 +57,8 @@ describe("o passo que chega apresenta-se", () => {
    * remontar. Se alguém puser um `key` num destes nós, o formulário do passo 1
    * volta a nascer a cada ida ao passo 2.
    */
-  it("nenhum dos três passos troca a classe por um `key` que remonta", () => {
-    expect(FONTE).not.toMatch(/hidden=\{step !== "conteudo"\}[\s\S]{0,200}?key=\{step\}/);
+  it("nenhum dos passos troca a classe por um `key` que remonta", () => {
+    expect(FONTE).not.toMatch(/hidden=\{!noFormulario\}[\s\S]{0,200}?key=\{step\}/);
     expect(FONTE).not.toMatch(/key=\{step\}[\s\S]{0,200}?hidden=\{step !== "enviar"\}/);
   });
 

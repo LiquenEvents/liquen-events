@@ -8,10 +8,13 @@ partir de «Contexto». Esta primeira parte é nossa: o estado e as decisões.)
 Ordem escolhida por ela: **B1 → A2 → C → A1 → A3/A4 → D1**, uma entrega por
 ramo e por PR.
 
+A 10/10 ela pôs «Ver as enviadas» e a A1 à frente da A2. A 11/10 pediu
+«avança com a A2», e a A2 fez-se antes da A1.
+
 | Ponto | Estado | Onde |
 |---|---|---|
 | B1 — lista do que falta e bloqueio | **feito** (entrega 1) | `proposal-progress.ts`, `conferencia.ts`, `ProposalStudio.tsx`, rota `proposta-doc` |
-| A2 — cinco passos | por fazer | |
+| A2 — cinco passos | **feito** (entrega 2) | `passos-do-estudio.ts`, `ProposalStudio.tsx`, `NavEstudio.tsx`, `FazerProposta.tsx` |
 | C1 — medir | **feito** (os números estão no plano da entrega 3) | |
 | C2 / C3 — rapidez e progresso | por fazer | |
 | A1 — pré-visualização real | por fazer | |
@@ -46,6 +49,30 @@ Onde a execução da B1 se afasta do texto, e porquê:
 - **Condições extra que já travavam** e se mantêm: o título interno, os
   serviços, os marcadores `{{…}}`, o inglês por traduzir e as fotografias ainda
   a entrar.
+
+Onde a execução da A2 se afasta do texto, e porquê:
+
+- **O 3.º passo chama-se «Cronograma»** numa proposta de Organização. Lá não há
+  mood boards; o que vive nesse passo é o cronograma.
+- **Os passos 1 a 4 são um formulário só, sempre montado.** Mudar de passo
+  esconde e mostra secções; não remonta nada. É isso que garante que nada se
+  perde ao saltar, e o rascunho continua a ser gravado de 800 em 800 ms como
+  antes.
+- **«Rever e enviar» junta o antigo «Pré-visualizar» e o antigo «Enviar».** O
+  «Descarregar PDF/rascunho» está na barra de baixo desse passo. O selector de
+  idioma saiu da barra porque o mesmo selector está no corpo do passo.
+- **O estado de cada passo** sai das mesmas duas listas que o índice e o envio
+  já usavam: erro quando há uma falta que trava nesse passo, por completar
+  quando há uma secção vazia ou um conselho, completo no resto. O «Rever e
+  enviar» fica em erro se alguma coisa trava em qualquer passo.
+- **Na Inspiração o índice da esquerda sai**, e a coluna dos mood boards fica
+  com a largura toda. O índice salta entre passos: carregar numa secção de
+  outro passo muda de passo e leva lá.
+- **Corrigido de passagem:** o salto para um campo que não está desenhado
+  procurava a secção pelo id sem o prefixo (`evento` em vez de `seccao-evento`)
+  e não ia a lado nenhum. Com cinco passos, saltar entre eles dependia disto.
+- **O «Fazer proposta» deixou de dizer «Passo 1 de 2».** Escolher o cliente
+  fica antes dos passos, como o documento pede.
 
 ## Contexto
 O back office tem uma área «Fazer proposta» com dois momentos: primeiro escolhe-se o cliente numa lista de pedidos; depois preenche-se a proposta (evento, fotografia de capa, serviços, moodboard com temas e fotografias, orçamento, notas, totais), pré-visualiza-se e envia-se. No fim, o sistema gera um PDF com o novo desenho editorial da Líquen.

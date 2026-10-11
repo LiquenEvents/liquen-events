@@ -30,6 +30,9 @@ rapidez, duplicados). A **Parte −1** tem a tabela do que está feito e os sít
 onde a execução se afastou do texto. A regra que manda no envio continua a ser
 uma só, em `proposal-progress.ts` (`oQueFaltaParaEnviar`): a Conferência copia
 a marca de «trava» de lá, e a rota do envio recusa os mesmos erros.
+Os cinco passos do estúdio (A2) são um formulário só, sempre montado: o que
+vive em cada passo e o estado de cada um estão em `passos-do-estudio.ts`, que
+lê as mesmas duas listas — não contes o estado de um passo noutro sítio.
 
 # E o ecrã de entrada tem outro
 

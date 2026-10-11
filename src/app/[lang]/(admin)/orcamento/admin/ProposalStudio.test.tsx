@@ -1324,7 +1324,7 @@ describe("o aviso de tempo antes de gerar", () => {
     seedDraft(78);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     expect(await screen.findByText(/Gerar este PDF demora/)).toBeTruthy();
     expect(screen.queryByText(/a página onde o casal o abre desiste/)).toBeNull();
   });
@@ -1333,7 +1333,7 @@ describe("o aviso de tempo antes de gerar", () => {
     seedDraft(6);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // A frase da estimativa continua lá — é o aviso do tecto que não aparece.
     expect(await screen.findByText(/Gerar este PDF demora/)).toBeTruthy();
     expect(screen.queryByText(/a página onde o casal o abre desiste/)).toBeNull();
@@ -1535,7 +1535,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     });
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Descarregar PDF/ }));
 
     const alerta = await screen.findByRole("alert");
@@ -1555,7 +1555,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     propostaDoc = reply({ json: { ok: true, emailed: true } });
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     const gerar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
     // Os dois cliques no MESMO instante, como um duplo clique. O relógio fica
     // parado entre os dois: o estúdio redesenha-se por inteiro depois do
@@ -1586,7 +1586,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     propostaDoc = reply({ json: { ok: true, emailed: true } });
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
     await new Promise((r) => setTimeout(r, 450));
@@ -1608,7 +1608,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
       propostaDoc = reply({ json: { ok: true, emailed: true } });
       renderStudio();
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+      await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
       await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
       const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
       await new Promise((r) => setTimeout(r, 450));
@@ -1639,7 +1639,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     });
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // Enviar exige duas carregadas: a acção e a confirmação.
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
@@ -1676,7 +1676,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     });
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -1711,7 +1711,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     });
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
     await user.click(await screen.findByRole("button", { name: /Voltar e corrigir/ }));
@@ -1900,7 +1900,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     await abrirBiblioteca(user);
     await reservar(user);
 
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Descarregar PDF/ }));
 
     const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
@@ -1919,7 +1919,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     await abrirBiblioteca(user);
     await reservar(user);
 
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // O gesto irreversível não segue com a proposta a meio: fica travado, com
     // a razão escrita — e não uma mensagem a mandá-la preencher campos.
     expect(await screen.findByText(/1 foto ainda está a entrar na proposta/)).toBeInTheDocument();
@@ -2705,7 +2705,7 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
     seedDraft(1);
     desenhar(comPreco(3000));
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -3559,7 +3559,7 @@ describe("repor e copiar gravam o preço no pedido", () => {
     );
     const user = userEvent.setup();
     // O painel das versões vive no passo do envio.
-    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Repor esta versão/ }));
 
     await waitFor(() => {
@@ -3635,7 +3635,7 @@ describe("repor e copiar gravam o preço no pedido", () => {
       </ToastProvider>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Repor esta versão/ }));
 
     await waitFor(() => {
@@ -4527,7 +4527,7 @@ describe("o «Ver no campo» do aviso de ortografia", () => {
     // Até ao passo do envio, que é onde o aviso vive.
     const utilizador = userEvent.setup();
     // Pela navegação do estúdio, como ela faz: 2 Pré-visualizar → 3 Enviar.
-    await utilizador.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await utilizador.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await utilizador.click(await screen.findByRole("button", { name: /Rever e enviar/ }));
 
     const ir = await screen.findAllByRole("button", { name: "Ver no campo" });
@@ -4554,7 +4554,7 @@ describe("o «Ver no campo» do aviso de ortografia", () => {
 describe("o custo de gerar o PDF", () => {
   const irAoPasso2 = async () => {
     const utilizador = userEvent.setup();
-    await utilizador.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await utilizador.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
   };
 
   it("diz quanto demora e quanto pesa, com as fotos que a proposta tem", async () => {
@@ -5099,7 +5099,7 @@ describe("gerar a proposta em inglês", () => {
    * prova é a língua, não o rascunho: serve qualquer dos dois.
    */
   async function irParaPrever(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     return await screen.findByRole("button", { name: /Descarregar (PDF|rascunho)/ });
   }
 
@@ -5343,7 +5343,7 @@ describe("gerar a proposta em inglês", () => {
     await irParaPrever(user);
     await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
 
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5357,7 +5357,7 @@ describe("gerar a proposta em inglês", () => {
     seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5380,7 +5380,7 @@ describe("gerar a proposta em inglês", () => {
     seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
 
     const grupo = await screen.findByRole("radiogroup", { name: "Idioma da proposta" });
     expect(within(grupo).getByRole("radio", { name: "Português" })).toHaveAttribute(
@@ -5408,7 +5408,7 @@ describe("gerar a proposta em inglês", () => {
     seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     const grupo = await screen.findByRole("radiogroup", { name: "Idioma da proposta" });
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
 
@@ -5471,7 +5471,7 @@ describe("gerar a proposta em inglês", () => {
     localStorage.setItem(`${DRAFT_KEY}:meta`, JSON.stringify({ idioma: "en" }));
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5538,7 +5538,7 @@ describe("o botão «Copiar resumo»", () => {
     seedDraft(1);
     const { user, writeText } = comClipboardAFuncionar();
     renderStudio();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
 
     await user.click(await screen.findByRole("button", { name: "Copiar resumo" }));
 
@@ -5568,7 +5568,7 @@ describe("o botão «Copiar resumo»", () => {
     });
     const { user, writeText } = comClipboardAFuncionar();
     renderStudio();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
     await screen.findByRole("button", { name: "Enviar de novo / nova revisão" });
@@ -5591,7 +5591,7 @@ describe("o botão «Copiar resumo»", () => {
     const user = userEvent.setup({ writeToClipboard: false });
     Reflect.deleteProperty(navigator, "clipboard");
     renderStudio();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
 
     await user.click(await screen.findByRole("button", { name: "Copiar resumo" }));
 
@@ -5649,7 +5649,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.type(caixa(), "Foi um gosto conhecer-vos na quinta!");
     await enviar(user);
 
@@ -5662,7 +5662,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await enviar(user);
 
     await waitFor(() => expect(envio().mode).toBe("send"));
@@ -5673,7 +5673,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.type(caixa(), "   ");
     await enviar(user);
 
@@ -5685,7 +5685,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.type(caixa(), "Ficamos à espera de vos ver!");
 
     await waitFor(
@@ -5699,7 +5699,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     localStorage.setItem(SIDE_KEY, JSON.stringify({ mensagem: "O arco fica incluído." }));
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
 
     await waitFor(() => expect(caixa().value).toBe("O arco fica incluído."));
   });
@@ -5714,7 +5714,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // A frase é a da AJUDA DESTA CAIXA e não uma qualquer no ecrã: o passo
     // «Enviar» ganhou o painel do email, que também diz — e bem — que a
     // assinatura da casa entra sozinha. Sem este aperto, o teste passava a ser
@@ -5733,7 +5733,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // O aviso tem um `<code>{nome}</code>` no meio, portanto o texto está
     // partido por vários nós: procura-se pelo parágrafo inteiro.
     const aviso = () =>
@@ -5948,7 +5948,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     expect(screen.queryByText(/Por traduzir/i)).toBeNull();
   });
 
@@ -5956,7 +5956,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await escolherIngles(user);
     const painel = await screen.findByRole("region", { name: /Por traduzir/i });
     expect(within(painel).getByText(/Serviços · grupo 1/)).toBeTruthy();
@@ -5967,7 +5967,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await escolherIngles(user);
     const conferencia = await screen.findByRole("region", { name: /Conferência/i });
     await waitFor(() =>
@@ -5985,7 +5985,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await escolherIngles(user);
     const painel = await screen.findByRole("region", { name: /Por traduzir/i });
     // Quatro: o título do grupo, a linha, a rubrica do orçamento e o rótulo do
@@ -6017,7 +6017,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await escolherIngles(user);
     const painel = await screen.findByRole("region", { name: /Por traduzir/i });
     await user.click(within(painel).getAllByRole("button", { name: /^Traduzir$/ })[0]);
@@ -6035,7 +6035,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // A frase do CONTADOR, que é diferente da da Conferência de propósito: o
     // passo «Enviar» está desenhado (escondido) ao mesmo tempo que este, e uma
     // procura por palavras comuns encontrava as duas.
@@ -6049,7 +6049,7 @@ describe("os avisos da proposta inglesa", () => {
     seedPorTraduzir();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     const ressalva = screen.getByText(/Em inglês sai a moldura do documento/i);
     expect(ressalva.textContent).toMatch(/caixas «EN»/);
     expect(ressalva.textContent).not.toMatch(/ficam como os escreveste/);
@@ -7149,7 +7149,7 @@ describe("o email do passo 3 viaja com o envio", () => {
   }
 
   async function irParaEnviar(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
   }
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
@@ -7328,7 +7328,7 @@ describe("o que falta para enviar, no passo de enviar", () => {
     seedSemNome();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     expect(
       screen.queryByText(/Preenche clientes, referência e um total maior que 0 \(no passo/),
     ).toBeNull();
@@ -7340,12 +7340,12 @@ describe("o que falta para enviar, no passo de enviar", () => {
     seedSemNome();
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Nome dos clientes/ }));
 
     // De volta ao passo 1 — o campo vive lá.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /^1\s*Conteúdo$/ })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: /^1\s*Evento/ })).toHaveAttribute(
         "aria-current",
         "step",
       ),
@@ -8240,7 +8240,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
     seedDraft(2);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
 
     const resumo = (await screen.findByText(/Enviar para/)).textContent ?? "";
@@ -8260,7 +8260,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
     seedDraft(2);
     renderStudio();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
 
@@ -8401,7 +8401,7 @@ describe("o estúdio diz o que mudou quando não se vê", () => {
     );
     renderStudio();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: "Corrigir" }));
 
     // A palavra muda numa linha do orçamento que está no passo 1 — fora do
@@ -9360,7 +9360,7 @@ describe("o salto para a pré-visualização não deixa o ecrã sem nada", () =>
     });
     observador.observe(document.body, { childList: true, subtree: true });
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Pré-visualizar/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /^5\s*Rever e enviar/ })[0]);
 
     // SEM `await`: o resumo tem de estar no ecrã no mesmo commit síncrono do
     // clique. É esta linha que fecha a porta ao ecrã branco — se o resumo

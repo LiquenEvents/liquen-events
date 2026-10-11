@@ -86,22 +86,22 @@ test.describe("Back office — fazer proposta", () => {
       .click();
     await expect(page.getByRole("heading", { level: 1, name: /^Fazer proposta$/ })).toBeVisible();
 
-    // Passo 1 — a lista de para-quem.
-    await expect(page.getByText(/Passo 1 de 2/)).toBeVisible();
+    // Antes dos passos — a lista de para-quem.
+    await expect(page.getByText(/Para quem é a proposta\?/)).toBeVisible();
     const clientes = page.locator("li button");
     await expect(clientes.first()).toBeVisible({ timeout: 15000 });
 
-    // Passo 2 — o estúdio, para aquele cliente.
+    // Depois — o estúdio, para aquele cliente.
     await clientes.first().click();
     await expect(page.getByText(/Proposta para/)).toBeVisible();
-    // O estúdio montou mesmo (o chunk é preguiçoso) e traz o fluxo dos 3 passos.
-    await expect(page.getByRole("button", { name: /Pré-visualizar/ }).first()).toBeVisible({
+    // O estúdio montou mesmo (o chunk é preguiçoso) e traz o fluxo dos 5 passos.
+    await expect(page.getByRole("button", { name: /Seguinte: Serviços/ }).first()).toBeVisible({
       timeout: 15000,
     });
 
     // E dá para trocar de cliente sem sair do ecrã.
     await page.getByRole("button", { name: /Trocar de cliente/ }).click();
-    await expect(page.getByText(/Passo 1 de 2/)).toBeVisible();
+    await expect(page.getByText(/Para quem é a proposta\?/)).toBeVisible();
 
     expect(errors, `Erros inesperados:\n${errors.join("\n")}`).toEqual([]);
   });
@@ -154,7 +154,7 @@ test.describe("Back office — fazer proposta", () => {
     // O ecrã inteiro de fazer proposta, para AQUELE cliente.
     await expect(page.getByText(/Proposta para/)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(nome, { exact: false }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /Pré-visualizar/ }).first()).toBeVisible({
+    await expect(page.getByRole("button", { name: /Seguinte: Serviços/ }).first()).toBeVisible({
       timeout: 20_000,
     });
 

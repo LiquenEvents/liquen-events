@@ -325,7 +325,9 @@ export default function FazerProposta({
       <Card padding="md">
         <div className="flex flex-col gap-3">
           <div>
-            <p className="bo-eyebrow mb-1.5">Passo 1 de 2</p>
+            {/* Sem «Passo 1 de 2»: o estúdio tem cinco passos (A2), e escolher o
+                cliente fica ANTES deles — contá-lo como um passo dava duas
+                contagens a discordar no mesmo fluxo. */}
             <p className="text-sm text-[var(--bo-tinta-72)]">
               Para quem é a proposta?{" "}
               {porFazer > 0 && (
