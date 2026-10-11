@@ -23,6 +23,7 @@ import {
   srcsetDaGaleria,
 } from "./gallery-srcset";
 import TILE_COLORS from "./tile-colors.json";
+import GALLERY_META from "./gallery-meta.json";
 
 // Resolved server-side (from blur-map.json / image-dims.json / tile-colors.json)
 // so those JSON maps never reach the gallery's client bundle — GaleriaClient
@@ -63,10 +64,31 @@ const ORDER_SEED = ":" + Math.floor(Math.random() * 0x7fffffff).toString(36);
  * vai ver (ORDER_SEED), e o resto tem cor.
  */
 const BLUR_WINDOW = 48;
+
+/**
+ * O que a galeria «vê» em cada foto (gallery-meta.json, gerado no build por
+ * scripts/pregen-gallery.mjs com scripts/galeria-analise.mjs). Vai só o que a
+ * ordem e o recorte precisam, e só nas fotos que o têm.
+ */
+type Visto = { c?: string; pb?: number; d?: number; f?: string };
+const VISTO = GALLERY_META as Record<string, Visto>;
+function oQueSeVe(src: string) {
+  const v = VISTO[src];
+  if (!v) return {};
+  const [x, y] = (v.f ?? "").split(",");
+  return {
+    ...(v.c ? { cena: v.c } : {}),
+    ...(v.pb ? { pb: true } : {}),
+    ...(v.d ? { destaque: true } : {}),
+    ...(x && y ? { foco: `${x}% ${y}%` } : {}),
+  };
+}
+
 const withRatio = PHOTOS.map((p) => ({
   ...p,
   aspectRatio: aspectFor(p.src),
   color: (TILE_COLORS as Record<string, string>)[p.src],
+  ...oQueSeVe(p.src),
 }));
 const ordemFinal = interleaveByCollection(withRatio, ORDER_SEED);
 const blurSrc = new Set(ordemFinal.slice(0, BLUR_WINDOW).map((p) => p.src));

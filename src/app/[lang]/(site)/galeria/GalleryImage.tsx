@@ -62,6 +62,12 @@ export type GalleryImageProps = {
   /** Proporção real da foto, para o `<img>` levar `width`/`height` e a caixa
       nunca depender de a fotografia ter chegado. */
   aspectRatio?: string;
+  /**
+   * Para onde se recorta (`object-position`, ex. `"40% 30%"`) — o ponto de
+   * interesse que o build encontrou na foto (gallery-meta.json). Só serve onde
+   * a foto é recortada: o mosaico do topo e as miniaturas do lightbox.
+   */
+  foco?: string;
   blurDataURL?: string;
   /** Candidato a LCP: salta a fila e a espera pelo viewport. */
   priority?: boolean;
@@ -118,6 +124,7 @@ export default function GalleryImage({
   sizes,
   className,
   aspectRatio,
+  foco,
   blurDataURL,
   priority = false,
   longe = false,
@@ -520,8 +527,9 @@ export default function GalleryImage({
              * do scroll; com `async` o browser pode tirá-lo de lá.
              */
             decoding="async"
-            // Sem `style`: o desfocado subiu para o `<picture>`, que é onde se
-            // vê. Aqui em baixo estava debaixo da própria opacidade zero.
+            // O desfocado subiu para o `<picture>`, que é onde se vê. Aqui em
+            // baixo fica só o recorte pelo ponto de interesse, quando o há.
+            style={foco ? { objectPosition: foco } : undefined}
             onLoad={handleLoad}
             onError={handleError}
           />

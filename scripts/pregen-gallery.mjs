@@ -44,6 +44,13 @@ import { promises as fs } from "fs";
 import { createHash } from "crypto";
 import path from "path";
 import os from "os";
+import {
+  VERSAO_ANALISE,
+  agruparCenas,
+  analisarFoto,
+  quantil,
+  serveParaDestaque,
+} from "./galeria-analise.mjs";
 
 const ROOT = process.cwd();
 const PUBLIC = path.join(ROOT, "public");
@@ -242,6 +249,9 @@ const countByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
 const failures = [];
 /** src -> cor média, escrito em tile-colors.json (ver mais abaixo). */
 const colors = {};
+/** src -> o que a galeria «vê» na foto (galeria-analise.mjs), para
+ *  gallery-meta.json (ver mais abaixo). */
+const analises = {};
 
 async function link(from, to) {
   await fs.rm(to, { force: true });
@@ -250,6 +260,17 @@ async function link(from, to) {
   } catch {
     // Sistemas de ficheiros diferentes (ou sem suporte a hardlinks): copia.
     await fs.copyFile(from, to);
+  }
+}
+
+/** A análise de uma foto, com a versão; uma falha não pára o build — a foto
+ *  fica só sem os dados da galeria inteligente (ordem e recorte de antes). */
+async function analisar(buf, src) {
+  try {
+    return { v: VERSAO_ANALISE, ...(await analisarFoto(sharp, buf)) };
+  } catch (err) {
+    console.warn(`  análise de ${src} falhou: ${err.message}`);
+    return undefined;
   }
 }
 
@@ -304,6 +325,7 @@ async function worker() {
 
     let want;
     let color;
+    let analise;
     try {
       /**
        * UM read do original, que serve para as duas coisas: o carimbo que
@@ -383,9 +405,20 @@ async function worker() {
         // original.
         const px = await sharp(smallest).resize(1, 1, { fit: "cover" }).raw().toBuffer();
         color = "#" + [px[0], px[1], px[2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+        analise = await analisar(smallest, src);
         encoded++;
       } else {
         reused++;
+        // A análise é da mesma miniatura de 384: quando a cache acerta mas a
+        // análise é de outra versão (ou não existe), refaz-se só ela, a partir
+        // do ficheiro que já lá está — sem voltar a codificar nada.
+        analise = entry.analise?.v === VERSAO_ANALISE ? entry.analise : undefined;
+        if (!analise) {
+          analise = await analisar(
+            await fs.readFile(path.join(CACHE_DIR, `${key}-${WIDTHS[0]}.webp`)),
+            src,
+          );
+        }
       }
     } finally {
       await fh.close();
@@ -406,8 +439,9 @@ async function worker() {
         }
       }
     }
-    nextIndex[key] = { stamp: want, color };
+    nextIndex[key] = { stamp: want, color, ...(analise ? { analise } : {}) };
     colors[src] = color;
+    if (analise) analises[src] = analise;
   }
 }
 
@@ -554,6 +588,58 @@ try {
   colorsChanged = true;
 }
 if (colorsChanged) await fs.writeFile(COLORS_FILE, colorsJson, "utf8");
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * gallery-meta.json — O QUE A GALERIA «VÊ» EM CADA FOTOGRAFIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela («espetacularmente inteligente»; para as quase iguais, «mostra
+ * todas, afastadas»). Por foto da galeria, só o que é preciso, e só quando há:
+ *
+ *  · `c`  — a cena: as fotos com o mesmo `c` são o mesmo momento (ver
+ *           `mesmaCena` em galeria-analise.mjs) e a ordem afasta-as;
+ *  · `pb` — a preto e branco: nunca duas seguidas;
+ *  · `d`  — serve para o mosaico grande do topo (deitada, a cores, nítida);
+ *  · `f`  — o ponto de interesse (`"x,y"` em %), quando não é o centro: é para
+ *           onde se recortam o mosaico e as miniaturas do lightbox.
+ *
+ * A impressão visual e a nitidez ficam no índice da cache, não aqui: o browser
+ * não precisa delas. Versionado e só reescrito quando muda, como o
+ * tile-colors.json, pelas mesmas razões.
+ */
+const META_FILE = path.join(ROOT, "src", "app", "[lang]", "(site)", "galeria", "gallery-meta.json");
+const daGaleria = [...GALLERY_SRCS].filter((src) => analises[src]);
+const cenas = agruparCenas(
+  daGaleria.map((src) => ({ src, h: analises[src].h, cor: colors[src], pb: analises[src].pb })),
+);
+const nitidezMinima = quantil(
+  daGaleria.map((src) => analises[src].n),
+  0.25,
+);
+const meta = {};
+for (const src of daGaleria.sort()) {
+  const a = analises[src];
+  const m = {};
+  if (cenas.has(src)) m.c = cenas.get(src);
+  if (a.pb) m.pb = 1;
+  if (serveParaDestaque(a, a.r, nitidezMinima)) m.d = 1;
+  if (a.f && a.f !== "50,50") m.f = a.f;
+  if (Object.keys(m).length) meta[src] = m;
+}
+const metaJson = JSON.stringify(meta, null, 2) + "\n";
+let metaChanged = false;
+try {
+  metaChanged = (await fs.readFile(META_FILE, "utf8")) !== metaJson;
+} catch {
+  metaChanged = true;
+}
+if (metaChanged) await fs.writeFile(META_FILE, metaJson, "utf8");
+console.log(
+  `  gallery-meta.json: ${daGaleria.length} fotos analisadas · ${new Set(cenas.values()).size} cenas` +
+    ` (${cenas.size} fotos) · ${Object.values(meta).filter((m) => m.pb).length} P&B` +
+    ` · ${Object.values(meta).filter((m) => m.d).length} servem o destaque`,
+);
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
