@@ -32,6 +32,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
+import sharp from "sharp";
+import { analisarFoto, mesmaCena } from "./galeria-analise.mjs";
 
 const ROOT = process.cwd();
 const IMG_DIR = path.join(ROOT, "public", "imagens");
@@ -171,6 +173,50 @@ for (const it of items) {
   if (label === "Evento" && !opts.label)
     warnings.push(`${it.name}: category not recognised → "Evento" (pass --label to set it)`);
   resolved.push({ ...it, src, label, collection: coll?.name ?? opts.collection ?? null });
+}
+
+/**
+ * ── FOTOS QUASE IGUAIS ÀS QUE JÁ LÁ ESTÃO ─────────────────────────────────
+ *
+ * Avisa — não bloqueia: ela pode querer as duas (a galeria afasta-as). Compara
+ * a impressão visual de cada foto nova com as que o último build analisou
+ * (`.next/cache/pregen-gallery/index.json`, ver `scripts/galeria-analise.mjs`).
+ * Sem esse índice (nunca se correu o build aqui) não há com que comparar, e
+ * diz-se isso em vez de calar.
+ */
+const galleryKey = (src) =>
+  (src.split("/").pop() ?? src).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_");
+try {
+  const index = JSON.parse(
+    await fs.readFile(path.join(ROOT, ".next", "cache", "pregen-gallery", "index.json"), "utf-8"),
+  );
+  const conhecidas = [...listed]
+    .map((src) => ({ src, e: index[galleryKey(src)] }))
+    .filter((x) => x.e?.analise?.h)
+    .map((x) => ({ src: x.src, h: x.e.analise.h, pb: x.e.analise.pb, cor: x.e.color }));
+  for (const r of resolved) {
+    try {
+      const mini = await sharp(r.from)
+        .resize(384, null, { withoutEnlargement: true })
+        .webp()
+        .toBuffer();
+      const px = await sharp(mini).resize(1, 1, { fit: "cover" }).raw().toBuffer();
+      const cor = "#" + [px[0], px[1], px[2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+      const a = { ...(await analisarFoto(sharp, mini)), cor };
+      const igual = conhecidas.find((k) => mesmaCena(a, k));
+      if (igual) {
+        warnings.push(
+          `${r.name}: parece a mesma fotografia que ${igual.src.split("/").pop()} — entra na mesma (a galeria afasta-as)`,
+        );
+      }
+    } catch {
+      /* uma foto que não se lê aqui também não passa no build — ele di-lo */
+    }
+  }
+} catch {
+  warnings.push(
+    "sem o índice do build, não comparei com as fotos que já lá estão (corre `npm run pregen`)",
+  );
 }
 
 // longest common lowercase alphanumeric-ish prefix, trimmed to a clean token
