@@ -293,6 +293,11 @@ test.describe("Biblioteca de Temas", () => {
       // botão que nunca ia nascer, até esgotar o tempo do teste. O `count()`
       // antes do clique é o que impede duas insistências criarem dois mood
       // boards.
+      // Os mood boards vivem no 3.º dos cinco passos do estúdio (A2).
+      await page
+        .getByRole("navigation", { name: "Passos da proposta" })
+        .getByRole("button", { name: /^3\s*Inspiração/ })
+        .click();
       const adicionar = page.getByRole("button", { name: /\+ Adicionar mood board/i }).first();
       const escolher = page.getByRole("button", { name: /Escolher da biblioteca de temas/i });
       await expect(async () => {

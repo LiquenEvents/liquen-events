@@ -43,7 +43,12 @@ async function abrirEstudio(page: import("@playwright/test").Page) {
   await clientes.first().click();
 
   // Passo 2 — o estúdio, com o editor de serviços montado (o chunk é
-  // preguiçoso, daí a espera generosa).
+  // preguiçoso, daí a espera generosa). Os Serviços são o 2.º dos cinco
+  // passos do estúdio (A2).
+  await page
+    .getByRole("navigation", { name: "Passos da proposta" })
+    .getByRole("button", { name: /^2\s*Serviços/ })
+    .click({ timeout: 30_000 });
   const linha1 = page.getByLabel(/^Linha 1 do grupo 1$/).first();
   await expect(linha1, "o editor de serviços do estúdio").toBeVisible({ timeout: 30_000 });
   await assentar(page, 800);
