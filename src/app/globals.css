@@ -3109,25 +3109,20 @@ body::before {
   }
 }
 .lb-photo-in {
-  animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: lb-photo-in var(--transition-duration-vista) var(--ease-out) both;
 }
 
-/* Opening a photo: a slightly deeper zoom-in than the between-photos lb-photo-in,
-   so the photo visibly "grows" as it opens. Transform + opacity only → fully
-   GPU-composited, no snapshot (this replaced the View Transition morph, which
-   snapshotted the whole full-screen layer and stuttered). */
-@keyframes lb-open-in {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* A fotografia grande do visualizador: transparente até chegar, e depois
+   entra por cima da pré-visualização que já lá está. Substituiu o desfocado
+   (`placeholder="blur"`), que tapava a pré-visualização nítida durante meio
+   segundo. O `lb-open-in` que aqui estava saiu com ele: quem abre a foto
+   agora é o voo a partir da miniatura (`voo.ts`). */
+.lb-grande {
+  opacity: 0;
+  transition: opacity var(--transition-duration-foto-chega) var(--ease-out);
 }
-.lb-open-in {
-  animation: lb-open-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+.lb-grande[data-carregada] {
+  opacity: 1;
 }
 
 /* ── Hero CSS animations (no JS — always in viewport on load) ── */
@@ -3673,8 +3668,7 @@ body[data-menu-open] .whatsapp-fixed {
 
 /* ── View Transitions (rotas + morph da galeria) ──
    .vt-page / .vt-page-fwd / .vt-page-bwd  todas as navegações usam UM cross-fade
-                  curto só de opacidade — ver nota de fluidez abaixo.
-   .gallery-morph  par thumbnail→lightbox (blur a meio esconde interpolação) */
+                  curto só de opacidade — ver nota de fluidez abaixo. */
 
 /* Fluidez da entrada de página: a API de View Transitions tira um "snapshot" da
    página inteira (no /sobre, um herói full-bleed de 100svh) e anima-o. Animar
@@ -3708,26 +3702,10 @@ body[data-menu-open] .whatsapp-fixed {
   }
 }
 
-/* Saída do lightbox sem par (a miniatura destino não está renderizada):
-   desvanece em vez de desaparecer de repente. */
-::view-transition-old(.vt-lb) {
-  animation: 200ms ease-out both vt-fade-out;
-}
 @keyframes vt-fade-out {
   to {
     opacity: 0;
   }
-}
-
-::view-transition-group(.gallery-morph) {
-  /* Only the group animates — a composited transform of the thumbnail→fullscreen
-     box (position + size), plus the default GPU cross-fade of the image pair.
-     The previous `vt-morph-blur` animated filter: blur(2px) on the image pair,
-     which forced a full-frame REPAINT of a large photo every frame — the reason
-     opening a photo stuttered. Dropping it keeps the expand-morph but makes it
-     60fps. Slightly shorter, too, so it feels snappier. */
-  animation-duration: 340ms;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4697,9 +4675,11 @@ body:has([data-orcamento-mode]) .eyebrow {
     animation: none;
     transform: scale(1.06);
   }
-  .lb-photo-in,
-  .lb-open-in {
+  .lb-photo-in {
     animation: none;
+  }
+  .lb-grande {
+    transition: none;
   }
 }
 
@@ -4803,6 +4783,13 @@ body:has([data-orcamento-mode]) .eyebrow {
    pode ser candidata a LCP para quem já respondeu. Segundos depois o React
    tira-a mesmo do DOM. */
 html.consentimento-decidido .barra-consentimento {
+  display: none;
+}
+
+/* E recolhe-se enquanto o visualizador da galeria está aberto: a barra é
+   `z-[70]`, por cima dele, e no telemóvel tapava a tira de miniaturas e o
+   gesto de arrastar. Volta ao fechar, com a escolha ainda por fazer. */
+html.lightbox-aberta .barra-consentimento {
   display: none;
 }
 
@@ -5200,9 +5187,22 @@ body:has(.barra-consentimento) footer {
   animation: g-hero-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) var(--hero-delay, 0ms) both;
 }
 
-/* Lightbox: o fundo escurece suavemente à entrada. A foto faz morph por cima,
-   por isso o preto é uma camada própria que só anima opacidade (nunca briga
-   com o <ViewTransition> da foto). */
+/* Lightbox: o fundo escurece à entrada, ao mesmo tempo que a miniatura voa
+   (a mesma duração e a mesma curva do voo, `DUR_VISTA_MS` e `EASE_OUT`).
+
+   E toma a COR DA FOTOGRAFIA (GAL-3): no centro, a cor média da foto (de
+   `tile-colors.json`) com 65% de preto; nas margens, quase preto. O caso mais
+   claro possível — uma foto branca — dá #595959 no centro, e o branco dos
+   controlos fica acima de 7:1; a barra de cima tem ainda o seu degradé.
+
+   `--lb-cor` é uma propriedade REGISTADA porque só assim o degradé transita
+   para a cor da foto seguinte; uma variável comum troca de repente. Não
+   herda: é escrita no próprio fundo (ver o `style` no `GaleriaClient`). */
+@property --lb-cor {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: black;
+}
 @keyframes lb-backdrop-in {
   from {
     opacity: 0;
@@ -5212,7 +5212,31 @@ body:has(.barra-consentimento) footer {
   }
 }
 .lb-backdrop {
-  animation: lb-backdrop-in 0.4s ease both;
+  background: radial-gradient(
+    farthest-corner at 50% 45%,
+    color-mix(in oklab, var(--lb-cor) 35%, black) 0%,
+    color-mix(in oklab, var(--lb-cor) 6%, black) 80%
+  );
+  transition: --lb-cor var(--transition-duration-foto-chega) var(--ease-out);
+  animation: lb-backdrop-in var(--transition-duration-vista) var(--ease-out) both;
+}
+
+/* A cópia da miniatura que voa (ver `voo.ts`). Escondida em repouso; o JS
+   põe-lhe `data-a-voar` durante o voo e esconde a foto do visualizador por
+   baixo (`data-voo`), para não haver duas. */
+.lb-voo {
+  display: none;
+  position: fixed;
+  z-index: 1;
+  object-fit: contain;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.lb-voo[data-a-voar] {
+  display: block;
+}
+.lb-photo-layer[data-voo] > * {
+  visibility: hidden;
 }
 
 /* A cromagem (barra, tira de miniaturas) entra com um leve atraso — deixa a
@@ -5226,35 +5250,46 @@ body:has(.barra-consentimento) footer {
   }
 }
 .lb-chrome {
-  animation: lb-chrome-in 0.5s ease 0.12s both;
+  animation: lb-chrome-in var(--transition-duration-vista) var(--ease-out)
+    var(--transition-duration-micro) both;
 }
 
-/* Fecho gracioso do lightbox. O morph de ABERTURA usa <ViewTransition>, mas o
-   de fecho revelou-se instável com a camada de motion ativa (o Escape disparava
-   e a transição não fazia commit). Aqui o fecho é 100% CSS e fiável: enquanto
-   `closing` está ativo (260ms, ver close()), o diálogo inteiro faz fade + um
-   ligeiro scale-down antes de desmontar. Overshoot subtil para dar peso. */
-@keyframes lb-out {
+/* A saída com voo: a foto volta para a miniatura (no JS) e o fundo e a
+   cromagem esbatem-se por baixo, no mesmo tempo. Sem miniatura à vista, quem
+   esbate é o diálogo inteiro (também no JS, com `EASE_IN`). */
+@keyframes lb-desvanece {
   from {
     opacity: 1;
-    transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: scale(0.965);
   }
 }
-.lb-closing {
-  animation: lb-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
-  transform-origin: center;
+[data-sair] {
   pointer-events: none;
+}
+[data-sair] .lb-backdrop,
+[data-sair] .lb-chrome,
+[data-sair] .lb-dica {
+  animation: lb-desvanece var(--transition-duration-vista) var(--ease-out) both;
+}
+
+/* A dica do teclado só com rato: «esc fechar» a quem tem um tablet não diz
+   nada. */
+.lb-dica {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lb-dica {
+    display: block;
+  }
 }
 
 /* Camada da foto do lightbox — mola de volta ao largar o arrasto (fechar em
    telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
    toque sem lag; ao largar, a transição trata do resto. */
 .lb-photo-layer {
-  transition: transform 0.28s var(--ease-out);
+  transition: transform var(--transition-duration-elemento) var(--ease-out);
 }
 .lb-photo-layer.lb-dragging {
   transition: none;
@@ -5303,11 +5338,8 @@ body:has(.barra-consentimento) footer {
   .lb-chrome {
     animation: none;
   }
-  /* Sem fade de saída: fica visível até o setTimeout desmontar (fecho instantâneo). */
-  .lb-closing {
-    animation: none;
-    opacity: 1;
-  }
+  /* A cor do fundo muda de foto para foto sem transitar. */
+  .lb-backdrop,
   .lb-photo-layer {
     transition: none;
   }
