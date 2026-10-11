@@ -33,7 +33,7 @@ volta atrás (a rota respondia 409).
 | **R1** — o padrão, os estados do pedido e a cadeia do Ganho, Propostas e Acompanhamento, Propostas Aceites, pagamentos, os dois envios | Feita no ramo `feat/anular-r1` |
 | **R2a** — a gaveta do pedido: os campos do «Guardar» e todas as listas | Feita (#188) |
 | **R2b** — o resto do back office, e os «Anular» antigos passam ao padrão | Feita no ramo `feat/anular-r2b` |
-| **R3a** — a Reciclagem: o motor, o ecrã, a limpeza diária, e tudo o que não tem fotografias | Feita (#193). **A migração (`db/migracoes/20261010_r3_reciclagem.sql`) NÃO está aplicada** — só corre com a aprovação dela |
+| **R3a** — a Reciclagem: o motor, o ecrã, a limpeza diária, e tudo o que não tem fotografias | Feita (#193). **Ligada:** a migração (`db/migracoes/20261010_r3_reciclagem.sql`) foi aplicada a 11/10, com a aprovação dela |
 | **R3b** — a Reciclagem do que tem fotografias: pedido, proposta, tema, foto de tema | Feita no ramo `feat/reciclagem-fotos`. Usa a mesma tabela da R3a: **nenhuma migração nova** |
 
 **Onde a R1 se afastou do plano.** Apagar um pagamento ficou com «Anular» e
