@@ -7508,8 +7508,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           <p className="bo-eyebrow flex items-center gap-1.5">
             Estúdio de propostas (PDF)
             <Ajuda sobre="o que se faz no estúdio de propostas">
-              Monta aqui a proposta em PDF para o cliente. Preenche de cima para baixo; podes
-              pré-visualizar antes de enviar.
+              Monta aqui a proposta em PDF para o cliente, em cinco passos: Evento, Serviços,
+              Inspiração, Orçamento e Rever e enviar. Podes saltar entre eles à vontade — nada se
+              perde.
             </Ajuda>
           </p>
         </div>
@@ -11357,9 +11358,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                        o que fazer a seguir. Fica, numa versão curta que cabe na
                        barra sem ser cortada pelo `truncate` do `<p>`. */
                   <>
-                    <span className="sm:hidden">Preenche o conteúdo para avançar.</span>
+                    <span className="sm:hidden">Preenche e avança.</span>
                     <span className="hidden sm:inline">
-                      Preenche o conteúdo e avança para pré-visualizar.
+                      Preenche este passo e avança para o seguinte.
                     </span>
                   </>
                 )}
@@ -11703,8 +11704,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     ))}
                   </ul>
                   <p className="mt-1.5 text-[var(--bo-text-muted)]">
-                    Volta ao conteúdo para encurtar o que ficou cortado, ou envia assim mesmo se for
-                    de propósito.
+                    Volta atrás para encurtar o que ficou cortado, ou envia assim mesmo se for de
+                    propósito.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -12815,7 +12816,7 @@ function StepNav({
   return (
     <nav
       aria-label="Passos da proposta"
-      className="sticky top-[var(--bo-cabecalho,0px)] z-10 -mx-1 mb-5 flex flex-wrap items-center gap-1.5 border-b border-[var(--bo-hairline)] bg-[var(--bo-surface)] px-1 py-2"
+      className="sticky top-[var(--bo-cabecalho,0px)] z-10 -mx-1 mb-5 flex flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-[var(--bo-hairline)] bg-[var(--bo-surface)] px-1 py-2 [scrollbar-width:none] [&>button]:shrink-0"
     >
       {PASSOS.map((p, i) => {
         const active = p === step;
@@ -12856,8 +12857,10 @@ function StepNav({
               </span>
               <span className="sr-only">, {FRASE_DO_ESTADO[estado]}</span>
             </button>
+            {/* As setas saem no telemóvel: com cinco passos, eram elas que
+                partiam a barra em duas linhas a 390 px. */}
             {i < PASSOS.length - 1 && (
-              <span aria-hidden="true" className="text-foreground/20">
+              <span aria-hidden="true" className="text-foreground/20 max-sm:hidden">
                 →
               </span>
             )}
@@ -13360,7 +13363,7 @@ function PreviewSummary({
           </dl>
         ) : (
           <p className="text-sm text-foreground/50">
-            Ainda sem total. Define o valor no passo «Conteúdo» → «Total, IVA e validade».
+            Ainda sem total. Define o valor no passo «Orçamento» → «Total, IVA e validade».
           </p>
         )}
       </div>
