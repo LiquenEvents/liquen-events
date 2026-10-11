@@ -125,6 +125,9 @@ export const getProposal = (id: string): Promise<Proposal | null> => repo.get(id
 export const updateProposal = (id: string, patch: Partial<Proposal>): Promise<Proposal | null> =>
   repo.update(id, patch);
 export const deleteProposal = (id: string): Promise<void> => repo.remove(id);
+/** Volta da Reciclagem com o MESMO id e a data em que foi criada. */
+export const reporProposta = (p: Proposal): Promise<void> =>
+  repo.create(p, { created_at: p.createdAt });
 export const listProposalsForQuote = (quoteId: string): Promise<Proposal[]> =>
   repo.where("quote_id", quoteId, (p) => p.quoteId === quoteId);
 /** The newest proposal for a quote (created_at descending), or null. The client

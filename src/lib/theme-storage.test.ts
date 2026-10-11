@@ -1522,3 +1522,65 @@ describe("transferThemeImage", () => {
     expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("exists");
   });
 });
+
+// ── A Reciclagem (R3b, `docs/TUDO-REVERSIVEL.md`) ──────────────────────────
+// Uma foto removida de um tema vivo sai da pasta para `reciclagem/<entrada>/`
+// com UM `move`, e volta ao mesmo caminho. As derivadas ficam onde estão.
+describe("fotos na Reciclagem", () => {
+  const ENTRADA = "0b6e8a52-3c41-4f0e-9d7a-2f1c5e9b7a10";
+  const GUARDADA = `reciclagem/${ENTRADA}/a.jpg`;
+
+  it("o caminho na Reciclagem tem dois níveis, e recusa o que é estranho", async () => {
+    const { caminhoNaReciclagem } = await load();
+    expect(caminhoNaReciclagem("t-1/a.jpg", ENTRADA)).toBe(GUARDADA);
+    expect(caminhoNaReciclagem("../x/a.jpg", ENTRADA)).toBeNull();
+    expect(caminhoNaReciclagem("t-1/a.jpg", "../../t-2")).toBeNull();
+  });
+
+  it("levar é um `move` do original — a miniatura não sai do sítio", async () => {
+    const { levarFotoParaAReciclagem } = await load();
+    expect(await levarFotoParaAReciclagem("t-1/a.jpg", GUARDADA)).toBe(true);
+    expect(st.move).toHaveBeenCalledWith("t-1/a.jpg", GUARDADA);
+    expect(st.remove).not.toHaveBeenCalled();
+    expect(st.thumbMove).not.toHaveBeenCalled();
+    expect(st.thumbRemove).not.toHaveBeenCalled();
+  });
+
+  it("um `move` recusado diz que não — a foto fica no tema", async () => {
+    st.move.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    const { levarFotoParaAReciclagem } = await load();
+    expect(await levarFotoParaAReciclagem("t-1/a.jpg", GUARDADA)).toBe(false);
+  });
+
+  it("trazer devolve ao mesmo caminho; se já lá está outra, não pisa", async () => {
+    const { trazerFotoDaReciclagem } = await load();
+    expect(await trazerFotoDaReciclagem("t-1/a.jpg", GUARDADA)).toBe("ok");
+    expect(st.move).toHaveBeenCalledWith(GUARDADA, "t-1/a.jpg");
+    st.move.mockResolvedValueOnce({
+      data: null,
+      error: { statusCode: "409", message: "The resource already exists" },
+    });
+    expect(await trazerFotoDaReciclagem("t-1/a.jpg", GUARDADA)).toBe("existe");
+  });
+
+  it("largar apaga a guardada e a miniatura — se a foto não voltou ao tema", async () => {
+    const { largarFotoDaReciclagem } = await load();
+    expect(await largarFotoDaReciclagem("t-1/a.jpg", GUARDADA)).toBe(true);
+    expect(st.remove).toHaveBeenCalledWith([GUARDADA]);
+    expect(st.thumbRemove).toHaveBeenCalledWith(["t-1/a.jpg"]);
+  });
+
+  it("largar NÃO leva a miniatura de uma foto que entretanto voltou ao tema", async () => {
+    st.list.mockResolvedValue(page(["a.jpg"]));
+    const { largarFotoDaReciclagem } = await load();
+    expect(await largarFotoDaReciclagem("t-1/a.jpg", GUARDADA)).toBe(true);
+    expect(st.remove).toHaveBeenCalledWith([GUARDADA]);
+    expect(st.thumbRemove).not.toHaveBeenCalled();
+  });
+
+  it("se a guardada não sai, diz que não — a entrada fica para amanhã", async () => {
+    st.remove.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    const { largarFotoDaReciclagem } = await load();
+    expect(await largarFotoDaReciclagem("t-1/a.jpg", GUARDADA)).toBe(false);
+  });
+});

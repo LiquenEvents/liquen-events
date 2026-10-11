@@ -25,6 +25,43 @@ import type { MaterialItem } from "./material-types";
 import type { PropItem } from "./inventory-types";
 import type { MaterialList, MaterialListItem } from "./material-list-types";
 import type { MaterialRule } from "./material-rules";
+import type { Proposal, Quote } from "./orcamento/types";
+import type { ProposalTheme } from "./theme-types";
+import { getQuote, reporPedido } from "./quotes-store";
+import {
+  deleteProposal,
+  getProposal,
+  listProposalsForQuote,
+  reporProposta,
+} from "./proposals-store";
+import { apagarPedidoSemContrato, type ResultadoDoApagamento } from "./apagar-pedido";
+import { draftKey } from "./proposal-drafts";
+import { getState, setState } from "./app-state";
+import { getEventMaterial, getForQuote, reporEventMaterial } from "./event-material-store";
+import type { EventMaterial, EventMaterialItem } from "./event-material-types";
+import { listItemsOfEvent, obterEventItem, reporEventItem } from "./event-material-items-store";
+import {
+  listLogOf,
+  obterDoRegisto,
+  reporNoRegisto,
+  type EventMaterialLog,
+} from "./event-material-log-store";
+import { apagarPastaDoPedido } from "./proposal-storage";
+import { deleteTheme, getTheme, listThemes, reporTema } from "./themes-store";
+import {
+  apagarFotoDaBiblioteca,
+  apagarPastaDaBiblioteca,
+  guardarFotoNaReciclagem,
+  salvarAntesDeReciclarOTema,
+} from "./theme-materializar";
+import {
+  caminhoNaReciclagem,
+  fotoExisteNoTema,
+  largarFotoDaReciclagem,
+  themeFolder,
+  trazerFotoDaReciclagem,
+} from "./theme-storage";
+import { isThemePath, themeIdOfPath } from "./theme-ref";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -79,11 +116,42 @@ type Retrato = Record<string, unknown[]>;
 interface DefinicaoDoTipo {
   /** Como se diz na lista («Tarefa», «Fornecedor»). */
   nome: string;
-  capturar(id: string): Promise<{ rotulo: string; retrato: Retrato } | null>;
-  apagar(id: string): Promise<void>;
+  /** `entradaId` é o id que a entrada vai ter — a foto de um tema precisa
+   *  dele para saber para onde vai (`reciclagem/<entrada>/`). */
+  capturar(
+    id: string,
+    entradaId: string,
+  ): Promise<{ rotulo: string; retrato: Retrato; ficheiros?: unknown[] } | null>;
+  /**
+   * Apaga. Com `entradaId`, a coisa vai para a Reciclagem (e o que tem
+   * ficheiros deixa-os guardados); sem ele, a Reciclagem não está ligada e o
+   * apagar é o de sempre — definitivo, ficheiros incluídos. O que devolve vai
+   * para quem chamou (o pedido devolve o que contou).
+   */
+  apagar(id: string, entradaId?: string): Promise<unknown>;
   /** Porque é que não pode voltar agora, ou `null` se pode. */
   conflito(retrato: Retrato): Promise<string | null>;
   repor(retrato: Retrato): Promise<void>;
+  /**
+   * Os ficheiros guardados saem de vez («Apagar de vez», ou os 30 dias).
+   * `false` deixa a entrada na Reciclagem, para se tentar outra vez — nunca se
+   * perde a última referência a uma pasta que ficou no Storage.
+   */
+  largar?(entrada: EntradaDaReciclagem): Promise<boolean>;
+}
+
+/**
+ * Um apagar que não pôde acontecer, com a frase e o estado HTTP que a rota
+ * já dava antes da Reciclagem (o 409 do contrato, o 502 das fotos).
+ */
+export class NaoDeuParaApagar extends Error {
+  readonly status: number;
+  readonly detalhe?: unknown;
+  constructor(mensagem: string, status: number, detalhe?: unknown) {
+    super(mensagem);
+    this.status = status;
+    this.detalhe = detalhe;
+  }
 }
 
 const primeiro = <T>(r: Retrato, grupo: string): T => (r[grupo] ?? [])[0] as T;
@@ -116,7 +184,7 @@ function simples<T extends { id: string }>(o: {
       const e = await o.obter(id);
       return e ? { rotulo: o.rotulo(e) || o.nome, retrato: { principal: [e] } } : null;
     },
-    apagar: o.apagar,
+    apagar: (id) => o.apagar(id),
     async conflito(r) {
       const e = primeiro<T>(r, "principal");
       return e && (await o.obter(e.id)) ? JA_EXISTE : null;
@@ -223,7 +291,246 @@ export const TIPOS = {
       await reporSeFaltar(todos<MaterialRule>(r, "regras"), obterRegra, reporRegra);
     },
   },
+
+  /**
+   * O pedido e tudo o que é dele: as propostas, os rascunhos do estúdio e o
+   * material do evento (que no Supabase cai em cascata). A pasta das
+   * fotografias fica no Storage enquanto ele estiver na Reciclagem — ninguém a
+   * mostra sem o pedido — e só sai quando a entrada sai de vez.
+   */
+  pedido: {
+    nome: "Pedido",
+    async capturar(id) {
+      const q = await getQuote(id);
+      if (!q) return null;
+      const [propostas, rascunhos, material] = await Promise.all([
+        listProposalsForQuote(id),
+        rascunhosDoPedido(id),
+        getForQuote(id),
+      ]);
+      const [itens, registo] = material
+        ? await Promise.all([listItemsOfEvent(material.id), listLogOf(material.id)])
+        : [[], []];
+      return {
+        rotulo: nomeDoPedido(q) || "Pedido sem nome",
+        retrato: {
+          principal: [q],
+          propostas,
+          rascunhos,
+          material: material ? [material] : [],
+          itens,
+          registo,
+        },
+      };
+    },
+    async apagar(id, entradaId) {
+      const r = await apagarPedidoSemContrato(id, { fotos: !entradaId });
+      if (!r.apagado) throw new NaoDeuParaApagar(fraseDoPedido(r), estadoDoPedido(r), r);
+      return r;
+    },
+    async conflito(r) {
+      const q = primeiro<Quote>(r, "principal");
+      if (q && (await getQuote(q.id))) return JA_EXISTE;
+      for (const p of todos<Proposal>(r, "propostas")) {
+        if (await getProposal(p.id)) {
+          return "Uma das propostas deste pedido já existe outra vez. Nada foi reposto.";
+        }
+      }
+      return null;
+    },
+    async repor(r) {
+      await reporPedido(primeiro<Quote>(r, "principal"));
+      await reporSeFaltar(todos<Proposal>(r, "propostas"), getProposal, reporProposta);
+      for (const { chave, valor } of todos<{ chave: string; valor: unknown }>(r, "rascunhos")) {
+        // Um rascunho que entretanto nasceu de novo é trabalho de agora: fica.
+        if ((await getState(draftKey(chave))) == null) await setState(draftKey(chave), valor);
+      }
+      await reporSeFaltar(
+        todos<EventMaterial>(r, "material"),
+        getEventMaterial,
+        reporEventMaterial,
+      );
+      await reporSeFaltar(todos<EventMaterialItem>(r, "itens"), obterEventItem, reporEventItem);
+      await reporSeFaltar(todos<EventMaterialLog>(r, "registo"), obterDoRegisto, reporNoRegisto);
+    },
+    async largar(e) {
+      // Se voltou (com o mesmo id), a pasta é dele outra vez.
+      if (await getQuote(e.origemId)) return true;
+      return apagarPastaDoPedido(e.origemId);
+    },
+  },
+
+  /** Uma proposta sozinha. Volta para o pedido de onde saiu. */
+  proposta: {
+    nome: "Proposta",
+    async capturar(id) {
+      const p = await getProposal(id);
+      if (!p) return null;
+      const quem = (p.clientName ?? "").trim();
+      return { rotulo: quem ? `Proposta de ${quem}` : "Proposta", retrato: { principal: [p] } };
+    },
+    apagar: (id) => deleteProposal(id),
+    async conflito(r) {
+      const p = primeiro<Proposal>(r, "principal");
+      if (!p) return null;
+      if (await getProposal(p.id)) return JA_EXISTE;
+      if (p.quoteId && !(await getQuote(p.quoteId))) {
+        return "O pedido desta proposta já não existe. Repõe primeiro o pedido (está na Reciclagem, se foi apagado há menos de 30 dias).";
+      }
+      return null;
+    },
+    async repor(r) {
+      await reporProposta(primeiro<Proposal>(r, "principal"));
+    },
+  },
+
+  /**
+   * Um tema. Antes de sair, as propostas que usam fotos dele ficam com a sua
+   * cópia (como sempre ficaram); as fotos ficam na pasta, que só sai de vez
+   * com a entrada. Repor devolve a linha — e as fotos estão onde estavam.
+   */
+  tema: {
+    nome: "Tema",
+    async capturar(id) {
+      const t = await getTheme(id);
+      return t ? { rotulo: t.name || "Tema sem nome", retrato: { principal: [t] } } : null;
+    },
+    async apagar(id, entradaId) {
+      if (entradaId) {
+        if (!(await salvarAntesDeReciclarOTema(id)))
+          throw new NaoDeuParaApagar(TEMA_REFERENCIAS, 502);
+      } else {
+        const limpo = await apagarPastaDaBiblioteca(id);
+        if (!limpo.ok) {
+          throw new NaoDeuParaApagar(
+            limpo.motivo === "referencias" ? TEMA_REFERENCIAS : TEMA_FOTOS,
+            502,
+          );
+        }
+      }
+      await deleteTheme(id);
+    },
+    async conflito(r) {
+      const t = primeiro<ProposalTheme>(r, "principal");
+      if (!t) return null;
+      if (await getTheme(t.id)) return JA_EXISTE;
+      const nome = (t.name ?? "").trim().toLowerCase();
+      const outro = (await listThemes()).find((o) => (o.name ?? "").trim().toLowerCase() === nome);
+      return outro
+        ? `Já há outro tema chamado «${outro.name}». Muda-lhe o nome e tenta de novo.`
+        : null;
+    },
+    async repor(r) {
+      await reporTema(primeiro<ProposalTheme>(r, "principal"));
+    },
+    async largar(e) {
+      if (await getTheme(e.origemId)) return true;
+      return (await apagarPastaDaBiblioteca(e.origemId)).ok;
+    },
+  },
+
+  /**
+   * Uma fotografia de um tema que continua. A pasta é a fonte da verdade do
+   * que o tema mostra, por isso a foto TEM de sair dela: vai para
+   * `reciclagem/<entrada>/` no mesmo bucket, e volta ao mesmo caminho.
+   */
+  "foto-de-tema": {
+    nome: "Fotografia de tema",
+    async capturar(path, entradaId) {
+      if (!isThemePath(path)) return null;
+      const destino = caminhoNaReciclagem(path, entradaId);
+      if (!destino) return null;
+      const tema = await getTheme(themeIdOfPath(path));
+      const foto: FotoNaReciclagem = { path, temaId: themeIdOfPath(path), naReciclagem: destino };
+      return {
+        rotulo: tema?.name ? `Fotografia de «${tema.name}»` : "Fotografia de um tema",
+        retrato: { principal: [foto] },
+        ficheiros: [{ de: path, para: destino }],
+      };
+    },
+    async apagar(path, entradaId) {
+      const destino = entradaId ? caminhoNaReciclagem(path, entradaId) : null;
+      const r = destino
+        ? await guardarFotoNaReciclagem(path, destino)
+        : await apagarFotoDaBiblioteca(path);
+      if (!r.ok) {
+        throw new NaoDeuParaApagar(
+          r.motivo === "referencias" ? FOTO_REFERENCIAS : "Falha ao remover a imagem.",
+          502,
+        );
+      }
+    },
+    async conflito(r) {
+      const f = primeiro<FotoNaReciclagem>(r, "principal");
+      if (!f) return null;
+      if (!(await getTheme(f.temaId))) {
+        return "O tema desta fotografia já não existe. Repõe primeiro o tema (está na Reciclagem, se foi eliminado há menos de 30 dias).";
+      }
+      if (await fotoExisteNoTema(f.path)) return "Esta fotografia já voltou a estar no tema.";
+      return null;
+    },
+    async repor(r) {
+      const f = primeiro<FotoNaReciclagem>(r, "principal");
+      const como = await trazerFotoDaReciclagem(f.path, f.naReciclagem);
+      if (como === "existe") throw new NaoDaParaRepor("Esta fotografia já voltou a estar no tema.");
+      if (como === "falhou") throw new Error("O armazenamento não devolveu a fotografia.");
+    },
+    async largar(e) {
+      const f = primeiro<FotoNaReciclagem>(e.retrato as Retrato, "principal");
+      return f ? largarFotoDaReciclagem(f.path, f.naReciclagem) : true;
+    },
+  },
 } satisfies Record<string, DefinicaoDoTipo>;
+
+interface FotoNaReciclagem {
+  path: string;
+  temaId: string;
+  /** Onde a foto espera: `reciclagem/<entrada>/<ficheiro>`. */
+  naReciclagem: string;
+}
+
+const TEMA_REFERENCIAS =
+  "Há propostas que usam fotos deste tema e não foi possível guardar lá uma cópia. O tema NÃO foi eliminado — tenta de novo.";
+const TEMA_FOTOS =
+  "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tenta de novo.";
+const FOTO_REFERENCIAS =
+  "Esta foto é usada por uma proposta e não foi possível guardar lá uma cópia. A foto NÃO foi removida — tenta de novo.";
+
+/** As quatro chaves do rascunho que o `apagarPedidoSemContrato` limpa. */
+const chavesDoRascunho = (id: string) => [
+  id,
+  `${id}--orcamento-linhas`,
+  `${id}--sobreposto`,
+  `${id}--orcamento-linhas--sobreposto`,
+];
+
+async function rascunhosDoPedido(id: string): Promise<{ chave: string; valor: unknown }[]> {
+  const out: { chave: string; valor: unknown }[] = [];
+  for (const chave of chavesDoRascunho(id)) {
+    const valor = await getState<unknown>(draftKey(chave));
+    if (valor != null) out.push({ chave, valor });
+  }
+  return out;
+}
+
+/** Os noivos, ou quem escreveu (o mesmo de `pastas-com-nome.ts`). */
+function nomeDoPedido(q: Quote): string {
+  const noivos = [q.partnerA, q.partnerB].map((n) => (n ?? "").trim()).filter(Boolean);
+  if (noivos.length === 2) return `${noivos[0]} e ${noivos[1]}`;
+  if (noivos.length === 1) return noivos[0];
+  return (q.name ?? "").trim();
+}
+
+/** As frases e os estados que a rota do pedido já dava. */
+function fraseDoPedido(r: ResultadoDoApagamento): string {
+  if (r.motivo === "nao-existe") return "Não encontrado";
+  if (r.motivo === "tem-contrato") {
+    return "Este pedido deu origem a contrato, e um contrato é um registo fiscal que tem de ser conservado. Nada foi apagado.";
+  }
+  return "Não consegui apagar este pedido.";
+}
+const estadoDoPedido = (r: ResultadoDoApagamento) =>
+  r.motivo === "nao-existe" ? 404 : r.motivo === "tem-contrato" ? 409 : 500;
 
 export type TipoNaReciclagem = keyof typeof TIPOS;
 
@@ -248,39 +555,46 @@ export async function enviarParaAReciclagem(
   id: string,
   quem?: string,
 ): Promise<ResultadoDeApagar> {
+  return (await enviarComDetalhe(tipo, id, quem)).reciclagem;
+}
+
+/**
+ * O mesmo, mais o que o apagar devolveu — o pedido conta o que apagou, e a
+ * rota continua a dizê-lo. Lança `NaoDeuParaApagar` quando o apagar recusa
+ * (e então nada fica na Reciclagem).
+ */
+export async function enviarComDetalhe(
+  tipo: TipoNaReciclagem,
+  id: string,
+  quem?: string,
+): Promise<{ reciclagem: ResultadoDeApagar; detalhe?: unknown }> {
   const def: DefinicaoDoTipo = TIPOS[tipo];
-  const capturado = await def.capturar(id);
-  if (!capturado) {
-    await def.apagar(id);
-    return null;
-  }
+  const entradaId = randomUUID();
+  const capturado = await def.capturar(id, entradaId);
+  if (!capturado) return { reciclagem: null, detalhe: await def.apagar(id) };
   const entrada: EntradaDaReciclagem = {
-    id: randomUUID(),
+    id: entradaId,
     tipo,
     rotulo: capturado.rotulo,
     origemId: id,
     apagadoEm: new Date().toISOString(),
     apagadoPor: quem,
     retrato: capturado.retrato,
-    ficheiros: [],
+    ficheiros: capturado.ficheiros ?? [],
   };
   try {
     await guardarNaReciclagem(entrada);
   } catch (err) {
     // A migração ainda não correu: apaga-se como sempre, e diz-se.
-    if (isMissingTable(err)) {
-      await def.apagar(id);
-      return false;
-    }
+    if (isMissingTable(err)) return { reciclagem: false, detalhe: await def.apagar(id) };
     throw err;
   }
   try {
-    await def.apagar(id);
+    return { reciclagem: { id: entrada.id }, detalhe: await def.apagar(id, entrada.id) };
   } catch (err) {
     await tirarDaReciclagem(entrada.id).catch(() => {});
     throw err;
   }
-  return { id: entrada.id };
 }
 
 /** O porquê de um «Repor» não poder acontecer — a rota responde 409. */
@@ -308,12 +622,47 @@ export async function reporDaReciclagem(entradaId: string): Promise<EntradaDaRec
   return entrada;
 }
 
-/** «Apagar de vez»: a entrada sai, e com ela a última cópia. */
+/** Os ficheiros que a entrada guarda saem de vez. `true` se não ficou nada. */
+async function largarFicheiros(entrada: EntradaDaReciclagem): Promise<boolean> {
+  if (!eTipo(entrada.tipo)) return true;
+  const def: DefinicaoDoTipo = TIPOS[entrada.tipo];
+  try {
+    return def.largar ? await def.largar(entrada) : true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * «Apagar de vez»: a entrada sai, e com ela a última cópia (e os ficheiros
+ * que guardava). Se os ficheiros não saírem, a entrada FICA — e diz-se.
+ */
 export async function apagarDeVez(entradaId: string): Promise<boolean> {
   const entrada = await obterDaReciclagem(entradaId);
   if (!entrada) return false;
+  if (!(await largarFicheiros(entrada))) {
+    throw new NaoDeuParaApagar(
+      "As fotografias guardadas não saíram do armazenamento. Continua na Reciclagem — tenta de novo.",
+      502,
+    );
+  }
   await tirarDaReciclagem(entradaId);
   return true;
+}
+
+/**
+ * As pastas da Biblioteca cujo tema está na Reciclagem. A pasta fica no
+ * Storage, e a Biblioteca (que lista pela `biblioteca_fotos`) mostrava-a outra
+ * vez se não a escondesse. Sem a tabela não há nada a esconder.
+ */
+export async function pastasDeTemasNaReciclagem(): Promise<Set<string>> {
+  try {
+    const todas = await listarReciclagem();
+    return new Set(todas.filter((e) => e.tipo === "tema").map((e) => themeFolder(e.origemId)));
+  } catch (err) {
+    if (isMissingTable(err)) return new Set();
+    throw err;
+  }
 }
 
 /** Quando sai sozinha da Reciclagem. */
@@ -345,9 +694,24 @@ export async function oQueEstaNaReciclagem(): Promise<
 export async function limparExpiradas(
   agora: Date = new Date(),
   lote = 50,
-): Promise<{ apagadas: number }> {
+  /** Uma pasta grande demora: o que não couber neste tempo fica para amanhã. */
+  tectoMs = 40_000,
+): Promise<{ apagadas: number; ficaram: number }> {
+  const comeco = Date.now();
   const todas = await listarReciclagem();
   const expiradas = todas.filter((e) => saiEm(e).getTime() <= agora.getTime()).slice(0, lote);
-  for (const e of expiradas) await tirarDaReciclagem(e.id);
-  return { apagadas: expiradas.length };
+  let apagadas = 0;
+  let ficaram = 0;
+  for (const e of expiradas) {
+    if (Date.now() - comeco > tectoMs) break;
+    // Os ficheiros primeiro: se não saírem, a entrada fica (e com ela a
+    // única lembrança de que há uma pasta para apagar).
+    if (await largarFicheiros(e)) {
+      await tirarDaReciclagem(e.id);
+      apagadas++;
+    } else {
+      ficaram++;
+    }
+  }
+  return { apagadas, ficaram };
 }

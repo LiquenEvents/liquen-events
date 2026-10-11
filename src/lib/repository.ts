@@ -97,7 +97,12 @@ export interface Backend<T> {
   list(): Promise<T[]>;
   get(id: string): Promise<T | null>;
   query(column: string, value: unknown, predicate: (e: T) => boolean): Promise<T[]>;
-  insert(entity: T): Promise<void>;
+  /**
+   * `extra`: colunas a mais para a linha, que o `toRow` cala de propósito —
+   * o `created_at` de quem é reposto (Reciclagem). O ficheiro local ignora-as:
+   * lá a entidade guarda-se inteira, com a sua data.
+   */
+  insert(entity: T, extra?: Record<string, unknown>): Promise<void>;
   /**
    * Write `merged` over the stored entity. When `cas` (the entity previously
    * returned by `get` on this same backend instance) is provided and the
@@ -510,8 +515,9 @@ export class SupabaseBackend<T> implements Backend<T> {
     return (data ?? []).map(this.map);
   }
 
-  async insert(entity: T): Promise<void> {
-    const { error, status } = await this.sb.from(this.m.table).insert(this.m.toRow(entity));
+  async insert(entity: T, extra?: Record<string, unknown>): Promise<void> {
+    const row = extra ? { ...this.m.toRow(entity), ...extra } : this.m.toRow(entity);
+    const { error, status } = await this.sb.from(this.m.table).insert(row);
     if (error) throw comEstadoHttp(error, status);
   }
 
@@ -693,8 +699,8 @@ export class Repository<T> {
     return this.getBackend().query(column, value, predicate);
   }
 
-  create(entity: T): Promise<void> {
-    return this.getBackend().insert(entity);
+  create(entity: T, extra?: Record<string, unknown>): Promise<void> {
+    return this.getBackend().insert(entity, extra);
   }
 
   /** Read-merge-write update. Returns the merged entity, or null if not found. */

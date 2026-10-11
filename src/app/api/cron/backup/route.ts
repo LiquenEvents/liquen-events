@@ -273,9 +273,17 @@ export async function GET(request: NextRequest) {
      * cópia seguiu na mesma — e amanhã tenta outra vez. Sem a tabela (a
      * migração ainda não correu), não há nada para limpar.
      */
-    let reciclagem: { apagadas: number } | null = null;
+    let reciclagem: { apagadas: number; ficaram: number } | null = null;
     try {
-      reciclagem = await limparExpiradas();
+      // 20 s: a função tem 60, e a cópia e a retenção já gastaram parte. O
+      // que não couber (uma pasta grande de fotos) fica para amanhã.
+      reciclagem = await limparExpiradas(new Date(), 50, 20_000);
+      if (reciclagem.ficaram > 0) {
+        log.warn("cron backup: há fotografias da Reciclagem que não saíram — fica para amanhã", {
+          dia,
+          ficaram: reciclagem.ficaram,
+        });
+      }
     } catch (e) {
       if (!isMissingTable(e)) {
         log.error("cron backup: a limpeza da Reciclagem falhou (a cópia seguiu na mesma)", e, {

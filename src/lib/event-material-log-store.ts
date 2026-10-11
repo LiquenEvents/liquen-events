@@ -58,6 +58,9 @@ export const mapper: Mapper<EventMaterialLog> = {
 const repo = createRepository(mapper);
 
 export const listAllLog = (): Promise<EventMaterialLog[]> => repo.list();
+export const obterDoRegisto = (id: string): Promise<EventMaterialLog | null> => repo.get(id);
+/** Volta da Reciclagem com o MESMO id (o `registar` refaria a hora). */
+export const reporNoRegisto = (l: EventMaterialLog): Promise<void> => repo.create(l);
 
 /**
  * O registo de UM evento — filtrado pela base de dados, nunca em memória.

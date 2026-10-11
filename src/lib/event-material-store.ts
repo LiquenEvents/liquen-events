@@ -84,3 +84,5 @@ export const updateEventMaterial = (
 ): Promise<EventMaterial | null> => repo.update(id, patch);
 
 export const deleteEventMaterial = (id: string): Promise<void> => repo.remove(id);
+/** Volta da Reciclagem tal e qual (o `createEventMaterial` refaria as datas). */
+export const reporEventMaterial = (e: EventMaterial): Promise<void> => repo.create(e);

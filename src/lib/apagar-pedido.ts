@@ -75,7 +75,14 @@ const VAZIO = { propostas: 0, fotos: 0, rascunhos: 0 };
  * Nunca lança: um apagamento que rebenta a meio deixa o sistema num estado que
  * ninguém consegue descrever. Devolve sempre o que conseguiu e o que não.
  */
-export async function apagarPedidoSemContrato(pedidoId: string): Promise<ResultadoDoApagamento> {
+export async function apagarPedidoSemContrato(
+  pedidoId: string,
+  /**
+   * `fotos: false` deixa a pasta do pedido no Storage: é o que a Reciclagem
+   * pede (`src/lib/reciclagem.ts`), que só a apaga quando a entrada sai de vez.
+   */
+  opcoes: { fotos?: boolean } = {},
+): Promise<ResultadoDoApagamento> {
   const id = String(pedidoId ?? "").trim();
   if (!id) return { apagado: false, motivo: "nao-existe", contou: { ...VAZIO }, falhou: [] };
 
@@ -133,20 +140,22 @@ export async function apagarPedidoSemContrato(pedidoId: string): Promise<Resulta
   // BIBLIOTECA não se tocam: vivem noutro bucket, são dela, e são usadas em
   // muitas propostas — apagá-las por causa de um pedido esvaziaria mood boards
   // de outros casais.
-  try {
-    const fotos = await listProposalImages(id);
-    for (const f of fotos) {
-      try {
-        await removeStoredObject(PROPOSAL_BUCKET, f.path);
-        contou.fotos++;
-      } catch (e) {
-        falhou.push(`a fotografia ${f.path} continua no armazenamento`);
-        log.error("apagar-pedido: fotografia não apagada", e, { pedido: id, path: f.path });
+  if (opcoes.fotos !== false) {
+    try {
+      const fotos = await listProposalImages(id);
+      for (const f of fotos) {
+        try {
+          await removeStoredObject(PROPOSAL_BUCKET, f.path);
+          contou.fotos++;
+        } catch (e) {
+          falhou.push(`a fotografia ${f.path} continua no armazenamento`);
+          log.error("apagar-pedido: fotografia não apagada", e, { pedido: id, path: f.path });
+        }
       }
+    } catch (e) {
+      falhou.push("não consegui listar as fotografias deste pedido");
+      log.error("apagar-pedido: listagem de fotografias falhou", e, { pedido: id });
     }
-  } catch (e) {
-    falhou.push("não consegui listar as fotografias deste pedido");
-    log.error("apagar-pedido: listagem de fotografias falhou", e, { pedido: id });
   }
 
   // ── O rascunho do estúdio, e as suas variantes ───────────────────────────

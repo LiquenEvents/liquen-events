@@ -6,7 +6,7 @@ import { act } from "react";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
 import Reciclagem from "./Reciclagem";
-import { useDepoisDeApagar } from "./ui/depois-de-apagar";
+import { useDepoisDeApagar, useDepoisDeApagarVarios } from "./ui/depois-de-apagar";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -133,6 +133,65 @@ describe("depois de apagar noutro ecrã", () => {
   it("sem a Reciclagem, não promete volta: diz que apagou de vez", async () => {
     const { result } = renderHook(() => useDepoisDeApagar(), { wrapper: comAviso });
     act(() => result.current({ ok: true, reciclagem: false }, "«X» eliminada."));
+    expect(await screen.findByText(/Apagado de vez/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Anular" })).toBeNull();
+  });
+});
+
+describe("depois de apagar VÁRIOS (pedidos marcados, fotos escolhidas — R3b)", () => {
+  const comAviso = ({ children }: { children: React.ReactNode }) => (
+    <ToastProvider>{children}</ToastProvider>
+  );
+
+  it("um só aviso, e um «Anular» que os repõe todos — diz quais voltaram", async () => {
+    const user = userEvent.setup();
+    const voltaram = vi.fn();
+    const { result } = renderHook(() => useDepoisDeApagarVarios(), { wrapper: comAviso });
+    act(() =>
+      result.current(
+        [{ reciclagem: { id: "a" } }, { reciclagem: { id: "b" } }],
+        "2 fotos removidas.",
+        voltaram,
+      ),
+    );
+    expect(await screen.findByText(/2 fotos removidas\. Ficam 30 dias na Reciclagem/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Anular" }));
+    await waitFor(() =>
+      expect(escritas).toEqual([
+        { url: "/api/reciclagem/a/repor", method: "POST" },
+        { url: "/api/reciclagem/b/repor", method: "POST" },
+      ]),
+    );
+    await waitFor(() => expect(voltaram).toHaveBeenCalledWith([0, 1]));
+    expect(await screen.findByText("Reposto.")).toBeTruthy();
+  });
+
+  it("se um não volta, diz quantos — e só esse fica na Reciclagem", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        String(url).includes("/b/") ? resposta(409, { error: "já existe" }) : resposta(200, {}),
+      ),
+    );
+    const user = userEvent.setup();
+    const voltaram = vi.fn();
+    const { result } = renderHook(() => useDepoisDeApagarVarios(), { wrapper: comAviso });
+    act(() =>
+      result.current(
+        [{ reciclagem: { id: "a" } }, { reciclagem: { id: "b" } }],
+        "2 pedidos apagados.",
+        voltaram,
+      ),
+    );
+    await user.click(await screen.findByRole("button", { name: "Anular" }));
+    await waitFor(() => expect(voltaram).toHaveBeenCalledWith([0]));
+    expect(await screen.findByText(/1 reposto\(s\); 1 não/)).toBeTruthy();
+    expect(screen.queryByText("Reposto.")).toBeNull();
+  });
+
+  it("sem a Reciclagem, diz que apagou de vez", async () => {
+    const { result } = renderHook(() => useDepoisDeApagarVarios(), { wrapper: comAviso });
+    act(() => result.current([{ reciclagem: false }], "1 pedido apagado."));
     expect(await screen.findByText(/Apagado de vez/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Anular" })).toBeNull();
   });
