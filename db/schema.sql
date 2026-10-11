@@ -827,6 +827,24 @@ create table if not exists public.passkeys (
 
 create index if not exists passkeys_user_name_idx on public.passkeys (lower(user_name));
 
+-- ── Reciclagem (R3 do «tudo reversível», 10/10) ─────────────────
+-- O que se apaga no back office fica aqui 30 dias, com um retrato que deixa
+-- repor tal e qual (com o mesmo id). A limpeza diária corre dentro de
+-- /api/cron/backup, depois da cópia de segurança. A migração própria está em
+-- db/migracoes/20261010_r3_reciclagem.sql.
+create table if not exists public.reciclagem (
+  id          uuid primary key default gen_random_uuid(),
+  tipo        text not null,
+  rotulo      text not null,
+  origem_id   text not null,
+  apagado_em  timestamptz not null default now(),
+  apagado_por text,
+  retrato     jsonb not null,
+  ficheiros   jsonb not null default '[]'::jsonb
+);
+
+create index if not exists reciclagem_apagado_em_idx on public.reciclagem (apagado_em);
+
 -- ── Restrições de integridade (CHECK) ───────────────────────────
 -- Garantem, na própria base de dados, que os campos de estado/tipo só
 -- aceitam os valores que a aplicação conhece e que os montantes não são
@@ -1206,3 +1224,4 @@ alter table public.biblioteca_foto_etiquetas enable row level security;
 alter table public.contracts enable row level security;
 alter table public.message_links enable row level security;
 alter table public.passkeys enable row level security;
+alter table public.reciclagem enable row level security;

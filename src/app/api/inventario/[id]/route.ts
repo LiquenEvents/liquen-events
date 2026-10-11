@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { updateItem, deleteItem, PROP_CATEGORIES, type PropItem } from "@/lib/inventory-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
+import { updateItem, PROP_CATEGORIES, type PropItem } from "@/lib/inventory-store";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -79,8 +80,8 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteItem(id);
-    return NextResponse.json({ ok: true });
+    const reciclagem = await enviarParaAReciclagem("inventario", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     log.error("inventario DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

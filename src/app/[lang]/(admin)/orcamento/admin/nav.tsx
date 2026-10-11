@@ -25,7 +25,8 @@ export type View =
   | "contratos"
   | "modelos-email"
   | "definicoes"
-  | "servicos";
+  | "servicos"
+  | "reciclagem";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -71,6 +72,7 @@ const TODAS: Record<View, true> = {
   "modelos-email": true,
   definicoes: true,
   servicos: true,
+  reciclagem: true,
 };
 
 /** As vistas todas, por ordem de declaração do tipo. */

@@ -6,6 +6,7 @@ import type { MaterialList, MaterialListItem } from "@/lib/material-list-types";
 import { quantidadePara, porCadaQuantos } from "@/lib/material-list-types";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -89,6 +90,7 @@ export default function MaterialListas() {
   /** O «Anular» da casa (`ui/anular.ts`, 10 s). Era uma tira própria de 8 s,
    *  encostada à lista; passou ao aviso comum para ser igual em todo o lado. */
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const [novoNome, setNovoNome] = useState("");
   const [ocupado, setOcupado] = useState(false);
   /** O item escolhido no seletor de "acrescentar linha", por lista. */
@@ -238,9 +240,10 @@ export default function MaterialListas() {
       titulo: `Apagar a lista «${lista.name}»?`,
       oQueSePerde: [
         `${quantas} ${quantas === 1 ? "linha" : "linhas"} de material — com as quantidades e o que está marcado como crítico`,
-        "as regras que apontem para ela passam a dizer «(lista apagada)»",
+        "as regras que a acrescentam vão com ela",
       ],
-      aviso: "As checklists já geradas a partir dela não mudam — são cópias. Não pode ser anulado.",
+      aviso:
+        "As checklists já geradas a partir dela não mudam — são cópias. Fica 30 dias na Reciclagem, de onde se repõe tal e qual, com as linhas e as regras.",
       rotulo: "Apagar a lista",
       fazer: () => apagar(lista),
     });
@@ -248,14 +251,16 @@ export default function MaterialListas() {
 
   async function apagar(lista: MaterialList) {
     setOcupado(true);
-    const { ok } = await gravar(
+    const { ok, corpo } = await gravar(
       `apagar a lista «${lista.name}»`,
       `/api/material/listas/${lista.id}`,
       { method: "DELETE" },
     );
     setOcupado(false);
     if (!ok) return;
-    toast("Lista apagada.", "success");
+    // Foi para a Reciclagem, com as linhas e as regras que a acrescentam: o
+    // aviso traz «Anular», que repõe tudo tal e qual.
+    depoisDeApagar(corpo, `Lista «${lista.name}» apagada.`, () => void recarregar());
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 

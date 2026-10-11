@@ -1,0 +1,245 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A RECICLAGEM, DE PONTA A PONTA, NO BACKEND DE FICHEIRO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Fase R3 de `docs/TUDO-REVERSIVEL.md` («Reciclagem 30 dias»). Corre sobre os
+ * stores verdadeiros, num `data/` temporário — o mesmo caminho que o servidor
+ * local usa sem Supabase. O que se prende:
+ *
+ *  1. apagar tira a coisa e deixa-a na Reciclagem;
+ *  2. «Repor» volta com o MESMO id, e a entrada sai;
+ *  3. se já existe outra vez com aquele id, não se pisa — 409;
+ *  4. um item de material volta com as suas regras, sem as duplicar;
+ *  5. uma lista volta com as suas linhas;
+ *  6. a limpeza dos 30 dias tira só o que passou do prazo.
+ */
+
+let dir: string;
+let cwdSpy: { mockRestore(): void };
+
+beforeEach(async () => {
+  dir = await fs.mkdtemp(path.join(os.tmpdir(), "reciclagem-"));
+  await fs.mkdir(path.join(dir, "data"), { recursive: true });
+  cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(dir);
+  vi.stubEnv("NODE_ENV", "development");
+  vi.stubEnv("SUPABASE_URL", "");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+  vi.resetModules();
+});
+
+afterEach(async () => {
+  cwdSpy.mockRestore();
+  vi.unstubAllEnvs();
+  await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+});
+
+async function carregar() {
+  const reciclagem = await import("./reciclagem");
+  const tarefas = await import("./tasks-store");
+  const material = await import("./material-store");
+  const regras = await import("./material-rules-store");
+  const listas = await import("./material-lists-store");
+  const linhas = await import("./material-list-items-store");
+  const store = await import("./reciclagem-store");
+  return { reciclagem, tarefas, material, regras, listas, linhas, store };
+}
+
+describe("Reciclagem — tarefas", () => {
+  it("apagar deixa-a na Reciclagem, e «Repor» volta com o mesmo id", async () => {
+    const { reciclagem, tarefas, store } = await carregar();
+    const t = await tarefas.createTask({ title: "TESTE Confirmar a tenda", priority: "normal" });
+
+    const r = await reciclagem.enviarParaAReciclagem("tarefa", t.id, "Catarina");
+    expect(r).toEqual({ id: expect.any(String) });
+    expect(await tarefas.obterTarefa(t.id)).toBeNull();
+
+    const [entrada] = await store.listarReciclagem();
+    expect(entrada).toMatchObject({
+      tipo: "tarefa",
+      rotulo: "TESTE Confirmar a tenda",
+      origemId: t.id,
+      apagadoPor: "Catarina",
+    });
+
+    await reciclagem.reporDaReciclagem(entrada.id);
+    expect(await tarefas.obterTarefa(t.id)).toMatchObject({ id: t.id, title: t.title });
+    expect(await store.listarReciclagem()).toEqual([]);
+  });
+
+  it("se já existe outra vez com o mesmo id, não repõe por cima — 409", async () => {
+    const { reciclagem, tarefas, store } = await carregar();
+    const t = await tarefas.createTask({ title: "TESTE Reservar carrinha", priority: "normal" });
+    await reciclagem.enviarParaAReciclagem("tarefa", t.id);
+    await tarefas.reporTarefa({ ...t, title: "Outra coisa" });
+
+    const [entrada] = await store.listarReciclagem();
+    await expect(reciclagem.reporDaReciclagem(entrada.id)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect((await tarefas.obterTarefa(t.id))?.title).toBe("Outra coisa");
+    // A entrada fica: pode ser apagada de vez, ou reposta depois.
+    expect(await store.listarReciclagem()).toHaveLength(1);
+  });
+
+  it("apagar o que já não existe responde `null`, sem entrada nenhuma", async () => {
+    const { reciclagem, store } = await carregar();
+    expect(await reciclagem.enviarParaAReciclagem("tarefa", "nao-existe")).toBeNull();
+    expect(await store.listarReciclagem()).toEqual([]);
+  });
+
+  it("«Apagar de vez» tira a entrada; uma segunda vez diz que já não está lá", async () => {
+    const { reciclagem, tarefas, store } = await carregar();
+    const t = await tarefas.createTask({ title: "TESTE Levar extensões", priority: "baixa" });
+    await reciclagem.enviarParaAReciclagem("tarefa", t.id);
+    const [entrada] = await store.listarReciclagem();
+    expect(await reciclagem.apagarDeVez(entrada.id)).toBe(true);
+    expect(await reciclagem.apagarDeVez(entrada.id)).toBe(false);
+    await expect(reciclagem.reporDaReciclagem(entrada.id)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+});
+
+describe("Reciclagem — material", () => {
+  it("um item volta com as regras que apontavam para ele, sem as duplicar", async () => {
+    const { reciclagem, material, regras, store } = await carregar();
+    const item = await material.createMaterial({
+      name: "TESTE Escadote",
+      category: "Ferramentas",
+      kind: "reutilizavel",
+      unit: "un",
+      stock: 2,
+    });
+    const regra = await regras.createRule({
+      name: "TESTE leva escadote",
+      enabled: true,
+      matchKind: "sempre",
+      action: "add_item",
+      itemId: item.id,
+      qty: 1,
+      position: 0,
+    });
+
+    await reciclagem.enviarParaAReciclagem("material", item.id);
+    const [entrada] = await store.listarReciclagem();
+    expect((entrada.retrato.regras as { id: string }[]).map((r) => r.id)).toEqual([regra.id]);
+
+    // No Supabase a regra cai em cascata; aqui fica. Simula-se a cascata:
+    await regras.deleteRule(regra.id);
+
+    await reciclagem.reporDaReciclagem(entrada.id);
+    expect(await material.getMaterial(item.id)).toMatchObject({ id: item.id });
+    const todas = (await regras.listRules()).filter((r) => r.itemId === item.id);
+    expect(todas.map((r) => r.id)).toEqual([regra.id]);
+  });
+
+  it("um item cuja regra NÃO caiu (ficheiro local) volta sem a duplicar", async () => {
+    const { reciclagem, material, regras, store } = await carregar();
+    const item = await material.createMaterial({
+      name: "TESTE Fita-cola",
+      category: "Consumíveis",
+      kind: "consumivel",
+      unit: "rolo",
+      stock: 5,
+    });
+    await regras.createRule({
+      name: "TESTE fita",
+      enabled: true,
+      matchKind: "sempre",
+      action: "add_item",
+      itemId: item.id,
+      position: 0,
+    });
+    await reciclagem.enviarParaAReciclagem("material", item.id);
+    const [entrada] = await store.listarReciclagem();
+    await reciclagem.reporDaReciclagem(entrada.id);
+    expect((await regras.listRules()).filter((r) => r.itemId === item.id)).toHaveLength(1);
+  });
+
+  it("uma lista volta com as suas linhas, com os mesmos ids", async () => {
+    const { reciclagem, material, listas, linhas, store } = await carregar();
+    const item = await material.createMaterial({
+      name: "TESTE Abraçadeiras",
+      category: "Fixação",
+      kind: "consumivel",
+      unit: "un",
+      stock: 100,
+    });
+    const lista = await listas.createList({ name: "TESTE Estrutura", isDefault: false });
+    const linha = await linhas.addListItem({
+      listId: lista.id,
+      itemId: item.id,
+      qty: 4,
+      critical: false,
+      position: 0,
+    } as Parameters<typeof linhas.addListItem>[0]);
+
+    await reciclagem.enviarParaAReciclagem("lista", lista.id);
+    expect(await listas.getList(lista.id)).toBeNull();
+    expect(await linhas.listItemsOf(lista.id)).toEqual([]);
+
+    const [entrada] = await store.listarReciclagem();
+    await reciclagem.reporDaReciclagem(entrada.id);
+    expect(await listas.getList(lista.id)).toMatchObject({ id: lista.id });
+    expect((await linhas.listItemsOf(lista.id)).map((l) => l.id)).toEqual([linha.id]);
+  });
+
+  it("uma lista cujo item foi apagado entretanto não volta, e diz porquê", async () => {
+    const { reciclagem, material, listas, linhas, store } = await carregar();
+    const item = await material.createMaterial({
+      name: "TESTE Escadote",
+      category: "Ferramentas",
+      kind: "reutilizavel",
+      unit: "un",
+      stock: 1,
+    });
+    const lista = await listas.createList({ name: "TESTE Montagem", isDefault: false });
+    await linhas.addListItem({
+      listId: lista.id,
+      itemId: item.id,
+      qty: 1,
+      critical: true,
+      position: 0,
+    } as Parameters<typeof linhas.addListItem>[0]);
+    await reciclagem.enviarParaAReciclagem("lista", lista.id);
+    await material.deleteMaterial(item.id);
+
+    const entrada = (await store.listarReciclagem()).find((e) => e.tipo === "lista")!;
+    await expect(reciclagem.reporDaReciclagem(entrada.id)).rejects.toThrow(
+      /já não está no catálogo/,
+    );
+  });
+});
+
+describe("Reciclagem — a limpeza dos 30 dias", () => {
+  it("tira só o que passou do prazo", async () => {
+    const { reciclagem, store } = await carregar();
+    const dias = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+    const base = { tipo: "tarefa", rotulo: "x", origemId: "o", retrato: {}, ficheiros: [] };
+    await store.guardarNaReciclagem({ ...base, id: "velha", apagadoEm: dias(31) });
+    await store.guardarNaReciclagem({ ...base, id: "no-limite", apagadoEm: dias(29) });
+    await store.guardarNaReciclagem({ ...base, id: "nova", apagadoEm: dias(1) });
+
+    expect(await reciclagem.limparExpiradas()).toEqual({ apagadas: 1 });
+    expect((await store.listarReciclagem()).map((e) => e.id).sort()).toEqual(["no-limite", "nova"]);
+  });
+
+  it("a lista para o ecrã diz o tipo por extenso e o dia em que sai", async () => {
+    const { reciclagem, tarefas } = await carregar();
+    const t = await tarefas.createTask({ title: "TESTE Ligar ao florista", priority: "normal" });
+    await reciclagem.enviarParaAReciclagem("tarefa", t.id);
+    const [linha] = await reciclagem.oQueEstaNaReciclagem();
+    expect(linha.tipoNome).toBe("Tarefa");
+    const dias =
+      (new Date(linha.saiEm).getTime() - new Date(linha.apagadoEm).getTime()) / 86_400_000;
+    expect(dias).toBe(30);
+    expect(linha).not.toHaveProperty("retrato");
+  });
+});

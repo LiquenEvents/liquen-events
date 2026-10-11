@@ -72,3 +72,7 @@ export const updateRule = (
 ): Promise<MaterialRule | null> => repo.update(id, patch);
 
 export const deleteRule = (id: string): Promise<void> => repo.remove(id);
+
+/** Para a Reciclagem: ler uma regra, e repô-la tal e qual — com o MESMO id. */
+export const obterRegra = (id: string): Promise<MaterialRule | null> => repo.get(id);
+export const reporRegra = (r: MaterialRule): Promise<void> => repo.create(r);

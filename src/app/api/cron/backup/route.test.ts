@@ -43,6 +43,9 @@ const st = vi.hoisted(() => ({
   /** O aquecimento dos PDF: o que devolveu, e se rebentou. */
   aquecimentos: [] as number[],
   aquecimentoRebenta: false,
+  /** A limpeza da Reciclagem: quantas tirou, e se rebentou. */
+  reciclagemRebenta: false,
+  reciclagemLimpezas: 0,
   enviados: [] as { subject: string; anexos: string[] }[],
   carimbos: [] as unknown[],
 }));
@@ -78,6 +81,13 @@ vi.mock("@/lib/aquecimento-de-pdf", () => ({
     };
   }),
 }));
+vi.mock("@/lib/reciclagem", () => ({
+  limparExpiradas: vi.fn(async () => {
+    if (st.reciclagemRebenta) throw new Error("a base não responde");
+    st.reciclagemLimpezas++;
+    return { apagadas: 2 };
+  }),
+}));
 vi.mock("@/lib/mail", () => ({
   MAIL_TO: "dona@liquen.test",
   sendMail: vi.fn(async (m: { subject: string; attachments?: { filename: string }[] }) => {
@@ -110,6 +120,8 @@ beforeEach(() => {
   st.carimbos = [];
   st.aquecimentos = [];
   st.aquecimentoRebenta = false;
+  st.reciclagemRebenta = false;
+  st.reciclagemLimpezas = 0;
   vi.stubEnv("CRON_SECRET", "segredo");
   vi.clearAllMocks();
 });
@@ -216,6 +228,23 @@ describe("o aquecimento dos PDF viaja com a cópia", () => {
     expect(st.enviados, "a cópia não seguiu por causa do aquecimento").toHaveLength(1);
     expect(st.carimbos, "a cópia deixou de ficar carimbada").toHaveLength(1);
     expect(await res.json()).toMatchObject({ ok: true, aquecimento: null });
+  });
+
+  it("limpa a Reciclagem dos 30 dias, DEPOIS de a cópia seguir", async () => {
+    st.authed = true;
+    const res = await GET(req());
+    expect(st.enviados).toHaveLength(1);
+    expect(st.reciclagemLimpezas).toBe(1);
+    expect(await res.json()).toMatchObject({ reciclagem: { apagadas: 2 } });
+  });
+
+  it("uma limpeza da Reciclagem que rebenta NÃO impede a cópia de seguir", async () => {
+    st.authed = true;
+    st.reciclagemRebenta = true;
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(st.enviados, "a cópia não seguiu por causa da Reciclagem").toHaveLength(1);
+    expect(await res.json()).toMatchObject({ ok: true, reciclagem: null });
   });
 
   it("um pedido recusado não aquece nada", async () => {

@@ -6,6 +6,7 @@ import type { MaterialList, MaterialListItem } from "@/lib/material-list-types";
 import type { MaterialRule, MatchKind } from "@/lib/material-rules";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -70,6 +71,7 @@ const AVISO_RELEITURA = "Gravado, mas não foi possível reler as regras. Atuali
 export default function MaterialRegras() {
   const { toast } = useToast();
   const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const {
     data: regras = [],
     setData: setRegras,
@@ -134,20 +136,28 @@ export default function MaterialRegras() {
    * `MaterialListas`. Devolve `ok` em vez de atirar, porque quem chama tem de
    * poder decidir o que faz a seguir.
    */
-  async function gravar(oQue: string, url: string, init?: RequestInit): Promise<boolean> {
+  async function gravarComCorpo(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
     let res: Response;
     try {
       res = await fetch(url, init);
     } catch {
       toast(porqueRebentou(oQue).mensagem, "error");
-      return false;
+      return { ok: false, corpo: null };
     }
     const corpo = await res.json().catch(() => null);
     if (!res.ok) {
       toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
-      return false;
+      return { ok: false, corpo };
     }
-    return true;
+    return { ok: true, corpo };
+  }
+
+  async function gravar(oQue: string, url: string, init?: RequestInit): Promise<boolean> {
+    return (await gravarComCorpo(oQue, url, init)).ok;
   }
 
   async function criar() {
@@ -240,11 +250,14 @@ export default function MaterialRegras() {
   }
 
   async function apagar(regra: MaterialRule) {
-    const ok = await gravar(`apagar a regra «${regra.name}»`, `/api/material/regras/${regra.id}`, {
-      method: "DELETE",
-    });
+    const { ok, corpo } = await gravarComCorpo(
+      `apagar a regra «${regra.name}»`,
+      `/api/material/regras/${regra.id}`,
+      { method: "DELETE" },
+    );
     if (!ok) return;
-    toast("Regra apagada.", "success");
+    // Foi para a Reciclagem: o aviso traz «Anular», que a repõe tal e qual.
+    depoisDeApagar(corpo, `Regra «${regra.name}» apagada.`, () => void recarregar());
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
