@@ -106,6 +106,54 @@ jobs:
       - name: Peso das rotas (bloqueante)
         run: node scripts/peso-das-rotas.mjs
 
+  # ── O PACOTE DAS MINIATURAS, PARA A VERCEL ──────────────────────────────
+  # A 13/10 nenhum deploy acabava: a Vercel restaurou uma cache de build sem
+  # as miniaturas da galeria, e o pré-gerador pôs-se a codificar ~1000 fotos
+  # numa máquina de 2 núcleos (hora e meia; a Vercel corta aos 45 minutos).
+  # Esta cache — a do job de cima — está sempre quente. Fica publicada como
+  # um ficheiro do repositório (a release `pregen-cache`), e o
+  # `scripts/pregen-gallery.mjs` descarrega-a quando lhe faltam fotos.
+  # Só se publica quando a cache mudou (a chave vai nas notas da release).
+  pacote-das-miniaturas:
+    name: Pacote das miniaturas (para a Vercel)
+    needs: quality
+    # Só ramos deste repositório: um fork não tem, nem pode ter, escrita.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: A cache que o build acabou de deixar
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .next/cache/pregen-gallery
+            .next/cache/pregen-logos
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
+      - name: Publicar o pacote, se mudou
+        if: steps.cache.outputs.cache-hit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHAVE: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
+        run: |
+          set -euo pipefail
+          atual="$(gh release view pregen-cache --json body --jq .body 2>/dev/null || true)"
+          if [ "$atual" = "$CHAVE" ]; then
+            echo "O pacote publicado já é este ($CHAVE)."
+            exit 0
+          fi
+          tar -cf pregen-gallery.tar -C .next/cache/pregen-gallery .
+          ls -la pregen-gallery.tar
+          if ! gh release view pregen-cache >/dev/null 2>&1; then
+            gh release create pregen-cache --prerelease --latest=false \
+              --title "Miniaturas da galeria (cache de build)" --notes "$CHAVE"
+          fi
+          gh release upload pregen-cache pregen-gallery.tar --clobber
+          gh release edit pregen-cache --notes "$CHAVE"
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest

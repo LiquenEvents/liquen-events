@@ -44,6 +44,10 @@ import { promises as fs } from "fs";
 import { createHash } from "crypto";
 import path from "path";
 import os from "os";
+import { spawnSync } from "child_process";
+import { createWriteStream } from "fs";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import {
   VERSAO_ANALISE,
   agruparCenas,
@@ -203,6 +207,94 @@ try {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PACOTE DO GITHUB — A CACHE QUE NÃO DEPENDE DA VERCEL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A 13/10 nenhum deploy acabava: a Vercel restaurou uma cache de build ANTIGA,
+ * sem as miniaturas da galeria, e este script pôs-se a codificar as ~1000
+ * fotos (5 larguras × WebP e AVIF). Medido: ~10 s de processador por foto —
+ * numa máquina de 2 núcleos, hora e meia. A Vercel corta aos 45 minutos, e o
+ * registo ficava mudo até lá. Era o mesmo defeito de agosto («meia hora de
+ * build, em cada build»), que a cache da Vercel tinha escondido — até ao dia em
+ * que ela não veio.
+ *
+ * A CI do GitHub tem a SUA cache destas miniaturas (`actions/cache`), sempre
+ * quente, e publica-a como um ficheiro do repositório (a release
+ * `pregen-cache`, ver .github/workflows/ci.yml). Quando aqui faltam muitas,
+ * descarrega-se esse pacote — segundos — e só se codifica o que for mesmo
+ * novo. Sem pacote (rede em baixo, ainda não publicado), segue como antes.
+ *
+ * O pacote só ACRESCENTA: o que já está nesta cache não é tocado, e cada
+ * entrada continua a ser conferida pelo carimbo do CONTEÚDO da fotografia —
+ * um ficheiro do pacote que não corresponda à foto de agora é recodificado.
+ */
+const LIMIAR_DO_PACOTE = 25;
+const URL_DO_PACOTE =
+  process.env.PREGEN_PACOTE_URL ||
+  "https://github.com/LiquenEvents/liquen-events/releases/download/pregen-cache/pregen-gallery.tar";
+{
+  const emFalta = [...byKey.keys()].filter((k) => !index[k]).length;
+  if (emFalta > LIMIAR_DO_PACOTE && !process.env.PREGEN_SEM_PACOTE) {
+    const t = Date.now();
+    console.log(`pregen-gallery: faltam ${emFalta} fotos na cache — a descarregar o pacote…`);
+    try {
+      index = await juntarOPacote(index);
+      const ainda = [...byKey.keys()].filter((k) => !index[k]).length;
+      console.log(
+        `pregen-gallery: pacote junto em ${((Date.now() - t) / 1000).toFixed(1)}s — ` +
+          `faltam agora ${ainda}`,
+      );
+    } catch (err) {
+      console.warn(`pregen-gallery: sem pacote (${err.message}) — segue a codificar tudo`);
+    }
+  }
+}
+
+/** Descarrega o pacote, abre-o ao lado da cache e junta só o que falta. */
+async function juntarOPacote(atual) {
+  const resposta = await fetch(URL_DO_PACOTE, { signal: AbortSignal.timeout(240_000) });
+  if (!resposta.ok || !resposta.body) throw new Error(`HTTP ${resposta.status}`);
+  const pasta = path.join(ROOT, ".next", "cache", "pregen-pacote");
+  await fs.rm(pasta, { recursive: true, force: true });
+  await fs.mkdir(pasta, { recursive: true });
+  const tar = path.join(pasta, "pacote.tar");
+  // Às postas para o disco: são ~600 MB, que não têm de passar pela memória.
+  await pipeline(Readable.fromWeb(resposta.body), createWriteStream(tar));
+  const r = spawnSync("tar", ["-xf", tar, "-C", pasta], { stdio: "inherit" });
+  if (r.status !== 0) throw new Error("tar falhou");
+  await fs.rm(tar, { force: true });
+
+  const doPacote = JSON.parse(await fs.readFile(path.join(pasta, "index.json"), "utf8"));
+  const junto = { ...atual };
+  for (const [chave, entrada] of Object.entries(doPacote)) {
+    if (junto[chave] || !byKey.has(chave)) continue;
+    // Só entra se TODOS os ficheiros da chave vieram no pacote; senão a
+    // entrada fica de fora e a foto é codificada como antes.
+    const nomes = WIDTHS.flatMap((w) => FORMATOS.map((f) => `${chave}-${w}.${f.ext}`));
+    const temTudo = (
+      await Promise.all(
+        nomes.map((n) =>
+          fs.access(path.join(pasta, n)).then(
+            () => true,
+            () => false,
+          ),
+        ),
+      )
+    ).every(Boolean);
+    if (!temTudo) continue;
+    for (const n of nomes) {
+      const destino = path.join(CACHE_DIR, n);
+      await fs.rm(destino, { force: true });
+      await fs.rename(path.join(pasta, n), destino);
+    }
+    junto[chave] = entrada;
+  }
+  await fs.rm(pasta, { recursive: true, force: true });
+  return junto;
+}
+
+/**
  * Carimbo de uma fonte: muda se o CONTEÚDO do ficheiro mudar, ou se as
  * larguras/qualidade mudarem — nesse caso toda a galeria é regenerada.
  *
@@ -278,6 +370,14 @@ async function worker() {
   for (;;) {
     const k = i++;
     if (k >= sources.length) return;
+    // O registo não pode ficar mudo: de 100 em 100, quantas vão e quantas
+    // foram codificadas (as outras vieram da cache).
+    if (k > 0 && k % 100 === 0) {
+      console.log(
+        `pregen-gallery: ${k}/${sources.length} — ${encoded} codificadas, ` +
+          `${((Date.now() - t0) / 1000).toFixed(0)}s`,
+      );
+    }
     const src = sources[k];
     const key = galleryKey(src);
 
