@@ -490,3 +490,22 @@ describe("as fotografias das alternativas também se copiam (A6-008)", () => {
     expect(novo.escolhas?.[0].opcoes[1].imagem).toBeUndefined();
   });
 });
+
+describe("o tipo de evento é o do pedido novo", () => {
+  it("copiar um casamento para um restaurante no Halloween deixa de dizer «Casamento»", () => {
+    const pedido = {
+      ...PEDIDO_NOVO,
+      eventType: null,
+      eventName: "Halloween no restaurante",
+    } as unknown as Quote;
+    const { doc, camposAMudar } = copiarParaPedido(ORIGEM, pedido);
+    expect(doc.eventType).toBe("Halloween no restaurante");
+    expect(camposAMudar).toContain("eventType");
+  });
+
+  it("um pedido que não sabe o tipo fica com o da origem, mas marcado para ela confirmar", () => {
+    const { doc, camposAMudar } = copiarParaPedido(ORIGEM, PEDIDO_NOVO);
+    expect(doc.eventType).toBe("Casamento");
+    expect(camposAMudar).toContain("eventType");
+  });
+});

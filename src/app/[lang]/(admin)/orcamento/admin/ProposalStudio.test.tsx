@@ -9612,3 +9612,70 @@ describe("o que não é um valor diz-se, e não se grava", () => {
     expect((sinal as HTMLInputElement).value).toBe("30");
   });
 });
+
+/**
+ * UMA PROPOSTA PARA UM RESTAURANTE NÃO É UM CASAMENTO.
+ *
+ * O caso dela, a 13/10: um restaurante no Halloween. O pedido veio com «Outro»
+ * (sem tipo) e o estúdio escrevia «Casamento» sozinho — e com isso o PDF
+ * punha «Noivos» e arrumava os mood boards em Cerimónia e Cocktail.
+ */
+describe("o tipo de evento não é «Casamento» por omissão", () => {
+  const halloween = {
+    id: "q-halloween",
+    name: "TESTE Restaurante Lua",
+    email: "lua@example.pt",
+    category: "particulares",
+    eventType: null,
+    eventName: "Halloween no restaurante",
+    ceremonyType: "civil",
+    status: "novo",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  } as unknown as Quote;
+  const abrir = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={halloween} />
+      </ToastProvider>,
+    );
+
+  it("um pedido «Outro» abre com o nome que o cliente deu ao evento, e sem Cerimónia", async () => {
+    abrir();
+    const campo = (await screen.findByLabelText(/^Tipo de evento/)) as HTMLInputElement;
+    expect(campo.value).toBe("Halloween no restaurante");
+    expect(screen.queryByLabelText(/^Cerimónia/)).toBeNull();
+    expect(screen.queryByText(/Este pedido não parece um casamento/)).toBeNull();
+  });
+
+  it("um rascunho que ficou com «Casamento» avisa, e um toque corrige-o", async () => {
+    localStorage.setItem(
+      `liquen-proposal-studio-${halloween.id}`,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "",
+        clientNames: "TESTE Restaurante Lua",
+        eventType: "Casamento",
+        eventDate: "31 de outubro de 2026",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+      }),
+    );
+    abrir();
+    expect(await screen.findByText(/Este pedido não parece um casamento/)).toBeTruthy();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: /Mudar para «Halloween no restaurante»/ }));
+    const campo = (await screen.findByLabelText(/^Tipo de evento/)) as HTMLInputElement;
+    await waitFor(() => expect(campo.value).toBe("Halloween no restaurante"));
+    expect(screen.queryByText(/Este pedido não parece um casamento/)).toBeNull();
+  });
+
+  it("um casamento continua a abrir como casamento, sem aviso", async () => {
+    renderStudio();
+    const campo = (await screen.findByLabelText(/^Tipo de evento/)) as HTMLInputElement;
+    expect(campo.value).toBe("Casamento");
+    expect(screen.queryByText(/Este pedido não parece um casamento/)).toBeNull();
+  });
+});

@@ -10,6 +10,7 @@ import {
 } from "@/lib/pdf-editorial/plano";
 import { MAXIMO_POR_PAGINA } from "@/lib/pdf-editorial/mosaico";
 import { grupoDoTema } from "@/lib/pdf-editorial/grupos";
+import { eCasamento } from "@/lib/proposal-evento";
 import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
 import { useMarcaQueAnda } from "./ui/useMarcaQueAnda";
@@ -201,7 +202,9 @@ export default function PainelDoEstudio({
       parte: 0,
       partes: 1,
       fotos: ordemDoDesenho(p.board).slice(0, MAXIMO_POR_PAGINA),
-      nome: (p.board.title ?? "").trim() || capituloDoTema(p.board),
+      nome:
+        (p.board.title ?? "").trim() ||
+        capituloDoTema(p.board, eCasamento(doc?.eventType ?? "Casamento")),
       seccao: "moodboards",
     };
   const entradas = paginas.map((p, i) => entradaDe(p, i + 1));

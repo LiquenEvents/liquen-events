@@ -47,6 +47,18 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
 - **Grupos de inspiração: «Pelo nome do tema».** O sistema não guarda o grupo
   de cada tema; lê-se das palavras do título (`grupos.ts`). Nenhum campo novo.
   O que não encaixa vai para «Ambiente».
+- **Fora dos casamentos, cada mood board é um capítulo (13/10).** Com uma
+  proposta para um restaurante no Halloween, o PDF punha «Noivos» e arrumava
+  «Bar» em «Cocktail» e «Arco de abóboras» em «Cerimónia». Ela escolheu: os
+  **casamentos ficam como estão**; o resto adapta-se ao que se escreve — cada
+  mood board abre o seu capítulo com o título que lhe deram, pela ordem dela,
+  e a página «A proposta» diz «Cliente», sem «Cerimónia», e «Uma decoração
+  pensada para {cliente}» (ou «para o vosso evento»). Quem decide se é casamento
+  é o «Tipo de evento» da proposta, numa regra só (`src/lib/proposal-evento.ts`)
+  que o PDF, o `plano.ts` e o estúdio lêem. O estúdio deixou de escrever
+  «Casamento» sozinho num pedido sem tipo, e avisa quando a proposta diz
+  casamento num pedido que não o parece. Os textos das Condições (texto da
+  casa) não mudaram.
 - **Nenhuma página com fundo desfocado, e nenhuma só texto sobre fundo liso.**
   Palavras dela, com o exemplo novo à frente: «Nenhuma página tem fundo
   desfocado a encher a página.» Vale também para as duas páginas onde o

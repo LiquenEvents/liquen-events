@@ -209,6 +209,80 @@ describe("a sequência do exemplo, pela mesma ordem", () => {
   });
 });
 
+describe("fora dos casamentos, a proposta adapta-se ao que se escreve", () => {
+  /**
+   * O caso dela, a 13/10: um restaurante no Halloween. Escolheu os grupos e os
+   * mood boards que queria, e o PDF continuava a dizer «Noivos», «Cerimónia» e
+   * «Cocktail». Cada mood board passa a ser o seu capítulo, com o título dela.
+   */
+  const restaurante = () =>
+    docDeTeste({
+      clientNames: "TESTE Restaurante Lua",
+      eventType: "Halloween",
+      ceremony: "Civil",
+      serviceGroups: [
+        {
+          letter: "a)",
+          title: "Decoração Halloween",
+          items: [{ label: "Decoração do bar" }, { label: "Arco de abóboras" }],
+        },
+      ],
+      moodBoards: [
+        { title: "Bar", images: fotos(3) },
+        { title: "Arco de abóboras", images: fotos(4) },
+        { title: "Mesas", images: fotos(5), annotation: "TESTE nota das mesas." },
+      ],
+      budgetItems: ["Decoração Bar", "Arco de abóboras", "Mesas"],
+    });
+
+  it("nada de casamento: nem Noivos, nem Cerimónia, nem Cocktail, nem «o vosso dia»", async () => {
+    const { escritas } = await desenhar(restaurante());
+    const texto = tudo(escritas);
+    for (const palavra of [
+      "Noivos",
+      "NOIVOS",
+      "Cerimónia",
+      "CERIMÓNIA",
+      "Cocktail",
+      "Jantar",
+      "Complementos",
+      "vosso dia",
+      "dia de",
+    ])
+      expect(texto, palavra).not.toContain(palavra);
+    expect(texto).toContain("Uma decoração pensada para TESTE Restaurante Lua");
+    expect(texto).toContain("Halloween");
+  });
+
+  it("cada mood board abre o seu capítulo, com o título que ela lhe deu e pela ordem dela", async () => {
+    const { escritas } = await desenhar(restaurante());
+    const indice = escritas.filter((e) => e.pagina === 2).map((e) => e.texto);
+    const capitulos = indice.filter((t) => t.startsWith("Inspiração · "));
+    expect(capitulos).toEqual([
+      "Inspiração · Bar",
+      "Inspiração · Arco de abóboras",
+      "Inspiração · Mesas",
+    ]);
+    const texto = tudo(escritas);
+    expect(texto).toMatch(/INSPIRAÇÃO Bar/);
+    expect(texto).toMatch(/INSPIRAÇÃO Arco de abóboras/);
+  });
+
+  it("em inglês também: «Client», «your event», e nada de «Bridal»", async () => {
+    const { escritas } = await desenhar(restaurante(), "en");
+    const texto = tudo(escritas);
+    for (const palavra of ["Couple", "COUPLE", "Ceremony", "CEREMONY", "Bridal", "’s day"])
+      expect(texto, palavra).not.toContain(palavra);
+  });
+
+  it("sem nome do cliente: «para o vosso evento»", async () => {
+    const { escritas } = await desenhar(
+      docDeTeste({ clientNames: "", eventType: "Festa", moodBoards: [] }),
+    );
+    expect(tudo(escritas)).toContain("Uma decoração pensada para o vosso evento");
+  });
+});
+
 describe("os temas: todas as fotografias, o título e a nota", () => {
   it.each([0, 1, 2, 3, 4, 5, 8, 12])("um tema com %i fotografias desenha-as todas", async (n) => {
     const doc = docDeTeste({
