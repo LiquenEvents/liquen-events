@@ -197,7 +197,11 @@ export default function PainelDoEstudio({
       tipo: "tema",
       bi: p.bi,
       vez,
-      grupo: grupoDoTema(p.board.title ?? "", p.board.subtitulo ?? ""),
+      // A mesma chave de capítulo que o `plano.ts` dá: o grupo do dia num
+      // casamento, `tema-<n>` fora dele (cada mood board é o seu capítulo).
+      grupo: eCasamento(doc?.eventType ?? "Casamento")
+        ? grupoDoTema(p.board.title ?? "", p.board.subtitulo ?? "")
+        : `tema-${vez}`,
       titulo: (p.board.title ?? "").trim(),
       parte: 0,
       partes: 1,
