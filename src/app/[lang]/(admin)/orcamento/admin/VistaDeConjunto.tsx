@@ -81,7 +81,11 @@ export default function VistaDeConjunto({
   // As páginas de tema que abrem um tema (a 1.ª parte), e o capítulo de cada
   // uma — é contra a vizinha do MESMO capítulo que as setas se movem.
   const aberturas = paginas.flatMap((p, i) => (p.tipo === "tema" && p.parte === 0 ? [i] : []));
-  const capituloDe = (p: EntradaDoPlano | undefined) => (p?.tipo === "tema" ? p.grupo : null);
+  // Fora dos casamentos cada mood board é o seu capítulo (`tema-<n>`), e a
+  // ordem do PDF é só a ordem dos boards: para as setas, contam todos como um
+  // capítulo só — senão nenhum tinha vizinho e as setas ficavam todas apagadas.
+  const capituloDe = (p: EntradaDoPlano | undefined) =>
+    p?.tipo === "tema" ? (p.grupo.startsWith("tema-") ? "tema" : p.grupo) : null;
 
   return (
     <div className="mb-4 rounded-2xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-4">

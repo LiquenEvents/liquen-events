@@ -219,7 +219,11 @@ export async function renderEditorialPdf(
       ...(org
         ? []
         : [
-            ...(casamento ? [{ rotulo: te.factos.cerimonia, valor: evento.ceremony ?? "" }] : []),
+            // Num casamento, sempre; fora dele, só se ela a escreveu — é a regra
+            // do estúdio, que só mostra o campo nesses dois casos.
+            ...(casamento || (evento.ceremony ?? "").trim()
+              ? [{ rotulo: te.factos.cerimonia, valor: evento.ceremony ?? "" }]
+              : []),
             { rotulo: te.factos.hora, valor: evento.time ?? "" },
           ]),
     ].filter((f) => f.valor.trim());
@@ -319,7 +323,15 @@ export async function renderEditorialPdf(
     // preferência fora do primeiro tema, que vem logo a seguir.
     const paginaDoSeparador = proxima();
     const evitar = new Set(c.itens.length > 1 ? c.itens[0].fotos.map((f) => f.id) : []);
-    const fotosDoSeparador = album.escolher(paginaDoSeparador, "qualquer", 2, doCapitulo, evitar);
+    // Um capítulo sem fotografias (um mood board só com texto) leva as da
+    // proposta — é o que a pré-visualização do estúdio mostra (`fontesDasFolhas`).
+    const fotosDoSeparador = album.escolher(
+      paginaDoSeparador,
+      "qualquer",
+      2,
+      doCapitulo.length ? doCapitulo : inspiracao,
+      evitar,
+    );
     plano.push({
       entrada: `${te.inspiracao} · ${nome}`,
       desenhar: (numero, entradas) =>

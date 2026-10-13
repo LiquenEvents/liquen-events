@@ -58,7 +58,10 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
   que o PDF, o `plano.ts` e o estúdio lêem. O estúdio deixou de escrever
   «Casamento» sozinho num pedido sem tipo, e avisa quando a proposta diz
   casamento num pedido que não o parece. Os textos das Condições (texto da
-  casa) não mudaram.
+  casa) não mudaram. A mesma regra vale fora do PDF: a página da proposta que
+  o cliente abre («Cliente», sem o título «Organização de Casamento»), o email
+  da proposta («o vosso evento», e saúda a pessoa que fez o pedido) e as setas
+  da Vista de conjunto (fora dos casamentos contam todos como um capítulo).
 - **Nenhuma página com fundo desfocado, e nenhuma só texto sobre fundo liso.**
   Palavras dela, com o exemplo novo à frente: «Nenhuma página tem fundo
   desfocado a encher a página.» Vale também para as duas páginas onde o

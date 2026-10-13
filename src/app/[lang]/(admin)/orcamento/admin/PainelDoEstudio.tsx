@@ -199,7 +199,7 @@ export default function PainelDoEstudio({
       vez,
       // A mesma chave de capítulo que o `plano.ts` dá: o grupo do dia num
       // casamento, `tema-<n>` fora dele (cada mood board é o seu capítulo).
-      grupo: eCasamento(doc?.eventType ?? "Casamento")
+      grupo: (doc ? eCasamento(doc.eventType) : true)
         ? grupoDoTema(p.board.title ?? "", p.board.subtitulo ?? "")
         : `tema-${vez}`,
       titulo: (p.board.title ?? "").trim(),
@@ -208,7 +208,7 @@ export default function PainelDoEstudio({
       fotos: ordemDoDesenho(p.board).slice(0, MAXIMO_POR_PAGINA),
       nome:
         (p.board.title ?? "").trim() ||
-        capituloDoTema(p.board, eCasamento(doc?.eventType ?? "Casamento")),
+        capituloDoTema(p.board, doc ? eCasamento(doc.eventType) : true),
       seccao: "moodboards",
     };
   const entradas = paginas.map((p, i) => entradaDe(p, i + 1));

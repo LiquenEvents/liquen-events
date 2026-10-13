@@ -28,8 +28,12 @@ const semAcentos = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
-/** As palavras que dizem «casamento», em português e em inglês. */
-const DE_CASAMENTO = /casament|wedding|matrimon|noivos|bride|groom/;
+/**
+ * As palavras que dizem «casamento», em português e em inglês — e as festas
+ * que têm o mesmo dia (renovação de votos, bodas, copo d'água, elopement).
+ */
+const DE_CASAMENTO =
+  /casament|wedding|matrimon|noivos|bride|groom|renovacao de votos|bodas?\b|copo d.agua|elopement/;
 
 /**
  * É um casamento? Lê-se o «Tipo de evento» da proposta, que é texto livre.

@@ -1381,8 +1381,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }, []);
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
-  // «É mesmo um casamento»: o aviso de baixo cala-se até ela reabrir o estúdio.
-  const [casamentoConfirmado, setCasamentoConfirmado] = useState(false);
+  // «É mesmo um casamento»: o aviso de baixo cala-se para este pedido — e
+  // fica calado nas próximas vezes (um casamento metido à mão, sem tipo, não
+  // pode ficar a perguntar o mesmo cada vez que se abre).
+  const chaveDoCasamentoConfirmado = `liquen-casamento-confirmado-${quote.id}`;
+  const [casamentoConfirmado, setCasamentoConfirmado] = useState(() => {
+    try {
+      return localStorage.getItem(chaveDoCasamentoConfirmado) === "1";
+    } catch {
+      return false;
+    }
+  });
   /**
    * O documento COMO ESTÁ AGORA, para quem volta de uma ida à rede.
    *
@@ -4156,8 +4165,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       return {
         ...d,
         template: t,
+        // «de Casamento» só num casamento: este título sai na página que o
+        // cliente abre (o PDF não o usa).
         headerTitle:
-          t === "organizacao" ? "Proposta de orçamento para Organização de Casamento" : undefined,
+          t === "organizacao"
+            ? eCasamento(d.eventType)
+              ? "Proposta de orçamento para Organização de Casamento"
+              : "Proposta de orçamento para Organização do Evento"
+            : undefined,
         ...(t === "organizacao" ? { totalEstimatedText: text } : { totalText: text }),
       };
     });
@@ -7996,6 +8011,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 que os deixa corrigir com um toque, sem adivinhar. */}
               {eCasamento(doc.eventType) &&
                 !pedidoECasamento(quote) &&
+                !eCasamento(tipoDoEventoDoPedido(quote)) &&
                 !(quote.partnerA || quote.partnerB) &&
                 !casamentoConfirmado && (
                   <div
@@ -8025,7 +8041,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setCasamentoConfirmado(true)}
+                        onClick={() => {
+                          setCasamentoConfirmado(true);
+                          try {
+                            localStorage.setItem(chaveDoCasamentoConfirmado, "1");
+                          } catch {
+                            /* sem localStorage: cala-se só até reabrir */
+                          }
+                        }}
                       >
                         É mesmo um casamento
                       </Button>

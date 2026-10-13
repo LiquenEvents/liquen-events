@@ -2,9 +2,16 @@ import { describe, expect, it } from "vitest";
 import { eCasamento, pedidoECasamento, tipoDoEventoDoPedido } from "./proposal-evento";
 
 describe("é um casamento?", () => {
-  it.each(["Casamento", "casamento", "CASAMENTO civil", "Wedding", "Matrimónio"])("«%s» é", (t) =>
-    expect(eCasamento(t)).toBe(true),
-  );
+  it.each([
+    "Casamento",
+    "casamento",
+    "CASAMENTO civil",
+    "Wedding",
+    "Matrimónio",
+    "Renovação de votos",
+    "Bodas de ouro",
+    "Copo d'água",
+  ])("«%s» é", (t) => expect(eCasamento(t)).toBe(true));
   it.each([
     "Halloween",
     "Decoração de restaurante",
@@ -13,6 +20,7 @@ describe("é um casamento?", () => {
     "Evento Corporativo",
     "Aniversário",
     "Batizado",
+    "Jantar de Natal com votos de boas festas",
     "",
     undefined,
     null,

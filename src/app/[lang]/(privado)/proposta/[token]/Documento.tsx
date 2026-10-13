@@ -7,6 +7,7 @@ import {
   type MoodBoard,
 } from "@/lib/proposal-doc";
 import { docNaLingua } from "@/lib/proposal-doc-bilingue";
+import { eCasamento } from "@/lib/proposal-evento";
 import {
   blocoEDaCasa,
   blocosFixosNaLingua,
@@ -520,8 +521,11 @@ export default function Documento({
   // Os mesmos campos, pela mesma ordem, com a mesma regra do papel: um rótulo
   // seguido de nada não é «um campo por preencher», é um erro impresso numa
   // folha que vai para o cliente.
+  // «Noivos» e a cerimónia só num casamento — a mesma regra do PDF
+  // (`montar.ts`, `proposal-evento.ts`): num restaurante, quem recebe é o cliente.
+  const casamento = eCasamento(doc.eventType);
   const campos: [CampoDoEvento, string][] = [
-    [org ? "cliente" : "noivos", doc.clientNames],
+    [org || !casamento ? "cliente" : "noivos", doc.clientNames],
     ...(org ? [] : ([["evento", evento.eventType ?? ""]] as [CampoDoEvento, string][])),
     ["data", evento.eventDate ?? ""],
     ["local", doc.location ?? ""],
@@ -530,10 +534,17 @@ export default function Documento({
     ...(org
       ? []
       : ([
-          ["cerimonia", evento.ceremony ?? ""],
+          ["cerimonia", casamento || (evento.ceremony ?? "").trim() ? (evento.ceremony ?? "") : ""],
           ["hora", evento.time ?? ""],
         ] as [CampoDoEvento, string][])),
   ];
+  // O título que o estúdio escrevia ao passar a «Organização» dizia sempre
+  // «…de Casamento». Numa proposta que não é de casamento, esse título antigo
+  // dá lugar ao da casa — as propostas já gravadas assim também saem certas.
+  const tituloDaApresentacao =
+    doc.headerTitle && !(!casamento && /casamento/i.test(doc.headerTitle))
+      ? doc.headerTitle
+      : t.tituloApresentacao;
   const apresentacao = campos.filter(([, v]) => (v ?? "").trim().length > 0);
 
   // ── OS MOOD BOARDS ────────────────────────────────────────────────────────
@@ -943,7 +954,7 @@ export default function Documento({
       <div className="max-w-2xl">
         <Titulo
           sobretitulo={t.sobretituloApresentacao}
-          titulo={numerada("apresentacao", doc.headerTitle || t.tituloApresentacao)}
+          titulo={numerada("apresentacao", tituloDaApresentacao)}
         />
         {apresentacao.length > 0 && (
           <dl className="mt-7 grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">

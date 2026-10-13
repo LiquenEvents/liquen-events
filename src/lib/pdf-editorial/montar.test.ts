@@ -219,7 +219,7 @@ describe("fora dos casamentos, a proposta adapta-se ao que se escreve", () => {
     docDeTeste({
       clientNames: "TESTE Restaurante Lua",
       eventType: "Halloween",
-      ceremony: "Civil",
+      ceremony: "",
       serviceGroups: [
         {
           letter: "a)",
@@ -273,6 +273,14 @@ describe("fora dos casamentos, a proposta adapta-se ao que se escreve", () => {
     const texto = tudo(escritas);
     for (const palavra of ["Couple", "COUPLE", "Ceremony", "CEREMONY", "Bridal", "’s day"])
       expect(texto, palavra).not.toContain(palavra);
+  });
+
+  it("uma cerimónia que ela escreveu sai, mesmo fora de um casamento (a regra do estúdio)", async () => {
+    const { escritas } = await desenhar(
+      docDeTeste({ eventType: "Batizado", ceremony: "Religiosa", moodBoards: [] }),
+    );
+    expect(tudo(escritas)).toMatch(/CERIMÓNIA Religiosa/);
+    expect(tudo(escritas)).toMatch(/CLIENTE/);
   });
 
   it("sem nome do cliente: «para o vosso evento»", async () => {
