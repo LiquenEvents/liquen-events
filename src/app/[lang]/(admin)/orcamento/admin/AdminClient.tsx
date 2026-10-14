@@ -104,6 +104,7 @@ import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, ROTULO_CURTO, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
 import { Escolha } from "./ui/Escolha";
+import { EscolhaDoEstado } from "./EscolhaDoEstado";
 import {
   Button,
   EmCurso,
@@ -537,9 +538,13 @@ function statusBadge(status: QuoteStatus): ReactNode {
  * quero a mudança de estado para ser feita ao carregar em cima do estado em
  * que está». A pastilha passa a ser o próprio selector: carrega-se, escolhe-se
  * o estado, e muda ali — com a linha no histórico e o «Anular», como no
- * quadro. Um `<select>` com o aspecto da pastilha (e não uma pastilha com um
- * `<select>` invisível por cima) para o anel do teclado e o leitor de ecrã
- * continuarem a saber o que é; no telemóvel abre a roda do sistema.
+ * quadro.
+ *
+ * Primeiro foi um `<select>` nativo com o aspecto da pastilha. No mesmo dia
+ * ela mandou a lista que ele abria (azul e cinzenta, a do sistema): «coloca
+ * isto ao estilo da apple transparente». Passou ao `EscolhaDoEstado` — o menu
+ * de vidro da casa, também no dedo, desenhado no `<body>` para a última linha
+ * da tabela não o cortar. A razão inteira está no cabeçalho dele.
  */
 function PastilhaDoEstado({
   q,
@@ -548,35 +553,14 @@ function PastilhaDoEstado({
   q: Quote;
   onMudar: (q: Quote, status: QuoteStatus) => void;
 }) {
-  const s = STATUS_OPTIONS.find((o) => o.id === q.status);
   return (
-    <span className="relative inline-flex">
-      <select
-        // A linha inteira abre o pedido; escolher o estado não pode abri-lo.
-        onClick={(e) => e.stopPropagation()}
-        value={q.status}
-        onChange={(e) => onMudar(q, e.target.value as QuoteStatus)}
-        aria-label={`Estado do pedido de ${q.name}`}
-        title="Carrega para mudar o estado"
-        className={`alvo-toque cursor-pointer appearance-none rounded-sm py-0.5 pr-5 pl-2 text-[9px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} ${s?.color ?? "bg-[var(--bo-tinta-10)] text-foreground/30"}`}
-      >
-        {STATUS_OPTIONS.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <svg
-        viewBox="0 0 10 10"
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 right-1.5 h-2 w-2 -translate-y-1/2 opacity-60"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path d="m2 3.5 3 3 3-3" />
-      </svg>
-    </span>
+    <EscolhaDoEstado
+      forma="pastilha"
+      estados={STATUS_OPTIONS}
+      valor={q.status}
+      aoMudar={(status) => onMudar(q, status)}
+      aria-label={`Estado do pedido de ${q.name}`}
+    />
   );
 }
 
@@ -6790,28 +6774,19 @@ export default function AdminClient({
                   <span className="text-foreground/35 text-[10px] tracking-[0.15em] uppercase">
                     Marcar como
                   </span>
-                  <select
+                  {/* Era aqui que vivia o «A aplicar…», num `<option>` de um
+                      `<select>` fechado — texto que ninguém vê. O sinal passou
+                      para o `EmCurso` no fundo desta barra. */}
+                  <EscolhaDoEstado
+                    forma="campo"
+                    estados={STATUS_OPTIONS}
+                    valor=""
+                    vazio="—"
                     disabled={bulkBusy}
-                    value=""
-                    onChange={(e) => {
-                      const v = e.target.value as QuoteStatus;
-                      if (v) applyBulkStatus(v, seleccionadosAVista);
-                    }}
+                    aoMudar={(v) => applyBulkStatus(v, seleccionadosAVista)}
                     aria-label="Marcar pedidos selecionados como"
-                    className="bo-input px-2 py-1.5 text-xs text-[var(--bo-tinta-72)] disabled:opacity-50"
-                  >
-                    {/* Era aqui que vivia o «A aplicar…». Um `<option>` de um
-                        `<select>` fechado é texto que ninguém vê: quem está a
-                        olhar para a barra não abre o selector para ir ver se o
-                        que pediu está a andar. O sinal passou para o `EmCurso`
-                        no fundo desta barra. */}
-                    <option value="">—</option>
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                    className="bo-input px-2 py-1.5 text-xs text-[var(--bo-tinta-72)]"
+                  />
                 </div>
                 <button
                   onClick={() =>
@@ -7632,28 +7607,27 @@ export default function AdminClient({
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                   <label
+                                    id="pedido-estado-rotulo"
                                     htmlFor="pedido-estado"
                                     className="bo-eyebrow block mb-1.5"
                                   >
                                     Estado
                                   </label>
-                                  <select
+                                  <EscolhaDoEstado
+                                    forma="campo"
                                     id="pedido-estado"
-                                    value={editStatus}
-                                    onChange={(e) => escolherEstado(e.target.value as QuoteStatus)}
+                                    estados={STATUS_OPTIONS}
+                                    valor={editStatus}
+                                    aoMudar={escolherEstado}
+                                    aria-labelledby="pedido-estado-rotulo"
                                     aria-describedby={
                                       ganhoSemProposta === selected.id && editStatus === "aceite"
                                         ? "pedido-estado-aviso"
                                         : undefined
                                     }
-                                    className="bo-input px-3 py-2 text-sm text-[var(--bo-text)] w-full"
-                                  >
-                                    {STATUS_OPTIONS.map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        {s.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    containerClassName="w-full"
+                                    className="bo-input w-full px-3 py-2 text-sm text-[var(--bo-text)]"
+                                  />
                                   {ganhoSemProposta === selected.id && editStatus === "aceite" && (
                                     <p
                                       id="pedido-estado-aviso"

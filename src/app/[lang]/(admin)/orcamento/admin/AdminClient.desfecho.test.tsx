@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { escolher } from "./ui/escolher.testkit";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Quote } from "@/lib/orcamento/types";
@@ -314,7 +315,7 @@ describe("o painel do pedido", () => {
     abrirOPainelDoPedido("Voltaram Atrás");
     await screen.findByRole("button", { name: "Fechar" });
 
-    await user.selectOptions(screen.getByLabelText("Estado"), "aceite");
+    await escolher(user, screen.getByLabelText("Estado"), "Ganho");
     await user.click(await screen.findByRole("button", { name: /guardar alterações/i }));
 
     await waitFor(() => expect(patches).toHaveLength(1));

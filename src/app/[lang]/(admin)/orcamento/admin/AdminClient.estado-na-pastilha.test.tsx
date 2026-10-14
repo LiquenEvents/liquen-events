@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
+import { escolherJa } from "./ui/escolher.testkit";
 
 /**
  * O ESTADO MUDA-SE NA PRÓPRIA PASTILHA (14/10). Palavras dela, com a captura da
@@ -146,13 +147,15 @@ describe("mudar o estado na pastilha da lista", () => {
     fireEvent.click(
       within(screen.getByRole("complementary")).getByRole("button", { name: /Pedidos/ }),
     );
-    const pastilha = (await screen.findByRole("combobox", {
-      name: "Estado do pedido de Ana Marques",
-    })) as HTMLSelectElement;
-    expect(pastilha.value).toBe("cotado");
+    // Espera pela forma de destino — o menu de vidro, e não o `<select>` do
+    // primeiro fotograma (ver o `escolher.testkit`). Lê-se outra vez depois:
+    // o elemento do primeiro fotograma já não é o que está no ecrã.
+    const nome = { name: "Estado do pedido de Ana Marques" };
+    await waitFor(() => expect(screen.getByRole("combobox", nome).tagName).toBe("BUTTON"));
+    const pastilha = screen.getByRole("combobox", nome);
+    expect(pastilha).toHaveTextContent("Proposta enviada");
 
-    fireEvent.click(pastilha);
-    fireEvent.change(pastilha, { target: { value: "aceite" } });
+    escolherJa(pastilha, "Ganho");
 
     await waitFor(() =>
       expect(pedidos.some((p) => p.metodo === "PATCH" && p.url === "/api/orcamento/LQ-201")).toBe(
@@ -172,7 +175,7 @@ describe("mudar o estado na pastilha da lista", () => {
     // O pedido não abriu: a escolha do estado não é um toque na linha.
     expect(screen.queryByRole("dialog")).toBeNull();
     // A pastilha já diz o estado novo, e há «Anular».
-    await waitFor(() => expect(pastilha.value).toBe("aceite"));
+    await waitFor(() => expect(pastilha).toHaveTextContent("Ganho"));
     expect(await screen.findByRole("button", { name: /Anular/ })).toBeInTheDocument();
   });
 });
