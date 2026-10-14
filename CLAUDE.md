@@ -134,3 +134,10 @@ NAV-, IA-, CON-, POS-, NEG-, SEG-) e um roteiro. **É uma lista para ela escolhe
 não uma ordem de trabalho**: antes de fazer um ponto, confirma que ela o escolheu.
 A Parte −1 diz o que ficou por verificar; a Parte 10 deixa de fora os pormenores
 de segurança enquanto o repositório estiver público.
+
+# E o mapa de mesas tem o seu
+
+`docs/MAPA-DE-MESAS.md` regista o pedido dela (14/10), as decisões que tomou e a
+tabela do que está feito. As regras vivem num sítio só,
+`src/lib/orcamento/mapa-de-mesas.ts`, e o ecrã e o PDF lêem as mesmas funções:
+não se desenha uma cadeira noutro sítio.
