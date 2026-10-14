@@ -6,6 +6,7 @@ import {
   alinhar,
   CADEIRA,
   cadeiras,
+  alargarSala,
   caixaDaSala,
   chaveDoLugar,
   dimensoes,
@@ -116,6 +117,20 @@ interface Caixa {
 }
 
 const LIMIAR_PX = 3;
+/**
+ * O mais perto que a sala aparece ao abrir ou ao «Encaixar»: 0,7 px por cm,
+ * ou seja uma sala de ~14 × 9 m à vista no computador, com uma redonda de 8 a
+ * ~110 px. Abaixo disto a sala cresce à volta do que lá está em vez de a mesa
+ * crescer — com uma mesa só, ela ficava a encher o ecrã (14/10: «coloca como
+ * predefinido já um espaço grande»). A pinça e o «+» continuam a aproximar.
+ */
+const PX_POR_CM_MAX = 0.7;
+/**
+ * A sala vista de mais longe (14/10: «coloca a sala mais afastada do ecrã»):
+ * ao abrir e ao «Encaixar» o chão ocupa 86% da parte livre, e à volta fica o
+ * pontilhado — vê-se onde a sala acaba, como uma folha pousada na mesa.
+ */
+const FOLGA_DO_ENCAIXE = 0.86;
 const DOIS_TOQUES_MS = 350;
 
 /**
@@ -165,9 +180,29 @@ export default function Sala({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const quadroRef = useRef<HTMLDivElement | null>(null);
   const [quadro, setQuadro] = useState({ w: 0, h: 0 });
-  const caixa = useMemo(() => caixaDaSala(mapa), [mapa]);
+  /* A sala que se vê: a do que existe, alargada até encher a parte livre do
+     quadro (o que os painéis não tapam) à escala máxima. */
+  const caixa = useMemo(() => {
+    const c = caixaDaSala(mapa);
+    const livreW = quadro.w - margens.esquerda - margens.direita;
+    const livreH = quadro.h - margens.topo - margens.fundo;
+    return cheio && livreW > 40 && livreH > 40
+      ? alargarSala(
+          c,
+          (livreW * FOLGA_DO_ENCAIXE) / PX_POR_CM_MAX,
+          (livreH * FOLGA_DO_ENCAIXE) / PX_POR_CM_MAX,
+        )
+      : c;
+  }, [mapa, cheio, quadro.w, quadro.h, margens]);
   const encaixe = useMemo(
-    () => encaixar(caixa, cheio ? quadro : { w: 0, h: 0 }, margens),
+    () =>
+      cheio && quadro.w > 0
+        ? encaixar(
+            alargarSala(caixa, caixa.largura / FOLGA_DO_ENCAIXE, caixa.altura / FOLGA_DO_ENCAIXE),
+            quadro,
+            margens,
+          )
+        : encaixar(caixa, { w: 0, h: 0 }, margens),
     [caixa, quadro, cheio, margens],
   );
   const [vista, setVista] = useState<Caixa>(encaixe);

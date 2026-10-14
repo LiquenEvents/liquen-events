@@ -40,6 +40,17 @@ Pedido dela (14/10), com a captura de um «Mapa de Mesas»:
   - `MapaDeMesas.tsx`: escolher o evento, com a mesma lista das Timelines;
   - `mesas/EditorDoMapa.tsx`: o estado, a gravação, a lista de espera, o inspector e a vista «Lista»;
   - `mesas/Sala.tsx`: o desenho em SVG e os gestos.
+  - `mesas/PartilharMapa.tsx`: o menu «Partilhar» e a folha do email.
+- **O PDF:** `src/lib/orcamento/mapa-de-mesas-pdf.ts` (pdf-lib, Carlito e o
+  logótipo, como o guião). Um nome com uma letra que a fonte não tem
+  («Nguyễn», «Ł») perde o acento em vez de rebentar o PDF.
+- **As rotas** (só com sessão, na tabela do `auth-guard-audit`):
+  - `GET /api/mesas/[id]/pdf` — descarrega; com `?ver=1` abre no separador
+    (o «Imprimir»). Um mapa sem mesas dá 409 com a frase;
+  - `POST /api/mesas/[id]/enviar` `{para, assunto, mensagem}` — o endereço vem
+    do corpo porque é ela quem o escolhe, e é validado. **Sem SMTP no servidor
+    responde 503 e diz que o mapa NÃO seguiu** — nada de «enviado» que não
+    chegou, e o histórico só regista o que seguiu mesmo.
 
 ## O que está feito, e o que falta
 
@@ -62,7 +73,20 @@ Pedido dela (14/10), com a captura de um «Mapa de Mesas»:
 | Anular e refazer, 50 passos (⌘Z, ⇧⌘Z; ⌘D duplica); o nome de uma mesa escrito é UM passo | **feito** |
 | De perto, o nome curto de cada pessoa debaixo da cadeira («Silva 2»); o selo «6/8» em cada mesa | **feito** |
 | A lista dos eventos: o dia em grande, quanto falta, «8 mesas · 64/74 sentados» com a barra, o próximo à cabeça, procura | **feito** |
-| Imprimir, descarregar e mandar por WhatsApp ou email (ela escolhe o contacto; no telemóvel, o PDF pelo «Partilhar») | **por fazer** (3.º PR) |
+| **Partilhar (14/10, 3.ª volta):** «Partilhar ▾» na barra de cima (no telemóvel, dentro do «⋯») com Descarregar PDF, WhatsApp, Email e Imprimir | **feito** |
+| O PDF: o desenho numa A4 deitada, depois a lista por mesa a três colunas, e no fim quem ficou por sentar | **feito** |
+| WhatsApp: no telemóvel, o «Partilhar» do sistema já com o PDF; no computador, descarrega o PDF e abre o WhatsApp com a frase escrita | **feito** |
+| Email: vem com o email do casal e muda-se na hora (quinta, catering, equipa); o PDF segue em anexo, com a assinatura da casa; fica no histórico do pedido | **feito** |
+| Antes de pedir o PDF grava-se o que está por gravar — o PDF tem sempre a última mesa | **feito** |
+
+**O que ficou de fora do «Partilhar», e porquê:**
+- **Nenhum site consegue anexar um ficheiro a uma conversa do WhatsApp.** No
+  computador o browser não partilha ficheiros, por isso o PDF descarrega-se e
+  o WhatsApp abre com a frase: arrasta-se o ficheiro para a conversa, e o
+  aviso di-lo.
+- **O email não foi experimentado com um servidor de correio a sério** (aqui
+  não há, e não se manda email a ninguém para o provar). Os testes simulam o
+  correio e provam o destino, o anexo e o histórico.
 
 **O que ficou de fora do ecrã de trabalho, e porquê:**
 - **O endereço não guarda o evento aberto** (`?evento=`). O gesto de voltar

@@ -66,3 +66,24 @@ describe("MoreMenu", () => {
     expect(abridor).toHaveFocus();
   });
 });
+
+describe("o menu que abre de dentro de uma barra de vidro", () => {
+  it("por omissão é vidro: a superfície translúcida e o desfoque", async () => {
+    const user = userEvent.setup();
+    render(<MoreMenu items={ITENS} />);
+    await user.click(screen.getByRole("button", { name: /Mais/ }));
+    const menu = screen.getByRole("menu");
+    expect(menu.className).toContain("bo-material-desfoque");
+    expect(menu.style.getPropertyValue("--bo-material")).toBe("");
+  });
+
+  it("`opaco`: sem desfoque e na superfície elevada — vidro sobre vidro não se lê", async () => {
+    const user = userEvent.setup();
+    render(<MoreMenu items={ITENS} opaco />);
+    await user.click(screen.getByRole("button", { name: /Mais/ }));
+    const menu = screen.getByRole("menu");
+    expect(menu.className).not.toContain("bo-material-desfoque");
+    expect(menu.className).toContain("bo-material");
+    expect(menu.style.getPropertyValue("--bo-material")).toBe("var(--bo-elevado)");
+  });
+});

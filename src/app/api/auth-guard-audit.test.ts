@@ -512,6 +512,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // ao serviço — é o resumo interno de um dia inteiro num ficheiro. Sem sessão
   // não sai.
   { path: "./guioes/[id]/pdf/route", methods: ["GET"] },
+  // O mapa de mesas traz o nome de cada convidado e onde se senta; e o envio
+  // manda-o por email a um endereço escrito por ela. Sem sessão, nenhum dos dois.
+  { path: "./mesas/[id]/pdf/route", methods: ["GET"] },
+  { path: "./mesas/[id]/enviar/route", methods: ["POST"] },
   { path: "./guioes/modelos/route", methods: ["GET", "POST"] },
   { path: "./guioes/modelos/[id]/route", methods: ["DELETE"] },
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },

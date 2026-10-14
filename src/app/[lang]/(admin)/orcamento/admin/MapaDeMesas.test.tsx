@@ -344,6 +344,33 @@ describe("o ecrã de trabalho", () => {
   });
 });
 
+describe("partilhar o mapa", () => {
+  it("«Partilhar» está na barra de cima, e grava a mesa acabada de pôr ANTES de pedir o PDF", async () => {
+    const ordem: string[] = [];
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      ordem.push(`${init?.method ?? "GET"} ${String(url)}`);
+      return original(url, init);
+    });
+    URL.createObjectURL = vi.fn(() => "blob:teste");
+    URL.revokeObjectURL = vi.fn();
+    const clique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await abrir();
+    await adicionar("Mesa redonda");
+    // Ainda dentro da espera da gravação: nada foi ao servidor.
+    expect(gravados).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Partilhar" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Descarregar PDF/ }));
+    await waitFor(() => expect(clique).toHaveBeenCalled());
+    const patch = ordem.findIndex((o) => o === "PATCH /api/orcamento/q1");
+    const pdf = ordem.findIndex((o) => o === "GET /api/mesas/q1/pdf");
+    expect(patch).toBeGreaterThanOrEqual(0);
+    expect(pdf).toBeGreaterThan(patch);
+    expect((gravados[0] as { mapaDeMesas: Mapa }).mapaDeMesas.mesas).toHaveLength(1);
+    clique.mockRestore();
+  });
+});
+
 describe("a lista dos eventos", () => {
   it("cada cartão diz em que pé está o mapa", async () => {
     vi.stubGlobal(
