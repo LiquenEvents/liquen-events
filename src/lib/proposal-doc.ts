@@ -21,13 +21,16 @@ export type ImageData = string;
 /** Taxa de IVA por omissão (23% — taxa normal em Portugal continental). */
 export const DEFAULT_VAT_RATE = 0.23;
 
-/** Dias de validade por omissão de uma proposta enviada. */
 /**
- * Validade de uma proposta, em dias.
+ * Validade de uma proposta, em dias, quando não se sabe a data do evento.
  *
- * Eram 30, e a proposta que a Líquen fazia à mão dizia 60. Decisão dela: fica
- * 60, o que os casais dela já viram. Continua a poder ser mudado por proposta
- * (`validUntilDays`) — isto é só o ponto de partida.
+ * Eram 30, e a proposta que a Líquen fazia à mão dizia 60. A 14/10 ela pediu
+ * 90 e logo a seguir corrigiu-se: «não faz sentido dizer que a validade da
+ * proposta é 90 dias e eles mandam uma proposta para o evento que é para a
+ * semana». A validade passou a depender do evento — ver
+ * {@link diasDeValidadePeloEvento} — e os 60 ficam como o máximo e o valor sem
+ * data. Continua a poder ser mudada por proposta (`validUntilDays`, ou uma
+ * data fixa em `validUntil`).
  */
 export const DEFAULT_VALID_DAYS = 60;
 
@@ -1383,18 +1386,107 @@ export function somarDias(dia: string, dias: number): string {
  * contagem lhe rouba ou lhe dá um dia.
  */
 export function resolveValidUntil(
-  doc: Pick<ProposalDoc, "validUntil" | "validUntilDays">,
+  doc: Pick<ProposalDoc, "validUntil" | "validUntilDays"> & { eventDate?: string },
   from: Date = new Date(),
 ): string {
   if (doc.validUntil && /^\d{4}-\d{2}-\d{2}$/.test(doc.validUntil)) return doc.validUntil;
+  const hoje = hojeNoEstudio(from);
+  return somarDias(hoje, diasDeValidade(doc, hoje));
+}
+
+/**
+ * Os dias de validade que valem para este documento, a contar de `hoje`.
+ *
+ * Sem dias escritos, os da regra do evento. Com dias escritos
+ * (`validUntilDays`), esses — MAS, com o evento a 90 dias ou menos, nunca mais
+ * do que a regra dá. É de propósito: o estúdio escrevia os 60 das
+ * preferências em todos os rascunhos, e uma proposta para a semana que vem
+ * continuava a dizer «válida 60 dias», que é o que ela não quer.
+ */
+export function diasDeValidade(
+  doc: Pick<ProposalDoc, "validUntilDays"> & { eventDate?: string },
+  hoje: string,
+): number {
+  const pelaRegra = diasDeValidadePeloEvento(hoje, diaDoEvento(doc.eventDate));
   // Floor BEFORE the positivity check: a fraction < 1 (e.g. 0.5) must fall back
   // to the default like an integer 0 — never collapse to a same-day (0-day)
   // validity, which /proposta's end-of-day expiry would treat as valid only on
   // the day of sending.
   const flooredDays =
     typeof doc.validUntilDays === "number" ? Math.floor(doc.validUntilDays) : Number.NaN;
-  const days = flooredDays > 0 ? flooredDays : DEFAULT_VALID_DAYS;
-  return somarDias(hojeNoEstudio(from), days);
+  if (!(flooredDays > 0)) return pelaRegra;
+  return eventoPerto(hoje, diaDoEvento(doc.eventDate))
+    ? Math.min(flooredDays, pelaRegra)
+    : flooredDays;
+}
+
+/** O evento é daqui a 1–90 dias (é aí que a regra encurta a validade). */
+function eventoPerto(hoje: string, evento: string | null): boolean {
+  const faltam = diasAte(hoje, evento);
+  return faltam !== null && faltam > 0 && faltam <= 90;
+}
+
+function diasAte(hoje: string, evento: string | null): number | null {
+  if (!evento) return null;
+  const n = Math.round((Date.parse(evento) - Date.parse(hoje)) / 86_400_000);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * A VALIDADE DEPENDE DE QUANTO FALTA PARA O EVENTO
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * A regra dela, de 14/10 (`hoje` e `evento` em yyyy-mm-dd):
+ *
+ *   · evento a mais de 90 dias  → 60 dias;
+ *   · evento a 30–90 dias       → 30 dias, sem passar da véspera;
+ *   · evento a menos de 30 dias → até à véspera, no máximo 7 dias e NUNCA
+ *     menos de 5 («tem que ser pelo menos 5 dias») — mesmo que os 5 passem a
+ *     véspera de um evento que é daqui a 3 dias;
+ *   · sem data, ou com uma data que já passou → os 60 de sempre (a data errada
+ *     é a Conferência que a aponta, não a validade).
+ *
+ * Os dias escritos à mão só passam por cima disto num evento a mais de 90
+ * dias (ver {@link diasDeValidade}).
+ */
+export function diasDeValidadePeloEvento(hoje: string, evento: string | null): number {
+  const faltam = diasAte(hoje, evento);
+  if (faltam === null || faltam <= 0) return DEFAULT_VALID_DAYS;
+  if (faltam > 90) return DEFAULT_VALID_DAYS;
+  if (faltam >= 30) return Math.min(30, faltam - 1);
+  return Math.max(5, Math.min(7, faltam - 1));
+}
+
+const MESES_DO_EVENTO = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+/**
+ * O dia do evento (yyyy-mm-dd), a partir do que o estúdio escreve no campo
+ * («12 de setembro de 2026»), ou `null`. É a mesma forma que
+ * `isoDaDataPorExtenso` (em `proposal-doc-textos.ts`) reconhece — aqui à parte
+ * porque esse ficheiro importa este, e um teste prende as duas iguais.
+ */
+export function diaDoEvento(texto: string | undefined): string | null {
+  const t = (texto ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const m = /^(\d{1,2}) de ([a-zç]+) de (\d{4})$/i.exec(t);
+  if (!m) return null;
+  const mes = MESES_DO_EVENTO.indexOf(m[2].toLowerCase());
+  if (mes < 0) return null;
+  return `${m[3]}-${String(mes + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 }
 
 /** Fills the fixed-text defaults into a partial doc, substituting the

@@ -26,8 +26,10 @@ import {
   countPendingImages,
   isPendingImage,
   stripPendingImages,
-  DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
+  diasDeValidade,
+  diaDoEvento,
+  resolveValidUntil,
   soMudaramOsIds,
   type MoodBoard,
   type VatMode,
@@ -10357,7 +10359,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     const n = Number.parseInt(e.target.value, 10);
                     patch({ validUntilDays: Number.isFinite(n) && n > 0 ? n : undefined });
                   }}
-                  placeholder={String(DEFAULT_VALID_DAYS)}
+                  // Os dias que a regra do evento dá (ver `diasDeValidadePeloEvento`):
+                  // uma proposta para a semana que vem não diz «60».
+                  placeholder={String(
+                    diasDeValidade({ eventDate: doc.eventDate }, hojeNoEstudio()),
+                  )}
                   aria-label="Dias de validade"
                   data-campo="validUntilDays"
                   // ── O ÚLTIMO CAMPO DO PASSO, LOGO ACIMA DA BARRA FIXA ───────
@@ -10376,19 +10382,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   onFocus={(e) => e.currentTarget.scrollIntoView({ block: "center" })}
                   containerClassName="scroll-mb-72"
                   hint={
-                    doc.validUntilDays ? (
-                      <button
-                        type="button"
-                        /* `alvo-toque` + `py-2`: media 18 px de altura. Foi o CI
-                         a apanhá-lo e não a máquina de quem escreveu — só
-                         aparece quando a proposta tem uma validade diferente da
-                         preferida, e os dados locais não a tinham. */
-                        className={`alvo-toque -my-1 py-2 text-[11px] text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
-                        onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
-                      >
-                        Passar a usar {doc.validUntilDays} dias em todas as propostas novas
-                      </button>
-                    ) : undefined
+                    <span className="flex flex-col items-start gap-0.5">
+                      {/* A data a que a conta chega — com o evento perto, os
+                          dias escritos podem não ser os que saem (ver
+                          `diasDeValidade`). Uma data já fixada (proposta que
+                          seguiu) tem o seu próprio aviso, mais abaixo. */}
+                      {!doc.validUntil && (
+                        <span data-testid="validade-calculada">
+                          Válida até{" "}
+                          {resolveValidUntil(doc as ProposalDoc)
+                            .split("-")
+                            .reverse()
+                            .join("/")}
+                          {diaDoEvento(doc.eventDate)
+                            ? " — conta com a data do evento."
+                            : " — sem data do evento, contam 60 dias."}
+                        </span>
+                      )}
+                      {doc.validUntilDays ? (
+                        <button
+                          type="button"
+                          /* `alvo-toque` + `py-2`: media 18 px de altura. Foi o CI
+                           a apanhá-lo e não a máquina de quem escreveu — só
+                           aparece quando a proposta tem uma validade diferente da
+                           preferida, e os dados locais não a tinham. */
+                          className={`alvo-toque -my-1 py-2 text-[11px] text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
+                          onClick={() => void guardarValidadePadrao(doc.validUntilDays!)}
+                        >
+                          Passar a usar {doc.validUntilDays} dias em todas as propostas novas
+                        </button>
+                      ) : null}
+                    </span>
                   }
                 />
               </div>
@@ -10409,7 +10433,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     className={`alvo-toque relative font-medium text-sage-600 underline-offset-2 hover:underline ${ESTADO} ${PRESSAO}`}
                     onClick={() => patch({ validUntil: undefined })}
                   >
-                    Contar {doc.validUntilDays ?? DEFAULT_VALID_DAYS} dias a partir de hoje
+                    Contar {diasDeValidade(doc, hojeNoEstudio())} dias a partir de hoje
                   </button>
                 </p>
               )}

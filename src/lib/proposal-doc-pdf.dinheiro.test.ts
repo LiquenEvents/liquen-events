@@ -561,7 +561,7 @@ describe("a data de validade", () => {
 
   it("são os 60 dias configurados, contados da emissão", async () => {
     // Sem `validUntil` explícita, a data sai de hoje + `validUntilDays`. 60 é a
-    // omissão da casa (DEFAULT_VALID_DAYS), e é o que a folha promete.
+    // omissão da casa (DEFAULT_VALID_DAYS) sem data do evento por perto.
     /**
      * ── «HOJE» É O DIA QUE PORTUGAL ESTÁ A VIVER, TAMBÉM AQUI ──────────────
      *

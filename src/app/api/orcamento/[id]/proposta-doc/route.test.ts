@@ -291,9 +291,13 @@ describe("POST /api/orcamento/[id]/proposta-doc — money model", () => {
   // 60 dias e não 30: é o que a proposta que a Líquen fazia à mão dizia, e foi
   // a decisão dela quando as duas se contradisseram. Ver `DEFAULT_VALID_DAYS`.
   it("sets a default validUntil (~60 days out) when the doc carries no date", async () => {
-    const res = await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "incluido" })), {
-      params,
-    });
+    // Evento longe: a regra do evento (`diasDeValidadePeloEvento`) dá os 60.
+    const res = await POST(
+      sendReq(
+        baseDoc({ totalAmount: 3000, totalVatMode: "incluido", eventDate: "3 de julho de 2099" }),
+      ),
+      { params },
+    );
     expect(res.status).toBe(200);
     const p = created.last!;
     expect(p.validUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/);

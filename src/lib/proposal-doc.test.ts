@@ -13,6 +13,9 @@ import {
   parseMoneyText,
   resolveProposalMoney,
   resolveValidUntil,
+  diasDeValidade,
+  diasDeValidadePeloEvento,
+  diaDoEvento,
   withProposalDefaults,
   type ProposalDoc,
 } from "./proposal-doc";
@@ -528,5 +531,71 @@ describe("proposal-doc — marcadores provisórios de foto", () => {
   it("devolve o MESMO objeto quando não há nada a filtrar", () => {
     const limpo = { coverImages: ["a", "b"], moodBoards: [{ title: "t", images: ["c"] }] };
     expect(stripPendingImages(limpo)).toBe(limpo);
+  });
+});
+
+/**
+ * A VALIDADE DEPENDE DO EVENTO (14/10). Palavras dela: «não faz sentido dizer
+ * que a validade da proposta é 90 dias e eles mandam uma proposta para o
+ * evento que é para a semana». A regra: mais de 90 dias → 60; 30–90 → 30, sem
+ * passar da véspera; menos de 30 → até à véspera, no máximo 7 e nunca menos
+ * de 5.
+ */
+describe("proposal-doc — a validade pelo evento", () => {
+  const hoje = "2026-10-14";
+  const em = (dias: number) => {
+    const d = new Date(Date.UTC(2026, 9, 14 + dias));
+    return d.toISOString().slice(0, 10);
+  };
+
+  it("cada escalão da regra", () => {
+    expect(diasDeValidadePeloEvento(hoje, null)).toBe(60);
+    expect(diasDeValidadePeloEvento(hoje, em(200))).toBe(60);
+    expect(diasDeValidadePeloEvento(hoje, em(91))).toBe(60);
+    expect(diasDeValidadePeloEvento(hoje, em(90))).toBe(30);
+    expect(diasDeValidadePeloEvento(hoje, em(31))).toBe(30);
+    expect(diasDeValidadePeloEvento(hoje, em(30))).toBe(29); // a véspera
+    expect(diasDeValidadePeloEvento(hoje, em(20))).toBe(7);
+    expect(diasDeValidadePeloEvento(hoje, em(7))).toBe(6); // a véspera
+    expect(diasDeValidadePeloEvento(hoje, em(5))).toBe(5); // nunca menos de 5
+    expect(diasDeValidadePeloEvento(hoje, em(2))).toBe(5);
+    // Uma data que já passou é um erro da data (a Conferência aponta-o).
+    expect(diasDeValidadePeloEvento(hoje, em(-3))).toBe(60);
+  });
+
+  it("lê a data como o estúdio a escreve", () => {
+    expect(diaDoEvento("21 de outubro de 2026")).toBe("2026-10-21");
+    expect(diaDoEvento("3 de Março de 2027")).toBe("2027-03-03");
+    expect(diaDoEvento("2026-10-21")).toBe("2026-10-21");
+    expect(diaDoEvento("Outubro")).toBeNull();
+    expect(diaDoEvento(undefined)).toBeNull();
+  });
+
+  it("uma proposta para a semana que vem não sai «válida 60 dias»", () => {
+    const meioDia = new Date("2026-10-14T11:00:00Z");
+    // O estúdio escrevia os 60 das preferências em todos os rascunhos.
+    const doc = { validUntilDays: 60, eventDate: "21 de outubro de 2026" };
+    expect(resolveValidUntil(doc, meioDia)).toBe("2026-10-20"); // a véspera
+    expect(resolveValidUntil({ eventDate: "21 de outubro de 2026" }, meioDia)).toBe("2026-10-20");
+  });
+
+  it("com o evento longe, os dias escritos à mão mandam", () => {
+    const meioDia = new Date("2026-10-14T11:00:00Z");
+    const doc = { validUntilDays: 90, eventDate: "20 de maio de 2027" };
+    expect(resolveValidUntil(doc, meioDia)).toBe("2027-01-12");
+  });
+
+  it("dias escritos abaixo da regra ficam; uma data fixada fica sempre", () => {
+    const meioDia = new Date("2026-10-14T11:00:00Z");
+    expect(
+      resolveValidUntil({ validUntilDays: 3, eventDate: "21 de outubro de 2026" }, meioDia),
+    ).toBe("2026-10-17");
+    expect(
+      resolveValidUntil({ validUntil: "2026-12-01", eventDate: "21 de outubro de 2026" }, meioDia),
+    ).toBe("2026-12-01");
+  });
+
+  it("os dias de `diasDeValidade` são os da data", () => {
+    expect(diasDeValidade({ eventDate: "13 de novembro de 2026" }, hoje)).toBe(29);
   });
 });

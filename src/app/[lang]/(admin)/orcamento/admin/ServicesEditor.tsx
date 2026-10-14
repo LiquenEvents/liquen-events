@@ -220,6 +220,19 @@ const emptyGroup = (i: number): ServiceGroup => ({
   items: [],
 });
 
+/** O texto cinzento dos campos vazios: diz o que se escreve, sem um exemplo
+ *  que se confunda com texto escrito (ver o título do grupo, mais abaixo). */
+const PEDE_O_TITULO = "Escreve aqui o título do grupo";
+const PEDE_A_LINHA = "Escreve aqui um serviço";
+
+/**
+ * Um grupo que NÃO sai em lado nenhum: sem título e sem uma linha com nome. É
+ * a mesma conta do PDF (`servicosDoDocumento`) e do índice do estúdio
+ * (`oQueTemODocumento`) — um grupo só com título sai, como um cartão.
+ */
+const grupoVazio = (g: ServiceGroup) =>
+  !(g.title ?? "").trim() && !g.items.some((it) => (it.label ?? "").trim());
+
 const isBlank = (it: ServiceItem) => !it.label.trim() && !(it.desc ?? "").trim();
 
 /** Uma linha colada: "- Montagem" / "1. Montagem" / "• Montagem" → "Montagem".
@@ -798,7 +811,11 @@ export default function ServicesEditor({
                           // A pega do aviso de ortografia — ver `chaveDoCampo`.
                           data-campo={`grupoTitulo:${gi}`}
                           onKeyDown={(e) => onGroupKeyDown(e, gi, "title")}
-                          placeholder="Decoração Floral de Casamento"
+                          // Uma INSTRUÇÃO e não um exemplo. A 14/10 ela mandou a
+                          // captura de um «b)» com «Decoração Floral de
+                          // Casamento» a cinzento: lia-se como um título já
+                          // escrito, o campo estava vazio, e o grupo não saía.
+                          placeholder={PEDE_O_TITULO}
                           aria-label={`Título do grupo ${gi + 1}`}
                         />
                         {/* A caixa inglesa AO LADO quando a fila tem largura
@@ -844,6 +861,16 @@ export default function ServicesEditor({
                           </IconBtn>
                         </div>
                       </div>
+
+                      {grupoVazio(g) && (
+                        <p
+                          data-testid={`grupo-vazio-${gi}`}
+                          className="mt-1 pl-4 text-xs leading-snug text-[var(--bo-text-muted)]"
+                        >
+                          Ainda sem título — o grupo {g.letter || autoLetter(gi)} só entra na
+                          proposta quando tiver um título (chega o título, sem linhas).
+                        </p>
+                      )}
 
                       <DndContext
                         sensors={sensors}
@@ -918,7 +945,7 @@ export default function ServicesEditor({
                                           e.preventDefault();
                                           pasteLines(gi, ii, "label", text, e.currentTarget);
                                         }}
-                                        placeholder="Reunião inicial"
+                                        placeholder={PEDE_A_LINHA}
                                         aria-label={`Linha ${ii + 1} do grupo ${gi + 1}`}
                                       />
                                       {bilingue && (
