@@ -241,6 +241,16 @@ export interface ContextoDoEnvio {
   canal?: "email" | "whatsapp" | "ambos";
   /** O dia de hoje (yyyy-mm-dd), no fuso do estúdio. Injetável para testes. */
   hoje?: string;
+  /**
+   * Se o PDF FINAL desta versão do documento já foi visto e confirmado.
+   *
+   * Pedido dela, a 14/10: «quero que haja algo que antes de enviar para os
+   * clientes obrigue os colaboradores da Líquen a verificar se está tudo bem».
+   * A escolha foi «Ver o PDF primeiro». Como o `canal`, só se verifica quando
+   * quem chama o diz: o estúdio no envio, e a rota do envio (que confere a
+   * chave do PDF visto contra a do documento que chega).
+   */
+  pdfVisto?: boolean;
 }
 
 /** O mesmo critério do passo do envio (`emailDoCliente` no estúdio). */
@@ -528,6 +538,22 @@ export function oQueFaltaParaEnviar(
       id: "imagens",
       seccao: "moodboards",
       texto: n === 1 ? "Uma fotografia não carrega" : `${n} fotografias não carregam`,
+      trava: true,
+    });
+  }
+  /**
+   * O PDF final por ver. Vem no fim da lista porque é o último passo — com
+   * erros, o PDF final nem sai (sai o rascunho). Mas vale SEMPRE, e não só
+   * quando o resto está certo: a rota do envio confere só uma parte dos erros
+   * (`TRAVAM_NO_SERVIDOR`), e uma regra condicionada aos outros deixava passar
+   * um envio sem o PDF visto sempre que sobrasse um erro que só o estúdio
+   * trava. Medido no teste da rota.
+   */
+  if (ctx.pdfVisto === false) {
+    faltas.push({
+      id: "visto",
+      seccao: "envio",
+      texto: "Falta ver o PDF final e confirmar que está tudo certo",
       trava: true,
     });
   }

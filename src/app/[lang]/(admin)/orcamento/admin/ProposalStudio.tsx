@@ -27,6 +27,7 @@ import {
   isPendingImage,
   stripPendingImages,
   DEFAULT_VAT_RATE,
+  DEFAULT_VALID_DAYS,
   diasDeValidade,
   diaDoEvento,
   resolveValidUntil,
@@ -2009,6 +2010,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Depois de um envio bem-sucedido, o formulário NÃO fica pronto a re-disparar:
   // mostra um estado de confirmação e exige uma escolha consciente para reenviar.
   const [sent, setSent] = useState(false);
+  /**
+   * ── VER O PDF FINAL ANTES DE ENVIAR (14/10) ────────────────────────────
+   *
+   * Pedido dela: «quero que haja algo que antes de enviar para os clientes
+   * obrigue os colaboradores da Líquen a verificar se está tudo bem». A
+   * escolha foi «Ver o PDF primeiro»: o envio só desbloqueia depois de
+   * descarregar o PDF FINAL desta versão e marcar «Vi a proposta e está tudo
+   * certo». `chave` é a que o servidor devolveu (`X-Chave-Do-Pdf`) e que o
+   * envio leva de volta; `retrato` é o documento tal como foi descarregado —
+   * mudar uma vírgula depois deixa de bater, e é preciso ver outra vez.
+   */
+  const [pdfVisto, setPdfVisto] = useState<{
+    chave: string;
+    retrato: string;
+    confirmado: boolean;
+  } | null>(null);
   // Fluxo guiado: Conteúdo → Pré-visualizar → Enviar.
   const [step, setStep] = useState<Step>("evento");
   // Qual o destino das fotos escolhidas na biblioteca de temas (null = fechado).
@@ -4487,6 +4504,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * `onQuoteUpdated`: pode cruzar-se com a gravação do preço (que tem o seu
    * próprio travão de 600 ms) e devolver um valor já velho.
    */
+  /**
+   * Marcar (ou desmarcar) «Vi a proposta e está tudo certo». Marcar deixa a
+   * linha no histórico do pedido — quem verificou fica dito ali, ao lado do
+   * envio que se segue. Falhar a linha não impede nada.
+   */
+  function confirmarPdfVisto(confirmado: boolean) {
+    setPdfVisto((v) => (v ? { ...v, confirmado } : v));
+    if (!confirmado) return;
+    const entrada: ActivityEntry = {
+      id: randomId(),
+      at: new Date().toISOString(),
+      kind: "proposal_reviewed",
+      summary: `PDF final verificado antes de enviar (${idiomaDoPdf === "en" ? "inglês" : "português"})`,
+    };
+    void fetch(`/api/orcamento/${quote.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activityLogAppend: [entrada] }),
+    }).catch(() => {
+      /* sem rede: a confirmação vale na mesma, fica é sem linha no histórico */
+    });
+  }
+
   function registarNoHistorico(summary: string) {
     const entrada: ActivityEntry = {
       id: randomId(),
@@ -6592,6 +6632,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // De ponta a ponta, que é o que ela espera — e não o que o servidor demora
     // a desenhar. É esta a medida que faz a estimativa valer alguma coisa.
     const comecou = Date.now();
+    // O documento EXACTO que vai ser desenhado — é este que fica «visto».
+    const desenhado = stripPendingImages(doc);
+    const retrato = retratoDoPdf(desenhado, idiomaDoPdf);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
@@ -6604,7 +6647,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         body: JSON.stringify({
           mode: "preview",
           idioma: idiomaDoPdf,
-          doc: stripPendingImages(doc),
+          doc: desenhado,
           ...(rascunho ? { rascunho: true } : {}),
         }),
       });
@@ -6660,6 +6703,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // cabe no desenho, por isso um PDF incompleto sai na mesma, com ar de
       // estar bem. Sem este aviso, a primeira pessoa a dar pela falta era o
       // cliente. O servidor conta as duas coisas e devolve-as nos cabeçalhos.
+      // Só o PDF FINAL conta como visto — o rascunho é o que ainda não pode
+      // seguir. Um PDF novo pede uma confirmação nova.
+      const chave = rascunho ? null : res.headers.get("X-Chave-Do-Pdf");
+      if (chave) setPdfVisto({ chave, retrato, confirmado: false });
       const emFalta = Number(res.headers.get("X-Fotos-Em-Falta") ?? "0");
       const cortes = cortesDoCabecalho(res.headers.get("X-Conteudo-Cortado"));
       const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
@@ -6805,6 +6852,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
              aqui em cima — e porque a rota trata a AUSÊNCIA como «sim», para
              nenhum envio antigo deixar de sair por causa de um campo novo. */
           ...(canal === "whatsapp" ? { porEmail: false } : {}),
+          // A chave do PDF final que foi visto e confirmado — o servidor
+          // recusa o envio sem ela (ver `chaveDoQueChegou` na rota).
+          ...(pdfVisto?.confirmado ? { pdfVisto: pdfVisto.chave } : {}),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -6991,7 +7041,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // numa proposta já escrita porque a política mudou seria alterar-lhe
         // as condições nas costas de quem a escreveu.
         const dias = Number(prefs?.validUntilDays);
-        if (Number.isFinite(dias) && dias > 0) {
+        // A omissão NÃO se escreve: sem dias escritos, a validade sai da regra
+        // do evento (`diasDeValidadePeloEvento`), que dá os mesmos 60 quando o
+        // evento está longe. Escrevê-la chegava depois de o estúdio abrir e
+        // mudava o documento sozinho — e um PDF acabado de ver deixava de ser
+        // «o que se viu» (medido no browser, com «Ver o PDF primeiro»).
+        if (Number.isFinite(dias) && dias > 0 && dias !== DEFAULT_VALID_DAYS) {
           setDoc((d) => (d.validUntilDays ? d : { ...d, validUntilDays: dias }));
         }
       })
@@ -7438,6 +7493,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross, contextoDoEnvio);
   const temErros = faltas.some((f) => f.trava);
+  /**
+   * O PDF final desta versão foi visto e confirmado? Conta-se só no passo do
+   * envio (é lá que se usa), para não serializar o documento a cada tecla
+   * nos outros passos.
+   */
+  const retratoAgora = useMemo(
+    () => (step === "enviar" ? retratoDoPdf(stripPendingImages(doc), idiomaDoPdf) : ""),
+    [step, doc, idiomaDoPdf],
+  );
+  const pdfVistoAgora = !!pdfVisto && pdfVisto.retrato === retratoAgora;
+  const pdfConfirmado = pdfVistoAgora && !!pdfVisto?.confirmado;
+  /**
+   * As faltas DO BOTÃO DE ENVIAR: as de cima mais «falta ver o PDF final».
+   * Ficam separadas de propósito — o `temErros` decide se se descarrega o
+   * rascunho ou o PDF final, e se o «ver o PDF» entrasse nele o PDF final
+   * nunca se podia descarregar para ser visto.
+   */
+  const contextoDoBotao = useMemo(
+    () => ({ ...contextoDoEnvio, pdfVisto: pdfConfirmado }),
+    [contextoDoEnvio, pdfConfirmado],
+  );
+  const faltasDoEnvio = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross, contextoDoBotao);
   /** O sinal de cada passo na barra de cima — das mesmas duas listas. */
   const estadosDosPassos = estadoDosPassos(seccoes, faltas, sent);
   /** Os passos 1 a 4 partilham o MESMO contentor, sempre montado. */
@@ -7447,7 +7524,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
   // PDF sem a foto escolhida dura para sempre.
   const canSend =
-    podeEnviar(doc as ProposalDoc, money.gross, contextoDoEnvio) && fotosPorConfirmar === 0;
+    podeEnviar(doc as ProposalDoc, money.gross, contextoDoBotao) && fotosPorConfirmar === 0;
   /**
    * Quantas traduções faltam em cada secção, para o índice.
    *
@@ -11166,6 +11243,51 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 emailDoCliente={quote.email}
                 onIr={(v) => irParaAFalta(v.seccao, v.campo)}
               />
+              {/* ── ANTES DE ENVIAR: VER O PDF FINAL (14/10) ───────────────
+                  «Quero que haja algo que antes de enviar para os clientes
+                  obrigue os colaboradores da Líquen a verificar se está tudo
+                  bem.» A escolha dela foi «Ver o PDF primeiro». O PDF final
+                  só sai sem erros (B1); depois de descarregado, pede-se a
+                  confirmação; e mudar o documento depois de o ver volta a
+                  pedir as duas coisas. O servidor confere a mesma chave. */}
+              <div
+                data-testid="ver-antes-de-enviar"
+                className="mt-4 flex flex-col items-start gap-2 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-3"
+              >
+                <p className="bo-eyebrow text-[var(--bo-text-muted)]">Antes de enviar</p>
+                {temErros ? (
+                  <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                    Primeiro corrige o que está na lista acima — o PDF final só sai sem erros.
+                    Depois descarrega-o e vê-o com atenção.
+                  </p>
+                ) : !pdfVistoAgora ? (
+                  <>
+                    <p className="text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+                      {pdfVisto
+                        ? "A proposta mudou depois de veres o PDF. Descarrega-o outra vez e vê-o antes de enviar."
+                        : "Descarrega o PDF final e vê-o com atenção, página a página — é exactamente o que o cliente vai receber."}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void preview()}
+                      disabled={busy !== null}
+                    >
+                      {busy === "preview" ? "A gerar o PDF…" : "Descarregar o PDF final"}
+                    </Button>
+                  </>
+                ) : (
+                  <label className="alvo-toque flex cursor-pointer items-start gap-2 text-sm leading-snug text-[var(--bo-text)]">
+                    <input
+                      type="checkbox"
+                      checked={!!pdfVisto?.confirmado}
+                      onChange={(e) => confirmarPdfVisto(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-sage-600"
+                    />
+                    <span>Vi a proposta e está tudo certo</span>
+                  </label>
+                )}
+              </div>
               {/* ── AS FOTOGRAFIAS ESTÃO MESMO LÁ? ─────────────────────────
                   Primeiro de todos os avisos deste passo, e é de propósito: é
                   o único que fala de uma coisa que já não se vê no ecrã. As
@@ -12089,7 +12211,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  cima sozinha (`flex-wrap`) — aí a altura é a mensagem. */
               <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
                 <PorqueNaoDaParaEnviar
-                  faltas={faltas}
+                  faltas={faltasDoEnvio}
                   fotosPorConfirmar={fotosPorConfirmar}
                   emailDoCliente={quote.email}
                   onIr={(f) => irParaAFalta(f.seccao, f.campo)}
@@ -12118,7 +12240,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       ? undefined
                       : fotosPorConfirmar > 0
                         ? "Há fotos ainda a entrar na proposta. Falta pouco."
-                        : faltas
+                        : faltasDoEnvio
                             .filter((f) => f.trava)
                             .map((f) => f.texto)
                             .join(" · ") || "Falta preencher a proposta antes de enviar."
@@ -14456,4 +14578,29 @@ function IconeEnvelope() {
       <path d="m4 7 8 6 8-6" />
     </svg>
   );
+}
+
+/**
+ * O documento e a língua de um PDF, numa só cadeia — para saber se o que se
+ * vai enviar ainda é o que foi visto.
+ *
+ * CANÓNICA (chaves por ordem, sem `undefined`), como a `chaveDoPdf` do
+ * servidor: a gravação do rascunho devolve o mesmo documento com as chaves
+ * noutra ordem, e uma comparação crua dava «mudou» sem nada ter mudado —
+ * medido no browser, a confirmação nunca chegava a aparecer.
+ */
+function retratoDoPdf(doc: unknown, idioma: string): string {
+  const canonico = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(canonico);
+    if (v && typeof v === "object") {
+      const saida: Record<string, unknown> = {};
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        const x = (v as Record<string, unknown>)[k];
+        if (x !== undefined) saida[k] = canonico(x);
+      }
+      return saida;
+    }
+    return v;
+  };
+  return `${idioma}|${JSON.stringify(canonico(doc))}`;
 }

@@ -351,6 +351,8 @@ export type ActivityKind =
   | "note_added"
   | "message_sent"
   | "proposal_sent"
+  /** Alguém viu o PDF final e confirmou que está tudo certo, antes de enviar. */
+  | "proposal_reviewed"
   | "follow_up_set"
   | "tags_updated"
   | "payment_added"

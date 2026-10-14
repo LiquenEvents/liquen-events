@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import type { Proposal } from "@/lib/orcamento/types";
 import { splitThirtySeventy } from "@/lib/money";
-import { resolveValidUntil } from "@/lib/proposal-doc";
+import { resolveValidUntil, type ProposalDoc } from "@/lib/proposal-doc";
+import { chaveDoPdf } from "@/lib/proposal-pdf-chave";
+import { ehIdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -196,11 +198,27 @@ function baseDoc(over: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * A chave do PDF final que o estúdio viu — a mesma conta da rota (o documento
+ * tal como chega, sem as `fotosDeBiblioteca`, na língua pedida).
+ */
+function chaveVista(doc: Record<string, unknown>, idioma: unknown): string {
+  const { fotosDeBiblioteca: _o, ...semOrigens } = JSON.parse(JSON.stringify(doc));
+  return chaveDoPdf(semOrigens as ProposalDoc, ehIdiomaDaProposta(idioma) ? idioma : "pt");
+}
+
+/** Um envio como o do estúdio: com o PDF final visto e confirmado, a não ser
+ *  que `extra` diga outra coisa (`pdfVisto: undefined` tira-o). */
 function sendReq(doc: Record<string, unknown>, extra: Record<string, unknown> = {}): NextRequest {
   return new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "send", doc, ...extra }),
+    body: JSON.stringify({
+      mode: "send",
+      doc,
+      pdfVisto: chaveVista(doc, extra.idioma),
+      ...extra,
+    }),
   }) as unknown as NextRequest;
 }
 
@@ -221,8 +239,15 @@ function req(corpo: Record<string, unknown>): NextRequest {
   return new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(comChave(corpo)),
   }) as unknown as NextRequest;
+}
+
+/** Um ENVIO escrito à mão leva a chave do PDF visto, como o do estúdio — a
+ *  não ser que o próprio corpo já diga alguma coisa sobre ela. */
+function comChave(corpo: Record<string, unknown>): Record<string, unknown> {
+  if (corpo.mode !== "send" || "pdfVisto" in corpo || !corpo.doc) return corpo;
+  return { ...corpo, pdfVisto: chaveVista(corpo.doc as Record<string, unknown>, corpo.idioma) };
 }
 
 const params = Promise.resolve({ id: "q1" });
@@ -2519,7 +2544,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — B1: o rascunho", () => {
       new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(corpo),
+        body: JSON.stringify(comChave(corpo)),
       }) as unknown as NextRequest,
       { params },
     );
@@ -2545,5 +2570,52 @@ describe("POST /api/orcamento/[id]/proposta-doc — B1: o rascunho", () => {
     for (const chamada of vi.mocked(renderStoredEditorialPdfWithReport).mock.calls) {
       expect(chamada[2]).toEqual({ rascunho: false });
     }
+  });
+});
+
+/**
+ * «VER O PDF PRIMEIRO» (14/10). Pedido dela: antes de enviar, alguém tem de
+ * ver o PDF final e confirmar. A pré-visualização final devolve a chave do
+ * que se viu; o envio tem de trazer a mesma, ou é recusado — para ninguém a
+ * saltar, nem com um estúdio antigo aberto noutra aba.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — ver o PDF antes de enviar", () => {
+  it("a pré-visualização FINAL devolve a chave do que se viu; o rascunho não", async () => {
+    const doc = baseDoc({ totalAmount: 3000 });
+    const final = await POST(previewReq(doc), { params });
+    expect(final.headers.get("X-Chave-Do-Pdf")).toBe(chaveVista(doc, "pt"));
+    const rascunho = await POST(req({ mode: "preview", rascunho: true, doc }), { params });
+    expect(rascunho.headers.get("X-Chave-Do-Pdf")).toBeNull();
+  });
+
+  it("sem a chave, ou com a de outra versão, o envio é recusado — com a certa, segue", async () => {
+    const doc = baseDoc({ totalAmount: 3000 });
+    const semChave = await POST(sendReq(doc, { pdfVisto: undefined }), { params });
+    expect(semChave.status).toBe(422);
+    expect((await semChave.json()).error).toMatch(/ver o pdf final/i);
+
+    const outraVersao = chaveVista(baseDoc({ totalAmount: 3100 }), "pt");
+    const mudou = await POST(sendReq(doc, { pdfVisto: outraVersao }), { params });
+    expect(mudou.status).toBe(422);
+
+    // A versão vista em português não vale para o envio em inglês.
+    const outraLingua = await POST(
+      sendReq(doc, { idioma: "en", pdfVisto: chaveVista(doc, "pt") }),
+      { params },
+    );
+    expect(outraLingua.status).toBe(422);
+
+    const certa = await POST(sendReq(doc), { params });
+    expect(certa.status).toBe(200);
+  });
+
+  it("as fotos de biblioteca que só o envio leva não mudam a chave", async () => {
+    const doc = baseDoc({ totalAmount: 3000 });
+    const vista = chaveVista(doc, "pt");
+    const res = await POST(
+      sendReq({ ...doc, fotosDeBiblioteca: ["theme-assets/t1/a.jpg"] }, { pdfVisto: vista }),
+      { params },
+    );
+    expect(res.status).toBe(200);
   });
 });

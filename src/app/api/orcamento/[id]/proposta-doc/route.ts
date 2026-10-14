@@ -57,6 +57,9 @@ const TRAVAM_NO_SERVIDOR: ReadonlySet<string> = new Set([
   "validade",
   "email",
   "condicoes",
+  // «Ver o PDF primeiro» (14/10): o envio leva a chave do PDF final que ela
+  // descarregou e confirmou — ver `chaveDoQueChegou`, mais abaixo.
+  "visto",
 ]);
 
 export const runtime = "nodejs";
@@ -212,6 +215,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       porEmail?: unknown;
       /** Só na pré-visualização: o PDF sai marcado «RASCUNHO» (B1). */
       rascunho?: unknown;
+      /** Só no envio: a chave do PDF final que foi visto e confirmado — a que
+       *  a pré-visualização devolveu em `X-Chave-Do-Pdf`. */
+      pdfVisto?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
@@ -321,6 +327,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         });
       }
     }
+    /**
+     * ── A CHAVE DO QUE FOI VISTO ─────────────────────────────────────────
+     *
+     * Pedido dela: antes de enviar, alguém tem de VER o PDF final e dizer que
+     * está tudo certo. A pré-visualização final devolve esta chave; o envio
+     * tem de trazer a mesma. Calcula-se sobre o documento TAL COMO CHEGOU —
+     * antes dos textos da casa e da validade que esta rota lhe escreve — e
+     * sem as `fotosDeBiblioteca`, que só o envio manda. Mudar uma vírgula
+     * depois de ver muda a chave, e o envio é recusado.
+     */
+    const { fotosDeBiblioteca: _origens, ...semOrigens } = raw;
+    const chaveDoQueChegou = chaveDoPdf(semOrigens as ProposalDoc, idioma);
+
     // Fill the studio's fixed boilerplate (condições, observações, faseamento,
     // cancelamento) + event-token substitution so the UI only sends what varies.
     const doc = withProposalDefaults(raw);
@@ -398,6 +417,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         idioma,
         canal: body?.porEmail === false ? "whatsapp" : "email",
         emailDoCliente: quote.email,
+        pdfVisto: typeof body?.pdfVisto === "string" && body.pdfVisto === chaveDoQueChegou,
       }).filter((f) => f.trava && TRAVAM_NO_SERVIDOR.has(f.id));
       if (travam.length > 0) {
         log.warn("proposta-doc: envio recusado, a proposta tem erros", {
@@ -492,6 +512,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // Vai em base64 porque o corpo desta resposta é o PDF e um cabeçalho
           // HTTP não transporta com segurança os acentos dos nomes dos campos.
           "X-Conteudo-Cortado": Buffer.from(JSON.stringify(truncations), "utf8").toString("base64"),
+          // A chave do que se está a ver — só no PDF FINAL. O rascunho não
+          // conta como visto: é o PDF que ainda não pode seguir.
+          ...(rascunho ? {} : { "X-Chave-Do-Pdf": chaveDoQueChegou }),
         },
       });
     }

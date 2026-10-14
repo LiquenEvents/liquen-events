@@ -348,6 +348,7 @@ const activityEntrySchema = z.object({
     "note_added",
     "message_sent",
     "proposal_sent",
+    "proposal_reviewed",
     "follow_up_set",
     "tags_updated",
     "payment_added",
