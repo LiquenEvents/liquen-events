@@ -6038,15 +6038,16 @@ function ThemeFolder({
                       className={`absolute inset-0 h-full w-full ${ESTADO} ${PRESSAO}`}
                     >
                       {/* O círculo da selecção, à maneira da app Fotografias:
-                          um anel branco fino com sombra em repouso, e cheio
-                          com o visto quando está escolhida (14/10, «tipo
-                          apple»). */}
+                          um anel branco fino sobre um véu escuro leve (sem
+                          sombra: esta casa não põe sombras em conteúdo — ver
+                          `sombras-do-back-office.test.ts`), e cheio com o
+                          visto quando está escolhida (14/10, «tipo apple»). */}
                       <span
                         aria-hidden
-                        className={`absolute left-2 top-2 flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-white shadow-[0_1px_3px_rgba(0,0,0,0.35)] ${ESTADO} ${
+                        className={`absolute left-2 top-2 flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-white ${ESTADO} ${
                           isSelected
                             ? "bg-sage-600 text-white opacity-100"
-                            : "bg-black/10 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
+                            : "bg-black/25 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
                         }`}
                       >
                         <svg
