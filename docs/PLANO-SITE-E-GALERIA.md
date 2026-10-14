@@ -258,7 +258,7 @@ como recomendação.
 > - **a mola é a da casa** (`src/lib/motion/mola.ts`, a da curadoria de
 >   fotografias), com a velocidade com que o dedo sai. Quem decide se muda é
 >   `decidirDeslize` (`voo.ts`): 20 % da largura, ou um gesto rápido
->   (≥ 0,5 px/ms) a partir de 12 px. Um gesto rápido ao contrário desiste;
+>   (≥ 0,3 px/ms, medido com toques simulados) a partir de 12 px. Um gesto rápido ao contrário desiste;
 > - **as pontas deixaram de dar a volta em todos os caminhos**: o dedo, as
 >   setas do teclado, o ‹ › (que desaparecem na primeira e na última) e a
 >   pré-carga. No dedo há um elástico (`elastico`, nunca mais de ⅓ da

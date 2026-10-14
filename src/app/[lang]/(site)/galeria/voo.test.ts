@@ -167,6 +167,10 @@ describe("decidirDeslize (GAL-2)", () => {
   });
   it("um gesto rápido muda mesmo curto, mas não um toque trémulo", () => {
     expect(decidirDeslize({ ...base, dx: -40, velocidade: -0.8 })).toBe(1);
+    // 40 px em ~120 ms: um polegar decidido, medido no browser.
+    expect(decidirDeslize({ ...base, dx: -40, velocidade: -0.34 })).toBe(1);
+    // 40 px em 300 ms: arrastar devagar não muda.
+    expect(decidirDeslize({ ...base, dx: -40, velocidade: -0.13 })).toBe(0);
     expect(decidirDeslize({ ...base, dx: -5, velocidade: -0.8 })).toBe(0);
   });
   it("um gesto rápido ao contrário desiste, mesmo depois dos 20 %", () => {

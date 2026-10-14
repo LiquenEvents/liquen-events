@@ -151,8 +151,15 @@ export function janelaDaTira(index: number, total: number, n: number): number[] 
 
 /** A fracção da largura a partir da qual largar muda de foto. */
 export const DESLIZE_FRACCAO = 0.2;
-/** Um gesto rápido (px/ms) muda de foto mesmo curto… */
-export const DESLIZE_RAPIDO_PX_MS = 0.5;
+/**
+ * Um gesto rápido (px/ms) muda de foto mesmo curto…
+ *
+ * Medido no browser, com toques simulados: 40 px em 120–150 ms dão 0,3–0,4
+ * px/ms, que é o que um polegar faz num gesto curto e decidido. Com 0,5 esses
+ * gestos eram ignorados — a mesma queixa de antes. Arrastar devagar (40 px em
+ * 300 ms ≈ 0,13) continua a não mudar.
+ */
+export const DESLIZE_RAPIDO_PX_MS = 0.3;
 /** …desde que tenha andado o suficiente para não ser um toque trémulo. */
 export const DESLIZE_RAPIDO_MIN_PX = 12;
 /** O intervalo entre duas fotografias na pista, em px. */
