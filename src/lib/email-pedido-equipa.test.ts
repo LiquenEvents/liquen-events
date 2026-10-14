@@ -6,16 +6,18 @@ import {
   htmlDoPedidoParaAEquipa,
   type DadosDoPedidoParaAEquipa,
 } from "./email-pedido-equipa";
+import { ESTILO_DA_CARTA } from "./email-pedido-recebido";
 
 /**
- * O email que a equipa recebe passou ao desenho do email ao cliente, a pedido
- * dela («coloca também com a mesma estrutura e design»). Estes casos guardam
- * as duas metades disso: que o desenho é MESMO o mesmo, e que nada do que a
- * equipa lia antes se perdeu pelo caminho.
+ * O email que a equipa recebe tem a ESTRUTURA DA CARTA que vai ao cliente, a
+ * pedido dela (14/10: «quero que coloques a estrutura do email que enviamos
+ * para o cliente… no email que recebemos quando recebemos o pedido»). Estes
+ * casos guardam as duas metades disso: que o desenho é MESMO o da carta, e que
+ * nada do que a equipa lia antes se perdeu pelo caminho.
  */
 
 const DESENHO_DELA = readFileSync(
-  join(process.cwd(), "docs/email-pedido-recebido-apple.html"),
+  join(process.cwd(), "docs/email-pedido-recebido-carta.html"),
   "utf8",
 );
 
@@ -45,25 +47,28 @@ const PEDIDO: DadosDoPedidoParaAEquipa = {
   quando: "06/10/2026, 16:58:03",
 };
 
-describe("o email da equipa tem o desenho do email ao cliente", () => {
-  it("a folha de estilo é a mesma, à letra", () => {
-    const doDesenho = /<style>\n {2}body[\s\S]*?<\/style>/.exec(DESENHO_DELA)?.[0];
-    expect(doDesenho, "não encontrei a folha de estilo no ficheiro dela").toBeTruthy();
-    expect(ESTILO_DO_EMAIL).toBe(doDesenho);
-    expect(htmlDoPedidoParaAEquipa(PEDIDO)).toContain(doDesenho!);
+describe("o email da equipa tem a estrutura da carta ao cliente", () => {
+  it("a folha de estilo é a da carta, a mesma constante", () => {
+    expect(ESTILO_DO_EMAIL).toBe(ESTILO_DA_CARTA);
+    expect(htmlDoPedidoParaAEquipa(PEDIDO)).toContain(ESTILO_DA_CARTA);
   });
 
-  it("o mesmo cartão, o mesmo título e a mesma cápsula", () => {
+  it("a mesma página, o mesmo título e as mesmas linhas finas", () => {
     const html = htmlDoPedidoParaAEquipa(PEDIDO);
     for (const peca of [
-      'class="card sf" style="max-width:640px;background:#ffffff;border-radius:18px;',
-      'class="h1 t1" style="margin:0;font-size:40px;line-height:44px;font-weight:600;letter-spacing:-0.3px;color:#1d1d1f;"',
-      'class="btn" style="display:inline-block;background:#4d6650;color:#ffffff;text-decoration:none;font-size:17px;line-height:20px;font-weight:400;padding:13px 24px;border-radius:980px;"',
-      'class="box" style="background:#f5f5f7;border-radius:18px;"',
+      "max-width:600px;font-family:-apple-system",
+      'class="h1 t1" style="margin:0;font-size:32px;line-height:36px;font-weight:600;letter-spacing:0.1px;color:#1d1d1f;"',
+      'class="lbl t2 line" width="140" valign="top" style="width:140px;padding:12px 12px 12px 0;border-top:1px solid #d2d2d7;',
     ]) {
       expect(DESENHO_DELA, "a peça já não está no desenho dela").toContain(peca);
       expect(html, `o email da equipa perdeu: ${peca.slice(0, 50)}…`).toContain(peca);
     }
+  });
+
+  it("sem os cartões cinzentos nem a cápsula do desenho anterior", () => {
+    const html = htmlDoPedidoParaAEquipa(PEDIDO);
+    expect(html).not.toContain("#f5f5f7;border-radius:18px");
+    expect(html).not.toContain("border-radius:980px");
   });
 });
 
@@ -81,7 +86,8 @@ describe("e nada do que a equipa lia se perdeu", () => {
       ">analobo@exemplo.pt</a>",
       ">919075659</a>",
       "pela parte do catering",
-      "Ref. LIQ-AE3E61-2D3846A4AC81D8A6 · 06/10/2026, 16:58:03",
+      ">LIQ-AE3E61-2D3846A4AC81D8A6</td>",
+      "Chegou a 06/10/2026, 16:58:03.",
       "Pedidos respondidos no próprio dia convertem muito mais.",
       "a resposta vai direta para Ana.",
     ]) {
@@ -116,14 +122,14 @@ describe("e nada do que a equipa lia se perdeu", () => {
     expect(html).not.toContain('<img src=x onerror="alert(1)">');
   });
 
-  it("a última linha de cada cartão não leva filete por baixo", () => {
+  it("todas as linhas têm o filete de cima, e só a última o de baixo", () => {
     const html = htmlDoPedidoParaAEquipa(PEDIDO);
-    expect(html).toContain(
-      '<td class="t2" style="padding:14px 12px 14px 0;color:#6e6e73;">Espaço</td>',
+    expect(html).toMatch(/border-top:1px solid #d2d2d7;color:#6e6e73;">Convidados<\/td>/);
+    // A última é a referência, que quebra onde for preciso.
+    expect(html).toMatch(
+      /border-top:1px solid #d2d2d7;border-bottom:1px solid #d2d2d7;color:#6e6e73;">Referência<\/td>/,
     );
-    expect(html).toContain(
-      '<td class="t2 line" style="padding:14px 12px 14px 0;border-bottom:1px solid #d2d2d7;color:#6e6e73;">Convidados</td>',
-    );
+    expect((html.match(/border-bottom:1px solid #d2d2d7/g) ?? []).length).toBe(2);
   });
 
   it("sem notas, não há caixa das notas", () => {
@@ -131,22 +137,22 @@ describe("e nada do que a equipa lia se perdeu", () => {
   });
 });
 
-describe("os botões, nos três casos", () => {
-  it("com telefone e email: a cápsula do WhatsApp e a ligação do email", () => {
+describe("responder ao cliente, nos três casos", () => {
+  it("com telefone e email: as duas ligações", () => {
     const html = htmlDoPedidoParaAEquipa(PEDIDO);
-    expect(html).toContain(">Enviar WhatsApp</a>");
+    expect(html).toContain(">Enviar WhatsApp&nbsp;›</a>");
     expect(html).toContain(">Responder por email&nbsp;›</a>");
   });
 
-  it("só com telefone: só a cápsula", () => {
+  it("só com telefone: só o WhatsApp", () => {
     const html = htmlDoPedidoParaAEquipa({ ...PEDIDO, mailto: "" });
-    expect(html).toContain(">Enviar WhatsApp</a>");
+    expect(html).toContain(">Enviar WhatsApp&nbsp;›</a>");
     expect(html).not.toContain("Responder por email");
   });
 
-  it("só com email: a cápsula é o email", () => {
+  it("só com email: só o email", () => {
     const html = htmlDoPedidoParaAEquipa({ ...PEDIDO, whatsapp: "" });
-    expect(html).toContain(">Responder ao cliente</a>");
+    expect(html).toContain(">Responder por email&nbsp;›</a>");
     expect(html).not.toContain("wa.me");
   });
 
@@ -154,5 +160,39 @@ describe("os botões, nos três casos", () => {
     for (const d of [PEDIDO, { ...PEDIDO, mailto: "" }, { ...PEDIDO, whatsapp: "" }]) {
       expect(htmlDoPedidoParaAEquipa(d)).not.toMatch(/href=""/);
     }
+  });
+});
+
+/**
+ * 14/10: «Maria Silva» em grande num pedido da Luana e do Afonso. Quando quem
+ * escreveu não é um dos noivos, vai o casal em grande, quem escreveu numa
+ * linha por baixo, e o rodapé diz para que endereço vai a resposta (e não
+ * «direta para Maria», que não se sabe se é dela).
+ */
+describe("quem pede e quem se casa", () => {
+  const COM_CASAL: DadosDoPedidoParaAEquipa = {
+    ...PEDIDO,
+    nome: "Luana Silva & Afonso Duarte",
+    feitoPor: "Maria Silva",
+    primeiroNome: "Maria",
+    respostaPara: "casal@exemplo.pt",
+  };
+
+  it("o casal vai em grande e quem escreveu numa linha por baixo", () => {
+    const html = htmlDoPedidoParaAEquipa(COM_CASAL);
+    expect(html).toMatch(/<h1[^>]*>Luana Silva &amp; Afonso Duarte<\/h1>/);
+    expect(html).toContain("Pedido feito por Maria Silva");
+  });
+
+  it("o rodapé diz o endereço da resposta, e não o nome de quem escreveu", () => {
+    const html = htmlDoPedidoParaAEquipa(COM_CASAL);
+    expect(html).toContain("a resposta vai para casal@exemplo.pt");
+    expect(html).not.toContain("direta para Maria");
+  });
+
+  it("sem ninguém a mais, fica como sempre", () => {
+    const html = htmlDoPedidoParaAEquipa(PEDIDO);
+    expect(html).not.toContain("Pedido feito por");
+    expect(html).toContain("a resposta vai direta para Ana");
   });
 });

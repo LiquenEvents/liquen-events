@@ -487,7 +487,10 @@ export const pt = {
       "Mais ou menos quantas? Uma estimativa chega, e ajuda-nos a preparar a proposta.",
     labelPessoas: "Nº de pessoas",
     labelLocal: "Local / região",
-    labelNome: "Nome",
+    // «O seu nome», e não «Nome»: é o de QUEM ESCREVE, que nem sempre é um dos
+    // noivos (14/10 — um pedido com «Maria Silva» aqui e outro casal, e o email
+    // pôs a Maria em grande). Ver `lib/orcamento/quem-pede.ts`.
+    labelNome: "O seu nome",
     labelEmail: "E-mail",
     labelTelefone: "Telefone",
     // The one field that decides whether the proposal can be designed or only
@@ -510,11 +513,16 @@ export const pt = {
      * indistinguíveis.
      *
      * Os dados já estavam certos: o servidor guarda `partnerA`/`partnerB`
-     * desde sempre. Era só o texto.
+     * desde sempre. Era só o texto.     *
+     * 14/10: chegou um pedido com «Maria Silva» no nome de quem escreve e
+     * «Luana Silva & Afonso Duarte» no casal, e o email pôs a Maria em grande.
+     * Com três campos a dizer «Nome», nada distinguia o de quem PEDE dos de
+     * quem SE CASA. O primeiro passa a «O seu nome»; os dois do casal continuam
+     * iguais entre si (sem ordem nem género), mas dizem de quem são.
      */
     labelNoivos: "Nomes do casal",
-    phNoivo: "Nome",
-    phNoiva: "Nome",
+    phNoivo: "Nome de quem se casa",
+    phNoiva: "Nome de quem se casa",
     ariaNoivoA: "Nome de uma das pessoas do casal",
     ariaNoivoB: "Nome da outra pessoa do casal",
     hintNoivos: "Aparecem na proposta.",
