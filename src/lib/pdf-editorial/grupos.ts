@@ -92,3 +92,37 @@ export function agrupar<T>(
   }
   return ORDEM_DOS_GRUPOS.filter((g) => por.has(g)).map((g) => ({ grupo: g, itens: por.get(g)! }));
 }
+
+/**
+ * ── E QUANDO NÃO É UM CASAMENTO ─────────────────────────────────────────────
+ *
+ * Os quatro capítulos de cima são os do dia de um casamento. Numa proposta
+ * para um restaurante no Halloween, «Bar» caía em «Cocktail» e «Arco de
+ * abóboras» em «Cerimónia» — ela viu-o assim a 13/10, e escolheu: fora dos
+ * casamentos, CADA MOOD BOARD É UM CAPÍTULO, com o título que lhe deram e pela
+ * ordem em que os puseram. Os casamentos ficam como estavam.
+ *
+ * Um capítulo destes não tem `grupo`: o nome é o do próprio mood board, e a
+ * `chave` («tema-3») é o que o distingue dos outros no plano das páginas.
+ */
+export interface Capitulo<T> {
+  /** O que distingue o capítulo: o grupo do casamento, ou `tema-<n>`. */
+  chave: string;
+  /** O grupo do dia do casamento; `null` num capítulo que é um mood board só. */
+  grupo: Grupo | null;
+  itens: T[];
+}
+
+/** Os capítulos da inspiração — a regra que o PDF e o plano das páginas partilham. */
+export function capitulos<T>(
+  itens: readonly T[],
+  temaDe: (t: T) => { title?: string; subtitulo?: string },
+  casamento: boolean,
+): Capitulo<T>[] {
+  if (casamento) {
+    return agrupar(itens, (t) => grupoDoTema(temaDe(t).title ?? "", temaDe(t).subtitulo ?? "")).map(
+      (c) => ({ chave: c.grupo, grupo: c.grupo, itens: c.itens }),
+    );
+  }
+  return itens.map((t, i) => ({ chave: `tema-${i + 1}`, grupo: null, itens: [t] }));
+}

@@ -112,6 +112,23 @@ describe("o plano das páginas é o do PDF", () => {
     await batem(doc());
   });
 
+  it("fora dos casamentos: um capítulo por mood board, com o título dele", async () => {
+    const { plano } = await batem(
+      doc({
+        eventType: "Halloween",
+        moodBoards: [
+          { title: "Bar", images: fotos(3) },
+          { title: "Arco de abóboras", images: fotos(4) },
+        ],
+      }),
+    );
+    const separadores = plano.filter((p) => p.tipo === "separador" && p.grupo !== null);
+    expect(separadores.map((p) => (p.tipo === "separador" ? p.titulo : ""))).toEqual([
+      "Bar",
+      "Arco de abóboras",
+    ]);
+  });
+
   it("sem orçamento: não há investimento, e as condições ficam", async () => {
     const { plano } = await batem(
       doc({ budgetItems: [], totalText: "", totalAmount: undefined, budgetExtras: [] }),

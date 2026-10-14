@@ -25,7 +25,8 @@ import { SITE } from "@/lib/site";
 import { aoMeio, paginarColunasFixas, paginarCorrido, repartir, type Peca } from "./colunas";
 import { bytesDaFoto, embedImagem } from "./embutir";
 import { Album, medir, type Foto } from "./fotos";
-import { agrupar, grupoDoTema } from "./grupos";
+import { capitulos as capitulosDaInspiracao } from "./grupos";
+import { eCasamento } from "../proposal-evento";
 import { logotipoNaCor } from "./imagens";
 import type { Contexto } from "./moldura";
 import { repartir as repartirFotos } from "./mosaico";
@@ -85,6 +86,8 @@ export async function renderEditorialPdf(
   const evento = camposDoEventoNaLingua(doc, idioma);
   const fixos = blocosFixosNaLingua(doc, idioma);
   const org = doc.template === "organizacao";
+  // Casamento ou não — a regra é uma só, e é a mesma do plano e do estúdio.
+  const casamento = eCasamento(doc.eventType);
   const totais = totaisDaProposta(doc, depositPercentOf(doc));
   /** O dinheiro na língua do documento — a mesma conversão do gerador antigo. */
   const dinheiro = (texto: string) => montanteNaLingua(milharesComPonto(texto), idioma);
@@ -202,7 +205,12 @@ export async function renderEditorialPdf(
   {
     const foto = album.escolher(proxima(), "deitada")[0] ?? fundoDaCapa;
     const factos = [
-      { rotulo: org ? te.factos.cliente : te.factos.noivos, valor: doc.clientNames },
+      // «Noivos» só num casamento: num restaurante, numa empresa, numa festa,
+      // quem recebe a proposta é o cliente.
+      {
+        rotulo: org || !casamento ? te.factos.cliente : te.factos.noivos,
+        valor: doc.clientNames,
+      },
       ...(org ? [] : [{ rotulo: te.factos.evento, valor: evento.eventType ?? "" }]),
       { rotulo: te.factos.data, valor: evento.eventDate ?? "" },
       { rotulo: te.factos.local, valor: doc.location ?? "" },
@@ -211,7 +219,11 @@ export async function renderEditorialPdf(
       ...(org
         ? []
         : [
-            { rotulo: te.factos.cerimonia, valor: evento.ceremony ?? "" },
+            // Num casamento, sempre; fora dele, só se ela a escreveu — é a regra
+            // do estúdio, que só mostra o campo nesses dois casos.
+            ...(casamento || (evento.ceremony ?? "").trim()
+              ? [{ rotulo: te.factos.cerimonia, valor: evento.ceremony ?? "" }]
+              : []),
             { rotulo: te.factos.hora, valor: evento.time ?? "" },
           ]),
     ].filter((f) => f.valor.trim());
@@ -220,7 +232,13 @@ export async function renderEditorialPdf(
       desenhar: (numero) =>
         apresentacao(ctx, {
           sobretitulo: t.sobretituloApresentacao,
-          titulo: te.tituloDaProposta(primeirosNomes(doc.clientNames, idioma), org),
+          titulo: te.tituloDaProposta(
+            casamento
+              ? primeirosNomes(doc.clientNames, idioma)
+              : (doc.clientNames ?? "").trim() || null,
+            org,
+            casamento,
+          ),
           factos,
           foto,
           numero,
@@ -292,20 +310,28 @@ export async function renderEditorialPdf(
   }
 
   // ── Os capítulos de inspiração ──
-  const capitulos = agrupar(comConteudo, (x) =>
-    grupoDoTema(x.pt.title ?? "", x.pt.subtitulo ?? ""),
-  );
+  const capitulos = capitulosDaInspiracao(comConteudo, (x) => x.pt, casamento);
   const meio = Math.ceil(capitulos.length / 2);
   let vezDoTema = 0;
   capitulos.forEach((c, ci) => {
-    const nome = te.grupos[c.grupo];
+    // Num casamento, o nome do dia («Cocktail»); fora dele, o título do próprio
+    // mood board — é o que ela escreveu, e é o que o capítulo é.
+    const nome = c.grupo ? te.grupos[c.grupo] : c.itens[0].titulo || te.inspiracao;
     const doCapitulo = c.itens.flatMap((x) => x.fotos);
     // O separador: as DUAS fotografias de maior resolução do capítulo — é a
     // regra do documento dela, e a forma não entra na escolha —, de
     // preferência fora do primeiro tema, que vem logo a seguir.
     const paginaDoSeparador = proxima();
     const evitar = new Set(c.itens.length > 1 ? c.itens[0].fotos.map((f) => f.id) : []);
-    const fotosDoSeparador = album.escolher(paginaDoSeparador, "qualquer", 2, doCapitulo, evitar);
+    // Um capítulo sem fotografias (um mood board só com texto) leva as da
+    // proposta — é o que a pré-visualização do estúdio mostra (`fontesDasFolhas`).
+    const fotosDoSeparador = album.escolher(
+      paginaDoSeparador,
+      "qualquer",
+      2,
+      doCapitulo.length ? doCapitulo : inspiracao,
+      evitar,
+    );
     plano.push({
       entrada: `${te.inspiracao} · ${nome}`,
       desenhar: (numero, entradas) =>
@@ -336,7 +362,8 @@ export async function renderEditorialPdf(
           desenhar: (n) =>
             tema(ctx, {
               numero,
-              grupo: nome,
+              // Um capítulo que é o próprio mood board não repete o título no topo.
+              grupo: c.grupo ? nome : "",
               titulo: x.titulo,
               subtitulo: k ? te.maisIdeias : x.subtitulo,
               nota: k ? "" : x.nota,

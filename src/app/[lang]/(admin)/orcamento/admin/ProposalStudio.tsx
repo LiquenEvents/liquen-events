@@ -200,6 +200,12 @@ import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-ca
 // inventa nenhuma espera sua.
 import { Ajuda, Button, Card, EmCurso, Field, FolhaOuDialogo, Segmented } from "./ui";
 import {
+  eCasamento,
+  pedidoECasamento,
+  SUGESTOES_DE_TIPO,
+  tipoDoEventoDoPedido,
+} from "@/lib/proposal-evento";
+import {
   baseParaOEstudio,
   degrauDosAdicionais,
   precoDoPedidoParaBase,
@@ -372,10 +378,10 @@ const AVISO_DO_BOARD =
  * inglesa voltava a sair com a data em português — sem erro nenhum pelo
  * caminho. Por isso nenhuma delas escreve texto seu: pedem-no a quem o tem. */
 
+/* Nunca «Casamento» por omissão: era o que fazia um pedido «Outro» — um
+ * restaurante no Halloween — abrir como um casamento (ver `proposal-evento.ts`). */
 function eventTypeLabel(q: Quote): string {
-  return (
-    eventTypeName(q.eventType) || (q.category === "empresas" ? "Evento Corporativo" : "Casamento")
-  );
+  return tipoDoEventoDoPedido(q);
 }
 
 /** yyyy-mm-dd → "12 de setembro de 2026"; passes through anything else. */
@@ -448,7 +454,9 @@ function initialDoc(quote: Quote): StudioDoc {
     //
     // Em português mesmo quando o pedido veio em inglês: o documento do estúdio
     // é escrito em português.
-    ceremony: ceremonyTypeLabel(quote.ceremonyType),
+    // Só num casamento: «Cerimónia» numa proposta para um restaurante é um
+    // campo de outro evento.
+    ceremony: eCasamento(eventTypeLabel(quote)) ? ceremonyTypeLabel(quote.ceremonyType) : "",
     time: "",
     serviceGroups: [],
     moodBoards: [],
@@ -1373,6 +1381,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }, []);
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
+  // «É mesmo um casamento»: o aviso de baixo cala-se para este pedido — e
+  // fica calado nas próximas vezes (um casamento metido à mão, sem tipo, não
+  // pode ficar a perguntar o mesmo cada vez que se abre).
+  const chaveDoCasamentoConfirmado = `liquen-casamento-confirmado-${quote.id}`;
+  const [casamentoConfirmado, setCasamentoConfirmado] = useState(() => {
+    try {
+      return localStorage.getItem(chaveDoCasamentoConfirmado) === "1";
+    } catch {
+      return false;
+    }
+  });
   /**
    * O documento COMO ESTÁ AGORA, para quem volta de uma ida à rede.
    *
@@ -4146,8 +4165,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       return {
         ...d,
         template: t,
+        // «de Casamento» só num casamento: este título sai na página que o
+        // cliente abre (o PDF não o usa).
         headerTitle:
-          t === "organizacao" ? "Proposta de orçamento para Organização de Casamento" : undefined,
+          t === "organizacao"
+            ? eCasamento(d.eventType)
+              ? "Proposta de orçamento para Organização de Casamento"
+              : "Proposta de orçamento para Organização do Evento"
+            : undefined,
         ...(t === "organizacao" ? { totalEstimatedText: text } : { totalText: text }),
       };
     });
@@ -7978,6 +8003,58 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
             {/* Event fields */}
             <Section title="Evento" id="evento">
+              {/* ── «ESTE PEDIDO NÃO PARECE UM CASAMENTO» ──────────────────
+                O estúdio escrevia «Casamento» sozinho em qualquer pedido sem
+                tipo — e com isso o PDF punha «Noivos» e arrumava os mood boards
+                em Cerimónia e Cocktail numa proposta para um restaurante. Os
+                rascunhos feitos até 13/10 ficaram com essa palavra; o aviso é o
+                que os deixa corrigir com um toque, sem adivinhar. */}
+              {eCasamento(doc.eventType) &&
+                !pedidoECasamento(quote) &&
+                !eCasamento(tipoDoEventoDoPedido(quote)) &&
+                !(quote.partnerA || quote.partnerB) &&
+                !casamentoConfirmado && (
+                  <div
+                    role="status"
+                    className="mb-4 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] p-3 text-sm"
+                  >
+                    <p className="font-medium">Este pedido não parece um casamento.</p>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--bo-text-muted)]">
+                      A proposta diz «{doc.eventType}», e por isso o PDF chama «Noivos» ao cliente e
+                      arruma os mood boards em Cerimónia, Cocktail e Jantar.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          confirmado("eventType");
+                          patch({ eventType: tipoDoEventoDoPedido(quote) });
+                          document
+                            .querySelector<HTMLInputElement>('input[data-campo="eventType"]')
+                            ?.focus();
+                        }}
+                      >
+                        {tipoDoEventoDoPedido(quote)
+                          ? `Mudar para «${tipoDoEventoDoPedido(quote)}»`
+                          : "Escrever o tipo de evento"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setCasamentoConfirmado(true);
+                          try {
+                            localStorage.setItem(chaveDoCasamentoConfirmado, "1");
+                          } catch {
+                            /* sem localStorage: cala-se só até reabrir */
+                          }
+                        }}
+                      >
+                        É mesmo um casamento
+                      </Button>
+                    </div>
+                  </div>
+                )}
               <div className="grid grid-cols-1 @min-[26rem]:grid-cols-2 gap-4">
                 <Field
                   label="Clientes"
@@ -7999,7 +8076,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   }}
                   containerClassName={realce("eventType")}
                   data-campo="eventType"
-                  placeholder="Casamento"
+                  list="sug-tipos-de-evento"
+                  placeholder="Casamento, festa, jantar…"
+                  hint={
+                    eCasamento(doc.eventType)
+                      ? "Casamento: o PDF arruma os mood boards em Cerimónia, Cocktail, Jantar e Complementos."
+                      : "O PDF diz «Cliente», e cada mood board abre o seu capítulo, com o título que lhe deram."
+                  }
                 />
                 <Field
                   label="Data"
@@ -8044,17 +8127,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       únicos campos do Evento onde a marca não acendia, e por
                       isso os únicos onde um valor de terceiros se lia como um
                       valor escrito. */}
-                    <Field
-                      label="Cerimónia"
-                      value={doc.ceremony ?? ""}
-                      onChange={(e) => {
-                        confirmado("ceremony");
-                        patch({ ceremony: e.target.value });
-                      }}
-                      containerClassName={realce("ceremony")}
-                      data-campo="ceremony"
-                      placeholder="Civil, simbólica"
-                    />
+                    {/* Só num casamento — ou se já tiver texto, para não o
+                      esconder de quem o escreveu. */}
+                    {(eCasamento(doc.eventType) || (doc.ceremony ?? "").trim() !== "") && (
+                      <Field
+                        label="Cerimónia"
+                        value={doc.ceremony ?? ""}
+                        onChange={(e) => {
+                          confirmado("ceremony");
+                          patch({ ceremony: e.target.value });
+                        }}
+                        containerClassName={realce("ceremony")}
+                        data-campo="ceremony"
+                        placeholder="Civil, simbólica"
+                      />
+                    )}
                     <Field
                       label="Hora"
                       value={doc.time ?? ""}
@@ -8085,6 +8172,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
               {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
                 escrever um espaço novo — a lista ajuda, não fecha a porta. */}
+              <datalist id="sug-tipos-de-evento">
+                {SUGESTOES_DE_TIPO.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
               <datalist id="sug-locais">
                 {sugestoes.locais.map((v) => (
                   <option key={v} value={v} />
@@ -8867,7 +8959,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                                         Capítulo:{" "}
                                         <strong className="font-medium text-[var(--bo-tinta-72)]">
-                                          {capituloDoTema(b)}
+                                          {capituloDoTema(b, eCasamento(doc.eventType))}
                                         </strong>
                                         <span className="text-foreground/35"> · </span>
                                         {composicaoEmPalavras(fotosDoTema)}
