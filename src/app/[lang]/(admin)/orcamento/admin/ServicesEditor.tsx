@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAlturaDoConteudo } from "./ui/altura-do-conteudo";
 import {
   DndContext,
   KeyboardSensor,
@@ -147,18 +148,11 @@ function CampoQueCresce({
   // A altura mede-se DEPOIS de o texto estar no nó e ANTES de o browser
   // pintar: com `useEffect` a caixa aparecia com uma linha e saltava para duas
   // à frente de quem estava a escrever.
-  useLayoutEffect(() => {
-    const el = meu.current;
-    if (!el) return;
-    el.style.height = "auto";
-    // `scrollHeight` conta o conteúdo e o `padding`, e NÃO conta a borda; com o
-    // `box-sizing: border-box` do Tailwind, escrevê-lo tal e qual em `height`
-    // faz a borda comer dois píxeis ao conteúdo. MEDIDO a 1280 px: a caixa do
-    // nome ficava com 32 px onde o `<input>` tinha 34, e a secção «Serviços»
-    // encolhia 66 px no computador — que é onde nada podia mudar. Somar
-    // `offsetHeight - clientHeight` (as bordas) devolve o número exacto.
-    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
-  }, [valor]);
+  // A altura segue o texto, e só se mede quando a caixa se vê — ver
+  // `ui/altura-do-conteudo.ts` (as caixas espremidas de 14/10). As bordas
+  // contam: MEDIDO a 1280 px, sem elas a caixa do nome ficava com 32 px onde o
+  // `<input>` tinha 34, e a secção «Serviços» encolhia 66 px.
+  useAlturaDoConteudo(meu, valor);
 
   return (
     <textarea
