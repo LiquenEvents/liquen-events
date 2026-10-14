@@ -182,3 +182,28 @@ describe("o fim vê-se", () => {
     expect(result.current).toEqual({ mostrar: false, concluido: false });
   });
 });
+
+describe("às cegas e depois com o tamanho", () => {
+  /** Medido no mapa de mesas com a rede lenta: ia nos 95 % e caía para 32 %. */
+  it("quando os bytes chegam, a barra continua de onde estava — nunca anda para trás", () => {
+    const { rerender } = render(<EmCurso titulo="A preparar o PDF…" estimadoMs={1_000} />);
+    act(() => void vi.advanceTimersByTime(3_000));
+    const cego = avanco();
+    expect(cego).toBeGreaterThan(0.85);
+
+    rerender(<EmCurso titulo="A preparar o PDF…" estimadoMs={1_000} feito={10} total={100} />);
+    const comBytes = avanco();
+    expect(comBytes).toBeGreaterThanOrEqual(cego);
+    expect(comBytes).toBeLessThan(1);
+    // A contagem diz os bytes verdadeiros, não o traço.
+    expect(screen.getByText("10 de 100")).toBeTruthy();
+
+    rerender(<EmCurso titulo="A preparar o PDF…" estimadoMs={1_000} feito={100} total={100} />);
+    expect(avanco()).toBe(1);
+  });
+
+  it("sabida desde o início, conta como sempre contou", () => {
+    render(<EmCurso titulo="A importar fotos…" feito={47} total={312} />);
+    expect(avanco()).toBeCloseTo(47 / 312, 4);
+  });
+});

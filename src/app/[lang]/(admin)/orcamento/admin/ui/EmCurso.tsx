@@ -188,11 +188,26 @@ export function EmCurso({
 }: EmCursoProps) {
   const decorrido = useDecorrido(!concluido);
   const sabida = typeof feito === "number" && typeof total === "number" && total > 0;
+  const cego = avancoDaEspera(decorrido, estimadoMs ?? 0);
+  /**
+   * ── A BARRA NUNCA ANDA PARA TRÁS ──────────────────────────────────────────
+   *
+   * Uma descarga espera primeiro às cegas (o servidor a desenhar o PDF) e só
+   * depois sabe o tamanho. Medido com a rede lenta, no mapa de mesas: a barra
+   * cega ia nos 95 %, chegavam os primeiros bytes e ela caía para 32 %. Agora
+   * guarda-se onde a espera cega estava quando o tamanho chegou, e os bytes
+   * enchem o que FALTA a partir daí. A contagem continua a dizer os bytes
+   * verdadeiros.
+   */
+  const [base, setBase] = useState<number | null>(null);
+  if (sabida && base === null) setBase(cego);
+  if (!sabida && base !== null) setBase(null);
+  const daBase = sabida ? (base ?? cego) : 0;
   const avanco = concluido
     ? 1
     : sabida
-      ? Math.min(1, Math.max(0, feito! / total!))
-      : avancoDaEspera(decorrido, estimadoMs ?? 0);
+      ? daBase + (1 - daBase) * Math.min(1, Math.max(0, feito! / total!))
+      : cego;
   const demorada =
     !concluido && !sabida && !!notaDemorada && esperaDemorada(decorrido, estimadoMs ?? 0);
   const temBarra = concluido || sabida || (estimadoMs ?? 0) > 0;
