@@ -38,6 +38,7 @@ export default function PorqueNaoDaParaEnviar({
   fotosPorConfirmar,
   emailDoCliente,
   onIr,
+  naFolha = false,
 }: {
   /** Tudo o que `oQueFaltaParaEnviar` devolveu — os conselhos ficam de fora. */
   faltas: readonly Impedimento[];
@@ -46,12 +47,15 @@ export default function PorqueNaoDaParaEnviar({
   /** O email do pedido — para onde isto vai. */
   emailDoCliente?: string;
   onIr: (falta: Impedimento) => void;
+  /** Dentro da folha da barra compacta (telemóvel): alinhado à esquerda e à
+   *  largura da folha, em vez de encostado ao botão de enviar. */
+  naFolha?: boolean;
 }) {
   const travam = faltas.filter((f) => f.trava);
   const destino = destinatarioDoEnvio(emailDoCliente);
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className={`flex flex-col gap-2 ${naFolha ? "items-stretch" : "items-end"}`}>
       {/* ── PARA ONDE É QUE ISTO VAI ────────────────────────────────────────
           «A proposta para "Melanie e Sebastien" ia para
           franciscomariagaspar6@gmail.com. Nada avisa que o destinatário não é o
@@ -68,7 +72,7 @@ export default function PorqueNaoDaParaEnviar({
           e a maioria dos endereços de casamento não tem o nome de ninguém lá
           dentro — ensina-se a ignorar. */}
       <p
-        className={`max-w-lg text-right text-[11px] leading-relaxed ${
+        className={`max-w-lg text-[11px] leading-relaxed ${naFolha ? "text-left" : "text-right"} ${
           destino.aviso ? "text-[var(--bo-aviso)]" : "text-foreground/45"
         }`}
       >
@@ -115,10 +119,19 @@ function PorqueTrava({
           <ul className="mt-1.5 flex flex-col gap-0.5">
             {travam.map((f) => (
               <li key={f.id}>
+                {/* ── NO DEDO, CADA LINHA TEM OS SEUS 44 PX ──────────────────
+                    MEDIDO a 390 px: isto era `alvo-invisivel`, um `::after`
+                    que alarga o toque — mas sem `relative` no botão o `::after`
+                    posicionava-se contra a caixa toda, e a ÚLTIMA linha
+                    ficava por cima das outras: tocar em «Falta o valor» levava
+                    a outra falta. E mesmo com `relative`, linhas de 20 px a
+                    2 px umas das outras sobrepunham os alvos. No toque, cada
+                    linha passa a medir os 44 px a sério; no rato fica como
+                    estava. */}
                 <button
                   type="button"
                   onClick={() => onIr(f)}
-                  className={`alvo-invisivel group flex w-full items-baseline gap-1.5 text-left text-[var(--bo-tinta-72)] hover:text-foreground ${ESTADO} ${PRESSAO}`}
+                  className={`group relative flex w-full items-baseline gap-1.5 text-left text-[var(--bo-tinta-72)] hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:items-center ${ESTADO} ${PRESSAO}`}
                 >
                   <span aria-hidden="true" className="text-foreground/35">
                     ·

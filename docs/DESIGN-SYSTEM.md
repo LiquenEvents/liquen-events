@@ -62,6 +62,13 @@ Está escrito na Parte 0 e repete-se aqui porque nesta casa já aconteceu: os
 rácios de contraste são medidos por teste a partir dos tokens, e um token novo
 que os baixe é um token que não entra.
 
+**6. Os logótipos de terceiros vão nas cores deles — e só onde se escolhe o canal.**
+Pedido dela (14/10): «coloca mesmo os logos do email coloridos e do whatsapp».
+No «Por onde segue» do estúdio, o email e o WhatsApp são logótipos a cores
+(`LogotiposDosCanais.tsx`, `.bo-marca-*` em `admin.css`), como já era o verde
+do botão do WhatsApp. As cores não são tokens, porque são a marca deles. A regra
+dos ícones em `currentColor` (§8.1) continua a valer para tudo o resto.
+
 ---
 
 ## PARTE 0 — QUEM ÉS, O QUE CONSTRÓIS, COMO TRABALHAS

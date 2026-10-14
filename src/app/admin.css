@@ -119,6 +119,24 @@
   background: #1fbe5a;
 }
 
+/* ── OS LOGÓTIPOS DOS CANAIS, NAS CORES DELES ─────────────────────────────
+   «coloca mesmo os logos do email coloridos e do whatsapp» (14/10). A mesma
+   excepção da `.bo-whatsapp` aqui em cima: a cor é a marca deles, e só se usa
+   onde se escolhe o canal (`LogotiposDosCanais.tsx`). O email não tem uma
+   marca única — leva o azul de um ícone de correio, que é o que se reconhece. */
+.bo-marca-whatsapp .bo-marca-fundo {
+  fill: #25d366;
+}
+.bo-marca-email .bo-marca-fundo {
+  fill: #1a8cff;
+}
+.bo-marca-email .bo-marca-traco {
+  stroke: #1a8cff;
+}
+.bo-marca-glifo {
+  fill: #fff;
+}
+
 .bo-whatsapp-marca {
   position: relative;
   display: inline-flex;

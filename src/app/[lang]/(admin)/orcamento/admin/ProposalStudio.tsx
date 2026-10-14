@@ -82,6 +82,7 @@ type CanalDeEnvio = "email" | "whatsapp" | "ambos";
 /** Onde fica a última escolha dela. */
 const CANAL_GUARDADO = "liquen-canal-de-envio";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
+import { ControlosDoEnvio, PastilhaDoEnvio } from "./BarraDoEnvioCompacta";
 import VistaDeConjunto from "./VistaDeConjunto";
 import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import LupaDeFotos from "./LupaDeFotos";
@@ -166,7 +167,8 @@ import {
 } from "@/lib/pdf-editorial/regra-da-capa";
 import { useTamanhoDoOriginal } from "./tamanhoDoOriginal";
 import { ArrastarParaEnquadrar } from "./ArrastarParaEnquadrar";
-import WhatsAppIcon from "@/components/WhatsAppIcon";
+import { LogotipoEmail, LogotipoWhatsApp } from "./LogotiposDosCanais";
+import { tecladoAberto } from "@/lib/orcamento/barra-de-destinos";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -286,6 +288,10 @@ type StudioDoc = Parameters<typeof withProposalDefaults>[0];
  * cabe» — mas agora medida onde ele aterra.
  */
 const LARGURA_MINIMA_DA_FILA = 992;
+/** Abaixo disto (a caixa do estúdio, não a janela) a barra do envio fica
+ *  compacta — uma linha, e o resto numa folha. 40rem, a mesma medida que a
+ *  barra já usa para deixar de ocupar a largura toda. */
+const LARGURA_DA_BARRA_INTEIRA = 640;
 
 // ── Shared styling (matches ProposalBuilder / PaymentsPanel) ──
 /**
@@ -4373,6 +4379,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * desenho não ficar sem folga nenhuma antes de a medição correr.
    */
   const barraDeBaixo = useRef<HTMLDivElement | null>(null);
+  /**
+   * ── A BARRA COMPACTA DO TELEMÓVEL ─────────────────────────────────────────
+   *
+   * Palavras dela (14/10), com a captura do «Rever e enviar» num iPhone: «esta
+   * aba de enviar ao cliente no telemóvel tapa tudo… transforma isto em algo
+   * inteligente que se adapte». A barra levava o voltar, a língua, o
+   * descarregar, o «Vai para», a lista do que falta e o enviar — meio ecrã.
+   *
+   * Numa caixa estreita fica uma linha só: «←», uma pastilha com o estado
+   * («Faltam 3 ›») e «Enviar». A pastilha abre uma folha com tudo o resto,
+   * inteiro. A pergunta é à CAIXA do estúdio e não à janela (ver
+   * `o-estudio-pergunta-a-caixa`); uma largura ainda por medir (zero, no
+   * servidor e no jsdom) conta como larga, que é a barra de sempre.
+   */
+  const caixaDoEstudio = useRef<HTMLDivElement | null>(null);
+  const larguraDoEstudio = useLarguraDaZona(caixaDoEstudio);
+  const barraCompacta = larguraDoEstudio > 0 && larguraDoEstudio < LARGURA_DA_BARRA_INTEIRA;
+  const [folhaDoEnvio, setFolhaDoEnvio] = useState(false);
+  /**
+   * Com o teclado aberto, a barra compacta sai da frente: no telemóvel, o
+   * teclado e a barra juntos deixavam uma tira de ecrã para o campo onde ela
+   * está a escrever. É a mesma conta da cápsula dos destinos
+   * (`tecladoAberto`, em `barra-de-destinos.ts`); sem `visualViewport` (jsdom,
+   * browsers antigos) fica tudo como antes.
+   */
+  const [tecladoNoEcra, setTecladoNoEcra] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const ver = () => setTecladoNoEcra(tecladoAberto(window.innerHeight, vv.height));
+    ver();
+    vv.addEventListener("resize", ver);
+    return () => vv.removeEventListener("resize", ver);
+  }, []);
+  const barraEscondida = barraCompacta && tecladoNoEcra;
   const [folgaDaBarra, setFolgaDaBarra] = useState(80);
   useEffect(() => {
     const el = barraDeBaixo.current;
@@ -4418,7 +4460,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // passo o pede, e aí é mais alta) para o aviso se afastar tanto quanto
       // preciso e nem um pixel mais. Só existe enquanto o estúdio estiver
       // aberto: a limpeza do efeito devolve-a a zero.
-      document.documentElement.style.setProperty("--bo-barra-accao", `${Math.ceil(r.height)}px`);
+      // Escondida pelo teclado, a barra não ocupa nada: o aviso desce.
+      const altura = barraEscondida ? 0 : Math.ceil(r.height);
+      document.documentElement.style.setProperty("--bo-barra-accao", `${altura}px`);
     };
     medir();
     const observador = new ResizeObserver(medir);
@@ -4430,7 +4474,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       document.documentElement.style.removeProperty("--bo-barra-accao");
     };
     // O passo muda o conteúdo da barra (e portanto a altura); remedir aí.
-  }, [step]);
+  }, [step, barraEscondida]);
 
   // ── Aviso ao sair com trabalho por gravar ─────────────────────────────
   // A janela é estreita (a gravação é a 800ms), mas existe: fechar o
@@ -7614,7 +7658,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
      `fixed` neste ficheiro para a contenção prender — verificado antes de a
      pôr. */
   return (
-    <div className="@container border-t border-[var(--bo-hairline-strong)] pt-5">
+    <div
+      ref={caixaDoEstudio}
+      className="@container border-t border-[var(--bo-hairline-strong)] pt-5"
+    >
       {/* EMPILHA no telemóvel, em vez de repartir a largura.
           O que estava aqui era um `flex` em linha com o texto de um lado e três
           botões do outro, marcados `shrink-0`. A 375 px os botões ficavam com
@@ -10865,19 +10912,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               value={canal}
               onChange={escolherCanal}
               options={[
-                { value: "email", label: "Email", icon: <IconeEnvelope /> },
-                {
-                  value: "whatsapp",
-                  label: "WhatsApp",
-                  icon: <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" />,
-                },
+                { value: "email", label: "Email", icon: <LogotipoEmail /> },
+                { value: "whatsapp", label: "WhatsApp", icon: <LogotipoWhatsApp /> },
                 {
                   value: "ambos",
                   label: "Os dois",
                   icon: (
                     <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-                      <IconeEnvelope />
-                      <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" />
+                      <LogotipoEmail />
+                      <LogotipoWhatsApp />
                     </span>
                   ),
                 },
@@ -11504,7 +11547,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            do bordo do ecrã. Não é um número afinado a olho — é o token do ar
            desta casa, aplicado ao vão entre duas peças em vez de ao vão entre
            uma peça e a moldura. Ficam 14 px, e lêem-se como duas. */
-        className="bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-1.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit"
+        // Escondida pelo teclado (barra compacta): fica no sítio, transparente e
+        // inerte — o conteúdo não salta, e nada nela se deixa tocar.
+        inert={barraEscondida}
+        className={`bo-material bo-material-desfoque sticky bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-folga)+env(safe-area-inset-bottom))] z-20 mx-1 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-1.5 shadow-[var(--bo-sombra-suspensa)] max-w-full @min-[40rem]:ml-auto @min-[40rem]:w-fit ${ESTADO} ${
+          barraEscondida ? "pointer-events-none opacity-0" : ""
+        }`}
       >
         {noFormulario && (
           <>
@@ -11811,8 +11859,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               // está a correr no servidor — e só serve para ela deixar de ver o
               // que está a acontecer.
               disabled={busy === "send"}
+              // Compacta, a seta chega: o nome do passo está na barra dos passos
+              // lá em cima, e cada letra aqui é largura tirada ao «Enviar».
+              aria-label={barraCompacta ? `Voltar a ${nomeDoPasso("orcamento")}` : undefined}
             >
-              ← {nomeDoPasso("orcamento")}
+              {barraCompacta ? "←" : `← ${nomeDoPasso("orcamento")}`}
             </Button>
             {/* ── A LÍNGUA E O DESCARREGAR VIERAM DO ANTIGO «PRÉ-VISUALIZAR» (A2) ──
                 O documento junta pré-visualizar e enviar num passo só, «Rever
@@ -11846,7 +11897,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                     A linha está sempre no ecrã, e não só depois de escolher: serve
                     para DECIDIR, não para explicar um arrependimento. */}
-                <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
+                <ControlosDoEnvio
+                  compacta={barraCompacta}
+                  aberta={folhaDoEnvio}
+                  onFechar={() => setFolhaDoEnvio(false)}
+                  antes={
+                    <PorqueNaoDaParaEnviar
+                      naFolha
+                      faltas={faltasDoEnvio}
+                      fotosPorConfirmar={fotosPorConfirmar}
+                      emailDoCliente={quote.email}
+                      onIr={(f) => {
+                        setFolhaDoEnvio(false);
+                        irParaAFalta(f.seccao, f.campo);
+                      }}
+                    />
+                  }
+                >
                   <Segmented
                     size="sm"
                     ariaLabel="Idioma da proposta"
@@ -12038,7 +12105,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         </p>
                       );
                     })()}
-                </div>
+                </ControlosDoEnvio>
               </>
             )}
             {/* ── ENQUANTO ESTÁ A IR ──────────────────────────────────────
@@ -12210,12 +12277,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  finas»). Quando há faltas, a caixa que as explica quebra para
                  cima sozinha (`flex-wrap`) — aí a altura é a mensagem. */
               <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-                <PorqueNaoDaParaEnviar
-                  faltas={faltasDoEnvio}
-                  fotosPorConfirmar={fotosPorConfirmar}
-                  emailDoCliente={quote.email}
-                  onIr={(f) => irParaAFalta(f.seccao, f.campo)}
-                />
+                {barraCompacta ? (
+                  <PastilhaDoEnvio
+                    faltas={faltasDoEnvio}
+                    fotosPorConfirmar={fotosPorConfirmar}
+                    idioma={idiomaDoPdf}
+                    onAbrir={() => setFolhaDoEnvio(true)}
+                  />
+                ) : (
+                  <PorqueNaoDaParaEnviar
+                    faltas={faltasDoEnvio}
+                    fotosPorConfirmar={fotosPorConfirmar}
+                    emailDoCliente={quote.email}
+                    onIr={(f) => irParaAFalta(f.seccao, f.campo)}
+                  />
+                )}
                 <Button
                   size="sm"
                   variant="primary"
@@ -12246,8 +12322,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             .join(" · ") || "Falta preencher a proposta antes de enviar."
                   }
                   iconRight={<span aria-hidden="true">→</span>}
+                  // Compacta, o rótulo encurta; o nome que se ouve não muda.
+                  aria-label={barraCompacta ? "Gerar e enviar ao cliente" : undefined}
                 >
-                  Gerar e enviar ao cliente
+                  {barraCompacta ? "Enviar" : "Gerar e enviar ao cliente"}
                 </Button>
               </div>
             )}
@@ -14554,29 +14632,6 @@ function UploadArea({
         }}
       />
     </button>
-  );
-}
-
-/**
- * O envelope do «Email» em «Por onde segue» — ao lado do logótipo do WhatsApp,
- * que já existia (`WhatsAppIcon`). O mesmo tamanho e a cor do texto do botão,
- * para os dois se lerem como um par.
- */
-function IconeEnvelope() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-3.5 w-3.5 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="5" width="18" height="14" rx="2.5" />
-      <path d="m4 7 8 6 8-6" />
-    </svg>
   );
 }
 
