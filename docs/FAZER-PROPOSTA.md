@@ -38,6 +38,14 @@ Portanto, neste repositório:
   é a parte do desenho que resolve o scroll — e essa não depende da sidebar;
 * a proibição «barra de separadores no fundo» (Parte 11) **não vale aqui**.
 
+**E a barra de acção do «Rever e enviar» encolhe no telemóvel** (14/10). Palavras
+dela: «esta aba de enviar ao cliente no telemóvel tapa tudo… transforma isto em
+algo inteligente que se adapte». Numa caixa com menos de 640 px, a barra fica com
+uma linha: «←», uma pastilha com o estado («Faltam 3 ›», «Ver o PDF ›»,
+«PT · pronto ›») e «Enviar». A pastilha abre uma folha com o resto — o «Vai
+para», o que falta, a língua e o descarregar. Com o teclado aberto, a barra sai
+da frente. No ecrã largo fica como estava (`BarraDoEnvioCompacta.tsx`).
+
 Tudo o resto do documento vale como está escrito, com uma segunda ressalva, que
 veio depois:
 

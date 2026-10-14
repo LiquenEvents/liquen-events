@@ -9894,6 +9894,74 @@ describe("por onde segue, no topo do passo do envio", () => {
     expect(opcao("Email").querySelectorAll("svg")).toHaveLength(1);
     expect(opcao("WhatsApp").querySelectorAll("svg")).toHaveLength(1);
     expect(opcao("Os dois").querySelectorAll("svg")).toHaveLength(2);
+    // «coloca mesmo os logos do email coloridos e do whatsapp» — nas cores deles.
+    expect(opcao("Email").querySelector("svg.bo-marca-email")).not.toBeNull();
+    expect(opcao("WhatsApp").querySelector("svg.bo-marca-whatsapp")).not.toBeNull();
+  });
+});
+
+/**
+ * A BARRA DO ENVIO NO TELEMÓVEL (14/10): «esta aba de enviar ao cliente no
+ * telemóvel tapa tudo… transforma isto em algo inteligente que se adapte».
+ * Numa caixa estreita fica uma linha — voltar, o estado numa pastilha, enviar —
+ * e o resto abre-se numa folha.
+ */
+describe("a barra do envio, numa caixa estreita", () => {
+  afterEach(() => vi.restoreAllMocks());
+  const estreita = () =>
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 360,
+      bottom: 600,
+      width: 360,
+      height: 600,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+  it("leva só o voltar, a pastilha e o enviar; o resto abre-se na folha", async () => {
+    estreita();
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    const enviar = await screen.findByRole("button", { name: "Gerar e enviar ao cliente" });
+    expect(enviar).toHaveTextContent(/^Enviar/);
+    expect(screen.getByRole("button", { name: "Voltar a Orçamento" })).toBeInTheDocument();
+    // Fora da folha não há língua, nem descarregar, nem lista.
+    expect(screen.queryByRole("radiogroup", { name: "Idioma da proposta" })).toBeNull();
+    expect(screen.queryByText(/Não dá para enviar/)).toBeNull();
+
+    const pastilha = screen.getByRole("button", { name: /^Antes de enviar: Ver o PDF/ });
+    await user.click(pastilha);
+    const folha = await screen.findByRole("dialog", { name: "Antes de enviar" });
+    expect(
+      within(folha).getByRole("radiogroup", { name: "Idioma da proposta" }),
+    ).toBeInTheDocument();
+    expect(within(folha).getByRole("button", { name: /Descarregar PDF/ })).toBeInTheDocument();
+    expect(within(folha).getByText(/Falta ver o PDF final/)).toBeInTheDocument();
+  });
+
+  it("com o teclado aberto, a barra sai da frente", async () => {
+    estreita();
+    const vv = Object.assign(new EventTarget(), { height: 300 });
+    vi.stubGlobal("visualViewport", vv);
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+    try {
+      seedDraft(2);
+      renderStudio();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+      const enviar = await screen.findByRole("button", {
+        name: "Gerar e enviar ao cliente",
+        hidden: true,
+      });
+      await waitFor(() => expect(enviar.closest("[inert]")).not.toBeNull());
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
