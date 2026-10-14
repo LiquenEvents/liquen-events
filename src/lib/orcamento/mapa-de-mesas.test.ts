@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Guest } from "./types";
 import {
+  unirCaixas,
   alargarSala,
   caixaDaSala,
   acrescentarLugares,
@@ -305,5 +306,22 @@ describe("a sala começa grande (14/10)", () => {
   it("uma sala que já é maior do que o mínimo fica igual", () => {
     const c = { x: -100, y: -50, largura: 4000, altura: 2500 };
     expect(alargarSala(c, 2600, 1600)).toBe(c);
+  });
+});
+
+describe("unir caixas (a sala parada, 14/10)", () => {
+  it("o que está dentro não muda nada — devolve a mesma caixa", () => {
+    const chao = { x: -300, y: -300, largura: 2000, altura: 1300 };
+    expect(unirCaixas(chao, { x: 100, y: 100, largura: 400, altura: 300 })).toBe(chao);
+  });
+
+  it("uma mesa levada para fora faz crescer só desse lado", () => {
+    const chao = { x: 0, y: 0, largura: 1000, altura: 800 };
+    expect(unirCaixas(chao, { x: 900, y: 100, largura: 300, altura: 200 })).toEqual({
+      x: 0,
+      y: 0,
+      largura: 1200,
+      altura: 800,
+    });
   });
 });

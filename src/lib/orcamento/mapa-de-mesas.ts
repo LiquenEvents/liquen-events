@@ -264,6 +264,28 @@ export function caixaDaSala(mapa: MapaDeMesas): {
  * se vê, pela escala máxima a que uma mesa pode aparecer — no ecrã, pelo
  * tamanho do quadro; no PDF, pelo da folha.
  */
+/**
+ * A caixa que contém as duas. É o que faz a sala do ecrã ficar PARADA: um chão
+ * fixo, ancorado no canto (0,0) onde as mesas novas nascem (`sitioLivre`),
+ * unido ao que existe. Pôr ou mover uma mesa lá dentro não muda nada; só uma
+ * mesa levada para fora o faz crescer, e para o lado dela (14/10, no site:
+ * «cada vez que eu adiciono uma mesa, a sala aumenta… não dá para arrastar»).
+ */
+export function unirCaixas<C extends { x: number; y: number; largura: number; altura: number }>(
+  a: C,
+  b: { x: number; y: number; largura: number; altura: number },
+): C {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  const x1 = Math.max(a.x + a.largura, b.x + b.largura);
+  const y1 = Math.max(a.y + a.altura, b.y + b.altura);
+  if (x === a.x && y === a.y && x1 === a.x + a.largura && y1 === a.y + a.altura) return a;
+  return { ...a, x, y, largura: x1 - x, altura: y1 - y };
+}
+
+/** O chão por omissão, a partir do canto onde as mesas nascem: 12 × 8 m. */
+export const SALA_MINIMA = { largura: 1200, altura: 800 };
+
 export function alargarSala<C extends { x: number; y: number; largura: number; altura: number }>(
   caixa: C,
   largura: number,
