@@ -559,9 +559,9 @@ describe("a data de validade", () => {
     expect(texto).not.toContain("out. de 2026");
   });
 
-  it("são os 90 dias configurados, contados da emissão", async () => {
-    // Sem `validUntil` explícita, a data sai de hoje + `validUntilDays`. 90 é a
-    // omissão da casa (DEFAULT_VALID_DAYS, decisão dela de 14/10).
+  it("são os 60 dias configurados, contados da emissão", async () => {
+    // Sem `validUntil` explícita, a data sai de hoje + `validUntilDays`. 60 é a
+    // omissão da casa (DEFAULT_VALID_DAYS) sem data do evento por perto.
     /**
      * ── «HOJE» É O DIA QUE PORTUGAL ESTÁ A VIVER, TAMBÉM AQUI ──────────────
      *
@@ -584,7 +584,7 @@ describe("a data de validade", () => {
       day: "2-digit",
     }).format(new Date());
     const [ano, mes, dia] = emLisboa.split("-").map(Number);
-    const limite = new Date(Date.UTC(ano, mes - 1, dia + 90));
+    const limite = new Date(Date.UTC(ano, mes - 1, dia + 60));
     const iso = limite.toISOString().slice(0, 10);
     expect(iso).toBe(resolveValidUntil(proposta()));
 
