@@ -110,7 +110,7 @@ describe("a pergunta de eliminar um tema", () => {
     }
     // E o gesto de remover uma foto solta passa a pedir, não a agir.
     expect(codigo, "o clique numa foto voltou a remover directo").toContain(
-      "onClick={() => pedirParaRemoverUma(im)}",
+      "onAccao: () => pedirParaRemoverUma(im)",
     );
   });
 

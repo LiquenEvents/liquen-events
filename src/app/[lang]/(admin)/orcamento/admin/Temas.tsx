@@ -5112,9 +5112,9 @@ function ThemeFolder({
            capa — separador — Remover do tema». O «Remover do tema…» guarda
            as reticências porque continua a perguntar antes de remover.
 
-           «Mover para o início» saiu do menu (não está na lista do
-           documento) e continua onde também já estava: no botão ↑ da célula
-           e no Alt+Home. */
+           «Pôr no início» voltou ao menu a 14/10, quando o ↑ da célula
+           saiu com os outros dois círculos: é o caminho de dedo para isso
+           (com teclado também há o Alt+Home). */
         [
           { id: "ver", rotulo: "Pré-visualizar", onAccao: () => openZoom(i) },
           {
@@ -5158,6 +5158,13 @@ function ThemeFolder({
           ...(im.path === coverPath
             ? []
             : [{ id: "capa", rotulo: "Definir como capa", onAccao: () => void setAsCover(im) }]),
+          /* Era o ↑ da célula, que saiu com os outros dois círculos (14/10):
+             passa a ser uma linha do menu, para continuar a haver um caminho
+             de dedo — o arrasto de reordenar é HTML5 e não pega no
+             telemóvel. Na primeira foto não aparece: já está no início. */
+          ...(i > 0
+            ? [{ id: "inicio", rotulo: "Pôr no início", onAccao: () => moveTo(i, 0) }]
+            : []),
         ],
         [
           {
@@ -6030,82 +6037,87 @@ function ThemeFolder({
                       }}
                       className={`absolute inset-0 h-full w-full ${ESTADO} ${PRESSAO}`}
                     >
+                      {/* O círculo da selecção, à maneira da app Fotografias:
+                          um anel branco fino com sombra em repouso, e cheio
+                          com o visto quando está escolhida (14/10, «tipo
+                          apple»). */}
                       <span
                         aria-hidden
-                        className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] leading-none ${ESTADO} ${
+                        className={`absolute left-2 top-2 flex h-[22px] w-[22px] items-center justify-center rounded-full border-[1.5px] border-white shadow-[0_1px_3px_rgba(0,0,0,0.35)] ${ESTADO} ${
                           isSelected
-                            ? "border-sage-600 bg-sage-600 text-white opacity-100"
-                            : "border-white/70 bg-black/35 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
+                            ? "bg-sage-600 text-white opacity-100"
+                            : "bg-black/10 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
                         }`}
                       >
-                        ✓
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 12.5l4.5 4.5L19 7.5" />
+                        </svg>
                       </span>
                     </button>
                     {isCover && (
-                      <span className="pointer-events-none absolute bottom-1 left-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-white">
+                      <span className="bo-vidro-claro pointer-events-none absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-white">
                         Capa
                       </span>
                     )}
-                    {/* ── OS TRÊS BOTÕES DA CÉLULA ────────────────────────────
-                        Desenhados a 28×28 (`h-7 w-7`), que é a densidade certa
-                        com rato; `.alvo-toque` leva-os a 44 sob `(pointer:
-                        coarse)` e o portátil fica exactamente como estava. A
-                        largura para eles caberem vem da grelha de duas colunas
-                        — ver `GRELHA_DE_FOTOS`.
+                    {/* ── UM SÓ «⋯», EM VIDRO CLARO ───────────────────────────
+                        Eram três círculos escuros (↑, ⤢, ×) por cima de cada
+                        fotografia. O documento dela manda um só, e ela
+                        escolheu-o (14/10, «tipo apple»): «um botão discreto ⋯
+                        no canto superior direito, em vidro claro, que abre o
+                        mesmo menu do botão direito» (APPLE-TEMAS, ponto 9 e
+                        critério 3). As acções passam a ter nome escrito.
 
-                        O `@media (hover: none)` que aqui estava era a pergunta
-                        QUASE certa, e o «quase» é o defeito: um portátil com
-                        ecrã táctil responde `hover: hover` (tem trackpad) E
-                        `pointer: coarse` (tem dedo). Nesse, os três continuavam
-                        escondidos atrás de um hover que o dedo não sabe fazer —
-                        mover, ampliar e remover uma foto não existiam ali.
-                        `com-rato:` exige as DUAS metades, e é por isso que o
-                        apanha.
+                        O desenho é o do «⋯» do cartão de tema — 28 px à vista,
+                        `.bo-vidro-claro`, glifo branco, sem desfoque (um por
+                        foto eram centenas) — e o alvo cresce para os 44 no
+                        dedo sem o disco crescer (`.alvo-invisivel`). O painel
+                        é o `MenuDeContexto`, que é `fixed`: o do
+                        `MenuDeAccoes` é `absolute` e esta célula é
+                        `overflow-hidden`, portanto sairia cortado.
 
-                        Ficam os três SOLTOS, e não dentro de um «⋯». Duas
-                        razões medidas: cada um é o ÚNICO caminho de dedo para o
-                        que faz (o arrasto de reordenar é HTML5 e não pega no
-                        telemóvel; o Alt+setas precisa de teclado), e a célula é
-                        `overflow-hidden` — recorta a foto aos cantos redondos —,
-                        portanto uma gaveta aberta cá dentro sairia cortada.
-                        MEDIDO a 375×667 com dedo: os três tapam 25,6 % de uma
-                        célula de 150,5 px, e é o preço de nada ficar
-                        inalcançável. */}
-                    {i > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => moveTo(i, 0)}
-                        aria-label={`Mover a foto ${i + 1} para o início`}
-                        title="Mover para o início"
-                        className={`alvo-toque absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
-                      >
-                        ↑
-                      </button>
-                    )}
-                    {/* Ampliar. A célula inteira já é o alvo da seleção, por
-                        isso o zoom precisa do seu próprio botão — como o ↑ e o
-                        ×. `stopPropagation` para não selecionar ao ampliar. */}
+                        Continua tudo a um caminho de dedo: Pré-visualizar,
+                        Pôr no início, Remover… estão no menu. Com rato, só
+                        aparece por cima da foto ou com o foco lá dentro. */}
                     <button
                       type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={menuDaFoto?.de === im.path}
+                      aria-label={`Acções da foto ${i + 1} de ${images.length}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        openZoom(i);
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setMenuDaFoto({
+                          x: r.left,
+                          y: r.bottom + 4,
+                          de: im.path,
+                          sobre: `foto ${i + 1} de ${images.length}`,
+                          accoes: accoesDaFoto(im, i),
+                        });
                       }}
-                      aria-label={`Ver a foto ${i + 1} em grande`}
-                      title="Ver em grande"
-                      className={`alvo-toque absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
+                      className={`bo-vidro-claro alvo-invisivel absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${
+                        menuDaFoto?.de === im.path ? "com-rato:opacity-100" : ""
+                      } ${ESTADO} ${PRESSAO}`}
                     >
-                      ⤢
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => pedirParaRemoverUma(im)}
-                      aria-label={`Remover foto ${i + 1} de ${images.length}`}
-                      // Num ecrã tátil não há "passar o rato": aí o × está sempre
-                      // visível, senão a foto não se conseguia remover de todo.
-                      className={`alvo-toque absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100 ${ESTADO} ${PRESSAO}`}
-                    >
-                      ×
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden
+                      >
+                        <circle cx="5" cy="12" r="1.8" />
+                        <circle cx="12" cy="12" r="1.8" />
+                        <circle cx="19" cy="12" r="1.8" />
+                      </svg>
                     </button>
                   </div>
                 );

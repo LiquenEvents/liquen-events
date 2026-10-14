@@ -28,7 +28,7 @@ Auditado no `Temas.tsx` (4346 linhas) contra a tabela da **Parte 8**.
 | # | Fase | Estado |
 |---|---|---|
 | 01 | Barra de topo | **parcial** — «Rever etiquetas» existe; falta a arrumação da Parte 8 |
-| 02 | Cartões | **parcial** — há `line-clamp`; falta a altura uniforme e a sombra |
+| 02 | Cartões | **parcial** — há `line-clamp`; falta a altura uniforme e a sombra. **14/10:** na grelha das fotografias de um tema, os três círculos escuros (↑, ⤢, ×) passaram a **um só «⋯» de vidro claro** (28 px à vista, 44 de alvo no dedo), que abre o mesmo menu do botão direito — critério 3 da Parte 8, escolhido por ela («tipo apple»). «Pôr no início» voltou ao menu, que é o caminho de dedo para isso. O círculo da selecção ficou à maneira da app Fotografias |
 | 03 | Menus | **parcial** — o `⋯` é um `MenuDeAccoes`; não há menu do botão direito |
 | 04 | Filtros | **por fazer** — há ordenação e a vista de arquivo, não os cinco filtros nomeados |
 | 05 | Seleção | **parcial** — clique e `Shift` funcionam, e a barra de seleção é a superfície de vidro; falta `⌘A` |

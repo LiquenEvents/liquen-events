@@ -18,6 +18,19 @@ import { ToastProvider } from "./Toast";
  * optimista, a reposição do que o servidor recusa, a barra de progresso do
  * lote) não muda; muda o caminho até lá.
  */
+/**
+ * Uma acção de uma fotografia pelo «⋯» dela. Eram três círculos (↑, ⤢, ×) por
+ * cima de cada foto; a 14/10 passaram a um «⋯» de vidro que abre o mesmo menu
+ * do botão direito (APPLE-TEMAS, ponto 9 — a escolha dela).
+ */
+async function accaoDaFoto(n: number, total: number, rotulo: string) {
+  fireEvent.click(screen.getByRole("button", { name: `Acções da foto ${n} de ${total}` }));
+  const item = await screen.findByRole("menuitem", { name: rotulo });
+  await act(async () => {
+    fireEvent.click(item);
+  });
+}
+
 async function confirmarRemocao() {
   const caixa = await screen.findByRole("dialog");
   await act(async () => {
@@ -442,8 +455,8 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await release("POST /api/temas/t1/imagens");
 
     expect(photos()).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Remover foto 1 de 2" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remover foto 2 de 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acções da foto 1 de 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acções da foto 2 de 2" })).toBeInTheDocument();
   });
 
   it("não ressuscita uma foto apagada enquanto um lote estava a subir", async () => {
@@ -460,9 +473,7 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     // Um lote começa…
     await chooseFiles(jpg("nova.jpg"));
     // …e a foto que já lá estava é removida antes de o lote acabar.
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 1" }));
-    });
+    await accaoDaFoto(1, 1, "Remover do tema…");
     await confirmarRemocao();
     // Do servidor não fica nada; o que está no ecrã é a foto que ela acabou de
     // largar, mostrada a partir do ficheiro que está no computador.
@@ -471,7 +482,7 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await release("POST /api/temas/t1/imagens");
 
     // Fica só a foto nova: a apagada não pode voltar.
-    expect(screen.getByRole("button", { name: "Remover foto 1 de 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acções da foto 1 de 1" })).toBeInTheDocument();
     expect(photos()).not.toContain(photo(1).url);
   });
 
@@ -487,9 +498,7 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     await openFolder(/Terracotta/);
 
     await chooseFiles(jpg("nova.jpg"));
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 1" }));
-    });
+    await accaoDaFoto(1, 1, "Remover do tema…");
     await confirmarRemocao();
 
     // A foto nova chega primeiro; só depois se sabe que a remoção falhou.
@@ -499,7 +508,7 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
 
     // Duas fotos na grelha: a que voltou (do servidor) e a que subiu — esta
     // mostrada da cópia local, que é a que ela própria acabou de largar.
-    expect(screen.getByRole("button", { name: "Remover foto 2 de 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acções da foto 2 de 2" })).toBeInTheDocument();
     expect(photos()).toHaveLength(2);
     expect(photos()).toContain(photo(1).url);
     expect(photos().some((s) => s?.startsWith("blob:"))).toBe(true);
@@ -1690,7 +1699,7 @@ describe("Biblioteca de Temas — as fotos aparecem enquanto sobem", () => {
     // Chegou: a célula provisória dá lugar à foto verdadeira, sem piscar —
     // continua a mostrar-se a cópia local, que já está no computador dela.
     expect(screen.queryByText("A carregar")).toBeNull();
-    expect(screen.getByRole("button", { name: "Remover foto 1 de 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acções da foto 1 de 1" })).toBeInTheDocument();
     expect(photos()[0]).toMatch(/^blob:/);
   });
 
@@ -1937,6 +1946,7 @@ describe("Biblioteca de Temas — os atalhos da selecção", () => {
       "Pré-visualizar",
       "Abrir tamanho real",
       "Definir como capa",
+      "Pôr no início",
       "Remover do tema…",
     ]);
     // Três grupos, dois filetes.
@@ -2975,22 +2985,22 @@ describe("Grelha de fotos de um tema — ergonomia de toque", () => {
     }
   });
 
-  it("dá 44 px de alvo aos três botões de cada foto", async () => {
+  it("o «⋯» de cada foto tem 44 px de alvo sem o disco crescer", async () => {
     route("GET /api/temas", () => ok([{ ...THEME, imageCount: 3 }]));
     route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
 
     renderTemas();
     await openFolder(/Terracotta/);
 
-    // A segunda foto, porque o "mover para o início" não existe na primeira.
-    for (const nome of [
-      /^Ver a foto 2 em grande$/,
-      /^Remover foto 2 de 3$/,
-      /^Mover a foto 2 para o início$/,
-    ]) {
-      const botao = screen.getByRole("button", { name: nome });
-      expect(botao.className, `${nome} sem alvo de 44 px`).toContain("alvo-toque");
-    }
+    // Um só botão por foto (14/10): o «⋯» de vidro claro, 28 px à vista, e o
+    // alvo de 44 no dedo vem do `.alvo-invisivel`, que não pinta nada a mais.
+    const botao = screen.getByRole("button", { name: "Acções da foto 2 de 3" });
+    expect(botao.className).toContain("alvo-invisivel");
+    expect(botao.className).toContain("bo-vidro-claro");
+    expect(botao.className).toContain("h-7 w-7");
+    expect(
+      screen.queryByRole("button", { name: /em grande|para o início|^Remover foto/ }),
+    ).toBeNull();
   });
 });
 
@@ -3239,7 +3249,7 @@ describe("a célula da grelha de fotos nunca desce abaixo do piso de 111 px", ()
     renderTemas();
     await openFolder(/Terracotta/);
 
-    const grelha = screen.getByRole("button", { name: /^Ver a foto 2 em grande$/ });
+    const grelha = screen.getByRole("button", { name: "Acções da foto 2 de 3" });
     const contentor = grelha.closest('[class*="@container"]');
     expect(
       contentor,
@@ -3431,9 +3441,7 @@ describe("a pasta de um tema diz o que mudou", () => {
     renderTemas();
     await openFolder(/Terracotta/);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 2" }));
-    });
+    await accaoDaFoto(1, 2, "Remover do tema…");
     await confirmarRemocao();
 
     // O buraco na grelha aparece no instante do clique, muito antes de o
@@ -3450,9 +3458,7 @@ describe("a pasta de um tema diz o que mudou", () => {
     renderTemas();
     await openFolder(/Terracotta/);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Mover a foto 2 para o início" }));
-    });
+    await accaoDaFoto(2, 3, "Pôr no início");
 
     // A foto salta para o lugar novo no instante do arrasto; o que não se via
     // era se o servidor tinha ficado com ela lá.
@@ -3472,12 +3478,8 @@ describe("a pasta de um tema diz o que mudou", () => {
 
     // Duas setas seguidas na mesma foto — o gesto de quem a empurra para o
     // fim da grelha. As duas gravam; só a ÚLTIMA fala.
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Mover a foto 2 para o início" }));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Mover a foto 3 para o início" }));
-    });
+    await accaoDaFoto(2, 3, "Pôr no início");
+    await accaoDaFoto(3, 3, "Pôr no início");
     await releaseAll("PATCH /api/temas/t1");
 
     expect(screen.queryByText("Ordem guardada — a foto ficou na posição 1 de 3.")).not.toBeNull();
@@ -3768,6 +3770,7 @@ describe("Biblioteca de Temas — os menus da Fase 2", () => {
       "Mover para…",
       "Duplicar para…",
       "Definir como capa",
+      "Pôr no início",
       "Remover do tema…",
     ]);
     await act(async () => {
