@@ -528,6 +528,56 @@ function statusBadge(status: QuoteStatus): ReactNode {
   );
 }
 
+/**
+ * ── O ESTADO MUDA-SE ONDE SE LÊ ─────────────────────────────────────────────
+ *
+ * Palavras dela, a 14/10, com a captura da coluna «Estado» da lista: «eu
+ * quero a mudança de estado para ser feita ao carregar em cima do estado em
+ * que está». A pastilha passa a ser o próprio selector: carrega-se, escolhe-se
+ * o estado, e muda ali — com a linha no histórico e o «Anular», como no
+ * quadro. Um `<select>` com o aspecto da pastilha (e não uma pastilha com um
+ * `<select>` invisível por cima) para o anel do teclado e o leitor de ecrã
+ * continuarem a saber o que é; no telemóvel abre a roda do sistema.
+ */
+function PastilhaDoEstado({
+  q,
+  onMudar,
+}: {
+  q: Quote;
+  onMudar: (q: Quote, status: QuoteStatus) => void;
+}) {
+  const s = STATUS_OPTIONS.find((o) => o.id === q.status);
+  return (
+    <span className="relative inline-flex">
+      <select
+        // A linha inteira abre o pedido; escolher o estado não pode abri-lo.
+        onClick={(e) => e.stopPropagation()}
+        value={q.status}
+        onChange={(e) => onMudar(q, e.target.value as QuoteStatus)}
+        aria-label={`Estado do pedido de ${q.name}`}
+        title="Carrega para mudar o estado"
+        className={`alvo-toque cursor-pointer appearance-none rounded-sm py-0.5 pr-5 pl-2 text-[9px] tracking-[0.15em] uppercase ${ESTADO} ${PRESSAO} ${s?.color ?? "bg-[var(--bo-tinta-10)] text-foreground/30"}`}
+      >
+        {STATUS_OPTIONS.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <svg
+        viewBox="0 0 10 10"
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-1.5 h-2 w-2 -translate-y-1/2 opacity-60"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      >
+        <path d="m2 3.5 3 3 3-3" />
+      </svg>
+    </span>
+  );
+}
+
 // One quote card in the pedidos list. Extracted to MODULE scope and wrapped in
 // React.memo so that typing in the detail edit panel — which only changes
 // AdminClient's editX state — no longer reconciles all ~50 cards on every
@@ -557,6 +607,8 @@ function COLUNAS_DE_PEDIDOS(ctx: {
   userName: string;
   /** O pedido gravado quando alguém marca o desfecho na própria linha. */
   onDesfecho: (q: Quote) => void;
+  /** Mudar o estado na própria pastilha da coluna «Estado». */
+  onMudarEstado: (q: Quote, status: QuoteStatus) => void;
   /**
    * Este pedido veio no lote que o «Mostrar mais» acabou de acrescentar?
    *
@@ -649,12 +701,15 @@ function COLUNAS_DE_PEDIDOS(ctx: {
        */
       chave: "estado",
       cabecalho: "Estado",
+      // A pastilha é um controlo (muda o estado): o botão que abre a linha
+      // pelo teclado vai para outra coluna — ver `interactiva`.
+      interactiva: true,
       celula: (q) => (
         // Um `div` e não um `span`: o componente traz a sua própria caixa de
         // bloco, e um `div` dentro de um `span` é HTML inválido — o browser
         // desfaz o aninhamento e a célula parte-se ao meio.
         <div className="min-w-[9rem]">
-          {statusBadge(q.status)}
+          <PastilhaDoEstado q={q} onMudar={ctx.onMudarEstado} />
           {faltaODesfecho(q) && (
             <PerguntaDeDesfecho
               key={`desfecho-${q.id}`}
@@ -2102,6 +2157,61 @@ export default function AdminClient({
        */
     },
     [selected?.id],
+  );
+
+  /**
+   * Mudar o estado na pastilha da lista — o mesmo gesto do quadro
+   * (`Kanban.changeStatus`): muda logo no ecrã, grava com a linha no
+   * histórico, e se o servidor recusar volta atrás e diz porquê. Gravado,
+   * deixa dez segundos para «Anular» (`reporEstadoDoPedido`, que também
+   * desfaz o que um «Ganho» criou).
+   */
+  const mudarEstadoNaLinha = useCallback(
+    async (q: Quote, status: QuoteStatus) => {
+      if (q.status === status) return;
+      const de = STATUS_OPTIONS.find((o) => o.id === q.status)?.label ?? q.status;
+      const para = STATUS_OPTIONS.find((o) => o.id === status)?.label ?? status;
+      setQuotes((prev) => prev.map((x) => (x.id === q.id ? { ...x, status } : x)));
+      const entrada: ActivityEntry = {
+        id: randomId(),
+        at: new Date().toISOString(),
+        kind: "status_change",
+        actor: userName,
+        summary: `${de} → ${para}`,
+      };
+      const oQue = `mudar «${q.name}» para «${para}»`;
+      const voltar = (mensagem: string) => {
+        setQuotes((prev) => prev.map((x) => (x.id === q.id ? { ...x, status: q.status } : x)));
+        toast(`${mensagem} O estado ficou «${de}».`, "error");
+      };
+      let res: Response;
+      try {
+        res = await fetch(`/api/orcamento/${q.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, activityLogAppend: [entrada] }),
+        });
+      } catch {
+        voltar(porqueRebentou(oQue).mensagem);
+        return;
+      }
+      const corpo = await res.json().catch(() => null);
+      if (!res.ok) {
+        voltar(porqueFalhou(oQue, res, corpo).mensagem);
+        return;
+      }
+      marcarDesfecho(corpo as Quote);
+      anular(`${q.name}: ${de} → ${para}`, async () => {
+        const reposto = await reporEstadoDoPedido({
+          quoteId: q.id,
+          de: q.status,
+          para: status,
+          actor: userName,
+        });
+        if (reposto) marcarDesfecho(reposto);
+      });
+    },
+    [userName, toast, anular, marcarDesfecho],
   );
 
   /**
@@ -6790,6 +6900,7 @@ export default function AdminClient({
                       atual: selected?.id,
                       userName,
                       onDesfecho: marcarDesfecho,
+                      onMudarEstado: mudarEstadoNaLinha,
                       ehDoLoteNovo,
                     })}
                   />
