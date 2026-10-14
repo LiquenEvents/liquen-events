@@ -8,6 +8,8 @@ import {
   cadeiras,
   alargarSala,
   caixaDaSala,
+  SALA_MINIMA,
+  unirCaixas,
   chaveDoLugar,
   dimensoes,
   iniciais,
@@ -118,11 +120,10 @@ interface Caixa {
 
 const LIMIAR_PX = 3;
 /**
- * O mais perto que a sala aparece ao abrir ou ao «Encaixar»: 0,7 px por cm,
- * ou seja uma sala de ~14 × 9 m à vista no computador, com uma redonda de 8 a
- * ~110 px. Abaixo disto a sala cresce à volta do que lá está em vez de a mesa
- * crescer — com uma mesa só, ela ficava a encher o ecrã (14/10: «coloca como
- * predefinido já um espaço grande»). A pinça e o «+» continuam a aproximar.
+ * A escala do chão por omissão: 0,7 px por cm, ou seja uma sala de ~17 × 11 m
+ * no computador, com uma redonda de 8 a ~110 px. Com uma mesa só, a mesa
+ * enchia o ecrã (14/10: «coloca como predefinido já um espaço grande»). A
+ * pinça e o «+» continuam a aproximar.
  */
 const PX_POR_CM_MAX = 0.7;
 /**
@@ -180,20 +181,33 @@ export default function Sala({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const quadroRef = useRef<HTMLDivElement | null>(null);
   const [quadro, setQuadro] = useState({ w: 0, h: 0 });
-  /* A sala que se vê: a do que existe, alargada até encher a parte livre do
-     quadro (o que os painéis não tapam) à escala máxima. */
+  /* ── A SALA FICA PARADA ─────────────────────────────────────────────────
+     Era alargada à volta do CENTRO das mesas: pôr uma mesa ou largar uma
+     arrastada mudava o centro, a sala ia atrás, a vista voltava a encaixar e
+     a mesa ficava no mesmo sítio do ecrã (14/10, no site: «cada vez que eu
+     adiciono uma mesa, a sala aumenta… não dá para arrastar»).
+
+     Agora o chão é FIXO, ancorado no canto (0,0) onde as mesas novas nascem,
+     do tamanho de uma sala grande para este ecrã — pelo quadro INTEIRO, para
+     abrir um painel não mudar a sala —, unido ao que existe. Dentro dele,
+     pôr e mover mesas não mexe em nada. */
   const caixa = useMemo(() => {
     const c = caixaDaSala(mapa);
-    const livreW = quadro.w - margens.esquerda - margens.direita;
-    const livreH = quadro.h - margens.topo - margens.fundo;
-    return cheio && livreW > 40 && livreH > 40
-      ? alargarSala(
-          c,
-          (livreW * FOLGA_DO_ENCAIXE) / PX_POR_CM_MAX,
-          (livreH * FOLGA_DO_ENCAIXE) / PX_POR_CM_MAX,
-        )
-      : c;
-  }, [mapa, cheio, quadro.w, quadro.h, margens]);
+    if (!cheio || quadro.w <= 40 || quadro.h <= 40) return c;
+    // A margem à volta do canto: a caixa de cada mesa mede-se pelo lado
+    // MAIOR (uma comprida de 10 é um quadrado de 3 m nessa conta), e as
+    // primeiras nascem encostadas ao canto — sem margem, a primeira comprida
+    // já empurrava a sala para cima.
+    const margem = 300;
+    const chao = {
+      x: -margem,
+      y: -margem,
+      largura:
+        Math.max(SALA_MINIMA.largura, (quadro.w * FOLGA_DO_ENCAIXE) / PX_POR_CM_MAX) + margem,
+      altura: Math.max(SALA_MINIMA.altura, (quadro.h * FOLGA_DO_ENCAIXE) / PX_POR_CM_MAX) + margem,
+    };
+    return unirCaixas(chao, c);
+  }, [mapa, cheio, quadro.w, quadro.h]);
   const encaixe = useMemo(
     () =>
       cheio && quadro.w > 0
