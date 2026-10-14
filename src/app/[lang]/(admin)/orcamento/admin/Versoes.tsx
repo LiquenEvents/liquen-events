@@ -44,7 +44,7 @@ import { ESTADO as MOV_ESTADO, PRESSAO } from "./ui/movimento";
  * ── E DIZ AO EMAIL O QUE MUDOU, EM VEZ DE ELA REESCREVER DE CABEÇA ─────────
  * As diferenças de cima já respondem à pergunta "o que é que eles vão ver de
  * diferente?". A partir do segundo envio, este painel oferece a MESMA resposta
- * como um parágrafo pronto para a caixa "Mensagem para o cliente" — «Desde a
+ * como um parágrafo pronto para o texto do email ao cliente — «Desde a
  * última proposta: ...» — em vez de ela ter de reler a lista e escrevê-lo à
  * mão. Nasce editável e nunca se envia sozinho: o botão só INSERE o texto na
  * caixa, pela mesma porta por onde as sugestões da Ortografia já entram nesta
@@ -73,7 +73,7 @@ interface Props {
    *  português: o mesmo que o resto do documento faz sem esta escolha. */
   idioma?: IdiomaDaProposta;
   /**
-   * Insere um texto na caixa "Mensagem para o cliente" do estúdio — usado
+   * Insere um texto no email ao cliente do estúdio (a caixa da mensagem saiu a 14/10) — usado
    * pelo botão "Inserir no email" do parágrafo do que mudou. Sem esta prop
    * (por exemplo, testes que só querem o histórico), o parágrafo não aparece:
    * um botão que não faz nada é pior do que não haver botão.
@@ -343,7 +343,7 @@ export default function Versoes({
           {/* ── O PARÁGRAFO PRONTO PARA O EMAIL ─────────────────────────────
               Só a partir do segundo envio (há `ultimoDoc`) e só quando há algo
               que valha a pena dizer (`paragrafo` não é `null`). Insere na
-              caixa "Mensagem para o cliente"; nunca escreve directamente no
+              texto do email ao cliente; nunca escreve directamente no
               email que vai sair. */}
           {paragrafo && onInserirNaMensagem && (
             <div className="mt-3 border-t border-sage-600/15 pt-3">
@@ -358,7 +358,7 @@ export default function Versoes({
                 onClick={() => onInserirNaMensagem(paragrafo)}
                 className={`alvo-toque mt-2 text-[11px] font-medium text-sage-600 underline-offset-2 hover:text-[var(--bo-accent-hover)] hover:underline ${MOV_ESTADO} ${PRESSAO}`}
               >
-                Inserir na mensagem para o cliente
+                Inserir no email para o cliente
               </button>
             </div>
           )}
@@ -480,7 +480,11 @@ export default function Versoes({
         rotuloConfirmar={aCortar ? "A cortar…" : "Cortar os links"}
         onConfirmar={cortarOsLinks}
       />
-      {erro && <p className="mt-2 text-xs text-[var(--bo-perigo)]">Alguma coisa falhou. Tenta outra vez.</p>}
+      {erro && (
+        <p className="mt-2 text-xs text-[var(--bo-perigo)]">
+          Alguma coisa falhou. Tenta outra vez.
+        </p>
+      )}
     </section>
   );
 }
