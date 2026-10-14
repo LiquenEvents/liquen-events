@@ -173,9 +173,7 @@ describe("o parágrafo do que mudou, para o email", () => {
     await waitFor(() => expect(screen.getByText("Para o email")).toBeTruthy());
     expect(screen.getByText(/houve alterações em o orçamento/)).toBeTruthy();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Inserir na mensagem para o cliente" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Inserir no email para o cliente" }));
     expect(onInserir).toHaveBeenCalledTimes(1);
     expect(onInserir.mock.calls[0][0]).toMatch(/^Desde a última proposta: houve alterações/);
   });

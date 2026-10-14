@@ -21,6 +21,7 @@ A 10/10 ela pôs «Ver as enviadas» e a A1 à frente da A2. A 11/10 pediu
 | A3 / A4 — papel e resolução das fotografias | por fazer | |
 | D1 — pedidos duplicados | por fazer | |
 | B1+ — ver o PDF final antes de enviar (pedido de 14/10, «Ver o PDF primeiro») | **feito** | `proposal-progress.ts` (`pdfVisto`, impedimento `visto`), rota `proposta-doc` (`X-Chave-Do-Pdf` na pré-visualização final; o envio recusa sem a mesma chave), `ProposalStudio.tsx` (caixa «Antes de enviar»; a confirmação cai se o documento ou a língua mudarem), histórico `proposal_reviewed` |
+| Passo 5 mais limpo (pedido de 14/10) | **feito** — saiu o bloco «Enviar ao cliente» (o resumo Para/Clientes/Total/Sinal, o «Copiar resumo» e o WhatsApp de antes do envio, as notas do WhatsApp e da língua, e a «Mensagem para o cliente»); fica o email que o cliente vai receber, cujo texto é editável e é o que segue. A mensagem deixou de ir no envio, e um rascunho antigo com mensagem gravada já não a manda. O «Inserir» das versões escreve agora no texto do email. «Por onde segue» também na barra de baixo, debaixo de «Gerar e enviar ao cliente» (no telemóvel, na folha «Antes de enviar»), com o mesmo estado do topo | `ProposalStudio.tsx` (`OPCOES_DO_CANAL`, `inserirParagrafoDoQueMudou`), `Versoes.tsx` |
 
 Decisões dela, nas perguntas antes de começar:
 

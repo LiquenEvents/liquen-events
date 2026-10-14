@@ -5469,9 +5469,13 @@ describe("gerar a proposta em inglês", () => {
       "aria-checked",
       "true",
     );
-    // E diz, antes do clique, o que sai em inglês além do PDF.
-    const nota = screen.getByText(/Em inglês, o email ao cliente/);
-    expect(nota.textContent).toMatch(/página onde ele responde/);
+    // E diz, antes do clique, o que sai em inglês além do PDF — no nome do
+    // próprio «Inglês» (a nota escrita saiu com o bloco do envio, 14/10).
+    expect(
+      within(grupo)
+        .getByRole("radio", { name: /^Inglês/ })
+        .getAttribute("aria-label"),
+    ).toMatch(/email ao cliente e a página onde ele responde/);
 
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
     await verEConfirmar();
@@ -5609,11 +5613,22 @@ describe("o botão «Copiar resumo»", () => {
     return { user, writeText };
   }
 
-  it("copia o nome, a data e o valor a pagar, sem link (a proposta ainda não foi enviada)", async () => {
+  /** Antes do envio já não há «Copiar resumo»: saiu com o bloco «Enviar ao
+   *  cliente» (14/10, pedido dela). Fica no painel do «Proposta enviada». */
+  async function enviarEAbrirOFim(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    expect(screen.queryByRole("button", { name: "Copiar resumo" })).toBeNull();
+    await verEConfirmar();
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await confirmarEnvio(user);
+    await screen.findByRole("button", { name: "Enviar de novo / nova revisão" });
+  }
+
+  it("depois de enviar, copia o nome, a data e o valor a pagar", async () => {
     seedDraft(1);
     const { user, writeText } = comClipboardAFuncionar();
     renderStudio();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await enviarEAbrirOFim(user);
 
     await user.click(await screen.findByRole("button", { name: "Copiar resumo" }));
 
@@ -5628,7 +5643,6 @@ describe("o botão «Copiar resumo»", () => {
     // 3.000 € + IVA (23%) = 3.690 €, o mesmo bloco que a barra do fundo e o
     // resumo do passo mostram (`totaisDaProposta`).
     expect(texto).toContain("3.690,00");
-    expect(texto).not.toContain("http");
   });
 
   it("depois de enviar, o resumo já leva o link — sem precisar de reabrir o estúdio", async () => {
@@ -5667,7 +5681,7 @@ describe("o botão «Copiar resumo»", () => {
     const user = userEvent.setup({ writeToClipboard: false });
     Reflect.deleteProperty(navigator, "clipboard");
     renderStudio();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await enviarEAbrirOFim(user);
 
     await user.click(await screen.findByRole("button", { name: "Copiar resumo" }));
 
@@ -5691,138 +5705,44 @@ describe("o botão «Copiar resumo»", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * A MENSAGEM QUE SEGUE COM A PROPOSTA
+ * A CAIXA DA MENSAGEM SAIU (14/10)
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Palavras dela: «quando eu vou enviar a proposta, quero que também dê para
- * enviar uma mensagem juntamente com a proposta, a partir do back office na
- * parte onde envio a proposta».
- *
- * O email levava uma frase fixa («Segue em anexo a proposta personalizada…») e
- * mais nada. A caixa vive no passo 3, ao lado do resumo do que vai seguir —
- * onde ela está quando decide enviar.
- *
- * O que estes testes prendem: o texto CHEGA ao envio, uma caixa vazia não muda
- * nada, e o que ela escreveu sobrevive a fechar o separador (o estúdio já grava
- * rascunho; a mensagem entra no mesmo sítio que o resto do que não é documento).
+ * Pedido dela: tirar o bloco «Enviar ao cliente» e deixar só o email que o
+ * cliente vai receber. O texto do email é editável e é o que segue; uma nota
+ * pessoal escreve-se lá. Um rascunho antigo com mensagem gravada deixa de a
+ * mandar — o que segue é o que está à vista.
  */
-describe("a mensagem pessoal que segue com a proposta", () => {
+describe("o passo 5 fica só com o email", () => {
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
-  const caixa = () => screen.getByLabelText("Mensagem para o cliente") as HTMLTextAreaElement;
 
-  /** O corpo do último envio (`mode: "send"`). */
   function envio(): Record<string, unknown> {
-    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "{}";
-    return JSON.parse(corpo);
+    return JSON.parse(corpos("proposta-doc", "POST").at(-1) ?? "{}");
   }
 
-  async function enviar(user: ReturnType<typeof userEvent.setup>) {
-    await verEConfirmar();
-    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
-    await confirmarEnvio(user);
-  }
-
-  it("o que ela escreve na caixa segue no pedido de envio", async () => {
+  it("sem a caixa, sem o resumo e sem o «Copiar resumo» antes do envio", async () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    await user.type(caixa(), "Foi um gosto conhecer-vos na quinta!");
-    await enviar(user);
-
-    await waitFor(() => expect(envio().mensagem).toBe("Foi um gosto conhecer-vos na quinta!"));
+    await screen.findByText("O email que o cliente vai receber");
+    expect(screen.queryByLabelText("Mensagem para o cliente")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Enviar ao cliente" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copiar resumo" })).toBeNull();
   });
 
-  /** OPCIONAL A SÉRIO: em branco, o pedido é o mesmo de sempre — a rota nem
-   *  chega a ver o campo, e o email sai como saía. */
-  it("em branco, o envio não leva mensagem nenhuma", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    await enviar(user);
-
-    await waitFor(() => expect(envio().mode).toBe("send"));
-    expect(envio()).not.toHaveProperty("mensagem");
-  });
-
-  it("espaços em branco contam como caixa vazia", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    await user.type(caixa(), "   ");
-    await enviar(user);
-
-    await waitFor(() => expect(envio().mode).toBe("send"));
-    expect(envio()).not.toHaveProperty("mensagem");
-  });
-
-  it("a mensagem entra no rascunho — fechar o separador não a deita fora", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    await user.type(caixa(), "Ficamos à espera de vos ver!");
-
-    await waitFor(
-      () => expect(localStorage.getItem(SIDE_KEY) ?? "").toContain("Ficamos à espera de vos ver!"),
-      { timeout: 3000 },
-    );
-  });
-
-  it("e volta ao ecrã quando o estúdio reabre", async () => {
+  it("um rascunho antigo com mensagem gravada já não a manda", async () => {
     seedDraft(1);
     localStorage.setItem(SIDE_KEY, JSON.stringify({ mensagem: "O arco fica incluído." }));
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await confirmarEnvio(user);
 
-    await waitFor(() => expect(caixa().value).toBe("O arco fica incluído."));
-  });
-
-  /**
-   * O IRMÃO DO FECHO A DOBRAR. A assinatura da casa entra sozinha no fim de
-   * todo o correio ao cliente; uma caixa que convide a assinar traz de volta o
-   * defeito dos modelos de resposta rápida — dois fechos colados, e o segundo a
-   * desmentir o primeiro.
-   */
-  it("diz-lhe que não precisa de assinar", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    // A frase é a da AJUDA DESTA CAIXA e não uma qualquer no ecrã: o passo
-    // «Enviar» ganhou o painel do email, que também diz — e bem — que a
-    // assinatura da casa entra sozinha. Sem este aperto, o teste passava a ser
-    // verdadeiro por causa do painel do lado e deixava de guardar esta caixa.
-    const ajuda = caixa().getAttribute("aria-describedby");
-    expect(document.getElementById(ajuda ?? "")?.textContent).toMatch(/assinatura da Líquen/i);
-  });
-
-  /**
-   * O ecrã «Modelos de email» do mesmo back office ensina-lhe que `{nome}` é um
-   * campo de fusão, com botões que o inserem. Esta caixa NÃO os substitui — o
-   * email já abre com «Olá Maria & Zé,» —, por isso diz-o no momento em que ela
-   * o escreve, em vez de o deixar seguir cru para o casal.
-   */
-  it("avisa quando ela escreve um campo de fusão que esta caixa não substitui", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    // O aviso tem um `<code>{nome}</code>` no meio, portanto o texto está
-    // partido por vários nós: procura-se pelo parágrafo inteiro.
-    const aviso = () =>
-      screen.queryAllByText((_, el) => (el?.textContent ?? "").includes("sai tal e qual"), {
-        selector: "p",
-      });
-    expect(aviso()).toHaveLength(0);
-    // `{{` é como se escreve uma chaveta literal no `userEvent` — sem isso, o
-    // `{nome}` era lido como uma tecla especial e nunca chegava à caixa.
-    await user.type(caixa(), "Olá {{nome}, ficamos à espera.");
-    expect(caixa().value).toContain("{nome}");
-    await waitFor(() => expect(aviso()).toHaveLength(1));
+    await waitFor(() => expect(envio().mode).toBe("send"));
+    expect(envio()).not.toHaveProperty("mensagem");
   });
 });
 
@@ -7287,32 +7207,6 @@ describe("o email do passo 3 viaja com o envio", () => {
     await waitFor(() => expect(envio().mode).toBe("send"));
     expect(envio()).not.toHaveProperty("corpo");
     expect(envio()).not.toHaveProperty("assunto");
-  });
-
-  /**
-   * Com o texto editável, o que segue é o TEXTO. Uma nota pessoal que não
-   * apareça lá dentro não chega ao casal — e ela via-a no ecrã, escrita.
-   */
-  it("avisa quando a nota pessoal não está no texto do email", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await irParaEnviar(user);
-    await waitFor(() => expect(caixaDoEmail().value).toContain("Olá"));
-    await user.type(screen.getByLabelText("Mensagem para o cliente"), "Foi um gosto conhecer-vos.");
-    expect(await screen.findByText(/Esta nota não aparece no texto do email/)).toBeTruthy();
-  });
-
-  /** O controlo positivo do aviso acima: escrita DENTRO do texto, cala-se. */
-  it("não avisa quando a nota está lá dentro", async () => {
-    seedDraft(1);
-    renderStudio();
-    const user = userEvent.setup();
-    await irParaEnviar(user);
-    await waitFor(() => expect(caixaDoEmail().value).toContain("Olá"));
-    await user.type(caixaDoEmail(), " Foi um gosto conhecer-vos.");
-    await user.type(screen.getByLabelText("Mensagem para o cliente"), "Foi um gosto conhecer-vos.");
-    expect(screen.queryByText(/Esta nota não aparece no texto do email/)).toBeNull();
   });
 });
 
@@ -9890,13 +9784,39 @@ describe("por onde segue, no topo do passo do envio", () => {
     const resumo = await screen.findByText("Resumo da proposta");
     // O grupo aparece ANTES do resumo na ordem do documento.
     expect(grupo.compareDocumentPosition(resumo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const opcao = (nome: string) => screen.getByRole("radio", { name: nome });
+    const opcao = (nome: string) => within(grupo).getByRole("radio", { name: nome });
     expect(opcao("Email").querySelectorAll("svg")).toHaveLength(1);
     expect(opcao("WhatsApp").querySelectorAll("svg")).toHaveLength(1);
     expect(opcao("Os dois").querySelectorAll("svg")).toHaveLength(2);
     // «coloca mesmo os logos do email coloridos e do whatsapp» — nas cores deles.
     expect(opcao("Email").querySelector("svg.bo-marca-email")).not.toBeNull();
     expect(opcao("WhatsApp").querySelector("svg.bo-marca-whatsapp")).not.toBeNull();
+  });
+
+  /** 14/10: também na barra de baixo, debaixo de «Gerar e enviar ao cliente»
+   *  — o MESMO estado: mudar num muda o outro. */
+  it("também na barra de baixo, e os dois andam juntos", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    const cima = await screen.findByRole("radiogroup", { name: "Por onde é que a proposta segue" });
+    const baixo = await screen.findByRole("radiogroup", { name: "Por onde segue (em baixo)" });
+    expect(
+      within(baixo).getByRole("radio", { name: "WhatsApp" }).querySelector("svg.bo-marca-whatsapp"),
+    ).not.toBeNull();
+
+    await user.click(within(baixo).getByRole("radio", { name: "WhatsApp" }));
+    expect(within(cima).getByRole("radio", { name: "WhatsApp" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+
+    await user.click(within(cima).getByRole("radio", { name: "Os dois" }));
+    expect(within(baixo).getByRole("radio", { name: "Os dois" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   });
 });
 
