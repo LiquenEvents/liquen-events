@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { escolherJa } from "./ui/escolher.testkit";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
@@ -199,9 +200,7 @@ describe("«Marcar como …» em lote", () => {
   });
 
   it("põe a contagem no ecrã, a sobe a cada pedido que responde, e some no fim", async () => {
-    fireEvent.change(screen.getByLabelText("Marcar pedidos selecionados como"), {
-      target: { value: "em_revisao" },
-    });
+    escolherJa(screen.getByLabelText("Marcar pedidos selecionados como"), "Aguardar resposta");
 
     // Está a andar, e diz quantos são — fora do `<select>`, à vista.
     expect(espera("A marcar os pedidos…")).toBeTruthy();
@@ -228,9 +227,7 @@ describe("«Marcar como …» em lote", () => {
    * o lê.
    */
   it("já não esconde o sinal dentro de um `<option>`", () => {
-    fireEvent.change(screen.getByLabelText("Marcar pedidos selecionados como"), {
-      target: { value: "em_revisao" },
-    });
+    escolherJa(screen.getByLabelText("Marcar pedidos selecionados como"), "Aguardar resposta");
     expect(screen.queryByText("A aplicar…")).toBeNull();
   });
 });

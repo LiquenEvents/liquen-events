@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
+import { escolherJa } from "./ui/escolher.testkit";
 import { render, screen, within, cleanup, fireEvent, act } from "@testing-library/react";
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
@@ -368,9 +369,7 @@ describe("Painel do pedido — o que se escreve grava-se sozinho", () => {
     montar(makeQuote());
     await abrirPedido();
 
-    fireEvent.change(screen.getByLabelText("Estado"), {
-      target: { value: "cotado" },
-    });
+    escolherJa(screen.getByLabelText("Estado"), "Proposta enviada");
     await passar(ATRASO_DA_GRAVACAO * 4);
     expect(gravacoes).toHaveLength(0);
 
@@ -459,9 +458,10 @@ describe("Painel do pedido — inscrito no «Guardar tudo»", () => {
     montar(makeQuote(), true);
     await abrirPedido();
 
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText("Estado"), { target: { value: "cotado" } });
-    });
+    // Fora do `act`: dentro dele a lista só abria no fim, e a opção
+    // ainda não estava lá para se carregar.
+    escolherJa(screen.getByLabelText("Estado"), "Proposta enviada");
+    await act(async () => {});
     expect(guardarTudo()).toHaveAccessibleName(/guardar tudo \(1\)/i);
 
     await act(async () => {
@@ -502,9 +502,10 @@ describe("Painel do pedido — fechar o separador", () => {
     montar(makeQuote());
     await abrirPedido();
 
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText("Estado"), { target: { value: "cotado" } });
-    });
+    // Fora do `act`: dentro dele a lista só abria no fim, e a opção
+    // ainda não estava lá para se carregar.
+    escolherJa(screen.getByLabelText("Estado"), "Proposta enviada");
+    await act(async () => {});
     expect(fecharSeparador()).toBe(true);
   });
 

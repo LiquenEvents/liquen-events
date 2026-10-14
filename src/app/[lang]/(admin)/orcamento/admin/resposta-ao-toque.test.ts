@@ -83,6 +83,14 @@ const SEM_AFUNDAR: { ficheiro: string; marca: string; porque: string }[] = [
     marca: "<span onClick={(e) => e.stopPropagation()}>",
     porque: "trava a propagação do menu dentro da linha clicável",
   },
+  // O mesmo embrulho à volta do menu do estado (14/10): a pastilha vive na
+  // linha da tabela, que abre o pedido, e a lista está num portal cujos cliques
+  // sobem pela árvore do React até à linha. Quem afunda é o botão do menu.
+  {
+    ficheiro: "orcamento/admin/EscolhaDoEstado.tsx",
+    marca: "onClick={(e) => e.stopPropagation()}",
+    porque: "trava a propagação do menu do estado dentro da linha clicável",
+  },
   // ── O ESCURO À VOLTA DE UM DIÁLOGO ──────────────────────────────────────
   // Tem `onClick` para fechar, mas não é uma coisa em que se carregue: é o
   // vazio à volta. Encolher o véu 2% descola-o das margens e deixa ver a

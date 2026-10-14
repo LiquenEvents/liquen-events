@@ -13,6 +13,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useCapacidade, useMontado } from "./adaptativo";
 import { cn } from "./cn";
 import { ESTADO, PRESSAO } from "./movimento";
@@ -214,6 +215,24 @@ export interface EscolhaProps {
    * omissão — a justificação está no cabeçalho deste ficheiro.
    */
   nativoNoToque?: boolean;
+  /**
+   * A lista desenha-se no `<body>`, e não dentro da caixa.
+   *
+   * Uma lista `absolute` fica presa a qualquer antepassado com `overflow` — e
+   * a tabela dos pedidos tem um `overflow-x-auto`: na última linha, a lista do
+   * estado abria e era cortada pelo fundo da tabela. Com isto ela vive num
+   * portal, `fixed`, colada ao botão, e vira-se para cima quando não cabe em
+   * baixo (a mesma conta de sempre). Os eventos do React continuam a subir
+   * pela árvore dos componentes, por isso quem está numa linha clicável tem
+   * de travar o clique à volta — é o que o `EscolhaDoEstado` faz.
+   */
+  noCorpo?: boolean;
+  /**
+   * O desenho fechado pequeno: a seta encolhe e a reserva à direita também.
+   * É o da pastilha do estado, onde os 36 px de reserva e a seta de 14 px de
+   * um campo normal comiam metade da pastilha.
+   */
+  compacta?: boolean;
 }
 
 /* ── O DESENHO FECHADO, UM SÓ PARA OS DOIS CAMINHOS ────────────────────────
@@ -238,6 +257,10 @@ const FECHADO_BASE =
   "text-left pr-9 pointer-coarse:min-h-11 pointer-coarse:text-base " +
   "disabled:cursor-not-allowed disabled:opacity-50 " +
   ESTADO;
+
+/** O desenho fechado da `compacta`. Sem os 44 px do dedo na própria peça: quem
+ *  a usa pede o alvo invisível (`alvo-toque`), que não muda o desenho. */
+const FECHADO_COMPACTO = "text-left pr-5 disabled:cursor-not-allowed disabled:opacity-50 " + ESTADO;
 
 /**
  * As peles. São as mesmas duas do `Field`, e a terceira é a ausência delas.
@@ -392,6 +415,8 @@ export function Escolha({
   style,
   containerClassName,
   nativoNoToque = true,
+  noCorpo = false,
+  compacta = false,
   ...aria
 }: EscolhaProps) {
   const idAutomatico = useId();
@@ -471,7 +496,12 @@ export function Escolha({
    * scroll em vez de sair do ecrã. O tecto continua a ser o da classe
    * (`max-h-72`); isto só o encurta quando é preciso.
    */
-  const [encaixe, setEncaixe] = useState<{ acima: boolean; alturaMax: number } | null>(null);
+  const [encaixe, setEncaixe] = useState<{
+    acima: boolean;
+    alturaMax: number;
+    /** Só no `noCorpo`: onde está o botão, em coordenadas da janela. */
+    botao?: { left: number; top: number; bottom: number; width: number };
+  } | null>(null);
 
   const aSair = useSaidaDeUmSo(aberto);
 
@@ -492,9 +522,12 @@ export function Escolha({
         indiceDoValor !== -1 && !lista[indiceDoValor].desactivada ? indiceDoValor : -1;
       const alvo = posicao ?? (doValor !== -1 ? doValor : primeiraUtil(0, 1));
       setActiva(alvo);
+      // No corpo, a medida da vez anterior é de OUTRO sítio (outra linha da
+      // tabela): esquece-se, e a lista fica invisível até ser medida aqui.
+      if (noCorpo) setEncaixe(null);
       setAberto(true);
     },
-    [disabled, indiceDoValor, lista, primeiraUtil],
+    [disabled, indiceDoValor, lista, noCorpo, primeiraUtil],
   );
 
   /**
@@ -578,7 +611,10 @@ export function Escolha({
   useEffect(() => {
     if (!aberto) return;
     const fora = (e: PointerEvent) => {
-      if (caixaRef.current && !caixaRef.current.contains(e.target as Node)) fechar(false);
+      const alvo = e.target as Node;
+      // No corpo, a lista não está dentro da caixa: carregar nela não é «fora».
+      if (listaRef.current?.contains(alvo)) return;
+      if (caixaRef.current && !caixaRef.current.contains(alvo)) fechar(false);
     };
     document.addEventListener("pointerdown", fora);
     return () => document.removeEventListener("pointerdown", fora);
@@ -618,7 +654,10 @@ export function Escolha({
       if (!b || !lista) return;
       // A altura que ela QUERIA ter, e não a que já lhe demos: sem isto, a
       // segunda medida via a lista já apertada e nunca mais a deixava crescer.
-      const querida = lista.scrollHeight;
+      // Sem disposição (o jsdom dos testes) não há altura nenhuma. Fora do
+      // corpo, fica a classe; no corpo a lista tem de ganhar sítio na mesma,
+      // senão ficava invisível para sempre — conta-se com o tecto.
+      const querida = lista.scrollHeight || (noCorpo ? TECTO_DA_LISTA : 0);
       if (!querida) return;
       const abaixo = window.innerHeight - b.bottom - MARGEM;
       const acimaDela = b.top - MARGEM;
@@ -638,10 +677,19 @@ export function Escolha({
          passa despercebido. Uma lista curta com scroll lê-se; uma lista cortada
          fora do ecrã não. */
       const alturaMax = Math.min(querida, TECTO_DA_LISTA, Math.max(espaco, 0));
+      const botao = noCorpo
+        ? { left: b.left, top: b.top, bottom: b.bottom, width: b.width }
+        : undefined;
       setEncaixe((antes) =>
-        antes && antes.acima === acima && Math.abs(antes.alturaMax - alturaMax) < 1
+        antes &&
+        antes.acima === acima &&
+        Math.abs(antes.alturaMax - alturaMax) < 1 &&
+        (!botao ||
+          (antes.botao &&
+            Math.abs(antes.botao.left - botao.left) < 1 &&
+            Math.abs(antes.botao.top - botao.top) < 1))
           ? antes
-          : { acima, alturaMax },
+          : { acima, alturaMax, botao },
       );
     };
     medir();
@@ -653,7 +701,7 @@ export function Escolha({
       window.removeEventListener("scroll", medir, { capture: true });
       window.removeEventListener("resize", medir);
     };
-  }, [aberto]);
+  }, [aberto, noCorpo]);
 
   function teclas(e: React.KeyboardEvent<HTMLButtonElement>) {
     if (disabled) return;
@@ -782,11 +830,16 @@ export function Escolha({
   /** A seta vive sempre POR CIMA, em posição absoluta, nos dois caminhos — é
    *  isso que garante que os dois estados fechados coincidem ao pixel. */
   const seta = (
-    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+    <span
+      className={cn(
+        "pointer-events-none absolute inset-y-0 flex items-center",
+        compacta ? "right-1.5" : "right-3",
+      )}
+    >
       <svg
         aria-hidden="true"
-        width="14"
-        height="14"
+        width={compacta ? 10 : 14}
+        height={compacta ? 10 : 14}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -800,7 +853,7 @@ export function Escolha({
     </span>
   );
 
-  const fechado = cn(FECHADO_BASE, PELE[variante], className);
+  const fechado = cn(compacta ? FECHADO_COMPACTO : FECHADO_BASE, PELE[variante], className);
 
   /** Uma só referência para os dois caminhos: quem leva o foco ao campo não
    *  tem de saber se hoje ele é um botão ou um `<select>`. */
@@ -856,6 +909,25 @@ export function Escolha({
   }
 
   const activaId = activa >= 0 ? `${idLista}-${activa}` : undefined;
+
+  /* No corpo, a posição é a do botão medido; e enquanto não houver medida (o
+     primeiro fotograma depois de abrir) a lista existe — para se poder medir a
+     altura que ela quer — mas não se vê. */
+  const b = encaixe?.botao;
+  const estiloDaLista: CSSProperties | undefined = noCorpo
+    ? b
+      ? {
+          maxHeight: encaixe.alturaMax,
+          left: b.left,
+          minWidth: b.width,
+          ...(encaixe.acima ? { bottom: window.innerHeight - b.top + 4 } : { top: b.bottom + 4 }),
+        }
+      : { left: 0, top: 0, visibility: "hidden" }
+    : encaixe
+      ? { maxHeight: encaixe.alturaMax }
+      : undefined;
+  const noSitio = (lista: ReactNode) =>
+    noCorpo && typeof document !== "undefined" ? createPortal(lista, document.body) : lista;
 
   return (
     <div ref={caixaRef} className={cn(CAIXA, containerClassName)}>
@@ -922,24 +994,31 @@ export function Escolha({
         </select>
       )}
 
-      {(aberto || aSair) && (
-        <div
-          ref={listaRef}
-          id={idLista}
-          // Só depois de medida: antes disso vale o tecto da classe, que é o
-          // que permite MEDIR a altura que ela queria ter.
-          style={encaixe ? { maxHeight: encaixe.alturaMax } : undefined}
-          /* A SAIR, ISTO JÁ NÃO É UMA LISTA. Fica montada os 200 ms para ter o
+      {(aberto || aSair) &&
+        noSitio(
+          <div
+            ref={listaRef}
+            id={idLista}
+            // Só depois de medida: antes disso vale o tecto da classe, que é o
+            // que permite MEDIR a altura que ela queria ter.
+            style={estiloDaLista}
+            /* A SAIR, ISTO JÁ NÃO É UMA LISTA. Fica montada os 200 ms para ter o
              que animar, mas para quem ouve o ecrã a escolha acabou no instante
              do gesto: sem `role`, sem nome, e fora do fio do teclado. */
-          role={aSair ? undefined : "listbox"}
-          aria-label={aSair ? undefined : aria["aria-label"]}
-          aria-labelledby={aSair ? undefined : aria["aria-labelledby"]}
-          aria-hidden={aSair || undefined}
-          inert={aSair}
-          className={cn(
-            "absolute left-0 z-30 max-h-72 min-w-full overflow-y-auto overscroll-contain",
-            /* ── O MATERIAL ────────────────────────────────────────────────
+            role={aSair ? undefined : "listbox"}
+            aria-label={aSair ? undefined : aria["aria-label"]}
+            aria-labelledby={aSair ? undefined : aria["aria-labelledby"]}
+            aria-hidden={aSair || undefined}
+            inert={aSair}
+            className={cn(
+              noCorpo
+                ? /* No corpo: `fixed`, junto ao botão (ver o `estiloDaLista`).
+                   Por cima de tudo o que já está aberto — a gaveta do pedido
+                   (50), os avisos (80), a paleta (90): é a última coisa que se
+                   pediu, presa ao dedo que a pediu. */
+                  "fixed z-[100] max-h-72 overflow-y-auto overscroll-contain"
+                : "absolute left-0 z-30 max-h-72 min-w-full overflow-y-auto overscroll-contain",
+              /* ── O MATERIAL ────────────────────────────────────────────────
                Era `rounded-xl border … bg-[var(--bo-surface)]`, e o
                `rounded-xl` não valia os 12 px que o nome promete: o bloco dos
                raios do `globals.css` colapsa a escala do Tailwind toda em 8 px
@@ -951,48 +1030,48 @@ export function Escolha({
                translúcida. O desfoque vem numa classe à parte, para se poder
                baixar num sítio só — a razão está por extenso no `globals.css`,
                e a conta do contraste também. */
-            "bo-material bo-material-desfoque shadow-[var(--bo-sombra-suspensa)]",
-            /* A FOLGA QUE FAZ DA PASTILHA UMA PASTILHA. Era `py-1`, ou seja
+              "bo-material bo-material-desfoque shadow-[var(--bo-sombra-suspensa)]",
+              /* A FOLGA QUE FAZ DA PASTILHA UMA PASTILHA. Era `py-1`, ou seja
                folga em cima e em baixo e ZERO aos lados: uma linha realçada só
                podia ser uma faixa de bordo a bordo. Com folga nos quatro lados
                o realce ganha forma própria — que é o que as capturas mostram —
                e o raio dele é o desta moldura menos esta folga, escrito como
                `calc()` no token para os dois não se descolarem. */
-            "p-[var(--bo-material-folga)]",
-            encaixe?.acima ? "bottom-full mb-1" : "top-full mt-1",
-            // 4 px e a curva de quem chega: isto é um item de menu, e é essa a
-            // distância que a casa mediu para um. A saída é a mesma palavra ao
-            // contrário, e larga os toques dentro da própria classe.
-            aSair ? SAIDA : "bo-entrada",
-          )}
-        >
-          {blocos.map((b, n) => {
-            const linhas = b.itens.map(({ o, i }) => (
-              <div
-                key={o.valor}
-                id={`${idLista}-${i}`}
-                data-i={i}
-                role="option"
-                aria-selected={o.valor === valor}
-                aria-disabled={o.desactivada || undefined}
-                // O foco NÃO passa para cá: sem isto, carregar numa opção
-                // tirava-o do botão e a devolução passava a ser um remendo.
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => escolher(i)}
-                onPointerMove={() => !o.desactivada && setActiva(i)}
-                className={cn(
-                  "alvo-toque flex w-full cursor-default items-center gap-2 px-2.5 py-2 text-left text-sm",
-                  // O raio da pastilha = o da moldura menos a folga. Ver o token.
-                  "rounded-[var(--bo-material-raio-pastilha)]",
-                  ESTADO,
-                  // O MESMO gesto do botão que abre esta lista. Sem ele, o
-                  // comando afundava e a opção — que é onde a escolha acontece
-                  // de facto — respondia só com tinta.
-                  !o.desactivada && PRESSAO,
-                  o.desactivada
-                    ? "cursor-not-allowed opacity-40"
-                    : i === activa
-                      ? /* ── A LINHA ESCOLHIDA É UMA PASTILHA CHEIA ──────────
+              "p-[var(--bo-material-folga)]",
+              !noCorpo && (encaixe?.acima ? "bottom-full mb-1" : "top-full mt-1"),
+              // 4 px e a curva de quem chega: isto é um item de menu, e é essa a
+              // distância que a casa mediu para um. A saída é a mesma palavra ao
+              // contrário, e larga os toques dentro da própria classe.
+              aSair ? SAIDA : "bo-entrada",
+            )}
+          >
+            {blocos.map((b, n) => {
+              const linhas = b.itens.map(({ o, i }) => (
+                <div
+                  key={o.valor}
+                  id={`${idLista}-${i}`}
+                  data-i={i}
+                  role="option"
+                  aria-selected={o.valor === valor}
+                  aria-disabled={o.desactivada || undefined}
+                  // O foco NÃO passa para cá: sem isto, carregar numa opção
+                  // tirava-o do botão e a devolução passava a ser um remendo.
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => escolher(i)}
+                  onPointerMove={() => !o.desactivada && setActiva(i)}
+                  className={cn(
+                    "alvo-toque flex w-full cursor-default items-center gap-2 px-2.5 py-2 text-left text-sm",
+                    // O raio da pastilha = o da moldura menos a folga. Ver o token.
+                    "rounded-[var(--bo-material-raio-pastilha)]",
+                    ESTADO,
+                    // O MESMO gesto do botão que abre esta lista. Sem ele, o
+                    // comando afundava e a opção — que é onde a escolha acontece
+                    // de facto — respondia só com tinta.
+                    !o.desactivada && PRESSAO,
+                    o.desactivada
+                      ? "cursor-not-allowed opacity-40"
+                      : i === activa
+                        ? /* ── A LINHA ESCOLHIDA É UMA PASTILHA CHEIA ──────────
                            Era `bg-[var(--bo-tinta-10)]`: dez por cento de preto,
                            uma faixa cinzenta de bordo a bordo. Numa lista de
                            doze linhas sobre um material translúcido, dez por
@@ -1005,11 +1084,11 @@ export function Escolha({
                            mais escuro que este ecrã permite caía para 4,65:1,
                            que passa por pouco e não tem margem para o dia em
                            que alguém mexa no verde. */
-                        "bg-[var(--bo-accent)] text-white"
-                      : "text-[var(--bo-tinta-72)]",
-                )}
-              >
-                {/* ── O VISTO, NUMA COLUNA COM LARGURA FIXA ─────────────────
+                          "bg-[var(--bo-accent)] text-white"
+                        : "text-[var(--bo-tinta-72)]",
+                  )}
+                >
+                  {/* ── O VISTO, NUMA COLUNA COM LARGURA FIXA ─────────────────
                     A escolha não se diz só pela tinta: há um visto, como na
                     lista aberta da captura. A largura é o token da coluna e não
                     um `w-3` à mão — é a MESMA coluna dos ícones dos menus, e é
@@ -1034,22 +1113,22 @@ export function Escolha({
                     pastilha aqui em cima faz. A conta está por extenso no
                     `globals.css` e medida no
                     `material-do-que-aparece-por-cima.test.ts`. */}
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "w-[var(--bo-material-coluna)] shrink-0 text-center",
-                    i === activa && !o.desactivada ? "text-white" : "text-[var(--bo-text)]",
-                  )}
-                >
-                  {o.valor === valor ? "✓" : ""}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{o.rotulo}</span>
-              </div>
-            ));
-            if (!b.grupo) return <Fragment key={`b${n}`}>{linhas}</Fragment>;
-            return (
-              <div key={`b${n}`} role="group" aria-label={b.grupo}>
-                {/* `aria-hidden`: o nome do grupo já é dito pelo `aria-label`
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "w-[var(--bo-material-coluna)] shrink-0 text-center",
+                      i === activa && !o.desactivada ? "text-white" : "text-[var(--bo-text)]",
+                    )}
+                  >
+                    {o.valor === valor ? "✓" : ""}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{o.rotulo}</span>
+                </div>
+              ));
+              if (!b.grupo) return <Fragment key={`b${n}`}>{linhas}</Fragment>;
+              return (
+                <div key={`b${n}`} role="group" aria-label={b.grupo}>
+                  {/* `aria-hidden`: o nome do grupo já é dito pelo `aria-label`
                     do `role="group"`. Sem isto era lido duas vezes.
 
                     O `text-foreground/45` que aqui estava era tinta MORTA — a
@@ -1058,15 +1137,15 @@ export function Escolha({
                     da `.bo-eyebrow`, que mede 5,32:1 sobre o pior material.
                     O `px` acompanha a folga nova da moldura para o nome do
                     grupo ficar alinhado com o rótulo das opções. */}
-                <div aria-hidden="true" className="bo-eyebrow px-2.5 pb-1 pt-2">
-                  {b.grupo}
+                  <div aria-hidden="true" className="bo-eyebrow px-2.5 pb-1 pt-2">
+                    {b.grupo}
+                  </div>
+                  {linhas}
                 </div>
-                {linhas}
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>,
+        )}
     </div>
   );
 }

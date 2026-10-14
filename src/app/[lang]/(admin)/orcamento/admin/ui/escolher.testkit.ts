@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 
 /**
@@ -46,4 +46,27 @@ export async function escolher(
   }
   await user.click(controlo);
   await user.click(await screen.findByRole("option", { name: rotulo }));
+}
+
+/**
+ * O mesmo gesto, SÍNCRONO, para os testes com relógio falso.
+ *
+ * O `user-event` espera entre teclas pelo relógio — e com `vi.useFakeTimers()`
+ * esse relógio não anda sozinho, e o teste fica parado. Aqui o gesto é feito
+ * com `fireEvent`: carregar no campo, carregar na opção. É o que a pessoa faz,
+ * sem o atraso entre os dois.
+ */
+export function escolherJa(controlo: HTMLElement, rotulo: RegExp | string): void {
+  if (controlo.tagName === "SELECT") {
+    const opcao = within(controlo)
+      .getAllByRole("option")
+      .find((o) =>
+        typeof rotulo === "string" ? o.textContent === rotulo : rotulo.test(o.textContent ?? ""),
+      ) as HTMLOptionElement | undefined;
+    if (!opcao) throw new Error(`não há opção «${rotulo}» neste <select>`);
+    fireEvent.change(controlo, { target: { value: opcao.value } });
+    return;
+  }
+  fireEvent.click(controlo);
+  fireEvent.click(screen.getByRole("option", { name: rotulo }));
 }

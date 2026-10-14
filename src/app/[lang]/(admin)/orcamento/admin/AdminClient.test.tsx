@@ -4,7 +4,7 @@ import { render, screen, within, cleanup, fireEvent, waitFor } from "@testing-li
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
-import { escolher } from "./ui/escolher.testkit";
+import { escolher, escolherJa } from "./ui/escolher.testkit";
 import userEvent from "@testing-library/user-event";
 
 /**
@@ -829,9 +829,7 @@ describe("a selecção em lote e o que está à vista", () => {
     procurar("Ana");
     await waitFor(() => expect(screen.queryByText("Bruno Dias")).not.toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText("Marcar pedidos selecionados como"), {
-      target: { value: "cotado" },
-    });
+    escolherJa(screen.getByLabelText("Marcar pedidos selecionados como"), "Proposta enviada");
 
     const tocados = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
       .filter((args) => (args[1] as RequestInit | undefined)?.method === "PATCH")
