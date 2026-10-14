@@ -217,7 +217,12 @@ function reply(body: {
   json?: unknown;
   headers?: Record<string, string>;
 }): Response {
-  const headers = body.headers ?? {};
+  // A chave do PDF final visto (ver «ver o PDF antes de enviar»): toda a
+  // pré-visualização deste teste a devolve, como a rota a devolve no PDF final.
+  const headers: Record<string, string> = {
+    "X-Chave-Do-Pdf": "chave-de-teste",
+    ...(body.headers ?? {}),
+  };
   return {
     ok: body.ok ?? true,
     status: body.status ?? (body.ok === false ? 500 : 200),
@@ -384,6 +389,24 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
 });
 
 /** Os corpos enviados a uma rota, pela ordem. */
+/**
+ * «VER O PDF PRIMEIRO» (14/10): antes de enviar, descarrega-se o PDF final e
+ * marca-se «Vi a proposta e está tudo certo». Os testes do envio passam por
+ * aqui como uma pessoa passaria — e a descarga sai da contagem dos pedidos,
+ * para eles continuarem a contar só o que medem (o envio).
+ */
+async function verEConfirmar() {
+  fireEvent.click(await screen.findByRole("button", { name: "Descarregar o PDF final" }));
+  const caixa = await screen.findByRole("checkbox", { name: "Vi a proposta e está tudo certo" });
+  fireEvent.click(caixa);
+  await waitFor(() => expect(caixa).toBeChecked());
+  const eDescarga = (url: unknown, init?: RequestInit) =>
+    String(url).includes("proposta-doc") && String(init?.body ?? "").includes('"mode":"preview"');
+  pedidos = pedidos.filter((p) => !eDescarga(p.url, p.init));
+  const chamadas = fetchMock.mock.calls.filter(([u, i]) => !eDescarga(u, i as RequestInit));
+  fetchMock.mock.calls.splice(0, fetchMock.mock.calls.length, ...chamadas);
+}
+
 function corpos(parte: string, metodo = "PUT"): string[] {
   return pedidos
     .filter((p) => p.url.includes(parte) && (p.init?.method ?? "GET") === metodo)
@@ -1585,6 +1608,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     const gerar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
     // Os dois cliques no MESMO instante, como um duplo clique. O relógio fica
     // parado entre os dois: o estúdio redesenha-se por inteiro depois do
@@ -1616,6 +1640,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
     await new Promise((r) => setTimeout(r, 450));
@@ -1638,6 +1663,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
       renderStudio();
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+      await verEConfirmar();
       await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
       const botao = await screen.findByRole("button", { name: /^Confirmar$/ });
       await new Promise((r) => setTimeout(r, 450));
@@ -1670,6 +1696,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     // Enviar exige duas carregadas: a acção e a confirmação.
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -1691,6 +1718,11 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
    */
   it("pergunta antes de enviar, com o que ficou cortado à vista", async () => {
     seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
+    // O 409 é a resposta do ENVIO — a descarga do PDF, antes, correu bem.
     propostaDoc = reply({
       ok: false,
       status: 409,
@@ -1703,9 +1735,6 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
         ],
       },
     });
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -1730,6 +1759,11 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
 
   it("«voltar e corrigir» leva ao passo do corte e não envia nada", async () => {
     seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
+    // O 409 é a resposta do ENVIO — a descarga do PDF, antes, correu bem.
     propostaDoc = reply({
       ok: false,
       status: 409,
@@ -1738,9 +1772,6 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
         truncations: [{ where: "Nome na capa", dropped: 2, unit: "linhas" }],
       },
     });
-    renderStudio();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
     await user.click(await screen.findByRole("button", { name: /Voltar e corrigir/ }));
@@ -1966,6 +1997,7 @@ describe("fotos da biblioteca em estado provisório", () => {
 
     // Mal assenta, o envio abre sozinho — e o documento leva o caminho real.
     await confirmar(user);
+    await verEConfirmar();
     const enviar = screen.getByRole("button", { name: /Gerar e enviar ao cliente/ });
     expect(enviar).toBeEnabled();
     await user.click(enviar);
@@ -2752,6 +2784,7 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
     desenhar(comPreco(3000));
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5391,6 +5424,7 @@ describe("gerar a proposta em inglês", () => {
     await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
 
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5405,6 +5439,7 @@ describe("gerar a proposta em inglês", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5439,6 +5474,7 @@ describe("gerar a proposta em inglês", () => {
     expect(nota.textContent).toMatch(/página onde ele responde/);
 
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5510,6 +5546,7 @@ describe("gerar a proposta em inglês", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
 
@@ -5607,6 +5644,7 @@ describe("o botão «Copiar resumo»", () => {
     const { user, writeText } = comClipboardAFuncionar();
     renderStudio();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
     await screen.findByRole("button", { name: "Enviar de novo / nova revisão" });
@@ -5679,6 +5717,7 @@ describe("a mensagem pessoal que segue com a proposta", () => {
   }
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
   }
@@ -7197,6 +7236,7 @@ describe("o email do passo 3 viaja com o envio", () => {
   }
 
   async function enviar(user: ReturnType<typeof userEvent.setup>) {
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await confirmarEnvio(user);
   }
@@ -8285,6 +8325,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
 
     const resumo = (await screen.findByText(/Enviar para/)).textContent ?? "";
@@ -8305,6 +8346,7 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
     await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
     await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
 
@@ -9852,5 +9894,60 @@ describe("por onde segue, no topo do passo do envio", () => {
     expect(opcao("Email").querySelectorAll("svg")).toHaveLength(1);
     expect(opcao("WhatsApp").querySelectorAll("svg")).toHaveLength(1);
     expect(opcao("Os dois").querySelectorAll("svg")).toHaveLength(2);
+  });
+});
+
+/**
+ * «VER O PDF PRIMEIRO» (14/10). Palavras dela: «quero que haja algo que antes
+ * de enviar para os clientes obrigue os colaboradores da Líquen a verificar se
+ * está tudo bem na proposta a ser enviada».
+ */
+describe("ver o PDF final antes de enviar", () => {
+  it("o envio fica fechado até descarregar o PDF final e confirmar — e o envio leva a chave", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    const enviar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    expect(enviar).toBeDisabled();
+    expect(screen.getByText(/Falta ver o PDF final/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Descarregar o PDF final" }));
+    const caixa = await screen.findByRole("checkbox", { name: "Vi a proposta e está tudo certo" });
+    expect(enviar).toBeDisabled();
+    await user.click(caixa);
+    await waitFor(() => expect(enviar).toBeEnabled());
+
+    // Fica no histórico do pedido quem verificou.
+    const historico = corpos(`/api/orcamento/${quote.id}`, "PATCH").join("\n");
+    expect(historico).toContain("proposal_reviewed");
+
+    await user.click(enviar);
+    await confirmarEnvio(user);
+    await waitFor(() =>
+      expect(
+        corpos("proposta-doc", "POST").some((c) => c.includes('"pdfVisto":"chave-de-teste"')),
+      ).toBe(true),
+    );
+  });
+
+  it("mudar o documento depois de o ver volta a pedir o PDF", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
+    const enviar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    await waitFor(() => expect(enviar).toBeEnabled());
+
+    // Muda a língua do PDF: já não é o documento que se viu.
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Idioma da proposta" })).getByRole("radio", {
+        name: /Inglês/,
+      }),
+    );
+    await waitFor(() => expect(enviar).toBeDisabled());
+    // A confirmação da versão portuguesa não vale para a inglesa.
+    expect(screen.queryByRole("checkbox", { name: "Vi a proposta e está tudo certo" })).toBeNull();
   });
 });

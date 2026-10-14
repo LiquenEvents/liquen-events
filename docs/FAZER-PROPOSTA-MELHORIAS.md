@@ -20,6 +20,7 @@ A 10/10 ela pôs «Ver as enviadas» e a A1 à frente da A2. A 11/10 pediu
 | A1 — pré-visualização real | por fazer | |
 | A3 / A4 — papel e resolução das fotografias | por fazer | |
 | D1 — pedidos duplicados | por fazer | |
+| B1+ — ver o PDF final antes de enviar (pedido de 14/10, «Ver o PDF primeiro») | **feito** | `proposal-progress.ts` (`pdfVisto`, impedimento `visto`), rota `proposta-doc` (`X-Chave-Do-Pdf` na pré-visualização final; o envio recusa sem a mesma chave), `ProposalStudio.tsx` (caixa «Antes de enviar»; a confirmação cai se o documento ou a língua mudarem), histórico `proposal_reviewed` |
 
 Decisões dela, nas perguntas antes de começar:
 

@@ -475,3 +475,26 @@ describe("B1: os avisos novos", () => {
     expect(podeEnviar(doc, 3997.5)).toBe(true);
   });
 });
+
+describe("ver o PDF final antes de enviar (14/10)", () => {
+  const ids = (ctx: Parameters<typeof oQueFaltaParaEnviar>[2]) =>
+    oQueFaltaParaEnviar(COMPLETO, 3997.5, ctx)
+      .filter((f) => f.trava)
+      .map((f) => f.id);
+
+  it("sem o PDF visto, trava — e é a única coisa que falta numa proposta completa", () => {
+    expect(ids({ pdfVisto: false })).toEqual(["visto"]);
+    expect(podeEnviar(COMPLETO, 3997.5, { pdfVisto: false })).toBe(false);
+  });
+
+  it("visto e confirmado, segue; quem não pergunta (a Conferência, os testes antigos) não vê a regra", () => {
+    expect(ids({ pdfVisto: true })).toEqual([]);
+    expect(ids({})).toEqual([]);
+  });
+
+  it("vale mesmo quando há outros erros — a rota só confere uma parte deles", () => {
+    const semValor = oQueFaltaParaEnviar(COMPLETO, 0, { pdfVisto: false }).map((f) => f.id);
+    expect(semValor).toContain("valor");
+    expect(semValor).toContain("visto");
+  });
+});
