@@ -10035,5 +10035,20 @@ describe("o PDF final preparado antes de ela carregar", () => {
     await user.click(descarregar);
     await screen.findByText(/o mesmo que seguiu para o cliente/);
     expect(descargas()).toHaveLength(0);
+    // D2: a espera acaba à vista — «PDF pronto» com o visto — e o botão volta.
+    expect(await screen.findByText("PDF pronto")).toBeInTheDocument();
+    expect(document.querySelector("[data-em-curso=visto]")).not.toBeNull();
+    expect(
+      await screen.findByRole("button", { name: "Descarregar PDF" }, { timeout: 3000 }),
+    ).toBeEnabled();
+  });
+
+  it("o PDF que se descarrega no último passo acaba com «PDF pronto» na barra", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await user.click(screen.getByRole("button", { name: "Descarregar o PDF final" }));
+    expect(await screen.findByText("PDF pronto")).toBeInTheDocument();
   });
 });
