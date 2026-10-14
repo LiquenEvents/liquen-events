@@ -2032,6 +2032,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     retrato: string;
     confirmado: boolean;
   } | null>(null);
+  /**
+   * O PDF FINAL da versão que está no ecrã, pedido antes de ela carregar no
+   * botão (ver o efeito «PREPARADO ANTES DE ELA CARREGAR»). `retrato` diz de
+   * que versão é; uma versão diferente não o usa.
+   */
+  const pdfPreparado = useRef<{ retrato: string; promessa: Promise<PdfPronto> } | null>(null);
+  /**
+   * O que seguiu no último envio: a proposta gravada (para ir buscar o PDF
+   * guardado) e, se ainda estiver à mão, o próprio ficheiro.
+   */
+  const enviada = useRef<{ id: string | null; pdf: Promise<PdfPronto> | null } | null>(null);
   // Fluxo guiado: Conteúdo → Pré-visualizar → Enviar.
   const [step, setStep] = useState<Step>("evento");
   // Qual o destino das fotos escolhidas na biblioteca de temas (null = fechado).
@@ -6670,49 +6681,83 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * «RASCUNHO» no rodapé de cada página e «(rascunho)» no nome do ficheiro,
    * para nunca poder ser confundido com o que segue para o casal.
    */
-  async function preview({ rascunho = false }: { rascunho?: boolean } = {}) {
-    if (busy) return;
-    setBusy("preview");
+  /**
+   * Pede o PDF ao servidor. É o mesmo pedido para o botão e para a preparação
+   * em segundo plano (mais abaixo), e por isso também é aqui que a geração
+   * ensina a estimativa — mas só quando o servidor DESENHOU: um PDF que veio da
+   * memória (`X-Pdf-Da-Memoria`) ensinava que desenhar leva um segundo.
+   */
+  async function pedirOPdf(
+    desenhado: ReturnType<typeof stripPendingImages<typeof doc>>,
+    rascunho: boolean,
+  ): Promise<PdfPronto> {
     // De ponta a ponta, que é o que ela espera — e não o que o servidor demora
     // a desenhar. É esta a medida que faz a estimativa valer alguma coisa.
     const comecou = Date.now();
+    const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // `idioma` vai SEMPRE, mesmo quando é o português. O servidor tem o
+      // português por omissão para os chamadores antigos, mas quem tem um
+      // botão para escolher diz o que escolheu — senão «pt» seria só a
+      // ausência de um campo, e o dia em que a omissão mudar de lado leva
+      // esta chamada atrás sem ninguém dar por isso.
+      body: JSON.stringify({
+        mode: "preview",
+        idioma: idiomaDoPdf,
+        doc: desenhado,
+        ...(rascunho ? { rascunho: true } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.error || "Não foi possível gerar a pré-visualização.");
+    }
+    const blob = await res.blob();
+    // A geração que acabou de acontecer ensina a próxima estimativa: quantas
+    // fotos, quanto tempo, quantos bytes. Medido, não estimado.
+    if (res.headers.get("X-Pdf-Da-Memoria") !== "1") {
+      apontarGeracao(totalDeFotos, Date.now() - comecou, blob.size);
+    }
+    return {
+      blob,
+      chave: rascunho ? null : res.headers.get("X-Chave-Do-Pdf"),
+      emFalta: Number(res.headers.get("X-Fotos-Em-Falta") ?? "0"),
+      cortes: res.headers.get("X-Conteudo-Cortado"),
+    };
+  }
+
+  // A preparação em segundo plano corre num efeito, e o efeito quer sempre o
+  // `pedirOPdf` deste render (o idioma e o pedido de agora).
+  const pedirOPdfAgora = useRef(pedirOPdf);
+  useEffect(() => {
+    pedirOPdfAgora.current = pedirOPdf;
+  });
+
+  async function preview({ rascunho = false }: { rascunho?: boolean } = {}) {
+    if (busy) return;
+    setBusy("preview");
     // O documento EXACTO que vai ser desenhado — é este que fica «visto».
     const desenhado = stripPendingImages(doc);
     const retrato = retratoDoPdf(desenhado, idiomaDoPdf);
     try {
-      const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // `idioma` vai SEMPRE, mesmo quando é o português. O servidor tem o
-        // português por omissão para os chamadores antigos, mas quem tem um
-        // botão para escolher diz o que escolheu — senão «pt» seria só a
-        // ausência de um campo, e o dia em que a omissão mudar de lado leva
-        // esta chamada atrás sem ninguém dar por isso.
-        body: JSON.stringify({
-          mode: "preview",
-          idioma: idiomaDoPdf,
-          doc: desenhado,
-          ...(rascunho ? { rascunho: true } : {}),
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Não foi possível gerar a pré-visualização.");
-      }
-      const blob = await res.blob();
-      // A geração que acabou de acontecer ensina a próxima estimativa: quantas
-      // fotos, quanto tempo, quantos bytes. Medido, não estimado.
-      apontarGeracao(totalDeFotos, Date.now() - comecou, blob.size);
-      // …e o mesmo número serve o ecrã do email, que confirma o anexo antes de
-      // ele seguir: aqui é MEDIDO, e não a estimativa que se mostra sem isto.
+      /**
+       * O PDF FINAL que o estúdio já preparou em segundo plano, se for desta
+       * versão (ver `pdfPreparado`) — pronto, ou ainda a caminho, e então
+       * espera-se por ele em vez de pedir outro. Se essa preparação falhou,
+       * pede-se agora, como antes: a preparação nunca pode ser a razão de o
+       * botão não dar nada.
+       */
+      const jaPedido =
+        !rascunho && pdfPreparado.current?.retrato === retrato
+          ? await pdfPreparado.current.promessa.catch(() => null)
+          : null;
+      const pdf = jaPedido ?? (await pedirOPdf(desenhado, rascunho));
+      if (!rascunho) pdfPreparado.current = { retrato, promessa: Promise.resolve(pdf) };
+      const { blob } = pdf;
+      // O tamanho serve o ecrã do email, que confirma o anexo antes de ele
+      // seguir: aqui é MEDIDO, e não a estimativa que se mostra sem isto.
       setBytesDoPdf(blob.size);
-      // Descarregar o PDF (anexo) em vez de abrir numa aba nova: a CSP do site
-      // (object-src 'none', sem frame-src) bloqueia mostrar um blob:PDF numa aba
-      // ou iframe, o que fazia "não acontecer nada". Um download nunca é
-      // bloqueado e abre no leitor de PDF do dispositivo.
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       // O nome do ficheiro diz a língua. Gerar as duas versões é coisa que
       // acontece — ela manda a portuguesa aos pais e a inglesa ao casal — e com
       // o mesmo nome a segunda ficava «proposta-Ana (1).pdf» na pasta de
@@ -6738,21 +6783,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         },
         idiomaDoPdf,
       );
-      a.download = rascunho ? nome.replace(/\.pdf$/i, " (rascunho).pdf") : nome;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      guardarNoDisco(blob, rascunho ? nome.replace(/\.pdf$/i, " (rascunho).pdf") : nome);
       // O gerador SALTA a foto que não consegue ir buscar E CORTA o que não
       // cabe no desenho, por isso um PDF incompleto sai na mesma, com ar de
       // estar bem. Sem este aviso, a primeira pessoa a dar pela falta era o
       // cliente. O servidor conta as duas coisas e devolve-as nos cabeçalhos.
       // Só o PDF FINAL conta como visto — o rascunho é o que ainda não pode
       // seguir. Um PDF novo pede uma confirmação nova.
-      const chave = rascunho ? null : res.headers.get("X-Chave-Do-Pdf");
+      const chave = rascunho ? null : pdf.chave;
       if (chave) setPdfVisto({ chave, retrato, confirmado: false });
-      const emFalta = Number(res.headers.get("X-Fotos-Em-Falta") ?? "0");
-      const cortes = cortesDoCabecalho(res.headers.get("X-Conteudo-Cortado"));
+      const emFalta = pdf.emFalta;
+      const cortes = cortesDoCabecalho(pdf.cortes);
       const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
       if (aviso) {
         toast(`PDF gerado, mas ${aviso}. Verifica antes de enviar.`, "error");
@@ -6776,6 +6817,53 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * ── «DESCARREGAR PDF» DEPOIS DE ENVIADA ──────────────────────────────────
+   *
+   * Desenhava o documento outra vez (10 a 60 s), quando o PDF que seguiu já
+   * existe duas vezes: no estúdio, se foi o que ela viu antes de enviar (e
+   * tinha de ver — é a verificação antes do envio), e guardado no
+   * armazenamento pelo envio. Agora entrega o primeiro que houver, que é
+   * EXACTAMENTE o que o cliente recebeu; só se nenhum responder é que se
+   * desenha, como antes.
+   */
+  async function descarregarAEnviada() {
+    if (busy) return;
+    setBusy("preview");
+    let blob: Blob | null = null;
+    try {
+      const doEnvio = enviada.current;
+      blob = (await doEnvio?.pdf?.catch(() => null))?.blob ?? null;
+      if (!blob && doEnvio?.id) {
+        const res = await fetch(`/api/orcamento/${quote.id}/propostas/${doEnvio.id}/pdf`, {
+          cache: "no-store",
+        });
+        if (res.ok) blob = await res.blob();
+      }
+      if (blob) {
+        guardarNoDisco(
+          blob,
+          nomeDoFicheiroDaProposta(
+            {
+              escolhido: doc.nomeDoFicheiro,
+              clientNames: doc.clientNames,
+              eventDate: doc.eventDate,
+              ref: quote.id,
+            },
+            idiomaDoPdf,
+          ),
+        );
+        toast("PDF descarregado — o mesmo que seguiu para o cliente.", "success");
+      }
+    } catch {
+      blob = null;
+    } finally {
+      setBusy(null);
+    }
+    // Nada à mão e o guardado não respondeu: desenha-se, como antes.
+    if (!blob) await preview();
   }
 
   /**
@@ -6839,6 +6927,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         janelaDoWhatsApp = null;
       }
     }
+    // O retrato do que vai seguir: se o PDF desta versão já estiver à mão, é o
+    // ficheiro que o «Descarregar PDF» de depois do envio entrega.
+    const retratoDoEnvio = retratoDoPdf(stripPendingImages(doc), idiomaDoPdf);
     try {
       const comecou = Date.now();
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
@@ -6920,7 +7011,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // O envio também ensina a estimativa. Os bytes vêm do servidor: o PDF do
       // envio não passa pelo browser (segue em anexo), portanto sem esta linha
       // metade das gerações não ensinava nada.
-      if (typeof data?.pdfBytes === "number") {
+      if (typeof data?.pdfBytes === "number" && data?.pdfDaMemoria !== true) {
         apontarGeracao(totalDeFotos, Date.now() - comecou, data.pdfBytes);
       }
       // O link desta proposta, já pronto para o botão «Copiar resumo» — sem
@@ -7031,6 +7122,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // confirmação "Proposta enviada ✓" em vez do botão pronto a disparar.
       // Só quando há mesmo o que confirmar.
       if (saiu) {
+        enviada.current = {
+          id: typeof data?.id === "string" ? data.id : null,
+          pdf:
+            pdfPreparado.current?.retrato === retratoDoEnvio ? pdfPreparado.current.promessa : null,
+        };
         setSent(true);
         onSent?.();
       }
@@ -7548,6 +7644,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   );
   const pdfVistoAgora = !!pdfVisto && pdfVisto.retrato === retratoAgora;
   const pdfConfirmado = pdfVistoAgora && !!pdfVisto?.confirmado;
+  /**
+   * ── PREPARADO ANTES DE ELA CARREGAR ──────────────────────────────────────
+   *
+   * No passo «Rever e enviar», sem erros, o PDF final desta versão pede-se em
+   * segundo plano 1,5 s depois de ela parar de mexer — uma vez por versão.
+   * Quando ela carrega em «Descarregar o PDF final», ou já está pronto, ou já
+   * vai a meio; e o envio a seguir sai da memória do servidor em vez de o
+   * desenhar outra vez. Uma falha aqui não diz nada a ninguém: o botão volta a
+   * pedir, e é lá que um erro se mostra.
+   */
+  useEffect(() => {
+    if (step !== "enviar" || sent || temErros || fotosPorConfirmar > 0 || busy !== null) return;
+    if (!retratoAgora || pdfPreparado.current?.retrato === retratoAgora) return;
+    const espera = setTimeout(() => {
+      const desenhado = stripPendingImages(doc);
+      const retrato = retratoDoPdf(desenhado, idiomaDoPdf);
+      const promessa = pedirOPdfAgora.current(desenhado, false);
+      pdfPreparado.current = { retrato, promessa };
+      promessa.catch(() => {
+        if (pdfPreparado.current?.promessa === promessa) pdfPreparado.current = null;
+      });
+    }, 1500);
+    return () => clearTimeout(espera);
+  }, [step, sent, temErros, fotosPorConfirmar, busy, retratoAgora, doc, idiomaDoPdf]);
   /**
    * As faltas DO BOTÃO DE ENVIAR: as de cima mais «falta ver o PDF final».
    * Ficam separadas de propósito — o `temErros` decide se se descarrega o
@@ -12341,7 +12461,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               size="sm"
               variant="secondary"
               className="ml-auto"
-              onClick={() => preview()}
+              onClick={() => void descarregarAEnviada()}
               loading={busy === "preview"}
               disabled={busy !== null}
             >
@@ -14644,6 +14764,33 @@ function UploadArea({
  * noutra ordem, e uma comparação crua dava «mudou» sem nada ter mudado —
  * medido no browser, a confirmação nunca chegava a aparecer.
  */
+/** O PDF que o servidor devolveu, com o que veio nos cabeçalhos. */
+interface PdfPronto {
+  blob: Blob;
+  /** `X-Chave-Do-Pdf` — só no PDF final. */
+  chave: string | null;
+  emFalta: number;
+  /** `X-Conteudo-Cortado`, por ler. */
+  cortes: string | null;
+}
+
+/**
+ * Descarregar o PDF (anexo) em vez de abrir numa aba nova: a CSP do site
+ * (object-src 'none', sem frame-src) bloqueia mostrar um blob:PDF numa aba ou
+ * iframe, o que fazia «não acontecer nada». Um download nunca é bloqueado e
+ * abre no leitor de PDF do dispositivo.
+ */
+function guardarNoDisco(blob: Blob, nome: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function retratoDoPdf(doc: unknown, idioma: string): string {
   const canonico = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(canonico);

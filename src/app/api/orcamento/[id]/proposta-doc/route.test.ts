@@ -174,6 +174,7 @@ vi.mock("@/lib/envios-de-proposta", () => ({
 import { GET, POST } from "./route";
 import { sendMail } from "@/lib/mail";
 import { renderStoredEditorialPdfWithReport } from "@/lib/proposal-doc-render";
+import { esvaziarPdfsFinais } from "@/lib/proposal-preview-cache";
 import { createProposal, updateProposal } from "@/lib/proposals-store";
 import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 
@@ -253,6 +254,9 @@ function comChave(corpo: Record<string, unknown>): Record<string, unknown> {
 const params = Promise.resolve({ id: "q1" });
 
 beforeEach(() => {
+  // O PDF final de cada versão fica na memória do processo; entre casos
+  // esquece-se, para cada um desenhar o seu.
+  esvaziarPdfsFinais();
   created.last = null;
   updated.last = null;
   updated.estado = "pendente";
@@ -2617,5 +2621,64 @@ describe("POST /api/orcamento/[id]/proposta-doc — ver o PDF antes de enviar", 
       { params },
     );
     expect(res.status).toBe(200);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PDF FINAL DA MESMA VERSÃO DESENHA-SE UMA VEZ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Descarregar o PDF final», a preparação em segundo plano do estúdio e o envio
+ * a seguir são o mesmo documento. Antes desenhavam-se três vezes.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — o PDF final da mesma versão", () => {
+  beforeEach(() => {
+    renderMock.missing = 0;
+    renderMock.sequencia = [];
+    renderMock.truncations = [];
+  });
+
+  it("a segunda pré-visualização da mesma versão sai da memória, e di-lo", async () => {
+    const doc = baseDoc({ totalAmount: 1000 });
+    const primeira = await POST(previewReq(doc), { params });
+    expect(primeira.headers.get("X-Pdf-Da-Memoria")).toBeNull();
+    const segunda = await POST(previewReq(doc), { params });
+    expect(segunda.status).toBe(200);
+    expect(segunda.headers.get("X-Pdf-Da-Memoria")).toBe("1");
+    expect(segunda.headers.get("X-Chave-Do-Pdf")).toBe(primeira.headers.get("X-Chave-Do-Pdf"));
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("o envio a seguir à pré-visualização não volta a desenhar", async () => {
+    const doc = baseDoc({ totalAmount: 1000 });
+    await POST(previewReq(doc), { params });
+    const res = await POST(sendReq(doc, { porEmail: false }), { params });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.pdfDaMemoria).toBe(true);
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("uma vírgula a mais é outra versão, e desenha-se", async () => {
+    await POST(previewReq(baseDoc({ totalAmount: 1000 })), { params });
+    await POST(previewReq(baseDoc({ totalAmount: 1001 })), { params });
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("o rascunho desenha-se sempre", async () => {
+    const corpo = { mode: "preview", doc: baseDoc({ totalAmount: 1000 }), rascunho: true };
+    await POST(req(corpo), { params });
+    await POST(req(corpo), { params });
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("um desenho com fotografias em falta não fica: a seguinte tenta outra vez", async () => {
+    renderMock.missing = 1;
+    const doc = baseDoc({ totalAmount: 1000 });
+    await POST(previewReq(doc), { params });
+    const segunda = await POST(previewReq(doc), { params });
+    expect(segunda.headers.get("X-Pdf-Da-Memoria")).toBeNull();
+    expect(renderStoredEditorialPdfWithReport).toHaveBeenCalledTimes(2);
   });
 });

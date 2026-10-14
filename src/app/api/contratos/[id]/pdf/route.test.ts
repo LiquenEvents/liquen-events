@@ -61,6 +61,9 @@ describe("GET /api/contratos/[id]/pdf", () => {
     expect(res.headers.get("Content-Type")).toBe("application/pdf");
     expect(res.headers.get("Content-Disposition")).toContain("inline");
     expect(res.headers.get("Content-Disposition")).toContain("Contrato-Liquen-q-1.pdf");
+    // O tamanho à frente: é o que deixa o back office mostrar quanto já chegou.
+    const corpo = await res.arrayBuffer();
+    expect(res.headers.get("Content-Length")).toBe(String(corpo.byteLength));
   });
 
   /**

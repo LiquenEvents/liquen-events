@@ -10019,3 +10019,40 @@ describe("ver o PDF final antes de enviar", () => {
     expect(screen.queryByRole("checkbox", { name: "Vi a proposta e está tudo certo" })).toBeNull();
   });
 });
+
+/**
+ * DESCARGAS MAIS RÁPIDAS (14/10): o PDF final prepara-se em segundo plano no
+ * passo «Rever e enviar», e o botão entrega-o sem pedir outro; depois de
+ * enviada, «Descarregar PDF» entrega o que seguiu sem o desenhar outra vez.
+ */
+describe("o PDF final preparado antes de ela carregar", () => {
+  const descargas = () =>
+    corpos("proposta-doc", "POST").filter((c) => c.includes('"mode":"preview"'));
+
+  it("prepara-se sozinho no último passo, e o botão não pede outro", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await waitFor(() => expect(descargas()).toHaveLength(1), { timeout: 4000 });
+    await user.click(screen.getByRole("button", { name: "Descarregar o PDF final" }));
+    await screen.findByRole("checkbox", { name: "Vi a proposta e está tudo certo" });
+    expect(descargas()).toHaveLength(1);
+  });
+
+  it("depois de enviada, «Descarregar PDF» entrega o que seguiu sem o desenhar outra vez", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    await verEConfirmar();
+    const enviar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    await waitFor(() => expect(enviar).toBeEnabled());
+    await user.click(enviar);
+    await confirmarEnvio(user);
+    const descarregar = await screen.findByRole("button", { name: "Descarregar PDF" });
+    await user.click(descarregar);
+    await screen.findByText(/o mesmo que seguiu para o cliente/);
+    expect(descargas()).toHaveLength(0);
+  });
+});

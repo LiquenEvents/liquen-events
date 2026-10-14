@@ -16,7 +16,7 @@ A 10/10 ela pôs «Ver as enviadas» e a A1 à frente da A2. A 11/10 pediu
 | B1 — lista do que falta e bloqueio | **feito** (entrega 1) | `proposal-progress.ts`, `conferencia.ts`, `ProposalStudio.tsx`, rota `proposta-doc` |
 | A2 — cinco passos | **feito** (entrega 2) | `passos-do-estudio.ts`, `ProposalStudio.tsx`, `NavEstudio.tsx`, `FazerProposta.tsx` |
 | C1 — medir | **feito** (os números estão no plano da entrega 3) | |
-| C2 / C3 — rapidez e progresso | por fazer | |
+| C2 / C3 — rapidez e progresso | **parcial** (pedido de 14/10, «descargas no back office») — o PDF final de cada versão desenha-se uma vez (o «Descarregar o PDF final», o que o estúdio prepara em segundo plano no último passo e o envio a seguir saem do mesmo desenho); depois de enviada, «Descarregar PDF» entrega o que seguiu sem desenhar; as fotografias reduzidas a 1 800 px ficam em memória. Ficam por fazer as caixas tratadas guardadas, a versão de 1 800 px guardada ao carregar, e o progresso por página (C3) | `proposal-preview-cache.ts`, `cache-por-bytes.ts`, `proposal-doc-render.ts` (`fotoEditorial`), rota `proposta-doc` (`X-Pdf-Da-Memoria`), `ProposalStudio.tsx` (`pdfPreparado`, `descarregarAEnviada`) |
 | A1 — pré-visualização real | por fazer | |
 | A3 / A4 — papel e resolução das fotografias | por fazer | |
 | D1 — pedidos duplicados | por fazer | |

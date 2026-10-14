@@ -247,6 +247,21 @@ describe("GET /api/backup", () => {
     expect(json.incomplete).toEqual(["proposalDrafts"]);
   });
 
+  /**
+   * A cópia sai sem espaços (mais pequena, mais depressa no telemóvel) e com o
+   * tamanho à frente, para o back office mostrar quanto já chegou. É o mesmo
+   * JSON: o restauro lê-o igual.
+   */
+  it("sai sem espaços, com o tamanho certo, e lê-se igual", async () => {
+    const res = await GET(get());
+    const texto = await res.text();
+    expect(texto).not.toMatch(/\n\s/);
+    expect(res.headers.get("Content-Length")).toBe(String(Buffer.byteLength(texto, "utf8")));
+    const lida = JSON.parse(texto);
+    expect(lida).toEqual(JSON.parse(JSON.stringify(lida, null, 2)));
+    expect(lida.counts).toBeDefined();
+  });
+
   it("sets a downloadable JSON Content-Disposition/Content-Type", async () => {
     const res = await GET(get());
     expect(res.headers.get("Content-Type")).toContain("application/json");
