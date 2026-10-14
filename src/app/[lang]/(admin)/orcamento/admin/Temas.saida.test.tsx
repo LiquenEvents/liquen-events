@@ -246,7 +246,9 @@ async function abrirAPasta() {
 describe("dentro de um tema, as duas caixas ficam montadas a sair", () => {
   it("o visualizador fica a apagar-se depois de o `zoomAt` cair", async () => {
     await abrirAPasta();
-    fireEvent.click(await screen.findByRole("button", { name: /Ver a foto 1 em grande/ }));
+    // A lupa abre-se pelo «⋯» da foto → «Pré-visualizar» (14/10).
+    fireEvent.click(await screen.findByRole("button", { name: "Acções da foto 1 de 1" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Pré-visualizar" }));
     const lupa = await screen.findByRole("dialog", { name: "Foto 1 de 1" });
     // Controlo negativo: aberto, cobre o ecrã, entra com a palavra da casa e
     // apanha os toques da grelha que está por baixo.
