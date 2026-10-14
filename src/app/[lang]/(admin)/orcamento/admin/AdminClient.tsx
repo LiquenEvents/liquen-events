@@ -5234,8 +5234,18 @@ export default function AdminClient({
             /* No telemóvel a cápsula ocupa a faixa toda e reparte-a por
                quatro (`flex-1`). No computador tem DOZE destinos lá dentro e
                não pode esticar-se de margem a margem: mede o que tem
-               (`lg:flex-none`), e se um dia não couber, rola por dentro em vez
-               de rebentar a cápsula (`lg:overflow-x-auto`). */
+               (`lg:flex-initial`), e se um dia não couber, rola por dentro em vez
+               de rebentar a cápsula (`lg:overflow-x-auto`).
+
+               ── `flex-initial` E NÃO `flex-none` ─────────────────────────
+               Era `lg:flex-none`, e o `lg:max-w-full` parecia bastar. Não
+               bastava: o máximo é a largura do PAI, e o pai tem mais um botão
+               ao lado. Com o «Mapa de mesas» a barra passou a treze destinos
+               e, medido a 1024 px, a cápsula tinha 966 px + 72 do botão + o
+               intervalo, num pai de 1000 — saía 11 px pela esquerda (o
+               `o-nome-do-destino-cabe-na-celula` apanhou-o). Com `flex-initial`
+               ela pode encolher, e quando encolhe é o `overflow-x-auto` que
+               trabalha, como este comentário sempre prometeu. */
             /* ── O GRAU FINO DO MATERIAL, E O QUE ELE CUSTOU A GANHAR ────────
                «eu quero que esteja aquele liquid glass transparente como é
                mesmo no macOS, como é no Instagram, como é no WhatsApp.» Fui
@@ -5258,7 +5268,7 @@ export default function AdminClient({
                recuos que devolvem uma superfície opaca a quem não tem
                `backdrop-filter`, a quem pediu menos transparência e a quem
                pediu mais contraste. O grau fino só redefine dois tokens. */
-            className="bo-material bo-material-desfoque bo-material-fino bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] lg:flex-none lg:max-w-full lg:overflow-x-auto"
+            className="bo-material bo-material-desfoque bo-material-fino bo-material-pilula pointer-events-auto flex min-w-0 flex-1 items-stretch p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)] lg:flex-initial lg:max-w-full lg:overflow-x-auto"
             style={{ height: "var(--bo-barra-capsula)" }}
           >
             {/* ── QUATRO NO TELEMÓVEL, TODOS NO COMPUTADOR ─────────────────
