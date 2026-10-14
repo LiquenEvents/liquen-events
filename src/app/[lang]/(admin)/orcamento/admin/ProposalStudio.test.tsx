@@ -407,6 +407,16 @@ async function verEConfirmar() {
   fetchMock.mock.calls.splice(0, fetchMock.mock.calls.length, ...chamadas);
 }
 
+/**
+ * A barra larga do «Rever e enviar» numa linha (14/10, «melhora isto
+ * drasticamente»): o que a caixa vermelha e a frase do inglês diziam abre-se da
+ * pastilha do estado, num painel por cima dela.
+ */
+async function abrirPastilhaDoEnvio(): Promise<HTMLElement> {
+  fireEvent.click(await screen.findByRole("button", { name: /^Antes de enviar:/ }));
+  return await screen.findByRole("dialog", { name: "Antes de enviar" });
+}
+
 function corpos(parte: string, metodo = "PUT"): string[] {
   return pedidos
     .filter((p) => p.url.includes(parte) && (p.init?.method ?? "GET") === metodo)
@@ -5234,17 +5244,18 @@ describe("gerar a proposta em inglês", () => {
    * «Português» escolhido fica uma linha; com «Inglês», abre inteira, porque
    * aí é a consequência do que ela acabou de fazer.
    */
-  it("com português, a explicação do inglês não gasta cinco linhas da barra", async () => {
+  it("a explicação do inglês já não ocupa a barra: abre-se da pastilha", async () => {
     seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
 
-    // A versão de uma linha, que é a única à vista — em qualquer ecrã desde
-    // que ela pediu as barras «muito mais finas».
-    expect(screen.getByText("Em inglês muda a moldura do documento.")).toBeTruthy();
-    // A longa continua lá para quem ouve o ecrã, mas não ocupa a barra.
-    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("sr-only");
+    // A barra larga é uma linha só (14/10): a frase não está nela.
+    expect(screen.queryByText("Em inglês muda a moldura do documento.")).toBeNull();
+    expect(screen.queryByText(/Da tua prosa sai em inglês/)).toBeNull();
+    // Está no painel da pastilha, inteira.
+    const painel = await abrirPastilhaDoEnvio();
+    expect(within(painel).getByText(/Da tua prosa sai em inglês/)).toBeVisible();
   });
 
   it("escolhido o inglês, a explicação abre inteira em qualquer ecrã", async () => {
@@ -5257,16 +5268,12 @@ describe("gerar a proposta em inglês", () => {
     // do idioma não fazer diferença nenhuma a este parágrafo. Por isso o que
     // se compara é o antes e o depois da mesma renderização: sem esta linha, o
     // teste passava por vacuidade contra o código que ele existe para apanhar.
-    const paragrafo = () => screen.getByText(/Da tua prosa sai em inglês/).closest("p")!;
-    const emPortugues = paragrafo().textContent;
-
     const grupo = screen.getByRole("radiogroup", { name: "Idioma da proposta" });
     await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
 
-    expect(paragrafo().textContent).not.toBe(emPortugues);
-    // A linha curta desaparece — deixou de ser um resumo, passou a ser o caso.
-    expect(screen.queryByText("Em inglês muda a moldura do documento.")).toBeNull();
-    expect(screen.getByText(/Da tua prosa sai em inglês/).className).not.toContain("hidden");
+    // Com o inglês escolhido, o painel da pastilha diz inteiro o que muda.
+    const painel = await abrirPastilhaDoEnvio();
+    expect(within(painel).getByText(/Da tua prosa sai em inglês/)).toBeVisible();
   });
 
   it("o caminho por omissão fica intacto: «pt», e o ficheiro chama-se proposta-…", async () => {
@@ -5345,8 +5352,9 @@ describe("gerar a proposta em inglês", () => {
     const user = userEvent.setup();
     await irParaPrever(user);
 
-    // Está no ecrã ANTES de se escolher fosse o que fosse.
-    const ressalva = screen.getByText(/Em inglês sai a moldura do documento/);
+    // Está a um toque (o painel da pastilha) ANTES de se escolher o que fosse.
+    const painel = await abrirPastilhaDoEnvio();
+    const ressalva = within(painel).getByText(/Em inglês sai a moldura do documento/);
     expect(ressalva).toBeInTheDocument();
     // E diz, com todas as letras, que a data não vai traduzida.
     expect(ressalva.textContent).toMatch(/data/i);
@@ -5494,7 +5502,7 @@ describe("gerar a proposta em inglês", () => {
   it("no «Rever e enviar» há um selector da língua só", async () => {
     seedDraftEmIngles(1);
     renderStudio("Rever e enviar");
-    await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
+    await screen.findByRole("button", { name: /Gerar e enviar ao cliente|Ver o PDF final/ });
     expect(screen.getAllByRole("radiogroup", { name: "Idioma da proposta" })).toHaveLength(1);
   });
 
@@ -6039,7 +6047,9 @@ describe("os avisos da proposta inglesa", () => {
     const contador = /ainda não têm versão inglesa/i;
     expect(screen.queryByText(contador)).toBeNull();
     await escolherIngles(user);
-    await waitFor(() => expect(screen.getByText(contador)).toBeTruthy());
+    // No ecrã largo o contador vive no painel da pastilha (14/10).
+    const painel = await abrirPastilhaDoEnvio();
+    await waitFor(() => expect(within(painel).getByText(contador)).toBeTruthy());
   });
 
   it("a ressalva já não promete que a prosa dela fica toda como está", async () => {
@@ -6047,7 +6057,8 @@ describe("os avisos da proposta inglesa", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    const ressalva = screen.getByText(/Em inglês sai a moldura do documento/i);
+    const painel = await abrirPastilhaDoEnvio();
+    const ressalva = within(painel).getByText(/Em inglês sai a moldura do documento/i);
     expect(ressalva.textContent).toMatch(/caixas «EN»/);
     expect(ressalva.textContent).not.toMatch(/ficam como os escreveste/);
   });
@@ -9847,8 +9858,9 @@ describe("a barra do envio, numa caixa estreita", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    const enviar = await screen.findByRole("button", { name: "Gerar e enviar ao cliente" });
-    expect(enviar).toHaveTextContent(/^Enviar/);
+    // Só falta ver o PDF: o botão guia esse passo (14/10), curto no telemóvel.
+    const enviar = await screen.findByRole("button", { name: "Ver o PDF final" });
+    expect(enviar).toHaveTextContent(/^Ver o PDF/);
     expect(screen.getByRole("button", { name: "Voltar a Orçamento" })).toBeInTheDocument();
     // Fora da folha não há língua, nem descarregar, nem lista.
     expect(screen.queryByRole("radiogroup", { name: "Idioma da proposta" })).toBeNull();
@@ -9875,7 +9887,7 @@ describe("a barra do envio, numa caixa estreita", () => {
       const user = userEvent.setup();
       await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
       const enviar = await screen.findByRole("button", {
-        name: "Gerar e enviar ao cliente",
+        name: "Ver o PDF final",
         hidden: true,
       });
       await waitFor(() => expect(enviar.closest("[inert]")).not.toBeNull());
@@ -9896,14 +9908,16 @@ describe("ver o PDF final antes de enviar", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
-    const enviar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
-    expect(enviar).toBeDisabled();
-    expect(screen.getByText(/Falta ver o PDF final/)).toBeInTheDocument();
+    // Só falta ver o PDF: o botão principal guia esse passo em vez de estar
+    // apagado (14/10), e a pastilha diz o que falta.
+    expect(await screen.findByRole("button", { name: "Ver o PDF final" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Antes de enviar: Ver o PDF/ })).toBeInTheDocument();
 
+    // O caminho pela caixa do corpo do passo continua a valer.
     await user.click(screen.getByRole("button", { name: "Descarregar o PDF final" }));
     const caixa = await screen.findByRole("checkbox", { name: "Vi a proposta e está tudo certo" });
-    expect(enviar).toBeDisabled();
     await user.click(caixa);
+    const enviar = await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ });
     await waitFor(() => expect(enviar).toBeEnabled());
 
     // Fica no histórico do pedido quem verificou.
@@ -9916,6 +9930,48 @@ describe("ver o PDF final antes de enviar", () => {
       expect(
         corpos("proposta-doc", "POST").some((c) => c.includes('"pdfVisto":"chave-de-teste"')),
       ).toBe(true),
+    );
+  });
+
+  it("o botão guia: «Ver o PDF final», depois «Está certo — enviar», e o envio leva a chave", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+
+    await user.click(await screen.findByRole("button", { name: "Ver o PDF final" }));
+    const confirmar = await screen.findByRole("button", { name: /Está certo — enviar/ });
+    await user.click(confirmar);
+
+    // Ficou registado que viu e confirmou, e abriu a pergunta de sempre.
+    await waitFor(() =>
+      expect(corpos(`/api/orcamento/${quote.id}`, "PATCH").join("\n")).toContain(
+        "proposal_reviewed",
+      ),
+    );
+    await confirmarEnvio(user);
+    await waitFor(() =>
+      expect(
+        corpos("proposta-doc", "POST").some((c) => c.includes('"pdfVisto":"chave-de-teste"')),
+      ).toBe(true),
+    );
+  });
+
+  it("no ecrã largo, a falta do PDF salta para a caixa «Antes de enviar»", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    const painel = await abrirPastilhaDoEnvio();
+    expect(within(painel).getByText(/Vai para/)).toBeInTheDocument();
+    // A caixa vermelha já não está na barra; está no painel.
+    expect(within(painel).getByText(/Não dá para enviar/)).toBeInTheDocument();
+    const caixa = document.querySelector('[data-campo="pdf-visto"]');
+    expect(caixa).not.toBeNull();
+    await user.click(within(painel).getByRole("button", { name: /Falta ver o PDF final/ }));
+    // O painel fecha-se ao saltar.
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Antes de enviar" })).toBeNull(),
     );
   });
 
@@ -9934,7 +9990,12 @@ describe("ver o PDF final antes de enviar", () => {
         name: /Inglês/,
       }),
     );
-    await waitFor(() => expect(enviar).toBeDisabled());
+    // Já não se pode enviar: a versão inglesa não foi vista (e, neste rascunho,
+    // tem campos por traduzir — por isso o botão fica apagado em vez de guiar).
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeDisabled(),
+    );
+    expect(screen.getByRole("button", { name: /^Antes de enviar:/ })).toHaveTextContent(/Falta/);
     // A confirmação da versão portuguesa não vale para a inglesa.
     expect(screen.queryByRole("checkbox", { name: "Vi a proposta e está tudo certo" })).toBeNull();
   });

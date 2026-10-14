@@ -44,7 +44,18 @@ algo inteligente que se adapte». Numa caixa com menos de 640 px, a barra fica c
 uma linha: «←», uma pastilha com o estado («Faltam 3 ›», «Ver o PDF ›»,
 «PT · pronto ›») e «Enviar». A pastilha abre uma folha com o resto — o «Vai
 para», o que falta, a língua e o descarregar. Com o teclado aberto, a barra sai
-da frente. No ecrã largo fica como estava (`BarraDoEnvioCompacta.tsx`).
+da frente (`BarraDoEnvioCompacta.tsx`).
+
+**E no ecrã largo também passa a uma linha** (14/10, com a captura do cartão de
+três andares: «melhora isto drasticamente»). Ela escolheu «uma linha só»: «←»,
+a MESMA pastilha do estado — que no computador abre um painel por cima dela com
+«Vai para», o que falta (cada falta salta para onde se resolve) e o que o inglês
+muda —, a língua (PT · EN), o canal só com os logótipos, o PDF e o botão. E «o
+botão guia»: quando a única coisa que falta é ver o PDF final, o botão diz «Ver
+o PDF final» e, depois de descarregado, «Está certo — enviar», que regista a
+confirmação e abre a pergunta de sempre. A caixa «Antes de enviar» do corpo do
+passo continua, e a falta «ver o PDF» passou a saltar para ela (antes ia dar ao
+«Por onde segue»).
 
 Tudo o resto do documento vale como está escrito, com uma segunda ressalva, que
 veio depois:

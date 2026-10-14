@@ -553,6 +553,10 @@ export function oQueFaltaParaEnviar(
     faltas.push({
       id: "visto",
       seccao: "envio",
+      // O salto leva à caixa «Antes de enviar», onde o PDF se descarrega e se
+      // confirma — e não ao «Por onde segue», que é o que o `#seccao-envio`
+      // apanhava sozinho (achado de 14/10).
+      campo: "pdf-visto",
       texto: "Falta ver o PDF final e confirmar que está tudo certo",
       trava: true,
     });

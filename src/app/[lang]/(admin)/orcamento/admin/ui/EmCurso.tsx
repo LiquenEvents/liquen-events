@@ -162,6 +162,12 @@ export interface EmCursoProps {
   pronto?: ReactNode;
   /** A contagem é em BYTES: escreve-se «1,2 de 5,1 MB» e não «1258291 de…». */
   emBytes?: boolean;
+  /**
+   * Numa linha só, sem cartão: o ponto, a frase e a barra ao lado. É a forma
+   * das barras finas (o «Rever e enviar» no ecrã largo, 14/10), onde um cartão
+   * de três linhas partia a barra em duas. As notas não cabem e não se dizem.
+   */
+  emLinha?: boolean;
   className?: string;
 }
 
@@ -177,6 +183,7 @@ export function EmCurso({
   concluido = false,
   pronto = "Pronto",
   emBytes = false,
+  emLinha = false,
   className,
 }: EmCursoProps) {
   const decorrido = useDecorrido(!concluido);
@@ -189,6 +196,54 @@ export function EmCurso({
   const demorada =
     !concluido && !sabida && !!notaDemorada && esperaDemorada(decorrido, estimadoMs ?? 0);
   const temBarra = concluido || sabida || (estimadoMs ?? 0) > 0;
+
+  if (emLinha) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className={cn(
+          "flex min-w-0 items-center gap-2 text-xs font-medium text-sage-600",
+          className,
+        )}
+      >
+        {concluido ? (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 12 12"
+            data-em-curso="visto"
+            className={`h-3 w-3 shrink-0 ${MOLA_DE_MARCAR}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m2.5 6.5 2.2 2.2 4.8-5" />
+          </svg>
+        ) : (
+          <span
+            aria-hidden="true"
+            data-em-curso="pulso"
+            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 ${PULSO}`}
+          />
+        )}
+        <span className="min-w-0 truncate">{concluido ? pronto : titulo}</span>
+        {temBarra && (
+          <span
+            aria-hidden="true"
+            className="block h-1 w-20 shrink-0 overflow-hidden rounded-full bg-sage-600/15"
+          >
+            <span
+              data-barra="preenchimento"
+              className={`block h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
+              style={{ transform: `scaleX(${avanco})` }}
+            />
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
